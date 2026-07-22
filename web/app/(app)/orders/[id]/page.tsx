@@ -234,9 +234,13 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
+      {/* min-w-0 on both tracks: a grid item's automatic minimum size is its MIN-CONTENT
+          width, so a long unbroken order/SKU string holds the 1.6fr track open and pushes
+          the whole grid past its container — the page then scrolls sideways. There was
+          slack to absorb it at 1600px; at the reading width there isn't. */}
       <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
         {/* items + timeline */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <SectionCard title={`Items (${items.length})`}>
             {items.length === 0 ? (
               <div className="p-6 text-sm text-muted-foreground">No line items on this order.</div>
@@ -394,7 +398,7 @@ export default function OrderDetailPage() {
         </div>
 
         {/* summary */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <SectionCard title="Customer">
             <div className="space-y-3 p-5 text-sm">
               <div>

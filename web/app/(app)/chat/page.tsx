@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, type ChatEntry, type SellerMatch, type SupportThread } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown } from "@/components/app/markdown"
+import { FullBleed } from "@/components/app/full-bleed"
 
 const nowMs = () => Date.now()
 const fmtTime = (ts?: number) => {
@@ -277,11 +278,12 @@ export default function ChatPage() {
   }
 
   return (
-    // One height for everyone: staff and sellers both render this through the same shell
-    // (topbar 3.5rem + main py-6 = 6.5rem, plus a little slack). The staff branch used
-    // to subtract only the topbar, so the pane ran 3rem taller than its space — the
-    // PAGE scrolled and the composer fell below the fold. min-h-0 lets the inner panes
-    // own their own scrolling instead of growing the container as threads are added.
+    <FullBleed reason="Two-pane messaging fixed to the viewport height — the thread list and conversation split the width.">
+    {/* One height for everyone: staff and sellers both render this through the same shell
+        (topbar 3.5rem + main py-6 = 6.5rem, plus a little slack). The staff branch used
+        to subtract only the topbar, so the pane ran 3rem taller than its space — the
+        PAGE scrolled and the composer fell below the fold. min-h-0 lets the inner panes
+        own their own scrolling instead of growing the container as threads are added. */}
     <div className="flex h-[calc(100svh-7rem)] min-h-0 gap-4">
       {/* conversation rail */}
       <aside className="hidden w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card md:flex">
@@ -512,5 +514,6 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+    </FullBleed>
   )
 }

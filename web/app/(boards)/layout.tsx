@@ -49,7 +49,9 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
       <StaffSidebar />
       <div className="md:pl-60">
         <TopBar />
-        <main className="mx-auto max-w-[1600px] px-4 py-5 md:px-8 md:py-6">{children}</main>
+        {/* eg-content caps the column at a reading width; a board that is a table opts out
+            with <FullBleed> and gets the old 1600px. See app/globals.css. */}
+        <main className="eg-content mx-auto px-4 py-5 md:px-8 md:py-6">{children}</main>
       </div>
     </div>
     </ConfirmProvider>

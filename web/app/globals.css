@@ -138,6 +138,22 @@
     }
 }
 
+/* Reading-width cap for the app + board shells.
+   Non-tabular content stops being readable long before it stops fitting. A
+   `justify-between` row inside a 1600px column throws its label to the far left and its
+   value to the far right with a dead middle, so related things stop looking related —
+   and it gets WORSE on a bigger monitor, which is backwards. Cap the column at a
+   reading width and let the extra space become margin instead.
+
+   Tables are the exception: orders, shipments, ledger and inventory genuinely want the
+   room, and capping them reintroduces horizontal scrolling — a worse bug than the one
+   this fixes. Such a page opts out by wrapping itself in <FullBleed reason="…">
+   (components/app/full-bleed.tsx), which drops a `data-full-bleed` marker into the
+   subtree; `:has()` lets the shell notice it without a prop threaded through the tree.
+   The opt-out is per page and states its reason at the call site. */
+.eg-content { max-width: 1100px; }
+.eg-content:has([data-full-bleed]) { max-width: 1600px; }
+
 /* Print — only the label sheet (Inventory → Print labels, Orders → Labels).
    The sheet is portalled to <body> (see label-sheet.tsx) precisely so we can
    display:none its siblings. The previous rule used `visibility:hidden`, which hides

@@ -68,7 +68,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <StaffSidebar />
         <div className="md:pl-60">
           <TopBar />
-          <main className="mx-auto max-w-[1600px] px-4 py-5 md:px-8 md:py-6">
+          {/* eg-content caps the column at a reading width; a page that is a table opts
+              out with <FullBleed> and gets the old 1600px. See app/globals.css. */}
+          <main className="eg-content mx-auto px-4 py-5 md:px-8 md:py-6">
             <PageTransition>{children}</PageTransition>
           </main>
         </div>
@@ -83,7 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="md:pl-60">
         <TopBar />
-        <main className="mx-auto max-w-[1600px] space-y-4 px-4 py-5 md:px-8 md:py-6">
+        <main className="eg-content mx-auto space-y-4 px-4 py-5 md:px-8 md:py-6">
           {/* Seller-only, and above the page rather than on one screen: a short wallet
               stops an order being submitted from ANYWHERE, so a warning that only appears
               on the wallet page arrives after the refusal it was meant to prevent.
