@@ -197,20 +197,67 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
   app.get('/api/catalog/lookbook', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
 
-    // Our own products.
-    const mine = (await q(
+    const mineRows = (await q(
       `select data, catalog_price from catalog_products where in_catalog = true order by created_at desc`
-    ).catch(() => ({ rows: [] }))).rows.map((row) => {
+    ).catch(() => ({ rows: [] }))).rows;
+
+    /**
+     * PREFER THE SUPPLIER'S PHOTOGRAPHY over whatever was uploaded on our product.
+     *
+     * A product's own image is whatever someone attached while setting it up — a phone
+     * photo, a mockup, in one case a screenshot. S&S ship real studio shots per colourway,
+     * already synced, and this document goes to a buyer who is deciding by looking.
+     *
+     * The link is by SKU CONVENTION: our ids are prefixed by supplier, so SS-16468 is
+     * their style 16468. Matched on the stripped id only — an exact key, never a fuzzy
+     * name match, because putting the wrong garment's photo in a catalogue is worse than
+     * printing our own mediocre one. No match falls back to ours.
+     */
+    const styleIdOf = (sku) => {
+      const v = String(sku || '').trim();
+      const m = v.match(/^(?:SS|OTTO)-(.+)$/i);
+      return (m ? m[1] : v).trim();
+    };
+    const wanted = mineRows.map((r) => styleIdOf((r.data || {}).sku)).filter(Boolean);
+    const supplierArt = new Map();
+    if (wanted.length) {
+      const ar = await q(
+        `select style_id,
+                max(image) filter (where image is not null and image <> '') as image
+           from ss_products where style_id = any($1::text[]) group by style_id`, [wanted]
+      ).catch(() => ({ rows: [] }));
+      for (const row of ar.rows) supplierArt.set(row.style_id, ssImgUrl(row.image));
+
+      const cr = await q(
+        `select distinct on (style_id, color) style_id, color, sku, image
+           from ss_products
+          where style_id = any($1::text[]) and color is not null and color <> ''
+          order by style_id, color, (image is null), sku`, [wanted]
+      ).catch(() => ({ rows: [] }));
+      for (const row of cr.rows) {
+        const key = 'c:' + row.style_id;
+        if (!supplierArt.has(key)) supplierArt.set(key, []);
+        supplierArt.get(key).push({ name: row.color, sku: row.sku, image: ssImgUrl(row.image) });
+      }
+    }
+
+    const mine = mineRows.map((row) => {
       const d = sellerSafe(row.data) || {};
       const ci = (d.colorImages && typeof d.colorImages === 'object') ? d.colorImages : {};
+      const sid = styleIdOf(d.sku);
+      const supplierColours = supplierArt.get('c:' + sid);
       return {
         ref: String(d.id ?? d.sku ?? ''), name: d.name || '', sku: d.sku || '',
         description: d.description || '', brand: d.brand || '',
-        image: d.image || d.img || '',
+        image: supplierArt.get(sid) || d.image || d.img || '',
         price: row.catalog_price == null ? null : Number(row.catalog_price),
         sizes: Array.isArray(d.sizes) ? d.sizes
           : (Array.isArray(d.sizePrices) ? d.sizePrices.map((t) => t && t.size).filter(Boolean) : []),
-        colors: Object.keys(ci).map((name) => ({ name, sku: '', image: ci[name] || '' })),
+        // Supplier colourways when we can match the style — they carry a real photo AND an
+        // orderable sku per colour, which our colorImages map has no room for.
+        colors: (supplierColours && supplierColours.length)
+          ? supplierColours
+          : Object.keys(ci).map((name) => ({ name, sku: '', image: ci[name] || '' })),
       };
     });
 
