@@ -1,18 +1,48 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { setSession } from "@/lib/auth"
+import { getToken, getUser, setSession } from "@/lib/auth"
 import { API_BASE } from "@/lib/api"
 import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
 
+/**
+ * Where to go after signing in.
+ *
+ * Only same-origin relative paths are honoured. A `next` that is a full URL, or
+ * protocol-relative ("//evil.example"), is an open redirect: an attacker sends
+ * /login?next=//their-site, the victim signs in on the real page, and gets bounced to a
+ * copy asking them to "sign in again". Requiring a single leading slash rules both out.
+ */
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null
+  return raw
+}
+
 export default function LoginPage() {
   const router = useRouter()
+  const [next, setNext] = useState<string | null>(null)
+
+  // Read the intended destination, and skip the form entirely for someone who already
+  // has a session — arriving at a login page you don't need is the failure this fixes.
+  // Deferred: localStorage doesn't exist during the prerender.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const want = safeNext(new URLSearchParams(window.location.search).get("next"))
+      setNext(want)
+      if (getToken()) {
+        const role = getUser()?.role
+        router.replace(want ?? landingFor(typeof role === "string" ? role : null))
+      }
+    }, 0)
+    return () => clearTimeout(id)
+  }, [router])
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +71,7 @@ export default function LoginPage() {
       const user = (j.user ?? j.data?.user ?? {}) as Record<string, unknown>
       if (!token) throw new Error("No session token returned")
       setSession(token, user)
-      router.push(landingFor(typeof user.role === "string" ? user.role : null))
+      router.push(next ?? landingFor(typeof user.role === "string" ? user.role : null))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed")
     } finally {
@@ -94,7 +124,15 @@ export default function LoginPage() {
           {/* The divider lives INSIDE GoogleSignIn — when Google isn't configured the
               button renders nothing, and a lone "or" above empty space read as a
               broken button. */}
-          <GoogleSignIn onSuccess={() => router.push("/dashboard")} onError={setError} />
+          {/* Same destination rule as the password path — Google sign-in used to always
+              land on /dashboard, which is wrong for staff and ignores `next`. */}
+          <GoogleSignIn
+            onSuccess={() => {
+              const role = getUser()?.role
+              router.push(next ?? landingFor(typeof role === "string" ? role : null))
+            }}
+            onError={setError}
+          />
 
           <div className="flex items-center justify-between text-xs">
             <Link href="/forgot-password" className="font-medium text-muted-foreground hover:text-foreground">

@@ -128,9 +128,14 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
           ))}
           <span className="ml-auto flex items-center gap-1">
             <CopyButton text={code} label={`${e.title} request`} />
-            {/* The docs can show the call; only the playground can send it. */}
+            {/* Through /login, not straight at /developers.
+                These docs are PUBLIC, so most people clicking this have no session, and
+                pointing them at an authenticated board meant landing on someone else's
+                dashboard or a bare redirect that lost the endpoint. Login sends an
+                existing session straight on without showing the form, and routes by role
+                afterwards — so a seller lands on their board, not an admin one. */}
             <a
-              href={`/developers?endpoint=${e.id}`}
+              href={`/login?next=${encodeURIComponent(`/developers?endpoint=${e.id}`)}`}
               className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
             >
               Try it <ArrowSquareOut size={11} weight="bold" />
