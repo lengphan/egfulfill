@@ -12,6 +12,11 @@ const STAFF_ITEMS: StaffNavItem[] = [
   // Dispatch = orders leaving the building (batch, print, scan out). Distinct from Scan,
   // which is the stock-in/out station for inventory.
   { label: "Dispatch", href: "/dispatch", icon: Truck, roles: ["operator", "warehouse", "admin"] },
+  // Shipments sits BESIDE Dispatch, not inside it. Dispatch is a work queue — what's left
+  // to scan today, read by the floor, empty by evening. This is the archive: every parcel
+  // that ever got a tracking number, searched by whoever is on the phone to a buyer. A
+  // growing list nobody works through does not belong underneath a short list they do.
+  { label: "Shipments", href: "/shipments", icon: Package, roles: ["operator", "warehouse", "admin"] },
   // Operator sees Scan READ-ONLY: stock movements are the warehouse's claim about
   // physical custody, but an operator needs to look up what's on hand.
   { label: "Scan", href: "/scan", icon: Barcode, roles: ["operator", "warehouse", "admin"] },
