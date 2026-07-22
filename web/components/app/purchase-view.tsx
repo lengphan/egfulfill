@@ -512,6 +512,10 @@ export function PurchaseView() {
   // takes to reach us. Together they answer what the blank space was leaving unsaid: not
   // "is there stock" but WHERE, and whether pulling from there costs a day.
   const [stock, setStock] = useState<Record<string, { total: number; warehouses: { abbr: string; qty: number }[] }>>({})
+  // Per-warehouse quantities, keyed "sku:ABBR". Empty everywhere = today's behaviour:
+  // autoselectWarehouse stays on and S&S split the line themselves. The server refuses the
+  // contradiction of picks WITH autoselect on, so this drives that flag too.
+  const [split, setSplit] = useState<Record<string, string>>({})
   const [transit, setTransit] = useState<Record<string, { days: number | null; cutOff: string }>>({})
 
   const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null; image?: string | null; variant?: string | null }>>({})
@@ -1115,17 +1119,58 @@ export function PurchaseView() {
                                 const t = transit[w.abbr]
                                 const eta = warehouseEta(t?.days ?? null, t?.cutOff ?? null, new Date(now || Date.now()))
                                 const covers = w.qty >= num(l.qty)
+                                const key = `${l.sku}:${w.abbr}`
+                                const taken = split[key] ?? ""
                                 return (
                                   <span key={w.abbr}
                                     title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : " — not enough for this line on its own"}`}
                                     className={"inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] " + (
                                       covers ? "bg-emerald-50 text-emerald-800" : "bg-muted text-muted-foreground")}>
                                     <span className="font-medium">{w.abbr}</span>
-                                    <span className="tabular-nums">{w.qty}</span>
+                                    <span className="tabular-nums opacity-70">{w.qty}</span>
                                     {eta.deliveryAt && <span className="opacity-70">{fmtEta(eta.deliveryAt)}</span>}
+                                    {/* Take THIS many from THIS warehouse. Blank means "no
+                                        preference", which is the default and leaves S&S to
+                                        split the line as before — typing anywhere turns the
+                                        whole line into a manual split. Capped at what the
+                                        warehouse actually holds, because asking for more
+                                        than exists is a rejection S&S can only find later. */}
+                                    <input
+                                      value={taken}
+                                      onChange={(e) => {
+                                        const v = e.target.value.replace(/[^0-9]/g, "")
+                                        const capped = v === "" ? "" : String(Math.min(Number(v), w.qty))
+                                        setSplit((p) => ({ ...p, [key]: capped }))
+                                      }}
+                                      placeholder="qty"
+                                      inputMode="numeric"
+                                      aria-label={`Quantity to take from ${w.abbr}`}
+                                      className="ml-0.5 h-5 w-12 rounded border border-border bg-background px-1 text-right text-[11px] tabular-nums transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                    />
                                   </span>
                                 )
                               })}
+                            {/* What the picks add up to, against what the line needs. Shown
+                                only once something is typed, so an untouched line stays
+                                quiet. A mismatch is stated rather than silently corrected —
+                                short means S&S never sees the rest, over means a rejection
+                                at their end. */}
+                            {(() => {
+                              const picks = stock[l.sku].warehouses
+                                .map((w) => Number(split[`${l.sku}:${w.abbr}`] || 0))
+                                .filter((n) => n > 0)
+                              if (!picks.length) return null
+                              const total = picks.reduce((a, b) => a + b, 0)
+                              const want = num(l.qty)
+                              const ok = total === want
+                              return (
+                                <span className={"inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium " + (
+                                  ok ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800")}>
+                                  {total} of {want} picked
+                                  {!ok && (total < want ? ` · ${want - total} unassigned` : ` · ${total - want} over`)}
+                                </span>
+                              )
+                            })()}
                           </div>
                         )}
                         {g.api === "ss" && stock[l.sku] && (

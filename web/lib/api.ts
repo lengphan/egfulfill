@@ -629,9 +629,15 @@ export function deletePurchaseOrder(num: string) {
  *  delivery address, shipping method, PO number and confirmation email. The endpoint has
  *  always accepted them; sending only lines is what made the orders incomplete. */
 export function ssOrder(
-  lines: { sku: string; qty: number }[],
+  /** A line may name a warehouse. Splitting one sku across DCs is two lines with the same
+   *  sku and different warehouseAbbr — the shape S&S expect. */
+  lines: { sku: string; qty: number; warehouseAbbr?: string }[],
   extra: { shippingAddress?: unknown; shippingMethod?: string; email?: string; poNumber?: string
-           paymentProfileId?: string; paymentProfileEmail?: string; requirePaymentProfile?: boolean } = {},
+           paymentProfileId?: string; paymentProfileEmail?: string; requirePaymentProfile?: boolean
+           /** MUST be false when any line names a warehouse — S&S ignore per-line
+            *  warehouses while autoselect is on, and the server refuses that contradiction
+            *  rather than letting the buyer's pick vanish silently. */
+           autoselectWarehouse?: boolean } = {},
   live = false
 ) {
   return api<{ ok?: boolean; testOrder?: boolean; dryRun?: boolean; error?: string; detail?: unknown }>(
