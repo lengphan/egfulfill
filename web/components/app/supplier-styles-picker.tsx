@@ -73,11 +73,11 @@ export function SupplierStylesPicker() {
     try {
       const r = await priceCatalogPicks({ refs: chosen, markupPct: n })
       if (r.error) throw new Error(r.error)
-      // Only PUBLISHED styles can be priced — the price lives on the pick row. Saying so
-      // beats "priced 0", which reads as a failure when it's a missing first step.
+      // Pricing publishes. Any style that didn't take a price had no cost recorded on it
+      // — the only remaining reason, and the one worth naming.
       setNote(r.priced
-        ? `Priced ${r.priced} at cost + ${n}%.${r.skippedNoCost ? ` ${r.skippedNoCost} skipped — publish them first, or they have no cost recorded.` : ""}`
-        : "Nothing was priced. A style has to be published before it can carry a price.")
+        ? `${r.priced} in the catalogue at cost + ${n}%.${r.skippedNoCost ? ` ${r.skippedNoCost} skipped — no supplier cost recorded on those.` : ""}`
+        : "None of those have a supplier cost recorded, so there was nothing to mark up. Type a price in instead.")
       load(q, page * PAGE)
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
@@ -120,14 +120,18 @@ export function SupplierStylesPicker() {
 
       {chosen.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-          <Button size="sm" onClick={() => publish(true)} disabled={busy}>Publish {chosen.length}</Button>
-          <Button size="sm" variant="outline" onClick={() => publish(false)} disabled={busy}>Remove</Button>
-          <span className="mx-1 h-5 w-px bg-border" />
+          {/* Setting a price IS adding it to the catalogue — there is no separate publish
+              step, because a style with a catalogue price and no place in the catalogue is
+              a state nobody wants. "Remove" stays, since taking something out is a real
+              decision with no price attached to it. */}
           <span className="text-xs text-muted-foreground">Cost +</span>
           <Input value={pct} onChange={(e) => setPct(e.target.value.replace(/[^\d.]/g, ""))}
             className="h-8 w-16 text-center text-xs tabular-nums" inputMode="decimal" aria-label="Markup percent" />
           <Button size="sm" variant="outline" onClick={markup} disabled={busy}>
-            <Percent size={14} weight="bold" /> Apply
+            <Percent size={14} weight="bold" /> Price &amp; add {chosen.length}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => publish(false)} disabled={busy}>
+            Remove from catalogue
           </Button>
         </div>
       )}
@@ -203,8 +207,7 @@ export function SupplierStylesPicker() {
                         onChange={(e) => setDraft((d) => ({ ...d, [st.ref]: e.target.value.replace(/[^\d.]/g, "") }))}
                         onBlur={() => savePrice(st.ref)}
                         onKeyDown={(e) => { if (e.key === "Enter") savePrice(st.ref) }}
-                        placeholder={st.picked ? "not set" : "publish first"}
-                        disabled={!st.picked}
+                        placeholder="set price"
                         inputMode="decimal"
                         aria-label={`Catalogue price for ${st.name || st.ref}`}
                         className="h-8 w-24 text-right text-xs tabular-nums"

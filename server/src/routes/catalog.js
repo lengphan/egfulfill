@@ -161,23 +161,37 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
   app.post('/api/catalog/picks/pricing', { preHandler: requireStaff }, async (req, reply) => {
     const b = req.body || {};
     const source = String(b.source || 'ss');
+    /**
+     * PRICING A STYLE PUBLISHES IT. There is no state worth having where a style carries a
+     * catalogue price and is not in the catalogue — that combination only existed because
+     * the pick row and the price landed in two separate calls, and it produced a dead end:
+     * "publish first" on a field someone had just typed a price into.
+     */
     if (b.ref && b.price !== undefined) {
       const price = b.price === null || b.price === '' ? null : Math.max(0, Number(b.price));
-      await q('update catalog_picks set catalog_price=$3 where source=$1 and ref=$2', [source, String(b.ref), price]);
-      return { ok: true, ref: String(b.ref), catalogPrice: price };
+      await q(
+        `insert into catalog_picks (source, ref, catalog_price) values ($1,$2,$3)
+         on conflict (source, ref) do update set catalog_price = excluded.catalog_price`,
+        [source, String(b.ref), price]);
+      return { ok: true, ref: String(b.ref), catalogPrice: price, published: true };
     }
     const refs = Array.isArray(b.refs) ? b.refs.map(String).filter(Boolean) : [];
     const pct = Number(b.markupPct);
     if (!refs.length || !isFinite(pct) || pct < 0) { reply.code(400); return { error: 'Send {ref, price} or {refs, markupPct} with a non-negative percent.' }; }
     // Cost is the HIGHEST sku price in the style — one catalogue price stands for every
     // size, and deriving it from the cheapest would sell the largest sizes under cost.
+    //
+    // Inserts as well as updates, for the same reason as above: applying a markup to a
+    // selection is the act of putting those styles in the catalogue. Requiring a separate
+    // publish first made the obvious gesture do nothing.
     const r = await q(
-      `update catalog_picks cp
-          set catalog_price = round((c.cost * (1 + $3::numeric / 100))::numeric, 2)
+      `insert into catalog_picks (source, ref, catalog_price)
+       select $1, c.style_id, round((c.cost * (1 + $3::numeric / 100))::numeric, 2)
          from (select style_id, max(price) as cost from ss_products
                 where style_id = any($2::text[]) and price is not null
                 group by style_id) c
-        where cp.source = $1 and cp.ref = c.style_id and c.cost > 0`,
+        where c.cost > 0
+       on conflict (source, ref) do update set catalog_price = excluded.catalog_price`,
       [source, refs, pct]).catch(() => ({ rowCount: 0 }));
     audit(req, 'catalog.pick.markup', { entityType: 'catalog', entityId: 'picks', after: { markupPct: pct, priced: r.rowCount } });
     return { ok: true, priced: r.rowCount, skippedNoCost: refs.length - r.rowCount };

@@ -117,9 +117,9 @@ export function CatalogView() {
               images, colours, sizes, price, laid out. The CSV is what someone imports into
               their own system. A spreadsheet of image URLs is not a catalogue, and a
               lookbook is not importable. */}
-          <Button size="sm" onClick={() => setPrintOpen(true)} disabled={!published}
-            title={published ? "A printable catalogue with images — save it as PDF" : "Publish something first"}>
-            <FilePdf size={14} weight="bold" /> PDF catalogue
+          <Button size="sm" onClick={() => setPrintOpen(true)}
+            title="A printable catalogue with images — save it as PDF">
+            <FilePdf size={14} weight="bold" /> Create lookbook
           </Button>
           <a href={catalogExportUrl()} download>
             <Button size="sm" variant="outline" disabled={!published}
