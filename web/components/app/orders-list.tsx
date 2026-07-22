@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { useRouter } from "next/navigation"
-import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut, Storefront, ArrowsOutSimple } from "@phosphor-icons/react"
+import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/table"
 import { getOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
 import { ItemAvatar } from "@/components/app/item-avatar"
-import { ArtworkZoom } from "@/components/app/artwork-zoom"
 import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken } from "@/lib/auth"
@@ -88,10 +87,9 @@ export function OrdersList() {
   // Placed artwork per order. Fetched only when a row is opened: pulling designs for
   // every row on load would be a request per order for imagery most sellers never expand.
   const [designs, setDesigns] = useState<Record<string, Record<string, OrderDesign>>>({})
-  // The artwork panel, opened by its own control rather than the avatar's click. The
-  // avatar already means "edit the placement" here exactly as it does on the factory
-  // board, so overloading it would take editing away to add uploading.
-  const [zoom, setZoom] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
+  // No artwork-panel entry point here on purpose. A seller edits and uploads in the
+  // mini designer (DesignCanvasDialog), which now takes a drop anywhere in it — adding a
+  // second window alongside it was the thing that made this confusing.
   // The mini designer, opened from an item row — same surface the factory boards use, so
   // a seller edits artwork where the item is rather than navigating to the order first.
   const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
@@ -354,20 +352,12 @@ export function OrdersList() {
                                 <div className="text-sm text-muted-foreground">No line items on this order.</div>
                               ) : items.map((it, i) => {
                                 return (
-                                  <div key={it.sku ?? i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
-                                    <button
-                                      onClick={() => setZoom({ order: o, item: it })}
-                                      title="Open the artwork — upload one, or use it on every line"
-                                      aria-label="Open artwork"
-                                      className="eg-tap self-start rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                                    >
-                                      <ArrowsOutSimple size={14} weight="bold" />
-                                    </button>
+                                  <div key={it.line_id ?? it.sku ?? i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-2.5">
                                     <ItemAvatar
                                       item={it}
                                       designs={designs[o.id]}
                                       catalog={catalog}
-                                      size={48}
+                                      size={76}
                                       onEdit={() => setEditing({ order: o, item: it })}
                                       onDropImage={(dataUrl) => {
                                         if (!it.sku) return
@@ -376,16 +366,31 @@ export function OrdersList() {
                                           .catch(() => {})
                                       }}
                                     />
+                                    {/* TITLE ROW then VARIANT ROW, rather than one row with the
+                                        quantity and price tacked on the end.
+                                        Quantity belongs to the title — "Tee ×2" is one fact, and
+                                        splitting it across the width made the reader carry the
+                                        name to the far edge to find out how many.
+                                        The price sits above the variants and right-aligned so it
+                                        lines up with the order total in the column behind it;
+                                        that frees the whole width for the variant strip, which
+                                        was being squeezed into whatever the price left over. */}
                                     <div className="min-w-0 flex-1">
-                                      <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
+                                      <div className="flex items-baseline gap-2">
+                                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                                          {it.name || it.sku || "Item"}
+                                          <span className="ml-1.5 font-normal text-muted-foreground">×{Number(it.qty) || 1}</span>
+                                        </span>
+                                        <span className="w-20 shrink-0 text-right text-sm font-medium tabular-nums">
+                                          {lineTotal(it) ? usd(lineTotal(it)) : "—"}
+                                        </span>
+                                      </div>
                                       {["", "new", "draft"].includes(String(o.factory_status || "")) ? (
                                         <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                                       ) : (
-                                        <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-1" />
+                                        <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-1.5" />
                                       )}
                                     </div>
-                                    <span className="shrink-0 text-xs text-muted-foreground">×{Number(it.qty) || 1}</span>
-                                    <span className="w-16 shrink-0 text-right text-sm font-medium tabular-nums">{lineTotal(it) ? usd(lineTotal(it)) : "—"}</span>
                                   </div>
                                 )
                               })}
@@ -437,19 +442,6 @@ export function OrdersList() {
 
       {/* One editor for the list, pointed at whichever row was clicked. Reloads that
           order's designs on save so the row thumb rehydrates immediately. */}
-      {zoom && (
-        <ArtworkZoom
-          key={`${zoom.order.id}:${zoom.item.line_id ?? zoom.item.sku ?? ""}`}
-          order={zoom.order}
-          item={zoom.item}
-          artwork={designForLine(designs[zoom.order.id], zoom.item)?.data ?? null}
-          designs={designs[zoom.order.id]}
-          open
-          onOpenChange={(v) => { if (!v) setZoom(null) }}
-          onUploaded={() => reloadDesigns(zoom.order.id)}
-        />
-      )}
-
       {editing && (
         <DesignCanvasDialog
           open
