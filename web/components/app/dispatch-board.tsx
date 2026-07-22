@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
+import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
 import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -279,6 +280,9 @@ export function DispatchBoard() {
 
   const canAdvance = canSetStage(role, STAGE, NEXT)
   const [manifestOpen, setManifestOpen] = useState(false)
+  // Mirrors the server's eligibility rules (lib/manifest-eligible.ts) so the button can
+  // say why before the click rather than after.
+  const manifestable = manifestReadiness(chosen).eligible
 
   if (orders === null) {
     return <div className="flex items-center justify-center py-20 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
@@ -330,10 +334,19 @@ export function DispatchBoard() {
                 parcel — it prints the document USPS scans at handover. So it sits beside
                 them but doesn't advance the stage or touch the scan. */}
             {canScanOut && (
-              <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={() => setManifestOpen(true)}
-                title="Print one barcode covering these labels — USPS scans it once when they collect">
-                <Barcode size={14} weight="bold" /> Create SCAN form
-              </Button>
+              // Gated on real eligibility, not just "has a label". A batch of already-
+              // scanned orders used to enable this and then fail inside the dialog with
+              // nothing to create — the check exists on the server either way, so the only
+              // thing that changed was whether the user found out before or after clicking.
+              // The title sits on a WRAPPER, not the button. A disabled button doesn't
+              // reliably receive hover in every engine — Safari in particular — so a
+              // title on the button itself is exactly the tooltip that fails to appear
+              // in the one state it was written to explain.
+              <span title={manifestTooltip(chosen)} className="inline-flex">
+                <Button size="sm" variant="outline" disabled={!manifestable.length || busy} onClick={() => setManifestOpen(true)}>
+                  <Barcode size={14} weight="bold" /> Create SCAN form
+                </Button>
+              </span>
             )}
             {canScanOut && (
             <Button size="sm" disabled={!chosen.length || busy || !canAdvance} onClick={markScanned} title={canAdvance ? undefined : "Your role can't move orders past this stage"}>
@@ -431,8 +444,8 @@ export function DispatchBoard() {
       {/* Keyed on the selection so reopening after a different pick can't show the
           previous batch's preview for a frame. */}
       <ManifestDialog
-        key={chosenWithLabel.map((o) => o.id).join(",")}
-        orderIds={chosenWithLabel.map((o) => o.id)}
+        key={manifestable.map((o) => o.id).join(",")}
+        orderIds={manifestable.map((o) => o.id)}
         open={manifestOpen}
         onOpenChange={setManifestOpen}
         onDone={() => { setPicked(new Set()); load() }}

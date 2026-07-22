@@ -696,6 +696,16 @@ export type OrderRow = {
   /** Pre-scanned at dispatch — tracking is LIVE for the buyer even though the parcel may
    *  still be in production. Separate from factory_status on purpose; see orders.js. */
   label_scanned_at?: string | null
+  /** Who bought the label and their own reference for it. Recorded at purchase because
+   *  the provider says it exactly once; without it a label can be neither voided nor put
+   *  on a SCAN form. Null on anything bought before that was recorded. */
+  label_provider?: string | null
+  label_ref?: string | null
+  label_carrier_account?: string | null
+  /** On a USPS SCAN form. NOT a scan — the form is a document; the carrier scanning it at
+   *  handover is a separate event that fills label_scanned_at. See manifests.js. */
+  manifested_at?: string | null
+  manifest_id?: string | null
   /** The CARRIER's status, separate from factory_status. Ours ends at 'shipped'; this is
    *  what happens to the parcel afterwards. */
   delivery_status?: string | null
