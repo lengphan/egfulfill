@@ -163,6 +163,27 @@ export function createUserAdmin(body: { email: string; password: string; role?: 
 }
 /** Manual balance adjustment by staff. Positive credits, negative debits. The reason is
  *  required — an unexplained movement in a money ledger is worse than no movement. */
+/** The categories a person may book into. Read from the server so a picker can never
+ *  offer something the route would reject. Admin/warehouse only. */
+export function getEntryTypes() {
+  return api<{ types: { id: string; label: string }[]; error?: string }>(`/api/wallet/entry-types`)
+}
+
+/**
+ * Write one manual ledger row. Admin/warehouse only, enforced server-side.
+ *
+ * `delta` is signed: positive money in, negative money out. `ref` makes the write
+ * idempotent on (account, type, ref) — the ledger is append-only, so a double-submit that
+ * got through would be permanent and correctable only by a counter-entry.
+ */
+export function addLedgerEntry(body: {
+  account: string; delta: number; type: string; note: string; ref?: string; partner?: string
+}) {
+  return api<{ ok?: boolean; balance?: number; duplicate?: boolean; error?: string }>(`/api/wallet/ledger`, {
+    method: "POST", body: JSON.stringify(body),
+  })
+}
+
 export function adjustBalance(body: { account: string; delta: number; note: string; ref?: string }) {
   return api<{ ok?: boolean; balance?: number; duplicate?: boolean; error?: string }>(`/api/wallet/ledger`, {
     method: "POST",
@@ -1051,6 +1072,18 @@ export function creditDesignCard(id: string | number, amount: number) {
 }
 export function saveDesignCards(cards: DesignCard[]) {
   return api<{ ok?: boolean; count?: number; error?: string }>(`/api/design_cards`, { method: "POST", body: JSON.stringify(cards) })
+}
+/**
+ * Delete ONE card. Warehouse/admin only.
+ *
+ * Removal used to go through saveDesignCards — the whole board minus one card. Every
+ * card carries a base64 thumb, so that payload gets very large, and if it failed the
+ * delete never ran while the upserts had already succeeded: the card came back on
+ * reload with no error shown. One id can't be too big to send and can't half-apply.
+ */
+export function deleteDesignCard(id: number | string) {
+  return api<{ ok?: boolean; deleted?: number; error?: string }>(
+    `/api/design_cards/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }
 
 // Staff wallet transfer (factory ↔ seller/designer). Idempotent by ref.

@@ -294,6 +294,38 @@ export function walletRoutes(app, requireAuth) {
     return r.rows;
   });
 
+  /**
+   * The categories a HUMAN may book into, and what each one means.
+   *
+   * An allowlist because the route took `b.type || 'adjust'` verbatim: a typo produced a
+   * category no report groups on, so the money left the balance and vanished from every
+   * summary — present in the total, invisible in the breakdown, which is the worst of both.
+   *
+   * These sit alongside the automatic ones in costs.js (label-cost, expedite-cost,
+   * design-partner-cost, blanks-cost) rather than duplicating them: a cost the system books
+   * itself must not also be enterable by hand, or the same invoice lands twice under two
+   * refs and nothing downstream can tell which is real.
+   */
+  const MANUAL_TYPES = {
+    adjust: 'Balance correction',
+    'manual-expense': 'Expense (no integration)',
+    'manual-income': 'Income (no integration)',
+    'partner-invoice': 'Partner invoice',
+    'supplier-invoice': 'Supplier invoice',
+    'shipping-other': 'Shipping paid outside the aggregator',
+    equipment: 'Equipment or materials',
+    overheads: 'Rent, utilities, software',
+    'refund-manual': 'Refund issued by hand',
+    'goodwill-credit': 'Goodwill credit to a seller',
+  };
+
+  /** The categories, for a picker. Read from the same object the route validates against,
+   *  so a menu can never offer something the server would reject. */
+  app.get('/api/wallet/entry-types', { preHandler: requireAuth }, async (req, reply) => {
+    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
+    return { types: Object.entries(MANUAL_TYPES).map(([id, label]) => ({ id, label })) };
+  });
+
   app.post('/api/wallet/ledger', { preHandler: requireAuth }, async (req, reply) => {
     // canMoveMoney, not isStaff: isStaff admits operator and designer, so this route let
     // either write an arbitrary delta onto ANY account — the seller-credits-themselves
@@ -310,21 +342,36 @@ export function walletRoutes(app, requireAuth) {
     if ((account === 'factory' || account === 'designer') && !isStaff(req.user)) {
       reply.code(403); return { error: 'staff only' };
     }
+    // Reject an unknown category rather than storing it. See MANUAL_TYPES above.
+    const entryType = String(b.type || 'adjust');
+    if (!Object.prototype.hasOwnProperty.call(MANUAL_TYPES, entryType)) {
+      reply.code(400);
+      return { error: `Unknown category "${entryType}". Pick one of: ${Object.keys(MANUAL_TYPES).join(', ')}.` };
+    }
+    // A reason is not optional on a hand-written money row. The ledger is append-only, so
+    // this note is the ONLY explanation that will ever exist for it — an entry nobody can
+    // account for later is indistinguishable from a mistake.
+    const entryNote = String(b.note || '').trim();
+    if (entryNote.length < 3) { reply.code(400); return { error: 'Add a reason — this lands in the ledger permanently.' }; }
     const ref = (b.ref != null && b.ref !== '') ? String(b.ref) : null;
     // Idempotent insert: if (account,type,ref) already exists, do nothing and
     // just return the current balance (duplicate:true) — never double-charge.
+    // VALIDATED values from here down, not the raw body. The de-dupe, the insert and the
+    // audit each re-derived `b.type || 'adjust'` independently, so a category that failed
+    // validation would still have been the one stored — and the de-dupe would have been
+    // checking a different key from the one written.
     if (ref) {
       const dup = await q('select 1 from wallet_ledger where account=$1 and type=$2 and ref=$3',
-        [account, b.type || 'adjust', ref]);
+        [account, entryType, ref]);
       if (dup.rowCount) { return { ok: true, duplicate: true, balance: await balanceOf(account) }; }
     }
     await q(
       `insert into wallet_ledger (account, delta, type, ref, note, created_by, partner)
        values ($1,$2,$3,$4,$5,$6,$7)
        on conflict do nothing`,
-      [account, delta, b.type || 'adjust', ref, b.note || null, req.user.sub,
+      [account, delta, entryType, ref, entryNote, req.user.sub,
        b.partner ? String(b.partner) : null]);
-    audit(req, 'wallet.ledger', { entityType: 'wallet', entityId: account, after: { delta, type: b.type || 'adjust', ref, note: b.note || null } });
+    audit(req, 'wallet.ledger', { entityType: 'wallet', entityId: account, after: { delta, type: entryType, ref, note: entryNote } });
     return { ok: true, balance: await balanceOf(account) };
   });
 

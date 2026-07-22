@@ -1,13 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Receipt, CircleNotch, DownloadSimple } from "@phosphor-icons/react"
+import { Receipt, CircleNotch, DownloadSimple, Plus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getLedgerPartners, getLedgerExport, ledgerExportUrl, type LedgerRowOut, type PartnerTotal } from "@/lib/api"
 import { getToken } from "@/lib/auth"
+import { LedgerEntryDialog } from "@/components/app/ledger-entry-dialog"
 
 const usd = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -45,6 +46,7 @@ function thisMonth() {
  * Amounts are signed from OUR side: negative means we paid out or owe.
  */
 export function BillingView() {
+  const [entryOpen, setEntryOpen] = useState(false)
   const [partners, setPartners] = useState<PartnerTotal[] | null>(null)
   const [rows, setRows] = useState<LedgerRowOut[] | null>(null)
   const [total, setTotal] = useState(0)
@@ -118,11 +120,20 @@ export function BillingView() {
         title="Ledger"
         description="Signed from our side — negative means we paid out or owe it"
         actions={
-          <a href={ledgerExportUrl(filters)} download>
-            <Button size="sm" variant="outline" disabled={!rows?.length}>
-              <DownloadSimple size={14} weight="bold" /> Export CSV
+          <div className="flex items-center gap-2">
+            {/* Manual entry lives HERE, next to the ledger it writes into, rather than in
+                Settings — the row it creates is indistinguishable from the ones above it
+                once written, and the person adding one is already reading this list. The
+                page is warehouse/admin-only, which is the same gate the route enforces. */}
+            <Button size="sm" variant="outline" onClick={() => setEntryOpen(true)}>
+              <Plus size={14} weight="bold" /> Add entry
             </Button>
-          </a>
+            <a href={ledgerExportUrl(filters)} download>
+              <Button size="sm" variant="outline" disabled={!rows?.length}>
+                <DownloadSimple size={14} weight="bold" /> Export CSV
+              </Button>
+            </a>
+          </div>
         }
       >
         <div className="flex flex-wrap items-end gap-2 border-b border-border px-5 py-3">
@@ -194,6 +205,10 @@ export function BillingView() {
           </div>
         )}
       </SectionCard>
+
+      {/* Reload after a write: the row just added belongs in the list above it, and a
+          ledger that needs a refresh to show what you just entered reads as a failure. */}
+      <LedgerEntryDialog open={entryOpen} onOpenChange={setEntryOpen} onDone={() => load()} />
     </div>
   )
 }
