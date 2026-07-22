@@ -338,12 +338,23 @@ export function OrdersHub() {
     } finally { setBusy(null) }
   }
   // Send a line item to the Designer board as a new card (whole-board upsert).
-  const sendToDesigner = async (o: OrderRow, it: OrderItem, force = false) => {
+  const sendToDesigner = async (o: OrderRow, it: OrderItem, force = false, artOverride?: string) => {
     const key = lineKey(o, it)
     // A designer card with no artwork is an empty job — there is nothing to digitise and
-    // no way to tell what it should become. The button is disabled in this state; this is
-    // the belt-and-braces check.
-    if (!artworkFor(o, it)) return
+    // no way to tell what it should become.
+    //
+    // `artOverride` is the designer window handing over the artwork it just saved: this
+    // component's `designs` map can still be a beat behind that write, and reading only
+    // from it is how a push landed on the guard below and did nothing.
+    //
+    // And it now SAYS SO. This used to be a bare `return` — the commonest way to reach it
+    // was a real push with a real file, and the operator got no card, no error and no
+    // reason, which is indistinguishable from the board being broken.
+    const art = artOverride || artworkFor(o, it)
+    if (!art) {
+      setActionErr("That line has no saved artwork yet, so there's nothing to digitise. Add artwork and save it first.")
+      return
+    }
     setBusy(`dsn:${key}`)
     // Before spending a designer on this, ask whether we've already made the file. An
     // exact hit means identical artwork; a fuzzy hit only means it looks alike, so both
@@ -368,14 +379,29 @@ export function OrdersHub() {
           title: it.name || it.sku || "Design", product: variantOf(it),
           // The ARTWORK, not the listing photo — a designer needs to see the file
           // they're digitising, not a product shot.
-          type: it.print_type || undefined, thumb: artworkFor(o, it) || null,
+          // `art`, not a second artworkFor call — that would re-read the possibly-stale map
+          // and hand the designer a card with no thumbnail on the very push that needed the
+          // override.
+          type: it.print_type || undefined, thumb: art || null,
           col: "incoming", pay_status: "pending", payment: 0,
           customer: o.customer?.name ?? null, is_emb: /emb/i.test(it.print_type || ""),
         }
-        await saveDesignCards([...(cards ?? []), card])
+        // The RESULT is checked. This is a POST of the ENTIRE board and every card carries
+        // a base64 thumb, so the payload grows with the board and is exactly the shape that
+        // gets rejected once it's big enough — the same hazard deleteDesignCard was split
+        // out to avoid. `api` resolves with {error} rather than throwing on a handled
+        // failure, so awaiting without looking swallowed it.
+        const r = await saveDesignCards([...(cards ?? []), card])
+        if (r?.error) throw new Error(r.error)
       }
       setSent((prev) => new Set(prev).add(key))
-    } catch { /* ignore */ } finally { setBusy(null) }
+      setNote(dup ? "That line is already on the designer board." : "Sent to the designer board.")
+    } catch (e) {
+      // Was `catch { /* ignore */ }`. A push that failed looked identical to one that
+      // worked: no card, no message, and an operator with no reason to think anything
+      // went wrong until they opened the board and found it empty.
+      setActionErr(`Couldn't send that line to a designer: ${e instanceof Error ? e.message : "unknown error"}`)
+    } finally { setBusy(null) }
   }
 
   const stats = useMemo(() => {
@@ -1279,9 +1305,21 @@ export function OrdersHub() {
               siblings={(editing.order.items ?? []).filter((it) =>
                 (it.line_id ?? it.sku) !== (editing.item.line_id ?? editing.item.sku))}
               designs={designs[editing.order.id]}
+              // The dialog SAVES before calling this, so the artwork is on the server — but
+              // `designs` in this component is still the copy from before that save, and
+              // artworkFor reads it. Refetch first, then push, or the card is built from a
+              // map that doesn't know about the file yet.
               onSendToDesigner={canDesign ? () => {
                 const e = editing; setEditing(null)
-                if (e) void sendToDesigner(e.order, e.item)
+                if (!e) return
+                void getOrderDesigns(e.order.id)
+                  .then((r) => {
+                    const list = Array.isArray(r) ? r : (r?.designs ?? [])
+                    const bySku = indexDesigns(list)
+                    setDesigns((p) => ({ ...p, [e.order.id]: bySku }))
+                    return sendToDesigner(e.order, e.item, false, designForLine(bySku, e.item)?.data || undefined)
+                  })
+                  .catch(() => setActionErr("Couldn't send that line to a designer."))
               } : undefined}
               onSaved={() => {
                 const oid = editing.order.id

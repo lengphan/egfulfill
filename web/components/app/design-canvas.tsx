@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, FolderOpen, ArrowSquareOut, DownloadSimple, CopySimple, PaperPlaneTilt, Sparkle, CaretDown } from "@phosphor-icons/react"
+import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
@@ -588,8 +588,11 @@ export function DesignCanvasDialog({
     if (done > 0) { setAttached(`Applied to ${done} other line${done === 1 ? "" : "s"}.`); onSaved?.() }
   }, [designUrl, siblings, designs, orderId, item.name, pos, onSaved])
 
-  const save = async () => {
-    if (!designUrl || !item.sku) { setErr("Upload artwork first."); return }
+  /** `close` is false when saving as a STEP in something else (sending to a designer),
+   *  where closing the window mid-flow would look like the action had finished.
+   *  Returns whether it persisted, so a caller can stop rather than carry on regardless. */
+  const save = async (close = true): Promise<boolean> => {
+    if (!designUrl || !item.sku) { setErr("Upload artwork first."); return false }
     setSaving(true); setErr(null)
     try {
       // Fingerprint the artwork as it's saved, so the factory can later tell that this
@@ -601,9 +604,12 @@ export function DesignCanvasDialog({
       // Persist the matched threads alongside the design so the factory loads the right
       // cones. Best-effort — a design still saves even if the thread write hiccups.
       if (isEmb && threads.length) await postOrderThreads(orderId, item.sku, threads).catch(() => {})
-      onSaved?.(); onOpenChange(false)
+      onSaved?.()
+      if (close) onOpenChange(false)
+      return true
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save the design.")
+      return false
     } finally { setSaving(false) }
   }
 
@@ -641,14 +647,18 @@ export function DesignCanvasDialog({
           readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr)
         }}
       >
-        {over && (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10">
-            <span className="rounded-lg bg-background px-3 py-1.5 text-sm font-medium shadow-sm">
-              Drop an image to place it on this product
-            </span>
-          </div>
-        )}
-        <DialogHeader><DialogTitle>Customize · {item.name || item.sku}</DialogTitle></DialogHeader>
+        {/* Dropping anywhere in the window still works — but it no longer outlines the WHOLE
+            window in dashed purple while it does. That fired at the same time as the drop
+            box on the stage, so a drag lit up two competing dashed rectangles and a floating
+            caption, and the window read as an error state. The stage box alone is the
+            feedback now: one target, one highlight. */}
+        {/* pr-10 clears the close button, line-clamp-2 stops a marketplace title from
+            becoming a three-line headline. Etsy names run 130+ characters, so unclamped
+            this pushed the stage most of the way down the window and ran the last word
+            underneath the ✕. */}
+        <DialogHeader>
+          <DialogTitle className="line-clamp-2 pr-10 leading-snug">{item.name || item.sku}</DialogTitle>
+        </DialogHeader>
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {faces.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
@@ -667,8 +677,20 @@ export function DesignCanvasDialog({
             artwork will land at, so the empty state teaches placement before there is
             anything to place. Once art is on, the overlay is gone entirely and the stage
             goes back to being a stage. */}
-        <div className="relative mx-auto w-full">
-          <DesignStage className="w-full" mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} picking={picking} onPickColor={onPickColor} />
+        {/* The stage is aspect-square, so its WIDTH sets its height — at a full 528px inside
+            the dialog it alone was taller than a laptop viewport and pushed everything
+            below it off-screen. Capping the width by a viewport-height unit is what keeps
+            the window small, which was the whole ask. */}
+        <div className="relative mx-auto w-full max-w-[min(100%,42vh)]">
+          <DesignStage
+            className="w-full" mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos}
+            onRemove={() => setDesignUrl("")} picking={picking} onPickColor={onPickColor}
+            // Suppress the stage's OWN "Pick a blank to start designing" placeholder: the
+            // overlay below is already the empty state, and rendering both stacked two
+            // different sentences on top of each other in the same 40px. An empty fragment
+            // rather than null — the stage falls back on nullish, so null would restore it.
+            emptyHint={<></>}
+          />
           {!designUrl && (
             <button
               type="button"
@@ -833,7 +855,17 @@ export function DesignCanvasDialog({
             )}
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-foreground">Customer&apos;s file</div>
-              {item.personalization && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">“{decodeEntities(item.personalization)}”</div>}
+              {/* NO decorative quotes around it. The buyer's text frequently contains its
+                  own — this one is literally `"MRS. AUSTIN "` — and wrapping it produced
+                  “"MRS. AUSTIN "”, which invites someone to stitch a quotation mark that
+                  isn't theirs. Personalisation is a literal to reproduce, so it is shown
+                  exactly, in mono, where a trailing space (this one has one) is visible
+                  rather than invisibly trimmed by the eye. */}
+              {item.personalization && (
+                <div className="mt-0.5 line-clamp-2 whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+                  {decodeEntities(item.personalization)}
+                </div>
+              )}
               <div className="mt-1.5 flex flex-wrap gap-2">
                 {item.design_src && (
                   <button onClick={() => { setErr(null); setDesignUrl(item.design_src!); setPos(DEFAULT_POS) }}
@@ -858,38 +890,40 @@ export function DesignCanvasDialog({
           <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void attachMachineFile(f); e.target.value = "" }} />
 
+          {/* WORDS ONLY, one component, one size.
+              This row was four controls in three different treatments — three Buttons with
+              icons plus a hand-rolled <a> that only LOOKED like one — so the icons carried
+              no meaning the label didn't already have and the odd one out read as a
+              different kind of thing. A verb each, styled identically, is legible without
+              decoding a glyph. Download is a real Button that triggers the save, rather
+              than an anchor dressed as a button. */}
           <div className="flex flex-wrap items-center gap-2">
             {designUrl && (
-              <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>
-                <UploadSimple size={15} weight="bold" /> Replace
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>Replace</Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>
-              <FolderOpen size={15} weight="bold" /> Library
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>Library</Button>
             {/* The seller's own-file route, now a BUTTON. Dropping one always worked, but
                 a drop is only discoverable if you already suspect it exists — which is why
                 the seller who had cut their own .pes had nowhere to go. */}
-            <Button variant="outline" size="sm" onClick={() => machineRef.current?.click()}>
-              <Sparkle size={15} weight="bold" /> Machine file
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => machineRef.current?.click()}>Machine file</Button>
             {designUrl && (
-              // `download` with a filename: without it a signed storage URL just opens in a
-              // tab and a data-URL saves as "download", neither of which is usable later.
-              <a href={designUrl} download={`${orderId}-${item.sku ?? "artwork"}`}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium transition-colors hover:bg-accent">
-                <DownloadSimple size={14} weight="bold" /> Download
-              </a>
+              // A filename is the point: without one a signed storage URL just opens in a
+              // tab and a data-URL saves as "download", neither usable later.
+              <Button variant="outline" size="sm" onClick={() => {
+                const a = document.createElement("a")
+                a.href = designUrl
+                a.download = `${orderId}-${item.sku ?? "artwork"}`
+                a.click()
+              }}>Download</Button>
             )}
             {/* Ten shirts, one file. Only when there IS another line, so a single-line
                 order doesn't carry a control that would do nothing. */}
             {designUrl && !!siblings?.length && (
               <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}>
-                {applying ? <CircleNotch size={14} className="animate-spin" /> : <CopySimple size={14} weight="bold" />} Use on every line
+                {applying ? "Applying…" : "Use on every line"}
               </Button>
             )}
           </div>
-          {designUrl && <p className="text-xs text-muted-foreground">Drag to move · corner resizes · top rotates</p>}
           {err && <div className="text-sm text-destructive">{err}</div>}
           {/* A machine file was filed. Green, not red, and it says what it did AND what it
               deliberately didn't — the canvas is unchanged, which without a word reads as
@@ -996,8 +1030,17 @@ export function DesignCanvasDialog({
                   {onSendToDesigner && (
                     <div className="mt-3 border-t border-border pt-3">
                       <p className="mb-1.5 text-[11px] text-muted-foreground">Don&apos;t have the file yet?</p>
-                      <Button size="sm" variant="outline" onClick={onSendToDesigner} disabled={!designUrl}>
-                        <PaperPlaneTilt size={14} weight="bold" /> Send this line to a designer
+                      {/* SAVE FIRST, then send — and only send if the save actually landed.
+                          This silently did nothing before: the board builds its card from
+                          the SAVED designs map, so artwork dropped here but not yet saved
+                          didn't exist as far as the push was concerned. It hit a guard that
+                          returned without a word, and the designer's board stayed empty
+                          with nothing on screen to say why. */}
+                      <Button size="sm" variant="outline" disabled={!designUrl || saving} onClick={async () => {
+                        if (!(await save(false))) return
+                        onSendToDesigner()
+                      }}>
+                        {saving ? "Saving…" : "Send this line to a designer"}
                       </Button>
                       {!designUrl && <p className="mt-1 text-[11px] text-muted-foreground">Needs artwork first — there&apos;s nothing to digitise.</p>}
                     </div>
@@ -1009,7 +1052,7 @@ export function DesignCanvasDialog({
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={save} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
+            <Button onClick={() => void save()} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
           </div>
         </div>
         <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }} />
