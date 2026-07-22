@@ -200,12 +200,34 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
       .then((r) => r.rows).catch(() => []);
     let priced = 0;
     const noCost = [];
+    /**
+     * Where a product's cost actually lives — the SAME order pricing.js resolves it in.
+     *
+     * It can sit per SIZE (sizePrices[].cost) or on the product (productCost). This only
+     * read the product-level field, so every product priced per size — which is most of
+     * S&S, where a 3XL costs more than an S — reported "no cost on record" and was
+     * skipped. The markup looked broken and was in fact looking in one of two places.
+     *
+     * With several size costs, the HIGHEST wins. One catalogue price has to stand for
+     * every size, and deriving it from the cheapest would put the largest sizes on sale
+     * below their own cost. Rounding a little margin onto the small sizes is the
+     * survivable direction of that error.
+     */
+    const costOf = (d) => {
+      const tiers = Array.isArray(d.sizePrices) ? d.sizePrices : [];
+      const tierCosts = tiers.map((t) => Number(t && t.cost)).filter((n) => isFinite(n) && n > 0);
+      if (tierCosts.length) return Math.max(...tierCosts);
+      const flat = Number(d.productCost ?? d.product_cost);
+      return isFinite(flat) && flat > 0 ? flat : null;
+    };
+
     for (const row of rows) {
       const d = row.data || {};
-      const cost = Number(d.productCost ?? d.product_cost);
-      // A product with no recorded cost cannot be marked up, and guessing one would put a
-      // made-up number in front of a buyer. Reported back rather than skipped in silence.
-      if (!isFinite(cost) || cost <= 0) { noCost.push(row.id); continue; }
+      const cost = costOf(d);
+      // A product with no recorded cost anywhere cannot be marked up, and guessing one
+      // would put a made-up number in front of a buyer. Reported back, not skipped in
+      // silence.
+      if (cost == null) { noCost.push(row.id); continue; }
       const price = Math.round(cost * (1 + pct / 100) * 100) / 100;
       await q('update catalog_products set catalog_price=$2 where id=$1', [row.id, price]).catch(() => {});
       priced++;
