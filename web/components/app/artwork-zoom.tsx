@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog"
 import { setDesignTier, uploadDesignFile, postOrderDesign, type DesignTier, type OrderItem, type OrderRow } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
+import { getUser } from "@/lib/auth"
 
 /** Machine-file extensions the embroidery side actually uses. Kept in one place so the
  *  accept attribute, the drop filter and the error message can't drift apart. */
@@ -56,6 +57,27 @@ export function ArtworkZoom({ order, item, artwork, designs, open, onOpenChange,
   /** Offered only when the line has no machine file yet — see the note by the button. */
   onSendToDesigner?: () => void
 }) {
+  /**
+   * Whether the VIEWER is factory staff.
+   *
+   * This panel is now opened by sellers too, and it carries two things a seller must never
+   * see: the design-charge tiers (which set what THEY are billed) and "send to a designer"
+   * (which spends factory time). Read from the session here rather than taken as a prop —
+   * a caller that forgot to pass one would silently expose both, and the failure would look
+   * like a working screen. The server gates these routes as well; this is the UI half.
+   *
+   * Deferred, like every other session read in the app: localStorage doesn't exist during
+   * the prerender.
+   */
+  const [isStaff, setIsStaff] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const role = getUser()?.role
+      setIsStaff(role === "admin" || role === "operator" || role === "warehouse" || role === "designer")
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
@@ -310,8 +332,10 @@ export function ArtworkZoom({ order, item, artwork, designs, open, onOpenChange,
 
             {/* WHAT THIS LINE COSTS THE SELLER. Sits here because this is where someone is
                 looking at the artwork, which is the only moment the judgement can honestly
-                be made — "is this intricate?" is not answerable from a list row. */}
-            <div className="border-t border-border pt-3">
+                be made — "is this intricate?" is not answerable from a list row.
+                STAFF ONLY: this sets what the seller is charged, so the person being
+                charged must not be the one setting it. */}
+            {isStaff && <div className="border-t border-border pt-3">
               <span className="mb-1.5 block text-xs font-medium">Design charge</span>
               <div className="grid grid-cols-3 gap-1.5">
                 {([
@@ -367,9 +391,12 @@ export function ArtworkZoom({ order, item, artwork, designs, open, onOpenChange,
               {!tier && (
                 <p className="mt-1.5 text-[11px] text-muted-foreground">Not judged yet, so nothing has been charged for the design on this line.</p>
               )}
-            </div>
+            </div>}
 
-            {onSendToDesigner && (
+            {/* Also staff-only: sending a line to a designer spends factory time and opens
+                a payable card. A seller asking for one goes through support, not a button
+                that silently creates work. */}
+            {isStaff && onSendToDesigner && (
               <div className="border-t border-border pt-3">
                 {/* The alternative to uploading, not a step after it. Offering both without
                     saying they're alternatives is how a line ends up with a finished file
