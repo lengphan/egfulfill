@@ -548,7 +548,11 @@ export function DesignCanvasDialog({
       })
       if (r?.error) throw new Error(r.error)
       setErr(null)
-      setAttached(`${f.name} is filed against this line as the machine file. It isn't placed on the mockup — a stitch file has nothing to position. We'll check it before production.`)
+      // Says what to do NEXT, not just what happened. Dropping an image afterwards has
+      // always worked — the two live side by side — but a message that only reported the
+      // filing read as the end of the interaction, so the placement never got set and the
+      // floor had a stitch file with no idea where on the garment it goes.
+      setAttached(`${f.name} is filed as your machine file — we'll check it before production, so this line is charged the check fee rather than a design fee. Now drop an IMAGE too: the stitch file can't be shown on the mockup, and without one there's nothing to say where on the garment it belongs.`)
     } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
   }, [orderId, item.line_id, item.sku])
 
