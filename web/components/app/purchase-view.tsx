@@ -1190,14 +1190,13 @@ export function PurchaseView() {
                                      instead. */
                                   <label key={w.abbr}
                                     title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : " — not enough for this line on its own"}`}
-                                    className={"flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 rounded-lg border px-1.5 py-1.5 transition-colors " + (
-                                      // No fill. The chip already contains an input, which
-                                      // has its own surface — a tinted box around a box made
-                                      // the input harder to find, not easier, and a row of
-                                      // them read as a block of colour rather than as
-                                      // separate choices. The covering warehouse is marked by
-                                      // its border alone.
-                                      covers ? "border-primary/50" : "border-border")}>
+                                    // No border, no fill. The input inside already draws its
+                                    // own outline, so the chip's border was a box around a
+                                    // box — five of them across a row built a grid nobody
+                                    // asked for, and it fought the page's own edges. Which
+                                    // warehouse can cover the line alone is carried by the
+                                    // code's weight and stays in the tooltip.
+                                    className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 px-1.5 py-1.5">
                                     {/* Take THIS many from THIS warehouse. Blank means "no
                                         preference", which is the default and leaves S&S to
                                         split the line as before — typing anywhere turns the
@@ -1231,7 +1230,7 @@ export function PurchaseView() {
                                       className="h-7 w-full px-1 text-center text-xs tabular-nums"
                                     />
                                     <span className="flex items-baseline gap-1 text-[11px] leading-none">
-                                      <span className="font-medium">{w.abbr}</span>
+                                      <span className={covers ? "font-semibold text-foreground" : "font-medium text-muted-foreground"}>{w.abbr}</span>
                                       <span className="tabular-nums text-muted-foreground">{w.qty}</span>
                                     </span>
                                     {/* Always rendered, so the chips stay the same height and
@@ -1243,27 +1242,11 @@ export function PurchaseView() {
                                   </label>
                                 )
                               })}
-                            {/* What the picks add up to, against what the line needs. Shown
-                                only once something is typed, so an untouched line stays
-                                quiet. A mismatch is stated rather than silently corrected —
-                                short means S&S never sees the rest, over means a rejection
-                                at their end. */}
-                            {(() => {
-                              const picks = stock[l.sku].warehouses
-                                .map((w) => Number(split[`${l.sku}:${w.abbr}`] || 0))
-                                .filter((n) => n > 0)
-                              if (!picks.length) return null
-                              const total = picks.reduce((a, b) => a + b, 0)
-                              const want = num(l.qty)
-                              const ok = total === want
-                              return (
-                                <span className={"inline-flex items-center gap-1 self-center rounded-lg px-2 py-1 text-[11px] font-medium " + (
-                                  ok ? "bg-muted text-foreground" : "bg-amber-50 text-amber-800")}>
-                                  {total} of {want} picked
-                                  {!ok && (total < want ? ` · ${want - total} unassigned` : ` · ${total - want} over`)}
-                                </span>
-                              )
-                            })()}
+                            {/* The "N of M picked" chip is gone. It existed to catch a
+                                mismatch between the picks and the line quantity — but the
+                                line now FOLLOWS the sum of the picks, so the two can no
+                                longer disagree and the chip could only ever say "5 of 5".
+                                A readout that can only report agreement is decoration. */}
                           </div>
                         )}
                         {/* OTTO: one source, so one chip — same shape as the S&S ones so the
@@ -1277,7 +1260,7 @@ export function PurchaseView() {
                               title={ottoStock[l.sku] == null
                                 ? "Otto didn't return a stock figure we could read"
                                 : `${ottoStock[l.sku]} available from Otto`}
-                              className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 rounded-lg border border-border px-1.5 py-1.5 transition-colors">
+                              className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 px-1.5 py-1.5">
                               <Input
                                 value={String(num(l.qty) || "")}
                                 onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
