@@ -30,6 +30,7 @@ import { VariantPicker } from "@/components/app/variant-picker"
 import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
+import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
 
 // PhotoStack moved to components/app/photo-stack.tsx so the factory boards render the
 // identical strip instead of growing a second copy (CLAUDE.md §5).
@@ -332,6 +333,17 @@ export function OrdersList() {
                       <TableRow className="hover:bg-transparent">
                         <TableCell colSpan={visibleCols.length + 1} className="bg-muted/30 p-0">
                           <div className="space-y-3 px-5 py-4">
+                            {/* Quotes FIRST, above the lines. A pending quote is the only
+                                thing on this order the seller has to act on, and burying it
+                                beside the line it belongs to means it reads as a label
+                                rather than a question. */}
+                            {items.filter((it) => it.design_quote_status === "pending").map((it, i) => (
+                              <DesignQuoteBanner
+                                key={`q-${it.line_id ?? it.sku ?? i}`}
+                                order={o} item={it}
+                                onAnswered={() => load()}
+                              />
+                            ))}
                             <div className="space-y-2">
                               {items.length === 0 ? (
                                 <div className="text-sm text-muted-foreground">No line items on this order.</div>

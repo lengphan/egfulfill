@@ -10,6 +10,7 @@ import { aiComplete } from './support_ai.js';
 import { audit } from '../audit.js';
 import { quoteOrder, freezeQuote } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
+import { readAll } from './factory_settings.js';
 import { orderCharges, refundOrder } from './order_refunds.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
 import { autoReplenish } from '../replenish.js';
@@ -361,6 +362,22 @@ export function ordersRoutes(app, requireAuth) {
   q('alter table order_items add column if not exists design_tier text').catch(() => {});
   q('alter table order_items add column if not exists design_tier_at timestamptz').catch(() => {});
   q('alter table order_items add column if not exists design_tier_by text').catch(() => {});
+  /**
+   * The complex-work quote, and its FROZEN prices.
+   *
+   * Frozen because the settings can change between quoting and accepting, and a seller must
+   * be charged what they agreed to — not what the number happened to be when they clicked.
+   * Same reason order refunds split on the stored unit_cost rather than re-quoting.
+   *
+   * Only 'complex' needs this. Standard and supplied are ordinary charges a seller already
+   * consented to by ordering embroidery; complex is a different, much larger number, and
+   * applying it silently is how chargebacks happen.
+   */
+  q('alter table order_items add column if not exists design_quote_status text').catch(() => {});
+  q('alter table order_items add column if not exists design_quote_make numeric(12,2)').catch(() => {});
+  q('alter table order_items add column if not exists design_quote_download numeric(12,2)').catch(() => {});
+  q('alter table order_items add column if not exists design_quote_at timestamptz').catch(() => {});
+  q('alter table order_items add column if not exists design_charged_at timestamptz').catch(() => {});
   // Design uploads live SERVER-side, not in browser localStorage (~5MB, overflows
   // the moment a seller uploads a few images → "Browser storage is full"). One row
   // per (order, item, kind): kind='raster' for png/jpg/etc, 'emb' for stitch files.
@@ -968,6 +985,53 @@ export function ordersRoutes(app, requireAuth) {
     return { ok: true };
   });
   /**
+   * Charge a seller for design work on ONE line.
+   *
+   * Idempotent on (order, line, 'design-work'): the ledger's own (account, type, ref)
+   * uniqueness means a retried request, a double-click, or a tier re-set to the same value
+   * cannot bill twice. Re-tiering a line that was already charged does NOT charge again —
+   * correcting a mis-categorised line is a fix, not a second sale, and the difference is
+   * settled by hand if it matters.
+   *
+   * Returns what happened rather than throwing: the tier decision is already recorded, and
+   * losing that record because a wallet call failed would leave the line uncategorised with
+   * no sign anything went wrong.
+   */
+  async function chargeDesign(req, orderId, lineId, sku, tier, fees) {
+    const amount = tier === 'supplied'
+      ? Number(fees.check_fee) || 0
+      : tier === 'complex'
+        ? Number(fees.design_fee_complex) || 0
+        : Number(fees.design_fee_standard) || 0;
+    if (!(amount > 0)) return { charged: 0, reason: 'no-fee-set' };
+    const key = lineId ? 'line_id' : 'sku';
+    const row = await q(
+      `select i.design_charged_at, o.seller_id from order_items i
+         join orders o on o.id = i.order_id
+        where i.order_id=$1 and i.${key}=$2 limit 1`, [orderId, lineId || sku])
+      .then((r) => r.rows[0]).catch(() => null);
+    if (!row) return { charged: 0, reason: 'no-line' };
+    if (row.design_charged_at) return { charged: 0, reason: 'already-charged' };
+    if (!row.seller_id) return { charged: 0, reason: 'no-seller' };
+
+    const ref = `design-${orderId}-${lineId || sku}`;
+    try {
+      await moveFunds({
+        from: row.seller_id, to: 'factory', amount,
+        type: 'design-work', ref,
+        note: `Design ${tier === 'supplied' ? 'check' : 'work'} · ${orderId} · ${sku || lineId}`,
+        by: req.user && req.user.sub,
+      });
+    } catch (e) {
+      return { charged: 0, reason: 'wallet-failed', error: e.message };
+    }
+    await q(`update order_items set design_charged_at = now() where order_id=$1 and ${key}=$2`,
+      [orderId, lineId || sku]).catch(() => {});
+    audit(req, 'design.charged', { entityType: 'order', entityId: orderId, after: { tier, amount, line_id: lineId, sku } });
+    return { charged: amount, tier };
+  }
+
+  /**
    * Record which design charge a line attracts. Staff decide; the seller is billed later,
    * and for 'complex' only after they accept the quote.
    *
@@ -984,14 +1048,133 @@ export function ordersRoutes(app, requireAuth) {
     const sku = b.sku ? String(b.sku) : null;
     if (!lineId && !sku) { reply.code(400); return { error: 'line_id or sku required' }; }
     const key = lineId ? 'line_id' : 'sku';
+    const fees = await readAll().catch(() => ({}));
+    // COMPLEX opens a quote and charges nothing. The other two are charged here, because
+    // setting them IS the decision — there is no second party to ask.
+    const quoted = tier === 'complex';
     const r = await q(
-      `update order_items set design_tier=$3, design_tier_at=now(), design_tier_by=$4
+      `update order_items set design_tier=$3, design_tier_at=now(), design_tier_by=$4,
+              design_quote_status = $5,
+              design_quote_make = $6, design_quote_download = $7, design_quote_at = $8
         where order_id=$1 and ${key}=$2`,
-      [String(req.params.id), lineId || sku, tier, String((req.user && req.user.sub) || '')]);
+      [String(req.params.id), lineId || sku, tier, String((req.user && req.user.sub) || ''),
+       quoted ? 'pending' : null,
+       quoted ? Number(fees.design_fee_complex) || 0 : null,
+       quoted ? Number(fees.emb_price_complex) || 0 : null,
+       quoted ? new Date().toISOString() : null]);
     if (!r.rowCount) { reply.code(404); return { error: 'No such line on this order.' }; }
     audit(req, 'design.tier', { entityType: 'order', entityId: String(req.params.id), after: { tier, line_id: lineId, sku } });
+
+    let charged = null;
+    if (quoted) {
+      const seller = await q('select seller_id from orders where id=$1', [String(req.params.id)])
+        .then((x) => x.rows[0] && x.rows[0].seller_id).catch(() => null);
+      if (seller) {
+        notify({
+          userIds: [seller], type: 'design-quote',
+          title: 'This design needs a quote',
+          body: `We've looked at your artwork and it's intricate — $${(Number(fees.design_fee_complex) || 0).toFixed(2)} to digitise. Open the order to accept or cancel the line.`,
+          href: `/orders`, entityId: String(req.params.id),
+        }).catch(() => {});
+      }
+    } else {
+      charged = await chargeDesign(req, String(req.params.id), lineId, sku, tier, fees);
+    }
     egBroadcast({ type: 'orders' });
-    return { ok: true, tier, lines: r.rowCount };
+    return { ok: true, tier, lines: r.rowCount, quoted, charged };
+  });
+
+  /**
+   * The seller answers the quote.
+   *
+   * Seller-owned, not staff: this is the whole point. A complex charge is several times the
+   * standard one, and it applies only because the person paying it said yes. Staff can set
+   * the tier; only the seller can accept the number.
+   *
+   * Accepting charges the FROZEN price stored at quote time, not today's setting — the
+   * seller agreed to a number and that is the number.
+   *
+   * Declining records the decision and tells staff. It does NOT cancel the line: cancelling
+   * moves money (the production charge has to come back) and that path already exists,
+   * tested, in the cancel flow. A second, hastier implementation of a refund is exactly the
+   * kind of thing that quietly pays the wrong amount.
+   */
+  app.post('/api/orders/:id/design-quote', { preHandler: requireAuth }, async (req, reply) => {
+    const b = req.body || {};
+    const decision = String(b.decision || '').trim();
+    if (!['accept', 'decline'].includes(decision)) { reply.code(400); return { error: "decision must be 'accept' or 'decline'" }; }
+    const lineId = b.line_id ? String(b.line_id) : null;
+    const sku = b.sku ? String(b.sku) : null;
+    if (!lineId && !sku) { reply.code(400); return { error: 'line_id or sku required' }; }
+
+    const orderId = String(req.params.id);
+    const sel = await resolveSeller(req.user);
+    const own = await q('select seller_id from orders where id=$1', [orderId])
+      .then((r) => r.rows[0]).catch(() => null);
+    if (!own) { reply.code(404); return { error: 'Order not found' }; }
+    // 404 rather than 403 on someone else's order — the same reason every other read here
+    // does: telling a stranger "that exists but isn't yours" confirms the id.
+    const mine = sel && sel.id && String(own.seller_id) === String(sel.id);
+    if (!mine && !isStaff(req.user)) { reply.code(404); return { error: 'Order not found' }; }
+
+    const key = lineId ? 'line_id' : 'sku';
+    const line = await q(
+      `select design_quote_status, design_quote_make, design_charged_at
+         from order_items where order_id=$1 and ${key}=$2 limit 1`, [orderId, lineId || sku])
+      .then((r) => r.rows[0]).catch(() => null);
+    if (!line) { reply.code(404); return { error: 'No such line on this order.' }; }
+    if (line.design_quote_status !== 'pending') {
+      reply.code(409);
+      return { error: `This quote is already ${line.design_quote_status || 'not open'}.` };
+    }
+
+    if (decision === 'decline') {
+      await q(`update order_items set design_quote_status='declined' where order_id=$1 and ${key}=$2`,
+        [orderId, lineId || sku]);
+      audit(req, 'design.quote.declined', { entityType: 'order', entityId: orderId, after: { line_id: lineId, sku } });
+      notify({
+        roles: ['operator', 'warehouse', 'admin'], excludeUserId: req.user && req.user.sub,
+        type: 'design-quote', title: 'Design quote declined',
+        body: `${orderId} · ${sku || lineId} — the seller declined the complex design fee. Cancel the line or agree something else.`,
+        href: `/operator?order=${orderId}`, entityId: orderId,
+      }).catch(() => {});
+      egBroadcast({ type: 'orders' });
+      return { ok: true, decision: 'declined' };
+    }
+
+    const amount = Number(line.design_quote_make) || 0;
+    if (line.design_charged_at) {
+      // Already paid: accept the click, change nothing, say so. Erroring here would look
+      // like the acceptance failed and invite a second attempt.
+      await q(`update order_items set design_quote_status='accepted' where order_id=$1 and ${key}=$2`,
+        [orderId, lineId || sku]);
+      return { ok: true, decision: 'accepted', charged: 0, already: true };
+    }
+    if (amount > 0) {
+      const bal = await balanceOf(own.seller_id).catch(() => 0);
+      if (bal < amount) {
+        reply.code(402);
+        return { error: `Not enough balance — this needs $${amount.toFixed(2)} and you have $${Number(bal).toFixed(2)}. Top up and accept again.`, needsTopup: true, amount };
+      }
+      try {
+        await moveFunds({
+          from: own.seller_id, to: 'factory', amount,
+          type: 'design-work', ref: `design-${orderId}-${lineId || sku}`,
+          note: `Complex design · ${orderId} · ${sku || lineId}`, by: req.user && req.user.sub,
+        });
+      } catch (e) { reply.code(400); return { error: e.message }; }
+    }
+    await q(`update order_items set design_quote_status='accepted', design_charged_at=now() where order_id=$1 and ${key}=$2`,
+      [orderId, lineId || sku]);
+    audit(req, 'design.quote.accepted', { entityType: 'order', entityId: orderId, after: { amount, line_id: lineId, sku } });
+    notify({
+      roles: ['operator', 'warehouse', 'admin'],
+      type: 'design-quote', title: 'Design quote accepted',
+      body: `${orderId} · ${sku || lineId} — cleared to digitise.`,
+      href: `/operator?order=${orderId}`, entityId: orderId,
+    }).catch(() => {});
+    egBroadcast({ type: 'orders' });
+    return { ok: true, decision: 'accepted', charged: amount };
   });
 
   /**

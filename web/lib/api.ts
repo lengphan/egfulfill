@@ -683,6 +683,16 @@ export function importOttoProducts(products: OttoImportRow[]) {
 export type OrderItem = {
   name?: string
   sku?: string
+  /** Which design charge this line attracts, and where its quote stands. Null tier = nobody
+   *  has judged it yet, which is deliberate: defaulting to `standard` would assert a
+   *  difficulty call no human made, and that call is several times the money. */
+  design_tier?: "standard" | "complex" | "supplied" | null
+  design_quote_status?: "pending" | "accepted" | "declined" | null
+  /** FROZEN at quote time. Settings can change between quoting and accepting, and the
+   *  seller must be charged what they agreed to. */
+  design_quote_make?: number | string | null
+  design_quote_download?: number | string | null
+  design_charged_at?: string | null
   qty?: number
   color?: string
   size?: string
@@ -1100,6 +1110,33 @@ export function createDesignCard(body: { title: string; data?: string; type?: st
 export function assignDesignCard(id: string, body: { orderId: string; sku: string; lineId?: string }) {
   return api<{ ok?: boolean; orderId?: string; sku?: string; error?: string }>(
     `/api/design_cards/${encodeURIComponent(id)}/assign`,
+    { method: "POST", body: JSON.stringify(body) })
+}
+
+/**
+ * Which design charge a line attracts. Staff decide; `complex` opens a quote and charges
+ * nothing until the seller accepts. The other two charge immediately, because setting them
+ * IS the decision — there is no second party to ask.
+ */
+export type DesignTier = "standard" | "complex" | "supplied"
+export function setDesignTier(orderId: string, body: { tier: DesignTier; line_id?: string; sku?: string }) {
+  return api<{ ok?: boolean; tier?: string; quoted?: boolean
+               charged?: { charged: number; reason?: string } | null; error?: string }>(
+    `/api/orders/${encodeURIComponent(orderId)}/design-tier`,
+    { method: "POST", body: JSON.stringify(body) })
+}
+
+/**
+ * The seller answers a complex-work quote. Accepting charges the price FROZEN when it was
+ * quoted, not today's setting — they agreed to a number and that is the number.
+ *
+ * Declining does not cancel the line. Cancelling moves money and that path already exists,
+ * tested; a second, hastier refund is how the wrong amount gets paid.
+ */
+export function answerDesignQuote(orderId: string, body: { decision: "accept" | "decline"; line_id?: string; sku?: string }) {
+  return api<{ ok?: boolean; decision?: string; charged?: number; already?: boolean
+               needsTopup?: boolean; amount?: number; error?: string }>(
+    `/api/orders/${encodeURIComponent(orderId)}/design-quote`,
     { method: "POST", body: JSON.stringify(body) })
 }
 

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { uploadDesignFile, type OrderItem, type OrderRow } from "@/lib/api"
+import { setDesignTier, uploadDesignFile, type DesignTier, type OrderItem, type OrderRow } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
 
 /** Machine-file extensions the embroidery side actually uses. Kept in one place so the
@@ -45,6 +45,9 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
   const [err, setErr] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
   const [over, setOver] = useState(false)
+  const [tierBusy, setTierBusy] = useState<DesignTier | null>(null)
+  const [tier, setTier] = useState<DesignTier | null>((item.design_tier as DesignTier | null) ?? null)
+  const quote = item.design_quote_status ?? null
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -154,6 +157,67 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
                 Filing it here counts as done for this line. Nobody is credited — a payout
                 follows a card someone claimed, and this path has no card.
               </p>
+            </div>
+
+            {/* WHAT THIS LINE COSTS THE SELLER. Sits here because this is where someone is
+                looking at the artwork, which is the only moment the judgement can honestly
+                be made — "is this intricate?" is not answerable from a list row. */}
+            <div className="border-t border-border pt-3">
+              <span className="mb-1.5 block text-xs font-medium">Design charge</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  ["standard", "Standard", "We cut it — ordinary artwork"],
+                  ["complex", "Complex", "We cut it — intricate. Quotes the seller first"],
+                  ["supplied", "Their file", "Seller sent a machine file — check fee only"],
+                ] as [DesignTier, string, string][]).map(([id, label, why]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    title={why}
+                    disabled={!!tierBusy || quote === "accepted"}
+                    onClick={async () => {
+                      setTierBusy(id); setErr(null); setDone(null)
+                      try {
+                        const r = await setDesignTier(order.id, {
+                          tier: id, line_id: item.line_id, sku: item.line_id ? undefined : item.sku,
+                        })
+                        if (r?.error) throw new Error(r.error)
+                        setTier(id)
+                        setDone(r.quoted
+                          // Says what has NOT happened yet. "Marked complex" would read as
+                          // done, and the money hasn't moved and may never.
+                          ? "Quoted to the seller. Nothing is charged until they accept, and they may decline."
+                          : r.charged?.charged
+                            ? `Charged $${Number(r.charged.charged).toFixed(2)} to the seller.`
+                            : r.charged?.reason === "already-charged"
+                              ? "Re-filed. This line was already charged, so nothing moved."
+                              : r.charged?.reason === "no-fee-set"
+                                ? "Filed. No fee is set for this tier yet, so nothing was charged."
+                                : "Filed.")
+                        onUploaded?.()
+                      } catch (e) { setErr((e as Error).message) } finally { setTierBusy(null) }
+                    }}
+                    className={"rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-50 " +
+                      (tier === id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent")}
+                  >
+                    {tierBusy === id ? <CircleNotch size={12} className="mx-auto animate-spin" /> : label}
+                  </button>
+                ))}
+              </div>
+              {/* The quote's own state, in words. A "complex" chip alone can't distinguish
+                  waiting on the seller from already paid from refused. */}
+              {quote === "pending" && (
+                <p className="mt-1.5 text-[11px] text-amber-700">Waiting on the seller to accept the quote — don&apos;t start work yet.</p>
+              )}
+              {quote === "declined" && (
+                <p className="mt-1.5 text-[11px] text-rose-700">The seller declined. Cancel the line, or agree something else with them.</p>
+              )}
+              {quote === "accepted" && (
+                <p className="mt-1.5 text-[11px] text-emerald-700">Accepted and paid — cleared to digitise. The tier is locked now.</p>
+              )}
+              {!tier && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">Not judged yet, so nothing has been charged for the design on this line.</p>
+              )}
             </div>
 
             {onSendToDesigner && (
