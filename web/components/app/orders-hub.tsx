@@ -1054,7 +1054,10 @@ export function OrdersHub() {
                             onClick={() => setZoom({ order: o, item: it })}
                             title="Open the artwork, download it, or attach a machine file"
                             aria-label={`Open artwork for ${it.name || it.sku || "this line"}`}
-                            className="eg-tap absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full border border-border bg-background text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/art:opacity-100"
+                            // TOP-right. item-avatar puts its listing/design SWAP control at -bottom-1 -right-1,
+                            // so putting this there too stacked two controls on the same
+                            // 24px of tile — "matching the pattern" was landing on top of it.
+                            className="eg-tap absolute -right-1 -top-1 grid size-6 place-items-center rounded-full border border-border bg-background text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/art:opacity-100"
                           >
                             <MagnifyingGlassPlus size={12} weight="bold" />
                           </button>

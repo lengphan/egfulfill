@@ -239,20 +239,7 @@ export function ArtworkZoom({ order, item, artwork, designs, open, onOpenChange,
           image, a drop zone and two panels, which is easily taller than a laptop. */}
       <DialogContent
         className="max-h-[90vh] overflow-y-auto sm:max-w-3xl"
-        // The WHOLE panel takes a drop, so there is no separate window to open and no
-        // hunting for the right rectangle. The zone below stays as the discoverable
-        // affordance — drop-anywhere alone is invisible to anyone who wasn't told.
-        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-        onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false) }}
-        onDrop={(e) => { e.preventDefault(); setOver(false); void upload(Array.from(e.dataTransfer?.files ?? [])) }}
       >
-        {over && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
-            <span className="rounded-lg bg-background px-3 py-1.5 text-sm font-medium shadow-sm">
-              Drop to attach — images become artwork, {MACHINE_EXT[0]}/{MACHINE_EXT[1]} become the machine file
-            </span>
-          </div>
-        )}
         <DialogHeader>
           <DialogTitle className="truncate pr-6">{item.name ?? item.sku ?? "Artwork"}</DialogTitle>
           <DialogDescription>
