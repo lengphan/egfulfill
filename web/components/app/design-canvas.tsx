@@ -388,6 +388,7 @@ export function DesignCanvasDialog({
   }
   const [err, setErr] = useState<string | null>(null)
   const [libOpen, setLibOpen] = useState(false)
+  const [over, setOver] = useState(false)
 
   const save = async () => {
     if (!designUrl || !item.sku) { setErr("Upload artwork first."); return }
@@ -410,7 +411,35 @@ export function DesignCanvasDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent
+        className="sm:max-w-xl"
+        // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
+        // Upload and From library but no drop target at all, so a dragged file had nowhere
+        // to land and the only route was a file picker. The point of putting it here is
+        // that this is the window already open when someone has a file in hand — no
+        // second window to invent.
+        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+        onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false) }}
+        onDrop={(e) => {
+          e.preventDefault(); setOver(false)
+          const f = Array.from(e.dataTransfer?.files ?? [])[0]
+          if (!f) return
+          // Images only here — this designer POSITIONS artwork on a mockup, and a .pes has
+          // nothing to position. Saying so beats a file that silently does nothing.
+          if (!/^image\//.test(f.type)) {
+            setErr(`${f.name} isn't an image. Machine files (.emb, .pes, .dst) are attached from the artwork panel, not placed here.`)
+            return
+          }
+          readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr)
+        }}
+      >
+        {over && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10">
+            <span className="rounded-lg bg-background px-3 py-1.5 text-sm font-medium shadow-sm">
+              Drop an image to place it on this product
+            </span>
+          </div>
+        )}
         <DialogHeader><DialogTitle>Customize · {item.name || item.sku}</DialogTitle></DialogHeader>
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {faces.length > 1 && (
@@ -589,7 +618,9 @@ export function DesignCanvasDialog({
             <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>
               <FolderOpen size={15} weight="bold" /> From library
             </Button>
-            {designUrl && <span className="text-xs text-muted-foreground">Drag · corner resizes · top rotates</span>}
+            {designUrl
+              ? <span className="text-xs text-muted-foreground">Drag · corner resizes · top rotates</span>
+              : <span className="text-xs text-muted-foreground">…or drop an image anywhere here</span>}
           </div>
           {err && <div className="text-sm text-destructive">{err}</div>}
           <div className="flex justify-end gap-2">
