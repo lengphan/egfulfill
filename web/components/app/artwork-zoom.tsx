@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { setDesignTier, uploadDesignFile, postOrderDesign, type DesignTier, type OrderItem, type OrderRow } from "@/lib/api"
+import { setDesignTier, uploadDesignFile, postOrderDesign, getFactorySettings, type DesignTier, type OrderItem, type OrderRow } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 
 /** Machine-file extensions the embroidery side actually uses. Kept in one place so the
  *  accept attribute, the drop filter and the error message can't drift apart. */
 const MACHINE_EXT = [".emb", ".pes", ".dst", ".exp", ".jef", ".vp3", ".xxx", ".hus"]
+const usd = (n: number | undefined) => `$${(Number(n) || 0).toFixed(2)}`
 const isMachineFile = (name: string) => MACHINE_EXT.some((e) => name.toLowerCase().endsWith(e))
 
 /** Artwork the customer's design can be. Anything else is refused BY NAME rather than
@@ -77,6 +78,28 @@ export function ArtworkZoom({ order, item, artwork, designs, open, onOpenChange,
     }, 0)
     return () => clearTimeout(t)
   }, [])
+
+  /**
+   * What each tier COSTS THE SELLER, fetched so the person choosing can see it.
+   *
+   * The tiers were three words with no numbers on them, so picking one meant knowing the
+   * price list by heart — and Complex is several times Standard. A charge decided by
+   * someone who cannot see the amount is a charge made blind.
+   */
+  const [fees, setFees] = useState<{ standard?: number; complex?: number; check?: number } | null>(null)
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(() => {
+      getFactorySettings()
+        .then((f) => setFees({
+          standard: Number(f.design_fee_standard) || 0,
+          complex: Number(f.design_fee_complex) || 0,
+          check: Number(f.check_fee) || 0,
+        }))
+        .catch(() => setFees(null))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [open])
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -360,7 +383,20 @@ export function ArtworkZoom({ order, item, artwork, designs, open, onOpenChange,
                     className={"rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-50 " +
                       (tier === id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent")}
                   >
-                    {tierBusy === id ? <CircleNotch size={12} className="mx-auto animate-spin" /> : label}
+                    {tierBusy === id ? <CircleNotch size={12} className="mx-auto animate-spin" /> : (
+                      <>
+                        <span className="block">{label}</span>
+                        {/* The number, not just the word. Rendered only once settings load,
+                            so a slow fetch never shows a confident $0. */}
+                        {fees && (
+                          <span className="block text-[10px] font-normal tabular-nums opacity-70">
+                            {id === "standard" ? usd(fees.standard)
+                              : id === "complex" ? usd(fees.complex)
+                              : usd(fees.check)} to seller
+                          </span>
+                        )}
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
