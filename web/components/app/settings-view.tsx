@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
+import { SupplierOrderingSettings } from "@/components/app/supplier-ordering-settings"
 import { getUser, updateUser } from "@/lib/auth"
 import { UserAvatar, AVATAR_COLORS, AVATAR_EMOJIS } from "@/components/app/user-avatar"
 import {
@@ -1702,6 +1703,9 @@ export function SettingsView() {
         {canUseKeys && <TabsTrigger value="keys">API keys</TabsTrigger>}
         {canPlatform && <TabsTrigger value="platform">Platform</TabsTrigger>}
         {canPlatform && <TabsTrigger value="users">Users</TabsTrigger>}
+        {/* Supplier ordering defaults. Warehouse/admin, matching who may spend — these
+            decide how a purchase order pays and ships. */}
+        {canPlatform && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
         {isAdmin && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
         {/* Team is a SELLER's own staff (and their permissions). Factory roles are managed
@@ -1723,6 +1727,16 @@ export function SettingsView() {
       {canPlatform && (
         <TabsContent value="platform">
           <PlatformPanel />
+        </TabsContent>
+      )}
+      {canPlatform && (
+        <TabsContent value="suppliers">
+          <SectionCard
+            title="Supplier ordering"
+            description="How purchase orders pay and ship, set once instead of on every order."
+          >
+            <SupplierOrderingSettings />
+          </SectionCard>
         </TabsContent>
       )}
       {canPlatform && (
