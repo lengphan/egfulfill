@@ -159,7 +159,6 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
       {e.response && (
         <div className="mt-3">
           <TitledBlock
-            tone="response"
             title={<span className="uppercase tracking-widest">Response</span>}
             actions={<CopyButton text={e.response} label={`${e.title} response`} onAccent />}
           >
