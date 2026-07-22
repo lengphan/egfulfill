@@ -92,7 +92,13 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      {/* sm: prefix matters. A bare max-w-3xl is 48rem at EVERY width, so on a window
+          narrower than that the dialog overflowed its own container and the left edge —
+          title included — was clipped behind a horizontal scrollbar. Prefixed, small
+          screens keep the primitive's responsive default and only wide ones go to 3xl.
+          The height cap plus scroll is the same problem vertically: this dialog carries an
+          image, a drop zone and two panels, which is easily taller than a laptop. */}
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="truncate pr-6">{item.name ?? item.sku ?? "Artwork"}</DialogTitle>
           <DialogDescription>
