@@ -50,8 +50,13 @@ function closeOtherTags(mine: () => void) {
  *  the paywall and the seller/staff checks still apply. */
 export type TagFile = { key: string; name: string; note?: string; href?: string; designId?: string }
 
-function Tag({ id, label, state, title, orderId, status, files }: {
+function Tag({ id, label, state, title, orderId, status, files, dot }: {
   id: TagId; label: string; state: State; title?: string; orderId: string
+  /** Render as a bare dot instead of a worded pill. The state, the popover and the
+   *  history are identical — only the label is dropped. In a TABLE the column heading
+   *  already says what the group is, so repeating "Label Scan Design" on all fifty rows
+   *  spends 176px per row to restate the header. */
+  dot?: boolean
   /** The sentence that used to be baked into the tag's name. */
   status?: string
   files?: TagFile[]
@@ -120,9 +125,13 @@ function Tag({ id, label, state, title, orderId, status, files }: {
         onMouseEnter={openLater}
         onMouseLeave={closeLater}
         onFocus={openNow}
-        className={"eg-tap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + cls}
+        // A dot is 10px, so the WORD cannot come with it — left in, the three labels
+        // spilled out of their circles and printed over each other ("LaScDesign"). The
+        // name still reaches a screen reader and the tooltip; only the ink is dropped.
+        aria-label={dot ? `${label}: ${title ?? ""}` : undefined}
+        className={"eg-tap shrink-0 font-semibold transition-colors " + (dot ? "block size-2.5 rounded-full " : "rounded-md px-2.5 py-1 text-xs ") + cls}
       >
-        {label}
+        {dot ? "" : label}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-0"
         // Entering the panel cancels the pending close, so it stays put while you read
@@ -225,7 +234,7 @@ function TagFileRow({ file }: { file: TagFile }) {
   )
 }
 
-export function ReadinessStrip({ order, items, designs, files, className }: {
+export function ReadinessStrip({ order, items, designs, files, className, compact }: {
   order: OrderRow
   items?: OrderItem[]
   /** Placed artwork keyed by sku — presence means a design exists to work from. */
@@ -233,6 +242,8 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
   /** Machine files produced for this order — presence means a design was approved. */
   files?: DesignFileRow[]
   className?: string
+  /** Dots, not words — for a table column that already has a heading. */
+  compact?: boolean
 }) {
   const stage = String(order.factory_status ?? "").toLowerCase()
 
@@ -366,14 +377,14 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
   const designFiles = designFilesAll.filter((f) => f.href || f.designId)
 
   return (
-    <span className={"inline-flex items-center gap-1.5 " + (className ?? "")}>
+    <span className={"inline-flex items-center " + (compact ? "gap-1 " : "gap-1.5 ") + (className ?? "")}>
       {/* Names are fixed. Colour carries progress; the words live in each popover. */}
       <Tag id="label" orderId={order.id} label="Label" state={hasLabel ? "done" : "todo"}
-           title={labelTitle} status={labelTitle} files={labelFile} />
+           title={labelTitle} status={labelTitle} files={labelFile} dot={compact} />
       <Tag id="scan" orderId={order.id} label="Scan" state={preScanned ? "done" : scanPending ? "doing" : "todo"}
-           title={scanTitle} status={scanTitle} files={labelFile} />
+           title={scanTitle} status={scanTitle} files={labelFile} dot={compact} />
       <Tag id="design" orderId={order.id} label="Design" state={designState}
-           title={designTitle} status={designStatus} files={designFiles} />
+           title={designTitle} status={designStatus} files={designFiles} dot={compact} />
     </span>
   )
 }

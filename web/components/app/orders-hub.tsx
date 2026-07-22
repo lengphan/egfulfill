@@ -18,7 +18,7 @@ import { resolveProduct } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
 import { DEFAULT_FACTORY_COLS, FACTORY_COLS, factoryGridTemplate } from "@/lib/order-columns"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
-import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
+import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
@@ -783,62 +783,61 @@ export function OrdersHub() {
                       <CaretRight size={13} weight="bold" className={"transition-transform " + (isCollapsed ? "" : "rotate-90")} />
                     </button>
 
-                    {/* STATUS */}
-                    <StageBadge status={stage} />
+                    {/* STATUS — justify-self-start so the pill hugs its word. Grid items
+                        stretch by default, which was inflating a two-letter badge to the
+                        full 6rem track and making every status look like a banner. */}
+                    <span className="justify-self-start"><StageBadge status={stage} /></span>
 
-                    {/* ORDER — the id, with what was the wrapped meta line folded underneath
-                        it as one quiet second line. Platform and shop are one fact
-                        ("CustomBabeUSA, on Etsy"), so they stay fused. */}
+                    {/* ORDER */}
+                    <div className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</div>
+
+                    {/* TRACKING — its own column, whole. It was a small link folded under
+                        the item count; a tracking number you cannot read to a buyer on the
+                        phone is not doing its job. */}
                     <div className="min-w-0">
-                      <div className="truncate font-mono text-sm font-semibold">{numOf(o)}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {platformOf(o)}
-                        {o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() && <> · <span className="capitalize">{o.store}</span></>}
-                        {" · "}{fmtDate(o.created_at)}
-                      </div>
+                      {track ? (
+                        <a
+                          href={trackUrl(o.carrier || label?.carrier, track)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 font-mono text-xs font-medium text-emerald-600 hover:underline"
+                          title={`${o.carrier || label?.carrier || "USPS"} ${track}`}
+                        >
+                          {track}<ArrowSquareOut size={9} weight="bold" className="shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/60">—</span>
+                      )}
+                    </div>
+
+                    {/* STORE — the shop, with the platform beneath it. One fact
+                        ("CustomBabeUSA, on Etsy"), but it gets a column rather than being
+                        appended to the order number where it truncated to "CustomBabeUS…". */}
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-medium">{o.store || platformOf(o)}</div>
+                      <div className="truncate text-[10px] text-muted-foreground">{platformOf(o)} · {fmtDate(o.created_at)}</div>
                     </div>
 
                     {/* CUSTOMER */}
                     <div className="min-w-0 truncate text-sm font-medium">{o.customer?.name || "—"}</div>
 
-                    {/* ADDRESS — named when absent, because an empty cell reads as a layout
-                        hole while "No address" is a real state that blocks shipping. */}
-                    <div className="min-w-0 text-xs text-muted-foreground" title={addrLine(o) || undefined}>
-                      {addrLine(o) ? (
-                        <>
-                          <div className="truncate">{addrLine(o)}</div>
-                          <div className="truncate text-[10px] text-muted-foreground/70">{ADDRESS_SOURCE_LABEL[addressSource(o)]}</div>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground/60">No address</span>
-                      )}
-                    </div>
-
-                    {/* ITEMS — the photos plus the count, the same shape the seller table
-                        uses for this column. Tracking lives here too: it belongs to what
-                        was shipped, and it only exists once a label has been bought. */}
+                    {/* ITEMS — photo, listing name, units. The same shape the seller table
+                        uses for this column, so the two surfaces read alike. The full
+                        address moved OUT of the row and into the expanded panel below,
+                        where it already appears in full and has the width for it. */}
                     <div className="flex min-w-0 items-center gap-2.5">
                       {items.length > 0 && <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={3} overlap />}
                       <div className="min-w-0">
-                        <div className="truncate text-xs text-muted-foreground">
+                        <div className="truncate text-xs">{itemsLabel(o)}</div>
+                        <div className="truncate text-[10px] text-muted-foreground">
                           {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}
                         </div>
-                        {track && (
-                          <a
-                            href={trackUrl(o.carrier || label?.carrier, track)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-0.5 truncate text-[11px] font-medium text-emerald-600 hover:underline"
-                          >
-                            <Truck size={10} weight="fill" /> {track} <ArrowSquareOut size={8} weight="bold" />
-                          </a>
-                        )}
                       </div>
                     </div>
 
                     {/* READY — its own column now, so the chips line up down the page
                         instead of riding on the front of the action cluster. */}
-                    <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} />
+                    <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} compact />
 
                     {/* One PRIMARY action for the current stage/role; everything rarer
                         (flag/status, labels, the non-primary of ship/advance) tucks into a

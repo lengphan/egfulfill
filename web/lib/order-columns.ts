@@ -93,34 +93,36 @@ export function reorderCols(ids: OrderColId[], id: OrderColId, toIndex: number):
 // `grid` (not a Tailwind width class) because this table is a CSS grid, not a <table>: an
 // order row and its expanded detail have to share one row container, and a grid lets the
 // detail sit as a full-width sibling instead of being forced into a colspan cell.
-export type FactoryColId = "status" | "order" | "customer" | "address" | "items" | "ready" | "action"
+export type FactoryColId = "status" | "order" | "tracking" | "store" | "customer" | "items" | "ready" | "action"
 
 export type FactoryColDef = { id: FactoryColId; label: string; grid: string; align?: "left" | "right" }
 
 export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
-  // Fixed where the content is a known shape (a badge, an id) so the eye can run down it;
-  // flexible only where real text lives and needs whatever is left over.
-  status:   { id: "status",   label: "Status",   grid: "7.5rem" },
-  order:    { id: "order",    label: "Order",    grid: "8rem" },
+  // Every fact gets a SLOT. Store and tracking were folded into sub-lines under the order
+  // number and the item count, which made them truncate, unscannable down the page, and
+  // invisible unless you were looking straight at that one row — the seller table gives
+  // each its own column, which is most of why it reads more easily.
+  status:   { id: "status",   label: "Status",   grid: "6rem" },
+  order:    { id: "order",    label: "Order",    grid: "5.5rem" },
+  // Wide enough for a FULL tracking number rather than an ellipsis. A truncated tracking
+  // number cannot be read to a buyer on the phone, which is the only reason it is on the
+  // row at all — so it is sized to the longest carrier format, not to the space left over.
+  tracking: { id: "tracking", label: "Tracking", grid: "12rem" },
+  store:    { id: "store",    label: "Store",    grid: "7rem" },
   customer: { id: "customer", label: "Customer", grid: "minmax(0,1fr)" },
-  address:  { id: "address",  label: "Address",  grid: "minmax(0,1.1fr)" },
-  items:    { id: "items",    label: "Items",    grid: "minmax(0,1.4fr)" },
-  // FIXED, not auto. An `auto` track sizes to its content, and the header's cell for
-  // these is empty — so the header collapsed them to 0px while the rows gave them 170px,
-  // and the two grids silently stopped agreeing. Every track the header cannot fill has
-  // to be a width, not a guess from content.
-  ready:    { id: "ready",    label: "Ready",    grid: "11rem" },
-  // 18rem, sized from the WIDEST it ever gets — a delivery badge, a refresh control, a
-  // long primary ("Create new label") and the ⋯ together. At 14rem the ⋯ was pushed past
-  // the card edge and clipped on any order carrying a carrier update, which is every
-  // order that has shipped.
-  action:   { id: "action",   label: "",         grid: "18rem" },  // header stays blank: buttons need no title
+  // The listing name lives here now, like the seller's Items column, and is deliberately
+  // the first thing squeezed: an Etsy title runs 130 characters and truncates whatever
+  // width it gets, so spending the table's flexible space on it starves everything that
+  // WOULD have fitted whole.
+  items:    { id: "items",    label: "Items",    grid: "minmax(0,1.2fr)" },
+  // Dots, not worded pills — the heading already says what they are, so three words per
+  // row restated it fifty times for 176px. Fixed, because the header cell can't size it.
+  ready:    { id: "ready",    label: "Ready",    grid: "5rem" },
+  action:   { id: "action",   label: "",         grid: "12rem" },  // header stays blank: buttons need no title
 }
 
-export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "customer", "address", "items", "ready", "action"]
+export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "tracking", "store", "customer", "items", "ready", "action"]
 
-/** The grid-template-columns value for the header and every row, built from one list so
- *  they cannot disagree. `lead` is the expand caret (+ the dispatch checkbox when on). */
 export function factoryGridTemplate(ids: FactoryColId[], lead: number): string {
   // Lead tracks are fixed for the same reason: the header renders empty spacers there.
   // 1.25rem is the checkbox, 1.5rem the caret — declared widest-first to match the row.
