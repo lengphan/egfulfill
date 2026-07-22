@@ -80,10 +80,52 @@ const OP_ZONE = new Set(['', 'in_review', 'awaiting_scan']);   // normalized
 const OP_STOPS = new Set(['flagged', 'on_hold']);
 const MONEY_STAGES = new Set(['cancelled', 'refunded']);
 
+// The linear order, '' (Received) first, for adjacency checks. EXCEPTIONS are deliberately
+// absent: a stop is not a position on this line, which is why it can be entered from
+// anywhere and never counts as a skip.
+const LINE = ['', ...PIPELINE];
+const posOf = (s) => LINE.indexOf(normalizeStage(s));
+// Human names, so a refusal can say which stages would be skipped rather than printing
+// the internal ids at someone.
+const STAGE_LABEL = {
+  '': 'Received', in_review: 'Submitted', awaiting_scan: 'Awaiting scan',
+  printed: 'Printed', working: 'Working', shipped: 'Shipped',
+};
+
+/**
+ * Would this move SKIP part of the pipeline?
+ *
+ * Forward moves must be one step. Nothing enforced this before: warehouse's rule was
+ * "anything that isn't a money stage" and admin's was "anything", so Received → Shipped
+ * was one click, and an order could be marked shipped having never been scanned, printed
+ * or made. The stages are a record of what physically happened to the goods; letting one
+ * be asserted without the ones before it makes the whole record untrustworthy, and it is
+ * the report the floor and the seller both read.
+ *
+ * Backwards is NOT a skip and stays open — correcting a mis-click has to remain possible,
+ * and stepping back to any earlier stage is a claim that less has happened, which is
+ * always safe to assert. Entering or leaving a stop is likewise never a skip.
+ */
+function skipsPipeline(current, target) {
+  const at = posOf(current), to = posOf(target);
+  if (at < 0 || to < 0) return false;      // a stop at either end — not on the line
+  return to > at + 1;
+}
+
 // null = allowed; a string = the refusal shown to the user.
 export function stageDenial(role, current, target) {
-  if (role === 'admin') return null;
   const at = normalizeStage(current), to = normalizeStage(target);
+
+  // SKIPPING IS DENIED FOR EVERYONE, admin included. This is not a permission — it is
+  // what the pipeline MEANS. An admin has the authority to correct any record; nobody has
+  // the authority to make an order have been printed when it wasn't. Admin keeps every
+  // other freedom: backwards, stops, money stages, one step at a time as far as they like.
+  if (skipsPipeline(at, to)) {
+    const missed = LINE.slice(posOf(at) + 1, posOf(to));
+    return `That would skip ${missed.map((s) => STAGE_LABEL[s] || s).join(', ')}. Move it one stage at a time.`;
+  }
+
+  if (role === 'admin') return null;
   if (role === 'warehouse') {
     return MONEY_STAGES.has(to) ? 'Cancelling or refunding is an admin decision.' : null;
   }
@@ -102,7 +144,15 @@ export function stageDenial(role, current, target) {
     // charge is idempotent so nothing double-bills, but the order goes back to looking
     // untouched while the money stays taken — and the seller sees it as editable again.
     // Anything that leaves a paid order looking unpaid is warehouse or admin.
-    if (at === 'in_review' && (to === '' || to === 'new' || to === 'draft')) {
+    // The test is the DESTINATION, not the origin. Written as `at === 'in_review'` it only
+    // blocked the direct hop, and OP_ZONE also contains awaiting_scan — so the same move
+    // went through in two clicks:
+    //     Submitted --X--> Received        blocked
+    //     Submitted --OK--> Awaiting scan --OK--> Received     same result, guard skipped
+    // Anything that has reached in_review has been PAID for; sending it back to Received
+    // makes a paid order read as untouched and editable while the money stays taken. That
+    // is true whichever stage it is sent back FROM, so the rule is about where it lands.
+    if ((to === '' || to === 'new' || to === 'draft') && posOf(at) > posOf('')) {
       return 'This order has been paid for — only warehouse or admin can send it back.';
     }
     return null;

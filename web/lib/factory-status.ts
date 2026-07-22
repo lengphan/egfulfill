@@ -111,21 +111,55 @@ const OP_ZONE = new Set(["", "in_review", "awaiting_scan"])
 const OP_STOPS = new Set(["flagged", "on_hold"])
 const MONEY_STAGES = new Set(["cancelled", "refunded"])
 
-export function canSetStage(role: string, current: string | null | undefined, target: string): boolean {
-  if (role === "admin") return true
+// The linear order, '' (Received) first, for adjacency. Exceptions are deliberately absent:
+// a stop is not a position on this line, which is why it can be entered from anywhere and
+// never counts as a skip. MIRRORS `LINE`/`skipsPipeline` in server/src/routes/orders.js.
+const LINE = ["", ...FACTORY_STAGES.map((s) => s.id)]
+const posOf = (s: string | null | undefined) => LINE.indexOf(normalizeStage(s))
+const LABEL_OF = (id: string) => (id === "" ? "Received" : FACTORY_STAGES.find((s) => s.id === id)?.label ?? id)
+
+/**
+ * WHY a move is refused, or null if it's allowed.
+ *
+ * Mirrors `stageDenial` in server/src/routes/orders.js — the server is what enforces this;
+ * this exists so the UI can grey an option and say why, instead of silently dropping it
+ * from the menu and leaving the rule unlearnable.
+ */
+export function stageDenialReason(role: string, current: string | null | undefined, target: string): string | null {
   const at = normalizeStage(current)
   const to = normalizeStage(target)
-  if (role === "warehouse") return !MONEY_STAGES.has(to)
-  if (role === "operator") {
-    if (MONEY_STAGES.has(to) || to === "backorder") return false
-    if (OP_STOPS.has(to)) return true
-    // Sending a SUBMITTED order back un-does something the seller paid for: the charge
-    // is idempotent so nothing double-bills, but the order reads as untouched while the
-    // money stays taken. Warehouse or admin only. (Server enforces the same.)
-    if (at === "in_review" && (to === "" || to === "new" || to === "draft")) return false
-    return OP_ZONE.has(at) && OP_ZONE.has(to)
+
+  // Skipping is denied for EVERYONE, admin included — it isn't a permission, it's what the
+  // pipeline means. Nobody has the authority to make an order have been printed when it
+  // wasn't. Backwards is not a skip: it claims LESS has happened, which is always safe.
+  const ai = posOf(at), ti = posOf(to)
+  if (ai >= 0 && ti >= 0 && ti > ai + 1) {
+    return `That would skip ${LINE.slice(ai + 1, ti).map(LABEL_OF).join(", ")}. Move it one stage at a time.`
   }
-  return false
+
+  if (role === "admin") return null
+  if (role === "warehouse") {
+    return MONEY_STAGES.has(to) ? "Cancelling or refunding is an admin decision." : null
+  }
+  if (role === "operator") {
+    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision — flag the order instead."
+    if (to === "backorder") return "Backorder is a stock call — warehouse or admin."
+    if (OP_STOPS.has(to)) return null                       // andon cord: any stage
+    // Tested on the DESTINATION, not the origin. As `at === "in_review"` it blocked only
+    // the direct hop, and OP_ZONE also holds awaiting_scan — so the same move went through
+    // in two clicks via Awaiting scan. Anything past Received has been PAID for.
+    if ((to === "" || to === "new" || to === "draft") && ai > 0) {
+      return "This order has been paid for — only warehouse or admin can send it back."
+    }
+    if (!OP_ZONE.has(at)) return "The warehouse has this item — only warehouse or admin can change its status now."
+    if (!OP_ZONE.has(to)) return "Operators can move an item as far as Awaiting scan."
+    return null
+  }
+  return "Your role cannot change production status."
+}
+
+export function canSetStage(role: string, current: string | null | undefined, target: string): boolean {
+  return stageDenialReason(role, current, target) === null
 }
 
 // Does this role get a status CONTROL for an item at this stage, or a read-only badge?

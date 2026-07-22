@@ -16,7 +16,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
-import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
@@ -815,9 +815,21 @@ export function OrdersHub() {
                     {allShipped ? (
                       <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> Shipped</span>
                     ) : (() => {
-                      const opts = stageOptionsFor(role, stage)
-                      const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
-                      const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
+                      /**
+                       * EVERY stage is listed; the ones this role can't use from here are
+                       * disabled and carry the reason.
+                       *
+                       * Filtering them out made the rule unlearnable — an option that is
+                       * simply absent looks the same as one that doesn't exist, so nobody
+                       * could tell "you may not" from "there is no such thing", and the
+                       * menu's length changed per row for no visible cause. The refusal
+                       * text is the SERVER's own sentence (stageDenialReason mirrors
+                       * stageDenial), so what the tooltip says is what the API would say.
+                       */
+                      const withReason = (list: typeof FACTORY_STAGES) =>
+                        list.map((s) => ({ ...s, deny: stageDenialReason(role, stage, s.id) }))
+                      const prod = withReason([{ id: "", label: "Received", tone: "new" as const }, ...FACTORY_STAGES])
+                      const exc = withReason(EXCEPTION_STAGES)
                       /**
                        * A STOPPED order has no obvious next move — that is what stopping it
                        * meant.
@@ -926,7 +938,16 @@ export function OrdersHub() {
                                       the popup mounts, which killed the whole menu. */}
                                   <DropdownMenuGroup>
                                     <DropdownMenuLabel>Set all items to</DropdownMenuLabel>
-                                    {prod.map((s) => <DropdownMenuItem key={s.id || "new"} onClick={() => setOrderStatus(o, s.id)}>{s.label}</DropdownMenuItem>)}
+                                    {prod.map((s) => (
+                                      <DropdownMenuItem
+                                        key={s.id || "new"}
+                                        disabled={!!s.deny || normalizeStage(stage) === s.id}
+                                        title={s.deny ?? (normalizeStage(stage) === s.id ? "Already at this stage" : undefined)}
+                                        onClick={() => { if (!s.deny) setOrderStatus(o, s.id) }}
+                                      >
+                                        {s.label}
+                                      </DropdownMenuItem>
+                                    ))}
                                   </DropdownMenuGroup>
                                 </>
                               )}
@@ -935,7 +956,16 @@ export function OrdersHub() {
                                   <DropdownMenuSeparator />
                                   <DropdownMenuGroup>
                                     <DropdownMenuLabel>Flag / hold</DropdownMenuLabel>
-                                    {exc.map((s) => <DropdownMenuItem key={s.id} onClick={() => setOrderStatus(o, s.id)}><Flag size={13} weight="fill" /> {s.label}</DropdownMenuItem>)}
+                                    {exc.map((s) => (
+                                      <DropdownMenuItem
+                                        key={s.id}
+                                        disabled={!!s.deny}
+                                        title={s.deny ?? undefined}
+                                        onClick={() => { if (!s.deny) setOrderStatus(o, s.id) }}
+                                      >
+                                        <Flag size={13} weight="fill" /> {s.label}
+                                      </DropdownMenuItem>
+                                    ))}
                                   </DropdownMenuGroup>
                                 </>
                               )}
@@ -1293,6 +1323,14 @@ export function OrdersHub() {
                             // past Awaiting scan keeps NO pipeline options — the stage is
                             // the warehouse's to report — but still gets the stop options,
                             // so they read as a badge + a Flag control rather than a select.
+                            //
+                            // This inherits the no-skipping rule for free, because
+                            // stageOptionsFor now asks stageDenialReason: a stage more than
+                            // one step ahead simply isn't offered, so the per-item control
+                            // can't be used to jump the pipeline that the ⋯ menu refuses.
+                            // It keeps FILTERING rather than greying, unlike that menu — a
+                            // native <option> has nowhere to put the reason, and a greyed
+                            // line you can't interrogate is worse than a shorter list.
                             const opts = stageOptionsFor(role, it.factory_status)
                             const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
                             const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
