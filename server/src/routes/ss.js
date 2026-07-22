@@ -1546,10 +1546,39 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   app.post('/api/ss/order', { preHandler: requireWarehouse }, async (req, reply) => {
     if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
     const b = req.body || {};
+    // A line may name a WAREHOUSE. Splitting one sku across two DCs is two lines with the
+    // same identifier and different warehouseAbbr — which is how S&S expect it, and what
+    // lets a buyer take 40 from NV and 20 from KS instead of accepting their split.
     const lines = (Array.isArray(b.lines) ? b.lines : [])
-      .map((l) => ({ identifier: String(l.sku || l.identifier || '').trim(), qty: parseInt(l.qty, 10) || 0 }))
+      .map((l) => ({
+        identifier: String(l.sku || l.identifier || '').trim(),
+        qty: parseInt(l.qty, 10) || 0,
+        ...(l.warehouseAbbr ? { warehouseAbbr: String(l.warehouseAbbr).trim().toUpperCase() } : {}),
+      }))
       .filter((l) => l.identifier && l.qty > 0);
     if (!lines.length) { reply.code(400); return { error: 'No order lines — each needs a sku + qty.' }; }
+
+    // Naming warehouses and leaving autoselect on is a contradiction S&S resolve silently
+    // in autoselect's favour — the buyer's choice would be dropped with no error, and the
+    // goods would arrive from wherever S&S preferred. Refuse instead of guessing which the
+    // caller meant.
+    const picked = lines.filter((l) => l.warehouseAbbr);
+    const autoselect = b.autoselectWarehouse !== false;
+    if (picked.length && autoselect) {
+      reply.code(400);
+      return {
+        error: 'Lines name a warehouse but autoselectWarehouse is on, and S&S ignore per-line warehouses when it is. Send autoselectWarehouse:false to honour the picks, or drop warehouseAbbr to let S&S split it.',
+        code: 'warehouse_conflict',
+        lines: picked.map((l) => ({ sku: l.identifier, warehouseAbbr: l.warehouseAbbr })),
+      };
+    }
+    // Turning autoselect off without naming warehouses hands S&S a decision with no
+    // information — their doc has them fall back to the account default DC, which is
+    // rarely the nearest one.
+    if (!autoselect && !picked.length) {
+      reply.code(400);
+      return { error: 'autoselectWarehouse is off but no line names a warehouse. Either pick warehouses per line, or leave autoselect on.', code: 'no_warehouse_picked' };
+    }
     const wantLive = b.live === true;
     // Their required address shape. Refuse rather than send a partial one: an order with
     // no valid delivery address is the one thing that cannot be fixed after the fact.
@@ -1577,7 +1606,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       // on, per-line warehouseAbbr is IGNORED — so sending both would be a contradiction
       // where only one side wins silently. We have no view of their stock levels at
       // order time, so they are better placed to decide than we are.
-      autoselectWarehouse: b.autoselectWarehouse !== false,
+      autoselectWarehouse: autoselect,
       // A saved card/bank on the ssactivewear.com account. It is an OBJECT of
       // {email, profileID} — NOT a flat id, which is what the profiles doc's phrasing
       // ("used in POST - Orders") led me to guess before reading this page.
