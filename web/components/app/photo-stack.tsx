@@ -27,7 +27,10 @@ export function PhotoStack({
   designs,
   catalog,
   max = 3,
-  size = 32,
+  // The row's PRIMARY image. It was 32px — smaller than the 44-64px avatars inside an
+  // EXPANDED line, so the summary picture was the least legible one on screen, which is
+  // backwards: the row is what you scan, the expansion is what you already chose to open.
+  size = 48,
   readOnly,
   overlap = true,
 }: {
@@ -61,13 +64,14 @@ export function PhotoStack({
             size={size}
             readOnly={readOnly}
             listingFirst
-            className="border-background ring-1 ring-border"
+            bare
+            className="border-background"
           />
         </span>
       ))}
       {extra > 0 && (
         <span
-          className={(overlap ? "-ml-2.5 " : "") + "flex items-center justify-center rounded-md border border-background bg-muted text-xs font-semibold text-muted-foreground ring-1 ring-border"}
+          className={(overlap ? "-ml-2.5 " : "") + "flex items-center justify-center rounded-md border border-background bg-muted text-xs font-semibold text-muted-foreground"}
           style={{ width: size, height: size }}
         >
           +{extra}

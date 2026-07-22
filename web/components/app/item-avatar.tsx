@@ -56,6 +56,11 @@ export type ItemAvatarProps = {
   /** Accept artwork dropped straight onto the thumb. Passed wherever a design can be
    *  attached — one handler here covers every surface that renders an item. */
   onDropImage?: (dataUrl: string, file: File) => void
+  /** Drop the frame. A row's PRIMARY photo is the picture itself — a border around a
+   *  small image reads as a chip, and a stack of them reads as a strip of chips rather
+   *  than as the products. Kept as an opt-in so the 44px avatars inside an expanded line,
+   *  where the tile IS a control, still look like one. */
+  bare?: boolean
   className?: string
 }
 
@@ -65,7 +70,7 @@ function blankOf(item: OrderItem, catalog?: CatalogProduct[]): string {
   return bestMockup(p, item.color, item.img || "")
 }
 
-export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, listingFirst, onDropImage, className }: ItemAvatarProps) {
+export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, listingFirst, onDropImage, bare, className }: ItemAvatarProps) {
   const [preview, setPreview] = useState(false)
   const [showListing, setShowListing] = useState(false)
   const [over, setOver] = useState(false)
@@ -112,7 +117,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   if (readOnly) {
     return (
       <span
-        className={"relative block shrink-0 overflow-hidden rounded-md border border-border bg-muted " + (className ?? "")}
+        className={"relative block shrink-0 overflow-hidden rounded-md bg-muted " + (bare ? "" : "border border-border ") + (className ?? "")}
         style={{ width: size, height: size }}
       >
         <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} />
@@ -131,7 +136,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           type="button"
           onClick={open}
           title={onEdit ? "Edit the design" : "View larger"}
-          className="eg-tap size-full overflow-hidden rounded-md border border-border bg-muted transition-colors hover:border-foreground/25"
+          className={"eg-tap size-full overflow-hidden rounded-md bg-muted transition-colors " + (bare ? "" : "border border-border hover:border-foreground/25")}
         >
           <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} />
           {/* Affordance only where there's something to do — and only on hover, so the

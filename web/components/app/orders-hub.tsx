@@ -833,16 +833,17 @@ export function OrdersHub() {
                           drift. Thumbs lead with the listing photo (it reads better at
                           32px than a composite does) and clicking one opens the detail
                           window on the attached design. */}
-                      {/* OVERLAPPED, and small. This strip used to be 56px tiles laid out
-                          flat on a line of their own, which cost every order about a third
-                          of its row height — on a queue you scan by scrolling, that is the
-                          expensive kind of space. Overlapping fans them from one point, so
-                          four items take barely more width than one, and the row stays a
-                          row. The artwork is still one click from here, and expanding still
-                          shows a 64px avatar per line. */}
+                      {/* The row's PRIMARY image, at the shared PhotoStack size — no local
+                          override. It was pinned to 32px here, SMALLER than the 64px avatar
+                          inside an expanded line, so the picture you scan by was the least
+                          legible one on the page while the one you'd already chosen to open
+                          was the biggest. Borderless too: a frame around a small photo reads
+                          as a chip, and four of them read as a strip of chips rather than as
+                          the products. Still overlapped, so four items cost barely more width
+                          than one and the row stays a row. */}
                       {isCollapsed && items.length > 0 && (
                         <div className="mt-1.5">
-                          <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} size={32} max={4} overlap />
+                          <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={4} overlap />
                         </div>
                       )}
                     </div>
