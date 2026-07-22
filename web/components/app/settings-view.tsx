@@ -786,6 +786,24 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
  * any one meant scrolling past the rest. They share a page, not a purpose; folded, the
  * page becomes a menu instead of a wall.
  */
+/**
+ * A named group inside a Fold, with its fields two-across.
+ *
+ * Nine money fields in one column read as nine separate decisions to get right. They are
+ * really three: what a seller pays us for design work, what they pay for the file, and what
+ * we pay a designer. Grouping says which is which; the two-column grid stops the list
+ * looking longer than it is.
+ */
+function FeeGroup({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-5 first:mt-0">
+      <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{title}</h4>
+      <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+      <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">{children}</div>
+    </section>
+  )
+}
+
 function Fold({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   return (
@@ -934,20 +952,40 @@ function PlatformPanel() {
         {/* MONEY OUT first, then money in, and the direction is written into every hint.
             These sat together unlabelled when the payout was called "design fee", which is
             how a rate paid TO a designer read as a charge made to a seller. */}
-        <MoneyField label="Designer payout" hint="Paid TO a designer per approved design — money out, not a seller charge" value={designFee} onChange={setDesignFee} />
+        {/* EXACTLY ONE of these three applies to a line, decided by where the machine file
+            came from. Said once here rather than three times in three hints, because the
+            thing that confuses is not each fee — it is not knowing they are alternatives. */}
+        <FeeGroup
+          title="Design work — what a seller pays"
+          hint="One of these three, never two: it depends on who cut the machine file."
+        >
+          <MoneyField label="We cut it — standard" hint="Their artwork, ordinary difficulty" value={designStd} onChange={setDesignStd} />
+          <MoneyField label="We cut it — complex" hint="Intricate. Quoted first; charged only if they accept" value={designCx} onChange={setDesignCx} />
+          <MoneyField label="They sent their own file" hint="We open and check it rather than cut it" value={checkFee} onChange={setCheckFee} />
+        </FeeGroup>
 
-        {/* The three seller-facing design charges. Exactly one applies to a line, decided
-            by where the machine file came from — so they are shown together and each hint
-            names its own case rather than describing a fee in the abstract. */}
-        <MoneyField label="Design fee — standard" hint="Seller pays this when WE cut the machine file from their artwork" value={designStd} onChange={setDesignStd} />
-        <MoneyField label="Design fee — complex" hint="Intricate artwork. Quoted to the seller and only charged once they accept" value={designCx} onChange={setDesignCx} />
-        <MoneyField label="Check fee" hint="Seller sent their own .emb — we verify it works rather than cut it" value={checkFee} onChange={setCheckFee} />
+        <FeeGroup
+          title="The file itself — what a seller pays"
+          hint="Charged separately, when they want to download the .pes/.emb. Paying for the work and owning the file are two transactions."
+        >
+          <MoneyField label="Download — standard" value={embPrice} onChange={setEmbPrice} />
+          <MoneyField label="Download — complex" hint="When the design work was complex" value={embCx} onChange={setEmbCx} />
+        </FeeGroup>
 
-        <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
-        <MoneyField label="Embroidery file price — complex" hint="Download price when the design work was complex" value={embCx} onChange={setEmbCx} />
-        <MarkupFormula value={baseMarkup} onChange={setBaseMarkup} />
-        <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />
-        <MoneyField label="Default shipping — each additional" value={shipExtra} onChange={setShipExtra} />
+        <FeeGroup
+          title="What we pay out"
+          hint="Money leaving us, not a seller charge — the only figure on this page that does."
+        >
+          <MoneyField label="Designer payout" hint="Per approved design, to the designer who claimed it" value={designFee} onChange={setDesignFee} />
+        </FeeGroup>
+        <FeeGroup
+          title="Product & shipping"
+          hint="What a blank sells for, and what carriage adds. Unrelated to design — separated so the design decisions above can be read on their own."
+        >
+          <div className="sm:col-span-2"><MarkupFormula value={baseMarkup} onChange={setBaseMarkup} /></div>
+          <MoneyField label="Shipping — first item" value={shipFirst} onChange={setShipFirst} />
+          <MoneyField label="Shipping — each additional" value={shipExtra} onChange={setShipExtra} />
+        </FeeGroup>
       </Fold>
 
       {/* Product types. The default mockup is the labour-saver: set one 2D outline per
