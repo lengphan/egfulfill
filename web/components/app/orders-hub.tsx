@@ -1218,7 +1218,7 @@ export function OrdersHub() {
                       // onto a second row. nowrap makes the identity give up width instead,
                       // which is what truncate is already there for.
                       return (
-                        <div key={it.line_id ?? it.sku ?? i} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border p-2.5 sm:flex-nowrap">
+                        <div key={it.line_id ?? it.sku ?? i} className="flex flex-wrap items-start gap-x-4 gap-y-2 rounded-xl border border-border p-2.5 sm:flex-nowrap">
                           {/* Shows the blank with its artwork placed — what actually gets
                               made — not the marketplace listing photo. Editing is offered
                               only to the roles whose job it is; warehouse gets the zoom.
@@ -1260,28 +1260,21 @@ export function OrdersHub() {
                               and the tile carries one control instead of two stacked on the
                               same 24px. */}
                           </div>
-                          {/* Sizes to its CONTENT, with a ceiling — deliberately not flex-1.
-                              Unbounded, this column ate the whole row: a short line name
-                              ("Short tee") ended at x≈469 while its Board button started at
-                              x≈1587, so the item and the controls acting on it sat 1118px
-                              apart and stopped reading as one thing.
+                          {/* FILLS the row, like the seller's item row does — and for the
+                              reason that row already documents: putting the secondary
+                              controls above the variants "frees the whole width for the
+                              variant strip, which was being squeezed into whatever the
+                              price left over."
 
-                              A flex-1 column with a max-width only half-fixes it — long
-                              names cluster, but a short one still leaves the dead space
-                              INSIDE the box, because the box always fills the cap. Dropping
-                              flex-1 lets a short line be short, so the actions follow the
-                              item's actual width. The cap is what this column already took
-                              at 1440, so long names truncate exactly as they did and no
-                              narrower screen moves.
-
-                              The floor is why there are two bounds and not one: pure
-                              shrink-to-fit put three sibling lines' controls at three
-                              different x-positions (1200/715/651), and a list you compare
-                              down wants its selects in a column. The floor aligns the
-                              ordinary rows and only a genuinely long title reaches past it.
-                              sm-scoped: 20rem is wider than a phone's content box, so
-                              applying it unconditionally would force a horizontal scroll. */}
-                          <div className="min-w-0 max-w-3xl sm:min-w-[20rem]">
+                              This column was content-sized with a floor and a ceiling, to
+                              stop the actions drifting away from short line names. It did
+                              that, but it also stopped the BLANK/COLOUR/SIZE/METHOD strip
+                              ever reaching full length: the fields bunched left and left
+                              ~540px of nothing before the Board button, so the row read as
+                              two unrelated halves. Alignment is now the row's job — it is
+                              items-start, so the actions sit level with the TITLE and the
+                              strip runs the full width underneath them. */}
+                          <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
                             {/* Factory-owned marketplace orders arrive with no blank chosen;
                                 artwork review (canDesign) picks it here while the order is
