@@ -116,6 +116,50 @@ app.get('/health', async () => ({ ok: true }));
  * uploads quietly fall back to inline base64 with nothing but a log line, and everything
  * looks fine until an outside partner needs a URL that was never created.
  */
+/**
+ * Mail self-test. Says which transport is live and, given ?to=, actually sends.
+ *
+ * This exists because "which SMTP or keys actually send forgot-password mail" has been
+ * an open question in the docs, and it is unanswerable by reading code: sendMail()
+ * deliberately never throws, so every caller treats a total mail outage as success. A
+ * seller clicking "forgot password" gets the same reassuring message whether a mail went
+ * out or nothing happened at all.
+ *
+ * ADMIN-only and send-on-request: this puts real mail on your sending reputation, so it
+ * must not be something an operator can trigger by loading a page.
+ */
+app.get('/api/admin/mail-diag', { preHandler: requireAdmin }, async (req) => {
+  const { mailConfigured, sendMail, lastMailError } = await import('./mailer.js');
+  const transport = process.env.BREVO_API_KEY ? 'brevo-api'
+    : (process.env.SMTP_HOST ? 'smtp' : null);
+  const cfg = {
+    configured: mailConfigured(),
+    transport,
+    from: process.env.SMTP_FROM || process.env.MAIL_FROM || null,
+    smtp_host: process.env.SMTP_HOST || null,
+    // What each feature does when mail is off, so the answer is actionable rather than
+    // just a red cross.
+    affects: {
+      password_reset: 'Falls back to an admin-visible reset request; the seller is never emailed a link.',
+      team_invites: 'Invite email silently not sent — the link must be passed on by hand.',
+      topup_alerts: 'Admins are not emailed when a top-up needs review.',
+      signup: 'No confirmation email is sent at all — signup never emails, configured or not.',
+    },
+  };
+  if (!cfg.configured) {
+    return { ...cfg, ok: false, error: 'No mail transport configured. Set BREVO_API_KEY (works on hosts that block SMTP ports) or SMTP_HOST.' };
+  }
+  const to = String((req.query || {}).to || '').trim();
+  if (!to) return { ...cfg, ok: null, note: 'Configured. Add ?to=you@example.com to actually send a test message.' };
+  const sent = await sendMail({
+    to,
+    subject: 'EGFULFILL mail test',
+    text: 'If you are reading this, transactional email is working.',
+    html: '<p>If you are reading this, transactional email is working.</p>',
+  });
+  return { ...cfg, ok: sent, sent_to: to, error: sent ? null : (lastMailError() || 'send failed for an unknown reason') };
+});
+
 app.get('/api/admin/storage-diag', { preHandler: requireStaff }, async () => {
   const cfg = {
     configured: storageEnabled(),
