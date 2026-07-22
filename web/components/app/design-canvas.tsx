@@ -987,9 +987,17 @@ export function DesignCanvasDialog({
                                   ? `Charged ${usd(Number(r.charged.charged))} to the seller.`
                                   : r.charged?.reason === "already-charged"
                                     ? "Re-filed. This line was already charged, so nothing moved."
-                                    : r.charged?.reason === "no-fee-set"
-                                      ? "Filed. No fee is set for this tier, so nothing was charged."
-                                      : "Filed.")
+                                    // OUR OWN SHOP. A factory-owned order's seller_id is a
+                                    // staff account, so charging it moves money from the
+                                    // factory to the factory. That nets to zero, which
+                                    // sounds harmless and isn't: it books revenue nobody
+                                    // earned, so every margin figure reading design-work
+                                    // rows counts our own costs as income.
+                                    : r.charged?.reason === "factory-order"
+                                      ? "Filed. This is our own shop's order, so nothing is charged — the tier is still recorded."
+                                      : r.charged?.reason === "no-fee-set"
+                                        ? "Filed. No fee is set for this tier, so nothing was charged."
+                                        : "Filed.")
                               onSaved?.()
                             } catch (e) { setErr((e as Error).message) } finally { setTierBusy(null) }
                           }}

@@ -1044,13 +1044,26 @@ export function ordersRoutes(app, requireAuth) {
     if (!(amount > 0)) return { charged: 0, reason: 'no-fee-set' };
     const key = lineId ? 'line_id' : 'sku';
     const row = await q(
-      `select i.design_charged_at, o.seller_id from order_items i
+      `select i.design_charged_at, o.seller_id, o.factory_order from order_items i
          join orders o on o.id = i.order_id
         where i.order_id=$1 and i.${key}=$2 limit 1`, [orderId, lineId || sku])
       .then((r) => r.rows[0]).catch(() => null);
     if (!row) return { charged: 0, reason: 'no-line' };
     if (row.design_charged_at) return { charged: 0, reason: 'already-charged' };
     if (!row.seller_id) return { charged: 0, reason: 'no-seller' };
+    /**
+     * A FACTORY-OWNED order charges nobody.
+     *
+     * Our own shop's orders carry a staff account as seller_id, so charging one would move
+     * money from the factory wallet to the factory wallet. That nets to zero, which sounds
+     * harmless and isn't: it books revenue that was never earned, so every margin figure
+     * that reads design-work rows counts our own costs as income and the real number is
+     * quietly wrong.
+     *
+     * The tier is still RECORDED. Whether a design was ordinary, intricate or supplied is a
+     * fact about the work, and it stays true on our own orders — it just doesn't bill.
+     */
+    if (row.factory_order) return { charged: 0, reason: 'factory-order' };
 
     const ref = `design-${orderId}-${lineId || sku}`;
     try {
@@ -1147,7 +1160,7 @@ export function ordersRoutes(app, requireAuth) {
 
     const orderId = String(req.params.id);
     const sel = await resolveSeller(req.user);
-    const own = await q('select seller_id from orders where id=$1', [orderId])
+    const own = await q('select seller_id, factory_order from orders where id=$1', [orderId])
       .then((r) => r.rows[0]).catch(() => null);
     if (!own) { reply.code(404); return { error: 'Order not found' }; }
     // 404 rather than 403 on someone else's order — the same reason every other read here
@@ -1180,7 +1193,7 @@ export function ordersRoutes(app, requireAuth) {
       return { ok: true, decision: 'declined' };
     }
 
-    const amount = Number(line.design_quote_make) || 0;
+    const amount = own.factory_order ? 0 : (Number(line.design_quote_make) || 0);
     if (line.design_charged_at) {
       // Already paid: accept the click, change nothing, say so. Erroring here would look
       // like the acceptance failed and invite a second attempt.
