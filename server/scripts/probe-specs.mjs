@@ -39,7 +39,11 @@ for (const path of paths) {
 
   // The SHAPE decides it, not the status. A 200 with no measurement fields is a "no" that
   // looks like a "yes", and that is the answer most likely to mislead.
-  const measures = /"(chest|bodyLength|sleeveLength|fullBodyLength|width|measurement)/i.test(body)
+  // Look for the SHAPE S&S actually uses — generic specName/value pairs — not for column
+  // names I guessed at. The first version of this checked for "chest" and friends and
+  // reported "no size charts" while a chart sat in its own output: the check was more
+  // confident than informed, which is the worst thing a diagnostic can be.
+  const measures = /"specName"/.test(body) || /"(chest|bodyLength|sleeveLength|width)"/i.test(body)
   console.log(`\n${status}  ${path}${measures ? '   <-- MEASUREMENTS' : ''}`)
   console.log('   ' + body.replace(/\s+/g, ' ').slice(0, 300))
   if (status === 200 && measures && !found) found = path

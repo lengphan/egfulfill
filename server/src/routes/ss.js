@@ -292,6 +292,49 @@ export async function ssOrderStatus(num) {
   };
 }
 
+/**
+ * SIZE CHARTS. They exist — /specs?styleid=N returns one row per (size, measurement):
+ *
+ *   { sizeName: "Adjustable", specName: "Bill/ Brim Length", value: "2 3/4\"" }
+ *
+ * Generic name/value pairs rather than named columns, which is why a probe looking for a
+ * `chest` field concluded there was no chart while the chart was on screen.
+ *
+ * FILTERED BY styleID IN CODE. Asking for 9183 came back carrying rows for 9182, so the
+ * query parameter cannot be trusted to scope the answer — printing another garment's
+ * measurements is worse than printing none.
+ *
+ * Cached: the chart for a style does not change between syncs, and the lookbook would
+ * otherwise spend one call per style every time someone previews it.
+ */
+q(`create table if not exists ss_style_specs (
+     style_id text primary key,
+     specs jsonb not null default '[]',
+     at timestamptz default now()
+   )`).catch(() => {});
+
+export async function ssSpecs(styleId) {
+  const id = String(styleId || '').trim();
+  if (!id) return [];
+  const cached = await q('select specs from ss_style_specs where style_id=$1', [id])
+    .then((r) => r.rows[0] && r.rows[0].specs).catch(() => null);
+  if (Array.isArray(cached) && cached.length) return cached;
+  if (!creds()) return [];
+  const r = await ssGet('/specs?styleid=' + encodeURIComponent(id) + '&mediatype=json').catch(() => null);
+  if (!r || !r.ok || !Array.isArray(r.data)) return [];
+  const rows = r.data
+    .filter((x) => x && String(x.styleID) === id)   // their filter is unreliable — see above
+    .map((x) => ({
+      size: x.sizeName || '', order: x.sizeOrder || '',
+      spec: x.specName || '', value: x.value || '',
+    }))
+    .filter((x) => x.size && x.spec && x.value);
+  await q(`insert into ss_style_specs (style_id, specs) values ($1,$2)
+           on conflict (style_id) do update set specs=excluded.specs, at=now()`,
+    [id, JSON.stringify(rows)]).catch(() => {});
+  return rows;
+}
+
 /** Cached style descriptions, by style id. Empty for styles nobody has opened yet — the
  *  text only exists on /styles/:id and is stored the first time it's fetched. */
 export async function ssStyleDescriptions(ids) {

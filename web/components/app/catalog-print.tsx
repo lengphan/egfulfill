@@ -162,6 +162,45 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       </div>
                     </div>
                   )}
+
+                  {/* THE REAL SIZE CHART. S&S return one row per (size, measurement) with
+                      no fixed columns — "Bill/ Brim Length", "Chest Width", whatever that
+                      garment has — so the table is PIVOTED here rather than read off named
+                      fields. Assuming columns is what made the probe report no chart while
+                      the chart was in its own output. */}
+                  {st.specs.length > 0 && (() => {
+                    const specNames = [...new Set(st.specs.map((x) => x.spec))]
+                    const sizeNames = [...new Set(st.specs.map((x) => x.size))]
+                    const at = (size: string, spec: string) =>
+                      st.specs.find((x) => x.size === size && x.spec === spec)?.value ?? ""
+                    return (
+                      <div className="mt-4">
+                        <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+                          Measurements
+                        </div>
+                        <table className="mt-1.5 w-full border-collapse text-[8px]">
+                          <thead>
+                            <tr>
+                              <th className="border-b border-neutral-300 py-1 text-left font-semibold">Size</th>
+                              {specNames.map((n) => (
+                                <th key={n} className="border-b border-neutral-300 py-1 text-left font-semibold">{n}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sizeNames.map((z) => (
+                              <tr key={z}>
+                                <td className="border-b border-neutral-100 py-1 font-medium">{z}</td>
+                                {specNames.map((n) => (
+                                  <td key={n} className="border-b border-neutral-100 py-1 tabular-nums text-neutral-600">{at(z, n)}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 {/* RIGHT — every colourway, captioned. */}

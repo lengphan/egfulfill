@@ -35,7 +35,6 @@ const money = (n: number | string | null | undefined) =>
 export function CatalogView() {
   const [rows, setRows] = useState<CatalogProduct[] | null>(null)
   const [q, setQ] = useState("")
-  const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -71,26 +70,26 @@ export function CatalogView() {
   }, [rows, q])
 
   const published = (rows ?? []).filter((p) => p.inCatalog).length
-  const chosen = [...picked]
 
-  const publish = async (include: boolean) => {
-    if (!chosen.length) return
+  /** Publish or unpublish ONE product, immediately — the tick is the decision. */
+  const toggleOne = async (id: string, include: boolean) => {
     setBusy(true); setErr(null); setNote(null)
     try {
-      const r = await setCatalogSelection(chosen, include)
+      const r = await setCatalogSelection([id], include)
       if (r.error) throw new Error(r.error)
-      setNote(`${r.updated ?? 0} ${include ? "published" : "removed from the catalogue"}.`)
       setSummaryTick((t) => t + 1); load()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
+
   const markup = async () => {
-    if (!chosen.length) return
+    const inCat = (rows ?? []).filter((p) => p.inCatalog)
+    if (!inCat.length) return
     const n = Number(pct)
     if (!isFinite(n) || n < 0) { setErr("Markup must be a number, and not negative."); return }
     setBusy(true); setErr(null); setNote(null)
     try {
-      const r = await applyCatalogMarkup(chosen, n)
+      const r = await applyCatalogMarkup((rows ?? []).filter((p) => p.inCatalog).map(idOf), n)
       if (r.error) throw new Error(r.error)
       // Names the products it COULDN'T price. A silent partial run here means a buyer sees
       // a blank where a price should be, and nobody knows which ones until they look.
@@ -162,19 +161,18 @@ export function CatalogView() {
             <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or SKU…" className="h-9 w-64 pl-8" />
           </div>
-          <span className="text-xs text-muted-foreground">{published} published · {chosen.length} selected</span>
+          <span className="text-xs text-muted-foreground">{published} published · </span>
         </div>
 
-        {chosen.length > 0 && (
+        {(rows ?? []).some((p) => p.inCatalog) && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-            <Button size="sm" onClick={() => publish(true)} disabled={busy}>Publish {chosen.length}</Button>
-            <Button size="sm" variant="outline" onClick={() => publish(false)} disabled={busy}>Remove</Button>
-            <span className="mx-1 h-5 w-px bg-border" />
+            {/* No publish/remove buttons: the tick already is that decision, and two ways
+                to express one thing is how they drifted apart. This bar only prices. */}
             <span className="text-xs text-muted-foreground">Cost +</span>
             <Input value={pct} onChange={(e) => setPct(e.target.value.replace(/[^\d.]/g, ""))}
               className="h-8 w-16 text-center text-xs tabular-nums" inputMode="decimal" aria-label="Markup percent" />
             <Button size="sm" variant="outline" onClick={markup} disabled={busy}>
-              {busy ? <CircleNotch size={14} className="animate-spin" /> : <><Percent size={14} weight="bold" /> Apply</>}
+              {busy ? <CircleNotch size={14} className="animate-spin" /> : <><Percent size={14} weight="bold" /> Price these {(rows ?? []).filter((p) => p.inCatalog).length}</>}
             </Button>
           </div>
         )}
@@ -219,7 +217,6 @@ export function CatalogView() {
               <tbody>
                 {shown.map((p) => {
                   const id = idOf(p)
-                  const on = picked.has(id)
                   return (
                     // NOT dimmed when unpublished. Fading a row is the language of
                     // "unavailable", and these are the rows you are here to pick — it read
@@ -227,10 +224,19 @@ export function CatalogView() {
                     // chip instead, which says the thing rather than implying it.
                     <tr key={id} className="border-b border-border/60 last:border-0">
                       <td className="px-2 py-2">
-                        <input type="checkbox" checked={on} aria-label={`Select ${p.name || id}`}
-                          onChange={(e) => setPicked((s) => {
-                            const n = new Set(s); if (e.target.checked) n.add(id); else n.delete(id); return n
-                          })} />
+                        {/* THE TICK IS THE STATE. It reflected a local selection, so a
+                            product already in the catalogue came back unticked — you had to
+                            tick it (which changed nothing) and press Remove to get it out.
+                            The box was describing what you had clicked this session rather
+                            than what is true, which is the same fault the supplier tab had.
+                            Now: ticked means in the catalogue, unticking removes it. */}
+                        <input
+                          type="checkbox"
+                          checked={!!p.inCatalog}
+                          disabled={busy}
+                          aria-label={`${p.inCatalog ? "Remove" : "Add"} ${p.name || id} ${p.inCatalog ? "from" : "to"} the catalogue`}
+                          onChange={(e) => void toggleOne(id, e.target.checked)}
+                        />
                       </td>
                       <td className="px-2 py-2">
                         {/* The picture, the colourways and the sizes — the things you are

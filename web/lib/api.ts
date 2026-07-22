@@ -302,6 +302,9 @@ export type LookbookStyle = {
   ref: string; name: string; sku: string; description: string; brand: string
   image: string; price: number | null; sizes: string[]
   colors: { name: string; sku: string; image: string }[]
+  /** Garment measurements from S&S, as generic name/value pairs per size — their /specs
+   *  feed has no fixed columns, so a chart is pivoted from these rather than read. */
+  specs: { size: string; order: string; spec: string; value: string }[]
 }
 export function getLookbook() {
   return api<{ styles: LookbookStyle[] }>(`/api/catalog/lookbook`)

@@ -7,7 +7,7 @@ import { isStaff } from '../auth.js';
 import { quoteSpec } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
-import { ssImgUrl, ssStyleDescriptions } from './ss.js';
+import { ssImgUrl, ssStyleDescriptions, ssSpecs } from './ss.js';
 
 // Roles that OWN pricing. A change by anyone else is legitimate — operators build
 // products, and that is the point — but it should not happen unseen, because a base
@@ -379,6 +379,9 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         colors: (supplierColours && supplierColours.length)
           ? supplierColours
           : Object.keys(ci).map((name) => ({ name, sku: '', image: ci[name] || '' })),
+        // Our own products carry no supplier spec chart unless their sku resolves to a
+        // style; filled below for the ones that do.
+        specs: [],
       };
     });
 
@@ -416,6 +419,20 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     // name dressed up as prose.
     const descs = await ssStyleDescriptions(styleRefs).catch(() => new Map());
 
+    /**
+     * Size charts, one style at a time and capped.
+     *
+     * Each is a single S&S call the first time and cached thereafter, so a settled
+     * catalogue costs nothing. Capped at 24 so a 200-style catalogue cannot spend the rate
+     * limit on a preview — beyond that the pages print without a chart rather than making
+     * everyone wait.
+     */
+    const specsByStyle = new Map();
+    for (const ref of styleRefs.slice(0, 24)) {
+      const rows = await ssSpecs(ref).catch(() => []);
+      if (rows.length) specsByStyle.set(ref, rows);
+    }
+
     const supplier = picked.map((p) => ({
       ref: p.ref, name: p.name || p.ref, sku: p.ref,
       description: descs.get(p.ref) || '', brand: p.brand || 'S&S',
@@ -423,6 +440,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       price: p.catalog_price == null ? null : Number(p.catalog_price),
       sizes: p.sizes || [],
       colors: coloursByStyle.get(p.ref) || [],
+      specs: specsByStyle.get(p.ref) || [],
     }));
 
     return { styles: [...mine, ...supplier] };
