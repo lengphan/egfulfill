@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { API_ENDPOINTS } from "@/lib/api-endpoints"
+import { DocsNav } from "./docs-nav"
 
 export const metadata: Metadata = {
   title: "API — EGFULFILL",
@@ -68,7 +69,7 @@ function Block({ children }: { children: string }) {
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
     <section id={id} className="scroll-mt-24 space-y-4">
-      <h2 className="font-display text-2xl font-semibold tracking-tight">{title}</h2>
+      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
       {children}
     </section>
   )
@@ -77,31 +78,18 @@ function Section({ id, title, children }: { id: string; title: string; children:
 export default function DocsPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
-      <header className="space-y-3 pb-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-primary">Developers</p>
-        <h1 className="font-display text-4xl font-semibold tracking-tight">The EGFULFILL API</h1>
-        <p className="text-lg text-muted-foreground">
-          Push orders into our factory, and get production status and tracking back. REST over HTTPS,
+      <header className="max-w-2xl space-y-3 pb-10">
+        <h1 className="text-3xl font-semibold tracking-tight">API reference</h1>
+        <p className="text-muted-foreground">
+          Push orders into our factory and get production status and tracking back. REST over HTTPS,
           JSON in and out, API-key auth, signed webhooks.
         </p>
       </header>
 
       <div className="grid gap-12 lg:grid-cols-[200px_1fr]">
-        {/* Sticky contents. `self-start` matters: a grid child stretches to the row
-            height by default, and a full-height sticky box has nothing left to travel. */}
-        <nav aria-label="Contents" className="hidden self-start lg:sticky lg:top-24 lg:block">
-          <div className="space-y-1 border-l border-border">
-            {SECTIONS.map(([id, label]) => (
-              <a
-                key={id}
-                href={`#${id}`}
-                className="-ml-px block border-l border-transparent py-1 pl-4 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
-              >
-                {label}
-              </a>
-            ))}
-          </div>
-        </nav>
+        {/* Client component: it highlights the section you're on, which needs scroll
+            position. Keeping it separate lets this page stay a server component. */}
+        <DocsNav sections={SECTIONS} />
 
         <div className="min-w-0 space-y-14">
         <Section id="auth" title="Authentication">
