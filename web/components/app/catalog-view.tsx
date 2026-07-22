@@ -153,7 +153,7 @@ export function CatalogView() {
           <TabsTrigger value="supplier">Supplier styles</TabsTrigger>
           <TabsTrigger value="history">Sent catalogues</TabsTrigger>
         </TabsList>
-        <TabsContent value="supplier"><SupplierStylesPicker /></TabsContent>
+        <TabsContent value="supplier"><SupplierStylesPicker onChanged={() => setSummaryTick((t) => t + 1)} /></TabsContent>
         <TabsContent value="history"><CatalogExportHistory onOpen={setReopenId} /></TabsContent>
         <TabsContent value="mine">
       <div className="space-y-3 px-5 py-4">

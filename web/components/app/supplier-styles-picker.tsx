@@ -21,12 +21,11 @@ const PAGE = 40
  * Paged rather than scrolled: there are 825 styles behind this, and loading them to filter
  * in the browser would move the entire catalogue over the wire to save one round trip.
  */
-export function SupplierStylesPicker() {
+export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) {
   const [rows, setRows] = useState<SupplierStyle[] | null>(null)
   const [total, setTotal] = useState(0)
   const [q, setQ] = useState("")
   const [page, setPage] = useState(0)
-  const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -41,6 +40,8 @@ export function SupplierStylesPicker() {
       .finally(() => setBusy(false))
   }, [])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- q is handled by the debounced
+  // effect below; including it here would fire an extra unpaged fetch on every keystroke.
   useEffect(() => { const t = setTimeout(() => load(q, page * PAGE), 0); return () => clearTimeout(t) }, [load, page])
   // Search resets to the first page — staying on page 6 of a new query shows a slice of
   // results nobody asked for and reads as "no matches".
@@ -49,29 +50,25 @@ export function SupplierStylesPicker() {
     return () => clearTimeout(t)
   }, [q, load])
 
-  const chosen = [...picked]
-
-  const publish = async (include: boolean) => {
-    if (!chosen.length) return
+  /** Publish or unpublish ONE style, immediately. */
+  const toggle = async (ref: string, include: boolean) => {
     setBusy(true); setErr(null); setNote(null)
     try {
-      const r = await setCatalogPicks(chosen, include)
+      const r = await setCatalogPicks([ref], include)
       if (r.error) throw new Error(r.error)
-      setNote(include
-        ? `${r.added ?? 0} published${r.already ? ` · ${r.already} were already in` : ""}.`
-        : `${r.removed ?? 0} removed.`)
-      setPicked(new Set())
       load(q, page * PAGE)
+      onChanged?.()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
   const markup = async () => {
-    if (!chosen.length) return
+    const inCat = (rows ?? []).filter((x) => x.picked)
+    if (!inCat.length) return
     const n = Number(pct)
     if (!isFinite(n) || n < 0) { setErr("Markup must be a number, and not negative."); return }
     setBusy(true); setErr(null); setNote(null)
     try {
-      const r = await priceCatalogPicks({ refs: chosen, markupPct: n })
+      const r = await priceCatalogPicks({ refs: (rows ?? []).filter((x) => x.picked).map((x) => x.ref), markupPct: n })
       if (r.error) throw new Error(r.error)
       // Pricing publishes. Any style that didn't take a price had no cost recorded on it
       // — the only remaining reason, and the one worth naming.
@@ -79,6 +76,7 @@ export function SupplierStylesPicker() {
         ? `${r.priced} in the catalogue at cost + ${n}%.${r.skippedNoCost ? ` ${r.skippedNoCost} skipped — no supplier cost recorded on those.` : ""}`
         : "None of those have a supplier cost recorded, so there was nothing to mark up. Type a price in instead.")
       load(q, page * PAGE)
+      onChanged?.()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
@@ -104,7 +102,7 @@ export function SupplierStylesPicker() {
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search style, brand or number…" className="h-9 w-72 pl-8" />
         </div>
         <span className="text-xs text-muted-foreground">
-          {total.toLocaleString()} styles synced{chosen.length ? ` · ${chosen.length} selected` : ""}
+          {total.toLocaleString()} styles synced
         </span>
         {busy && <CircleNotch size={14} className="animate-spin text-muted-foreground" />}
         <div className="ml-auto flex items-center gap-1">
@@ -118,7 +116,7 @@ export function SupplierStylesPicker() {
         </div>
       </div>
 
-      {chosen.length > 0 && (
+      {rows && rows.some((r) => r.picked) && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
           {/* Setting a price IS adding it to the catalogue — there is no separate publish
               step, because a style with a catalogue price and no place in the catalogue is
@@ -127,11 +125,10 @@ export function SupplierStylesPicker() {
           <span className="text-xs text-muted-foreground">Cost +</span>
           <Input value={pct} onChange={(e) => setPct(e.target.value.replace(/[^\d.]/g, ""))}
             className="h-8 w-16 text-center text-xs tabular-nums" inputMode="decimal" aria-label="Markup percent" />
+          {/* Applies to the ticked styles ON THIS PAGE — which are, by definition, the
+              ones in the catalogue. No second selection to keep in sync with the first. */}
           <Button size="sm" variant="outline" onClick={markup} disabled={busy}>
-            <Percent size={14} weight="bold" /> Price &amp; add {chosen.length}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => publish(false)} disabled={busy}>
-            Remove from catalogue
+            <Percent size={14} weight="bold" /> Price these {rows.filter((r) => r.picked).length}
           </Button>
         </div>
       )}
@@ -166,14 +163,22 @@ export function SupplierStylesPicker() {
             </thead>
             <tbody>
               {rows.map((st) => {
-                const on = picked.has(st.ref)
                 return (
                   <tr key={st.ref} className="border-b border-border/60 last:border-0">
                     <td className="px-2 py-2">
-                      <input type="checkbox" checked={on} aria-label={`Select ${st.name || st.ref}`}
-                        onChange={(e) => setPicked((s) => {
-                          const n = new Set(s); if (e.target.checked) n.add(st.ref); else n.delete(st.ref); return n
-                        })} />
+                      {/* THE TICK IS THE DECISION. It used to only mark a row for a bulk
+                          action you then had to press, so ticking a style and hitting
+                          "Create lookbook" produced a catalogue without it — the box looked
+                          like the answer and was only the question. Now it publishes on the
+                          spot, and unticking removes. Reversible, so an accidental click
+                          costs one more click. */}
+                      <input
+                        type="checkbox"
+                        checked={st.picked}
+                        disabled={busy}
+                        aria-label={`${st.picked ? "Remove" : "Add"} ${st.name || st.ref} ${st.picked ? "from" : "to"} the catalogue`}
+                        onChange={(e) => void toggle(st.ref, e.target.checked)}
+                      />
                     </td>
                     <td className="px-2 py-2">
                       <div className="flex items-start gap-3">
