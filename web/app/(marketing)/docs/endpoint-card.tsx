@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Check, Copy, ArrowSquareOut } from "@phosphor-icons/react"
 import type { ApiEndpoint } from "@/lib/api-endpoints"
-import { Block, CODE_SURFACE } from "./code-block"
+import { TitledBlock } from "./code-block"
 
 const BASE = "https://api.egful.store"
 const KEY = "egk_test_..."
@@ -63,7 +63,9 @@ function snippet(e: ApiEndpoint, lang: Lang): string {
   ].join("\n")
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+/** `onAccent` restyles for the accent header strip — the muted-foreground default is
+ *  near-invisible on it, and a copy button nobody can see is a copy button nobody uses. */
+function CopyButton({ text, label, onAccent }: { text: string; label: string; onAccent?: boolean }) {
   const [done, setDone] = useState(false)
   return (
     <button
@@ -74,7 +76,12 @@ function CopyButton({ text, label }: { text: string; label: string }) {
         setDone(true)
         setTimeout(() => setDone(false), 1400)
       }}
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      className={
+        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " +
+        (onAccent
+          ? "text-white/80 hover:bg-white/15 hover:text-white"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground")
+      }
     >
       {done ? <><Check size={12} weight="bold" /> Copied</> : <><Copy size={12} weight="bold" /> Copy</>}
     </button>
@@ -102,54 +109,62 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
 
       <p className="mt-2 text-sm text-muted-foreground">{e.description}</p>
 
-      {/* Request, in whichever language they actually write in. */}
+      {/* Request, in whichever language they actually write in. The language tabs live
+          IN the header strip now rather than floating above the block — they name what
+          the block contains, which is what the strip is for. */}
       <div className="mt-3">
-        <div className="mb-1.5 flex items-center gap-1">
-          {LANGS.map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setLang(id)}
-              aria-pressed={lang === id}
-              className={
-                "rounded px-2 py-0.5 text-[11px] font-medium transition-colors " +
-                // The ACTIVE tab wears the panel's own colour, so the chip and the block
-                // below it read as one object. It was bg-foreground — pure black — which
-                // was invisible against a black panel and then, once the panel took the
-                // accent's hue, became a second dark colour sitting a few percent off the
-                // first. Two darks that nearly match look like a bug.
-                (lang === id ? CODE_SURFACE : "text-muted-foreground hover:bg-accent hover:text-foreground")
-              }
-            >
-              {label}
-            </button>
-          ))}
-          <span className="ml-auto flex items-center gap-1">
-            <CopyButton text={code} label={`${e.title} request`} />
-            {/* Through /login, not straight at /developers.
-                These docs are PUBLIC, so most people clicking this have no session, and
-                pointing them at an authenticated board meant landing on someone else's
-                dashboard or a bare redirect that lost the endpoint. Login sends an
-                existing session straight on without showing the form, and routes by role
-                afterwards — so a seller lands on their board, not an admin one. */}
-            <a
-              href={`/login?next=${encodeURIComponent(`/developers?endpoint=${e.id}`)}`}
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
-            >
-              Try it <ArrowSquareOut size={11} weight="bold" />
-            </a>
-          </span>
-        </div>
-        <Block>{code}</Block>
+        <TitledBlock
+          title={
+            <span className="flex items-center gap-1">
+              {LANGS.map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setLang(id)}
+                  aria-pressed={lang === id}
+                  className={
+                    "rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " +
+                    // On the accent strip the ACTIVE tab is the readable one and the rest
+                    // recede — inverted from the old light bar, where active meant darker.
+                    (lang === id ? "bg-white/20 text-white" : "text-white/60 hover:bg-white/10 hover:text-white")
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </span>
+          }
+          actions={
+            <>
+              <CopyButton text={code} label={`${e.title} request`} onAccent />
+              {/* Through /login, not straight at /developers.
+                  These docs are PUBLIC, so most people clicking this have no session, and
+                  pointing them at an authenticated board meant landing on someone else's
+                  dashboard or a bare redirect that lost the endpoint. Login sends an
+                  existing session straight on without showing the form, and routes by role
+                  afterwards — so a seller lands on their board, not an admin one. */}
+              <a
+                href={`/login?next=${encodeURIComponent(`/developers?endpoint=${e.id}`)}`}
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+              >
+                Try it <ArrowSquareOut size={11} weight="bold" />
+              </a>
+            </>
+          }
+        >
+          {code}
+        </TitledBlock>
       </div>
 
       {e.response && (
         <div className="mt-3">
-          <div className="mb-1.5 flex items-center">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Response</span>
-            <span className="ml-auto"><CopyButton text={e.response} label={`${e.title} response`} /></span>
-          </div>
-          <Block>{e.response}</Block>
+          <TitledBlock
+            tone="response"
+            title={<span className="uppercase tracking-widest">Response</span>}
+            actions={<CopyButton text={e.response} label={`${e.title} response`} onAccent />}
+          >
+            {e.response}
+          </TitledBlock>
         </div>
       )}
     </div>

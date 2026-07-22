@@ -27,11 +27,56 @@
  */
 export const CODE_SURFACE = "bg-[oklch(0.24_0.03_280)] text-[oklch(0.93_0.012_280)]"
 
+/**
+ * The header strip that names a block — the language tabs on a request, "Response" on a
+ * response. Full accent, and this is the one place it earns a whole surface: the strip is
+ * a few pixels tall, it appears once per block, and it's the thing that tells you which of
+ * the two you're looking at. Spending the accent on the label rather than the body is what
+ * keeps the body readable.
+ */
+export const CODE_HEADER = "bg-[var(--primary)] text-white"
+
+/**
+ * The response body. Light violet rather than the request's dark surface, because request
+ * and response are not the same kind of thing: one is what you send, one is what comes
+ * back, and a reader scanning a long page sorts them by value before reading either. Same
+ * hue 280, near-white lightness — a tint, not a fill.
+ */
+export const RESPONSE_SURFACE = "bg-[oklch(0.975_0.012_280)] text-[oklch(0.28_0.02_280)]"
+
+/**
+ * A titled code block: accent header strip, then the body.
+ *
+ * `tone` picks which body — "request" is the dark machine surface, "response" the light
+ * violet one. `actions` sits at the right of the strip (copy, language tabs).
+ */
+export function TitledBlock({ title, tone = "request", actions, children }: {
+  title: React.ReactNode
+  tone?: "request" | "response"
+  actions?: React.ReactNode
+  children: string
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-black/10">
+      <div className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold ${CODE_HEADER}`}>
+        {title}
+        {actions && <span className="ml-auto flex items-center gap-1">{actions}</span>}
+      </div>
+      <pre className={`overflow-x-auto p-4 font-mono text-xs leading-relaxed ${tone === "response" ? RESPONSE_SURFACE : CODE_SURFACE}`}>
+        {children}
+      </pre>
+    </div>
+  )
+}
+
+/**
+ * An untitled block, for prose sections where the surrounding text already says what the
+ * snippet is. No header strip: a bar reading "Request" under a paragraph that just said
+ * "send this" is a label for something already labelled.
+ */
 export function Block({ children }: { children: string }) {
   return (
-    // The border is nearly invisible on a light page and does the separating on a dark
-    // one, so a single class covers both surfaces without a theme branch.
-    <pre className={`overflow-x-auto rounded-lg border border-white/10 p-4 font-mono text-xs leading-relaxed ${CODE_SURFACE}`}>
+    <pre className={`overflow-x-auto rounded-lg border border-black/10 p-4 font-mono text-xs leading-relaxed ${CODE_SURFACE}`}>
       {children}
     </pre>
   )
