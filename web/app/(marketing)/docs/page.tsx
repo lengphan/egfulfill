@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { API_ENDPOINTS } from "@/lib/api-endpoints"
 import { DocsNav } from "./docs-nav"
 import { EndpointCard } from "./endpoint-card"
+import { Block, Code } from "./code-block"
 
 export const metadata: Metadata = {
   title: "API — EGFULFILL",
@@ -54,18 +55,6 @@ const LIMITS: { scope: string; limit: string }[] = [
   { scope: "All endpoints", limit: "600 requests / minute / key" },
   { scope: "Order creation", limit: "60 requests / minute / key" },
 ]
-
-function Code({ children }: { children: React.ReactNode }) {
-  return <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em]">{children}</code>
-}
-
-function Block({ children }: { children: string }) {
-  return (
-    <pre className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-4 font-mono text-xs leading-relaxed">
-      {children}
-    </pre>
-  )
-}
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (

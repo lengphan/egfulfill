@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Check, Copy, ArrowSquareOut } from "@phosphor-icons/react"
 import type { ApiEndpoint } from "@/lib/api-endpoints"
+import { Block } from "./code-block"
 
 const BASE = "https://api.egful.store"
 const KEY = "egk_test_..."
@@ -77,14 +78,6 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     >
       {done ? <><Check size={12} weight="bold" /> Copied</> : <><Copy size={12} weight="bold" /> Copy</>}
     </button>
-  )
-}
-
-function Block({ children }: { children: string }) {
-  return (
-    <pre className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-4 font-mono text-xs leading-relaxed">
-      {children}
-    </pre>
   )
 }
 
