@@ -1636,14 +1636,16 @@ export function ordersRoutes(app, requireAuth) {
              count(*)::int as n,
              (select body from order_messages x where x.order_id = m.order_id order by created_at desc, id desc limit 1) as last_body,
              (select coalesce(nullif(u.name,''), u.email) from users u where u.id::text = replace(m.order_id, 'support-', '')) as seller_name,
-             -- Open escalation = the seller asked for a human and no staffer has replied
-             -- since. That's what sorts a thread to the top of the inbox.
+             -- Open escalation = the seller asked for a human and no HUMAN has replied since.
+             -- That's what sorts a thread to the top of the inbox. The AI assistant and its
+             -- auto-acknowledgments (both role 'assistant') deliberately do NOT clear it —
+             -- only a real teammate does — otherwise a bot reply would bury the request.
              (select count(*) from order_messages e
                where e.order_id = m.order_id
                  and coalesce((e.meta->>'escalated')::boolean, false)
                  and e.created_at > coalesce((select max(s.created_at) from order_messages s
                                                where s.order_id = m.order_id
-                                                 and s.sender_role <> 'seller'), '-infinity'::timestamptz)
+                                                 and s.sender_role not in ('seller', 'assistant')), '-infinity'::timestamptz)
              )::int as open_escalations
         from order_messages m
        where m.order_id like 'support-%'

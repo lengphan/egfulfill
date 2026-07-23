@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, type ChatEntry, type SellerMatch, type SupportThread } from "@/lib/api"
+import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown } from "@/components/app/markdown"
 
@@ -53,6 +53,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
   const [aiNote, setAiNote] = useState<string | null>(null)
+  const [office, setOffice] = useState<SupportAvailability | null>(null)
   const [streaming, setStreaming] = useState("") // assistant reply revealed word-by-word
   const revealingRef = useRef(false)             // pause polling while the typewriter runs
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -154,6 +155,20 @@ export default function ChatPage() {
     const h = messages.find((x) => { const r = x.role ?? "seller"; return r !== "seller" && r !== "assistant" && !x.internal })
     return h ? { id: String(h.id), by: h.by || "A teammate" } : null
   }, [isSupport, messages])
+
+  // Office hours, fetched once the support thread is active, so the handoff copy tells the
+  // truth about whether anyone's around right now.
+  useEffect(() => {
+    if (!isSupport) return
+    const id = setTimeout(() => { getSupportAvailability().then(setOffice).catch(() => {}) }, 0)
+    return () => clearTimeout(id)
+  }, [isSupport])
+
+  // The right "you're in the queue" line for the moment — in hours vs. offline.
+  const queueNote = (o: SupportAvailability | null) =>
+    o && !o.open
+      ? `Our team is offline right now (${o.hoursLabel}). Your request is logged — a teammate will reply right here as soon as we're back. The assistant is paused.`
+      : `You're in the queue — a teammate will reply here${o?.hoursLabel ? `, usually within business hours (${o.hoursLabel})` : ""}. The assistant is paused until they do.`
   const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
   // Announcements are a broadcast, not a conversation — the server 403s a non-admin
   // write, so the composer must say so rather than letting the send fail silently.
@@ -247,7 +262,7 @@ export default function ChatPage() {
             setAiNote(null)
           }
           else if (r.ok && r.skipped) { await load(); setAiNote(null) }
-          else if (r.ok && r.escalated) { await load(); setAiNote("You're in the queue — a teammate will reply here shortly. The assistant is paused until they do.") }
+          else if (r.ok && r.escalated) { if (r.office) setOffice(r.office); await load(); setAiNote(queueNote(r.office ?? office)) }
           else if (r.disabled) setAiNote("The assistant is off — an admin can add the AI key in Settings → Integrations. A teammate will follow up.")
           else if (r.error) setAiNote(`Assistant couldn't reply (${r.error}). A teammate will follow up.`)
           else setAiNote(null)
@@ -272,7 +287,7 @@ export default function ChatPage() {
     const clientId = `c-${cidBase.current}-${cidSeq.current++}`
     const text = "I'd like to talk to a human — please have someone follow up."
     setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: nowMs() }])
-    setAiNote("Flagged for a teammate — someone will reply here shortly.")
+    setAiNote(queueNote(office))
     // escalated:true is what actually raises the flag — it writes meta.escalated, sends
     // staff a distinct notification, and pins the thread to the top of their inbox until
     // one of them replies. Without it this was just another message.

@@ -14,6 +14,7 @@ import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, 
 import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
+import { StoresTab } from "@/components/app/spydeck-stores"
 import { detectTrademarks } from "@/lib/trademarks"
 import { PublishProductDialog } from "@/components/app/publish-product-dialog"
 import { usePaged, Pagination } from "@/components/app/pagination"
@@ -106,7 +107,7 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
 // Memoised: the trending grid re-renders on every keystroke/filter/save, and each card ran
 // estFor() + detectTrademarks() (a regex over ~40 brands) on every one of those. With stable
 // callbacks from the parent, memo means a card only re-renders when ITS own data changes.
-const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing, wasSaved: boolean) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void }) {
+export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing, wasSaved: boolean) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void }) {
   const e = estFor(l)
   const trending = e.trending
   const tags = (l.tags ?? []).slice(0, 13)
@@ -286,7 +287,7 @@ export function SpyDeckView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState("")
-  const [view, setView] = useState<"trending" | "search" | "saved" | "uploaded" | "account">("trending")
+  const [view, setView] = useState<"trending" | "search" | "saved" | "uploaded" | "account" | "stores">("trending")
   const [saved, setSaved] = useState<SavedListing[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   // "Make product" → Etsy draft. Track which listings have been uploaded (this session).
@@ -587,9 +588,9 @@ export function SpyDeckView() {
           <div className="flex rounded-lg border border-border p-0.5">
             {(([
               ...(showTrending ? (["trending"] as const) : []),
-              "search", "saved", "uploaded",
+              "search", "saved", "uploaded", "stores",
               ...(showAccount ? (["account"] as const) : []),
-            ]) as Array<"trending" | "search" | "saved" | "uploaded" | "account">).map((v) => (
+            ]) as Array<"trending" | "search" | "saved" | "uploaded" | "account" | "stores">).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -598,7 +599,7 @@ export function SpyDeckView() {
                   (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
-                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "uploaded" ? `Uploaded${uploaded.length ? ` (${uploaded.length})` : ""}` : v === "trending" ? "Trending" : v === "account" ? "My shop" : "Search"}
+                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "uploaded" ? `Uploaded${uploaded.length ? ` (${uploaded.length})` : ""}` : v === "trending" ? "Trending" : v === "account" ? "My shop" : v === "stores" ? "Stores" : "Search"}
               </button>
             ))}
           </div>
@@ -675,7 +676,15 @@ export function SpyDeckView() {
         )}
 
 
-        {view === "account" ? (
+        {view === "stores" ? (
+          <StoresTab
+            savedIds={savedIds}
+            uploadedIds={uploadedIds}
+            onToggleSave={toggleSave}
+            onSearchTag={onSearchTag}
+            onMakeProduct={setMakeListing}
+          />
+        ) : view === "account" ? (
           <ShopAnalyzer />
         ) : view === "trending" ? (
           trending === null && trendErr ? (

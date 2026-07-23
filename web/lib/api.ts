@@ -1114,10 +1114,16 @@ export function getMe() {
 }
 // Ask the account-aware AI to reply in the seller's support thread. No-op server-side
 // if ANTHROPIC_API_KEY isn't configured ({ ok:false, disabled:true }).
+export type SupportAvailability = { open: boolean; hoursLabel: string }
+/** Is the support team within office hours right now? Drives the handoff copy. */
+export function getSupportAvailability() {
+  return api<SupportAvailability>(`/api/support/availability`)
+}
 export function requestAiReply() {
   // `escalated: true` means the thread has an OPEN human handoff — the assistant deliberately
-  // stays quiet until a teammate replies, so there's no `reply`.
-  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; escalated?: boolean; error?: string }>(`/api/support/ai-reply`, {
+  // stays quiet until a teammate replies, so there's no `reply`. `office` says whether the
+  // team is in hours, so the client can show the right "in queue" vs "we're offline" copy.
+  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; escalated?: boolean; office?: SupportAvailability; error?: string }>(`/api/support/ai-reply`, {
     method: "POST",
     body: "{}",
   })
@@ -1513,6 +1519,35 @@ export function putNavVisibility(hidden: NavVisibilityMap) {
   return api<{ ok?: boolean; hidden?: NavVisibilityMap; error?: string }>(`/api/nav_visibility`, {
     method: "PUT", body: JSON.stringify({ hidden }),
   })
+}
+
+// ── Competitor STORE research ────────────────────────────────────────────────
+export type SpyShop = {
+  shop_id: string; shop_name: string | null; title: string | null; url: string | null;
+  icon: string | null; listings: number | null; favorers: number | null;
+  reviews: number | null; rating: number | null; sales: number | null;
+  since?: number | null; saved_at?: string;
+}
+export function searchSpydeckShops(q: string) {
+  return api<{ shops?: SpyShop[]; error?: string }>(`/api/spydeck/shops?q=${encodeURIComponent(q)}`)
+}
+export function getSpydeckShop(id: string | number) {
+  return api<{ shop?: SpyShop; error?: string }>(`/api/spydeck/shops/${encodeURIComponent(String(id))}`)
+}
+export function getSpydeckShopListings(id: string | number, offset = 0) {
+  return api<{ listings?: EtsyListing[]; count?: number; error?: string }>(
+    `/api/spydeck/shops/${encodeURIComponent(String(id))}/listings?offset=${offset}&limit=48`)
+}
+export function getSpydeckSavedShops() {
+  return api<{ shops?: SpyShop[] }>(`/api/spydeck/shops/saved`)
+}
+export function saveSpydeckShop(shop: SpyShop) {
+  return api<{ ok?: boolean; error?: string }>(`/api/spydeck/shops/saved`, {
+    method: "POST", body: JSON.stringify({ shop_id: shop.shop_id, data: shop }),
+  })
+}
+export function unsaveSpydeckShop(shopId: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/spydeck/shops/saved/${encodeURIComponent(shopId)}`, { method: "DELETE" })
 }
 
 export function saveSpydeckListing(listing: EtsyListing) {

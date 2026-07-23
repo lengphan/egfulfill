@@ -23,6 +23,78 @@ const AI_MODELS = [
   { id: 'claude-opus-4-8',          label: 'Claude Opus 4.8 — most capable' },
 ];
 
+// ── Support office hours ─────────────────────────────────────────────────────
+// When a seller asks for a human, what we PROMISE them depends on whether the team is
+// around. This is a small, single-timezone team, so it's a simple weekly window — not
+// per-agent presence. Read at CALL time (env, not module load) so a change applies without
+// a restart. ICT (UTC+7), Mon–Fri 09:00–18:00 by default; override via SUPPORT_* env.
+function supportHours() {
+  const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
+  return {
+    tzOffset: n(process.env.SUPPORT_TZ_OFFSET, 7),   // hours east of UTC
+    startH: n(process.env.SUPPORT_HOURS_START, 9),
+    endH: n(process.env.SUPPORT_HOURS_END, 18),
+    days: [1, 2, 3, 4, 5],                            // Mon–Fri
+    label: process.env.SUPPORT_HOURS_LABEL || '9:00–18:00 ICT, Mon–Fri',
+  };
+}
+export function supportAvailability() {
+  const h = supportHours();
+  // Shift UTC into the office timezone, then read the wall-clock there. Fixed offset, no tz
+  // library — good enough for a business-hours gate and dependency-free.
+  const local = new Date(Date.now() + h.tzOffset * 3600 * 1000);
+  const dow = local.getUTCDay();                       // 0 Sun … 6 Sat, in office tz
+  const hour = local.getUTCHours() + local.getUTCMinutes() / 60;
+  const open = h.days.includes(dow) && hour >= h.startH && hour < h.endH;
+  return { open, hoursLabel: h.label };
+}
+
+/**
+ * No-response safety net. A seller who asked for a human and heard nothing is the exact
+ * failure this handoff exists to prevent. This finds escalations a HUMAN still hasn't
+ * answered past a grace window and posts ONE acknowledgment into the thread — guarded by a
+ * `waitAck` marker so it never repeats and never spams. It does NOT resume the bot (posted
+ * as a system note), and it does NOT count as a human reply, so the "needs a human" flag
+ * stays raised for staff. The copy depends on whether the team is currently around.
+ */
+async function runSupportNudges() {
+  const graceMin = Number(process.env.SUPPORT_NUDGE_MINUTES) || 60;
+  let rows;
+  try {
+    rows = await q(
+      `select e.order_id
+         from order_messages e
+        where e.order_id like 'support-%'
+          and coalesce((e.meta->>'escalated')::boolean, false)
+          and e.created_at < now() - ($1 * interval '1 minute')
+          and not exists (
+            select 1 from order_messages s
+             where s.order_id = e.order_id
+               and s.sender_role not in ('seller', 'assistant')
+               and s.created_at > e.created_at)
+          and not exists (
+            select 1 from order_messages a
+             where a.order_id = e.order_id
+               and coalesce((a.meta->>'waitAck')::boolean, false)
+               and a.created_at > e.created_at)
+        group by e.order_id
+        limit 25`, [graceMin]);
+  } catch { return; }
+  if (!rows.rows.length) return;
+  const avail = supportAvailability();
+  const body = avail.open
+    ? 'Thanks for your patience — your request is still in our queue and a teammate will reply here as soon as they can.'
+    : `Our team is offline right now (${avail.hoursLabel}). Your request is logged — a teammate will reply right here as soon as we're back.`;
+  for (const r of rows.rows) {
+    try {
+      await q(
+        `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+         values ($1, null, 'assistant', $2, $3)`,
+        [r.order_id, body, JSON.stringify({ by: 'EGFULFILL Support', system: true, waitAck: true, ts: Date.now() })]);
+    } catch { /* one thread failing must not stop the rest */ }
+  }
+}
+
 let _settingsReady = null;
 function ensureSettings() {
   if (_settingsReady) return _settingsReady;
@@ -155,6 +227,18 @@ async function generateReply(key, model, sellerId, messages) {
 }
 
 export function supportAiRoutes(app, requireAuth, requireStaff) {
+  // Break silence on stuck escalations. Same single-instance pattern as the other sweeps:
+  // a globalThis guard so a hot reload can't stack timers, unref() so it never holds the
+  // process open, and a delayed first run to catch anything already overdue at boot.
+  if (!globalThis.__egSupportNudge) {
+    globalThis.__egSupportNudge = setInterval(() => { runSupportNudges().catch(() => {}); }, 15 * 60 * 1000);
+    if (globalThis.__egSupportNudge.unref) globalThis.__egSupportNudge.unref();
+    setTimeout(() => { runSupportNudges().catch(() => {}); }, 45 * 1000).unref?.();
+  }
+
+  // ── Is the support team around right now? Drives the handoff copy the seller sees. ──
+  app.get('/api/support/availability', { preHandler: requireAuth }, async () => supportAvailability());
+
   // ── Staff: DRAFT a reply for a seller's support thread (does NOT post it) ─────
   app.post('/api/support/ai-draft', { preHandler: requireStaff }, async (req, reply) => {
     const { key, model } = await aiConfig();
@@ -264,7 +348,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
                   and s.sender_role not in ('seller', 'assistant')
                   and s.created_at > e.created_at)
            limit 1`, [threadId]);
-      if (open.rows.length) return { ok: true, escalated: true };
+      if (open.rows.length) return { ok: true, escalated: true, office: supportAvailability() };
     } catch { /* if the check fails, fall through — a missed suppression is better than a hang */ }
 
     // Exclude INTERNAL rows (staff order briefs, internal notes). They share this
