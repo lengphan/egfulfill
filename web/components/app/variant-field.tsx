@@ -41,6 +41,7 @@ export function VariantField({
   required,
   swatches,
   compact,
+  className,
 }: {
   label: string
   value: string
@@ -54,6 +55,8 @@ export function VariantField({
   swatches?: boolean
   /** Row variant: no label above, smaller — used inline on order item rows. */
   compact?: boolean
+  /** Extra classes merged into the trigger (e.g. a height override for a form row). */
+  className?: string
 }) {
   // A product that declares no options for this attribute is a free choice, not a bug —
   // the field says "Any" and there's nothing to open.
@@ -75,7 +78,8 @@ export function VariantField({
         "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border",
         compact ? "h-7 px-2 text-[11px]" : "h-9 px-2.5 text-xs",
         // Only the required-but-empty field draws attention; the rest stay quiet.
-        required && unset ? "border-amber-400/70" : "border-border"
+        required && unset ? "border-amber-400/70" : "border-border",
+        className
       )}
     >
       {swatches && value && (
