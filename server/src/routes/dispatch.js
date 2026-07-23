@@ -115,6 +115,15 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   q('alter table orders add column if not exists dispatch_pdf_id text').catch(() => {});
   q('alter table orders add column if not exists dispatch_pushed_at timestamptz').catch(() => {});
   q('alter table orders add column if not exists dispatch_error text').catch(() => {});
+  // Scan provenance — who scanned a label out and via which channel (in-house / partner /
+  // carrier). These are WRITTEN by the scan endpoints below and READ by /api/shipments,
+  // but nothing ever created them: not schema.sql, not an ALTER. On any live DB the column
+  // was absent, so `o.scanned_via` in the Shipments SELECT threw, softQ swallowed it, and
+  // the page came back EMPTY however many labels had been bought — the label was recorded
+  // on the order, the list just couldn't be read. The comment at the in-house scan endpoint
+  // already assumed these ALTERs existed; now they do.
+  q('alter table orders add column if not exists scanned_by text').catch(() => {});
+  q('alter table orders add column if not exists scanned_via text').catch(() => {});
 
   /**
    * Bill the expedited dispatch, both sides.
