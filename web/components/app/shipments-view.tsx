@@ -1,11 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { MagnifyingGlass, CircleNotch, ArrowSquareOut, Package, ArrowClockwise } from "@phosphor-icons/react"
+import { MagnifyingGlass, CircleNotch, ArrowSquareOut, Package, ArrowClockwise, DownloadSimple, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getShipments, refreshTracking, type ShipmentRow } from "@/lib/api"
+import { getShipments, refreshTracking, voidLabel, type ShipmentRow } from "@/lib/api"
 import { onLive } from "@/lib/live"
 import { getUser } from "@/lib/auth"
 
@@ -46,6 +46,7 @@ const VIA: Record<string, string> = {
 
 export function ShipmentsView() {
   const [rows, setRows] = useState<ShipmentRow[] | null>(null)
+  const [spend, setSpend] = useState(0)
   const [q, setQ] = useState("")
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -56,10 +57,24 @@ export function ShipmentsView() {
     if (!getUser()) { setRows([]); return }
     setBusy(true)
     getShipments({ search: search?.trim() || undefined, limit: 300 })
-      .then((r) => { setRows(r.shipments ?? []); setErr(null) })
+      .then((r) => { setRows(r.shipments ?? []); setSpend(r.labelSpend ?? 0); setErr(null) })
       .catch((e: Error) => { setErr(e.message); setRows([]) })
       .finally(() => setBusy(false))
   }, [])
+
+  // Client-side CSV of what's on screen — reconciles against the label-cost ledger in Billing.
+  const exportCsv = () => {
+    const r = rows ?? []
+    if (!r.length) return
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`
+    const head = ["Order", "Customer", "State", "Tracking", "Carrier", "Method", "Price", "Stage", "Delivery", "Scanned at"]
+    const lines = [head.join(","), ...r.map((s) => [s.num, s.customer, s.state, s.tracking, s.carrier, s.method, s.price != null ? s.price.toFixed(2) : "", s.stage, s.delivery, s.scannedAt].map(esc).join(","))]
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url; a.download = `shipments-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
 
   useEffect(() => { const t = setTimeout(() => load(), 0); return () => clearTimeout(t) }, [load])
   // The search runs on the SERVER, so it reaches past the 300 rows loaded here. Debounced
@@ -80,6 +95,21 @@ export function ShipmentsView() {
     finally { setChecking(null) }
   }
 
+  // Void a label: refund the postage with the carrier + credit the cost back in the ledger
+  // (so it shows in Billing). Warehouse/admin only — the server enforces it too.
+  const [voiding, setVoiding] = useState<string | null>(null)
+  const canVoid = role === "warehouse" || role === "admin"
+  const doVoid = async (s: ShipmentRow) => {
+    if (!window.confirm(`Void the label for ${s.num}? This refunds the postage with the carrier and credits it back.`)) return
+    setVoiding(s.id)
+    try {
+      const r = await voidLabel(s.id)
+      if (r.ok) { setErr(`Label voided${r.refunded ? ` — $${r.refunded.toFixed(2)} credited back` : ""}.`); load(q) }
+      else setErr(r.error || "Void failed.")
+    } catch (e) { setErr((e as Error).message) }
+    finally { setVoiding(null) }
+  }
+
   const counts = useMemo(() => {
     const r = rows ?? []
     return {
@@ -95,7 +125,7 @@ export function ShipmentsView() {
       title="Shipments"
       description="Every parcel with a tracking number. Search by tracking, order, customer or carrier."
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {busy && <CircleNotch size={14} className="animate-spin text-muted-foreground" />}
           <span className="text-xs text-muted-foreground">
             {err ? "count unknown" : `${counts.total} shown`}
@@ -104,6 +134,12 @@ export function ShipmentsView() {
             {counts.stuck > 0 && ` · ${counts.stuck} not collected`}
             {counts.problem > 0 && ` · ${counts.problem} need attention`}
           </span>
+          {spend > 0 && (
+            <span className="text-xs"><span className="text-muted-foreground">Label spend </span><span className="font-semibold tabular-nums">${spend.toFixed(2)}</span></span>
+          )}
+          <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows || rows.length === 0}>
+            <DownloadSimple size={14} weight="bold" /> Export CSV
+          </Button>
         </div>
       }
     >
@@ -154,6 +190,8 @@ export function ShipmentsView() {
                 <th className="px-5 py-2 font-medium">Order</th>
                 <th className="px-3 py-2 font-medium">Customer</th>
                 <th className="px-3 py-2 font-medium">Tracking</th>
+                <th className="px-3 py-2 font-medium">Method</th>
+                <th className="px-3 py-2 text-right font-medium">Price</th>
                 <th className="px-3 py-2 font-medium">Carrier says</th>
                 <th className="px-3 py-2 font-medium">Scan</th>
                 <th className="px-3 py-2 text-right font-medium">Label</th>
@@ -173,6 +211,8 @@ export function ShipmentsView() {
                       <div className="font-mono text-xs">{s.tracking}</div>
                       {s.carrier && <div className="text-[11px] text-muted-foreground">{s.carrier}</div>}
                     </td>
+                    <td className="px-3 py-2.5 text-xs">{s.method || <span className="text-muted-foreground">—</span>}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums">{s.price != null ? `$${s.price.toFixed(2)}` : <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-3 py-2.5">
                       {d ? (
                         <span className={"rounded px-1.5 py-0.5 text-[11px] font-medium " + d.cls}>{d.label}</span>
@@ -227,6 +267,17 @@ export function ShipmentsView() {
                           <span className="px-1.5 text-[11px] text-muted-foreground" title="This label predates storing the PDF">
                             not stored
                           </span>
+                        )}
+                        {canVoid && s.labelUrl && (
+                          <button
+                            onClick={() => doVoid(s)}
+                            disabled={voiding === s.id}
+                            className="eg-tap rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                            title="Void label — refunds the postage with the carrier"
+                            aria-label={`Void label for ${s.num}`}
+                          >
+                            {voiding === s.id ? <CircleNotch size={13} className="animate-spin" /> : <X size={13} weight="bold" />}
+                          </button>
                         )}
                       </div>
                     </td>

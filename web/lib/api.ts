@@ -2311,6 +2311,8 @@ export function getDispatchHistory(p: { days?: number; search?: string } = {}) {
 export type ShipmentRow = {
   id: string; num: string; customer: string | null; state: string | null
   tracking: string; carrier: string | null; labelUrl: string | null
+  /** Shipping service (e.g. "USPS Ground Advantage"), and what the label cost. */
+  method: string | null; price: number | null
   stage: string | null
   /** What the CARRIER says, as distinct from `stage` which is what the floor says. When
    *  they disagree, which one is wrong is the thing being worked out. */
@@ -2321,7 +2323,12 @@ export function getShipments(p: { search?: string; limit?: number } = {}) {
   const s = new URLSearchParams()
   if (p.search) s.set("search", p.search)
   if (p.limit) s.set("limit", String(p.limit))
-  return api<{ shipments: ShipmentRow[] }>(`/api/shipments?${s.toString()}`)
+  return api<{ shipments: ShipmentRow[]; labelSpend?: number }>(`/api/shipments?${s.toString()}`)
+}
+// Void/refund a bought label — cancels it with the carrier AND credits the label cost
+// back in the ledger (so it shows in Billing under the carrier). Staff only, server-side.
+export function voidLabel(orderId: string) {
+  return api<{ ok?: boolean; refunded?: number; error?: string }>(`/api/shipments/${encodeURIComponent(orderId)}/void`, { method: "POST" })
 }
 
 // ── Broadcasts — one-to-many email to sellers ────────────────────────────────

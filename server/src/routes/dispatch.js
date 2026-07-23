@@ -24,6 +24,7 @@ import { q, softQ } from '../db.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 import { refundOrder } from './order_refunds.js';
+import { aggregatorRefundLabel } from './shipping.js';
 
 /**
  * Undo the money booked by a successful push, when a label is cancelled BEFORE it's picked.
@@ -257,6 +258,37 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         createdAt: x.created_at,
       })),
     };
+  });
+
+  /**
+   * Void a bought label — refund the postage with the carrier (via the aggregator) AND
+   * reverse the label-cost in the ledger, so the credit shows in Billing under 'carrier'
+   * (the same gap the dispatch-cancel fix closed for byeastside). Best-effort on the ledger
+   * so a booking blip can't undo a successful carrier refund. Warehouse/admin only (money).
+   */
+  app.post('/api/shipments/:id/void', { preHandler: requireWarehouse }, async (req, reply) => {
+    const id = String(req.params.id);
+    const o = (await q('select id, label_provider, label_ref, tracking_label_url from orders where id=$1', [id]).catch(() => ({ rows: [] }))).rows[0];
+    if (!o) { reply.code(404); return { error: 'Order not found' }; }
+    if (!o.label_ref) { reply.code(400); return { error: "No provider reference stored for this label — void it in the carrier's dashboard." }; }
+    const refund = await aggregatorRefundLabel(o.label_provider, o.label_ref).catch((e) => ({ ok: false, message: e.message }));
+    if (!refund.ok) { reply.code(400); return { error: refund.message || 'The carrier refused the void.' }; }
+    // Credit the postage back in the ledger (new ref so it dedupes on retry).
+    let refunded = 0;
+    try {
+      const paid = (await q("select -sum(delta)::float as paid from wallet_ledger where account='factory' and type='label-cost' and ref=$1", [`label-${id}`])).rows[0]?.paid || 0;
+      if (paid > 0) {
+        await q(`insert into wallet_ledger (account, delta, type, ref, note, order_id)
+                 values ('factory', $1, 'label-cost', $2, $3, $4) on conflict do nothing`,
+          [paid, `label-void-${id}`, `Label voided — postage refunded (${refund.status || 'submitted'}) · order ${id}`, id]);
+        refunded = paid;
+      }
+    } catch { /* best-effort */ }
+    // The label is void — drop the stored PDF so a dead label can't be printed.
+    await q('update orders set tracking_label_url=null where id=$1', [id]).catch(() => {});
+    audit(req, 'label.void', { entityType: 'order', entityId: id, after: { refundStatus: refund.status || 'submitted', refunded } });
+    egBroadcast({ type: 'orders' });
+    return { ok: true, status: refund.status || 'submitted', refunded };
   });
 
   /**
