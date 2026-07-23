@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User } from "@phosphor-icons/react"
+import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User, Smiley } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson } from "@/lib/api"
@@ -41,6 +41,10 @@ const ANNOUNCE_CHANNEL = "announce"
 // One "@" suggestion — either a teammate (mentioning them notifies) or an order to tag.
 type MentionItem = { kind: "order"; o: OrderRow } | { kind: "person"; p: MentionPerson }
 
+// A small, practical emoji set for the composer — reactions, status, and the POD/shipping
+// bits that actually come up here. Not a full library; just the common ones.
+const EMOJIS = "😀 😄 😊 🙂 😉 😎 🤔 😅 😂 🤣 😭 😢 😡 🥳 🙏 👍 👎 👌 👏 🙌 💪 🔥 ✨ 🎉 ❤️ 💜 ✅ ❌ ⚠️ ❓ ‼️ 📦 🚚 🏷️ 💳 💰 📸 🎨 🧵 👕 🧢 ⏳ 🕐 👋".split(" ")
+
 // Module scope, not a component defined in render (react-hooks/static-components).
 const convoIcon = (kind: Convo["kind"] | undefined, size = 16) => {
   if (kind === "support") return <Headset size={size + 1} weight="duotone" />
@@ -65,6 +69,7 @@ export default function ChatPage() {
   const [aiNote, setAiNote] = useState<string | null>(null)
   const [office, setOffice] = useState<SupportAvailability | null>(null)
   const [hoursOpen, setHoursOpen] = useState(false)  // staff: support-hours editor dialog
+  const [emojiOpen, setEmojiOpen] = useState(false)  // composer emoji picker
   // @-mention autocomplete: the seller's own orders power the suggestions, and `mention`
   // tracks the token being typed after an "@".
   const [orders, setOrders] = useState<OrderRow[]>([])
@@ -238,6 +243,16 @@ export default function ChatPage() {
       if (el) { const pos = mention.start + tag.length + 2; el.focus(); el.setSelectionRange(pos, pos) }
     })
   }
+  // Insert an emoji at the caret (or replacing a selection), then refocus after it.
+  const insertEmoji = (emoji: string) => {
+    const el = composerRef.current
+    const start = el?.selectionStart ?? input.length
+    const end = el?.selectionEnd ?? start
+    setInput(input.slice(0, start) + emoji + input.slice(end))
+    setEmojiOpen(false)
+    requestAnimationFrame(() => { if (el) { const pos = start + emoji.length; el.focus(); el.setSelectionRange(pos, pos) } })
+  }
+
   const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
   // Announcements are a broadcast, not a conversation — the server 403s a non-admin
   // write, so the composer must say so rather than letting the send fail silently.
@@ -648,6 +663,25 @@ export default function ChatPage() {
               Draft with AI
             </Button>
           )}
+          {/* Emoji picker */}
+          <div className="relative shrink-0">
+            <Button variant="ghost" size="icon" className="size-10" onClick={() => setEmojiOpen((o) => !o)}
+              disabled={signedOut || !activeId || readOnly} aria-label="Emoji">
+              <Smiley size={18} />
+            </Button>
+            {emojiOpen && (
+              <>
+                {/* click-away to close */}
+                <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setEmojiOpen(false)} />
+                <div className="absolute bottom-full left-0 z-20 mb-1 grid w-72 grid-cols-8 gap-0.5 rounded-lg border border-border bg-card p-2 shadow-lg">
+                  {EMOJIS.map((e) => (
+                    <button key={e} type="button" onMouseDown={(ev) => { ev.preventDefault(); insertEmoji(e) }}
+                      className="rounded p-1 text-lg leading-none hover:bg-accent" aria-label={`Insert ${e}`}>{e}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           <div className="relative flex-1">
             {/* @-mention autocomplete: type "@" then part of a teammate's name or an order
                 number/name, and pick one — a person gets notified, an order gets tagged.
