@@ -27,6 +27,8 @@ import { getUser, clearSession, type User } from "@/lib/auth"
 import { UserAvatar } from "@/components/app/user-avatar"
 import { NotificationBell } from "@/components/app/notification-bell"
 import { OrderSearch } from "@/components/app/order-search"
+import { LanguageSwitcher } from "@/components/app/language-switcher"
+import { useT } from "@/lib/i18n"
 
 function IconButton({
   label,
@@ -53,6 +55,7 @@ function IconButton({
 export function TopBar({ balance: initialBalance }: { balance?: number }) {
   const pathname = usePathname()
   const router = useRouter()
+  const t = useT()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   // null until the real balance loads — never show a fake default (that made the
@@ -125,13 +128,14 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
       <h1 className="text-[22px] font-bold tracking-tight">{title}</h1>
 
       <div className="ml-auto flex items-center gap-1">
-        <IconButton label="Search orders (⌘K)" onClick={() => setSearchOpen(true)}>
+        <IconButton label={t("topbar.searchOrders")} onClick={() => setSearchOpen(true)}>
           <MagnifyingGlass size={18} />
         </IconButton>
         <OrderSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
         <NotificationBell />
+        <LanguageSwitcher />
         <IconButton
-          label="Toggle theme"
+          label={t("topbar.toggleTheme")}
           onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
         >
           {mounted && resolvedTheme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
@@ -144,7 +148,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
             onClick={() => router.push("/wallet")}
             className="flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-accent"
           >
-            <span className="text-muted-foreground">Balance</span>
+            <span className="text-muted-foreground">{t("topbar.balance")}</span>
             <span className="font-semibold tabular-nums">{money}</span>
           </button>
         )}
@@ -153,12 +157,12 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
           <DropdownMenu>
             <DropdownMenuTrigger className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
               <Plus size={16} weight="bold" />
-              New
+              {t("topbar.new")}
               <CaretDown size={12} className="opacity-80" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={() => router.push("/orders/new")}>Manual order</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/stores")}>Sync from platforms</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/orders/new")}>{t("topbar.new.manualOrder")}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/stores")}>{t("topbar.new.syncPlatforms")}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -171,7 +175,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
         <div className="flex items-center">
           <button
             onClick={() => router.push("/settings")}
-            title="Your profile"
+            title={t("topbar.yourProfile")}
             className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <UserAvatar user={user ?? { name }} size={32} />
@@ -179,7 +183,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger
-              aria-label="Account menu"
+              aria-label={t("topbar.accountMenu")}
               className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               <CaretDown size={12} />
@@ -191,9 +195,9 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
                 <DropdownMenuLabel>{name}</DropdownMenuLabel>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push("/settings")}>Profile &amp; settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/settings")}>{t("topbar.profileSettings")}</DropdownMenuItem>
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
-                Log out
+                {t("topbar.logout")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
