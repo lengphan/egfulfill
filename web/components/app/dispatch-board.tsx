@@ -54,6 +54,13 @@ export function DispatchBoard() {
     getOrders().then((r) => setOrders(r ?? [])).catch(() => setOrders([]))
   }, [])
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+  // Auto-dismiss the status/notice line (e.g. "Pulled 1 back") — it's transient, not a
+  // sticky error you must act on, so it clears itself after a few seconds.
+  useEffect(() => {
+    if (!err) return
+    const t = setTimeout(() => setErr(null), 6000)
+    return () => clearTimeout(t)
+  }, [err])
   // The partner scans on their own schedule, so this board goes stale on its own — an
   // order byeastside scanned five minutes ago sits here looking unscanned until someone
   // reloads. The scan sync broadcasts, so listen rather than poll.
@@ -192,7 +199,11 @@ export function DispatchBoard() {
       if (scanned) parts.push(`${scanned} already picked and can't be recalled`)
       if (other.length) parts.push(`${other.length} failed (${other[0].reason})`)
       setErr(parts.length ? parts.join(" · ") : "Nothing to pull back.")
-      setPicked(new Set())
+      // Keep the successfully pulled-back orders SELECTED — they stay on the board
+      // (still awaiting_scan) and the usual next move is to scan them in-house right away,
+      // so "Scanned here" should be live without re-ticking every box. Already-picked ones
+      // (couldn't recall) drop out of the selection.
+      setPicked(new Set(results.filter((x) => x.ok).map((x) => String(x.id))))
       load()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't pull those labels back.")
