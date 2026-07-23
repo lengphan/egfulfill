@@ -264,6 +264,18 @@ async function generateReply(key, model, sellerId, messages) {
   return postAnthropic(key, body);
 }
 
+// Workbench = the user's PRIVATE personal assistant (desk-<uid>). Only they can read it, so
+// it's a scratch space: ask things, keep notes. No live order/wallet data here (that's
+// Support) — it works over the conversation plus the user's own saved notes.
+const DESK_SYSTEM = `You are Workbench, a private personal assistant for one EGFULFILL user. This space is theirs alone — no one else can read it. Help them think, answer questions, and remember what they've saved.
+
+Rules:
+- Reply in the same language the user writes in (English or Vietnamese).
+- Be concise and practical. Use markdown (**bold**, lists) when it helps.
+- When SAVED NOTES are provided, treat them as facts the user asked you to remember, and cite them when relevant ("from your notes, …").
+- You don't have live order, wallet, or shipping data here — if they need that, point them to EGFULFILL Support or the relevant board.
+- Never claim to have taken actions in the system.`;
+
 export function supportAiRoutes(app, requireAuth, requireStaff) {
   // Break silence on stuck escalations. Same single-instance pattern as the other sweeps:
   // a globalThis guard so a hot reload can't stack timers, unref() so it never holds the
@@ -453,6 +465,45 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       `insert into order_messages (order_id, sender_id, sender_role, body, meta, client_id)
        values ($1,$2,$3,$4,$5,$6) on conflict (client_id) where client_id is not null do nothing`,
       // sender_id is uuid references users(id) — the assistant is not a user row, so NULL (role/meta carry identity).
+      [threadId, null, 'assistant', text, JSON.stringify(meta), clientId]);
+    return { ok: true, reply: text };
+  });
+
+  // ── Private Workbench: personal AI over the user's OWN notes + chat ────────────
+  // Reads only desk-<caller's own id>, so one user can never reach another's Workbench.
+  app.post('/api/desk/ai-reply', { preHandler: requireAuth }, async (req, reply) => {
+    const { key, model } = await aiConfig();
+    if (!key) return { ok: false, disabled: true };
+    const threadId = 'desk-' + req.user.sub;
+    // Pinned notes (meta.note) become durable context; everything else is recent chat.
+    const noteRows = await q(
+      `select body from order_messages
+         where order_id=$1 and coalesce((meta->>'note')::boolean, false)
+         order by created_at asc, id asc limit 50`, [threadId]);
+    const hist = await q(
+      `select sender_role, body from order_messages
+         where order_id=$1 and not coalesce((meta->>'note')::boolean, false)
+         order by created_at asc, id asc limit 20`, [threadId]);
+    const messages = toMessages(hist.rows);
+    if (!messages.length) return { ok: false, empty: true };
+    if (messages[messages.length - 1].role !== 'user') return { ok: true, skipped: true };
+    const notes = noteRows.rows.map((r) => String(r.body || '').trim()).filter(Boolean);
+    const system = DESK_SYSTEM + (notes.length
+      ? '\n\nSAVED NOTES (the user pinned these):\n' + notes.map((n) => '- ' + n).join('\n')
+      : '\n\n(No saved notes yet.)');
+    let text = '';
+    try {
+      text = await postAnthropic(key, JSON.stringify({ model, max_tokens: 700, system, messages }));
+    } catch (e) {
+      req.log?.warn?.({ err: String(e), detail: e.detail }, 'desk-ai request failed');
+      return { ok: false, error: e.message || 'AI service unavailable' };
+    }
+    if (!text) return { ok: false, empty: true };
+    const clientId = 'ai-' + crypto.randomBytes(8).toString('hex');
+    const meta = { by: 'Workbench', ai: true, ts: Date.now() };
+    await q(
+      `insert into order_messages (order_id, sender_id, sender_role, body, meta, client_id)
+       values ($1,$2,$3,$4,$5,$6) on conflict (client_id) where client_id is not null do nothing`,
       [threadId, null, 'assistant', text, JSON.stringify(meta), clientId]);
     return { ok: true, reply: text };
   });

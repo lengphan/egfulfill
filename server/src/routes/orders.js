@@ -1562,7 +1562,9 @@ export function ordersRoutes(app, requireAuth) {
   // panel don't 404.
   async function resolveChannel(id) {
     const s = String(id);
-    if (s === 'staff-general' || s === 'announce' || s.indexOf('support-') === 0) {
+    // desk-<uid> is the private personal Workbench — a synthetic channel like the others,
+    // never a real order, so it passes straight through (access is gated in canSeeThread).
+    if (s === 'staff-general' || s === 'announce' || s.indexOf('support-') === 0 || s.indexOf('desk-') === 0) {
       return { channel: s, orderRef: null };
     }
     if (s.indexOf('design-') === 0) return { channel: 'staff-general', orderRef: s.slice(7) };
@@ -1611,6 +1613,11 @@ export function ordersRoutes(app, requireAuth) {
       // member gets their own channel instead. Same rule as before this refactor.
       return id === ('support-' + user.sub);
     }
+    // Private personal Workbench — ONLY its owner may read or write it, ever. Not staff,
+    // not a team owner, not the support inbox. A desk that leaked would be the same class
+    // of failure as an internal brief reaching a seller, so this is a hard identity match
+    // on the authenticated user and nothing else.
+    if (id.indexOf('desk-') === 0) return id === ('desk-' + user.sub);
     return false;
   }
 
@@ -1697,9 +1704,13 @@ export function ordersRoutes(app, requireAuth) {
     // Explicit order id in the URL wins; otherwise an @mention in the body decides
     // what this message is about.
     const channelSeller = channel.indexOf('support-') === 0 ? channel.slice(8) : null;
-    const ref = orderRef || (b.orderRef ? String(b.orderRef) : null)
-      || (await resolveMention(b.text, channelSeller));
-    const meta = { by: b.by || null, system: !!b.system, internal: !!b.internal, ts: b.ts || null, escalated };
+    // The private Workbench is a personal AI + notes space, not order-linked: don't run
+    // @order resolution there (with a null seller it would match ANY order), and a "note"
+    // is just a message flagged meta.note so the client can pin it and the AI can read it.
+    const isDesk = channel.indexOf('desk-') === 0;
+    const ref = isDesk ? null : (orderRef || (b.orderRef ? String(b.orderRef) : null)
+      || (await resolveMention(b.text, channelSeller)));
+    const meta = { by: b.by || null, system: !!b.system, internal: !!b.internal, ts: b.ts || null, escalated, note: !!b.note };
     if (ref) meta.order_ref = ref;
     await q(
       `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
@@ -1801,6 +1812,8 @@ export function ordersRoutes(app, requireAuth) {
         ts: meta.ts || (m.created_at ? new Date(m.created_at).getTime() : 0), system: !!meta.system };
       if (m.attachment) e.attachment = m.attachment;
       if (meta.internal) e.internal = true;
+      // A pinned note in the private Workbench — rendered as a saved card, not a chat bubble.
+      if (meta.note) e.note = true;
       // Which order this message is about, now that orders don't own channels.
       if (meta.order_ref) e.orderRef = String(meta.order_ref);
       return e;
