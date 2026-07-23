@@ -18,21 +18,29 @@ const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.z
 const FROM_STORE = "eg_ship_from"
 
 /**
- * Create a one-off shipping label for a MANUAL order (re-ship, sample, replacement…). Buys a
- * REAL label through the same aggregator (Shippo → USPS) as the order ship panel, and creates
- * a minimal staff-owned manual order so it's RECORDED in Shipments. Ship-to is a single paste
- * box (validated live); ship-from is the saved warehouse address (Settings › Platform).
+ * Buy a REAL shipping label through the aggregator (Shippo → USPS), shared by two callers:
+ *
+ *  - Shipments page — no `order`: creates a minimal staff-owned manual FF-order (re-ship,
+ *    sample, replacement…) so the label is RECORDED in Shipments.
+ *  - Order detail — with `order`: buys against that existing order, ship-to pre-filled from
+ *    its address; nothing new is created.
+ *
+ * Ship-to is a single paste box (validated live); ship-from is the saved warehouse address
+ * (Settings › Platform). Optional add-ons (signature, insurance) ride the same buy.
  */
-export function NewLabelDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void }) {
+export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void; order?: { id: string; num?: string; to?: ShipAddress } }) {
   const [pasteText, setPasteText] = useState("")
   const [to, setTo] = useState<ShipAddress>({ ...BLANK })
   const [from, setFrom] = useState<ShipAddress>({ ...BLANK })
   const [pkg, setPkg] = useState({ weightOz: 6, length: 10, width: 8, height: 1, mailClass: "USPS_GROUND_ADVANTAGE" })
+  // Add-ons the carrier prices into the label: signature on delivery, declared insurance.
+  const [svc, setSvc] = useState<{ signature: boolean; insurance: number }>({ signature: false, insurance: 0 })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [result, setResult] = useState<UspsLabelResult | null>(null)
 
   // Load the saved warehouse 'from' when the dialog opens (deferred so no sync setState).
+  // With an `order`, also seed ship-to from its address so the label is one click away.
   useEffect(() => {
     if (!open) return
     const t = setTimeout(() => {
@@ -41,9 +49,14 @@ export function NewLabelDialog({ open, onOpenChange, onCreated }: { open: boolea
         const sf = s?.ship_from as ShipAddress | undefined
         if (sf && sf.street) { const a = { ...BLANK, ...sf }; setFrom(a); try { localStorage.setItem(FROM_STORE, JSON.stringify(a)) } catch {} }
       }).catch(() => {})
+      if (order?.to && order.to.street) {
+        const a = { ...BLANK, ...order.to }
+        setTo(a)
+        setPasteText([a.name, a.street, a.street2, [a.city, a.state].filter(Boolean).join(", ") + (a.zip ? " " + a.zip : "")].filter((l) => l && l.trim()).join("\n"))
+      }
     }, 0)
     return () => clearTimeout(t)
-  }, [open])
+  }, [open, order?.id])
 
   // Live recipient validation — visible ✓/⚠ before spending. Debounced, warn-not-block.
   const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid"; msg?: string }>({ status: "idle" })
@@ -61,7 +74,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated }: { open: boolea
     return () => { alive = false; clearTimeout(t) }
   }, [to.street, to.street2, to.city, to.state, to.zip])
 
-  const reset = () => { setPasteText(""); setTo({ ...BLANK }); setResult(null); setErr(null); setAddrCheck({ status: "idle" }) }
+  const reset = () => { setPasteText(""); setTo({ ...BLANK }); setSvc({ signature: false, insurance: 0 }); setResult(null); setErr(null); setAddrCheck({ status: "idle" }) }
 
   const buy = async () => {
     setErr(null)
@@ -69,19 +82,25 @@ export function NewLabelDialog({ open, onOpenChange, onCreated }: { open: boolea
     if (!addrComplete(from)) { setErr("No warehouse ‘From’ address saved — set it in Settings › Platform first."); return }
     setBusy(true)
     try {
-      const id = `FF-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
-      const co = await createOrder({
-        id, source: "manual", status: "new",
-        customer: { name: to.name || "" },
-        address: { name: to.name || "", street: to.street, street2: to.street2, city: to.city, state: to.state, zip: to.zip },
-      })
-      if (!co.ok) { setErr(co.error || "Couldn't create the order."); return }
+      // Existing order → buy against it. No order → mint a manual FF-order so the label is
+      // recorded in Shipments the same way marketplace labels are.
+      let orderId = order?.id
+      if (!orderId) {
+        const id = `FF-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+        const co = await createOrder({
+          id, source: "manual", status: "new",
+          customer: { name: to.name || "" },
+          address: { name: to.name || "", street: to.street, street2: to.street2, city: to.city, state: to.state, zip: to.zip },
+        })
+        if (!co.ok) { setErr(co.error || "Couldn't create the order."); return }
+        orderId = id
+      }
       setFactorySettings({ ship_from: from }).catch(() => {})
       try {
         const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
         if (v && !v.ok && v.error && !window.confirm(`Address check couldn't confirm this is deliverable:\n\n${v.error}\n\nBuy the label anyway?`)) return
       } catch { /* validation unavailable — proceed */ }
-      const r = await buyUspsLabel({ to, from, orderId: id, weightOz: pkg.weightOz, length: pkg.length, width: pkg.width, height: pkg.height, mailClass: pkg.mailClass })
+      const r = await buyUspsLabel({ to, from, orderId, weightOz: pkg.weightOz, length: pkg.length, width: pkg.width, height: pkg.height, mailClass: pkg.mailClass, signature: svc.signature, insurance: svc.insurance || undefined })
       if (!r.ok) { setErr(r.error || "Couldn't buy the label."); return }
       setResult(r)
       onCreated()
@@ -93,7 +112,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated }: { open: boolea
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset() }}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>New label</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{order ? `New label · ${order.num || order.id}` : "New label"}</DialogTitle></DialogHeader>
 
         {result ? (
           <div className="space-y-3 py-2">
@@ -146,6 +165,19 @@ export function NewLabelDialog({ open, onOpenChange, onCreated }: { open: boolea
                 <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => setPkg({ ...pkg, width: Number(e.target.value) })} className="h-9" /></label>
                 <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" /></label>
               </div>
+
+              <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Add-ons</div>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={svc.signature} onChange={(e) => setSvc({ ...svc, signature: e.target.checked })} className="size-4 accent-[var(--primary)]" />
+                  Signature on delivery
+                </label>
+                <label className="flex items-center gap-1.5 text-sm">
+                  <span className="text-muted-foreground">Insure $</span>
+                  <Input type="number" min={0} step={1} value={svc.insurance || ""} placeholder="0" onChange={(e) => setSvc({ ...svc, insurance: Math.max(0, Number(e.target.value) || 0) })} className="h-9 w-24" />
+                </label>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Add-ons are priced into the label by the carrier. Leave insurance at 0 for none.</p>
 
               {!addrComplete(from) && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">

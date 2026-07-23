@@ -93,13 +93,22 @@ async function epBuy(shipmentId, rateId) {
 }
 
 // ── Shippo ────────────────────────────────────────────────────────────────────
-async function shRates(to, from, pc) {
+async function shRates(to, from, pc, extra) {
   const body = {
     address_from: { name: from.name, street1: from.street1, street2: from.street2, city: from.city, state: from.state, zip: from.zip, country: from.country, phone: from.phone, email: from.email },
     address_to: { name: to.name, street1: to.street1, street2: to.street2, city: to.city, state: to.state, zip: to.zip, country: to.country, phone: to.phone, email: to.email },
     parcels: [{ length: String(pc.length), width: String(pc.width), height: String(pc.height), distance_unit: 'in', weight: String(pc.weightOz), mass_unit: 'oz' }],
     async: false
   };
+  // Optional add-ons. Shippo carries `extra` on the SHIPMENT through to the bought
+  // transaction, and both add to the quoted amount — so setting them here means the
+  // rate we buy already includes them. Only sent when asked, so a plain label is
+  // unchanged and a provider that rejects the field can't break the common path.
+  if (extra && (extra.signature || (Number(extra.insurance) > 0))) {
+    body.extra = {};
+    if (extra.signature) body.extra.signature_confirmation = extra.signature === true ? 'STANDARD' : String(extra.signature);
+    if (Number(extra.insurance) > 0) body.extra.insurance = { amount: Number(extra.insurance).toFixed(2), currency: 'USD' };
+  }
   const r = await fetch(SH_BASE + '/shipments/', { method: 'POST', headers: { Authorization: shAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error((d.detail || JSON.stringify(d)).slice(0, 200));
@@ -200,7 +209,7 @@ export async function aggregatorBuyCheapest(to, from, pc, opts) {
   const problems = [];
   const jobs = [];
   if (epKey()) jobs.push(epRates(T, F, P).catch((e) => { problems.push('EasyPost: ' + (e && e.message ? e.message : e)); return []; }));
-  if (shToken()) jobs.push(shRates(T, F, P).catch((e) => { problems.push('Shippo: ' + (e && e.message ? e.message : e)); return []; }));
+  if (shToken()) jobs.push(shRates(T, F, P, opts.extra).catch((e) => { problems.push('Shippo: ' + (e && e.message ? e.message : e)); return []; }));
   let all = (await Promise.all(jobs)).flat();
   if (!all.length) {
     if (problems.length) throw new Error(problems.join(' · '));

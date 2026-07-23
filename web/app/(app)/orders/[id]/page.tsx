@@ -33,10 +33,27 @@ import {
   type ChatEntry,
   type OrderQuote,
   type CatalogProduct,
+  type ShipAddress,
 } from "@/lib/api"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
+import { OrderStageMenu } from "@/components/app/order-stage-menu"
+import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { designSrc } from "@/lib/order-image"
+
+// Same fallbacks as the boards' toAddrOf — marketplace payloads spell the address a dozen
+// ways, so the ship-to a label uses must read them all. Kept identical on purpose.
+const toShipAddress = (o: OrderRow): ShipAddress => {
+  const a = (o.address ?? {}) as Record<string, string>
+  return {
+    name: o.customer?.name || a.name || "",
+    street: a.street || a.first_line || a.line1 || a.address1 || "",
+    street2: a.street2 || a.second_line || a.line2 || a.address2 || "",
+    city: a.city || "",
+    state: a.state || a.province || "",
+    zip: a.zip || a.postal_code || a.postcode || "",
+  }
+}
 
 const fmtMsgTime = (ts?: number) => {
   if (!ts) return ""
@@ -81,9 +98,20 @@ export default function OrderDetailPage() {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   const [quote, setQuote] = useState<OrderQuote | null>(null)
 
+  // Staff processing controls (stage moves + labels). Gated exactly like the boards:
+  // canFulfill = warehouse/admin; the ⋯ menu itself is per-stage/role-gated inside.
+  const role = getUser()?.role || "seller"
+  const isStaff = role !== "seller"
+  const canFulfill = role === "warehouse" || role === "admin"
+  const [labelOpen, setLabelOpen] = useState(false)
+  const [actionErr, setActionErr] = useState<string | null>(null)
+
   // Re-pull orders after an action that changes this one (submit, cancel) so the badge
   // and the action bar reflect the new status without a manual refresh.
   const reload = () => { getOrders().then((rows) => setOrders(rows ?? [])).catch(() => {}) }
+  // `one` (the direct fetch) wins over the list, so a stage change must refresh IT too or
+  // the badge and menu would show stale state after a move.
+  const reloadAll = () => { getOrder(String(id)).then((o) => { if (o && !o.error) setOne(o) }).catch(() => {}); reload() }
 
   const reloadDesigns = () => {
     getOrderDesigns(id)
@@ -226,13 +254,42 @@ export default function OrderDetailPage() {
               {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}
             </div>
           </div>
-          {/* Secondary first, primary last — the destructive action shouldn't lead. */}
+          {/* Secondary first, primary last — the destructive action shouldn't lead.
+              Staff also get the factory move set here: the board row is the quick option,
+              but the detail page is where an order is actually worked. */}
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {isStaff && canFulfill && (
+              <Button variant="outline" size="sm" onClick={() => setLabelOpen(true)}>
+                <Truck size={14} weight="bold" /> New label
+              </Button>
+            )}
+            {isStaff && (
+              <OrderStageMenu
+                order={order}
+                role={role}
+                canFulfill={canFulfill}
+                onNewLabel={() => setLabelOpen(true)}
+                onChanged={reloadAll}
+                onError={setActionErr}
+              />
+            )}
             <CancelOrderButton order={order} onDone={reload} />
             <SubmitOrderButton order={order} quote={quote} onDone={reload} />
           </div>
         </div>
+        {isStaff && actionErr && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{actionErr}</div>
+        )}
       </div>
+
+      {isStaff && (
+        <NewLabelDialog
+          open={labelOpen}
+          onOpenChange={setLabelOpen}
+          order={{ id: order.id, num, to: toShipAddress(order) }}
+          onCreated={reloadAll}
+        />
+      )}
 
       {/* min-w-0 on both tracks: a grid item's automatic minimum size is its MIN-CONTENT
           width, so a long unbroken order/SKU string holds the 1.6fr track open and pushes

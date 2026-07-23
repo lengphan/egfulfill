@@ -693,7 +693,7 @@ export function undoScan(id: string) {
 // ── USPS-direct label (Labels 3.0) — buys a real label + writes tracking onto the order ──
 export type ShipAddress = { name?: string; street?: string; street2?: string; city?: string; state?: string; zip?: string }
 export type UspsLabelResult = { ok?: boolean; error?: string; mock?: boolean; trackingNumber?: string; labelUrl?: string; labelImage?: string; labelHtml?: string; imageType?: string; carrier?: string; service?: string; cost?: number }
-export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightOz?: number; length?: number; width?: number; height?: number; mailClass?: string; orderId?: string; directUsps?: boolean }) {
+export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightOz?: number; length?: number; width?: number; height?: number; mailClass?: string; orderId?: string; directUsps?: boolean; signature?: boolean; insurance?: number; refNo?: string; refNo2?: string; contents?: string }) {
   // Route through the aggregator (Shippo/EasyPost) when one is configured — it needs no
   // USPS EPS billing approval, and a test key buys free sample labels.
   //
