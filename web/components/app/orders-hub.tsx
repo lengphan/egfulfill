@@ -60,6 +60,11 @@ const toAddrOf = (o: OrderRow): ShipAddress => {
   }
 }
 const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.zip)
+// Render an address back into the paste-box text, so opening a prefilled order shows the
+// block the way it was pasted in (and stays the single source of truth for the ship-to box).
+const addrToText = (a: ShipAddress): string =>
+  [a.name, a.street, a.street2, [[a.city, a.state].filter(Boolean).join(", "), a.zip].filter(Boolean).join(" ")]
+    .map((s) => (s || "").trim()).filter(Boolean).join("\n")
 
 /** Identity of ONE line. Two lines of the same SKU on an order (same product, different
  *  personalisation) are different jobs, so the sku alone is not an identity — keying on it
@@ -144,7 +149,7 @@ export function OrdersHub() {
   // Non-error feedback from an action (what the auto-push did), cleared on the next one.
   const [note, setNote] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
-  const [pasteOpen, setPasteOpen] = useState(false)
+  // (pasteOpen removed — Ship-to is now a single, always-visible paste box.)
   const [pasteText, setPasteText] = useState("")
   // Per-order production detail the floor needs but the board never showed: matched
   // thread cones, machine files, and how much of the blank we actually have. Fetched
@@ -190,6 +195,23 @@ export function OrdersHub() {
   const [from, setFrom] = useState<ShipAddress>(BLANK_ADDR)
   const [to, setTo] = useState<ShipAddress>(BLANK_ADDR)
   const [pkg, setPkg] = useState({ weightOz: 6, length: 10, width: 8, height: 1, mailClass: "USPS_GROUND_ADVANTAGE" })
+  // Live recipient-address check for the ship panel — a visible ✓/⚠ before spending on a
+  // label. Debounced; warn-not-block (validation can be down or the USPS Addresses API may
+  // still be pending). All setState is inside the deferred timeout, never synchronous.
+  const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid"; msg?: string }>({ status: "idle" })
+  useEffect(() => {
+    const complete = !!(to.street && to.city && to.state && to.zip)
+    let alive = true
+    const t = setTimeout(() => {
+      if (!alive) return
+      if (!complete) { setAddrCheck({ status: "idle" }); return }
+      setAddrCheck({ status: "checking" })
+      validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
+        .then((v) => { if (alive) setAddrCheck(v && v.ok ? { status: "valid" } : { status: "invalid", msg: v?.error }) })
+        .catch(() => { if (alive) setAddrCheck({ status: "idle" }) })
+    }, 600)
+    return () => { alive = false; clearTimeout(t) }
+  }, [to.street, to.street2, to.city, to.state, to.zip])
   const [labelErr, setLabelErr] = useState<string | null>(null)
   const [labels, setLabels] = useState<Record<string, UspsLabelResult>>({})
   // Barcode labels for an order's blanks — only lines whose variant is actually
@@ -297,8 +319,8 @@ export function OrdersHub() {
   // Open the fulfill panel for an order — prefill recipient from the order address.
   const openFulfill = (o: OrderRow) => {
     setShipOpen(o.id); setLabelErr(null); setCarrier("USPS"); setTracking("")
-    setPasteOpen(false); setPasteText("")
-    setTo(toAddrOf(o))
+    const a = toAddrOf(o)
+    setTo(a); setPasteText(addrToText(a))   // seed the single ship-to box from the order
   }
   // Buy a real label. Goes through the aggregator (Shippo/EasyPost) when one is
   // configured, falling back to USPS-direct only if none is. On success the server stores
@@ -307,7 +329,7 @@ export function OrdersHub() {
   const buyLabel = async (o: OrderRow) => {
     setLabelErr(null)
     if (!addrComplete(to)) { setLabelErr("Recipient needs a street, city, state and ZIP."); return }
-    if (!addrComplete(from)) { setLabelErr("Set your warehouse 'From' address (street, city, state, ZIP)."); return }
+    if (!addrComplete(from)) { setLabelErr("No warehouse 'From' address saved — set it in Settings › Platform, then try again."); return }
     setBusy(`label:${o.id}`)
     try {
       try { localStorage.setItem(FROM_STORE, JSON.stringify(from)) } catch {}
@@ -1084,74 +1106,29 @@ export function OrdersHub() {
                   {/* Fulfill panel (warehouse/admin): buy a USPS-direct label, or record tracking manually */}
                   {canFulfill && shipOpen === o.id && (
                     <div className="mb-3 space-y-3 rounded-xl border border-border bg-muted/30 p-4">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {/* Ship to — prefilled from the order */}
+                      <div>
+                        {/* Ship to — ONE paste box that parses itself. Ship-from is the saved
+                            warehouse address (Settings › Platform), so it isn't shown or edited
+                            here. The address is validated live — see the badge by the header. */}
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
-                            <button
-                              onClick={() => setPasteOpen((v) => !v)}
-                              className="text-[11px] font-medium text-primary hover:underline"
-                            >
-                              {pasteOpen ? "Hide paste box" : "Paste an address"}
-                            </button>
+                            {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking address…</span>}
+                            {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><CheckCircle size={12} weight="fill" /> Address validated</span>}
+                            {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify — check it" : "Address not found"}</span>}
                           </div>
-
-                          {/* The fastest way in while Etsy withholds buyer addresses:
-                              paste the block from anywhere and let it split itself. Same
-                              parser the manual-order form uses. */}
-                          {pasteOpen && (
-                            <div className="space-y-1.5 rounded-lg border border-dashed border-border p-2">
-                              <textarea
-                                value={pasteText}
-                                onChange={(e) => {
-                                  setPasteText(e.target.value)
-                                  const { name, addr } = parseBlock(e.target.value)
-                                  // Only overwrite what we actually parsed — a half-typed
-                                  // paste shouldn't wipe fields already filled in.
-                                  setTo((prev) => ({
-                                    ...prev,
-                                    name: name || prev.name,
-                                    street: addr.street || prev.street,
-                                    street2: addr.street2 || prev.street2,
-                                    city: addr.city || prev.city,
-                                    state: addr.state || prev.state,
-                                    zip: addr.zip || prev.zip,
-                                  }))
-                                }}
-                                rows={4}
-                                placeholder={"Jyoti Reddy\n881 Bergen Ave\nApt 4R\nBrooklyn, NY 11238"}
-                                className="w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-                              />
-                              <p className="text-[10px] text-muted-foreground">
-                                Name on the first line, then the street, then City, ST ZIP. Fields below fill as you paste.
-                              </p>
-                            </div>
-                          )}
-
-                          <Input value={to.name ?? ""} onChange={(e) => setTo({ ...to, name: e.target.value })} placeholder="Recipient name" className="h-9" />
-                          <Input value={to.street ?? ""} onChange={(e) => setTo({ ...to, street: e.target.value })} placeholder="Street address" className="h-9" />
-                          <Input value={to.street2 ?? ""} onChange={(e) => setTo({ ...to, street2: e.target.value })} placeholder="Apt, suite (optional)" className="h-9" />
-                          <div className="grid grid-cols-[1fr_4rem_5rem] gap-2">
-                            <Input value={to.city ?? ""} onChange={(e) => setTo({ ...to, city: e.target.value })} placeholder="City" className="h-9" />
-                            <Input value={to.state ?? ""} onChange={(e) => setTo({ ...to, state: e.target.value })} placeholder="ST" className="h-9" />
-                            <Input value={to.zip ?? ""} onChange={(e) => setTo({ ...to, zip: e.target.value })} placeholder="ZIP" className="h-9" />
-                          </div>
-                        </div>
-                        {/* Ship from — your warehouse, saved for next time */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship from</span>
-                            <span className="text-[10px] text-muted-foreground">saved for next time</span>
-                          </div>
-                          <Input value={from.name ?? ""} onChange={(e) => setFrom({ ...from, name: e.target.value })} placeholder="Warehouse / sender name" className="h-9" />
-                          <Input value={from.street ?? ""} onChange={(e) => setFrom({ ...from, street: e.target.value })} placeholder="Street address" className="h-9" />
-                          <Input value={from.street2 ?? ""} onChange={(e) => setFrom({ ...from, street2: e.target.value })} placeholder="Suite (optional)" className="h-9" />
-                          <div className="grid grid-cols-[1fr_4rem_5rem] gap-2">
-                            <Input value={from.city ?? ""} onChange={(e) => setFrom({ ...from, city: e.target.value })} placeholder="City" className="h-9" />
-                            <Input value={from.state ?? ""} onChange={(e) => setFrom({ ...from, state: e.target.value })} placeholder="ST" className="h-9" />
-                            <Input value={from.zip ?? ""} onChange={(e) => setFrom({ ...from, zip: e.target.value })} placeholder="ZIP" className="h-9" />
-                          </div>
+                          <textarea
+                            value={pasteText}
+                            onChange={(e) => {
+                              setPasteText(e.target.value)
+                              const { name, addr } = parseBlock(e.target.value)
+                              setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
+                            }}
+                            rows={4}
+                            placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
+                            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                          />
+                          <p className="text-[10px] text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
                         </div>
                       </div>
 
