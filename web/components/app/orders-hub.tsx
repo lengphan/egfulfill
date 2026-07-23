@@ -820,8 +820,9 @@ export function OrdersHub() {
                       <div className="truncate text-[10px] text-muted-foreground">{platformOf(o)} · {fmtDate(o.created_at)}</div>
                     </div>
 
-                    {/* CUSTOMER */}
-                    <div className="min-w-0 truncate text-sm font-medium">{o.customer?.name || "—"}</div>
+                    {/* CUSTOMER — text-xs to match the Store and Product metadata columns;
+                        the order # stays the one size-standout in the row. */}
+                    <div className="min-w-0 truncate text-xs font-medium">{o.customer?.name || "—"}</div>
 
                     {/* ITEMS — photo, listing name, units. The same shape the seller table
                         uses for this column, so the two surfaces read alike. The full
