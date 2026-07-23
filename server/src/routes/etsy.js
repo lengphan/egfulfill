@@ -370,6 +370,20 @@ async function syncAllEtsy(opts = {}) {
   return { ok: true, synced: summary };
 }
 
+// Public (app-key) GET — for data that needs NO seller OAuth: taxonomy, and competitor SHOP
+// research (a shop's public profile + active listings). Same key the categories route uses.
+// Returns { ok, status, data } rather than throwing, so callers map partial failures per row.
+export async function etsyPublicGet(path) {
+  if (!KEYSTRING) return { ok: false, status: 500, data: { error: 'Server missing ETSY_KEYSTRING' } };
+  try {
+    const r = await fetch(API + path, { headers: { 'x-api-key': API_KEY_HEADER } });
+    const data = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, data: { error: e.message } };
+  }
+}
+
 // Public listing search (keystring only, no seller OAuth) → normalized cards. Reused
 // by the /api/etsy/search route AND the SpyDeck trending aggregator. Throws on failure
 // with an `.status` for the caller to map.

@@ -3,7 +3,7 @@
 // is stored as jsonb so the Saved view renders without re-hitting Etsy. Table is
 // created idempotently at route-load (same pattern as order_designs / wallet_ledger).
 import { q } from '../db.js';
-import { searchListings, connectionFor, shopListings } from './etsy.js';
+import { searchListings, connectionFor, shopListings, etsyPublicGet, mapListing } from './etsy.js';
 import { aiComplete } from './support_ai.js';
 import { requireSpydeck } from '../entitlements.js';
 
@@ -38,6 +38,14 @@ function ensure() {
       shop_id    text,
       data       jsonb,
       created_at timestamptz not null default now()
+    )`))
+    // Saved COMPETITOR shops (store research), keyed by seller like spydeck_saves.
+    .then(() => q(`create table if not exists spydeck_saved_shops (
+      seller_id  text not null,
+      shop_id    text not null,
+      data       jsonb,
+      created_at timestamptz not null default now(),
+      primary key (seller_id, shop_id)
     )`))
     // Per-seller "fresh scan" throttle (once / 2 days). Staff use the global 30-min lock
     // (read off the cached feed's built_at) instead, so they aren't tracked here.
@@ -281,6 +289,26 @@ async function realSales(sellerId) {
   } catch {
     return null; // never block the analysis on this
   }
+}
+
+// Normalise an Etsy shop object → the card the Stores tab renders. listing_active_count is
+// the "how many products" figure; the rest is public credibility (favourites, reviews, sales).
+function shopCard(s) {
+  if (!s || !s.shop_id) return null;
+  return {
+    shop_id: String(s.shop_id),
+    shop_name: s.shop_name || null,
+    title: s.title || null,
+    url: s.url || (s.shop_name ? `https://www.etsy.com/shop/${encodeURIComponent(s.shop_name)}` : null),
+    icon: s.icon_url_fullxfull || null,
+    listings: s.listing_active_count ?? null,
+    favorers: s.num_favorers ?? null,
+    reviews: s.review_count ?? null,
+    rating: s.review_average ?? null,
+    sales: s.transaction_sold_count ?? null,
+    digital: s.is_using_structured_policies === undefined ? null : !!s.is_using_structured_policies,
+    since: s.create_date || s.created_timestamp || null,
+  };
 }
 
 export function spydeckRoutes(app, requireAuth) {
@@ -575,6 +603,67 @@ export function spydeckRoutes(app, requireAuth) {
     await ensure();
     await q('delete from spydeck_uploads where seller_id=$1 and listing_id=$2', [String(req.user.sub), String(req.params.listingId)]);
     return { ok: true };
+  });
+
+  // ── Competitor STORE research ────────────────────────────────────────────────
+  // Public shop data via the app key — no seller OAuth, same access class as categories.
+  // Search shops by name → shop cards (with product COUNT); open one → its full catalogue.
+
+  // Search shops by name.
+  app.get('/api/spydeck/shops', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
+    const qy = String((req.query || {}).q || '').trim();
+    if (!qy) { reply.code(400); return { error: 'Enter a shop name to search.' }; }
+    const r = await etsyPublicGet(`/shops?shop_name=${encodeURIComponent(qy)}&limit=25`);
+    // 404 = no shop by that name: an empty result, not an error.
+    if (!r.ok) {
+      if (r.status === 404) return { shops: [] };
+      reply.code(502); return { shops: [], error: (r.data && (r.data.error || r.data.message)) || `Etsy error (${r.status})` };
+    }
+    const rows = (r.data && Array.isArray(r.data.results)) ? r.data.results : [];
+    return { shops: rows.map(shopCard).filter(Boolean) };
+  });
+
+  // Saved competitor shops — declared BEFORE /shops/:id so "saved" isn't captured as an id
+  // (Fastify prefers static over parametric, but registering first makes it unambiguous).
+  app.get('/api/spydeck/shops/saved', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
+    await ensure();
+    const r = await q('select shop_id, data, created_at from spydeck_saved_shops where seller_id=$1 order by created_at desc limit 500', [String(req.user.sub)]);
+    return { shops: r.rows.map((row) => ({ ...(row.data || {}), shop_id: row.shop_id, saved_at: row.created_at })) };
+  });
+  app.post('/api/spydeck/shops/saved', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
+    await ensure();
+    const b = req.body || {};
+    const shopId = String(b.shop_id ?? '').trim();
+    if (!shopId) { reply.code(400); return { error: 'shop_id required' }; }
+    await q(`insert into spydeck_saved_shops (seller_id, shop_id, data) values ($1,$2,$3)
+             on conflict (seller_id, shop_id) do update set data=excluded.data`,
+      [String(req.user.sub), shopId, b.data ? JSON.stringify(b.data) : JSON.stringify(b)]);
+    return { ok: true };
+  });
+  app.delete('/api/spydeck/shops/saved/:shopId', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
+    await ensure();
+    await q('delete from spydeck_saved_shops where seller_id=$1 and shop_id=$2', [String(req.user.sub), String(req.params.shopId)]);
+    return { ok: true };
+  });
+
+  // One shop's public profile (product count + credibility).
+  app.get('/api/spydeck/shops/:id', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
+    const r = await etsyPublicGet(`/shops/${encodeURIComponent(String(req.params.id))}`);
+    if (!r.ok) { reply.code(r.status === 404 ? 404 : 502); return { error: r.status === 404 ? 'Shop not found' : ((r.data && (r.data.error || r.data.message)) || `Etsy error (${r.status})`) }; }
+    const card = shopCard(r.data);
+    if (!card) { reply.code(404); return { error: 'Shop not found' }; }
+    return { shop: card };
+  });
+
+  // A shop's active listings, paginated — same card shape as search/trending (reuses gridRow).
+  app.get('/api/spydeck/shops/:id/listings', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
+    const id = encodeURIComponent(String(req.params.id));
+    const limit = Math.min(100, Math.max(1, parseInt((req.query || {}).limit, 10) || 48));
+    const offset = Math.max(0, parseInt((req.query || {}).offset, 10) || 0);
+    const r = await etsyPublicGet(`/shops/${id}/listings/active?includes=Images&limit=${limit}&offset=${offset}`);
+    if (!r.ok) { reply.code(r.status === 404 ? 404 : 502); return { listings: [], count: 0, error: (r.data && (r.data.error || r.data.message)) || `Etsy error (${r.status})` }; }
+    const raw = (r.data && Array.isArray(r.data.results)) ? r.data.results : [];
+    return { listings: raw.map((l) => gridRow(mapListing(l))), count: r.data.count || raw.length };
   });
 
   // ── Pre-warm ─────────────────────────────────────────────────────────────────
