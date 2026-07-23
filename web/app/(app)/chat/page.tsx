@@ -167,7 +167,7 @@ export default function ChatPage() {
   // The right "you're in the queue" line for the moment — in hours vs. offline.
   const queueNote = (o: SupportAvailability | null) =>
     o && !o.open
-      ? `Our team is offline right now (${o.hoursLabel}). Your request is logged — a teammate will reply right here as soon as we're back. The assistant is paused.`
+      ? `Our team is offline right now (${o.hoursLabel}). Your request is logged — a teammate will reply right here, and email you, as soon as we're back. The assistant is paused.`
       : `You're in the queue — a teammate will reply here${o?.hoursLabel ? `, usually within business hours (${o.hoursLabel})` : ""}. The assistant is paused until they do.`
   const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
   // Announcements are a broadcast, not a conversation — the server 403s a non-admin

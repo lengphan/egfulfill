@@ -65,3 +65,29 @@ export function welcomeEmail(name) {
     html: transactionalShell(inner, 'Your EGFULFILL seller account is ready — connect a store to start.'),
   };
 }
+
+/**
+ * A seller has a new reply from a HUMAN teammate on their support thread. This is what makes
+ * the handoff promise ("a teammate will reply") reach them even when they're not on the app —
+ * especially the after-hours case, where they escalated and left. `snippet` is the reply's
+ * opening, quoted so the email stands on its own; the button drops them back into the chat.
+ */
+export function supportReplyEmail(name, snippet) {
+  const hi = name ? esc(name) : 'there';
+  const quote = snippet
+    ? `<p style="margin:0 0 20px;padding:12px 14px;border-left:3px solid ${BRAND.accent};background:${BRAND.pageBg};color:${BRAND.ink};font-size:14px">${esc(snippet)}</p>`
+    : '';
+  const inner =
+    `<p style="margin:0 0 15px;font-size:19px;font-weight:600;color:${BRAND.head}">You have a reply from EGFULFILL support</p>
+     <p style="margin:0 0 15px">Hi ${hi}, a teammate just replied to your support conversation:</p>
+     ${quote}
+     <p style="margin:0 0 22px">${button(APP_URL + '/chat', 'Open the conversation')}</p>
+     <p style="margin:0;font-size:13px;color:${BRAND.muted}">Reply right in the chat and we'll pick it up there.</p>`;
+  return {
+    subject: 'You have a reply from EGFULFILL support',
+    text: `Hi ${name || 'there'},\n\nA teammate replied to your support conversation`
+      + (snippet ? `:\n\n"${snippet}"\n\n` : '.\n\n')
+      + `Open it here: ${APP_URL}/chat`,
+    html: transactionalShell(inner, snippet ? String(snippet).slice(0, 120) : 'A teammate replied to your support conversation.'),
+  };
+}

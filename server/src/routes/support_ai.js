@@ -84,7 +84,7 @@ async function runSupportNudges() {
   const avail = supportAvailability();
   const body = avail.open
     ? 'Thanks for your patience — your request is still in our queue and a teammate will reply here as soon as they can.'
-    : `Our team is offline right now (${avail.hoursLabel}). Your request is logged — a teammate will reply right here as soon as we're back.`;
+    : `Our team is offline right now (${avail.hoursLabel}). Your request is logged — a teammate will reply right here, and email you, as soon as we're back.`;
   for (const r of rows.rows) {
     try {
       await q(

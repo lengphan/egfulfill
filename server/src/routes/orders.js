@@ -7,6 +7,8 @@ import { isStaff } from '../auth.js';
 import { egBroadcast } from '../events.js';
 import { notify } from './notifications.js';
 import { aiComplete } from './support_ai.js';
+import { sendMail, mailConfigured } from '../mailer.js';
+import { supportReplyEmail } from '../emails.js';
 import { audit } from '../audit.js';
 import { quoteOrder, freezeQuote } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
@@ -1752,6 +1754,25 @@ export function ordersRoutes(app, requireAuth) {
           type: 'support-message', title: `EGFULFILL replied${about}`,
           body, href: ref ? `/orders/${ref}` : '/chat', entityId: ref || channel,
         });
+        // Email the seller too, so a human's reply reaches them off-app — the "a teammate
+        // will reply" promise landing in the inbox, which matters most for the after-hours
+        // seller who escalated and left. Best-effort (never blocks the post), and only on
+        // the FIRST reply of a staff burst — if the previous message was already from a
+        // teammate, they're mid-conversation and don't need another email per line.
+        if (mailConfigured() && String(b.text || '').trim()) {
+          const sellerId = channel.slice(8);
+          (async () => {
+            const prev = await q(
+              `select sender_role from order_messages where order_id=$1 order by created_at desc, id desc limit 1 offset 1`, [channel]);
+            const prevRole = prev.rows[0] && prev.rows[0].sender_role;
+            if (prevRole && prevRole !== 'seller' && prevRole !== 'assistant') return; // mid-burst
+            const u = await q('select email, name from users where id=$1', [sellerId]);
+            const to = u.rows[0] && u.rows[0].email;
+            if (!to) return;
+            const mail = supportReplyEmail(u.rows[0].name, String(b.text).slice(0, 200));
+            await sendMail({ to, subject: mail.subject, html: mail.html, text: mail.text });
+          })().catch(() => { /* email is a nicety; the in-app notification already fired */ });
+        }
       }
     }
     return { ok: true };
