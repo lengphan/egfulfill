@@ -341,10 +341,18 @@ export function SpyDeckView() {
   // results; sourcing decisions — "what's actually moving in this category above this
   // price" — are the factory's job, and the controls only get in a seller's way.
   const [canFilter, setCanFilter] = useState(false)
+  // Operators get a REDUCED SpyDeck — Search / Saved / Uploaded only, no Trending feed and
+  // no shop analyzer. They research and save what to build; the Trending sourcing feed stays
+  // with warehouse/admin. Resolved after mount, since role is read from localStorage.
+  const [isOperator, setIsOperator] = useState(false)
   useEffect(() => {
     const t = setTimeout(() => {
       const r = getUser()?.role
       setCanFilter(r === "admin" || r === "warehouse")
+      if (r === "operator") {
+        setIsOperator(true)
+        setView((v) => (v === "trending" || v === "account" ? "search" : v))
+      }
     }, 0)
     return () => clearTimeout(t)
   }, [])
@@ -567,7 +575,7 @@ export function SpyDeckView() {
         description="Spy live Etsy listings and save the winners"
         actions={
           <div className="flex rounded-lg border border-border p-0.5">
-            {(["trending", "search", "saved", "uploaded", "account"] as const).map((v) => (
+            {(isOperator ? (["search", "saved", "uploaded"] as const) : (["trending", "search", "saved", "uploaded", "account"] as const)).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}

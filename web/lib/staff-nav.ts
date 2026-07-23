@@ -33,12 +33,12 @@ const STAFF_ITEMS: StaffNavItem[] = [
   // Broadcasts is seller EMAIL, not ad spend — a different thing from Campaigns above,
   // which is why it gets its own entry rather than a tab inside it. The team can draft;
   // only an admin can send, so this is visible to staff and the send button is not.
-  { label: "Broadcasts", href: "/broadcasts", icon: EnvelopeSimple, roles: ["admin"] },
+  { label: "Broadcasts", href: "/broadcasts", icon: EnvelopeSimple, roles: ["operator", "admin"] },
   // Digitizer — the (planned) Wilcom EWA embroidery page: drag a design in → quote +
   // TrueView review → edit → export a machine file. Dormant for now (the page is a
   // placeholder + API-key holder). Currently surfaced to admin ONLY so it can be reviewed;
   // set roles: [] to hide it again, or widen roles to open it up — same toggle as Campaigns.
-  { label: "Digitizer", href: "/digitizer", icon: Needle, roles: ["admin"] },
+  { label: "Digitizer", href: "/digitizer", icon: Needle, roles: ["operator", "admin"] },
   // Console retired — Users + Activity live in Settings, Top-ups in Wallet, Products at /products.
 ]
 
@@ -61,7 +61,7 @@ export function isStaffRole(role?: string | null): boolean {
 // Seller-side tool pages (in the (app) group) that specific staff roles may also use.
 // Admin gets everything; others get a curated set. Designers get none (design-only).
 const STAFF_TOOLS: StaffNavItem[] = [
-  { label: "SpyDeck", href: "/spydeck", icon: Binoculars, roles: ["warehouse", "admin"] },
+  { label: "SpyDeck", href: "/spydeck", icon: Binoculars, roles: ["operator", "warehouse", "admin"] },
   { label: "Products", href: "/products", icon: Tag, roles: ["operator", "warehouse", "admin"] },
   // The shop window we publish OUTWARD — curated selection, trade prices, CSV export.
   // Warehouse/admin only: it sets the prices outside buyers are shown, which is a
@@ -73,7 +73,7 @@ const STAFF_TOOLS: StaffNavItem[] = [
   // STAFF_ITEMS only, so a STAFF_TOOLS page placed there renders in the sidebar and then
   // bounces to the landing board the moment you click it — visible, unreachable, and no
   // error anywhere.
-  { label: "Catalogue", href: "/published-catalog", icon: Storefront, roles: ["warehouse", "admin"] },
+  { label: "Catalogue", href: "/published-catalog", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
   { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
   // Admin-only seller pages (full superuser access). (Seller "Orders"/Dashboard are
   // redundant with the factory Orders hub, so they're intentionally not here.)
