@@ -479,7 +479,12 @@ export function mapListing(l, imgsById = {}, rangeById = {}) {
   // product/publish path, which actually displays it large.
   const pickThumb = (im) => (im && (im.url_300x300 || im.url_570xN || im.url_680x540 || im.url_fullxfull)) || null;
   const inlineImgs = (l.images || []).map(pick).filter(Boolean);
-  const images = inlineImgs.length ? inlineImgs : (imgsById[l.listing_id] || []);
+  // Some Etsy endpoints (notably a shop's active listings) return the primary image as
+  // `MainImage` rather than expanding `images[]`, even with includes=Images — fall back to
+  // it so a competitor's shop catalog isn't a wall of blank tiles.
+  const mainImg = pick(l.MainImage);
+  const withMain = inlineImgs.length ? inlineImgs : (mainImg ? [mainImg] : []);
+  const images = withMain.length ? withMain : (imgsById[l.listing_id] || []);
   return {
     listing_id: l.listing_id,
     title: decodeEntities(l.title),
@@ -493,7 +498,7 @@ export function mapListing(l, imgsById = {}, rangeById = {}) {
     url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
     tags: Array.isArray(l.tags) ? l.tags : [],
     image: images[0] || null,
-    thumb: pickThumb((l.images || [])[0]) || images[0] || null,
+    thumb: pickThumb((l.images || [])[0]) || pickThumb(l.MainImage) || images[0] || null,
     images: images,
     created: l.original_creation_timestamp || l.created_timestamp || l.creation_tsz || null,
     views: (typeof l.views === 'number' ? l.views : null),
