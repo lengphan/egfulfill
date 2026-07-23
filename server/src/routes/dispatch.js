@@ -223,18 +223,29 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     const r = await softQ('shipments',
       `select o.id, o.seq, o.tracking, o.carrier, o.tracking_label_url,
               o.factory_status, o.delivery_status, o.delivery_detail, o.delivery_checked_at,
-              o.label_scanned_at, o.scanned_via, o.created_at,
+              o.label_scanned_at, o.scanned_via, o.created_at, o.ship_service,
+              -- price from the order column if stored, else the label-cost ledger row (so
+              -- labels bought before the column existed still show what they cost).
+              coalesce(o.label_cost,
+                (select -sum(w.delta) from wallet_ledger w where w.type='label-cost' and w.ref='label-'||o.id)
+              )::float as label_cost,
               o.customer->>'name' as customer, o.address->>'state' as state
          from orders o
          ${where}
         order by coalesce(o.label_scanned_at, o.created_at) desc
         limit $${args.length}`, args);
+    // Total label spend (all time), for the page's stat tile — straight off the ledger.
+    const spend = await q("select coalesce(-sum(delta),0)::float as total from wallet_ledger where type='label-cost'")
+      .then((x) => (x.rows[0] || {}).total || 0).catch(() => 0);
     return {
+      labelSpend: spend,
       shipments: r.rows.map((x) => ({
         id: x.id, num: x.seq ? '#' + x.seq : x.id,
         customer: x.customer || null, state: x.state || null,
         tracking: x.tracking, carrier: x.carrier || null,
         labelUrl: x.tracking_label_url || null,
+        method: x.ship_service || null,
+        price: x.label_cost != null ? Number(x.label_cost) : null,
         stage: x.factory_status || null,
         // Two DIFFERENT facts, kept apart on purpose: `stage` is what the floor says,
         // `delivery` is what the carrier says. They disagree, and which one is wrong is

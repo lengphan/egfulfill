@@ -291,6 +291,11 @@ const PRE_SCAN = ['', 'new', 'draft', 'in_review', 'approved', 'ready_print', 'i
  * Tagged `source: 'label'` so the row can say where it came from, the same way an Etsy or
  * CSV address does, rather than appearing as though someone typed it by hand.
  */
+// Recorded on the order at purchase so the Shipments page shows what each label cost and by
+// which service — the carrier states both exactly once, in the buy response.
+q('alter table orders add column if not exists label_cost numeric').catch(() => {});
+q('alter table orders add column if not exists ship_service text').catch(() => {});
+
 async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) {
   if (!orderId) return { shipped: false };
   // Book the postage as it's bought. The carrier tells us the price exactly once, in the
@@ -302,10 +307,14 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) 
     .then((r) => String((r.rows[0] || {}).factory_status || '').toLowerCase()).catch(() => '');
   const advance = PRE_SCAN.includes(cur);
   await q(
-    `update orders set tracking=$1, carrier=$2, tracking_label_url=coalesce($3, tracking_label_url)
+    `update orders set tracking=$1, carrier=$2, tracking_label_url=coalesce($3, tracking_label_url),
+       label_cost=coalesce($4, label_cost), ship_service=coalesce(nullif($5,''), ship_service)
        ${advance ? ", factory_status='awaiting_scan'" : ''}
-     where id=$4`,
-    [tracking, carrier || 'USPS', labelUrl || null, orderId]).catch(() => {});
+     where id=$6`,
+    [tracking, carrier || 'USPS', labelUrl || null,
+     (cost != null && isFinite(Number(cost))) ? Number(cost) : null,
+     (ref && ref.service) ? String(ref.service) : null,
+     orderId]).catch(() => {});
 
   // Backfill the destination, only into an order that hasn't got one. Separate statement
   // and best-effort for the same reason as the label reference below: the label is already
