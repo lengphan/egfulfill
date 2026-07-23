@@ -290,6 +290,50 @@ export function DispatchBoard() {
     w.print()
   }
 
+  // Packing slips — one per selected order, sized for a thermal 4x6 so the warehouse can
+  // print them WITH the labels or on their own, and pick by SKU x qty. A separate slip
+  // (never overlaid on the postage) so the USPS barcode is never at risk.
+  const printPackingSlips = () => {
+    if (!chosen.length) return
+    const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string))
+    const slips = chosen.map((o) => {
+      const its = o.items ?? []
+      const rows = its.length
+        ? its.map((it) => `<tr><td>${esc(it.name || it.sku || "Item")}${it.sku && it.name ? `<div class="sku mono">${esc(it.sku)}</div>` : ""}</td><td class="qty">&times;${esc(it.qty ?? 1)}</td></tr>`).join("")
+        : `<tr><td colspan="2" class="empty">No items recorded on this order</td></tr>`
+      return `<section class="slip">
+        <div class="hd"><div class="num mono">${esc(numOf(o))}</div><div class="plat">${esc(platformOf(o))}${o.store ? " &middot; " + esc(o.store) : ""}</div></div>
+        <div class="cust">${esc(customerOf(o))}</div>
+        ${addrLine(o) ? `<div class="addr">${esc(addrLine(o))}</div>` : ""}
+        <table><tbody>${rows}</tbody></table>
+        <div class="ft">${esc(unitsOf(o))} unit${unitsOf(o) === 1 ? "" : "s"}${o.tracking ? ` &middot; <span class="mono">${esc(o.tracking)}</span>` : ""}</div>
+      </section>`
+    }).join("")
+    const w = window.open("", "_blank")
+    if (!w) { setErr("Your popup blocker stopped the packing slips — allow popups for this site."); return }
+    w.document.write(`<!doctype html><html><head><title>Packing slips</title><style>
+      *{box-sizing:border-box}
+      body{font:12px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#111;margin:0}
+      .slip{width:4in;min-height:6in;padding:.25in;page-break-after:always;display:flex;flex-direction:column}
+      .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:2px solid #111;padding-bottom:6px}
+      .num{font-size:17px;font-weight:700}
+      .plat{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.05em;text-align:right}
+      .cust{font-size:14px;font-weight:600;margin-top:8px}
+      .addr{font-size:11px;color:#555}
+      table{width:100%;border-collapse:collapse;margin-top:8px}
+      td{padding:5px 2px;border-bottom:1px solid #eee;vertical-align:top;font-size:12px}
+      .sku{font-size:10px;color:#666;margin-top:1px}
+      .qty{text-align:right;font-weight:700;width:2.6rem;white-space:nowrap}
+      .empty{color:#999;text-align:center}
+      .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+      .ft{margin-top:auto;padding-top:8px;border-top:1px solid #ddd;font-size:9px;color:#888}
+      @page{size:4in 6in;margin:0}
+    </style></head><body>${slips}</body></html>`)
+    w.document.close()
+    w.focus()
+    w.print()
+  }
+
   const canAdvance = canSetStage(role, STAGE, NEXT)
   const [manifestOpen, setManifestOpen] = useState(false)
   // Mirrors the server's eligibility rules (lib/manifest-eligible.ts) so the button can
@@ -321,6 +365,9 @@ export function DispatchBoard() {
                 <Printer size={14} weight="bold" /> Print <CaretDown size={12} weight="bold" className="text-muted-foreground" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-52 p-1">
+                <DropdownMenuItem disabled={!chosen.length} onClick={printPackingSlips}>
+                  <Package size={14} weight="bold" /> Print packing slips
+                </DropdownMenuItem>
                 <DropdownMenuItem disabled={!chosen.length} onClick={printManifest}>
                   <ListChecks size={14} weight="bold" /> Print manifest
                 </DropdownMenuItem>
