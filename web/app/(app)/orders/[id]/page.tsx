@@ -585,13 +585,10 @@ function CancelOrderButton({ order, onDone }: { order: OrderRow; onDone: () => v
     } finally { setBusy(false) }
   }
 
-  if (started) {
-    return (
-      <span className="text-xs text-muted-foreground" title="Cancelling is only possible before the factory starts">
-        In production — message support to cancel
-      </span>
-    )
-  }
+  // Once the factory has started there's no cancel to offer, and the order's own status
+  // already says it's in production — so this control simply steps aside rather than
+  // repeating that in words.
+  if (started) return null
   return (
     <span className="flex items-center gap-2">
       {err && <span className="text-xs text-destructive">{err}</span>}
