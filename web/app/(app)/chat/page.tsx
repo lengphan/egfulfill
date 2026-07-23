@@ -233,6 +233,7 @@ export default function ChatPage() {
             setAiNote(null)
           }
           else if (r.ok && r.skipped) { await load(); setAiNote(null) }
+          else if (r.ok && r.escalated) { await load(); setAiNote("You're in the queue — a teammate will reply here shortly. The assistant is paused until they do.") }
           else if (r.disabled) setAiNote("The assistant is off — an admin can add the AI key in Settings → Integrations. A teammate will follow up.")
           else if (r.error) setAiNote(`Assistant couldn't reply (${r.error}). A teammate will follow up.`)
           else setAiNote(null)

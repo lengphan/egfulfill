@@ -1115,7 +1115,9 @@ export function getMe() {
 // Ask the account-aware AI to reply in the seller's support thread. No-op server-side
 // if ANTHROPIC_API_KEY isn't configured ({ ok:false, disabled:true }).
 export function requestAiReply() {
-  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; error?: string }>(`/api/support/ai-reply`, {
+  // `escalated: true` means the thread has an OPEN human handoff — the assistant deliberately
+  // stays quiet until a teammate replies, so there's no `reply`.
+  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; escalated?: boolean; error?: string }>(`/api/support/ai-reply`, {
     method: "POST",
     body: "{}",
   })

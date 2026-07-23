@@ -246,6 +246,27 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     const sellerId = req.user.sub;
     const threadId = 'support-' + sellerId;
 
+    // HUMAN HANDOFF: once a seller asks for a human, the AI stays OUT until a real teammate
+    // replies. Two reasons — it must not talk over the queue, and its own reply (role
+    // 'assistant') would otherwise count as "answered" and clear the escalation flag,
+    // burying the request no one saw. An open handoff = an escalation message with no reply
+    // from a human after it; the seller's own follow-ups and the AI's posts don't count.
+    // This is the industry-standard behaviour (Intercom/Zendesk/etc. suppress the bot on
+    // handoff). The bot may resume only once a human has actually replied.
+    try {
+      const open = await q(
+        `select 1 from order_messages e
+           where e.order_id = $1
+             and coalesce((e.meta->>'escalated')::boolean, false)
+             and not exists (
+               select 1 from order_messages s
+                where s.order_id = e.order_id
+                  and s.sender_role not in ('seller', 'assistant')
+                  and s.created_at > e.created_at)
+           limit 1`, [threadId]);
+      if (open.rows.length) return { ok: true, escalated: true };
+    } catch { /* if the check fails, fall through — a missed suppression is better than a hang */ }
+
     // Exclude INTERNAL rows (staff order briefs, internal notes). They share this
     // channel but must never reach the seller — and this reply is auto-posted with no
     // human in the loop, so a brief in the model's context could bleed factory-internal
