@@ -115,9 +115,10 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // width it gets, so spending the table's flexible space on it starves everything that
   // WOULD have fitted whole.
   items:    { id: "items",    label: "Items",    grid: "minmax(0,1.2fr)" },
-  // Dots, not worded pills — the heading already says what they are, so three words per
-  // row restated it fifty times for 176px. Fixed, because the header cell can't size it.
-  ready:    { id: "ready",    label: "Ready",    grid: "5rem" },
+  // A small coloured dot + its word (Label · Scan · Design), read as a status light with a
+  // legible name. Fixed — the header cell can't size it — and wide enough to hold the three
+  // dot+word tags on one line, in English or Vietnamese ("Thiết kế" is the widest).
+  ready:    { id: "ready",    label: "Ready",    grid: "13rem" },
   action:   { id: "action",   label: "",         grid: "12rem" },  // header stays blank: buttons need no title
 }
 

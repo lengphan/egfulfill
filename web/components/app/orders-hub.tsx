@@ -23,6 +23,7 @@ import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
+import { useLabelT } from "@/lib/i18n"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -123,6 +124,7 @@ const FILTERS: { label: string; id: string }[] = [
 // receives + ships, admin does everything.
 export function OrdersHub() {
   const router = useRouter()
+  const tl = useLabelT()
   const role = getUser()?.role || ""
   const isAdmin = role === "admin"
   const canFulfill = role === "warehouse" || isAdmin // receive (intake) + ship
@@ -613,10 +615,10 @@ export function OrdersHub() {
       </div>
 
       <StatGrid>
-        <StatCard label="New" value={String(stats.newCount)} sub="awaiting start" tone={stats.newCount ? "neg" : undefined} />
-        <StatCard label="In production" value={String(stats.production)} sub="scan → pack" />
-        <StatCard label="Working" value={String(stats.ready)} sub="being made" tone={stats.ready ? "pos" : undefined} />
-        <StatCard label="Shipped" value={String(stats.shipped)} sub="complete" tone="pos" />
+        <StatCard label={tl("stat", "New")} value={String(stats.newCount)} sub={tl("stat", "awaiting start")} tone={stats.newCount ? "neg" : undefined} />
+        <StatCard label={tl("stat", "In production")} value={String(stats.production)} sub={tl("stat", "scan → pack")} />
+        <StatCard label={tl("stat", "Working")} value={String(stats.ready)} sub={tl("stat", "being made")} tone={stats.ready ? "pos" : undefined} />
+        <StatCard label={tl("stat", "Shipped")} value={String(stats.shipped)} sub={tl("stat", "complete")} tone="pos" />
       </StatGrid>
 
       {/* Why an action was refused — the ship gate's reasons land here rather than the
@@ -641,14 +643,14 @@ export function OrdersHub() {
       )}
 
       <SectionCard
-        title="Production queue"
+        title={tl("ui", "Production queue")}
         actions={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-              <UploadSimple size={14} weight="bold" /> Import
+              <UploadSimple size={14} weight="bold" /> {tl("ui", "Import")}
             </Button>
             <Button size="sm" variant="outline" onClick={() => router.push("/orders/new")}>
-              <Plus size={14} weight="bold" /> New order
+              <Plus size={14} weight="bold" /> {tl("ui", "New order")}
             </Button>
           </div>
         }
@@ -656,7 +658,7 @@ export function OrdersHub() {
         <div className="flex flex-wrap gap-1.5 border-b border-border px-5 py-3">
           {FILTERS.map((f) => (
             <button key={f.id} onClick={() => setFilter(f.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (filter === f.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-              {f.label}
+              {tl("stage", f.label)}
             </button>
           ))}
         </div>
@@ -666,8 +668,8 @@ export function OrdersHub() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
             <Package size={24} weight="duotone" />
-            <div className="font-medium text-foreground">Nothing here</div>
-            <div className="text-sm">{(orders.length ?? 0) === 0 ? "No orders are in production yet." : "No orders match this filter."}</div>
+            <div className="font-medium text-foreground">{tl("ui", "Nothing here")}</div>
+            <div className="text-sm">{(orders.length ?? 0) === 0 ? tl("ui", "No orders are in production yet.") : tl("ui", "No orders match this filter.")}</div>
           </div>
         ) : (
           <>
@@ -712,7 +714,7 @@ export function OrdersHub() {
           >
             {dispatchOn && <span />}
             <span />
-            {DEFAULT_FACTORY_COLS.map((id) => <span key={id} className="truncate">{FACTORY_COLS[id].label}</span>)}
+            {DEFAULT_FACTORY_COLS.map((id) => <span key={id} className="truncate">{tl("col", FACTORY_COLS[id].label)}</span>)}
           </div>
           <div className="divide-y divide-border">
             {paged.pageItems.map((o) => {
@@ -843,7 +845,7 @@ export function OrdersHub() {
                         (flag/status, labels, the non-primary of ship/advance) tucks into a
                         ⋯ menu so the row isn't a wall of buttons. */}
                     {allShipped ? (
-                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> Shipped</span>
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> {tl("ui", "Shipped")}</span>
                     ) : (() => {
                       /**
                        * EVERY stage is listed; the ones this role can't use from here are
@@ -933,12 +935,12 @@ export function OrdersHub() {
                               {normalizeStage(stage) === "on_hold" ? "On hold" : "Flagged"} — resolve in ⋯
                             </span>
                           )}
-                          {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}>Start order</Button>}
-                          {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}>Create new label</Button>}
-                          {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further.">Next stage</Button>}
+                          {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}>{tl("ui", "Start order")}</Button>}
+                          {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}>{tl("ui", "Create new label")}</Button>}
+                          {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further.">{tl("ui", "Next stage")}</Button>}
                           <DropdownMenu>
                             <DropdownMenuTrigger
-                              aria-label="More actions"
+                              aria-label={tl("ui", "More actions")}
                               disabled={busy === `ord:${o.id}`}
                               className="inline-flex h-8 items-center justify-center rounded-lg border border-border bg-card px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
                             >
@@ -946,10 +948,10 @@ export function OrdersHub() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-52">
                               {/* the non-primary pipeline actions */}
-                              <DropdownMenuItem onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}><ArrowSquareOut size={14} weight="bold" /> Open order</DropdownMenuItem>
-                              {primary !== "advance" && canAdvance && <DropdownMenuItem onClick={() => advanceOrder(o)}><SkipForward size={14} weight="fill" /> Next stage</DropdownMenuItem>}
-                              {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Create new label</DropdownMenuItem>}
-                              {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> Reopen label</DropdownMenuItem>}
+                              <DropdownMenuItem onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}><ArrowSquareOut size={14} weight="bold" /> {tl("ui", "Open order")}</DropdownMenuItem>
+                              {primary !== "advance" && canAdvance && <DropdownMenuItem onClick={() => advanceOrder(o)}><SkipForward size={14} weight="fill" /> {tl("ui", "Next stage")}</DropdownMenuItem>}
+                              {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> {tl("ui", "Create new label")}</DropdownMenuItem>}
+                              {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> {tl("ui", "Reopen label")}</DropdownMenuItem>}
                               {/* Only printable once a blank is chosen — the barcode is the
                                   STOCK code, so a line without a blank has nothing to
                                   encode. Disabled with the reason rather than hidden, so
@@ -962,7 +964,7 @@ export function OrdersHub() {
                                     onClick={() => printable && setBarcodeOrder(o)}
                                     title={printable ? undefined : "Pick a blank on at least one line first — the barcode is the stock code"}
                                   >
-                                    <Barcode size={14} weight="bold" /> Print blank labels
+                                    <Barcode size={14} weight="bold" /> {tl("ui", "Print blank labels")}
                                   </DropdownMenuItem>
                                 )
                               })()}
@@ -973,7 +975,7 @@ export function OrdersHub() {
                                       a bare label throws "MenuGroupContext is missing" as
                                       the popup mounts, which killed the whole menu. */}
                                   <DropdownMenuGroup>
-                                    <DropdownMenuLabel>Set all items to</DropdownMenuLabel>
+                                    <DropdownMenuLabel>{tl("ui", "Set all items to")}</DropdownMenuLabel>
                                     {prod.map((s) => (
                                       <DropdownMenuItem
                                         key={s.id || "new"}
@@ -986,10 +988,10 @@ export function OrdersHub() {
                                           if (!s.deny) setOrderStatus(o, s.id)
                                         }}
                                       >
-                                        {s.label}
+                                        {tl("stage", s.label)}
                                         {/* Marked, so a catch-up is never mistaken for an
                                             ordinary one-step move before it's clicked. */}
-                                        {s.walk && <span className="ml-auto text-[10px] text-muted-foreground">catch up</span>}
+                                        {s.walk && <span className="ml-auto text-[10px] text-muted-foreground">{tl("ui", "catch up")}</span>}
                                       </DropdownMenuItem>
                                     ))}
                                   </DropdownMenuGroup>
@@ -999,7 +1001,7 @@ export function OrdersHub() {
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuGroup>
-                                    <DropdownMenuLabel>Flag / hold</DropdownMenuLabel>
+                                    <DropdownMenuLabel>{tl("ui", "Flag / hold")}</DropdownMenuLabel>
                                     {exc.map((s) => (
                                       <DropdownMenuItem
                                         key={s.id}
@@ -1007,7 +1009,7 @@ export function OrdersHub() {
                                         title={s.deny ?? undefined}
                                         onClick={() => { if (!s.deny) setOrderStatus(o, s.id) }}
                                       >
-                                        <Flag size={13} weight="fill" /> {s.label}
+                                        <Flag size={13} weight="fill" /> {tl("stage", s.label)}
                                       </DropdownMenuItem>
                                     ))}
                                   </DropdownMenuGroup>
@@ -1346,8 +1348,8 @@ export function OrdersHub() {
                               onClick={() => sendToDesigner(o, it)}
                             >
                               {busy === `dsn:${key}` ? <CircleNotch size={13} className="animate-spin" />
-                                : sent.has(key) ? <><CheckCircle size={13} weight="fill" className="text-emerald-600" /> Sent</>
-                                : <><PaperPlaneTilt size={13} weight="bold" /> Board</>}
+                                : sent.has(key) ? <><CheckCircle size={13} weight="fill" className="text-emerald-600" /> {tl("ui", "Sent")}</>
+                                : <><PaperPlaneTilt size={13} weight="bold" /> {tl("ui", "Board")}</>}
                             </Button>
                           )}
                           {/* ONE control per item. This row used to carry THREE things
@@ -1383,8 +1385,8 @@ export function OrdersHub() {
                                   aria-label={`Flag ${it.name || it.sku}`}
                                   title="The warehouse has this item. You can still stop it if the artwork is wrong."
                                 >
-                                  <option value="">Flag…</option>
-                                  {exc.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                                  <option value="">{tl("ui", "Flag…")}</option>
+                                  {exc.map((s) => <option key={s.id} value={s.id}>{tl("stage", s.label)}</option>)}
                                 </select>
                               </>
                             )
@@ -1397,12 +1399,12 @@ export function OrdersHub() {
                                 aria-label={`Status for ${it.name || it.sku}`}
                                 title="Set this item's status — forward or back"
                               >
-                                <optgroup label="Production">
-                                  {prod.map((s) => <option key={s.id || "new"} value={s.id}>{s.label}</option>)}
+                                <optgroup label={tl("ui", "Production")}>
+                                  {prod.map((s) => <option key={s.id || "new"} value={s.id}>{tl("stage", s.label)}</option>)}
                                 </optgroup>
                                 {exc.length > 0 && (
-                                  <optgroup label="Exceptions">
-                                    {exc.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                                  <optgroup label={tl("ui", "Exceptions")}>
+                                    {exc.map((s) => <option key={s.id} value={s.id}>{tl("stage", s.label)}</option>)}
                                   </optgroup>
                                 )}
                               </select>

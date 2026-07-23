@@ -5,6 +5,7 @@ import { CircleNotch, DownloadSimple } from "@phosphor-icons/react"
 import { getOrderHistory, downloadDesignFile, type AuditRow, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { forTag, sayAction, EMPTY_HINT, DONE_NO_HISTORY, type TagId } from "@/components/app/tag-history"
+import { useLabelT } from "@/lib/i18n"
 
 /**
  * Three tags, always the same three, always in the same place: LABEL · SCAN · DESIGN.
@@ -52,10 +53,10 @@ export type TagFile = { key: string; name: string; note?: string; href?: string;
 
 function Tag({ id, label, state, title, orderId, status, files, dot }: {
   id: TagId; label: string; state: State; title?: string; orderId: string
-  /** Render as a bare dot instead of a worded pill. The state, the popover and the
-   *  history are identical — only the label is dropped. In a TABLE the column heading
-   *  already says what the group is, so repeating "Label Scan Design" on all fifty rows
-   *  spends 176px per row to restate the header. */
+  /** Compact form for a table row: a small coloured DOT followed by the word, instead of
+   *  the full tinted pill. The dot carries progress (grey/amber/violet) and the word stays
+   *  readable — the floor asked to see the word, not decode a colour. State, popover and
+   *  history are identical to the pill; only the chrome is lighter. */
   dot?: boolean
   /** The sentence that used to be baked into the tag's name. */
   status?: string
@@ -75,6 +76,10 @@ function Tag({ id, label, state, title, orderId, status, files, dot }: {
       : state === "doing"
         ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
         : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
+  // Solid dot colour for the compact form — the same three states, read as a status light.
+  const dotCls =
+    state === "done" ? "bg-primary" : state === "doing" ? "bg-amber-500" : "bg-muted-foreground/40"
+  const tl = useLabelT()
   const [rows, setRows] = useState<AuditRow[] | null>(null)
   const [open, setOpen] = useState(false)
   // Hover in, hover out — with two different delays, for two different mistakes.
@@ -125,13 +130,12 @@ function Tag({ id, label, state, title, orderId, status, files, dot }: {
         onMouseEnter={openLater}
         onMouseLeave={closeLater}
         onFocus={openNow}
-        // A dot is 10px, so the WORD cannot come with it — left in, the three labels
-        // spilled out of their circles and printed over each other ("LaScDesign"). The
-        // name still reaches a screen reader and the tooltip; only the ink is dropped.
-        aria-label={dot ? `${label}: ${title ?? ""}` : undefined}
-        className={"eg-tap shrink-0 font-semibold transition-colors " + (dot ? "block size-2.5 rounded-full " : "rounded-md px-2.5 py-1 text-xs ") + cls}
+        className={"eg-tap inline-flex shrink-0 items-center gap-1 whitespace-nowrap transition-colors " + (dot
+          ? "text-[11px] font-medium text-muted-foreground hover:text-foreground"
+          : "rounded-md px-2.5 py-1 text-xs font-semibold " + cls)}
       >
-        {dot ? "" : label}
+        {dot && <span className={"size-2 shrink-0 rounded-full " + dotCls} />}
+        {tl("ui", label)}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-0"
         // Entering the panel cancels the pending close, so it stays put while you read
@@ -140,7 +144,7 @@ function Tag({ id, label, state, title, orderId, status, files, dot }: {
         onMouseLeave={closeLater}
       >
         <div className="border-b border-border px-3 py-2">
-          <div className="text-xs font-semibold">{label}</div>
+          <div className="text-xs font-semibold">{tl("ui", label)}</div>
           {/* Where "Design sent" / "Pre-scanned" went. Saying it here keeps the chip's
               text stable while still answering "what state is this in?" in words. */}
           {status && <div className="mt-0.5 text-[11px] text-muted-foreground">{status}</div>}
@@ -377,7 +381,7 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
   const designFiles = designFilesAll.filter((f) => f.href || f.designId)
 
   return (
-    <span className={"inline-flex items-center " + (compact ? "gap-1 " : "gap-1.5 ") + (className ?? "")}>
+    <span className={"inline-flex items-center " + (compact ? "gap-2 " : "gap-1.5 ") + (className ?? "")}>
       {/* Names are fixed. Colour carries progress; the words live in each popover. */}
       <Tag id="label" orderId={order.id} label="Label" state={hasLabel ? "done" : "todo"}
            title={labelTitle} status={labelTitle} files={labelFile} dot={compact} />
