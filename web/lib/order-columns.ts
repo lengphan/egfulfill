@@ -130,3 +130,49 @@ export function factoryGridTemplate(ids: FactoryColId[], lead: number): string {
   const leads = lead === 2 ? ["1.25rem", "1.5rem"] : ["1.5rem"]
   return [...leads, ...ids.map((id) => FACTORY_COLS[id].grid)].join(" ")
 }
+
+// ── Factory column layout: user-reorderable + hide/show, persisted per browser ──────
+// Only the DATA columns reorder/hide. `action` (the buttons) is pinned last and always
+// shown, and `order` (the identifier) can never be hidden — a row must stay identifiable
+// and actionable. Same localStorage-backed model as the seller table above.
+export const FACTORY_DATA_COLS: FactoryColId[] = ["status", "order", "tracking", "store", "customer", "items", "ready"]
+const FACTORY_LOCKED: FactoryColId[] = ["order"]
+export const isFactoryColLocked = (id: FactoryColId) => FACTORY_LOCKED.includes(id)
+const isFactoryDataId = (v: unknown): v is FactoryColId => typeof v === "string" && (FACTORY_DATA_COLS as string[]).includes(v)
+
+const FACTORY_ORDER_KEY = "eg_factory_col_order"
+const FACTORY_HIDDEN_KEY = "eg_factory_col_hidden"
+
+export function loadFactoryColOrder(): FactoryColId[] {
+  try {
+    const raw = localStorage.getItem(FACTORY_ORDER_KEY)
+    if (!raw) return [...FACTORY_DATA_COLS]
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return [...FACTORY_DATA_COLS]
+    const saved = parsed.filter(isFactoryDataId)
+    const missing = FACTORY_DATA_COLS.filter((id) => !saved.includes(id))
+    return [...saved, ...missing]   // heal: new columns append rather than vanish
+  } catch { return [...FACTORY_DATA_COLS] }
+}
+export function saveFactoryColOrder(ids: FactoryColId[]) { try { localStorage.setItem(FACTORY_ORDER_KEY, JSON.stringify(ids)) } catch {} }
+
+export function loadFactoryHiddenCols(): FactoryColId[] {
+  try {
+    const raw = localStorage.getItem(FACTORY_HIDDEN_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isFactoryDataId).filter((id) => !FACTORY_LOCKED.includes(id))
+  } catch { return [] }
+}
+export function saveFactoryHiddenCols(ids: FactoryColId[]) { try { localStorage.setItem(FACTORY_HIDDEN_KEY, JSON.stringify(ids)) } catch {} }
+
+/** Move `id` to sit at `toIndex` (drag-to-reorder). Shared shape with reorderCols above. */
+export function reorderFactoryCols(ids: FactoryColId[], id: FactoryColId, toIndex: number): FactoryColId[] {
+  const from = ids.indexOf(id)
+  if (from < 0 || toIndex < 0 || toIndex >= ids.length || from === toIndex) return ids
+  const next = [...ids]
+  next.splice(from, 1)
+  next.splice(toIndex, 0, id)
+  return next
+}

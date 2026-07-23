@@ -1,9 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -16,7 +16,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
-import { DEFAULT_FACTORY_COLS, FACTORY_COLS, factoryGridTemplate } from "@/lib/order-columns"
+import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, isFactoryColLocked, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
@@ -479,10 +479,36 @@ export function OrdersHub() {
   // Only orders with a bought label can be dispatched — there's nothing to scan otherwise.
   const dispatchable = (o: OrderRow) => !!o.tracking && !o.label_scanned_at
 
-  /** One grid template for the header and every row. The lead tracks are the expand caret
-   *  plus, when dispatch is configured, its checkbox — declared here rather than baked into
-   *  each grid so the two can never disagree about how many columns precede Status. */
-  const gridTmpl = factoryGridTemplate(DEFAULT_FACTORY_COLS, dispatchOn ? 2 : 1)
+  // User-reorderable / hideable DATA columns (persisted per browser). `action` is pinned
+  // last and always shown; `order` can't be hidden. Read after mount (localStorage).
+  const [dataColOrder, setDataColOrder] = useState<FactoryColId[]>(FACTORY_DATA_COLS)
+  const [hiddenCols, setHiddenCols] = useState<FactoryColId[]>([])
+  const [colsMenuOpen, setColsMenuOpen] = useState(false)
+  const dragCol = useRef<FactoryColId | null>(null)
+  useEffect(() => {
+    const id = setTimeout(() => { setDataColOrder(loadFactoryColOrder()); setHiddenCols(loadFactoryHiddenCols()) }, 0)
+    return () => clearTimeout(id)
+  }, [])
+  const visibleData = useMemo(() => dataColOrder.filter((id) => !hiddenCols.includes(id)), [dataColOrder, hiddenCols])
+  // The full ordered column set for the grid/header: visible data columns, then the pinned action.
+  const gridCols = useMemo<FactoryColId[]>(() => [...visibleData, "action"], [visibleData])
+
+  const onColDrop = (target: FactoryColId) => {
+    const src = dragCol.current
+    dragCol.current = null
+    if (!src || src === target) return
+    const next = reorderFactoryCols(dataColOrder, src, dataColOrder.indexOf(target))
+    setDataColOrder(next); saveFactoryColOrder(next)
+  }
+  const toggleCol = (id: FactoryColId) => {
+    if (isFactoryColLocked(id)) return
+    const next = hiddenCols.includes(id) ? hiddenCols.filter((x) => x !== id) : [...hiddenCols, id]
+    setHiddenCols(next); saveFactoryHiddenCols(next)
+  }
+
+  /** One grid template for the header and every row. Lead tracks (caret, + checkbox when
+   *  dispatch is on) precede the data columns; action is pinned last. */
+  const gridTmpl = factoryGridTemplate(gridCols, dispatchOn ? 2 : 1)
   const selectableOnPage = paged.pageItems.filter(dispatchable)
   const allOnPageSelected = selectableOnPage.length > 0 && selectableOnPage.every((o) => selected.has(o.id))
 
@@ -714,7 +740,47 @@ export function OrdersHub() {
           >
             {dispatchOn && <span />}
             <span />
-            {DEFAULT_FACTORY_COLS.map((id) => <span key={id} className="truncate">{tl("col", FACTORY_COLS[id].label)}</span>)}
+            {gridCols.map((id) =>
+              id === "action" ? (
+                // The pinned last column carries the Columns settings (reorder is by drag on
+                // the header labels; this menu toggles which columns show).
+                <div key={id} className="relative flex justify-end normal-case tracking-normal">
+                  <button type="button" onClick={() => setColsMenuOpen((v) => !v)} className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" title="Show/hide columns">
+                    Columns
+                  </button>
+                  {colsMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setColsMenuOpen(false)} />
+                      <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1.5 shadow-lg">
+                        <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Show columns</div>
+                        {FACTORY_DATA_COLS.map((cid) => {
+                          const locked = isFactoryColLocked(cid)
+                          const shown = !hiddenCols.includes(cid)
+                          return (
+                            <button key={cid} type="button" disabled={locked} onClick={() => toggleCol(cid)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs normal-case tracking-normal text-foreground transition-colors hover:bg-accent disabled:opacity-40">
+                              <span className={"flex size-4 items-center justify-center rounded border " + (shown ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{shown && <Check size={11} weight="bold" />}</span>
+                              {tl("col", FACTORY_COLS[cid].label)}{locked && <span className="ml-auto text-[9px] text-muted-foreground">locked</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <span
+                  key={id}
+                  draggable
+                  onDragStart={() => { dragCol.current = id }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => onColDrop(id)}
+                  className="cursor-grab select-none truncate"
+                  title="Drag to reorder"
+                >
+                  {tl("col", FACTORY_COLS[id].label)}
+                </span>
+              )
+            )}
           </div>
           <div className="divide-y divide-border">
             {paged.pageItems.map((o) => {
@@ -725,6 +791,44 @@ export function OrdersHub() {
               const label = labels[o.id]
               const track = label?.trackingNumber || o.tracking
               const isCollapsed = !expandedIds.has(o.id)
+              // Data cells keyed by column id, so the row can render them in the user's saved
+              // order. JSX is IDENTICAL to before — only relocated here. `action` stays inline
+              // below (pinned last), so its large action logic is untouched.
+              const cell: Record<FactoryColId, ReactNode> = {
+                status: <span className="justify-self-start"><StageBadge status={stage} /></span>,
+                order: <div className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</div>,
+                tracking: (
+                  <div className="min-w-0">
+                    {track ? (
+                      <a href={trackUrl(o.carrier || label?.carrier, track)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-xs font-medium text-emerald-600 hover:underline" title={`${o.carrier || label?.carrier || "USPS"} ${track}`}>
+                        {track}<ArrowSquareOut size={9} weight="bold" className="shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/60">—</span>
+                    )}
+                  </div>
+                ),
+                store: (
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium">{o.store || platformOf(o)}</div>
+                    <div className="truncate text-[10px] text-muted-foreground">{platformOf(o)} · {fmtDate(o.created_at)}</div>
+                  </div>
+                ),
+                customer: <div className="min-w-0 truncate text-xs font-medium">{o.customer?.name || "—"}</div>,
+                items: (
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {items.length > 0 && <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={3} overlap />}
+                    <div className="min-w-0">
+                      <div className="truncate text-xs">{itemsLabel(o)}</div>
+                      <div className="truncate text-[10px] text-muted-foreground">
+                        {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}
+                      </div>
+                    </div>
+                  </div>
+                ),
+                ready: <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} compact />,
+                action: null, // rendered inline below, pinned last
+              }
               return (
                 <div key={o.id} className="p-5">
                   {/* Growing the identity block to fill the row was the first fix for the
@@ -785,62 +889,10 @@ export function OrdersHub() {
                       <CaretRight size={13} weight="bold" className={"transition-transform " + (isCollapsed ? "" : "rotate-90")} />
                     </button>
 
-                    {/* STATUS — justify-self-start so the pill hugs its word. Grid items
-                        stretch by default, which was inflating a two-letter badge to the
-                        full 6rem track and making every status look like a banner. */}
-                    <span className="justify-self-start"><StageBadge status={stage} /></span>
-
-                    {/* ORDER */}
-                    <div className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</div>
-
-                    {/* TRACKING — its own column, whole. It was a small link folded under
-                        the item count; a tracking number you cannot read to a buyer on the
-                        phone is not doing its job. */}
-                    <div className="min-w-0">
-                      {track ? (
-                        <a
-                          href={trackUrl(o.carrier || label?.carrier, track)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 font-mono text-xs font-medium text-emerald-600 hover:underline"
-                          title={`${o.carrier || label?.carrier || "USPS"} ${track}`}
-                        >
-                          {track}<ArrowSquareOut size={9} weight="bold" className="shrink-0" />
-                        </a>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/60">—</span>
-                      )}
-                    </div>
-
-                    {/* STORE — the shop, with the platform beneath it. One fact
-                        ("CustomBabeUSA, on Etsy"), but it gets a column rather than being
-                        appended to the order number where it truncated to "CustomBabeUS…". */}
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-medium">{o.store || platformOf(o)}</div>
-                      <div className="truncate text-[10px] text-muted-foreground">{platformOf(o)} · {fmtDate(o.created_at)}</div>
-                    </div>
-
-                    {/* CUSTOMER — text-xs to match the Store and Product metadata columns;
-                        the order # stays the one size-standout in the row. */}
-                    <div className="min-w-0 truncate text-xs font-medium">{o.customer?.name || "—"}</div>
-
-                    {/* ITEMS — photo, listing name, units. The same shape the seller table
-                        uses for this column, so the two surfaces read alike. The full
-                        address moved OUT of the row and into the expanded panel below,
-                        where it already appears in full and has the width for it. */}
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      {items.length > 0 && <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={3} overlap />}
-                      <div className="min-w-0">
-                        <div className="truncate text-xs">{itemsLabel(o)}</div>
-                        <div className="truncate text-[10px] text-muted-foreground">
-                          {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* READY — its own column now, so the chips line up down the page
-                        instead of riding on the front of the action cluster. */}
-                    <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} compact />
+                    {/* DATA COLUMNS — rendered in the user's saved order (drag/hide via the
+                        header). Cells are defined above; the action cluster stays pinned
+                        immediately after this, always last. */}
+                    {visibleData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
 
                     {/* One PRIMARY action for the current stage/role; everything rarer
                         (flag/status, labels, the non-primary of ship/advance) tucks into a
