@@ -76,9 +76,6 @@ function Tag({ id, label, state, title, orderId, status, files, dot }: {
       : state === "doing"
         ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
         : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
-  // Solid dot colour for the compact form — the same three states, read as a status light.
-  const dotCls =
-    state === "done" ? "bg-primary" : state === "doing" ? "bg-amber-500" : "bg-muted-foreground/40"
   const tl = useLabelT()
   const [rows, setRows] = useState<AuditRow[] | null>(null)
   const [open, setOpen] = useState(false)
@@ -130,15 +127,14 @@ function Tag({ id, label, state, title, orderId, status, files, dot }: {
         onMouseEnter={openLater}
         onMouseLeave={closeLater}
         onFocus={openNow}
-        className={"eg-tap inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors " + (dot
-          // A VISIBLE bordered chip, not bare text — the dot+word alone gave almost no hit
-          // area and read as decoration, so on a dense board the right tag was hard to see
-          // and fiddly to hit. A resting border + fill make each an obvious, comfortable
-          // target; the dot still carries progress (grey/amber/violet).
-          ? "rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground"
-          : "rounded-md px-2.5 py-1 text-xs font-semibold " + cls)}
+        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap font-semibold transition-colors " + (dot
+          // A SOLID coloured pill, tinted by state (grey = to-do · amber = in progress ·
+          // violet = done) with the word inside — the biggest, clearest hit target and the
+          // easiest to read down a column. Bare dots and a faint bordered chip both tested
+          // too small/hard to click; the table pill is just a touch tighter than the full one.
+          ? "rounded-md px-2 py-1 text-[11px] "
+          : "rounded-md px-2.5 py-1 text-xs ") + cls}
       >
-        {dot && <span className={"size-2.5 shrink-0 rounded-full " + dotCls} />}
         {tl("ui", label)}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-0"
@@ -385,7 +381,7 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
   const designFiles = designFilesAll.filter((f) => f.href || f.designId)
 
   return (
-    <span className={"inline-flex items-center " + (compact ? "gap-1 " : "gap-1.5 ") + (className ?? "")}>
+    <span className={"inline-flex items-center " + (compact ? "gap-1.5 " : "gap-1.5 ") + (className ?? "")}>
       {/* Names are fixed. Colour carries progress; the words live in each popover. */}
       <Tag id="label" orderId={order.id} label="Label" state={hasLabel ? "done" : "todo"}
            title={labelTitle} status={labelTitle} files={labelFile} dot={compact} />
