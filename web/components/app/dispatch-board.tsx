@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode, CaretDown } from "@phosphor-icons/react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
@@ -302,56 +303,55 @@ export function DispatchBoard() {
           : "Labelled and waiting to be scanned. You can print and pull labels back; warehouse and admin scan the batch out."}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" disabled={!chosen.length} onClick={printManifest}>
-              <ListChecks size={14} weight="bold" /> Print manifest
-            </Button>
-            <Button size="sm" variant="outline" disabled={!chosenWithLabel.length} onClick={openLabels}>
-              <Printer size={14} weight="bold" /> Open labels
-            </Button>
-            {/* Pull back. The reason this exists: a batch goes to the partner, some of it
-                gets picked, and the rest shouldn't ship today. Anything already picked is
-                refused per-order by the partner (409) — the rest still come back. */}
-            <Button size="sm" variant="outline" disabled={!chosen.length || busy}
-              onClick={() => removeFromBoard(chosen.map((o) => o.id))}
-              title="Send these back to review — they come off the board without being scanned">
-              <X size={14} weight="bold" /> Remove from board
-            </Button>
-            <Button size="sm" variant="outline" disabled={!chosen.length || busy} onClick={pullBack}>
-              <ArrowUUpLeft size={14} weight="bold" /> Cancel with byeastside
-            </Button>
-            {/* THE TWO ROUTES, side by side, because this is where the choice is made.
-                Both start the buyer's tracking clock; they differ in who does it and what
-                it costs. Sending to the partner was previously only reachable from the
-                orders hub — which meant staging an order here left no way to reach them
-                at all. */}
+            {/* PRINT / documents — grouped: manifest, labels, and (when scanning out) the
+                USPS SCAN form. All are "produce a document" actions, none touch the scan. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+                <Printer size={14} weight="bold" /> Print <CaretDown size={12} weight="bold" className="text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52 p-1">
+                <DropdownMenuItem disabled={!chosen.length} onClick={printManifest}>
+                  <ListChecks size={14} weight="bold" /> Print manifest
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!chosenWithLabel.length} onClick={openLabels}>
+                  <Printer size={14} weight="bold" /> Open labels
+                </DropdownMenuItem>
+                {canScanOut && (
+                  <DropdownMenuItem disabled={!manifestable.length || busy} onClick={() => setManifestOpen(true)} title={manifestTooltip(chosen)}>
+                    <Barcode size={14} weight="bold" /> Create SCAN form
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* PULL BACK / undo — grouped: take orders off the board, or cancel the batch at
+                the partner. Both are "walk it back", kept out of the primary row. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+                <ArrowUUpLeft size={14} weight="bold" /> Pull back <CaretDown size={12} weight="bold" className="text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 p-1">
+                <DropdownMenuItem disabled={!chosen.length || busy} onClick={() => removeFromBoard(chosen.map((o) => o.id))} title="Send these back to review — off the board without being scanned">
+                  <X size={14} weight="bold" /> Remove from board
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!chosen.length || busy} onClick={pullBack}>
+                  <ArrowUUpLeft size={14} weight="bold" /> Cancel with byeastside
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* THE TWO ROUTES kept prominent — this is where the choice is made. Both start
+                the buyer's tracking clock; they differ in who does it and what it costs. */}
             {dispatchOn && (
               <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={sendToPartner}
                 title="Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label">
                 {busy ? <CircleNotch size={14} className="animate-spin" /> : <><TrayArrowDown size={14} weight="bold" /> Send to byeastside</>}
               </Button>
             )}
-            {/* THE THIRD ROUTE. Unlike the other two this asserts nothing about the
-                parcel — it prints the document USPS scans at handover. So it sits beside
-                them but doesn't advance the stage or touch the scan. */}
             {canScanOut && (
-              // Gated on real eligibility, not just "has a label". A batch of already-
-              // scanned orders used to enable this and then fail inside the dialog with
-              // nothing to create — the check exists on the server either way, so the only
-              // thing that changed was whether the user found out before or after clicking.
-              // The title sits on a WRAPPER, not the button. A disabled button doesn't
-              // reliably receive hover in every engine — Safari in particular — so a
-              // title on the button itself is exactly the tooltip that fails to appear
-              // in the one state it was written to explain.
-              <span title={manifestTooltip(chosen)} className="inline-flex">
-                <Button size="sm" variant="outline" disabled={!manifestable.length || busy} onClick={() => setManifestOpen(true)}>
-                  <Barcode size={14} weight="bold" /> Create SCAN form
-                </Button>
-              </span>
-            )}
-            {canScanOut && (
-            <Button size="sm" disabled={!chosen.length || busy || !canAdvance} onClick={markScanned} title={canAdvance ? undefined : "Your role can't move orders past this stage"}>
-              {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Scanned here</>}
-            </Button>
+              <Button size="sm" disabled={!chosen.length || busy || !canAdvance} onClick={markScanned} title={canAdvance ? undefined : "Your role can't move orders past this stage"}>
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Scanned here</>}
+              </Button>
             )}
           </div>
         }
