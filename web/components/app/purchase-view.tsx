@@ -1181,39 +1181,34 @@ export function PurchaseView() {
                     </span>
                   </div>
                   {g.lines.map((l) => (
-                    <div key={l.sku} className="flex items-start gap-4 px-5 py-3">
+                    <div key={l.sku} className="px-5 py-3">
+                     <div className="flex items-start gap-4">
                       <LineThumb src={l.image ?? supByS[l.sku]?.image} onZoom={(src, label) => setZoom({ src, label })}
                         label={[l.name || l.sku, l.variant].filter(Boolean).join(" · ")} />
-                      <div className="min-w-0 flex-1">
+                      {/* Product identity — a FIXED-ish column (doesn't grow) so the qty pills
+                          get the whole middle band to spread across, rather than being shoved
+                          against the price by a title that ate all the slack. */}
+                      <div className="min-w-0 basis-56">
                         <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
                         <div className="truncate text-xs text-muted-foreground">
                           {l.variant || supByS[l.sku]?.variant || l.sku}
                           <span className="ml-1.5 font-mono opacity-70">{l.sku}</span>
                         </div>
                         <SourceTags line={l} />
-                        {/* The split warning stays with the product text — it's about the
-                            line as a whole, not a control. The quantity inputs move out to
-                            their own column (below). */}
-                        {g.api === "ss" && stock[l.sku] && (
-                          <StockSplitWarning
-                            qty={num(l.qty)} stock={stock[l.sku]} transit={transit} now={now || Date.now()}
-                            onReduce={(q) => setSavedQty(l.sku, q)}
-                            onSaveForLater={() => putSaved(saved.filter((x) => x.sku !== l.sku))}
-                          />
-                        )}
                       </div>
-                      {/* QTY SLOTS — their own column, BETWEEN the product and the price, so
-                          the numbers you type read as a column of their own instead of being
-                          stacked under the name. Each box STACKS four facts — how many to
-                          take, the warehouse code, its stock, and the arrival date — because
-                          laid out in a row they read as one run-on line.
+                      {/* QTY SLOTS — flex-1, so they take the whole band BETWEEN the product
+                          and the price and spread across it (justify-between: they fan out
+                          when the row is wide, close up and wrap when it's narrow). No dead
+                          gap between title and price — this is where the pills live. Each box
+                          STACKS four facts — how many to take, the warehouse code, its stock,
+                          and the arrival date — because in a row they'd read as one run-on line.
                             • S&S  → one box per warehouse, nearest first (blank = let S&S
                                      split it; typing turns the line into a manual split, and
                                      the line qty follows the sum of the boxes).
                             • Otto → a single box (their inventory is per-sku, no warehouse).
                             • else → one plain box (a manual line, or S&S before stock loads),
                                      the sole quantity control in that case. */}
-                      <div className="flex shrink-0 flex-wrap items-start justify-end gap-3 sm:gap-4">
+                      <div className="flex flex-1 flex-wrap items-start justify-between gap-3 sm:gap-4">
                         {g.api === "ss" && stock[l.sku] ? (
                           stock[l.sku].warehouses.filter((w) => w.qty > 0).length === 0 ? (
                             <span className="self-center text-[11px] font-medium text-destructive">No stock in any warehouse</span>
@@ -1300,6 +1295,16 @@ export function PurchaseView() {
                         className="self-center text-muted-foreground hover:text-red-600" title="Drop — not ordering this">
                         <Trash size={14} />
                       </button>
+                     </div>
+                     {/* Split warning spans the full row width BELOW it — it's about the whole
+                         line and needs room to breathe, not a squeeze into a column. */}
+                     {g.api === "ss" && stock[l.sku] && (
+                       <StockSplitWarning
+                         qty={num(l.qty)} stock={stock[l.sku]} transit={transit} now={now || Date.now()}
+                         onReduce={(q) => setSavedQty(l.sku, q)}
+                         onSaveForLater={() => putSaved(saved.filter((x) => x.sku !== l.sku))}
+                       />
+                     )}
                     </div>
                   ))}
                 </div>
