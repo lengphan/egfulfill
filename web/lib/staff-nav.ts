@@ -1,4 +1,4 @@
-import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, Receipt, EnvelopeSimple, Needle, type Icon } from "@phosphor-icons/react"
+import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, EnvelopeSimple, Needle, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -25,7 +25,9 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
   // Partner billing — what byeastside / Pink Design / carriers / suppliers are owed.
   // Money, so warehouse and admin only, matching every other spend boundary.
-  { label: "Billing", href: "/billing", icon: Receipt, roles: ["warehouse", "admin"] },
+  // Finance = Wallet (balances/transactions) + Partner costs (byeastside/carriers/suppliers)
+  // as tabs on one page. Replaces the separate Billing + Wallet items.
+  { label: "Finance", href: "/finance", icon: Wallet, roles: ["warehouse", "admin"] },
   // Campaigns is HIDDEN until Meta/Google connections exist — there are no settings to
   // connect an ad account yet, so the page can only show an empty shell. The route and
   // component are intact; restore the roles here to bring it back.
@@ -79,7 +81,7 @@ export const STAFF_TOOLS: StaffNavItem[] = [
   // redundant with the factory Orders hub, so they're intentionally not here.)
   { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },
   { label: "Reports", href: "/reports", icon: ChartBar, roles: ["admin"] },
-  { label: "Wallet", href: "/wallet", icon: Wallet, roles: ["admin", "warehouse"] },
+  // Wallet moved into Finance (a STAFF_ITEM) — kept out of Tools to avoid two entries.
   // API keys are a SELLER integration concern — an operator minting live keys is
   // not something the role needs. Warehouse keeps it for connection testing.
   { label: "Developers", href: "/developers", icon: Code, roles: ["warehouse", "admin"] },
