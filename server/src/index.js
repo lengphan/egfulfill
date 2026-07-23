@@ -37,6 +37,7 @@ import { adminSecretsRoutes } from './routes/admin_secrets.js';
 import { auditRoutes } from './audit.js';
 import { supportAiRoutes } from './routes/support_ai.js';
 import { factorySettingsRoutes } from './routes/factory_settings.js';
+import { navVisibilityRoutes } from './routes/nav_visibility.js';
 import { purchaseRoutes } from './routes/purchase.js';
 import { spydeckRoutes } from './routes/spydeck.js';
 import { notificationRoutes } from './routes/notifications.js';
@@ -348,6 +349,7 @@ adminSecretsRoutes(app, requireStaff);                 // READ-ONLY masked last-
 auditRoutes(app, requireAdmin, requireAuth);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
 factorySettingsRoutes(app, requireAuth, requireStaff); // platform factory settings — design fee, default shipping, emb file price (warehouse/admin)
+navVisibilityRoutes(app, requireAuth);                 // role → hidden nav pages/tabs (admin-editable, HIDE-only; never grants access)
 purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse);        // purchase orders — draft → placed (S&S/Otto) → received into inventory
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)
 notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
