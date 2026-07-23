@@ -11,7 +11,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
+import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, validateAddress, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -314,6 +314,13 @@ export function OrdersHub() {
       // Persist for the whole team, not just this browser. Best-effort: a failed save
       // must not block a label that's otherwise ready to buy.
       setFactorySettings({ ship_from: from }).catch(() => {})
+      // Validate the recipient before spending — a bad address is a wasted label. A failure
+      // is a WARNING the user can override (validation can be down, or the USPS Addresses API
+      // may still be pending approval), never a hard block.
+      try {
+        const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
+        if (v && !v.ok && v.error && !window.confirm(`Address check couldn't confirm this is deliverable:\n\n${v.error}\n\nBuy the label anyway?`)) return
+      } catch { /* validation unavailable — proceed with the buy */ }
       const r = await buyUspsLabel({ to, from, orderId: o.id, ...pkg })
       if (!r.ok) { setLabelErr(r.error || "USPS couldn't create the label."); return }
       setLabels((prev) => ({ ...prev, [o.id]: r }))
