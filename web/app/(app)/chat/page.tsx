@@ -109,7 +109,7 @@ export default function ChatPage() {
   const convos = useMemo<Convo[]>(() => {
     const list: Convo[] = []
     if (isStaffUser) list.push({ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "All boards — production & artwork" })
-    if (supportId) list.push({ id: supportId, kind: "support", title: "EGFULFILL Support", sub: isStaffUser ? "Ask EGFULFILL" : "Assistant + team" })
+    if (supportId) list.push({ id: supportId, kind: "support", title: isStaffUser ? "My EG" : "EGFULFILL Support", sub: isStaffUser ? "Your AI assistant" : "Assistant + team" })
     // Admin writes, everyone else reads. Designers aren't part of seller-facing comms.
     if (!isDesigner) list.push({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: isAdmin ? "Broadcast to all sellers" : "From EGFULFILL" })
     // Threads with an unanswered "talk to a human" sort above the rest — an explicit
