@@ -2124,7 +2124,10 @@ export function getCatalogFilters() {
  *  not the HTTP code, and reports a refusal as a failure naming the real status. */
 export function cancelSsOrder(orderNumber: string) {
   return api<{ ok?: boolean; cancelled?: boolean; orderStatus?: string | null
-               orderNumber?: string; restockFee?: number; dryRun?: boolean; error?: string }>(
+               orderNumber?: string; restockFee?: number; dryRun?: boolean; error?: string
+               /** True when the live cancel was refused (past S&S's 10-min window) but S&S
+                *  already report the order cancelled, so our record was reconciled to match. */
+               reconciled?: boolean }>(
     `/api/ss/order/${encodeURIComponent(orderNumber)}`, { method: "DELETE" })
 }
 

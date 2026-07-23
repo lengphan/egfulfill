@@ -1669,8 +1669,20 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { data = txt; }
       if (!r.ok) {
         // Their guide: cancellation is only possible within 10 MINUTES of the order being
-        // sent. That's the refusal almost everyone will hit, so name it rather than
-        // returning a bare status code.
+        // sent. That's the refusal almost everyone will hit. But the order may ALREADY be
+        // cancelled — done in the S&S portal, or by an earlier attempt whose result we
+        // never recorded — in which case the goods really are stopped and our record is
+        // just stale. Before reporting failure, ask what the order's status ACTUALLY is:
+        // if S&S themselves say "Cancelled", reconcile rather than leaving a settled order
+        // stuck as "placed" forever. Any other answer keeps the safe refusal.
+        const cur = await ssOrderStatus(num).catch(() => null);
+        if (cur && String(cur.orderStatus || '').toLowerCase() === 'cancelled') {
+          return {
+            ok: true, cancelled: true, reconciled: true,
+            orderStatus: cur.orderStatus, orderNumber: cur.orderNumber || num,
+            note: 'The API cancel was refused (past the 10-minute window), but S&S report this order as already cancelled — our record was caught up to match.',
+          };
+        }
         reply.code(502);
         return {
           error: `S&S wouldn't cancel it (${r.status}). Orders can only be cancelled through the API within 10 minutes of being placed — after that it has to go through them directly.`,

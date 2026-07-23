@@ -501,7 +501,12 @@ export function PurchaseView() {
           setMsg({ ok: false, text: `S&S wouldn't cancel ${orderNo}: ${c.error}` })
           return
         }
-        supplierMsg = ` S&S confirmed it cancelled (${(c as { orderStatus?: string }).orderStatus ?? "Cancelled"}).`
+        const cc = c as { orderStatus?: string; reconciled?: boolean }
+        // Reconciled = the API cancel was too late, but S&S already had it cancelled, so
+        // this is catching our stale record up rather than stopping a live order.
+        supplierMsg = cc.reconciled
+          ? ` S&S already had it cancelled — this caught our record up to match.`
+          : ` S&S confirmed it cancelled (${cc.orderStatus ?? "Cancelled"}).`
       }
 
       const r = await savePurchaseOrder({
@@ -1164,7 +1169,7 @@ export function PurchaseView() {
                             boxes on three days — green marks a warehouse that can send the
                             whole line in one. */}
                         {g.api === "ss" && stock[l.sku] && (
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <div className="mt-1.5 flex flex-wrap items-center gap-3 sm:gap-4">
                             {stock[l.sku].warehouses.filter((w) => w.qty > 0).length === 0 ? (
                               <span className="text-[11px] font-medium text-destructive">No stock in any warehouse</span>
                             ) : stock[l.sku].warehouses
@@ -1286,12 +1291,20 @@ export function PurchaseView() {
                           />
                         )}
                       </div>
-                      <Input
-                        value={String(num(l.qty))}
-                        onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                        inputMode="numeric" className="h-8 w-20 self-start text-center"
-                        aria-label={`Quantity of ${l.sku}`}
-                      />
+                      {/* The standalone qty box is shown ONLY when nothing else can set the
+                          quantity: a manual/unassigned line, or an S&S line whose stock
+                          hasn't loaded. For S&S (warehouse boxes) and Otto (their own box)
+                          the quantity is already driven there, and a second box would
+                          re-open the "two numbers for one fact" disagreement the
+                          per-warehouse picks were written to close. */}
+                      {!(g.api === "ss" && stock[l.sku]) && g.api !== "otto" && (
+                        <Input
+                          value={String(num(l.qty))}
+                          onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                          inputMode="numeric" className="h-8 w-20 self-start text-center"
+                          aria-label={`Quantity of ${l.sku}`}
+                        />
+                      )}
                       <span className="w-20 text-right text-xs tabular-nums text-muted-foreground">
                         {num(l.price) ? usd(num(l.price) * num(l.qty)) : "—"}
                       </span>
