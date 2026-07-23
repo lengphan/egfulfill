@@ -43,6 +43,8 @@ import { notificationRoutes } from './routes/notifications.js';
 import { adsRoutes } from './routes/ads.js';
 import { broadcastsRoutes } from './routes/broadcasts.js';
 import { siteContentRoutes } from './routes/site_content.js';
+import { sendMail } from './mailer.js';
+import { welcomeEmail } from './emails.js';
 import { dispatchRoutes } from './routes/dispatch.js';
 import { ssOrderStatus } from './routes/ss.js';
 import { startSupplierPoll } from './supplier-poll.js';
@@ -157,7 +159,7 @@ app.get('/api/admin/mail-diag', { preHandler: requireAdmin }, async (req) => {
       password_reset: 'Falls back to an admin-visible reset request; the seller is never emailed a link.',
       team_invites: 'Invite email silently not sent — the link must be passed on by hand.',
       topup_alerts: 'Admins are not emailed when a top-up needs review.',
-      signup: 'No confirmation email is sent at all — signup never emails, configured or not.',
+      signup: 'The welcome email is not sent; the account is still created and usable.',
     },
   };
   if (!cfg.configured) {
@@ -205,8 +207,17 @@ app.get('/api/admin/storage-diag', { preHandler: requireStaff }, async () => {
 
 // ── Auth ──
 app.post('/api/auth/signup', async (req, reply) => {
-  try { return await signup(req.body || {}); }
-  catch (e) { reply.code(400); return { error: e.message }; }
+  try {
+    const res = await signup(req.body || {});
+    // Best-effort welcome email. Fire-and-forget AFTER the account exists: a mail hiccup
+    // must never fail a signup, and the user already has their session from `res`. sendMail
+    // never throws and is a no-op when mail is off.
+    if (res && res.user && res.user.email) {
+      const { subject, text, html } = welcomeEmail(res.user.name);
+      sendMail({ to: res.user.email, subject, text, html }).catch(() => {});
+    }
+    return res;
+  } catch (e) { reply.code(400); return { error: e.message }; }
 });
 app.post('/api/auth/login', async (req, reply) => {
   try { return await login(req.body || {}); }
