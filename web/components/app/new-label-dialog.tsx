@@ -1,55 +1,72 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CircleNotch, ArrowSquareOut } from "@phosphor-icons/react"
+import { CircleNotch, ArrowSquareOut, CheckCircle, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { parseBlock } from "@/lib/address-paste"
 import { createOrder, validateAddress, buyUspsLabel, getFactorySettings, setFactorySettings, type ShipAddress, type UspsLabelResult } from "@/lib/api"
 
+const MAIL_CLASSES = [
+  { id: "USPS_GROUND_ADVANTAGE", label: "Ground Advantage" },
+  { id: "PRIORITY_MAIL", label: "Priority Mail" },
+  { id: "PRIORITY_MAIL_EXPRESS", label: "Priority Express" },
+]
 const BLANK: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
 const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.zip)
 const FROM_STORE = "eg_ship_from"
 
 /**
- * Create a one-off shipping label for a MANUAL order (re-ship, sample, replacement…). It
- * creates a minimal manual order (source 'manual', staff-owned) so the label is RECORDED in
- * Shipments like any other — then validates the address and buys the label. Reuses the exact
- * buy + validate flow the order ship panel uses.
+ * Create a one-off shipping label for a MANUAL order (re-ship, sample, replacement…). Buys a
+ * REAL label through the same aggregator (Shippo → USPS) as the order ship panel, and creates
+ * a minimal staff-owned manual order so it's RECORDED in Shipments. Ship-to is a single paste
+ * box (validated live); ship-from is the saved warehouse address (Settings › Platform).
  */
 export function NewLabelDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void }) {
+  const [pasteText, setPasteText] = useState("")
   const [to, setTo] = useState<ShipAddress>({ ...BLANK })
   const [from, setFrom] = useState<ShipAddress>({ ...BLANK })
-  const [pkg, setPkg] = useState({ weightOz: 6, length: 10, width: 8, height: 1 })
+  const [pkg, setPkg] = useState({ weightOz: 6, length: 10, width: 8, height: 1, mailClass: "USPS_GROUND_ADVANTAGE" })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [result, setResult] = useState<UspsLabelResult | null>(null)
 
+  // Load the saved warehouse 'from' when the dialog opens (deferred so no sync setState).
   useEffect(() => {
     if (!open) return
-    // Deferred (setTimeout 0) so the initial read isn't a synchronous setState in the effect.
     const t = setTimeout(() => {
       try { const raw = localStorage.getItem(FROM_STORE); if (raw) setFrom({ ...BLANK, ...JSON.parse(raw) }) } catch {}
       getFactorySettings().then((s) => {
         const sf = s?.ship_from as ShipAddress | undefined
-        if (sf && sf.street) {
-          const a = { ...BLANK, ...sf }
-          setFrom(a)
-          try { localStorage.setItem(FROM_STORE, JSON.stringify(a)) } catch {}
-        }
+        if (sf && sf.street) { const a = { ...BLANK, ...sf }; setFrom(a); try { localStorage.setItem(FROM_STORE, JSON.stringify(a)) } catch {} }
       }).catch(() => {})
     }, 0)
     return () => clearTimeout(t)
   }, [open])
 
-  const set = (k: keyof ShipAddress, v: string) => setTo((t) => ({ ...t, [k]: v }))
+  // Live recipient validation — visible ✓/⚠ before spending. Debounced, warn-not-block.
+  const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid"; msg?: string }>({ status: "idle" })
+  useEffect(() => {
+    const complete = addrComplete(to)
+    let alive = true
+    const t = setTimeout(() => {
+      if (!alive) return
+      if (!complete) { setAddrCheck({ status: "idle" }); return }
+      setAddrCheck({ status: "checking" })
+      validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
+        .then((v) => { if (alive) setAddrCheck(v && v.ok ? { status: "valid" } : { status: "invalid", msg: v?.error }) })
+        .catch(() => { if (alive) setAddrCheck({ status: "idle" }) })
+    }, 600)
+    return () => { alive = false; clearTimeout(t) }
+  }, [to.street, to.street2, to.city, to.state, to.zip])
 
-  const reset = () => { setTo({ ...BLANK }); setResult(null); setErr(null) }
+  const reset = () => { setPasteText(""); setTo({ ...BLANK }); setResult(null); setErr(null); setAddrCheck({ status: "idle" }) }
 
   const buy = async () => {
     setErr(null)
     if (!addrComplete(to)) { setErr("Recipient needs a street, city, state and ZIP."); return }
-    if (!addrComplete(from)) { setErr("No warehouse ‘From’ address saved — set it in Settings first."); return }
+    if (!addrComplete(from)) { setErr("No warehouse ‘From’ address saved — set it in Settings › Platform first."); return }
     setBusy(true)
     try {
       const id = `FF-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -60,12 +77,11 @@ export function NewLabelDialog({ open, onOpenChange, onCreated }: { open: boolea
       })
       if (!co.ok) { setErr(co.error || "Couldn't create the order."); return }
       setFactorySettings({ ship_from: from }).catch(() => {})
-      // Validate (warn, don't block) — a bad address is a wasted label.
       try {
         const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
         if (v && !v.ok && v.error && !window.confirm(`Address check couldn't confirm this is deliverable:\n\n${v.error}\n\nBuy the label anyway?`)) return
       } catch { /* validation unavailable — proceed */ }
-      const r = await buyUspsLabel({ to, from, orderId: id, ...pkg })
+      const r = await buyUspsLabel({ to, from, orderId: id, weightOz: pkg.weightOz, length: pkg.length, width: pkg.width, height: pkg.height, mailClass: pkg.mailClass })
       if (!r.ok) { setErr(r.error || "Couldn't buy the label."); return }
       setResult(r)
       onCreated()
@@ -98,22 +114,39 @@ export function NewLabelDialog({ open, onOpenChange, onCreated }: { open: boolea
         ) : (
           <>
             <div className="space-y-3 py-1">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
-              <Input placeholder="Name" value={to.name || ""} onChange={(e) => set("name", e.target.value)} />
-              <Input placeholder="Street" value={to.street || ""} onChange={(e) => set("street", e.target.value)} />
-              <Input placeholder="Apt / unit (optional)" value={to.street2 || ""} onChange={(e) => set("street2", e.target.value)} />
-              <div className="grid grid-cols-3 gap-2">
-                <Input placeholder="City" value={to.city || ""} onChange={(e) => set("city", e.target.value)} />
-                <Input placeholder="State" value={to.state || ""} onChange={(e) => set("state", e.target.value)} />
-                <Input placeholder="ZIP" value={to.zip || ""} onChange={(e) => set("zip", e.target.value)} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+                {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking address…</span>}
+                {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><CheckCircle size={12} weight="fill" /> Address validated</span>}
+                {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify — check it" : "Address not found"}</span>}
               </div>
-              <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Parcel</div>
-              <div className="grid grid-cols-4 gap-2">
-                <label className="text-xs text-muted-foreground">Weight oz<Input type="number" min={1} value={pkg.weightOz} onChange={(e) => setPkg({ ...pkg, weightOz: Number(e.target.value) })} className="mt-1" /></label>
-                <label className="text-xs text-muted-foreground">L in<Input type="number" min={1} value={pkg.length} onChange={(e) => setPkg({ ...pkg, length: Number(e.target.value) })} className="mt-1" /></label>
-                <label className="text-xs text-muted-foreground">W in<Input type="number" min={1} value={pkg.width} onChange={(e) => setPkg({ ...pkg, width: Number(e.target.value) })} className="mt-1" /></label>
-                <label className="text-xs text-muted-foreground">H in<Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="mt-1" /></label>
+              <textarea
+                value={pasteText}
+                onChange={(e) => {
+                  setPasteText(e.target.value)
+                  const { name, addr } = parseBlock(e.target.value)
+                  setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
+                }}
+                rows={4}
+                placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
+              <p className="text-[10px] text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
+
+              <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Service &amp; parcel</div>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] text-muted-foreground">Service</span>
+                  <select value={pkg.mailClass} onChange={(e) => setPkg({ ...pkg, mailClass: e.target.value })} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                    {MAIL_CLASSES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </label>
+                <label className="flex w-20 flex-col gap-1"><span className="text-[11px] text-muted-foreground">Weight oz</span><Input type="number" min={1} value={pkg.weightOz} onChange={(e) => setPkg({ ...pkg, weightOz: Number(e.target.value) })} className="h-9" /></label>
+                <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">L in</span><Input type="number" min={1} value={pkg.length} onChange={(e) => setPkg({ ...pkg, length: Number(e.target.value) })} className="h-9" /></label>
+                <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => setPkg({ ...pkg, width: Number(e.target.value) })} className="h-9" /></label>
+                <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" /></label>
               </div>
+
               {!addrComplete(from) && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
                   No warehouse ‘From’ address saved — set it in Settings › Platform before buying.
