@@ -1212,10 +1212,10 @@ export function PurchaseView() {
                         </div>
                         <SourceTags line={l} />
                       </div>
-                      {/* QTY SLOTS — flex-1, so they take the whole band BETWEEN the product
-                          and the price and spread across it (justify-between: they fan out
-                          when the row is wide, close up and wrap when it's narrow). No dead
-                          gap between title and price — this is where the pills live. Each box
+                      {/* QTY SLOTS — flex-1 so they occupy the band BETWEEN the product and
+                          the price, but kept as a TIGHT cluster (fixed small gap) centred in
+                          that band rather than stretched edge-to-edge — justify-between fanned
+                          them too far apart on a wide row. Wraps when the row is narrow. Each box
                           STACKS four facts — how many to take, the warehouse code, its stock,
                           and the arrival date — because in a row they'd read as one run-on line.
                             • S&S  → one box per warehouse, nearest first (blank = let S&S
@@ -1224,7 +1224,7 @@ export function PurchaseView() {
                             • Otto → a single box (their inventory is per-sku, no warehouse).
                             • else → one plain box (a manual line, or S&S before stock loads),
                                      the sole quantity control in that case. */}
-                      <div className="flex flex-1 flex-wrap items-start justify-between gap-3 sm:gap-4">
+                      <div className="flex flex-1 flex-wrap items-start justify-center gap-2 sm:gap-2.5">
                         {g.api === "ss" && stock[l.sku] ? (
                           stock[l.sku].warehouses.filter((w) => w.qty > 0).length === 0 ? (
                             <span className="self-center text-[11px] font-medium text-destructive">No stock in any warehouse</span>
