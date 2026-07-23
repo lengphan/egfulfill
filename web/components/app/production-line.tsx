@@ -1,6 +1,5 @@
 "use client"
 
-import { CaretRight } from "@phosphor-icons/react"
 import { FACTORY_STAGES, orderStage, type FactoryTone } from "@/lib/factory-status"
 import { type OrderRow } from "@/lib/api"
 
@@ -41,30 +40,39 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
   // an all-zero floor picks nothing rather than lighting up Received.
   const peak = counts.filter((s) => WIP.has(s.id)).reduce((a, s) => (s.n > a.n ? s : a), { id: "", n: 0 })
 
+  // Each column is scaled to the BUSIEST stage, not to the total — so a lopsided floor
+  // (everything in one stage, nothing shipped yet) still reads as a clean chart instead of
+  // one segment eating a shared track. A non-zero stage never drops below a visible stub.
+  const CHART_H = 128
+  const BAR_MAX = CHART_H - 22 // leaves room for the value label riding on top
+  const max = Math.max(1, ...counts.map((s) => s.n))
+
   return (
-    <div className="space-y-3 px-5 py-4">
-      {/* proportional flow bar — segment width ∝ count, a sliver kept for empty stages */}
-      <div className="flex h-2 gap-1 overflow-hidden">
-        {counts.map((s) => (
-          <div
-            key={s.id || "received"}
-            className={"h-full rounded-full transition-[flex-grow] duration-500 " + (s.n ? BAR[s.tone] : "bg-muted")}
-            style={{ flexGrow: s.n || 0.12, flexBasis: 0 }}
-            title={`${s.label}: ${s.n}`}
-          />
-        ))}
+    <div className="px-5 py-4">
+      {/* columns — value label on top, bar grounded on a shared baseline */}
+      <div className="flex items-end gap-2 border-b border-border" style={{ height: CHART_H }}>
+        {counts.map((s) => {
+          const hot = s.id === peak.id && peak.n > 0
+          const h = s.n ? Math.max(6, Math.round((s.n / max) * BAR_MAX)) : 2
+          return (
+            <div key={s.id || "received"} className="flex flex-1 flex-col items-center justify-end gap-1.5">
+              <div className={"text-sm font-bold leading-none tabular-nums " + (hot ? "text-primary" : s.n ? "text-foreground" : "text-muted-foreground")}>{s.n}</div>
+              <div
+                className={"w-full max-w-[52px] rounded-t-[5px] transition-[height] duration-500 " + (s.n ? BAR[s.tone] : "bg-muted")}
+                style={{ height: h }}
+                title={`${s.label}: ${s.n}`}
+              />
+            </div>
+          )
+        })}
       </div>
-      {/* stage nodes with flow carets between */}
-      <div className="flex items-center">
-        {counts.map((s, i) => {
+      {/* stage labels, aligned under each column */}
+      <div className="mt-2 flex gap-2">
+        {counts.map((s) => {
           const hot = s.id === peak.id && peak.n > 0
           return (
-            <div key={s.id || "received"} className="flex flex-1 items-center">
-              <div className="flex-1 text-center">
-                <div className={"text-xl font-bold leading-none tabular-nums " + (hot ? "text-primary" : "")}>{s.n}</div>
-                <div className={"mt-1 text-[11px] font-medium " + (hot ? "text-primary" : "text-muted-foreground")}>{s.label}</div>
-              </div>
-              {i < counts.length - 1 && <CaretRight size={12} weight="bold" className="shrink-0 text-muted-foreground/40" />}
+            <div key={s.id || "received"} className={"flex-1 text-center text-[11px] font-medium leading-tight " + (hot ? "text-primary" : "text-muted-foreground")}>
+              {s.label}
             </div>
           )
         })}
