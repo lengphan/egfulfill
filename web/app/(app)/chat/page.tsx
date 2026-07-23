@@ -9,6 +9,12 @@ import { getUser, getToken } from "@/lib/auth"
 import { Markdown } from "@/components/app/markdown"
 
 const nowMs = () => Date.now()
+// Render as markdown only when the text actually carries the syntax our Markdown
+// renderer supports (**bold**, `code`, #headings, - / 1. lists). This keys off the
+// CONTENT, not who's viewing — so an AI reply bolds on the seller's screen and the
+// factory's alike, while a plain human message stays verbatim (literal * and line breaks).
+const hasMarkdown = (t?: string) =>
+  !!t && /\*\*[^*\n]+\*\*|`[^`\n]+`|^\s{0,3}#{1,4}\s|^\s*[-*]\s|^\s*\d+[.)]\s/m.test(t)
 const fmtTime = (ts?: number) => {
   if (!ts) return ""
   const d = new Date(ts)
@@ -496,11 +502,13 @@ export default function ChatPage() {
                       </div>
                     )}
                     <div className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
-                      <div className={"max-w-[75%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "whitespace-pre-wrap bg-primary text-primary-foreground" : "bg-muted")}>
-                        {/* The assistant answers in markdown, so rendering it as plain text
-                            showed literal ** around every bold phrase. Own messages stay
-                            verbatim — a seller typing *asterisks* meant them. */}
-                        {mine ? m.text : <Markdown>{m.text ?? ""}</Markdown>}
+                      <div className={"max-w-[75%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                        {/* Markdown when the text has markdown syntax, verbatim otherwise —
+                            decided by CONTENT, not by which side is viewing. This is what
+                            fixes the factory view: an AI reply is "mine" there, and the old
+                            `mine ? m.text` branch showed its ** raw. A plain typed message
+                            (literal *asterisks*, line breaks) still renders exactly as sent. */}
+                        {hasMarkdown(m.text) ? <Markdown>{m.text ?? ""}</Markdown> : <span className="whitespace-pre-wrap">{m.text ?? ""}</span>}
                       </div>
                       <span className="mt-0.5 flex items-center gap-1.5 px-1 text-[10px] text-muted-foreground">
                         {m.orderRef && (
