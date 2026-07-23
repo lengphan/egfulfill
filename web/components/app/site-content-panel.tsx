@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CircleNotch, Plus, Trash, ArrowSquareOut, FloppyDisk, UploadSimple, Image as ImageIcon } from "@phosphor-icons/react"
+import { CircleNotch, Plus, Trash, ArrowSquareOut, FloppyDisk, UploadSimple, Warning, Image as ImageIcon } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,6 +44,46 @@ function Intro({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>
 }
 
+/**
+ * Downscale + re-encode an image in the browser BEFORE upload.
+ *
+ * A phone/DSLR photo is 4–12MB; base64-encoded it blows past Vercel's ~4.5MB proxy body
+ * limit, so the upload silently failed on anything but tiny images — which is why "the file
+ * is limited". Capping the longest edge and re-encoding as JPEG keeps the payload small
+ * (well under the limit) AND stops the homepage shipping a 12MB background. Returns a data
+ * URL. Falls back to the original bytes if the canvas isn't available.
+ */
+async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promise<string> {
+  const read = () => new Promise<string>((res, rej) => {
+    const fr = new FileReader()
+    fr.onload = () => res(String(fr.result))
+    fr.onerror = () => rej(new Error("Couldn't read the file"))
+    fr.readAsDataURL(file)
+  })
+  const original = await read()
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image()
+      i.onload = () => res(i)
+      i.onerror = () => rej(new Error("decode failed"))
+      i.src = original
+    })
+    const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
+    // Already small in both bytes and dimensions — send as-is (keeps PNG transparency etc.).
+    if (scale === 1 && file.size < 1_200_000) return original
+    const w = Math.max(1, Math.round(img.width * scale))
+    const h = Math.max(1, Math.round(img.height * scale))
+    const canvas = document.createElement("canvas")
+    canvas.width = w; canvas.height = h
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return original
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL("image/jpeg", quality)
+  } catch {
+    return original
+  }
+}
+
 const SUBTABS: { id: string; label: string }[] = [
   { id: "hero", label: "Hero" },
   { id: "stats", label: "Stats" },
@@ -73,6 +113,13 @@ export function SiteContentPanel() {
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  // A LOCAL preview of the just-picked image, shown instantly so the banner isn't blank
+  // while the upload runs — and stays visible even if the stored URL later fails to load.
+  const [localPreview, setLocalPreview] = useState<string | null>(null)
+  // The stored URL didn't load in the <img>: almost always a storage/CDN that isn't public,
+  // not a broken editor. Say so instead of showing a broken-image glyph.
+  const [imgBroken, setImgBroken] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(() => {
@@ -101,16 +148,18 @@ export function SiteContentPanel() {
 
   const onPickImage = async (file: File | undefined) => {
     if (!file) return
-    if (!file.type.startsWith("image/")) { setErr("That file isn't an image."); return }
-    if (file.size > 8 * 1024 * 1024) { setErr("Image is over 8MB — resize it first."); return }
-    setUploading(true); setErr(null)
+    if (!file.type.startsWith("image/")) { setErr("That file isn't an image — pick a JPEG, PNG, WebP or AVIF."); return }
+    // Generous ceiling only as a sanity check — anything reasonable is downscaled below the
+    // proxy limit before it's sent, so a big camera photo is fine.
+    if (file.size > 40 * 1024 * 1024) { setErr("That image is over 40MB — pick a smaller one."); return }
+    setUploading(true); setErr(null); setImgBroken(false)
     try {
-      const dataUrl = await new Promise<string>((res, rej) => {
-        const fr = new FileReader()
-        fr.onload = () => res(String(fr.result))
-        fr.onerror = () => rej(new Error("Couldn't read the file"))
-        fr.readAsDataURL(file)
-      })
+      // Resize + re-encode in the browser FIRST. A raw photo base64's past Vercel's ~4.5MB
+      // proxy body limit and the upload fails; the downscaled data URL comfortably fits.
+      const dataUrl = await downscaleImage(file)
+      // Instant local preview, so the banner shows immediately and stays visible even if the
+      // stored URL later can't load.
+      setLocalPreview(dataUrl)
       const r = await uploadHeroImage(dataUrl)
       if (r.error || !r.url) throw new Error(r.error || "Upload failed")
       const url = r.url
@@ -166,30 +215,48 @@ export function SiteContentPanel() {
           <div>
             <span className="mb-1 block text-xs font-medium text-muted-foreground">Banner image</span>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPickImage(e.target.files?.[0])} />
-            {c.hero.image ? (
+            {(localPreview || c.hero.image) ? (
               <div className="space-y-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.hero.image} alt="Hero banner preview" className="max-h-44 w-full rounded-lg border border-border object-cover" />
+                {imgBroken && !localPreview ? (
+                  // The stored URL couldn't load. Almost always the object storage / CDN isn't
+                  // serving it publicly — say that plainly instead of a broken-image glyph.
+                  <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-8 text-center text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                    <Warning size={20} weight="fill" />
+                    <span className="font-medium">The saved banner isn&apos;t loading.</span>
+                    <span className="max-w-sm">Its URL was saved, but the browser can&apos;t open it — usually the storage bucket / CDN isn&apos;t public. Re-upload, or check <code>SPACES_CDN</code> and public-read on the server.</span>
+                  </div>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={localPreview || c.hero.image} alt="Hero banner preview" onError={() => setImgBroken(true)}
+                    className="max-h-44 w-full rounded-lg border border-border object-cover" />
+                )}
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                     {uploading ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} />}Replace
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => edit((x) => { x.hero.image = "" })} disabled={uploading}><Trash size={13} />Remove</Button>
+                  <Button variant="ghost" size="sm" onClick={() => { setLocalPreview(null); setImgBroken(false); edit((x) => { x.hero.image = "" }) }} disabled={uploading}><Trash size={13} />Remove</Button>
                 </div>
               </div>
             ) : (
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-8 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-60"
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileRef.current?.click() } }}
+                onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => { e.preventDefault(); setDragging(false); onPickImage(e.dataTransfer.files?.[0]) }}
+                className={"flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-10 text-sm transition-colors " +
+                  (dragging ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground") +
+                  (uploading ? " pointer-events-none opacity-60" : "")}
               >
                 {uploading ? <CircleNotch size={20} className="animate-spin" /> : <ImageIcon size={20} />}
-                {uploading ? "Uploading…" : "Upload a banner image"}
-                <span className="text-xs">JPEG, PNG, WebP or AVIF · up to 8MB · optional</span>
-              </button>
+                {uploading ? "Uploading…" : "Drag an image here, or click to choose"}
+                <span className="text-xs">JPEG, PNG, WebP or AVIF · big photos are resized automatically</span>
+              </div>
             )}
             <span className="mt-1 block text-xs text-muted-foreground">
-              Optional. Sits behind the hero under a scrim so the text stays readable. Leave empty for the default gradient. Press Save to publish.
+              Optional. Sits behind the hero under a scrim, so the text stays readable. Landscape works best — around 1600×900 (16:9). Leave empty for the default gradient. Press Save to publish — it&apos;s live within a minute.
             </span>
           </div>
 
