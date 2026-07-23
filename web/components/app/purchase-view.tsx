@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
-  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsInventory, getSsDaysInTransit, getOttoInventory, type PoReturn, type SsShipment,
+  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsOrder, getSsInventory, getSsDaysInTransit, getOttoInventory, type PoReturn, type SsShipment,
   ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
@@ -518,31 +518,35 @@ export function PurchaseView() {
       // No order number means we CAN'T ask S&S — so we can't verify, but we also can't
       // leave it stuck. Let the operator attest they've already cancelled it directly.
       if (sent && isSs && !orderNo) {
-        // No S&S number was captured at placement (an all-error line, or a response shape
-        // we didn't record). Rather than dead-end, let the operator PASTE it from the S&S
-        // portal / confirmation email so we can still cancel through their API — the real
-        // fix for "I can't stop this order." Blank = attest they've stopped it directly.
-        const entered = window.prompt(
-          `${po.num} has no S&S order number saved, so we can't auto-cancel it.\n\n` +
-          `Paste the S&S order number (from your S&S portal or confirmation email) to cancel it via their API.\n\n` +
-          `Leave it blank ONLY if you've already cancelled it with S&S directly.`, "")
-        if (entered === null) { setMsg({ ok: false, text: `${po.num} left as-is.` }); return }
-        const typed = entered.trim()
-        if (typed) {
-          const c = await cancelSsOrder(typed).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
+        // No S&S number was recorded at placement. RESOLVE it from OUR po number — we sent
+        // it as the poNumber, and S&S's /orders/{reference} accepts it — so cancellation is
+        // automatic and nobody has to hunt for their number. If it still can't be found,
+        // fall back to pasting it; blank = attest it was already stopped directly.
+        const ref = String((po.meta as { splitFrom?: string } | undefined)?.splitFrom || po.num)
+        const looked = await getSsOrder(ref).catch(() => null)
+        let numToCancel: string | null = (looked?.orders?.find((o) => o.orderNumber)?.orderNumber) || null
+        if (!numToCancel) {
+          const entered = window.prompt(
+            `${po.num}: no S&S order number saved, and we couldn't find one by PO number.\n\n` +
+            `Paste the S&S order number (portal / confirmation email) to cancel it via their API — or leave blank if you've already cancelled it with S&S directly.`, "")
+          if (entered === null) { setMsg({ ok: false, text: `${po.num} left as-is.` }); return }
+          numToCancel = entered.trim() || null
+        }
+        if (numToCancel) {
+          const c = await cancelSsOrder(numToCancel).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
           if ("error" in c && c.error) {
             if (!window.confirm(
-              `S&S wouldn't cancel ${typed} via their API:\n${c.error}\n\n` +
+              `S&S wouldn't cancel ${numToCancel} via their API:\n${c.error}\n\n` +
               `If you've ALREADY cancelled it with S&S directly, click OK to mark it cancelled here.\n\n` +
               `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
-            )) { setMsg({ ok: false, text: `S&S wouldn't cancel ${typed}: ${c.error}` }); return }
-            supplierMsg = ` You confirmed it was already cancelled with S&S (their API declined ${typed}).`
+            )) { setMsg({ ok: false, text: `S&S wouldn't cancel ${numToCancel}: ${c.error}` }); return }
+            supplierMsg = ` You confirmed it was already cancelled with S&S (their API declined ${numToCancel}).`
             manualCancel = true
           } else {
             const cc = c as { orderStatus?: string; reconciled?: boolean }
             supplierMsg = cc.reconciled
-              ? ` S&S already had ${typed} cancelled — this caught our record up.`
-              : ` S&S confirmed ${typed} cancelled (${cc.orderStatus ?? "Cancelled"}).`
+              ? ` S&S already had ${numToCancel} cancelled — this caught our record up.`
+              : ` S&S confirmed ${numToCancel} cancelled (${cc.orderStatus ?? "Cancelled"}).`
             supplierCancelled = true
           }
         } else {
