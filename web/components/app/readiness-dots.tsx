@@ -331,11 +331,14 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
     (it.line_id ? designs?.[it.line_id] : undefined) ?? (it.sku ? designs?.[it.sku] : undefined)
   const withArt = decorated.filter((it) => artFor(it)?.data)
   const buyerUploads = list.filter((it) => it.design_src)
-  // A machine file marks the design done. Prefer the loaded file list, but fall back to the
-  // row-level flag the orders list computes — the full list is only fetched on a row that's
-  // been expanded, so without this an uploaded .emb didn't register on a collapsed row and
-  // the tag stayed grey next to a history that already said "Machine file uploaded".
-  const approved = (files ?? []).some((f) => f.kind === "pes" || f.kind === "emb") || order.has_machine_file === true
+  // A machine file marks the design done. The loaded file list WINS when it's present
+  // (even when empty) — so removing the last file reverts the tag immediately, rather than
+  // the stale row-level flag keeping it "done". Only when the list hasn't been fetched (a
+  // collapsed row) do we fall back to has_machine_file from the orders query, which is what
+  // lets the tag be right on a row nobody expanded.
+  const approved = files
+    ? files.some((f) => f.kind === "pes" || f.kind === "emb")
+    : order.has_machine_file === true
 
   const designState: State = approved
     ? "done"

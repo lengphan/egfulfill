@@ -611,6 +611,11 @@ export function purchaseDesignFile(designId: string) {
 export function downloadDesignFile(designId: string) {
   return api<{ designId: string; name?: string; mime?: string; data?: string; url?: string }>(`/api/design_files/${encodeURIComponent(designId)}`)
 }
+/** Remove a file from an order (staff only). The Design readiness tag reverts once it's
+ *  gone; the server records it in the order's tag history and broadcasts a refresh. */
+export function deleteDesignFile(designId: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/design_files/${encodeURIComponent(designId)}`, { method: "DELETE" })
+}
 
 // ── Notifications ──
 export type Notification = { id: number | string; type: string; title: string; body?: string | null; href?: string | null; entity_id?: string | null; read_at?: string | null; created_at: string }

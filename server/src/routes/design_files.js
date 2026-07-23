@@ -296,6 +296,29 @@ export function designFilesRoutes(app, requireAuth) {
     return { ok: true, stored: url ? 'object-storage' : 'inline' };
   });
 
+  // Remove a file from an order. Staff-only: a machine file is a factory artefact, and a
+  // seller must not be able to delete a working file. The Design readiness tag reverts on
+  // its own once the file is gone (it reads has_machine_file), and the two lines below make
+  // that live — egBroadcast wakes the boards to re-read, audit leaves a 'Machine file
+  // removed' row in the tag's history so a file appearing then vanishing is explained, not
+  // a mystery. No ledger touch: removing the record is not a refund (charge/refund ride the
+  // wallet on purchase/cancel, not on a staff file cleanup).
+  app.delete('/api/design_files/:designId', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    const designId = String(req.params.designId || '');
+    const row = await q('select order_id, sku, file_name, kind from design_file_data where design_id=$1', [designId]).then((r) => r.rows[0]);
+    if (!row) { reply.code(404); return { error: 'File not found.' }; }
+    await q('delete from design_file_data where design_id=$1', [designId]);
+    if (row.order_id) {
+      audit(req, 'design_file.removed', {
+        entityType: 'order', entityId: String(row.order_id),
+        after: { name: row.file_name || designId, sku: row.sku || null, kind: row.kind || null },
+      });
+      egBroadcast({ type: 'design-file', orderId: String(row.order_id), sku: row.sku || null, kind: row.kind || null });
+    }
+    return { ok: true };
+  });
+
   // ── Paywall ────────────────────────────────────────────────────────────────
   // A machine file is a deliverable the seller BUYS. The entitlement was previously
   // only a localStorage flag (eg_emb_paid) flipped on the client — so the download

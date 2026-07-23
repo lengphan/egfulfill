@@ -1,10 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle } from "@phosphor-icons/react"
+import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, type DesignFileRow } from "@/lib/api"
+import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, type DesignFileRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 
 // A file id that's stable per (order, sku, filename) so re-dropping the same file
@@ -97,6 +97,20 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
     } finally { setBusy(null) }
   }
 
+  // Remove a file. Drops it from the order and reverts the Design tag (the server records
+  // it in the tag history and broadcasts, so the readiness pill flips back on its own).
+  const remove = async (f: DesignFileRow) => {
+    if (typeof window !== "undefined" && !window.confirm(`Remove ${f.name}? This can't be undone.`)) return
+    setBusy(f.designId); setErr(null)
+    try {
+      const r = await deleteDesignFile(f.designId)
+      if (r?.error) throw new Error(r.error)
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not remove the file")
+    } finally { setBusy(null) }
+  }
+
   return (
     <div className="space-y-2">
       {/* Drop zone — the thing that didn't exist before. */}
@@ -156,6 +170,9 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
                 <Button size="sm" variant="ghost" className="shrink-0" disabled={busy === f.designId} onClick={() => get(f)} title="Download">
                   {busy === f.designId ? <CircleNotch size={12} className="animate-spin" /> : <FileArrowDown size={13} weight="bold" />}
                 </Button>
+                <Button size="sm" variant="ghost" className="shrink-0 text-muted-foreground hover:text-destructive" disabled={busy === f.designId} onClick={() => remove(f)} title="Remove this file">
+                  <Trash size={13} weight="bold" />
+                </Button>
               </div>
             )
           })}
@@ -186,12 +203,28 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
   const [err, setErr] = useState<string | null>(null)
   const [over, setOver] = useState(false)
   const [sent, setSent] = useState<string | null>(null)
+  const [role, setRole] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
+  // Only staff may remove a file — this card is also shown to sellers, who must never be
+  // able to delete a factory working file.
+  const canRemove = !!role && role !== "seller"
 
   const load = useCallback(() => {
     getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
   }, [orderId])
-  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  useEffect(() => { const id = setTimeout(() => { setRole(getUser()?.role || ""); load() }, 0); return () => clearTimeout(id) }, [load])
+
+  const remove = async (f: DesignFileRow) => {
+    if (typeof window !== "undefined" && !window.confirm(`Remove ${f.name}? This can't be undone.`)) return
+    setBusy(f.designId); setErr(null)
+    try {
+      const r = await deleteDesignFile(f.designId)
+      if (r?.error) throw new Error(r.error)
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not remove the file")
+    } finally { setBusy(null) }
+  }
 
   /**
    * Send us a machine file. Refused BY NAME if it isn't one — this panel sits under a
@@ -309,6 +342,11 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
               : f.paid ? <><FileArrowDown size={13} weight="bold" /> Download</>
               : <>Buy ${f.price} &amp; download</>}
           </Button>
+          {canRemove && (
+            <Button size="sm" variant="ghost" className="shrink-0 text-muted-foreground hover:text-destructive" disabled={busy === f.designId} onClick={() => remove(f)} title="Remove this file">
+              <Trash size={13} weight="bold" />
+            </Button>
+          )}
         </div>
       ))}
       {/* Offered alongside existing files too, not only when the list is empty — a seller

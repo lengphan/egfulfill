@@ -29,6 +29,7 @@ const SAID: Record<string, string> = {
   "design.pushed": "Sent to the designer board",
   "design.approved": "Design approved",
   "design_file.uploaded": "Machine file uploaded",
+  "design_file.removed": "Machine file removed",
   "item.status": "Item status changed",
   "order.stage": "Order stage changed",
   // The scanning steps. Without these the fallback prints the raw action with the dots
