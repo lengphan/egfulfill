@@ -1,16 +1,16 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront } from "@phosphor-icons/react"
+import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, getSpydeckListingDetail } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, getSpydeckListingDetail } from "@/lib/api"
 import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { detectTrademarks } from "@/lib/trademarks"
@@ -102,11 +102,15 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
 
 // One research card — image (price + TRENDING overlay) + heart-to-save + estimate
 // stat boxes + the listing's up-to-13 keyword tags (clickable to research + copy all).
-function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void }) {
+// Memoised: the trending grid re-renders on every keystroke/filter/save, and each card ran
+// estFor() + detectTrademarks() (a regex over ~40 brands) on every one of those. With stable
+// callbacks from the parent, memo means a card only re-renders when ITS own data changes.
+const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing, wasSaved: boolean) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void }) {
   const e = estFor(l)
   const trending = e.trending
   const tags = (l.tags ?? []).slice(0, 13)
-  const tmHits = detectTrademarks(`${l.title} ${(l.tags ?? []).join(" ")}`)
+  // Keyed on the listing only, so toggling the save heart doesn't re-run the brand regex.
+  const tmHits = useMemo(() => detectTrademarks(`${l.title} ${(l.tags ?? []).join(" ")}`), [l.title, l.tags])
   const [copied, setCopied] = useState(false)
   const copyAll = async () => {
     try { await navigator.clipboard.writeText(tags.join(", ")); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
@@ -115,7 +119,7 @@ function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProdu
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
       <button
         type="button"
-        onClick={(ev) => { ev.preventDefault(); onToggleSave(l) }}
+        onClick={(ev) => { ev.preventDefault(); onToggleSave(l, saved) }}
         aria-label={saved ? "Remove from saved" : "Save listing"}
         aria-pressed={saved}
         className={
@@ -208,7 +212,7 @@ function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProdu
       </a>
     </div>
   )
-}
+})
 
 // Curated popular POD niches for the discovery cloud (before a search). Weight = heat.
 const SEED_NICHES: { text: string; weight: number }[] = [
@@ -318,6 +322,11 @@ export function SpyDeckView() {
   const [trending, setTrending] = useState<{ products: EtsyListing[]; keywords: string[] } | null>(null)
   // Carries the server's own 502 reason through to the screen instead of dropping it.
   const [trendErr, setTrendErr] = useState<string | null>(null)
+  // "More ideas" reshuffles the cached pool (free); "Fresh scan" re-hits Etsy (rate-limited).
+  const [seed, setSeed] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+  const [freshScanning, setFreshScanning] = useState(false)
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
   // Filters — server-side (category/price/sort re-run the search) + client-side
   // (min sold-per-day / min favorites filter the shown cards live).
   const [categories, setCategories] = useState<EtsyCategory[]>([])
@@ -409,30 +418,31 @@ export function SpyDeckView() {
     return () => clearTimeout(id)
   }, [entitled])
 
-  const toggleSave = async (l: EtsyListing) => {
+  // Stable identity (no deps) so memoised cards don't re-render on every parent change.
+  // The card passes its own `wasSaved`, so this never needs to read `savedIds`.
+  const toggleSave = useCallback(async (l: EtsyListing, wasSaved: boolean) => {
     const key = String(l.listing_id)
-    const isSaved = savedIds.has(key)
     // Optimistic update.
     setSavedIds((prev) => {
       const next = new Set(prev)
-      if (isSaved) next.delete(key)
+      if (wasSaved) next.delete(key)
       else next.add(key)
       return next
     })
-    setSaved((prev) => (isSaved ? prev.filter((x) => String(x.listing_id) !== key) : [{ ...l }, ...prev]))
+    setSaved((prev) => (wasSaved ? prev.filter((x) => String(x.listing_id) !== key) : [{ ...l }, ...prev]))
     try {
-      if (isSaved) await unsaveSpydeckListing(l.listing_id)
+      if (wasSaved) await unsaveSpydeckListing(l.listing_id)
       else await saveSpydeckListing(l)
     } catch {
       // Revert on failure.
       setSavedIds((prev) => {
         const next = new Set(prev)
-        if (isSaved) next.add(key)
+        if (wasSaved) next.add(key)
         else next.delete(key)
         return next
       })
     }
-  }
+  }, [])
 
   const hasFilter = !!(cat || minPrice || maxPrice)
   const run = async (term?: string) => {
@@ -464,6 +474,40 @@ export function SpyDeckView() {
       setLoading(false)
     }
   }
+
+  // Stable tag-research handler for the memoised cards: a ref keeps `onSearchTag`'s identity
+  // fixed while still calling the LATEST `run` (which closes over changing filter state), so
+  // typing in the search box no longer re-renders all 24 cards.
+  const runRef = useRef(run)
+  useEffect(() => { runRef.current = run })
+  const onSearchTag = useCallback((t: string) => runRef.current(t), [])
+
+  // "More ideas" — new seed, refetch the reshuffled pool for FREE (no Etsy call), page 1.
+  const moreIdeas = useCallback(async () => {
+    const s = Math.floor(Math.random() * 1_000_000) + 1
+    setSeed(s); setRefreshing(true); setRefreshMsg(null)
+    try {
+      const r = await getSpydeckTrending(s)
+      setTrending({ products: r.products ?? [], keywords: r.keywords ?? [] }); setTrendErr(null)
+      trendingPaged.setPage(1)
+    } catch (e) {
+      setRefreshMsg(e instanceof Error ? e.message : "Couldn't refresh the feed.")
+    } finally { setRefreshing(false) }
+  }, [trendingPaged])
+
+  // "Fresh scan" — re-hit Etsy for a genuinely new pool. The server enforces the rate limits
+  // and returns a friendly 429 reason (global 30-min lock / seller once-2-days / 20-a-day cap).
+  const freshScan = useCallback(async () => {
+    setFreshScanning(true); setRefreshMsg(null)
+    try {
+      const r = await rebuildSpydeckTrending(seed || 1)
+      setTrending({ products: r.products ?? [], keywords: r.keywords ?? [] }); setTrendErr(null)
+      trendingPaged.setPage(1)
+      setRefreshMsg("Fresh scan complete — new niches pulled from Etsy.")
+    } catch (e) {
+      setRefreshMsg(e instanceof ApiError || e instanceof Error ? e.message : "Fresh scan failed.")
+    } finally { setFreshScanning(false) }
+  }, [seed, trendingPaged])
 
   // Stats reflect whatever's on screen — search results, or the trending feed when
   // no search has run yet — so the cards fill in without a search.
@@ -627,11 +671,29 @@ export function SpyDeckView() {
             <div className="py-16 text-center text-sm text-muted-foreground">Today&apos;s trending feed isn&apos;t available yet — try a search, or check back shortly.</div>
           ) : (
             <>
-              {/* No keyword chips or methodology note here — the keyword cloud lives on
-                  the Search tab, and repeating it above the feed was redundant. */}
+              {/* Refresh controls: "More ideas" reshuffles the day's cached pool for free;
+                  "Fresh scan" re-hits Etsy (rate-limited server-side, friendly 429). The
+                  keyword cloud lives on the Search tab, so it isn't repeated here. */}
+              <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
+                <button
+                  type="button" onClick={moreIdeas} disabled={refreshing || freshScanning}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:opacity-50"
+                  title="Reshuffle the feed for a fresh set of ideas — free and instant"
+                >
+                  {refreshing ? <CircleNotch size={14} className="animate-spin" /> : <Shuffle size={14} weight="bold" />} More ideas
+                </button>
+                <button
+                  type="button" onClick={freshScan} disabled={refreshing || freshScanning}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+                  title="Pull a brand-new batch of niches from Etsy (rate-limited)"
+                >
+                  {freshScanning ? <CircleNotch size={14} className="animate-spin" /> : <ArrowsClockwise size={14} weight="bold" />} Fresh scan
+                </button>
+                {refreshMsg && <span className="text-xs text-muted-foreground">{refreshMsg}</span>}
+              </div>
               <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {trendingPaged.pageItems.map((l) => (
-                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
+                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} />
                 ))}
               </div>
               <Pagination page={trendingPaged.page} pageCount={trendingPaged.pageCount} perPage={trendingPaged.perPage} total={trendingPaged.total} start={trendingPaged.start} onPage={trendingPaged.setPage} onPerPage={trendingPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -650,7 +712,7 @@ export function SpyDeckView() {
             <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {uploadedPaged.pageItems.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} />
               ))}
             </div>
             <Pagination page={uploadedPaged.page} pageCount={uploadedPaged.pageCount} perPage={uploadedPaged.perPage} total={uploadedPaged.total} start={uploadedPaged.start} onPage={uploadedPaged.setPage} onPerPage={uploadedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -669,7 +731,7 @@ export function SpyDeckView() {
             <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {savedPaged.pageItems.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} />
               ))}
             </div>
             <Pagination page={savedPaged.page} pageCount={savedPaged.pageCount} perPage={savedPaged.perPage} total={savedPaged.total} start={savedPaged.start} onPage={savedPaged.setPage} onPerPage={savedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -701,7 +763,7 @@ export function SpyDeckView() {
                 saved={savedIds.has(String(l.listing_id))}
                 uploaded={uploadedIds.has(String(l.listing_id))}
                 onToggleSave={toggleSave}
-                onSearchTag={(t) => run(t)}
+                onSearchTag={onSearchTag}
                 onMakeProduct={setMakeListing}
               />
             ))}

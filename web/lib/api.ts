@@ -1482,15 +1482,24 @@ export function getSpydeckSaves() {
   return api<SavedListing[]>(`/api/spydeck/saves`)
 }
 // Daily trending feed (server-cached) — auto-populates SpyDeck without a search.
-export type TrendingFeed = { date?: string; products?: EtsyListing[]; keywords?: string[]; error?: string }
+// `built_at`/`offset` come back so the client can reason about the shared pool; `rebuilt`
+// marks a response from a fresh Etsy scan (POST /rebuild) vs a free reshuffle.
+export type TrendingFeed = { date?: string; products?: EtsyListing[]; keywords?: string[]; error?: string; built_at?: string | null; offset?: number; rebuilt?: boolean }
 /** The heavy half of ONE listing (description + full images), served from the day's
  *  cached pool. Kept out of the grid payload, which ships 120 rows. */
 export function getSpydeckListingDetail(id: number | string) {
   return api<{ listing_id: number; description: string; images: string[] }>(
     `/api/spydeck/listing/${encodeURIComponent(String(id))}/detail`)
 }
-export function getSpydeckTrending() {
-  return api<TrendingFeed>(`/api/spydeck/trending`)
+// `seed` (a "More ideas" click) reshuffles the cached pool server-side — FREE, no Etsy call.
+export function getSpydeckTrending(seed = 0) {
+  return api<TrendingFeed>(`/api/spydeck/trending${seed ? `?seed=${seed}` : ""}`)
+}
+// Fresh scan — re-hits Etsy to rebuild the shared pool from new niches. Rate-limited
+// server-side (429 with a friendly reason: global 30-min lock, seller once/2-days, 20/day cap).
+export function rebuildSpydeckTrending(seed = 0) {
+  return api<TrendingFeed & { retryInMs?: number; nextAt?: string; dailyCapped?: boolean }>(
+    `/api/spydeck/trending/rebuild${seed ? `?seed=${seed}` : ""}`, { method: "POST" })
 }
 export function saveSpydeckListing(listing: EtsyListing) {
   return api<{ ok?: boolean; error?: string }>(`/api/spydeck/saves`, {
@@ -1727,6 +1736,10 @@ export function getBillingPlan() {
 export type SubscribeResult = {
   ok?: boolean; plan?: string; spydeck_addon?: boolean; charged?: number
   renews_at?: string | null; balance?: number
+  /** Present on a DOWNGRADE: the change is scheduled, not applied now. `plan`/`spydeck_addon`
+   *  above stay what you're on TODAY; this is what you drop to at `at` (== renews_at). */
+  auto_renew?: boolean
+  scheduled?: { plan: string; spydeck_addon: boolean; at: string | null }
 }
 /** 402 (ApiError) means the wallet can't cover it — the body carries the shortfall and
  *  the top-up methods that can fund it, so the caller offers a top-up rather than a dead end. */

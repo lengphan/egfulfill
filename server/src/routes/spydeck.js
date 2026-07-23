@@ -39,6 +39,12 @@ function ensure() {
       data       jsonb,
       created_at timestamptz not null default now()
     )`))
+    // Per-seller "fresh scan" throttle (once / 2 days). Staff use the global 30-min lock
+    // (read off the cached feed's built_at) instead, so they aren't tracked here.
+    .then(() => q(`create table if not exists spydeck_seller_rebuild (
+      seller_id  text primary key,
+      at         timestamptz not null default now()
+    )`))
     .catch((e) => { _ready = null; throw e; });
   return _ready;
 }
@@ -86,19 +92,44 @@ const TREND_NICHES = [
   'teacher gift', 'vintage aesthetic sweatshirt', 'embroidered crewneck', 'coquette',
   'minimalist jewelry', 'boho wall art', 'funny shirt', 'monogram tumbler',
   'trendy sweatshirt', 'aesthetic wall art', 'custom pet', 'personalized jewelry',
+  // Widened again so a manual "fresh scan" (which advances the niche window) pulls
+  // genuinely NEW niches instead of near-duplicates of the day's set.
+  'embroidered sweatshirt', 'custom dog mom', 'western boho tee', 'coquette bow',
+  'gym pump cover', 'in my mom era', 'wildflower shirt', 'stanley tumbler',
+  'graphic tee vintage', 'christian faith shirt', 'eras tour shirt', 'cat mom gift',
+  'nurse gift', 'bridesmaid proposal', 'baby announcement', 'halloween sweatshirt',
+  'christmas pajamas', 'golf dad shirt', 'skeleton hand', 'sports mom shirt',
 ];
 
 // Build (and cache daily) the trending POOL. One pool is cached for everyone and
 // then sliced per role at request time (see the route) — a seller and an admin want
 // different cuts of the same day's data, and re-searching Etsy per role would burn
 // the rate limit for no reason.
-const POOL_SIZE = 120;      // was 30 — the feed ran dry after one screen
-const NICHES_PER_DAY = 16;  // was 8 — a wider net across the rotating niche list
-async function buildTrending() {
+const POOL_SIZE = 200;      // was 120 — deeper pool so the free "More ideas" reshuffle
+                            // has ~8 screens of variety before a card repeats
+const NICHES_PER_DAY = 16;  // niches searched per pool build
+const SEARCH_CONCURRENCY = 5; // Etsy allows ~10 req/sec; batch searches 5-at-a-time so a
+                              // build (or fresh scan) never bursts past the per-second limit
+
+// Run async work over `items` in fixed-size batches — the real rate-limit guard. Firing
+// all 16 searches at once could brush Etsy's ~10/sec; 5-at-a-time stays comfortably under.
+async function inBatches(items, size, fn) {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(...await Promise.all(items.slice(i, i + size).map(fn)));
+  }
+  return out;
+}
+
+// Build a trending POOL. `offset` advances WHICH niches are searched: the daily build uses
+// 0; a manual "fresh scan" advances it so genuinely new niches are pulled, not duplicates.
+async function buildTrending(offset = 0) {
   const dayIndex = Math.floor(Date.now() / 86400000);
+  const base = dayIndex + offset * NICHES_PER_DAY;
   const picks = [];
-  for (let i = 0; i < NICHES_PER_DAY; i++) picks.push(TREND_NICHES[(dayIndex + i) % TREND_NICHES.length]);
-  const batches = await Promise.all(picks.map((qy) => searchListings(qy, { limit: 48, sort: 'score' }).then((r) => r.results).catch(() => [])));
+  for (let i = 0; i < NICHES_PER_DAY; i++) picks.push(TREND_NICHES[(base + i) % TREND_NICHES.length]);
+  const batches = await inBatches(picks, SEARCH_CONCURRENCY, (qy) =>
+    searchListings(qy, { limit: 48, sort: 'score' }).then((r) => r.results).catch(() => []));
   const byId = new Map();
   for (const list of batches) for (const l of list) if (l.listing_id && !byId.has(l.listing_id)) byId.set(l.listing_id, l);
   // Carry the computed estimate on each row so the per-role slice is a plain filter,
@@ -113,7 +144,7 @@ async function buildTrending() {
     if (k) counts[k] = (counts[k] || 0) + 1;
   }
   const keywords = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([t]) => t);
-  return { date: new Date().toISOString().slice(0, 10), products, keywords };
+  return { date: new Date().toISOString().slice(0, 10), products, keywords, offset, built_at: new Date().toISOString() };
 }
 
 // Slice the shared pool for who's asking. Same data, different priority — staff
@@ -122,11 +153,40 @@ async function buildTrending() {
 //    hidden, it's ordered — they still page on into the rest.
 //  - Sellers: a MIX. The hot ones are interleaved 1-in-3 rather than front-loaded,
 //    so a seller browses the feed instead of skimming the top and leaving.
-function sliceFor(pool, staff) {
+// Seeded PRNG (mulberry32). A deterministic shuffle so "More ideas" gives a NEW order per
+// click, yet the SAME seed reproduces exactly — so paging stays stable within one refresh.
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Weighted-random ordering: hotter listings TEND toward the top, but the exact order
+// varies with the seed — prioritisation without a frozen ranking. (Efraimidis-Spirakis
+// weighted sampling: key = rnd^(1/weight), sort desc.)
+function weightedShuffle(items, seed) {
+  const rnd = mulberry32((seed >>> 0) || 1);
+  return items
+    .map((l) => {
+      const w = Math.max(0.05, (l._sold24 || 0) + (l._trending ? 8 : 0) + 1);
+      return { l, k: Math.pow(rnd(), 1 / w) };
+    })
+    .sort((a, b) => b.k - a.k)
+    .map((x) => x.l);
+}
+
+// `seed === 0` (or omitted) keeps the original deterministic order — backward-compatible
+// with every existing caller. A non-zero seed (a "More ideas" click) reshuffles WITHIN the
+// hot/rest tiers, so the priority split is preserved but the specific cards rotate.
+function sliceFor(pool, staff, seed = 0) {
   const rows = Array.isArray(pool) ? pool : [];
   const isHot = (l) => l._trending || (l._sold24 || 0) > 5;
-  const hot = rows.filter(isHot);
-  const rest = rows.filter((l) => !isHot(l));
+  const sh = (arr) => (seed ? weightedShuffle(arr, seed) : arr);
+  const hot = sh(rows.filter(isHot));
+  const rest = sh(rows.filter((l) => !isHot(l)));
 
   if (staff) return [...hot, ...rest];
 
@@ -272,9 +332,12 @@ export function spydeckRoutes(app, requireAuth) {
     await ensure();
     const today = new Date().toISOString().slice(0, 10);
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    // `seed` from a "More ideas" click reshuffles the cached pool for free — no Etsy call.
+    const seed = Math.abs(parseInt(req.query.seed, 10) || 0);
     const serve = (feed) => ({
       date: feed.date, keywords: feed.keywords || [],
-      products: sliceFor(feed.products, staff).map(gridRow),
+      built_at: feed.built_at || null, offset: feed.offset || 0,
+      products: sliceFor(feed.products, staff, seed).map(gridRow),
     });
 
     try {
@@ -295,6 +358,68 @@ export function spydeckRoutes(app, requireAuth) {
     } catch (e) {
       reply.code(502); return { error: e.message || 'Could not build the trending feed', products: [], keywords: [] };
     }
+  });
+
+  // Fresh scan — rebuild the SHARED pool from new niches. This is the only path that
+  // re-hits Etsy on demand, so it's rate-limited on three independent axes:
+  //   • global 30-min lock (read off the cached feed's built_at) — the pool is shared,
+  //   • per-seller once / 2 days (spydeck_seller_rebuild) — staff skip this,
+  //   • global daily cap (20) — an absolute ceiling regardless of who clicks.
+  // Batched searches (SEARCH_CONCURRENCY) keep it under Etsy's per-second limit, and any
+  // Etsy failure falls back to the current cached pool rather than emptying the feed.
+  const REBUILD_GLOBAL_MS = 30 * 60 * 1000;          // 30 min between ANY rebuilds
+  const REBUILD_SELLER_MS = 2 * 24 * 60 * 60 * 1000; // a seller: once / 2 days
+  const REBUILD_DAILY_CAP = 20;                       // hard ceiling on Etsy scans / day
+  app.post('/api/spydeck/trending/rebuild', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
+    await ensure();
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const now = Date.now();
+    const today = new Date().toISOString().slice(0, 10);
+    const seed = Math.abs(parseInt(req.query.seed, 10) || 0);
+
+    // The cached feed's built_at drives the global 30-min lock.
+    let cur = {};
+    try { const c = await q("select value from settings where key='spydeck_trending'"); cur = readSetting(c.rows[0]) || {}; } catch { cur = {}; }
+    const builtAt = cur.built_at ? Date.parse(cur.built_at) : 0;
+    const sinceGlobal = now - builtAt;
+    if (builtAt && sinceGlobal < REBUILD_GLOBAL_MS) {
+      reply.code(429);
+      return { error: `A fresh scan ran recently. Try again in ${Math.ceil((REBUILD_GLOBAL_MS - sinceGlobal) / 60000)} min.`, retryInMs: REBUILD_GLOBAL_MS - sinceGlobal };
+    }
+
+    // Global daily cap.
+    let dayRec = {};
+    try { const d = await q("select value from settings where key='spydeck_rebuild_day'"); dayRec = readSetting(d.rows[0]) || {}; } catch { dayRec = {}; }
+    const dayCount = dayRec.date === today ? (dayRec.count || 0) : 0;
+    if (dayCount >= REBUILD_DAILY_CAP) {
+      reply.code(429);
+      return { error: 'The daily fresh-scan limit is reached — it resets tomorrow. The feed still auto-refreshes each day, and "More ideas" reshuffles unlimited.', dailyCapped: true };
+    }
+
+    // Per-seller once / 2 days.
+    if (!staff) {
+      let last = 0;
+      try { const r = await q('select at from spydeck_seller_rebuild where seller_id=$1', [String(req.user.sub)]); last = r.rows[0] && r.rows[0].at ? Date.parse(r.rows[0].at) : 0; } catch { last = 0; }
+      if (last && now - last < REBUILD_SELLER_MS) {
+        reply.code(429);
+        return { error: 'You can request a fresh scan once every 2 days — use "More ideas" for unlimited reshuffles meanwhile.', nextAt: new Date(last + REBUILD_SELLER_MS).toISOString() };
+      }
+    }
+
+    // Rebuild from the NEXT niche window.
+    let feed;
+    try { feed = await buildTrending((cur.offset || 0) + 1); }
+    catch (e) { reply.code(502); return { error: e.message || 'Fresh scan failed — showing the current feed.' }; }
+    if (!feed.products || !feed.products.length) { reply.code(502); return { error: 'Fresh scan returned nothing — showing the current feed.' }; }
+
+    await q("insert into settings (key,value,updated_at) values ('spydeck_trending',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(feed)]).catch(() => {});
+    await q("insert into settings (key,value,updated_at) values ('spydeck_rebuild_day',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify({ date: today, count: dayCount + 1 })]).catch(() => {});
+    if (!staff) await q('insert into spydeck_seller_rebuild (seller_id, at) values ($1, now()) on conflict (seller_id) do update set at=now()', [String(req.user.sub)]).catch(() => {});
+
+    return {
+      date: feed.date, keywords: feed.keywords || [], built_at: feed.built_at, offset: feed.offset,
+      products: sliceFor(feed.products, staff, seed).map(gridRow), rebuilt: true,
+    };
   });
 
   // List the seller's saved listings (newest first).
@@ -451,4 +576,27 @@ export function spydeckRoutes(app, requireAuth) {
     await q('delete from spydeck_uploads where seller_id=$1 and listing_id=$2', [String(req.user.sub), String(req.params.listingId)]);
     return { ok: true };
   });
+
+  // ── Pre-warm ─────────────────────────────────────────────────────────────────
+  // Build the day's pool in the background so the FIRST visitor each day never eats the
+  // cold 16-search build. Only actually rebuilds when the cache is missing/stale (so the
+  // hourly tick is a cheap one-row read the other 23 hours). Any failure is swallowed —
+  // the /trending route still rebuilds on miss, so this is an optimisation, never a
+  // dependency. Timers are unref'd so they never hold the process open (or a boot-test).
+  async function warmTrending() {
+    try {
+      await ensure();
+      const today = new Date().toISOString().slice(0, 10);
+      const c = await q("select value from settings where key='spydeck_trending'");
+      const v = readSetting(c.rows[0]) || {};
+      if (v.date === today && Array.isArray(v.products) && v.products.length && v.products[0] && v.products[0]._sold24 !== undefined) return;
+      const feed = await buildTrending(0);
+      if (feed.products && feed.products.length) {
+        await q("insert into settings (key,value,updated_at) values ('spydeck_trending',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(feed)]).catch(() => {});
+      }
+    } catch { /* on-demand build still covers a miss */ }
+  }
+  const warmSoon = setTimeout(warmTrending, 25000);            // ~25s after boot
+  const warmHourly = setInterval(warmTrending, 60 * 60 * 1000); // hourly → catches the date rollover well before peak
+  warmSoon.unref?.(); warmHourly.unref?.();
 }
