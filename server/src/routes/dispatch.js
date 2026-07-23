@@ -23,6 +23,49 @@
 import { q, softQ } from '../db.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
+import { refundOrder } from './order_refunds.js';
+
+/**
+ * Undo the money booked by a successful push, when a label is cancelled BEFORE it's picked.
+ * billExpedite() books two things; a cancel must reverse both, or the seller stays charged
+ * and the byeastside cost stands for a pick that never happened.
+ *
+ *   1. byeastside cost — a "per-label PICK fee" (costs.js). Cancel only ever runs on an
+ *      un-scanned label (the handler guards on label_scanned_at / their 409), so the pick
+ *      never happened and the cost never really occurred. Book a compensating credit with a
+ *      NEW ref (`expedite-cancel-…`) so it dedupes on retry via the (account,type,ref) index.
+ *   2. seller's expedite fee — refunded through the canonical refundOrder(), so the per-part
+ *      cap and idempotency are the SAME ones the manual refund UI uses (no double-pay if a
+ *      human already refunded it, no double-pay on a re-cancel).
+ *
+ * Best-effort throughout: a missing accounting row is a report blemish, never a reason to
+ * fail a cancel the partner already accepted.
+ */
+async function reverseExpediteOnCancel(order, by) {
+  const out = { costReversed: 0, feeRefunded: 0 };
+  try {
+    const orig = await q(
+      "select delta from wallet_ledger where account='factory' and type='expedite-cost' and ref=$1",
+      [`expedite-${order.id}`]);
+    const paid = orig.rows[0] ? -Number(orig.rows[0].delta) : 0;   // stored as a negative delta
+    if (paid > 0) {
+      await q(
+        `insert into wallet_ledger (account, delta, type, ref, note, order_id)
+         values ('factory', $1, 'expedite-cost', $2, $3, $4) on conflict do nothing`,
+        [paid, `expedite-cancel-${order.id}`,
+         `Dispatch cancelled — byeastside label pulled back before pick · order ${order.id}`, order.id]);
+      out.costReversed = paid;
+    }
+  } catch { /* leave costReversed 0 */ }
+  if (order.seller_id) {
+    try {
+      const res = await refundOrder({ orderId: order.id, select: ['expedite'], full: true,
+        note: `Expedited dispatch cancelled · order ${order.id}`, by, clientId: `expedite-cancel-${order.id}` });
+      if (res && res.ok) out.feeRefunded = res.refunded || 0;
+    } catch { /* leave feeRefunded 0 */ }
+  }
+  return out;
+}
 import { egBroadcast } from '../events.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll as readSettings } from './factory_settings.js';
@@ -406,8 +449,9 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     if (!ids.length) { reply.code(400); return { error: 'orderIds required' }; }
 
     const rows = (await q(
-      'select id, dispatch_pdf_id, label_scanned_at, tracking from orders where id = any($1)', [ids]
+      'select id, dispatch_pdf_id, label_scanned_at, tracking, seller_id from orders where id = any($1)', [ids]
     )).rows;
+    const by = (req.user && (req.user.email || req.user.sub)) || 'dispatch-cancel';
 
     const results = [];
     for (const o of rows) {
@@ -426,7 +470,9 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         continue;
       }
       await q('update orders set dispatch_pdf_id=null where id=$1', [o.id]).catch(() => {});
-      results.push({ id: o.id, ok: true });
+      // Pull the money back: reverse the byeastside cost + refund the seller's expedite fee.
+      const credited = await reverseExpediteOnCancel(o, by);
+      results.push({ id: o.id, ok: true, ...credited });
     }
 
     const cancelled = results.filter((x) => x.ok).length;
@@ -474,7 +520,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       `select
          coalesce(sum(delta) filter (where type='expedite-in'), 0)::float   as revenue,
          coalesce(sum(-delta) filter (where type='expedite-cost'), 0)::float as cost,
-         count(*) filter (where type='expedite-cost')::int                   as labels
+         count(*) filter (where type='expedite-cost' and delta < 0)::int     as labels
        from wallet_ledger
        where account='factory' and created_at >= ${since}`
     ).catch(() => ({ rows: [{}] }))).rows[0] || {};
