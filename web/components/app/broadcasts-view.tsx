@@ -235,6 +235,41 @@ function EmailBrandingCard() {
   )
 }
 
+// The email as a seller will actually receive it: the saved branding chrome (accent, logo/
+// wordmark, footer) wrapped around the draft's body. Same chrome as the branding preview,
+// but populated with the real copy so you compose against the finished layout — not a bare
+// textarea. `branding` may be null while it loads; a sane default keeps the preview stable.
+function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | null; body: string }) {
+  const b = branding ?? { preset: "branded", accent: "#604cfa", logoUrl: "", heading: "egfulfill", footerNote: "" }
+  const paras = body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
+  return (
+    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+      {b.preset === "branded" && <div className="h-1" style={{ background: b.accent }} />}
+      <div className="px-5 py-4" style={b.preset === "bold" ? { background: b.accent } : undefined}>
+        {b.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={b.logoUrl} alt="" className="h-8 max-w-[11rem] object-contain" />
+        ) : (
+          <span className="text-2xl font-semibold tracking-tight"
+            style={{ color: b.preset === "bold" ? "#ffffff" : "#0b0b0c", fontFamily: "Georgia, 'Times New Roman', serif" }}>
+            {b.heading || "egfulfill"}
+          </span>
+        )}
+      </div>
+      <div className="px-5 pb-4 text-sm text-zinc-700">
+        <p className="mb-2">Hi Alex,</p>
+        {paras.length
+          ? paras.map((p, i) => <p key={i} className="mb-2 whitespace-pre-line">{p}</p>)
+          : <p className="text-zinc-400">Your message appears here…</p>}
+      </div>
+      <div className="border-t border-zinc-200 px-5 py-3 text-[11px] leading-relaxed text-zinc-400">
+        {b.footerNote && <p className="mb-1.5 text-zinc-500">{b.footerNote}</p>}
+        <p>You&apos;re receiving this because you have an EGFULFILL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
+      </div>
+    </div>
+  )
+}
+
 /**
  * Seller email broadcasts.
  *
@@ -245,6 +280,7 @@ function EmailBrandingCard() {
 export function BroadcastsView() {
   const [rows, setRows] = useState<Broadcast[]>([])
   const [mailOk, setMailOk] = useState(true)
+  const [branding, setBranding] = useState<EmailBranding | null>(null) // saved branding, for the editor preview
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [role, setRole] = useState("")
@@ -273,7 +309,11 @@ export function BroadcastsView() {
   }, [])
 
   useEffect(() => {
-    const id = setTimeout(() => { setRole(getUser()?.role || ""); load() }, 0)
+    const id = setTimeout(() => {
+      setRole(getUser()?.role || ""); load()
+      // Load the saved branding so the editor can preview the finished email.
+      getEmailBranding().then((r) => setBranding(r.branding)).catch(() => {})
+    }, 0)
     return () => clearTimeout(id)
   }, [load])
 
@@ -439,13 +479,14 @@ export function BroadcastsView() {
 
       {/* ── Editor ────────────────────────────────────────────────────────── */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit draft" : "New broadcast"}</DialogTitle>
             <DialogDescription>
               Written as plain text. An unsubscribe footer is added automatically — it is required, so it is not optional here.
             </DialogDescription>
           </DialogHeader>
+          <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">Subject</label>
@@ -485,6 +526,17 @@ export function BroadcastsView() {
                 </p>
               </div>
             </div>
+          </div>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Preview</span>
+              <span className="text-[11px] text-muted-foreground">Your saved branding</span>
+            </div>
+            <div className="mb-2 truncate text-xs text-muted-foreground">Subject: <span className="font-medium text-foreground">{subject || "…"}</span></div>
+            <div className="max-h-[52vh] overflow-y-auto">
+              <BrandedEmailPreview branding={branding} body={body} />
+            </div>
+          </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
