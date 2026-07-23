@@ -48,6 +48,11 @@ export function DispatchBoard() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [q, setQ] = useState("")
+  // Two views of the same board: what's waiting to go out, and what already went. The
+  // second is a read-only history — "did this order actually get scanned?" was a question
+  // that could only be answered by leaving for the Shipments page, so the floor now has it
+  // where the scan happens.
+  const [view, setView] = useState<"queue" | "scanned">("queue")
 
   const load = useCallback(() => {
     if (!getUser()) { setOrders([]); return }
@@ -75,6 +80,19 @@ export function DispatchBoard() {
     if (!term) return all
     return all.filter((o) =>
       [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
+  }, [orders, q])
+
+  // The "Scanned" history. Any order carrying a label_scanned_at has been scanned —
+  // here or by byeastside — whatever stage it has since moved on to, so this reads the
+  // timestamp rather than the current factory_status (which the order leaves behind).
+  const scanned = useMemo(() => {
+    const all = (orders ?? []).filter((o) => o.label_scanned_at)
+    const term = q.trim().toLowerCase()
+    const list = term
+      ? all.filter((o) => [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
+      : all
+    // Most-recently scanned first — the last handover is the one someone's asking about.
+    return [...list].sort((a, b) => String(b.label_scanned_at).localeCompare(String(a.label_scanned_at)))
   }, [orders, q])
 
   // A label is what makes an order dispatchable. Without one there is nothing to scan, so
@@ -371,7 +389,7 @@ export function DispatchBoard() {
         description={canScanOut
           ? "Labelled and waiting to be scanned. Print the batch, scan it, then move it into production."
           : "Labelled and waiting to be scanned. You can print and pull labels back; warehouse and admin scan the batch out."}
-        actions={
+        actions={view === "scanned" ? undefined : (
           <div className="flex flex-wrap items-center gap-2">
             {/* PRINT / documents — grouped: manifest, labels, and (when scanning out) the
                 USPS SCAN form. All are "produce a document" actions, none touch the scan. */}
@@ -427,14 +445,32 @@ export function DispatchBoard() {
               </Button>
             )}
           </div>
-        }
+        )}
       >
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+          {/* Awaiting-scan vs. scanned history. Kept as a segmented toggle rather than a
+              second page so the search box and stat cards above stay put. */}
+          <div className="inline-flex shrink-0 rounded-lg border border-border p-0.5 text-sm">
+            <button
+              onClick={() => setView("queue")}
+              className={"rounded-md px-3 py-1 font-medium transition-colors " + (view === "queue" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              Awaiting scan
+            </button>
+            <button
+              onClick={() => setView("scanned")}
+              className={"rounded-md px-3 py-1 font-medium transition-colors " + (view === "scanned" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              Scanned{scanned.length ? ` · ${scanned.length}` : ""}
+            </button>
+          </div>
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search order, customer or tracking…" className="h-9 max-w-xs" />
-          {chosen.length > 0 && <span className="text-xs text-muted-foreground">{chosen.length} in this batch</span>}
-          <Button size="sm" variant="outline" disabled={!withLabel.length} onClick={toggleAll}>
-            {picked.size === withLabel.length && withLabel.length ? "Clear selection" : `Select all ${withLabel.length}`}
-          </Button>
+          {view === "queue" && chosen.length > 0 && <span className="text-xs text-muted-foreground">{chosen.length} in this batch</span>}
+          {view === "queue" && (
+            <Button size="sm" variant="outline" disabled={!withLabel.length} onClick={toggleAll}>
+              {picked.size === withLabel.length && withLabel.length ? "Clear selection" : `Select all ${withLabel.length}`}
+            </Button>
+          )}
         </div>
 
         {err && (
@@ -443,7 +479,54 @@ export function DispatchBoard() {
           </div>
         )}
 
-        {queue.length === 0 ? (
+        {view === "scanned" ? (
+          scanned.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+              <CheckCircle size={26} weight="duotone" className="opacity-50" />
+              <div className="text-sm font-medium text-foreground">Nothing scanned yet</div>
+              <div className="text-xs">Orders show here once they&apos;ve been scanned — here or by byeastside.</div>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {scanned.map((o) => {
+                const via = (o as { scanned_via?: string | null }).scanned_via
+                const when = o.label_scanned_at
+                  ? new Date(o.label_scanned_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+                  : ""
+                return (
+                  <div key={o.id} className="flex items-center gap-3 px-5 py-3">
+                    <CheckCircle size={16} weight="fill" className="shrink-0 text-emerald-500" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
+                        <span className="truncate text-sm">{customerOf(o)}</span>
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
+                          {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
+                        </span>
+                        {when && <span>Scanned {when}</span>}
+                        {via && <span className="rounded bg-muted px-1.5 py-0.5">{via === "byeastside" ? "byeastside" : "in-house"}</span>}
+                      </div>
+                    </div>
+                    {o.tracking && (
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">{o.tracking}</span>
+                    )}
+                    {o.tracking_label_url && (
+                      <a
+                        href={o.tracking_label_url} target="_blank" rel="noopener noreferrer"
+                        className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        aria-label={`Open label for ${numOf(o)}`}
+                      >
+                        <ArrowSquareOut size={13} weight="bold" />
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        ) : queue.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
             <Truck size={26} weight="duotone" className="opacity-50" />
             <div className="text-sm font-medium text-foreground">Nothing waiting to go out</div>
