@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { getOrders, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
-import { canSetStage } from "@/lib/factory-status"
+import { canSetStage, canWalk, stagePath } from "@/lib/factory-status"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
 
 /**
@@ -153,6 +153,11 @@ export function DispatchBoard() {
     if (!chosen.length) return
     setBusy(true); setErr(null)
     const failed: string[] = []
+    // The pipeline is awaiting_scan → printed → working, so a scan advances TWO stages.
+    // The server refuses a two-stage jump one hop at a time (skip guard), so record each
+    // stage on the way — "printed" is the label-paperwork step, done by the time a parcel
+    // is scanned. Falls back to a single move if the pipeline ever makes them adjacent.
+    const path = stagePath(STAGE, NEXT) ?? [NEXT]
     for (const o of chosen) {
       try {
         // RECORD THE SCAN ITSELF, not just the stage move. These are two different facts
@@ -165,8 +170,13 @@ export function DispatchBoard() {
         // Best-effort: an order whose scan won't record must still advance, because the
         // parcel has physically been scanned either way.
         await markScannedInHouse(o.id).catch(() => {})
-        for (const it of o.items ?? []) {
-          if (it.sku || it.line_id) await postItemStatus(o.id, it.sku ?? "", NEXT, it.line_id)
+        // Walk the stages in order: every item to "printed", then every item to "working".
+        // Each hop is validated against the item's CURRENT stage, so the second hop only
+        // passes because the first already moved it — teleporting straight to working 403s.
+        for (const stage of path) {
+          for (const it of o.items ?? []) {
+            if (it.sku || it.line_id) await postItemStatus(o.id, it.sku ?? "", stage, it.line_id)
+          }
         }
         await updateOrder(o.id, { factoryStatus: NEXT })
       } catch { failed.push(numOf(o)) }
@@ -334,7 +344,12 @@ export function DispatchBoard() {
     w.print()
   }
 
-  const canAdvance = canSetStage(role, STAGE, NEXT)
+  // awaiting_scan → working is TWO steps in the pipeline ("printed" sits between), so it's a
+  // skip, and stageDenial refuses a skip for EVERYONE — which greyed "Scanned here" out for
+  // every role, always, however an order was selected. The scan doesn't teleport past
+  // printed; it WALKS it (markScanned below), so the gate is "can this role walk there" —
+  // true for warehouse/admin, still false for an operator whose zone ends at the scan.
+  const canAdvance = canSetStage(role, STAGE, NEXT) || canWalk(role, STAGE, NEXT)
   const [manifestOpen, setManifestOpen] = useState(false)
   // Mirrors the server's eligibility rules (lib/manifest-eligible.ts) so the button can
   // say why before the click rather than after.
