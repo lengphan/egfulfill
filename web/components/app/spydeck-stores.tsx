@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { MagnifyingGlass, Heart, Storefront, Star, ArrowLeft, ArrowSquareOut, CircleNotch, Package } from "@phosphor-icons/react"
 import {
@@ -101,6 +101,17 @@ export function StoresTab(h: Handlers) {
       setError(e instanceof Error ? e.message : "Category search failed."); setShops([])
     } finally { setLoading(false) }
   }, [])
+
+  // Suggest shops by default: once the category list arrives, auto-load the FIRST category's
+  // shops (once) — so the tab opens with competitors to browse instead of a blank prompt.
+  // The seller can switch categories or search a name from there.
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (autoRan.current || !categories.length || query.trim() || shops) return
+    autoRan.current = true
+    const id = setTimeout(() => byCategory(String(categories[0].id)), 0)
+    return () => clearTimeout(id)
+  }, [categories, query, shops, byCategory])
 
   useEffect(() => {
     let alive = true
