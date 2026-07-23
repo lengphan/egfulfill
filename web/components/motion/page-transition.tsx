@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation"
 import type { ReactNode } from "react"
 
 /**
- * Subtle per-route entrance for the app shell: content fades + rises a touch on
- * each navigation. Keyed on pathname so it re-fires when the route changes.
- * Honors prefers-reduced-motion (fade only). Kept short so pages feel fast.
+ * Subtle per-route entrance: a quick OPACITY-only fade on each navigation. Keyed on
+ * pathname so it re-fires when the route changes. Deliberately no vertical shift and a
+ * short duration — the old fade+rise (y:10, 0.32s) read as the page "jumping" on every
+ * nav, especially while the page was still fetching, which felt like flicker/jank.
+ * Honors prefers-reduced-motion (instant).
  */
 export function PageTransition({ children }: { children: ReactNode }) {
   const reduce = useReducedMotion()
@@ -15,9 +17,9 @@ export function PageTransition({ children }: { children: ReactNode }) {
   return (
     <motion.div
       key={pathname}
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.32, ease: [0.21, 0.5, 0.28, 1] }}
+      initial={{ opacity: reduce ? 1 : 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: reduce ? 0 : 0.14, ease: "easeOut" }}
     >
       {children}
     </motion.div>

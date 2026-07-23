@@ -24,12 +24,15 @@ export function StaffSidebar() {
       const u = getUser()
       const r = u?.role ?? ""
       setRole(r)
-      // Filter by the admin-set hide-map (HIDE-only — never adds a page the role can't see).
-      loadNavVisibility().then(() => {
+      // Draw IMMEDIATELY (isSurfaceHidden falls back to defaults before the map loads — no
+      // empty-nav flash), then refine once any admin overrides arrive. HIDE-only throughout.
+      const apply = () => {
         if (!alive) return
         setItems(staffNav(r).filter((i) => !isSurfaceHidden(r, i.href)))
         setTools(staffTools(r).filter((i) => !isSurfaceHidden(r, i.href)))
-      })
+      }
+      apply()
+      loadNavVisibility().then(apply)
     }, 0)
     return () => { alive = false; clearTimeout(id) }
   }, [])
