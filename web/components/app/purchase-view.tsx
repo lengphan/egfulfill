@@ -1175,13 +1175,13 @@ export function PurchaseView() {
                     {!g.api && (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">order by hand</span>
                     )}
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {g.lines.length} line{g.lines.length === 1 ? "" : "s"} · {g.lines.reduce((s, l) => s + num(l.qty), 0)} units
-                      {g.total > 0 ? ` · ${usd(g.total)}` : ""}
+                    <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{g.lines.length} line{g.lines.length === 1 ? "" : "s"} · {g.lines.reduce((s, l) => s + num(l.qty), 0)} units</span>
+                      {g.total > 0 && <span className="text-sm font-semibold tabular-nums text-foreground">{usd(g.total)}</span>}
                     </span>
                   </div>
                   {g.lines.map((l) => (
-                    <div key={l.sku} className="flex items-start gap-3 px-5 py-2.5">
+                    <div key={l.sku} className="flex items-start gap-4 px-5 py-3">
                       <LineThumb src={l.image ?? supByS[l.sku]?.image} onZoom={(src, label) => setZoom({ src, label })}
                         label={[l.name || l.sku, l.variant].filter(Boolean).join(" · ")} />
                       <div className="min-w-0 flex-1">
@@ -1191,15 +1191,34 @@ export function PurchaseView() {
                           <span className="ml-1.5 font-mono opacity-70">{l.sku}</span>
                         </div>
                         <SourceTags line={l} />
-                        {/* WHERE the stock is, nearest first. S&S split a line across
-                            warehouses when one can't fill it, so "in stock" can mean three
-                            boxes on three days — green marks a warehouse that can send the
-                            whole line in one. */}
+                        {/* The split warning stays with the product text — it's about the
+                            line as a whole, not a control. The quantity inputs move out to
+                            their own column (below). */}
                         {g.api === "ss" && stock[l.sku] && (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-3 sm:gap-4">
-                            {stock[l.sku].warehouses.filter((w) => w.qty > 0).length === 0 ? (
-                              <span className="text-[11px] font-medium text-destructive">No stock in any warehouse</span>
-                            ) : stock[l.sku].warehouses
+                          <StockSplitWarning
+                            qty={num(l.qty)} stock={stock[l.sku]} transit={transit} now={now || Date.now()}
+                            onReduce={(q) => setSavedQty(l.sku, q)}
+                            onSaveForLater={() => putSaved(saved.filter((x) => x.sku !== l.sku))}
+                          />
+                        )}
+                      </div>
+                      {/* QTY SLOTS — their own column, BETWEEN the product and the price, so
+                          the numbers you type read as a column of their own instead of being
+                          stacked under the name. Each box STACKS four facts — how many to
+                          take, the warehouse code, its stock, and the arrival date — because
+                          laid out in a row they read as one run-on line.
+                            • S&S  → one box per warehouse, nearest first (blank = let S&S
+                                     split it; typing turns the line into a manual split, and
+                                     the line qty follows the sum of the boxes).
+                            • Otto → a single box (their inventory is per-sku, no warehouse).
+                            • else → one plain box (a manual line, or S&S before stock loads),
+                                     the sole quantity control in that case. */}
+                      <div className="flex shrink-0 flex-wrap items-start justify-end gap-3 sm:gap-4">
+                        {g.api === "ss" && stock[l.sku] ? (
+                          stock[l.sku].warehouses.filter((w) => w.qty > 0).length === 0 ? (
+                            <span className="self-center text-[11px] font-medium text-destructive">No stock in any warehouse</span>
+                          ) : (
+                            stock[l.sku].warehouses
                               .filter((w) => w.qty > 0)
                               .sort((a, b) => (transit[a.abbr]?.days ?? 99) - (transit[b.abbr]?.days ?? 99))
                               .slice(0, 5)
@@ -1210,36 +1229,13 @@ export function PurchaseView() {
                                 const key = `${l.sku}:${w.abbr}`
                                 const taken = split[key] ?? ""
                                 return (
-                                  /* STACKED, not a strip. Four facts per warehouse — code,
-                                     stock, arrival date and how many to take — read as one
-                                     run-on line when laid out horizontally, and the input
-                                     was the only thing that looked interactive so the rest
-                                     read as decoration.
-                                     No green fill: covering the line is worth marking but it
-                                     is not a success state, and a row of green pills next to
-                                     an amber total reads as an alarm about nothing. The
-                                     covering warehouse gets a ring in the theme's own accent
-                                     instead. */
                                   <label key={w.abbr}
                                     title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : " — not enough for this line on its own"}`}
-                                    // No border, no fill. The input inside already draws its
-                                    // own outline, so the chip's border was a box around a
-                                    // box — five of them across a row built a grid nobody
-                                    // asked for, and it fought the page's own edges. Which
-                                    // warehouse can cover the line alone is carried by the
-                                    // code's weight and stays in the tooltip.
-                                    className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 px-1.5 py-1.5">
-                                    {/* Take THIS many from THIS warehouse. Blank means "no
-                                        preference", which is the default and leaves S&S to
-                                        split the line as before — typing anywhere turns the
-                                        whole line into a manual split. Capped at what the
-                                        warehouse actually holds, because asking for more
-                                        than exists is a rejection S&S can only find later. */}
-                                    {/* The shared Input, not a hand-rolled one. The pill
-                                        shape and the violet focus ring belong to the
-                                        primitive; copying its classes here would look
-                                        identical today and drift the first time the theme
-                                        moves. */}
+                                    className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1">
+                                    {/* Shared Input primitive — pill shape + violet focus ring
+                                        come from the theme, so they can't drift. Capped at the
+                                        warehouse's stock; over-asking is a rejection S&S only
+                                        find later. */}
                                     <Input
                                       value={taken}
                                       onChange={(e) => {
@@ -1247,11 +1243,6 @@ export function PurchaseView() {
                                         const capped = v === "" ? "" : String(Math.min(Number(v), w.qty))
                                         const next = { ...split, [key]: capped }
                                         setSplit(next)
-                                        // THE PICKS ARE THE QUANTITY. The header read "5 of 0
-                                        // picked · 5 over" because the line's own qty stayed
-                                        // where it was while the splits moved — two numbers
-                                        // for one fact, disagreeing. Choosing per warehouse
-                                        // IS choosing how many, so the line follows the sum.
                                         const sum = stock[l.sku].warehouses
                                           .reduce((a, x) => a + Number(next[`${l.sku}:${x.abbr}`] || 0), 0)
                                         if (sum > 0) setSavedQty(l.sku, sum)
@@ -1259,84 +1250,54 @@ export function PurchaseView() {
                                       placeholder="0"
                                       inputMode="numeric"
                                       aria-label={`Quantity to take from ${w.abbr}`}
-                                      className="h-7 w-full px-1 text-center text-xs tabular-nums"
+                                      className="h-8 w-full px-1 text-center text-sm tabular-nums"
                                     />
                                     <span className="flex items-baseline gap-1 text-[11px] leading-none">
                                       <span className={covers ? "font-semibold text-foreground" : "font-medium text-muted-foreground"}>{w.abbr}</span>
                                       <span className="tabular-nums text-muted-foreground">{w.qty}</span>
                                     </span>
-                                    {/* Always rendered, so the chips stay the same height and
-                                        the row doesn't comb up and down. Says which of the
-                                        two it is rather than leaving a gap. */}
                                     <span className="text-[10px] leading-none text-muted-foreground">
                                       {eta.deliveryAt ? fmtEta(eta.deliveryAt) : "no ETA"}
                                     </span>
                                   </label>
                                 )
-                              })}
-                            {/* The "N of M picked" chip is gone. It existed to catch a
-                                mismatch between the picks and the line quantity — but the
-                                line now FOLLOWS the sum of the picks, so the two can no
-                                longer disagree and the chip could only ever say "5 of 5".
-                                A readout that can only report agreement is decoration. */}
-                          </div>
-                        )}
-                        {/* OTTO: one source, so one chip — same shape as the S&S ones so the
-                            two suppliers don't read as two different products. No warehouse
-                            code and no ETA, because Otto's inventory is per-sku and tells us
-                            neither; inventing a placeholder for them would imply we asked
-                            and got nothing back. */}
-                        {g.api === "otto" && (
-                          <div className="mt-1.5 flex flex-wrap items-start gap-1.5">
-                            <label
-                              title={ottoStock[l.sku] == null
-                                ? "Otto didn't return a stock figure we could read"
-                                : `${ottoStock[l.sku]} available from Otto`}
-                              className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 px-1.5 py-1.5">
-                              <Input
-                                value={String(num(l.qty) || "")}
-                                onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                                placeholder="0"
-                                inputMode="numeric"
-                                aria-label={`Quantity to order from Otto for ${l.sku}`}
-                                className="h-7 w-full px-1 text-center text-xs tabular-nums"
-                              />
-                              <span className="text-[11px] font-medium leading-none">Otto</span>
-                              {/* Says which of the two it is. A blank or a 0 here would both
-                                  read as "none in stock", and one of them would be a lie. */}
-                              <span className="text-[10px] leading-none text-muted-foreground">
-                                {ottoStock[l.sku] == null ? "stock unknown" : `${ottoStock[l.sku]} avail`}
-                              </span>
-                            </label>
-                          </div>
-                        )}
-                        {g.api === "ss" && stock[l.sku] && (
-                          <StockSplitWarning
-                            qty={num(l.qty)} stock={stock[l.sku]} transit={transit} now={now || Date.now()}
-                            onReduce={(q) => setSavedQty(l.sku, q)}
-                            onSaveForLater={() => putSaved(saved.filter((x) => x.sku !== l.sku))}
+                              })
+                          )
+                        ) : g.api === "otto" ? (
+                          <label
+                            title={ottoStock[l.sku] == null
+                              ? "Otto didn't return a stock figure we could read"
+                              : `${ottoStock[l.sku]} available from Otto`}
+                            className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1">
+                            <Input
+                              value={String(num(l.qty) || "")}
+                              onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                              placeholder="0"
+                              inputMode="numeric"
+                              aria-label={`Quantity to order from Otto for ${l.sku}`}
+                              className="h-8 w-full px-1 text-center text-sm tabular-nums"
+                            />
+                            <span className="text-[11px] font-medium leading-none">Otto</span>
+                            <span className="text-[10px] leading-none text-muted-foreground">
+                              {ottoStock[l.sku] == null ? "stock unknown" : `${ottoStock[l.sku]} avail`}
+                            </span>
+                          </label>
+                        ) : (
+                          <Input
+                            value={String(num(l.qty))}
+                            onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                            inputMode="numeric" className="h-8 w-20 text-center text-sm tabular-nums"
+                            aria-label={`Quantity of ${l.sku}`}
                           />
                         )}
                       </div>
-                      {/* The standalone qty box is shown ONLY when nothing else can set the
-                          quantity: a manual/unassigned line, or an S&S line whose stock
-                          hasn't loaded. For S&S (warehouse boxes) and Otto (their own box)
-                          the quantity is already driven there, and a second box would
-                          re-open the "two numbers for one fact" disagreement the
-                          per-warehouse picks were written to close. */}
-                      {!(g.api === "ss" && stock[l.sku]) && g.api !== "otto" && (
-                        <Input
-                          value={String(num(l.qty))}
-                          onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                          inputMode="numeric" className="h-8 w-20 self-start text-center"
-                          aria-label={`Quantity of ${l.sku}`}
-                        />
-                      )}
-                      <span className="w-20 text-right text-xs tabular-nums text-muted-foreground">
-                        {num(l.price) ? usd(num(l.price) * num(l.qty)) : "—"}
+                      {/* Line total — foreground weight so the money reads at a glance rather
+                          than hiding as muted micro-text. */}
+                      <span className="w-24 shrink-0 self-center text-right text-sm font-semibold tabular-nums">
+                        {num(l.price) ? usd(num(l.price) * num(l.qty)) : <span className="font-normal text-muted-foreground">—</span>}
                       </span>
                       <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))}
-                        className="text-muted-foreground hover:text-red-600" title="Drop — not ordering this">
+                        className="self-center text-muted-foreground hover:text-red-600" title="Drop — not ordering this">
                         <Trash size={14} />
                       </button>
                     </div>
