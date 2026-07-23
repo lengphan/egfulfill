@@ -23,6 +23,11 @@ type Handlers = {
 const fmtK = (n: number | null | undefined) =>
   n == null ? "—" : n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(n)
 
+const priceStr = (l: EtsyListing) =>
+  l.price_usd != null ? `$${Number(l.price_usd).toFixed(2)}`
+    : l.price != null ? `${l.currency === "USD" ? "$" : ""}${l.price}${l.currency && l.currency !== "USD" ? " " + l.currency : ""}`
+      : ""
+
 function ShopCard({ s, saved, onToggle, onOpen }: { s: SpyShop; saved: boolean; onToggle: (s: SpyShop) => void; onOpen: (s: SpyShop) => void }) {
   return (
     <div className="flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
@@ -72,6 +77,10 @@ export function StoresTab(h: Handlers) {
   const [open, setOpen] = useState<SpyShop | null>(null)
   const [catalog, setCatalog] = useState<EtsyListing[] | null>(null)
   const [catLoading, setCatLoading] = useState(false)
+  // Catalog presentation: image-first Gallery (fast visual scan of a competitor) vs the full
+  // Details cards (with save / make-product). Gallery is the default — it's what you open a
+  // competitor's shop to do.
+  const [catView, setCatView] = useState<"gallery" | "cards">("gallery")
   // Category discovery — suggest shops selling in a category (vs searching a name).
   const [categories, setCategories] = useState<EtsyCategory[]>([])
   const [catId, setCatId] = useState("")
@@ -143,13 +152,41 @@ export function StoresTab(h: Handlers) {
             <span className="text-sm font-semibold">{open.shop_name}</span>
             <span className="text-xs text-muted-foreground">{fmtK(open.listings)} products</span>
           </div>
-          {open.url && <a href={open.url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">Open on Etsy <ArrowSquareOut size={12} /></a>}
+          {/* Gallery (image-first, for scanning) vs Details (full cards with save / make). */}
+          <div className="ml-auto flex items-center gap-1 rounded-full bg-muted p-1">
+            {(["gallery", "cards"] as const).map((v) => (
+              <button key={v} type="button" onClick={() => setCatView(v)}
+                className={"rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (catView === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                {v === "gallery" ? "Gallery" : "Details"}
+              </button>
+            ))}
+          </div>
+          {open.url && <a href={open.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">Open on Etsy <ArrowSquareOut size={12} /></a>}
         </div>
         {catLoading ? (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-[320px] animate-pulse rounded-2xl bg-muted" />)}
           </div>
-        ) : (catalog && catalog.length) ? (
+        ) : !(catalog && catalog.length) ? (
+          <div className="py-16 text-center text-sm text-muted-foreground">No active listings returned for this shop.</div>
+        ) : catView === "gallery" ? (
+          // Image-first: big photos, price overlay, title beneath — click through to Etsy.
+          <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {catalog.map((l) => (
+              <a key={l.listing_id} href={l.url} target="_blank" rel="noopener noreferrer" className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-md">
+                <div className="relative aspect-square overflow-hidden bg-muted">
+                  {(l.thumb || l.image) ? (
+                    <Image src={l.thumb || l.image || ""} alt={l.title} fill unoptimized sizes="(max-width:640px) 50vw, 20vw" className="object-cover transition-transform duration-300 group-hover:scale-105" />
+                  ) : (
+                    <span className="flex size-full items-center justify-center text-muted-foreground"><Package size={20} weight="duotone" /></span>
+                  )}
+                  {priceStr(l) && <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-white">{priceStr(l)}</span>}
+                </div>
+                <div className="line-clamp-1 px-2 py-1.5 text-[11px] leading-tight text-muted-foreground">{l.title}</div>
+              </a>
+            ))}
+          </div>
+        ) : (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {catalog.map((l) => (
               <ResultCard
@@ -160,8 +197,6 @@ export function StoresTab(h: Handlers) {
               />
             ))}
           </div>
-        ) : (
-          <div className="py-16 text-center text-sm text-muted-foreground">No active listings returned for this shop.</div>
         )}
       </div>
     )
