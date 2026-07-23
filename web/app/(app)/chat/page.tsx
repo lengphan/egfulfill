@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -145,6 +145,15 @@ export default function ChatPage() {
 
   const active = useMemo(() => convos.find((c) => c.id === activeId) ?? null, [convos, activeId])
   const isSupport = active?.kind === "support" // AI auto-reply only on the seller support thread
+
+  // The moment a human takes over from the assistant — shown ONCE as a divider so the
+  // handoff is unmistakable (standard live-chat pattern). It's the first message in the
+  // thread from a real teammate: not the seller, not the assistant, not an internal brief.
+  const joinAt = useMemo(() => {
+    if (!isSupport || !messages) return null
+    const h = messages.find((x) => { const r = x.role ?? "seller"; return r !== "seller" && r !== "assistant" && !x.internal })
+    return h ? { id: String(h.id), by: h.by || "A teammate" } : null
+  }, [isSupport, messages])
   const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
   // Announcements are a broadcast, not a conversation — the server 403s a non-admin
   // write, so the composer must say so rather than letting the send fail silently.
@@ -204,9 +213,14 @@ export default function ChatPage() {
     setSending(true)
     setInput("")
     const clientId = `c-${cidBase.current}-${cidSeq.current++}`
-    setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: nowMs() }])
+    // Staff post as 'staff', NOT the default 'seller' — otherwise a human's reply is stored
+    // with the seller's role and shows up on the seller's side as if they'd sent it, so the
+    // seller can't tell a person has answered. A distinct role puts it on the support side
+    // with the sender's name.
+    const myRole = isStaffUser ? "staff" : "seller"
+    setMessages((prev) => [...(prev ?? []), { id: clientId, role: myRole, by: myName, text, ts: nowMs() }])
     try {
-      await postOrderMessage(activeId, text, { clientId, by: myName })
+      await postOrderMessage(activeId, text, { clientId, by: myName, role: myRole })
       await load()
       // Only the Support thread gets an AI reply; order threads are seller↔factory.
       if (isSupport) {
@@ -417,7 +431,17 @@ export default function ChatPage() {
           ) : (
             <>
               {messages.map((m) => {
-                const mine = (m.role ?? "seller") === "seller"
+                // In the support thread the SELLER is on one side and the SUPPORT side
+                // (assistant + human staff) on the other, whichever end is viewing — so a
+                // teammate's reply is never mistaken for the seller's own message. Other
+                // channels keep the plain seller-on-the-right convention.
+                const role = m.role ?? "seller"
+                const mine = isSupport
+                  ? (isStaffUser ? role !== "seller" : role === "seller")
+                  : role === "seller"
+                const isAi = role === "assistant"
+                // The one-time "a human joined" divider goes right before their first message.
+                const joined = joinAt && String(m.id) === joinAt.id ? joinAt.by : null
                 // The AI order brief. Only staff ever receive it (the server filters
                 // internal messages out of a seller's read), and it's styled as a
                 // note rather than a bubble so nobody mistakes it for something the
@@ -433,27 +457,38 @@ export default function ChatPage() {
                   </div>
                 )
                 return (
-                  <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
-                    <div className={"max-w-[75%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "whitespace-pre-wrap bg-primary text-primary-foreground" : "bg-muted")}>
-                      {/* The assistant answers in markdown, so rendering it as plain text
-                          showed literal ** around every bold phrase. Own messages stay
-                          verbatim — a seller typing *asterisks* meant them. */}
-                      {mine ? m.text : <Markdown>{m.text ?? ""}</Markdown>}
-                    </div>
-                    <span className="mt-0.5 flex items-center gap-1.5 px-1 text-[10px] text-muted-foreground">
-                      {m.orderRef && (
-                        // Which order this is about — the context the per-order
-                        // channels used to carry in their name.
-                        <a href={`/orders/${m.orderRef}`} className="rounded-full bg-muted px-1.5 py-0.5 font-medium hover:underline">
-                          <Package size={9} weight="duotone" className="mr-0.5 inline" />{m.orderRef}
-                        </a>
-                      )}
-                      <span>
-                        {!mine ? `${m.by || (isSupport ? "Support" : "Factory")} · ` : ""}
-                        {fmtTime(m.ts)}
+                  <Fragment key={String(m.id)}>
+                    {joined && (
+                      <div className="my-1.5 flex items-center gap-2 px-1 text-[11px] font-medium text-muted-foreground">
+                        <span className="h-px flex-1 bg-border" />
+                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+                          <Headset size={12} weight="fill" /> {joined} joined the conversation
+                        </span>
+                        <span className="h-px flex-1 bg-border" />
+                      </div>
+                    )}
+                    <div className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
+                      <div className={"max-w-[75%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "whitespace-pre-wrap bg-primary text-primary-foreground" : "bg-muted")}>
+                        {/* The assistant answers in markdown, so rendering it as plain text
+                            showed literal ** around every bold phrase. Own messages stay
+                            verbatim — a seller typing *asterisks* meant them. */}
+                        {mine ? m.text : <Markdown>{m.text ?? ""}</Markdown>}
+                      </div>
+                      <span className="mt-0.5 flex items-center gap-1.5 px-1 text-[10px] text-muted-foreground">
+                        {m.orderRef && (
+                          // Which order this is about — the context the per-order
+                          // channels used to carry in their name.
+                          <a href={`/orders/${m.orderRef}`} className="rounded-full bg-muted px-1.5 py-0.5 font-medium hover:underline">
+                            <Package size={9} weight="duotone" className="mr-0.5 inline" />{m.orderRef}
+                          </a>
+                        )}
+                        <span>
+                          {!mine ? `${m.by || (isAi ? "EGFULFILL Assistant" : isSupport ? "Support" : "Factory")} · ` : ""}
+                          {fmtTime(m.ts)}
+                        </span>
                       </span>
-                    </span>
-                  </div>
+                    </div>
+                  </Fragment>
                 )
               })}
               {aiTyping && !streaming && (
