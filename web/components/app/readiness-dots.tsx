@@ -131,10 +131,11 @@ function Tag({ id, label, state, title, orderId, status, files, dot }: {
         onMouseLeave={closeLater}
         onFocus={openNow}
         className={"eg-tap inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors " + (dot
-          // A padded chip, not bare text — the dot+word alone gave almost no hit area, so
-          // hovering/tapping the right tag on a dense board was fiddly. Padding + a hover
-          // fill make each an obvious, comfortable target.
-          ? "rounded-md px-2 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          // A VISIBLE bordered chip, not bare text — the dot+word alone gave almost no hit
+          // area and read as decoration, so on a dense board the right tag was hard to see
+          // and fiddly to hit. A resting border + fill make each an obvious, comfortable
+          // target; the dot still carries progress (grey/amber/violet).
+          ? "rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground"
           : "rounded-md px-2.5 py-1 text-xs font-semibold " + cls)}
       >
         {dot && <span className={"size-2.5 shrink-0 rounded-full " + dotCls} />}
