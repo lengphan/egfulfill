@@ -74,3 +74,16 @@ export function useT() {
     return s.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? String(vars[k]) : `{${k}}`))
   }, [locale])
 }
+
+// Translate a value whose identity IS its English string — nav labels, section
+// headings, status words that live in data modules. Looks up `${ns}.${value}` and
+// falls back to the VALUE itself (not the key), so English needs no catalog entry and a
+// missing translation shows the original English. Keeps the data modules untranslated:
+// only the render site calls this.
+export function useLabelT() {
+  const { locale } = useLocale()
+  return useCallback((ns: string, value: string) => {
+    const key = `${ns}.${value}`
+    return messages[locale]?.[key] ?? messages.en[key] ?? value
+  }, [locale])
+}

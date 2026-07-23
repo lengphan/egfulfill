@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { SignOut, LockSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { sellerNav, allowedByPerms } from "@/lib/nav"
+import { useLabelT } from "@/lib/i18n"
 import { useEntitlements } from "@/lib/entitlements"
 import { getMyAccess } from "@/lib/api"
 import { clearSession, getToken } from "@/lib/auth"
@@ -14,6 +15,7 @@ import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const nl = useLabelT()
   const logout = () => {
     clearSession()
     router.push("/login")
@@ -67,7 +69,7 @@ export function Sidebar() {
           <div key={i} className="mb-1">
             {section.heading && (
               <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {section.heading}
+                {nl("nav", section.heading)}
               </div>
             )}
             {section.items.map((item) => {
@@ -90,7 +92,7 @@ export function Sidebar() {
                     weight={active ? "fill" : "regular"}
                     className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground")}
                   />
-                  <span className="flex-1">{item.label}</span>
+                  <span className="flex-1">{nl("nav", item.label)}</span>
                   {locked && <LockSimple size={13} weight="fill" className="shrink-0 text-muted-foreground/60" />}
                 </Link>
               )
@@ -105,7 +107,7 @@ export function Sidebar() {
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
         >
           <SignOut size={19} className="text-muted-foreground" />
-          Log out
+          {nl("nav", "Log out")}
         </button>
       </div>
     </aside>

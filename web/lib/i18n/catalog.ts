@@ -52,6 +52,42 @@ const vi: Dict = {
   "topbar.accountMenu": "Menu tài khoản",
   "topbar.profileSettings": "Hồ sơ & cài đặt",
   "topbar.logout": "Đăng xuất",
+
+  // Nav labels + section headings — keyed by their English string (see useLabelT), so
+  // English needs no entry here and an omitted key (e.g. the "SpyDeck" brand name) keeps
+  // its English. AI-drafted, pending review.
+  "nav.Dashboard": "Tổng quan",
+  "nav.Orders": "Đơn hàng",
+  "nav.Products": "Sản phẩm",
+  "nav.Stores": "Cửa hàng",
+  "nav.Reports": "Báo cáo",
+  "nav.Wallet": "Ví",
+  "nav.Design Lab": "Xưởng thiết kế",
+  "nav.Chat": "Trò chuyện",
+  "nav.Developers": "Nhà phát triển",
+  "nav.Help": "Trợ giúp",
+  "nav.Settings": "Cài đặt",
+  "nav.Board": "Bảng thiết kế",
+  "nav.Earnings": "Thu nhập",
+  "nav.Dispatch": "Xuất hàng",
+  "nav.Shipments": "Kiện hàng",
+  "nav.Scan": "Quét mã",
+  "nav.Inventory": "Kho hàng",
+  "nav.Purchase": "Mua hàng",
+  "nav.Suppliers": "Nhà cung cấp",
+  "nav.Billing": "Thanh toán",
+  "nav.Campaigns": "Chiến dịch",
+  "nav.Broadcasts": "Email hàng loạt",
+  "nav.Digitizer": "Số hóa thêu",
+  "nav.Catalogue": "Danh mục",
+  "nav.Notifications": "Thông báo",
+  // Section headings
+  "nav.Account": "Tài khoản",
+  "nav.Tools": "Công cụ",
+  // Shared chrome
+  "nav.Log out": "Đăng xuất",
+  "nav.Open menu": "Mở menu",
+  "nav.Close menu": "Đóng menu",
 }
 
 export const messages: Record<Locale, Dict> = { en, vi }

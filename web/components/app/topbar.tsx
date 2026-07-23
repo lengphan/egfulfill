@@ -28,7 +28,7 @@ import { UserAvatar } from "@/components/app/user-avatar"
 import { NotificationBell } from "@/components/app/notification-bell"
 import { OrderSearch } from "@/components/app/order-search"
 import { LanguageSwitcher } from "@/components/app/language-switcher"
-import { useT } from "@/lib/i18n"
+import { useT, useLabelT } from "@/lib/i18n"
 
 function IconButton({
   label,
@@ -56,6 +56,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
   const pathname = usePathname()
   const router = useRouter()
   const t = useT()
+  const nl = useLabelT()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   // null until the real balance loads — never show a fake default (that made the
@@ -118,7 +119,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
   }, [])
 
   const isStaff = !!role && role !== "seller"
-  const title = isStaff ? staffNavTitle(pathname) : navTitle(pathname)
+  const title = nl("nav", isStaff ? staffNavTitle(pathname) : navTitle(pathname))
   // Balance only for accounts with a selling wallet — sellers, admin, warehouse. Not operator/designer.
   const showBalance = !isStaff || role === "admin" || role === "warehouse"
   const money = balance == null ? "—" : balance.toLocaleString("en-US", { style: "currency", currency: "USD" })
