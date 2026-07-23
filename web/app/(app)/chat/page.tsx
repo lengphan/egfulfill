@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability } from "@/lib/api"
+import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrders, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown } from "@/components/app/markdown"
 
@@ -60,6 +60,12 @@ export default function ChatPage() {
   const [aiTyping, setAiTyping] = useState(false)
   const [aiNote, setAiNote] = useState<string | null>(null)
   const [office, setOffice] = useState<SupportAvailability | null>(null)
+  // @-mention autocomplete: the seller's own orders power the suggestions, and `mention`
+  // tracks the token being typed after an "@".
+  const [orders, setOrders] = useState<OrderRow[]>([])
+  const [mention, setMention] = useState<{ start: number; end: number; query: string } | null>(null)
+  const [mentionIdx, setMentionIdx] = useState(0)
+  const composerRef = useRef<HTMLInputElement>(null)
   const [streaming, setStreaming] = useState("") // assistant reply revealed word-by-word
   const revealingRef = useRef(false)             // pause polling while the typewriter runs
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -175,6 +181,47 @@ export default function ChatPage() {
     o && !o.open
       ? `Our team is out of office right now${o.resumesLabel ? ` — back ${o.resumesLabel}` : ""} (${o.hoursLabel}). Your request is logged; a teammate will reply right here, and email you, when we're back. The assistant is paused.`
       : `You're in the queue — a teammate will reply here${o?.hoursLabel ? `, usually within business hours (${o.hoursLabel})` : ""}. The assistant is paused until they do.`
+
+  // Load the seller's own orders once, to power "@" suggestions. (Staff viewing a seller's
+  // thread don't have that seller's orders here, so they type the number by hand — still
+  // resolved server-side by resolveMention.)
+  useEffect(() => {
+    if (isStaffUser) return
+    const id = setTimeout(() => { getOrders().then((r) => setOrders(Array.isArray(r) ? r : [])).catch(() => {}) }, 0)
+    return () => clearTimeout(id)
+  }, [isStaffUser])
+
+  const mentionMatches = useMemo(() => {
+    if (!mention) return []
+    const qq = mention.query.toLowerCase()
+    return orders.filter((o) => {
+      if (!qq) return true
+      return String(o.seq ?? "").includes(qq) || o.id.toLowerCase().includes(qq) || (o.customer?.name ?? "").toLowerCase().includes(qq)
+    }).slice(0, 6)
+  }, [mention, orders])
+
+  // Detect an "@order" token at the caret so the dropdown can offer matches.
+  const detectMention = (value: string, caret: number) => {
+    const before = value.slice(0, caret)
+    const m = /(?:^|\s)(@#?[\w-]*)$/.exec(before)
+    if (!m) { setMention(null); return }
+    const full = m[1]
+    setMention({ start: before.length - full.length, end: caret, query: full.replace(/^@#?/, "") })
+    setMentionIdx(0)
+  }
+
+  // Replace the "@…" token with the chosen order's number (or id), then refocus after it.
+  const pickMention = (o: OrderRow) => {
+    if (!mention) return
+    const tag = String(o.seq ?? o.id)
+    const next = input.slice(0, mention.start) + `@${tag} ` + input.slice(mention.end)
+    setInput(next)
+    setMention(null); setMentionIdx(0)
+    requestAnimationFrame(() => {
+      const el = composerRef.current
+      if (el) { const pos = mention.start + tag.length + 2; el.focus(); el.setSelectionRange(pos, pos) }
+    })
+  }
   const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
   // Announcements are a broadcast, not a conversation — the server 403s a non-admin
   // write, so the composer must say so rather than letting the send fail silently.
@@ -232,7 +279,7 @@ export default function ChatPage() {
     const text = raw.trim()
     if (!text || !activeId || sending) return
     setSending(true)
-    setInput("")
+    setInput(""); setMention(null)
     const clientId = `c-${cidBase.current}-${cidSeq.current++}`
     // Staff post as 'staff', NOT the default 'seller' — otherwise a human's reply is stored
     // with the seller's role and shows up on the seller's side as if they'd sent it, so the
@@ -571,14 +618,48 @@ export default function ChatPage() {
               Draft with AI
             </Button>
           )}
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder={signedOut ? "Sign in to send a message" : readOnly ? "Only EGFULFILL can post announcements" : "Type a message…  @4099 to tag an order"}
-            disabled={signedOut || !activeId || readOnly}
-            className="h-10"
-          />
+          <div className="relative flex-1">
+            {/* @-mention autocomplete: type "@" then part of an order number/name and pick
+                one to tag it. Dropped in above the box, keyboard-navigable. */}
+            {mention && mentionMatches.length > 0 && (
+              <div className="absolute bottom-full left-0 z-20 mb-1 w-full max-w-md overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                <div className="border-b border-border px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tag an order</div>
+                {mentionMatches.map((o, i) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    // mousedown, not click: fire before the input blurs so the caret + token
+                    // are still intact when we splice the tag in.
+                    onMouseDown={(e) => { e.preventDefault(); pickMention(o) }}
+                    onMouseEnter={() => setMentionIdx(i)}
+                    className={"flex w-full items-center gap-2 px-3 py-2 text-left text-sm " + (i === mentionIdx ? "bg-accent" : "hover:bg-muted/60")}
+                  >
+                    <Package size={13} weight="duotone" className="shrink-0 text-muted-foreground" />
+                    <span className="font-medium tabular-nums">#{o.seq ?? o.id}</span>
+                    <span className="truncate text-xs text-muted-foreground">{o.customer?.name || o.store || o.source || ""}</span>
+                    <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{o.factory_status || o.status || ""}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <Input
+              ref={composerRef}
+              value={input}
+              onChange={(e) => { setInput(e.target.value); if (!readOnly) detectMention(e.target.value, e.target.selectionStart ?? e.target.value.length) }}
+              onKeyDown={(e) => {
+                if (mention && mentionMatches.length) {
+                  if (e.key === "ArrowDown") { e.preventDefault(); setMentionIdx((i) => (i + 1) % mentionMatches.length); return }
+                  if (e.key === "ArrowUp") { e.preventDefault(); setMentionIdx((i) => (i - 1 + mentionMatches.length) % mentionMatches.length); return }
+                  if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickMention(mentionMatches[mentionIdx]); return }
+                  if (e.key === "Escape") { e.preventDefault(); setMention(null); return }
+                }
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() }
+              }}
+              placeholder={signedOut ? "Sign in to send a message" : readOnly ? "Only EGFULFILL can post announcements" : "Type a message…  @ to tag an order"}
+              disabled={signedOut || !activeId || readOnly}
+              className="h-10 w-full"
+            />
+          </div>
           <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !activeId || readOnly || !input.trim() || sending}>
             <PaperPlaneTilt size={16} weight="fill" />
           </Button>
