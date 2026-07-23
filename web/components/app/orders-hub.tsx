@@ -1212,7 +1212,7 @@ export function OrdersHub() {
                       // onto a second row. nowrap makes the identity give up width instead,
                       // which is what truncate is already there for.
                       return (
-                        <div key={it.line_id ?? it.sku ?? i} className="flex flex-wrap items-start gap-x-4 gap-y-2 rounded-xl border border-border p-2.5 sm:flex-nowrap">
+                        <div key={it.line_id ?? it.sku ?? i} className="relative flex flex-wrap items-start gap-x-4 gap-y-2 rounded-xl border border-border p-2.5 sm:flex-nowrap">
                           {/* Shows the blank with its artwork placed — what actually gets
                               made — not the marketplace listing photo. Editing is offered
                               only to the roles whose job it is; warehouse gets the zoom.
@@ -1269,7 +1269,10 @@ export function OrdersHub() {
                               items-start, so the actions sit level with the TITLE and the
                               strip runs the full width underneath them. */}
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
+                            {/* Title reserves height + right room on desktop for the controls,
+                                which are lifted to the top-right corner (position: absolute)
+                                so the variant strip below can run the FULL width of the row. */}
+                            <div className="truncate text-sm font-medium sm:min-h-8 sm:pr-[15rem]">{it.name || it.sku || "Item"}</div>
                             {/* Factory-owned marketplace orders arrive with no blank chosen;
                                 artwork review (canDesign) picks it here while the order is
                                 still unstarted. A pushed seller order is past "" (already
@@ -1334,7 +1337,7 @@ export function OrdersHub() {
                               </>
                             )}
                           </div>
-                          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
+                          <div className="mt-2 flex w-full flex-wrap items-center gap-2 sm:absolute sm:right-2.5 sm:top-2.5 sm:z-10 sm:mt-0 sm:w-auto">
                           {/* Own icon + a visible word. The pen-nib is the sidebar's
                               Board/Design Lab glyph — reusing it here made one symbol
                               mean three different things. */}
@@ -1381,7 +1384,7 @@ export function OrdersHub() {
                                   value=""
                                   onChange={(e) => { if (e.target.value) advanceItem(o, it, e.target.value) }}
                                   disabled={busy === key}
-                                  className="eg-select h-8 shrink-0 rounded-2xl border border-border bg-card px-1.5 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                  className="eg-select h-8 shrink-0 rounded-lg border border-border bg-card px-1.5 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                                   aria-label={`Flag ${it.name || it.sku}`}
                                   title="The warehouse has this item. You can still stop it if the artwork is wrong."
                                 >
@@ -1395,7 +1398,7 @@ export function OrdersHub() {
                                 value={normalizeStage(it.factory_status)}
                                 onChange={(e) => advanceItem(o, it, e.target.value)}
                                 disabled={busy === key}
-                                className={"eg-select h-8 shrink-0 rounded-2xl border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-border bg-card hover:border-primary/40")}
+                                className={"eg-select h-8 shrink-0 rounded-lg border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-border bg-card hover:border-primary/40")}
                                 aria-label={`Status for ${it.name || it.sku}`}
                                 title="Set this item's status — forward or back"
                               >
