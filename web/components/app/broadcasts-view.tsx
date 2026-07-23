@@ -80,6 +80,7 @@ const EMAIL_PRESETS: { id: string; label: string; hint: string }[] = [
  * non-admin write anyway). The logo reuses the hero-image upload — any public image URL.
  */
 function EmailBrandingCard() {
+  const [open, setOpen] = useState(false)
   const [b, setB] = useState<EmailBranding | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -130,8 +131,25 @@ function EmailBrandingCard() {
   const preset = EMAIL_PRESETS.find((p) => p.id === b.preset) ?? EMAIL_PRESETS[0]
 
   return (
-    <SectionCard title="Email branding" description="Logo, colour and footer applied to every broadcast email." bodyClassName="p-5">
-      <div className="grid gap-6 lg:grid-cols-2">
+    <>
+      {/* Compact trigger in the Broadcasts header — the swatch + logo show branding is
+          already set, so it's a one-time setup you open only to adjust, not a panel
+          that dominates the page. */}
+      <Button variant="outline" size="sm" className="gap-2" onClick={() => setOpen(true)}>
+        <span className="size-3.5 shrink-0 rounded-full border border-black/10" style={{ background: b.accent }} />
+        {b.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={b.logoUrl} alt="" className="h-4 max-w-[4.5rem] object-contain" />
+        ) : null}
+        Branding
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Email branding</DialogTitle>
+            <DialogDescription>Logo, colour and footer — applied to every broadcast email.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Theme</label>
@@ -206,13 +224,14 @@ function EmailBrandingCard() {
           </div>
         </div>
       </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
-        {saved && <span className="text-xs text-emerald-600 dark:text-emerald-400">Saved — applies to the next send.</span>}
-        {err && <span className="text-xs text-destructive">{err}</span>}
-        <Button size="sm" onClick={save} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : null}Save branding</Button>
-      </div>
-    </SectionCard>
+          <DialogFooter className="mt-2 flex-wrap items-center gap-3">
+            {saved && <span className="mr-auto text-xs text-emerald-600 dark:text-emerald-400">Saved — applies to the next send.</span>}
+            {err && <span className="mr-auto text-xs text-destructive">{err}</span>}
+            <Button size="sm" onClick={save} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : null}Save branding</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -321,13 +340,16 @@ export function BroadcastsView() {
 
   return (
     <div className="space-y-4">
-      {/* Global look of every broadcast email — editing is admin-only. */}
-      {isAdmin && <EmailBrandingCard />}
-
       <SectionCard
         title="Broadcasts"
         description="Email every seller, or a filtered set. Separate from Campaigns, which is ad spend."
-        actions={<Button size="sm" onClick={() => openEditor(null)}><Plus size={14} weight="bold" />New broadcast</Button>}
+        actions={
+          <div className="flex items-center gap-2">
+            {/* Branding is a one-time setup behind this button (admin-only), not a panel. */}
+            {isAdmin && <EmailBrandingCard />}
+            <Button size="sm" onClick={() => openEditor(null)}><Plus size={14} weight="bold" />New broadcast</Button>
+          </div>
+        }
         bodyClassName="p-5"
       >
         {!mailOk && (
