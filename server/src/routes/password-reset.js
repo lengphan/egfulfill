@@ -3,33 +3,48 @@
 //   1) Admin-mediated (always on): every request is recorded as a row staff can
 //      see (GET /api/auth/reset-requests) and resolve by setting a new password
 //      (POST .../resolve) which the admin then shares with the user.
-//   2) Email link (auto-on when SMTP_* env is set): /api/auth/forgot also emails a
-//      one-time link to reset-password.html?token=…; POST /api/auth/reset completes
-//      it. No admin action needed.
+//   2) Email link: /api/auth/forgot also emails a one-time link to
+//      /reset-password?token=…; POST /api/auth/reset completes it. No admin action needed.
+//
+// The email goes through the SHARED mailer (Brevo HTTP API first), NOT a private SMTP
+// transport. This file used to own a nodemailer/SMTP mailer that returned null unless
+// SMTP_HOST was set — but the droplet BLOCKS outbound SMTP, so that path could never
+// deliver: a seller who forgot their password got a row in the admin queue and no email.
+// The shared sendMail() reaches Brevo over 443, which is the only transport that works here.
 //
 // /api/auth/forgot never reveals whether an email exists (same response either way).
 import crypto from 'crypto';
 import { q } from '../db.js';
 import { hashPassword, canManageUsers } from '../auth.js';
+import { sendMail } from '../mailer.js';
 
 // The REACT app — email links must land where the /reset-password route exists.
 const APP_URL = (process.env.APP_URL || 'https://app.egful.store').replace(/\/+$/, '');
-const SMTP_HOST = process.env.SMTP_HOST || '';
 
-let _mailer = null;
-async function getMailer(app) {
-  if (!SMTP_HOST) return null;          // email path off until SMTP creds are set
-  if (_mailer) return _mailer;
-  try {
-    const nodemailer = (await import('nodemailer')).default;
-    _mailer = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: String(process.env.SMTP_SECURE || '') === 'true' || Number(process.env.SMTP_PORT) === 465,
-      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || '' } : undefined
-    });
-    return _mailer;
-  } catch (e) { if (app) app.log.error('nodemailer unavailable: ' + e.message); return null; }
+// Branded transactional shell. Deliberately has NO unsubscribe footer: a password reset is
+// transactional, not marketing, so it's exempt from CAN-SPAM's address/unsubscribe rules —
+// and letting someone "unsubscribe" from their own account security would be a mistake.
+function resetEmail(link) {
+  const text = 'Reset your EGFULFILL password using this link (valid for 1 hour):\n\n' + link
+    + '\n\nIf you did not request this, ignore this email — your password stays the same.';
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>
+<body style="margin:0;padding:0;background:#f4f4f5">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:28px 16px">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #e4e4e7;border-radius:14px;overflow:hidden">
+  <tr><td style="height:4px;background:#604cfa;line-height:4px;font-size:4px">&nbsp;</td></tr>
+  <tr><td style="padding:26px 32px 6px 32px"><span style="font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:600;letter-spacing:-0.5px;color:#0b0b0c">egfulfill</span></td></tr>
+  <tr><td style="padding:12px 32px 8px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#18181b">
+    <p style="margin:0 0 15px">Someone asked to reset the password for your EGFULFILL account.</p>
+    <p style="margin:0 0 20px">Click below to set a new one. The link is valid for <strong>one hour</strong>.</p>
+    <p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#604cfa;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:11px 22px;border-radius:10px">Reset your password</a></p>
+    <p style="margin:0 0 6px;font-size:13px;color:#71717a">Or paste this link into your browser:</p>
+    <p style="margin:0 0 15px;font-size:13px"><a href="${link}" style="color:#604cfa;word-break:break-all">${link}</a></p>
+  </td></tr>
+  <tr><td style="padding:16px 32px 30px 32px;border-top:1px solid #e4e4e7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.55;color:#71717a">
+    If you didn't request this, you can ignore this email — your password won't change.
+  </td></tr>
+</table></td></tr></table></body></html>`;
+  return { text, html };
 }
 
 export function passwordResetRoutes(app, requireAuth, requireStaff) {
@@ -79,22 +94,15 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
           "insert into password_resets (user_id, email, token, status, expires_at) values ($1,$2,$3,'pending', now() + interval '1 hour')",
           [user.id, user.email, token]
         );
-        const mailer = await getMailer(app);
-        if (mailer) {
-          // Path, not /reset-password.html: APP_URL now points at the REACT app, where
-          // the route is /reset-password (it reads the same ?token=). Leaving the .html
-          // suffix would 404 on Vercel and break every reset email.
-          const link = APP_URL + '/reset-password?token=' + token;
-          try {
-            await mailer.sendMail({
-              from: process.env.SMTP_FROM || ('EGFULFILL <no-reply@' + SMTP_HOST + '>'),
-              to: user.email,
-              subject: 'Reset your EGFULFILL password',
-              text: 'Reset your password using this link (valid for 1 hour):\n\n' + link + '\n\nIf you did not request this, ignore this email.',
-              html: '<p>Reset your EGFULFILL password (link valid for 1 hour):</p><p><a href="' + link + '">' + link + '</a></p><p style="color:#888;font-size:12px">If you did not request this, ignore this email.</p>'
-            });
-          } catch (e) { app.log.error('reset email failed: ' + e.message); }
-        }
+        // Path, not /reset-password.html: APP_URL points at the REACT app, where the route
+        // is /reset-password (it reads the same ?token=). The .html suffix would 404 on
+        // Vercel and break every reset email.
+        const link = APP_URL + '/reset-password?token=' + token;
+        const { text, html } = resetEmail(link);
+        // sendMail is best-effort and never throws — a false return (no transport) still
+        // leaves the admin-mediated row in place as the fallback path.
+        const sent = await sendMail({ to: user.email, subject: 'Reset your EGFULFILL password', text, html });
+        if (!sent) app.log.warn('password reset email not sent (no transport / send failed) for ' + user.email);
       }
     } catch (e) { /* never leak failures */ }
     return { ok: true, message: GENERIC };
