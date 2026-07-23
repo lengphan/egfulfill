@@ -5,7 +5,8 @@ import Image from "next/image"
 import { MagnifyingGlass, Heart, Storefront, Star, ArrowLeft, ArrowSquareOut, CircleNotch, Package } from "@phosphor-icons/react"
 import {
   searchSpydeckShops, getSpydeckShopListings, getSpydeckSavedShops, saveSpydeckShop, unsaveSpydeckShop,
-  type SpyShop, type EtsyListing,
+  getSpydeckShopsByCategory, getEtsyCategories,
+  type SpyShop, type EtsyListing, type EtsyCategory,
 } from "@/lib/api"
 import { ResultCard } from "@/components/app/spydeck-view"
 
@@ -71,6 +72,26 @@ export function StoresTab(h: Handlers) {
   const [open, setOpen] = useState<SpyShop | null>(null)
   const [catalog, setCatalog] = useState<EtsyListing[] | null>(null)
   const [catLoading, setCatLoading] = useState(false)
+  // Category discovery — suggest shops selling in a category (vs searching a name).
+  const [categories, setCategories] = useState<EtsyCategory[]>([])
+  const [catId, setCatId] = useState("")
+  useEffect(() => {
+    let alive = true
+    getEtsyCategories().then((r) => { if (alive) setCategories(r.categories ?? []) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  const byCategory = useCallback(async (id: string) => {
+    setCatId(id)
+    if (!id) return
+    setLoading(true); setError(null); setTab("search"); setQuery("")
+    try {
+      const r = await getSpydeckShopsByCategory(id)
+      setShops(r.shops ?? [])
+      if (r.error) setError(r.error)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Category search failed."); setShops([])
+    } finally { setLoading(false) }
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -163,6 +184,17 @@ export function StoresTab(h: Handlers) {
             {loading ? <CircleNotch size={14} className="animate-spin" /> : "Search"}
           </button>
         </div>
+        {categories.length > 0 && (
+          <select
+            value={catId}
+            onChange={(e) => byCategory(e.target.value)}
+            title="Discover shops selling in a category"
+            className="rounded-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <option value="">Browse by category…</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
         <div className="flex items-center gap-1 rounded-full bg-muted p-1">
           {(["search", "saved"] as const).map((t) => (
             <button key={t} type="button" onClick={() => setTab(t)}

@@ -283,11 +283,11 @@ export default function ChatPage() {
     setSending(true)
     setInput(""); setMention(null)
     const clientId = `c-${cidBase.current}-${cidSeq.current++}`
-    // Staff post as 'staff', NOT the default 'seller' — otherwise a human's reply is stored
-    // with the seller's role and shows up on the seller's side as if they'd sent it, so the
-    // seller can't tell a person has answered. A distinct role puts it on the support side
-    // with the sender's name.
-    const myRole = isStaffUser ? "staff" : "seller"
+    // Staff post as 'staff' ONLY when answering SOMEONE ELSE's support thread — that's what
+    // lets the seller see a named teammate replied. But on their OWN "Ask EGFULFILL" thread
+    // the staffer is the ASKER, so they post as 'seller'; otherwise the AI mapper reads it as
+    // an assistant turn and never answers (the regression this fixes).
+    const myRole = (isStaffUser && activeId !== supportId) ? "staff" : "seller"
     setMessages((prev) => [...(prev ?? []), { id: clientId, role: myRole, by: myName, text, ts: nowMs() }])
     try {
       await postOrderMessage(activeId, text, { clientId, by: myName, role: myRole })
@@ -531,9 +531,11 @@ export default function ChatPage() {
                 // teammate's reply is never mistaken for the seller's own message. Other
                 // channels keep the plain seller-on-the-right convention.
                 const role = m.role ?? "seller"
-                const mine = isSupport
-                  ? (isStaffUser ? role !== "seller" : role === "seller")
-                  : role === "seller"
+                // "Mine" is by IDENTITY, not role — the Factory channel is staff↔staff, where
+                // role can't tell me from a teammate, and role-based sides put everyone on one
+                // side. Prefer the server's `me` flag; fall back to a name match so it's right
+                // before the backend redeploy. The assistant is never "mine".
+                const mine = m.me !== undefined ? m.me : (role !== "assistant" && !!m.by && m.by === myName)
                 const isAi = role === "assistant"
                 // The one-time "a human joined" divider goes right before their first message.
                 const joined = joinAt && String(m.id) === joinAt.id ? joinAt.by : null

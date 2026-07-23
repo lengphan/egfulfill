@@ -1078,6 +1078,9 @@ export type ChatEntry = {
   id: number | string
   by?: string
   role?: string
+  /** True when the current user sent this message — used to pick the bubble side, since
+   *  role alone can't tell "me" from a teammate in staff-to-staff channels. */
+  me?: boolean
   text?: string
   ts?: number
   system?: boolean
@@ -1088,6 +1091,8 @@ export type ChatEntry = {
   // Staff-only (AI order briefings, internal notes). The server never sends these
   // to a seller; this flag only drives how staff see them.
   internal?: boolean
+  // A pinned note in the private Workbench — rendered as a saved card, not a chat bubble.
+  note?: boolean
 }
 export type SellerMatch = { seller_id: string; channel: string; name: string; email: string }
 // Staff-only seller directory — start a channel with a seller who hasn't written in.
@@ -1101,10 +1106,10 @@ export function getOrderMessages(id: string) {
 // `{body}` posts an EMPTY message — the server keys off `text`.
 // `escalated` marks an explicit "talk to a human" request so staff can tell it apart
 // from ordinary chat; the server ignores the flag from staff senders.
-export function postOrderMessage(id: string, text: string, opts?: { by?: string; role?: string; clientId?: string; escalated?: boolean }) {
+export function postOrderMessage(id: string, text: string, opts?: { by?: string; role?: string; clientId?: string; escalated?: boolean; note?: boolean }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/messages`, {
     method: "POST",
-    body: JSON.stringify({ text, role: opts?.role ?? "seller", by: opts?.by, clientId: opts?.clientId, escalated: opts?.escalated }),
+    body: JSON.stringify({ text, role: opts?.role ?? "seller", by: opts?.by, clientId: opts?.clientId, escalated: opts?.escalated, note: opts?.note }),
   })
 }
 
@@ -1136,6 +1141,14 @@ export function requestAiReply() {
   // stays quiet until a teammate replies, so there's no `reply`. `office` says whether the
   // team is in hours, so the client can show the right "in queue" vs "we're offline" copy.
   return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; escalated?: boolean; office?: SupportAvailability; error?: string }>(`/api/support/ai-reply`, {
+    method: "POST",
+    body: "{}",
+  })
+}
+// Private Workbench: ask the personal AI. Reads ONLY the caller's own desk channel +
+// their pinned notes. Same disabled/skipped/error shape as the support reply.
+export function deskAiReply() {
+  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; error?: string }>(`/api/desk/ai-reply`, {
     method: "POST",
     body: "{}",
   })
@@ -1545,6 +1558,9 @@ export function searchSpydeckShops(q: string) {
 }
 export function getSpydeckShop(id: string | number) {
   return api<{ shop?: SpyShop; error?: string }>(`/api/spydeck/shops/${encodeURIComponent(String(id))}`)
+}
+export function getSpydeckShopsByCategory(taxonomyId: string) {
+  return api<{ shops?: SpyShop[]; error?: string }>(`/api/spydeck/shops/by-category?taxonomyId=${encodeURIComponent(taxonomyId)}`)
 }
 export function getSpydeckShopListings(id: string | number, offset = 0) {
   return api<{ listings?: EtsyListing[]; count?: number; error?: string }>(
