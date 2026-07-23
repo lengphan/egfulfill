@@ -9,6 +9,7 @@ import { isStaff, canMoveMoney } from '../auth.js';
 import { storageEnabled, putObject, fromDataUrl } from '../storage.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
+import { egBroadcast } from '../events.js';
 import { phashDistance, PHASH_NEAR } from '../fingerprint.js';
 
 export function designFilesRoutes(app, requireAuth) {
@@ -224,6 +225,26 @@ export function designFilesRoutes(app, requireAuth) {
       [String(b.designId), b.orderId || null, b.sku || null, seller || null, b.name || null, b.mime || null, data, url, b.hash || null,
        priceFor(req.user, b, defaultPrice),
        kindOf(b.name, b.mime)]);
+    /**
+     * Record it + wake the boards. Without these two lines the file lands in storage but
+     * nothing tells the UI: the Design readiness tag stayed grey until a full reload (it
+     * flips on a `pes`/`emb` file, which this now is) and the tag's history popover had no
+     * row for how the file got there. A drag-drop that changes nothing on screen reads as
+     * a drop that failed.
+     *   · audit  → the Design tag matches /^design_file\./, so this shows as
+     *              "Machine file uploaded" in that tag's history.
+     *   · egBroadcast → a cache-invalidation ping (carries no bytes); every open board
+     *              re-fetches the shared file list through its own access-controlled
+     *              endpoint, so the tag flips colour live wherever the file was dropped.
+     */
+    if (b.orderId) {
+      const savedKind = kindOf(b.name, b.mime);
+      audit(req, 'design_file.uploaded', {
+        entityType: 'order', entityId: String(b.orderId),
+        after: { name: b.name || String(b.designId), sku: b.sku || null, kind: savedKind },
+      });
+      egBroadcast({ type: 'design-file', orderId: String(b.orderId), sku: b.sku || null, kind: savedKind });
+    }
     /**
      * A SELLER'S OWN MACHINE FILE enters the verification queue.
      *

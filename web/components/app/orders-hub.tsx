@@ -651,6 +651,18 @@ export function OrdersHub() {
     return () => clearTimeout(id)
   }, [visibleIds, loadDesigns, loadFiles])
 
+  // A machine file dropped ANYWHERE — the designer's folder, the order page, the canvas
+  // dialog — pings "design-file" carrying its order id. Re-fetch that order's shared file
+  // list so the Design readiness tag flips colour live, without a manual reload. The
+  // board-level "orders"/"item-status" pings reload rows, not files, so they can't do
+  // this on their own — which is exactly why a drop into the folder looked like it did
+  // nothing. The orderId is used only to pick which order to re-query; the fetch itself
+  // still goes through the access-controlled endpoint.
+  useEffect(() => onLive("design-file", (e) => {
+    const oid = String((e as { orderId?: string }).orderId || "")
+    if (oid) loadFiles(oid, true)
+  }), [loadFiles])
+
   const subtitle = isAdmin
     ? "Every order across the team — production to shipping."
     : canFulfill ? "Receive, pack, and ship orders out the door."
