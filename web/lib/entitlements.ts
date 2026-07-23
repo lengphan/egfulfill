@@ -73,19 +73,31 @@ export function useEntitlements(): Entitlements {
 
   useEffect(() => {
     let alive = true
+    // EVENT is dispatched by loadEntitlements itself after a fetch, so this path must NOT
+    // force — it just reads the freshly-populated cache. Forcing here would loop.
     const sync = () => {
       if (!alive) return
       setEnt(cache ?? fromSession())
       loadEntitlements().then((e) => { if (alive) setEnt(e) })
     }
+    // A plan change makes the cached entitlement STALE: a downgrade lapse must lock the
+    // gate, an upgrade must unlock it. loadEntitlements() short-circuits to the stale cache
+    // when one exists, so force a fresh read via refreshEntitlements. This was the missing
+    // wiring — refreshEntitlements existed but nothing called it, so gates kept the old
+    // answer (SpyDeck looked unlocked after a downgrade) until the next full reload.
+    const invalidate = () => {
+      if (!alive) return
+      setEnt(cache ?? fromSession())
+      refreshEntitlements().then((e) => { if (alive) setEnt(e) })
+    }
     const id = setTimeout(sync, 0)
     window.addEventListener(EVENT, sync)
-    window.addEventListener("eg-plan-changed", sync)
+    window.addEventListener("eg-plan-changed", invalidate)
     return () => {
       alive = false
       clearTimeout(id)
       window.removeEventListener(EVENT, sync)
-      window.removeEventListener("eg-plan-changed", sync)
+      window.removeEventListener("eg-plan-changed", invalidate)
     }
   }, [])
 

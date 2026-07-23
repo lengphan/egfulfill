@@ -70,10 +70,6 @@ export function SubscriptionPanel() {
     return () => clearTimeout(id)
   }, [])
 
-  // A downgrade is any move to a cheaper plan — that's the case where time already paid
-  // for is at stake, and where "nothing is charged" is the least useful thing to say.
-  const rank = (id?: string) => PLAN_TIERS.findIndex((t) => t.id === id)
-  const isDowngrade = !!pending?.plan && rank(pending.plan) >= 0 && rank(pending.plan) < rank(plan)
   const currentTier = PLAN_TIERS.find((t) => t.id === plan)
   const pendingTier = PLAN_TIERS.find((t) => t.id === pending?.plan)
   // Stamped once after mount rather than read during render: Date.now() during render is
@@ -83,6 +79,18 @@ export function SubscriptionPanel() {
   const daysLeft = billing?.renews_at && now
     ? Math.max(0, Math.ceil((new Date(billing.renews_at).getTime() - now) / 86400000))
     : 0
+
+  // A downgrade is a move to a CHEAPER monthly total, measured exactly as the server does
+  // (billing.js), while a paid month is still running. This is the case that is now
+  // SCHEDULED: nothing is charged, you keep the tier + SpyDeck you paid for until
+  // renews_at, then drop to Starter. Upgrades still apply — and charge — immediately.
+  const monthlyOf = (p?: string, a?: boolean) =>
+    (billing?.prices.plans[p ?? plan] ?? 0) + ((a ?? spydeckAddon) ? (billing?.prices.spydeck_addon ?? 0) : 0)
+  const isDowngrade =
+    !!pending && daysLeft > 0 && monthlyOf(pending.plan, pending.addon) < monthlyOf(plan, spydeckAddon)
+  // The paid plan you're on is set to lapse to Starter at period end (auto-renew is off).
+  const downgradeScheduled =
+    mounted && !!billing && billing.auto_renew === false && (currentTier?.monthlyPrice ?? 0) > 0 && !!billing.renews_at && daysLeft > 0
 
   // Price the pending change the same way the server does, so the confirm dialog can
   // state the real amount before anything is charged.
@@ -169,7 +177,7 @@ export function SubscriptionPanel() {
 
           {/* Renewal state + the opt-out. Only meaningful on a paid plan — Starter has
               nothing to renew. */}
-          {billing?.renews_at && (
+          {billing?.renews_at && current.monthlyPrice > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               {billing.auto_renew ? (
                 <>
@@ -180,9 +188,9 @@ export function SubscriptionPanel() {
                 </>
               ) : (
                 <>
-                  <span>Auto-renew is off — your plan ends {fmtDate(billing.renews_at)}.</span>
+                  <span>You keep {current.shortName} until {fmtDate(billing.renews_at)}, then move to Starter.</span>
                   <button onClick={() => toggleRenew(true)} disabled={renewBusy} className="font-medium text-primary underline underline-offset-2 hover:no-underline disabled:opacity-50">
-                    Turn it back on
+                    Keep {current.shortName}
                   </button>
                 </>
               )}
@@ -227,7 +235,9 @@ export function SubscriptionPanel() {
               {mounted && daysLeft > 0 && billing?.renews_at && (
                 <div className="mt-1 text-xs text-muted-foreground">
                   {isCurrent ? (
-                    <>{daysLeft} day{daysLeft === 1 ? "" : "s"} left · renews {fmtDate(billing.renews_at)}</>
+                    <>{daysLeft} day{daysLeft === 1 ? "" : "s"} left · {billing.auto_renew ? "renews" : "ends"} {fmtDate(billing.renews_at)}</>
+                  ) : downgradeScheduled && t.id === "starter" ? (
+                    <span className="font-medium text-foreground">Starts {fmtDate(billing.renews_at)}</span>
                   ) : alreadyPaidFor(t.id as PlanId) ? (
                     <span className="font-medium text-emerald-600">$0 now — paid through {fmtDate(billing.renews_at)}</span>
                   ) : (priceOf({ plan: t.id as PlanId }) ?? 0) > 0 ? (
@@ -247,6 +257,10 @@ export function SubscriptionPanel() {
                 {isCurrent ? (
                   <Button variant="outline" className="w-full" disabled>
                     Current plan
+                  </Button>
+                ) : downgradeScheduled && t.id === "starter" ? (
+                  <Button variant="outline" className="w-full" disabled title={`Starts ${fmtDate(billing?.renews_at)}`}>
+                    Scheduled
                   </Button>
                 ) : t.id === "enterprise" ? (
                   // Enterprise is negotiated, not self-serve — the server rejects it too.
@@ -326,7 +340,9 @@ export function SubscriptionPanel() {
             <DialogDescription>
               {(priceOf(pending ?? {}) ?? 0) > 0
                 ? "This charges your wallet now and bills monthly from today."
-                : "This takes effect now. Nothing is charged, and the current month isn't refunded."}
+                : isDowngrade
+                ? "This is scheduled — it takes effect when your paid period ends. Nothing is charged now."
+                : "This takes effect now. Nothing is charged."}
             </DialogDescription>
           </DialogHeader>
 
@@ -337,12 +353,12 @@ export function SubscriptionPanel() {
               made with the facts, and offer the obvious alternative: wait it out. */}
           {isDowngrade && billing?.renews_at && daysLeft > 0 && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-              <div className="font-medium">You&apos;ve already paid through {fmtDate(billing.renews_at)}.</div>
+              <div className="font-medium">You keep {currentTier?.shortName ?? "your current plan"} until {fmtDate(billing.renews_at)}.</div>
               <p className="mt-1">
-                That&apos;s {daysLeft} day{daysLeft === 1 ? "" : "s"} of {currentTier?.shortName ?? "your current plan"} left.{" "}
-                Switching drops you to {pendingTier?.shortName ?? "the new plan"} now and the month isn&apos;t refunded — but
-                it stays yours: switch back before {fmtDate(billing.renews_at)} and there&apos;s no new charge. To keep the
-                {" "}{currentTier?.shortName ?? "current"} features until then, turn off auto-renew instead.
+                Nothing is charged now. You&apos;ll keep {currentTier?.shortName ?? "your plan"}
+                {includedFree || spydeckAddon ? " and SpyDeck" : ""} for the {daysLeft} day{daysLeft === 1 ? "" : "s"} left,
+                then move to {pendingTier?.shortName ?? "Starter"} on {fmtDate(billing.renews_at)}. Change your mind before
+                then and it&apos;s cancelled at no charge.
               </p>
             </div>
           )}

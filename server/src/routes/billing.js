@@ -42,13 +42,22 @@ const GRACE_DAYS = 7;
  */
 export async function runRenewals() {
   const due = await q(
-    `select id, plan, spydeck_addon, plan_past_due_since from users
-      where plan_auto_renew is true
-        and plan_renews_at is not null
+    `select id, plan, spydeck_addon, plan_past_due_since, plan_auto_renew from users
+      where plan_renews_at is not null
         and plan_renews_at <= now()
         and (plan <> 'starter' or spydeck_addon is true)`
   );
   for (const u of due.rows) {
+    // Auto-renew OFF means the seller scheduled a downgrade (or cancelled): the paid month
+    // they were keeping has now ended, so drop to Starter. Without this the plan never
+    // actually lapsed — auto-renew-off rows were skipped entirely, so a plan stayed Pro
+    // (with SpyDeck) for free forever after its paid-through date.
+    if (u.plan_auto_renew === false) {
+      await q("update users set plan='starter', spydeck_addon=false, plan_renews_at=null, plan_past_due_since=null, plan_paid_plan=null, plan_paid_addon=false where id=$1", [u.id]).catch(() => {});
+      notify({ userIds: [u.id], type: 'billing-downgraded', title: 'Moved to the Starter plan',
+        body: 'Your paid plan has ended as scheduled. You can upgrade again any time.', href: '/settings' });
+      continue;
+    }
     const monthly = (PLAN_PRICES[u.plan] || 0) + (u.spydeck_addon === true ? SPYDECK_ADDON_PRICE : 0);
     if (monthly <= 0) {
       await q('update users set plan_renews_at=null where id=$1', [u.id]).catch(() => {});
@@ -171,6 +180,30 @@ export function billingRoutes(app, requireAuth) {
       reply.code(400); return { error: 'Enterprise is set up with our team — contact sales.' };
     }
     const addon = typeof b.spydeckAddon === 'boolean' ? b.spydeckAddon : curAddon;
+
+    // A DOWNGRADE (a cheaper target) while a paid month is still running is SCHEDULED, not
+    // applied now: the seller keeps the tier + SpyDeck they already paid for until
+    // plan_renews_at, then drops to Starter. Nothing is charged, and it's reversible before
+    // the date — re-arming auto-renew ("Keep <plan>") cancels the scheduled drop. This is
+    // the industry-standard deferred downgrade; applying it immediately would strip access
+    // that's already been paid for. Mechanically it's exactly "auto-renew off": the plan
+    // runs out the paid month, then runRenewals lapses it to Starter.
+    const curMonthly = (PLAN_PRICES[curPlan] || 0) + (curAddon ? SPYDECK_ADDON_PRICE : 0);
+    const tgtMonthly = (PLAN_PRICES[plan] || 0) + (addon ? SPYDECK_ADDON_PRICE : 0);
+    if (tgtMonthly < curMonthly && activePeriod) {
+      await q('update users set plan_auto_renew=false where id=$1', [req.user.sub]);
+      audit(req, 'billing.subscribe', {
+        entityType: 'user', entityId: req.user.sub,
+        before: { plan: curPlan, spydeck_addon: curAddon, auto_renew: true },
+        after: { scheduled_plan: plan, scheduled_addon: addon, auto_renew: false, charged: 0 },
+      });
+      return {
+        ok: true, plan: curPlan, spydeck_addon: curAddon, charged: 0,
+        auto_renew: false, renews_at: cur.plan_renews_at || null,
+        scheduled: { plan, spydeck_addon: addon, at: cur.plan_renews_at || null },
+        balance: await balanceOf(req.user.sub),
+      };
+    }
 
     // Charge only what's being ADDED this month, measured against the BEST tier this
     // period has already been paid for — not merely the tier in use. So Pro → Starter →
