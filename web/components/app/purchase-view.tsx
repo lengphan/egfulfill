@@ -386,9 +386,22 @@ export function PurchaseView() {
           status: placedOk && g.api ? "placed" : placedOk ? "placed" : "draft",
           meta: { ...(po.meta || {}), response: resp, placedAt, api: g.api, splitFrom: parts.length > 1 ? po.num : undefined },
         })
+        // Say what ACTUALLY happened, not a blanket "test/dry-run": a real dry run (live
+        // keys off) never reached the supplier, while a live placement returns an order
+        // number worth surfacing. The old hardcoded line made a placed order look like a
+        // dry run and vice-versa — the exact confusion behind "why can't I cancel this".
+        const rr = resp as Record<string, unknown>
+        const dry = rr.dryRun === true
+        const ssNo = (() => {
+          const os = rr.orders
+          if (Array.isArray(os)) for (const o of os) { const n = (o as { orderNumber?: unknown })?.orderNumber; if (n) return String(n) }
+          return null
+        })()
         results.push(
           !placedOk ? `${g.supplier ?? "Unassigned"}: failed — ${(resp as { error?: string }).error}`
-            : g.api ? `${g.supplier}: sent (test/dry-run — set live keys to place for real)`
+            : g.api ? (dry
+                ? `${g.supplier}: DRY RUN — not sent to ${g.api === "ss" ? "S&S" : "Otto"} (live keys off). Set SS_ORDER_LIVE=1 to place for real.`
+                : `${g.supplier}: placed${ssNo ? ` — ${g.api === "ss" ? "S&S" : "Otto"} order #${ssNo}` : " — but no order number came back; check for line errors"}`)
               : `${g.supplier ?? "Unassigned"}: marked placed, order it manually (no supplier API for these SKUs)`
         )
       }
@@ -505,13 +518,41 @@ export function PurchaseView() {
       // No order number means we CAN'T ask S&S — so we can't verify, but we also can't
       // leave it stuck. Let the operator attest they've already cancelled it directly.
       if (sent && isSs && !orderNo) {
-        if (!window.confirm(
-          `${po.num} has no S&S order number on file, so we can't ask their API to cancel it.\n\n` +
-          `If you've ALREADY cancelled this order with S&S directly, click OK to mark it cancelled here.\n\n` +
-          `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
-        )) { setMsg({ ok: false, text: `${po.num} left as-is. Cancel it in the S&S portal, then use Cancel again to clear it here.` }); return }
-        supplierMsg = ` You confirmed it was already cancelled with S&S directly.`
-        manualCancel = true
+        // No S&S number was captured at placement (an all-error line, or a response shape
+        // we didn't record). Rather than dead-end, let the operator PASTE it from the S&S
+        // portal / confirmation email so we can still cancel through their API — the real
+        // fix for "I can't stop this order." Blank = attest they've stopped it directly.
+        const entered = window.prompt(
+          `${po.num} has no S&S order number saved, so we can't auto-cancel it.\n\n` +
+          `Paste the S&S order number (from your S&S portal or confirmation email) to cancel it via their API.\n\n` +
+          `Leave it blank ONLY if you've already cancelled it with S&S directly.`, "")
+        if (entered === null) { setMsg({ ok: false, text: `${po.num} left as-is.` }); return }
+        const typed = entered.trim()
+        if (typed) {
+          const c = await cancelSsOrder(typed).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
+          if ("error" in c && c.error) {
+            if (!window.confirm(
+              `S&S wouldn't cancel ${typed} via their API:\n${c.error}\n\n` +
+              `If you've ALREADY cancelled it with S&S directly, click OK to mark it cancelled here.\n\n` +
+              `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
+            )) { setMsg({ ok: false, text: `S&S wouldn't cancel ${typed}: ${c.error}` }); return }
+            supplierMsg = ` You confirmed it was already cancelled with S&S (their API declined ${typed}).`
+            manualCancel = true
+          } else {
+            const cc = c as { orderStatus?: string; reconciled?: boolean }
+            supplierMsg = cc.reconciled
+              ? ` S&S already had ${typed} cancelled — this caught our record up.`
+              : ` S&S confirmed ${typed} cancelled (${cc.orderStatus ?? "Cancelled"}).`
+            supplierCancelled = true
+          }
+        } else {
+          if (!window.confirm(
+            `Mark ${po.num} cancelled here without an order number?\n\n` +
+            `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
+          )) { setMsg({ ok: false, text: `${po.num} left as-is. Cancel it in the S&S portal, then use Cancel again to clear it here.` }); return }
+          supplierMsg = ` You confirmed it was already cancelled with S&S directly.`
+          manualCancel = true
+        }
       } else if (sent && isSs && orderNo) {
         const c = await cancelSsOrder(orderNo).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
         if ("error" in c && c.error) {
