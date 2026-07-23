@@ -219,16 +219,25 @@ export default function ChatPage() {
   // "@" suggestions = TEAMMATES (mentioning one notifies them — not everything is about an
   // order) + the active thread's seller's ORDERS. Orders are thread-scoped (so staff on a
   // seller's inbox see THAT seller's); people are the staff directory. Refetched per thread.
+  // Teammates for @-mentions (the staff directory) — the same regardless of the query.
   useEffect(() => {
     const id = setTimeout(() => {
       getMentionPeople().then((r) => setPeople(r.people ?? [])).catch(() => setPeople([]))
-      // Load order suggestions for the seller support threads AND the staff Factory channel
-      // (the server decides which orders and gates access). Announce/Workbench get none.
-      if (!activeId || (activeId.indexOf("support-") !== 0 && activeId !== STAFF_CHANNEL)) { setOrders([]); return }
-      getOrderMentions(activeId).then((r) => setOrders(r.orders ?? [])).catch(() => setOrders([]))
     }, 0)
     return () => clearTimeout(id)
   }, [activeId])
+
+  // Order suggestions — for the seller support threads AND the staff Factory channel; the
+  // server gates access and SEARCHES BY NUMBER, so typing "@14" finds even an old order past
+  // the recent window. Debounced so a query hits the server once, not per keystroke.
+  useEffect(() => {
+    if (!activeId || (activeId.indexOf("support-") !== 0 && activeId !== STAFF_CHANNEL)) { setOrders([]); return }
+    const query = mention?.query?.trim() ?? ""
+    const id = setTimeout(() => {
+      getOrderMentions(activeId, query || undefined).then((r) => setOrders(r.orders ?? [])).catch(() => setOrders([]))
+    }, query ? 200 : 0)
+    return () => clearTimeout(id)
+  }, [activeId, mention?.query])
 
   const mentionMatches = useMemo<MentionItem[]>(() => {
     if (!mention) return []

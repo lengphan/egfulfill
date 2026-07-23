@@ -880,8 +880,9 @@ export function getOrders() {
 }
 /** Orders to suggest when "@"-tagging in a support thread — the THREAD's seller's orders,
  *  so it works for staff on a seller's inbox thread too (getOrders is caller-only). */
-export function getOrderMentions(thread: string) {
-  return api<{ orders?: OrderRow[]; error?: string }>(`/api/support/order-mentions?thread=${encodeURIComponent(thread)}`)
+export function getOrderMentions(thread: string, q?: string) {
+  const qs = q && q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ""
+  return api<{ orders?: OrderRow[]; error?: string }>(`/api/support/order-mentions?thread=${encodeURIComponent(thread)}${qs}`)
 }
 /** Teammates to suggest when "@"-mentioning a person (not everything is about an order).
  *  Mentioning one notifies them server-side. */

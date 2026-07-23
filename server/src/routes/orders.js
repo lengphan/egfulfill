@@ -1824,6 +1824,11 @@ export function ordersRoutes(app, requireAuth) {
   // got no suggestions). Gated by the same visibility guard as reading the thread.
   app.get('/api/support/order-mentions', { preHandler: requireAuth }, async (req, reply) => {
     const thread = String((req.query && req.query.thread) || '');
+    // Optional search: `@14` searches by order NUMBER (seq) or id, so an OLD order past the
+    // recent window still surfaces. No q → the recent list for the initial dropdown.
+    const rawQ = String((req.query && req.query.q) || '').trim().slice(0, 40);
+    const like = rawQ ? `%${rawQ.replace(/[%_\\]/g, (c) => '\\' + c)}%` : null;
+    const cols = 'id, seq, customer, store, source, status, factory_status';
     // A SELLER support thread returns that seller's orders — a staffer answering the seller
     // sees the seller's, the seller sees their own. A staffer's OWN "My EG" has no seller
     // orders, so it falls through to the staff-wide list below.
@@ -1831,9 +1836,10 @@ export function ordersRoutes(app, requireAuth) {
       if (!(await canSeeThread(req.user, thread))) { reply.code(403); return { error: 'forbidden' }; }
       const sellerId = thread.slice('support-'.length);
       if (!(isStaff(req.user) && sellerId === req.user.sub)) {
+        const filt = like ? ` and (cast(seq as text) ilike $2 or id ilike $2)` : '';
         const r = await q(
-          `select id, seq, customer, store, source, status, factory_status
-             from orders where seller_id = $1 order by created_at desc limit 100`, [sellerId]);
+          `select ${cols} from orders where seller_id = $1${filt} order by created_at desc limit ${like ? 20 : 100}`,
+          like ? [sellerId, like] : [sellerId]);
         return { orders: r.rows };
       }
     }
@@ -1842,9 +1848,10 @@ export function ordersRoutes(app, requireAuth) {
     // whole-board list is never exposed to a seller — the "Mention an order with @" the
     // Factory channel promises now actually works.
     if (isStaff(req.user)) {
+      const filt = like ? ` where (cast(seq as text) ilike $1 or id ilike $1)` : '';
       const r = await q(
-        `select id, seq, customer, store, source, status, factory_status
-           from orders order by created_at desc limit 100`);
+        `select ${cols} from orders${filt} order by created_at desc limit ${like ? 20 : 100}`,
+        like ? [like] : []);
       return { orders: r.rows };
     }
     return { orders: [] };
