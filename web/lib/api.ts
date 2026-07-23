@@ -878,6 +878,11 @@ export function getOrder(id: string) {
 export function getOrders() {
   return api<OrderRow[]>(`/api/orders`)
 }
+/** Orders to suggest when "@"-tagging in a support thread — the THREAD's seller's orders,
+ *  so it works for staff on a seller's inbox thread too (getOrders is caller-only). */
+export function getOrderMentions(thread: string) {
+  return api<{ orders?: OrderRow[]; error?: string }>(`/api/support/order-mentions?thread=${encodeURIComponent(thread)}`)
+}
 
 /** Staff: set ONE line item's factory_status (drives the production boards).
  *  Pass line_id whenever the item has one — sku alone can't address a marketplace line

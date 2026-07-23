@@ -1789,6 +1789,21 @@ export function ordersRoutes(app, requireAuth) {
     return { ok: true };
   });
 
+  // Orders to suggest when "@"-tagging in a support thread. Scoped to the THREAD's seller —
+  // so it works whether the seller is on their own thread OR a staffer is on that seller's
+  // inbox thread (getOrders() only ever returns the CALLER's own orders, which is why staff
+  // got no suggestions). Gated by the same visibility guard as reading the thread.
+  app.get('/api/support/order-mentions', { preHandler: requireAuth }, async (req, reply) => {
+    const thread = String((req.query && req.query.thread) || '');
+    if (thread.indexOf('support-') !== 0) return { orders: [] };
+    if (!(await canSeeThread(req.user, thread))) { reply.code(403); return { error: 'forbidden' }; }
+    const sellerId = thread.slice('support-'.length);
+    const r = await q(
+      `select id, seq, customer, store, source, status, factory_status
+         from orders where seller_id = $1 order by created_at desc limit 100`, [sellerId]);
+    return { orders: r.rows };
+  });
+
   app.get('/api/orders/:id/messages', { preHandler: requireAuth }, async (req, reply) => {
     const { channel, orderRef } = await resolveChannel(req.params.id);
     if (!(await canSeeThread(req.user, channel))) { reply.code(403); return { error: 'forbidden' }; }
