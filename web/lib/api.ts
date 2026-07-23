@@ -1114,10 +1114,22 @@ export function getMe() {
 }
 // Ask the account-aware AI to reply in the seller's support thread. No-op server-side
 // if ANTHROPIC_API_KEY isn't configured ({ ok:false, disabled:true }).
-export type SupportAvailability = { open: boolean; hoursLabel: string; resumesLabel?: string }
+export type SupportAvailability = { open: boolean; hoursLabel: string; resumesLabel?: string; oooMessage?: string }
 /** Is the support team within office hours right now? Drives the handoff copy. */
 export function getSupportAvailability() {
   return api<SupportAvailability>(`/api/support/availability`)
+}
+// Admin-editable support hours + manual holiday closure, edited from the chat page.
+export type SupportHoursConfig = {
+  startH: number; endH: number; tzOffset: number; tzLabel: string; days: number[]
+  ooo: { until: string | null; message: string }
+}
+export function getSupportHoursConfig() {
+  return api<{ config: SupportHoursConfig; availability: SupportAvailability }>(`/api/support/hours-config`)
+}
+export function setSupportHoursConfig(config: SupportHoursConfig) {
+  return api<{ ok?: boolean; config?: SupportHoursConfig; availability?: SupportAvailability; error?: string }>(
+    `/api/support/hours-config`, { method: "PUT", body: JSON.stringify(config) })
 }
 export function requestAiReply() {
   // `escalated: true` means the thread has an OPEN human handoff — the assistant deliberately

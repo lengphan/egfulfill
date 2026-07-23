@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrders, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown } from "@/components/app/markdown"
+import { SupportHoursEditor } from "@/components/app/support-hours-editor"
 
 const nowMs = () => Date.now()
 // Render as markdown only when the text actually carries the syntax our Markdown
@@ -60,6 +61,7 @@ export default function ChatPage() {
   const [aiTyping, setAiTyping] = useState(false)
   const [aiNote, setAiNote] = useState<string | null>(null)
   const [office, setOffice] = useState<SupportAvailability | null>(null)
+  const [hoursOpen, setHoursOpen] = useState(false)  // staff: support-hours editor dialog
   // @-mention autocomplete: the seller's own orders power the suggestions, and `mention`
   // tracks the token being typed after an "@".
   const [orders, setOrders] = useState<OrderRow[]>([])
@@ -168,13 +170,13 @@ export default function ChatPage() {
     return h ? { id: String(h.id), by: h.by || "A teammate" } : null
   }, [isSupport, messages])
 
-  // Office hours, fetched once the support thread is active, so the handoff copy tells the
-  // truth about whether anyone's around right now.
+  // Office hours, fetched once on mount, so the seller's handoff copy AND the staff status
+  // pill both know whether we're open right now — regardless of which thread is active.
   useEffect(() => {
-    if (!isSupport) return
+    if (!getToken()) return
     const id = setTimeout(() => { getSupportAvailability().then(setOffice).catch(() => {}) }, 0)
     return () => clearTimeout(id)
-  }, [isSupport])
+  }, [])
 
   // The right "you're in the queue" line for the moment — in hours vs. offline.
   const queueNote = (o: SupportAvailability | null) =>
@@ -369,7 +371,18 @@ export default function ChatPage() {
     <div className="flex h-[calc(100svh-7rem)] min-h-0 gap-4">
       {/* conversation rail */}
       <aside className="hidden w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card md:flex">
-        <div className="border-b border-border px-4 py-3 font-semibold">Conversations</div>
+        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <span className="font-semibold">Conversations</span>
+          {/* Staff: live support-hours status, click to view/edit. Easy to check at a glance. */}
+          {isStaffUser && (
+            <button onClick={() => setHoursOpen(true)} title="Support hours"
+              className={"inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors hover:bg-accent " +
+                (office ? (office.open ? "border-emerald-300 text-emerald-700 dark:text-emerald-300" : "border-amber-300 text-amber-700 dark:text-amber-300") : "border-border text-muted-foreground")}>
+              <span className={"size-1.5 rounded-full " + (office ? (office.open ? "bg-emerald-500" : "bg-amber-500") : "bg-muted-foreground/50")} />
+              {office ? (office.open ? "Open" : "Closed") : "Hours"}
+            </button>
+          )}
+        </div>
         {!signedOut && (
           <div className="border-b border-border p-2">
             <Input
@@ -666,6 +679,8 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+
+    {isStaffUser && <SupportHoursEditor open={hoursOpen} onOpenChange={setHoursOpen} isAdmin={isAdmin} onSaved={setOffice} />}
     </>
   )
 }

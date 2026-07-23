@@ -30,31 +30,51 @@ const AI_MODELS = [
 // a restart. ICT (UTC+7), Mon–Fri 09:00–18:00 by default; override via SUPPORT_* env.
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const fmtHour = (hh) => { const H = Math.floor(hh); const M = Math.round((hh - H) * 60); return `${H}:${String(M).padStart(2, '0')}`; };
-function supportHours() {
-  const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
-  const tzLabel = process.env.SUPPORT_TZ_LABEL || 'ICT';
-  const startH = n(process.env.SUPPORT_HOURS_START, 9);
-  const endH = n(process.env.SUPPORT_HOURS_END, 18);
-  return {
-    tzOffset: n(process.env.SUPPORT_TZ_OFFSET, 7),   // hours east of UTC
-    startH, endH, tzLabel,
-    days: [1, 2, 3, 4, 5],                            // Mon–Fri
-    label: process.env.SUPPORT_HOURS_LABEL || `${fmtHour(startH)}–${fmtHour(endH)} ${tzLabel}, Mon–Fri`,
-  };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/**
+ * The effective support-hours config: a saved `support_config` row (admin-edited from the
+ * chat page) overrides env, which overrides the defaults. Read at CALL time so an edit
+ * applies immediately, no restart. `ooo` is a manual holiday closure — an ISO date we're
+ * out UNTIL, with an optional custom message — which overrides the weekly window.
+ */
+export async function supportConfig() {
+  let saved = {};
+  try {
+    await ensureSettings();
+    const r = await q("select value from settings where key='support_config'");
+    const v = r.rows[0] && r.rows[0].value;
+    saved = (typeof v === 'string' ? JSON.parse(v) : v) || {};
+  } catch { saved = {}; }
+  const pick = (a, b, d) => { for (const x of [a, b]) { const y = Number(x); if (Number.isFinite(y)) return y; } return d; };
+  const tzLabel = (typeof saved.tzLabel === 'string' && saved.tzLabel.trim()) ? saved.tzLabel.trim() : (process.env.SUPPORT_TZ_LABEL || 'ICT');
+  const startH = pick(saved.startH, process.env.SUPPORT_HOURS_START, 9);
+  const endH = pick(saved.endH, process.env.SUPPORT_HOURS_END, 18);
+  const tzOffset = pick(saved.tzOffset, process.env.SUPPORT_TZ_OFFSET, 7);
+  const days = Array.isArray(saved.days) && saved.days.length ? saved.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [1, 2, 3, 4, 5];
+  const label = (typeof saved.label === 'string' && saved.label.trim()) ? saved.label.trim()
+    : (process.env.SUPPORT_HOURS_LABEL || `${fmtHour(startH)}–${fmtHour(endH)} ${tzLabel}, Mon–Fri`);
+  const o = (saved.ooo && typeof saved.ooo === 'object') ? saved.ooo : {};
+  const ooo = { until: (typeof o.until === 'string' && o.until) ? o.until : null, message: (typeof o.message === 'string') ? o.message.slice(0, 300) : '' };
+  return { startH, endH, tzOffset, tzLabel, days, label, ooo };
 }
-export function supportAvailability() {
-  const h = supportHours();
+
+export async function supportAvailability() {
+  const h = await supportConfig();
+  // A manual holiday closure wins over the weekly window while its date is still ahead.
+  const oooUntil = h.ooo.until ? new Date(h.ooo.until).getTime() : 0;
+  const oooActive = oooUntil > Date.now();
   // Shift UTC into the office timezone, then read the wall-clock there. Fixed offset, no tz
   // library — good enough for a business-hours gate and dependency-free.
   const local = new Date(Date.now() + h.tzOffset * 3600 * 1000);
   const dow = local.getUTCDay();                       // 0 Sun … 6 Sat, in office tz
   const hour = local.getUTCHours() + local.getUTCMinutes() / 60;
-  const open = h.days.includes(dow) && hour >= h.startH && hour < h.endH;
-  // When we're closed, work out the NEXT time the office opens so the seller sees a concrete
-  // "back Monday at 9:00" instead of a vague "soon". Walk forward day by day to the next
-  // working day (today only counts if it's before opening).
+  const open = !oooActive && h.days.includes(dow) && hour >= h.startH && hour < h.endH;
+  // When closed, a CONCRETE return time beats a vague "soon".
   let resumesLabel = '';
-  if (!open) {
+  if (oooActive) {
+    const u = new Date(oooUntil + h.tzOffset * 3600 * 1000);
+    resumesLabel = `${MONTHS[u.getUTCMonth()]} ${u.getUTCDate()}`;
+  } else if (!open) {
     for (let i = 0; i <= 7; i++) {
       const d = (dow + i) % 7;
       if (!h.days.includes(d)) continue;
@@ -64,7 +84,7 @@ export function supportAvailability() {
       break;
     }
   }
-  return { open, hoursLabel: h.label, resumesLabel };
+  return { open, hoursLabel: h.label, resumesLabel, oooMessage: oooActive ? h.ooo.message : '' };
 }
 
 /**
@@ -99,7 +119,7 @@ async function runSupportNudges() {
         limit 25`, [graceMin]);
   } catch { return; }
   if (!rows.rows.length) return;
-  const avail = supportAvailability();
+  const avail = await supportAvailability();
   const body = avail.open
     ? 'Thanks for your patience — your request is still in our queue and a teammate will reply here as soon as they can.'
     : `Our team is out of office right now${avail.resumesLabel ? ` — back ${avail.resumesLabel}` : ''} (${avail.hoursLabel}). Your request is logged; a teammate will reply right here, and email you, when we're back.`;
@@ -255,7 +275,41 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   }
 
   // ── Is the support team around right now? Drives the handoff copy the seller sees. ──
-  app.get('/api/support/availability', { preHandler: requireAuth }, async () => supportAvailability());
+  app.get('/api/support/availability', { preHandler: requireAuth }, async () => await supportAvailability());
+
+  // ── Staff: read the editable hours config + live status (shown in the chat editor). ──
+  app.get('/api/support/hours-config', { preHandler: requireStaff }, async () => {
+    const cfg = await supportConfig();
+    return {
+      config: { startH: cfg.startH, endH: cfg.endH, tzOffset: cfg.tzOffset, tzLabel: cfg.tzLabel, days: cfg.days, ooo: cfg.ooo },
+      availability: await supportAvailability(),
+    };
+  });
+  // ── ADMIN: save the hours config + manual holiday closure. ──
+  app.put('/api/support/hours-config', { preHandler: requireStaff }, async (req, reply) => {
+    if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only' }; }
+    await ensureSettings();
+    const b = req.body || {};
+    const cur = await supportConfig();
+    const clampH = (v, d) => { const x = Number(v); return Number.isFinite(x) && x >= 0 && x <= 24 ? x : d; };
+    const cfg = {
+      startH: clampH(b.startH, cur.startH),
+      endH: clampH(b.endH, cur.endH),
+      tzOffset: Number.isFinite(Number(b.tzOffset)) ? Number(b.tzOffset) : cur.tzOffset,
+      tzLabel: (typeof b.tzLabel === 'string' && b.tzLabel.trim()) ? b.tzLabel.trim().slice(0, 8) : cur.tzLabel,
+      days: Array.isArray(b.days) ? b.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : cur.days,
+      ooo: {
+        // A blank/absent until clears the holiday closure. Stored as-is (ISO date string).
+        until: (b.ooo && typeof b.ooo.until === 'string' && b.ooo.until.trim()) ? b.ooo.until.trim() : null,
+        message: (b.ooo && typeof b.ooo.message === 'string') ? b.ooo.message.slice(0, 300) : '',
+      },
+    };
+    await q(
+      `insert into settings (key, value, updated_at) values ('support_config', $1::jsonb, now())
+       on conflict (key) do update set value = excluded.value, updated_at = now()`,
+      [JSON.stringify(cfg)]);
+    return { ok: true, config: cfg, availability: await supportAvailability() };
+  });
 
   // ── Staff: DRAFT a reply for a seller's support thread (does NOT post it) ─────
   app.post('/api/support/ai-draft', { preHandler: requireStaff }, async (req, reply) => {
@@ -366,7 +420,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
                   and s.sender_role not in ('seller', 'assistant')
                   and s.created_at > e.created_at)
            limit 1`, [threadId]);
-      if (open.rows.length) return { ok: true, escalated: true, office: supportAvailability() };
+      if (open.rows.length) return { ok: true, escalated: true, office: await supportAvailability() };
     } catch { /* if the check fails, fall through — a missed suppression is better than a hang */ }
 
     // Exclude INTERNAL rows (staff order briefs, internal notes). They share this
