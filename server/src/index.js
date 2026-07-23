@@ -42,6 +42,7 @@ import { spydeckRoutes } from './routes/spydeck.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { adsRoutes } from './routes/ads.js';
 import { broadcastsRoutes } from './routes/broadcasts.js';
+import { siteContentRoutes } from './routes/site_content.js';
 import { dispatchRoutes } from './routes/dispatch.js';
 import { ssOrderStatus } from './routes/ss.js';
 import { startSupplierPoll } from './supplier-poll.js';
@@ -341,6 +342,7 @@ spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorite
 notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
 adsRoutes(app, requireStaff);                          // Meta + Google Ads: connect, read spend/ROAS, create + pause campaigns
 broadcastsRoutes(app, requireStaff, requireAdmin);     // seller email broadcasts — staff draft, ADMIN sends; PUBLIC one-click unsubscribe at /api/broadcasts/unsubscribe
+siteContentRoutes(app, requireAdmin);                  // editable marketing-home copy — PUBLIC GET (homepage reads it), ADMIN PUT (Settings › Site content)
 dispatchRoutes(app, requireAuth, requireWarehouse);    // byeastside: push labels for pre-scan, poll PICKED
 manifestRoutes(app, requireWarehouse);                  // USPS SCAN forms via Shippo manifests
 manualSupplierRoutes(app, requireStaff, requireWarehouse); // shops with no API — saved links + prices

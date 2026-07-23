@@ -15,63 +15,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Reveal } from "@/components/motion/reveal"
-
-const stats = [
-  { value: "2.4M+", label: "orders shipped" },
-  { value: "3", label: "marketplaces synced" },
-  { value: "99.2%", label: "on-time fulfillment" },
-  { value: "48hrs", label: "avg to doorstep" },
-]
-
-const steps = [
-  { n: "01", title: "Connect your stores", body: "OAuth into Etsy, Shopify or TikTok Shop in about two minutes." },
-  { n: "02", title: "Upload your designs", body: "Map artwork to products once — we handle placement and print files." },
-  { n: "03", title: "We fulfill, hands-off", body: "Print, pack, ship, and track. You just watch orders go out." },
-]
-
-const testimonials = [
-  {
-    quote:
-      "I went from spending three hours a day on orders to basically zero. They just ship. I check tracking sometimes for fun.",
-    name: "Maya R.",
-    role: "Etsy · 4k orders/mo",
-  },
-  {
-    quote:
-      "The wallet made it click for me — I can see exactly what each order costs before it prints. No mystery invoices.",
-    name: "Devon K.",
-    role: "Shopify apparel",
-  },
-  {
-    quote:
-      "TikTok Shop blew up overnight and egfulfill just absorbed it. Same queue, same flow, tracking pushed back automatically.",
-    name: "Priya S.",
-    role: "TikTok Shop",
-  },
-]
-
-const faqs = [
-  {
-    q: "Which marketplaces do you sync with?",
-    a: "Etsy, Shopify, TikTok Shop and WooCommerce today, with more on the way. Orders flow into one queue automatically and tracking is pushed back to each marketplace.",
-  },
-  {
-    q: "Is there a monthly fee?",
-    a: "No. The platform is free — you only pay the per-order fulfillment cost when an order ships, funded from your prepaid wallet.",
-  },
-  {
-    q: "How does shipping pricing work?",
-    a: "We rate-shop across carriers and buy the cheapest available label, billed at cost. You always see the exact charge on each order.",
-  },
-  {
-    q: "Can I use my own designs?",
-    a: "Yes. Upload artwork to your library, map it to products once, and our mini designer handles placement and print-ready files.",
-  },
-  {
-    q: "What about quality control?",
-    a: "Every order is quality-checked at each stage on a vetted print network — intake, print, and pack — before it ships.",
-  },
-]
+import { getSiteContent, DEFAULT_SITE_CONTENT } from "@/lib/site-content"
 
 /* Hover: a soft lift, a brand-tinted border, and a glow the same hue as the accent.
    Kept to one definition so the feature cards can't drift apart, and to transform +
@@ -81,7 +25,16 @@ const CARD_HOVER =
   "group transition-all duration-200 hover:-translate-y-0.5 " +
   "hover:border-primary/40 hover:shadow-[0_14px_40px_-20px_var(--primary)]"
 
-export default function MarketingHome() {
+// The bento's four cards each carry bespoke decoration (chips, a wallet figure) and grid
+// span, so the layout owns exactly four fixed slots — only the title/body of each is
+// editable. Read a slot's copy from stored content, falling back per-slot to the default so
+// a short saved array can never leave a card textless.
+const featureCard = (cards: { title: string; body: string }[], i: number) =>
+  cards[i] ?? DEFAULT_SITE_CONTENT.features.cards[i]
+
+export default async function MarketingHome() {
+  const content = await getSiteContent()
+  const { hero, stats, features, steps, testimonials, faq, cta } = content
   return (
     <>
       {/* ── Hero ── */}
@@ -102,26 +55,25 @@ export default function MarketingHome() {
         <div className="mx-auto max-w-6xl px-6 pb-20 pt-20 text-center sm:pt-28">
           <Reveal delay={0}>
             <h1 className="mx-auto max-w-4xl font-display text-6xl font-semibold leading-[1.02] tracking-tight text-balance text-foreground sm:text-7xl">
-              What if every order <span className="italic text-primary">printed itself?</span>
+              {hero.headline} <span className="italic text-primary">{hero.accent}</span>
             </h1>
           </Reveal>
 
           <Reveal delay={0.08}>
             <p className="mx-auto mt-7 max-w-2xl text-lg text-muted-foreground text-pretty">
-              Etsy, Shopify & TikTok orders sync into one queue, print on a vetted network, and ship with
-              tracking pushed back — completely hands off.
+              {hero.subhead}
             </p>
           </Reveal>
 
           <Reveal delay={0.16}>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Link href="/login" className={buttonVariants({ size: "lg" })}>
-                Start for free <ArrowRight size={16} weight="bold" />
+                {hero.ctaPrimary} <ArrowRight size={16} weight="bold" />
               </Link>
               {/* No override any more: the outline variant is themed for a light surface,
                   which is what this now is. */}
               <Link href="/how-it-works" className={buttonVariants({ variant: "outline", size: "lg" })}>
-                See how it works
+                {hero.ctaSecondary}
               </Link>
             </div>
           </Reveal>
@@ -130,16 +82,15 @@ export default function MarketingHome() {
           <Reveal delay={0.32}>
             <div className="mt-12 flex flex-col items-center gap-3">
               <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Works with
+                {hero.worksWithLabel}
               </span>
               <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-lg font-semibold text-foreground/70">
-                <span>Etsy</span>
-                <span className="text-foreground/25">·</span>
-                <span>Shopify</span>
-                <span className="text-foreground/25">·</span>
-                <span>TikTok Shop</span>
-                <span className="text-foreground/25">·</span>
-                <span>WooCommerce</span>
+                {hero.integrations.map((name, i) => (
+                  <span key={name} className="contents">
+                    {i > 0 && <span className="text-foreground/25">·</span>}
+                    <span>{name}</span>
+                  </span>
+                ))}
               </div>
             </div>
           </Reveal>
@@ -150,7 +101,7 @@ export default function MarketingHome() {
       <section className="border-y border-border bg-muted/30">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-6 py-12 md:grid-cols-4">
           {stats.map((s, i) => (
-            <Reveal key={s.label} delay={i * 0.08} className="text-center">
+            <Reveal key={`${s.label}-${i}`} delay={i * 0.08} className="text-center">
               <div className="font-display text-4xl font-semibold tracking-tight">{s.value}</div>
               <div className="mt-1 text-sm text-muted-foreground">{s.label}</div>
             </Reveal>
@@ -162,10 +113,10 @@ export default function MarketingHome() {
       <section id="features" className="mx-auto max-w-6xl px-6 py-24">
         <Reveal>
           <h2 className="max-w-2xl font-display text-4xl font-semibold tracking-tight">
-            Everything after the sale, handled.
+            {features.heading}
           </h2>
           <p className="mt-3 max-w-2xl text-muted-foreground">
-            From the moment an order lands to the tracking number your buyer sees.
+            {features.subhead}
           </p>
         </Reveal>
 
@@ -176,10 +127,9 @@ export default function MarketingHome() {
             <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
               <PlugsConnected size={22} weight="duotone" />
             </span>
-            <div className="text-lg font-semibold">Every store, one queue</div>
+            <div className="text-lg font-semibold">{featureCard(features.cards, 0).title}</div>
             <p className="max-w-md text-sm text-muted-foreground">
-              Orders from Etsy, Shopify & TikTok Shop sync in automatically — no CSV exports, no
-              copy-paste, no missed orders.
+              {featureCard(features.cards, 0).body}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {["Etsy #4142", "Shopify #8821", "TikTok #2093"].map((t) => (
@@ -196,9 +146,9 @@ export default function MarketingHome() {
             <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
               <Printer size={22} weight="duotone" />
             </span>
-            <div className="text-lg font-semibold">Vetted print network</div>
+            <div className="text-lg font-semibold">{featureCard(features.cards, 1).title}</div>
             <p className="text-sm text-muted-foreground">
-              Quality-checked partners with QC at every stage — not a black box.
+              {featureCard(features.cards, 1).body}
             </p>
           </Card>
           </Reveal>
@@ -208,9 +158,9 @@ export default function MarketingHome() {
             <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
               <Truck size={22} weight="duotone" />
             </span>
-            <div className="text-lg font-semibold">Tracking, automatic</div>
+            <div className="text-lg font-semibold">{featureCard(features.cards, 2).title}</div>
             <p className="text-sm text-muted-foreground">
-              Cheapest label bought and tracking pushed back to the marketplace for you.
+              {featureCard(features.cards, 2).body}
             </p>
           </Card>
           </Reveal>
@@ -220,10 +170,9 @@ export default function MarketingHome() {
             <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
               <Wallet size={22} weight="duotone" />
             </span>
-            <div className="text-lg font-semibold">Transparent wallet</div>
+            <div className="text-lg font-semibold">{featureCard(features.cards, 3).title}</div>
             <p className="max-w-md text-sm text-muted-foreground">
-              A prepaid wallet with clear per-order charges and instant payouts. Always know exactly what
-              you paid and why.
+              {featureCard(features.cards, 3).body}
             </p>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-display text-3xl font-semibold tracking-tight">$12,480.00</span>
@@ -238,7 +187,7 @@ export default function MarketingHome() {
       <section id="how" className="border-t border-border bg-muted/30">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <Reveal>
-            <h2 className="font-display text-4xl font-semibold tracking-tight">Live in three steps.</h2>
+            <h2 className="font-display text-4xl font-semibold tracking-tight">{steps.heading}</h2>
           </Reveal>
           <div className="relative mt-12 grid gap-10 md:grid-cols-3">
             {/* connector line */}
@@ -246,8 +195,8 @@ export default function MarketingHome() {
               aria-hidden
               className="absolute left-0 right-0 top-5 hidden h-px bg-border md:block"
             />
-            {steps.map((s, i) => (
-              <Reveal key={s.n} delay={i * 0.1} className="relative">
+            {steps.items.map((s, i) => (
+              <Reveal key={`${s.n}-${i}`} delay={i * 0.1} className="relative">
                 <div className="flex size-10 items-center justify-center rounded-full border border-primary/30 bg-background font-display text-sm font-semibold text-primary">
                   {s.n}
                 </div>
@@ -263,12 +212,12 @@ export default function MarketingHome() {
       <section className="mx-auto max-w-6xl px-6 py-24">
         <Reveal>
           <h2 className="max-w-2xl font-display text-4xl font-semibold tracking-tight">
-            Sellers who stopped touching orders.
+            {testimonials.heading}
           </h2>
         </Reveal>
         <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {testimonials.map((t, i) => (
-            <Reveal key={t.name} delay={i * 0.1}>
+          {testimonials.items.map((t, i) => (
+            <Reveal key={`${t.name}-${i}`} delay={i * 0.1}>
             <Card className="gap-4 p-7">
               <div className="font-display text-4xl leading-[0.5] text-primary">&ldquo;</div>
               <p className="text-sm leading-relaxed text-foreground/90">{t.quote}</p>
@@ -289,10 +238,10 @@ export default function MarketingHome() {
       <section className="border-t border-border bg-muted/30">
         <div className="mx-auto max-w-3xl px-6 py-24">
           <Reveal>
-            <h2 className="text-center font-display text-4xl font-semibold tracking-tight">Questions, answered.</h2>
+            <h2 className="text-center font-display text-4xl font-semibold tracking-tight">{faq.heading}</h2>
           </Reveal>
           <Accordion multiple={false} className="mt-10 w-full">
-            {faqs.map((f, i) => (
+            {faq.items.map((f, i) => (
               <AccordionItem key={i} value={`faq-${i}`}>
                 <AccordionTrigger className="text-left text-base font-medium">{f.q}</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">{f.a}</AccordionContent>
@@ -306,16 +255,16 @@ export default function MarketingHome() {
       <section className="bg-foreground text-background">
         <Reveal className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 py-24 text-center">
           <h2 className="max-w-2xl font-display text-5xl font-semibold tracking-tight text-balance">
-            Ready to put fulfillment on autopilot?
+            {cta.heading}
           </h2>
           <p className="max-w-xl text-background/70">
-            Connect a store and send your first hands-off order today. No monthly fee.
+            {cta.subhead}
           </p>
           <Link
             href="/login"
             className="inline-flex h-11 items-center gap-2 rounded-2xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Start for free <ArrowRight size={16} weight="bold" />
+            {cta.button} <ArrowRight size={16} weight="bold" />
           </Link>
         </Reveal>
       </section>

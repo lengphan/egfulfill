@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
+import { SiteContentPanel } from "@/components/app/site-content-panel"
 import { SupplierOrderingSettings } from "@/components/app/supplier-ordering-settings"
 import { getUser, updateUser } from "@/lib/auth"
 import { UserAvatar, AVATAR_COLORS, AVATAR_EMOJIS } from "@/components/app/user-avatar"
@@ -1766,6 +1767,8 @@ export function SettingsView() {
             decide how a purchase order pays and ships. */}
         {canPlatform && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
         {isAdmin && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
+        {/* Marketing-home copy — admin only, public-facing brand surface. */}
+        {isAdmin && <TabsTrigger value="site">Site content</TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
         {/* Team is a SELLER's own staff (and their permissions). Factory roles are managed
             in Users by admin/warehouse, so a "Team" tab on an operator's settings invites
@@ -1811,6 +1814,11 @@ export function SettingsView() {
       {isAdmin && (
         <TabsContent value="integrations">
           <IntegrationsPanel />
+        </TabsContent>
+      )}
+      {isAdmin && (
+        <TabsContent value="site">
+          <SiteContentPanel />
         </TabsContent>
       )}
       {/* Same condition as the trigger — gating the two differently would render a tab

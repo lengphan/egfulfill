@@ -1,4 +1,5 @@
 import { getToken } from "./auth"
+import type { SiteContent } from "./site-content"
 
 // Same-origin in production (Caddy reverse-proxies /api → Fastify). For local
 // cross-origin dev against a running API, set NEXT_PUBLIC_API_BASE=http://localhost:3000.
@@ -2278,4 +2279,21 @@ export function deleteBroadcast(id: string | number) {
  *  so poll getBroadcasts() for sent_count rather than expecting this to wait. */
 export function sendBroadcast(id: string | number) {
   return api<{ id: string; recipientCount: number; status?: string; note?: string }>(`/api/broadcasts/${id}/send`, { method: "POST" })
+}
+
+// ── Site content — editable marketing-home copy (admin) ──────────────────────
+// The type + defaults live in lib/site-content.ts (shared with the SSR homepage). These
+// are the admin read/write used by Settings › Site content.
+
+/** Admin read of the STORED blob merged over defaults. Returns a complete SiteContent so the
+ *  editor always has every field populated, never a half-empty form. */
+export async function getSiteContentAdmin() {
+  const { mergeSiteContent } = await import("./site-content")
+  const r = await api<{ content: unknown; updatedAt: string | null }>(`/api/site-content`)
+  return { content: mergeSiteContent(r.content), updatedAt: r.updatedAt }
+}
+export function setSiteContent(content: SiteContent) {
+  return api<{ ok?: boolean; error?: string; content: SiteContent }>(`/api/site-content`, {
+    method: "PUT", body: JSON.stringify({ content }),
+  })
 }
