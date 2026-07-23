@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { SignOut, LockSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { sellerNav, allowedByPerms } from "@/lib/nav"
+import { useNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
 import { useLabelT } from "@/lib/i18n"
 import { useEntitlements } from "@/lib/entitlements"
 import { getMyAccess } from "@/lib/api"
@@ -24,6 +25,7 @@ export function Sidebar() {
   // cached session: a team member's own row is always 'starter', so the cached answer
   // drew a padlock next to a feature their leader had already paid for.
   const spydeck = useEntitlements().spydeck
+  useNavVisibility() // re-render once the admin hide-map loads
 
   // Team permissions: if I'm someone's member, show only the surfaces they shared. An
   // owner gets null → everything. Until it resolves we render the full nav (an owner is
@@ -45,7 +47,7 @@ export function Sidebar() {
 
   // One filtered copy of the nav, used by both the desktop rail and the mobile sheet.
   const sections = sellerNav
-    .map((s) => ({ ...s, items: s.items.filter((it) => allowedByPerms(it.href, perms)) }))
+    .map((s) => ({ ...s, items: s.items.filter((it) => allowedByPerms(it.href, perms) && !isSurfaceHidden("seller", it.href)) }))
     .filter((s) => s.items.length > 0)
 
   const mobileSections: MobileNavSection[] = sections.map((s) => ({

@@ -6,6 +6,7 @@ import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, Us
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
+import { PermissionsMatrix } from "@/components/app/permissions-matrix"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1770,6 +1771,8 @@ export function SettingsView() {
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
         {isAdmin && <TabsTrigger value="site">Site content</TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
+        {/* Permissions — admin-only, HIDE-only nav visibility per role. */}
+        {isAdmin && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         {/* Team is a SELLER's own staff (and their permissions). Factory roles are managed
             in Users by admin/warehouse, so a "Team" tab on an operator's settings invites
             them to invite people into an account that isn't theirs. */}
@@ -1809,6 +1812,11 @@ export function SettingsView() {
       {isAdmin && (
         <TabsContent value="activity">
           <ActivityPanel />
+        </TabsContent>
+      )}
+      {isAdmin && (
+        <TabsContent value="permissions">
+          <PermissionsMatrix />
         </TabsContent>
       )}
       {isAdmin && (

@@ -1503,6 +1503,18 @@ export function rebuildSpydeckTrending(seed = 0) {
   return api<TrendingFeed & { retryInMs?: number; nextAt?: string; dailyCapped?: boolean }>(
     `/api/spydeck/trending/rebuild${seed ? `?seed=${seed}` : ""}`, { method: "POST" })
 }
+// Admin-editable nav visibility (HIDE-only): role -> hidden surface keys. Readable by any
+// signed-in user (so their nav filters); writable admin-only (enforced server-side).
+export type NavVisibilityMap = Partial<Record<string, string[]>>
+export function getNavVisibility() {
+  return api<{ hidden: NavVisibilityMap }>(`/api/nav_visibility`)
+}
+export function putNavVisibility(hidden: NavVisibilityMap) {
+  return api<{ ok?: boolean; hidden?: NavVisibilityMap; error?: string }>(`/api/nav_visibility`, {
+    method: "PUT", body: JSON.stringify({ hidden }),
+  })
+}
+
 export function saveSpydeckListing(listing: EtsyListing) {
   return api<{ ok?: boolean; error?: string }>(`/api/spydeck/saves`, {
     method: "POST",

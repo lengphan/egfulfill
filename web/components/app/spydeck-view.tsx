@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, getSpydeckListingDetail } from "@/lib/api"
 import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
+import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
 import { detectTrademarks } from "@/lib/trademarks"
 import { PublishProductDialog } from "@/components/app/publish-product-dialog"
 import { usePaged, Pagination } from "@/components/app/pagination"
@@ -348,16 +349,22 @@ export function SpyDeckView() {
   const [showTrending, setShowTrending] = useState(true)
   const [showAccount, setShowAccount] = useState(true)
   useEffect(() => {
+    let alive = true
     const t = setTimeout(() => {
       const r = getUser()?.role
       setCanFilter(r === "admin" || r === "warehouse")
-      const trend = r === "admin" || r === "warehouse"
-      const acct = r !== "operator"
-      setShowTrending(trend)
-      setShowAccount(acct)
-      setView((v) => ((v === "trending" && !trend) || (v === "account" && !acct) ? "search" : v))
+      // Driven by the admin hide-map now (DEFAULT_HIDDEN reproduces the prior behaviour —
+      // Trending staff-only, Analyzer hidden from operators — until an admin overrides).
+      loadNavVisibility().then(() => {
+        if (!alive) return
+        const trend = !isSurfaceHidden(r, "/spydeck#trending")
+        const acct = !isSurfaceHidden(r, "/spydeck#account")
+        setShowTrending(trend)
+        setShowAccount(acct)
+        setView((v) => ((v === "trending" && !trend) || (v === "account" && !acct) ? "search" : v))
+      })
     }, 0)
-    return () => clearTimeout(t)
+    return () => { alive = false; clearTimeout(t) }
   }, [])
 
   useEffect(() => {

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { SignOut, ChatCircleDots, Gear } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { staffNav, staffTools, type StaffNavItem } from "@/lib/staff-nav"
+import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
 import { useLabelT } from "@/lib/i18n"
 import { getUser, clearSession } from "@/lib/auth"
 import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
@@ -18,13 +19,19 @@ export function StaffSidebar() {
   const [tools, setTools] = useState<StaffNavItem[]>([])
   const [role, setRole] = useState("")
   useEffect(() => {
+    let alive = true
     const id = setTimeout(() => {
       const u = getUser()
-      setRole(u?.role ?? "")
-      setItems(staffNav(u?.role))
-      setTools(staffTools(u?.role))
+      const r = u?.role ?? ""
+      setRole(r)
+      // Filter by the admin-set hide-map (HIDE-only — never adds a page the role can't see).
+      loadNavVisibility().then(() => {
+        if (!alive) return
+        setItems(staffNav(r).filter((i) => !isSurfaceHidden(r, i.href)))
+        setTools(staffTools(r).filter((i) => !isSurfaceHidden(r, i.href)))
+      })
     }, 0)
-    return () => clearTimeout(id)
+    return () => { alive = false; clearTimeout(id) }
   }, [])
 
   const logout = () => { clearSession(); router.push("/login") }

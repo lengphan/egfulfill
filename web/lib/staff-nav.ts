@@ -3,7 +3,7 @@ import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFo
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
 // Staff boards, gated by role. Admin sees everything.
-const STAFF_ITEMS: StaffNavItem[] = [
+export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Dashboard", href: "/overview", icon: SquaresFour, roles: ["operator", "warehouse", "admin"] },
   { label: "Orders", href: "/operator", icon: Printer, roles: ["operator", "warehouse", "admin"] },
   { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
@@ -60,7 +60,7 @@ export function isStaffRole(role?: string | null): boolean {
 
 // Seller-side tool pages (in the (app) group) that specific staff roles may also use.
 // Admin gets everything; others get a curated set. Designers get none (design-only).
-const STAFF_TOOLS: StaffNavItem[] = [
+export const STAFF_TOOLS: StaffNavItem[] = [
   { label: "SpyDeck", href: "/spydeck", icon: Binoculars, roles: ["operator", "warehouse", "admin"] },
   { label: "Products", href: "/products", icon: Tag, roles: ["operator", "warehouse", "admin"] },
   // The shop window we publish OUTWARD — curated selection, trade prices, CSV export.
