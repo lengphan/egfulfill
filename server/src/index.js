@@ -7,6 +7,7 @@ import { ordersRoutes } from './routes/orders.js';
 import { orderRefundRoutes } from './routes/order_refunds.js';
 import { inventoryRoutes } from './routes/inventory.js';
 import { designCardsRoutes } from './routes/design_cards.js';
+import { designImagesRoutes } from './routes/design_images.js';
 import { catalogRoutes } from './routes/catalog.js';
 import { etsyRoutes } from './routes/etsy.js';
 import { tiktokRoutes } from './routes/tiktok.js';
@@ -319,6 +320,7 @@ ordersRoutes(app, requireAuth);
 orderRefundRoutes(app, requireAuth);                    // itemised per-order charges + partial refunds back to the seller's wallet (admin/warehouse only)
 inventoryRoutes(app, requireStaff, requireWarehouse);
 designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);
+designImagesRoutes(app, requireAuth);                   // seller's reusable Images library for the design maker (own uploads + buyer order art)
 catalogRoutes(app, requireAuth, requireStaff, requireWarehouse);
 etsyRoutes(app, requireAuth, requireStaff);
 tiktokRoutes(app, requireAuth, requireStaff);   // TikTok Shop OAuth connect (seller + admin connect their own shop)
