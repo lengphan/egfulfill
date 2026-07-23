@@ -1824,13 +1824,30 @@ export function ordersRoutes(app, requireAuth) {
   // got no suggestions). Gated by the same visibility guard as reading the thread.
   app.get('/api/support/order-mentions', { preHandler: requireAuth }, async (req, reply) => {
     const thread = String((req.query && req.query.thread) || '');
-    if (thread.indexOf('support-') !== 0) return { orders: [] };
-    if (!(await canSeeThread(req.user, thread))) { reply.code(403); return { error: 'forbidden' }; }
-    const sellerId = thread.slice('support-'.length);
-    const r = await q(
-      `select id, seq, customer, store, source, status, factory_status
-         from orders where seller_id = $1 order by created_at desc limit 100`, [sellerId]);
-    return { orders: r.rows };
+    // A SELLER support thread returns that seller's orders — a staffer answering the seller
+    // sees the seller's, the seller sees their own. A staffer's OWN "My EG" has no seller
+    // orders, so it falls through to the staff-wide list below.
+    if (thread.indexOf('support-') === 0) {
+      if (!(await canSeeThread(req.user, thread))) { reply.code(403); return { error: 'forbidden' }; }
+      const sellerId = thread.slice('support-'.length);
+      if (!(isStaff(req.user) && sellerId === req.user.sub)) {
+        const r = await q(
+          `select id, seq, customer, store, source, status, factory_status
+             from orders where seller_id = $1 order by created_at desc limit 100`, [sellerId]);
+        return { orders: r.rows };
+      }
+    }
+    // Staff channels (the Factory channel) + a staffer's own thread: staff may tag ANY
+    // order. A seller can only ever reach their own support thread (handled above), so this
+    // whole-board list is never exposed to a seller — the "Mention an order with @" the
+    // Factory channel promises now actually works.
+    if (isStaff(req.user)) {
+      const r = await q(
+        `select id, seq, customer, store, source, status, factory_status
+           from orders order by created_at desc limit 100`);
+      return { orders: r.rows };
+    }
+    return { orders: [] };
   });
 
   // Chat attachment upload. The client downsizes images first (canvas), so this just stores

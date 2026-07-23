@@ -222,7 +222,9 @@ export default function ChatPage() {
   useEffect(() => {
     const id = setTimeout(() => {
       getMentionPeople().then((r) => setPeople(r.people ?? [])).catch(() => setPeople([]))
-      if (!activeId || activeId.indexOf("support-") !== 0) { setOrders([]); return }
+      // Load order suggestions for the seller support threads AND the staff Factory channel
+      // (the server decides which orders and gates access). Announce/Workbench get none.
+      if (!activeId || (activeId.indexOf("support-") !== 0 && activeId !== STAFF_CHANNEL)) { setOrders([]); return }
       getOrderMentions(activeId).then((r) => setOrders(r.orders ?? [])).catch(() => setOrders([]))
     }, 0)
     return () => clearTimeout(id)
