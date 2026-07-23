@@ -1786,6 +1786,34 @@ export function ordersRoutes(app, requireAuth) {
         }
       }
     }
+
+    // @-mention of a TEAMMATE (any channel) → notify them, so pinging a person works even
+    // when the message isn't about an order. Match the @token against username, email-prefix
+    // or first name of a staff user; never the sender themselves.
+    try {
+      const toks = [];
+      const re = /(?:^|\s)@([a-z0-9][a-z0-9_.-]{1,63})/gi;
+      let mm;
+      while ((mm = re.exec(String(b.text || ''))) && toks.length < 10) toks.push(mm[1].toLowerCase());
+      if (toks.length) {
+        const u = await q(
+          `select id from users
+            where role <> 'seller' and active is not false
+              and (lower(username) = any($1)
+                   or lower(split_part(email,'@',1)) = any($1)
+                   or lower(split_part(name,' ',1)) = any($1))
+            limit 10`, [toks]);
+        const ids = u.rows.map((r) => String(r.id)).filter((id) => id !== String(req.user.sub));
+        if (ids.length) {
+          notify({
+            userIds: ids, type: 'mention',
+            title: `${b.by || 'Someone'} mentioned you`,
+            body: String(b.text || '').slice(0, 140), href: '/chat', entityId: channel,
+          });
+        }
+      }
+    } catch { /* a mention that can't resolve is just not a mention */ }
+
     return { ok: true };
   });
 
@@ -1802,6 +1830,16 @@ export function ordersRoutes(app, requireAuth) {
       `select id, seq, customer, store, source, status, factory_status
          from orders where seller_id = $1 order by created_at desc limit 100`, [sellerId]);
     return { orders: r.rows };
+  });
+
+  // People to suggest when "@"-mentioning a teammate — not everything is about an order.
+  // Staff only (you mention a colleague to pull them in); the mention notifies them (below).
+  app.get('/api/support/mention-people', { preHandler: requireAuth }, async () => {
+    const r = await q(
+      `select id, coalesce(nullif(name,''), split_part(email,'@',1)) as name, username, role
+         from users where role <> 'seller' and active is not false
+         order by name limit 100`);
+    return { people: r.rows };
   });
 
   app.get('/api/orders/:id/messages', { preHandler: requireAuth }, async (req, reply) => {

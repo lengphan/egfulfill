@@ -883,6 +883,12 @@ export function getOrders() {
 export function getOrderMentions(thread: string) {
   return api<{ orders?: OrderRow[]; error?: string }>(`/api/support/order-mentions?thread=${encodeURIComponent(thread)}`)
 }
+/** Teammates to suggest when "@"-mentioning a person (not everything is about an order).
+ *  Mentioning one notifies them server-side. */
+export type MentionPerson = { id: string; name: string; username: string | null; role: string }
+export function getMentionPeople() {
+  return api<{ people?: MentionPerson[] }>(`/api/support/mention-people`)
+}
 
 /** Staff: set ONE line item's factory_status (drives the production boards).
  *  Pass line_id whenever the item has one — sku alone can't address a marketplace line
