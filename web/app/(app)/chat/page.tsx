@@ -373,8 +373,9 @@ export default function ChatPage() {
       <aside className="hidden w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card md:flex">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
           <span className="font-semibold">Conversations</span>
-          {/* Staff: live support-hours status, click to view/edit. Easy to check at a glance. */}
-          {isStaffUser && (
+          {/* Support team (not designers, who don't handle seller support): live hours
+              status, click to view/edit. Matches the inbox carve-out above. */}
+          {isStaffUser && !isDesigner && (
             <button onClick={() => setHoursOpen(true)} title="Support hours"
               className={"inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors hover:bg-accent " +
                 (office ? (office.open ? "border-emerald-300 text-emerald-700 dark:text-emerald-300" : "border-amber-300 text-amber-700 dark:text-amber-300") : "border-border text-muted-foreground")}>
@@ -680,7 +681,7 @@ export default function ChatPage() {
       </div>
     </div>
 
-    {isStaffUser && <SupportHoursEditor open={hoursOpen} onOpenChange={setHoursOpen} isAdmin={isAdmin} onSaved={setOffice} />}
+    {isStaffUser && !isDesigner && <SupportHoursEditor open={hoursOpen} onOpenChange={setHoursOpen} isAdmin={isAdmin} onSaved={setOffice} />}
     </>
   )
 }
