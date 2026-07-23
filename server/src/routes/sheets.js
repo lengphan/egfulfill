@@ -130,7 +130,11 @@ export async function fetchSheetRows(raw, tabWanted) {
 export function sheetsRoutes(app, requireAuth) {
   // Public config: is import enabled, the template link, and whether the server
   // can auto-create a filled sheet (service account present).
-  app.get('/api/sheets/config', async () => ({ enabled: !!API_KEY, templateUrl: TEMPLATE_URL, canCreate: !!loadSA() }));
+  // enabled = "can this server read a sheet AT ALL", which is EITHER credential. Reporting
+  // only the API key hid the Sheet tab whenever someone had set up the service account (the
+  // preferred, keeps-it-private path the read helper actually uses) but no API key — the
+  // import option simply wasn't there, which read as "Google Sheet import is blank".
+  app.get('/api/sheets/config', async () => ({ enabled: !!(API_KEY || loadSA()), templateUrl: TEMPLATE_URL, canCreate: !!loadSA() }));
 
   // Diagnostic: does the service account actually authenticate? (auth-gated so it
   // isn't a public probe). Returns the SA email + token-mint result.
@@ -172,44 +176,22 @@ export function sheetsRoutes(app, requireAuth) {
   });
 
   // Read a sheet → { rows, title, tab }. Any seller may import into their own orders.
+  // Delegates to fetchSheetRows so the tab-picking, PII-safe service-account preference and
+  // blank-row filtering are shared with scheduled jobs rather than re-implemented here (the
+  // old inline copy was API-key-only, so a service-account-only setup got a 503 even though
+  // the server could read the sheet perfectly well).
   app.get('/api/sheets', { preHandler: requireAuth }, async (req, reply) => {
-    if (!API_KEY) { reply.code(503); return { error: 'Google Sheets import is not configured on the server.' }; }
+    if (!API_KEY && !loadSA()) { reply.code(503); return { error: 'Google Sheets import is not configured on the server.' }; }
     const raw = req.query.url || req.query.id || '';
-    const id = extractId(raw);
-    if (!id) { reply.code(400); return { error: 'Could not read a spreadsheet ID from that link.' }; }
-    const gid = extractGid(raw);
     try {
-      // 1) Find which tab to read. Prefer ?tab=, else the gid in the URL, else a
-      //    tab literally named "Orders", else the first tab.
-      const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?key=${API_KEY}&fields=properties.title,sheets.properties(title,sheetId)`);
-      const meta = await metaR.json().catch(() => ({}));
-      if (!metaR.ok) {
-        const msg = (meta.error && meta.error.message) || '';
-        if (metaR.status === 403) { reply.code(403); return { error: 'This sheet isn’t shared. In Google Sheets: Share → General access → “Anyone with the link” → Viewer.', detail: msg }; }
-        if (metaR.status === 404) { reply.code(404); return { error: 'Spreadsheet not found — double-check the link.', detail: msg }; }
-        reply.code(502); return { error: 'Google Sheets error: ' + (msg || metaR.status) };
-      }
-      const sheets = (meta.sheets || []).map((s) => s.properties).filter(Boolean);
-      const wantTab = String(req.query.tab || '').trim();
-      let pick = null;
-      if (wantTab) pick = sheets.find((s) => s.title === wantTab);
-      if (!pick && gid != null) pick = sheets.find((s) => String(s.sheetId) === String(gid));
-      if (!pick) pick = sheets.find((s) => /^orders$/i.test(s.title));
-      if (!pick) pick = sheets[0];
-      if (!pick) { reply.code(404); return { error: 'The spreadsheet has no readable tabs.' }; }
-
-      // 2) Read that tab's values. FORMATTED_VALUE (the default) keeps cells exactly
-      //    as displayed — important so a zip like 07030 isn't coerced to 7030.
-      const range = encodeURIComponent(pick.title);
-      const valR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${range}?key=${API_KEY}&majorDimension=ROWS`);
-      const val = await valR.json().catch(() => ({}));
-      if (!valR.ok) { reply.code(502); return { error: 'Could not read tab “' + pick.title + '”: ' + ((val.error && val.error.message) || valR.status) }; }
-      const rows = (val.values || [])
-        .map((r) => r.map((c) => (c == null ? '' : String(c))))
-        .filter((r) => r.some((c) => String(c).trim() !== ''));   // drop blank rows
-      return { ok: true, title: meta.properties && meta.properties.title, tab: pick.title, rows };
+      const { title, tab, rows } = await fetchSheetRows(raw, req.query.tab);
+      return { ok: true, title, tab, rows };
     } catch (e) {
-      reply.code(502); return { error: 'Failed to reach Google Sheets: ' + e.message };
+      // fetchSheetRows throws already-human-readable messages (bad link, not shared,
+      // not found). A caller-fixable problem is a 400; anything else is upstream (502).
+      const msg = String((e && e.message) || e);
+      reply.code(/spreadsheet ID|isn.t shared|not found|no readable tabs/i.test(msg) ? 400 : 502);
+      return { error: msg };
     }
   });
 }
