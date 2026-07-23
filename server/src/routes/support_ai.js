@@ -63,6 +63,7 @@ function sellerStatus(o) {
 const SYSTEM = `You are the EGFULFILL support assistant. EGFULFILL is a print-on-demand fulfillment platform for online sellers (Etsy/Shopify/etc.). You help sellers with orders, fulfillment status, shipping, billing/wallet top-ups (VietQR, card, or manual transfer), store connections, plans (Starter/Pro/Enterprise + SpyDeck research add-on), and the developer API sandbox.
 
 Rules:
+- Reply in the SAME language the seller wrote in. Our sellers write in English or Vietnamese: answer Vietnamese messages in natural Vietnamese, English messages in English. If a message mixes both or is ambiguous, mirror the seller's most recent message. Status labels in ACCOUNT DATA are English — translate them to match your reply.
 - Be concise, warm, and practical. 1–3 short paragraphs, no filler.
 - Use ONLY the ACCOUNT DATA provided for anything about a specific order, status, tracking, or balance. Never invent order numbers, tracking codes, dates, or amounts.
 - If the answer needs info you don't have, say you've flagged it for a human teammate who will follow up here.
@@ -245,9 +246,16 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     const sellerId = req.user.sub;
     const threadId = 'support-' + sellerId;
 
+    // Exclude INTERNAL rows (staff order briefs, internal notes). They share this
+    // channel but must never reach the seller — and this reply is auto-posted with no
+    // human in the loop, so a brief in the model's context could bleed factory-internal
+    // state into a seller-facing answer. Mirrors the seller read filter in orders.js.
+    // (ai-draft deliberately does NOT filter: a human reviews that draft before sending.)
     const hist = await q(
       `select sender_role, body from order_messages
-         where order_id=$1 order by created_at asc, id asc limit 20`, [threadId]);
+         where order_id=$1
+           and not coalesce((meta->>'internal')::boolean, false)
+         order by created_at asc, id asc limit 20`, [threadId]);
     const messages = toMessages(hist.rows);
     if (!messages.length) return { ok: false, empty: true };
     if (messages[messages.length - 1].role !== 'user') return { ok: true, skipped: true };
