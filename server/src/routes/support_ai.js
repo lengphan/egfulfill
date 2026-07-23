@@ -177,23 +177,38 @@ Rules:
 - Be concise, warm, and practical. 1–3 short paragraphs, no filler.
 - Use ONLY the ACCOUNT DATA provided for anything about a specific order, status, tracking, or balance. Never invent order numbers, tracking codes, dates, or amounts.
 - If the answer needs info you don't have, say you've flagged it for a human teammate who will follow up here.
-- For "where is my order?" cite the order's status label and tracking if present.
+- Be SPECIFIC about orders — the ACCOUNT DATA includes each recent order's items, placed date, status and tracking. When answering, name the actual item(s) and cite the status, the placed date, and the tracking when present, rather than giving a generic reply. If the seller doesn't say which order, use the most recent (or briefly list them if it's ambiguous).
+- For "where is my order?" give the status label in plain terms (e.g. what "In production" means), the tracking if present, and — if not shipped yet — that tracking appears once it ships.
 - Don't claim to have taken actions (refunds, cancellations, shipping changes) — you can explain how, or say you've passed it to the team.`;
 
 // Build a compact ACCOUNT DATA block for the system prompt.
 async function accountContext(sellerId) {
   const lines = [];
   try {
+    // Include the LINE ITEMS + placed date, not just a status label — a seller asking "where's
+    // my hat" or "what did I order" gets a vague answer if all the model sees is "#4099:
+    // In production". Items come back as a small JSON array, formatted below.
     const o = await q(
-      `select id, seq, factory_status, status, total, tracking, carrier, created_at
-         from orders where seller_id=$1 order by created_at desc limit 15`, [sellerId]);
+      `select o.id, o.seq, o.factory_status, o.status, o.total, o.tracking, o.carrier, o.created_at,
+              (select json_agg(json_build_object(
+                        'name', coalesce(nullif(i.name,''), i.sku, 'item'),
+                        'qty', coalesce(i.qty, 1),
+                        'variant', coalesce(nullif(i.variant,''), nullif(btrim(coalesce(i.color,'') || ' ' || coalesce(i.size,'')), ''))
+                      ) order by i.created_at)
+                 from order_items i where i.order_id = o.id) as items
+         from orders o where o.seller_id=$1 order by o.created_at desc limit 10`, [sellerId]);
     if (o.rows.length) {
       lines.push('Recent orders (newest first):');
       for (const r of o.rows) {
         const num = r.seq ? `#${r.seq}` : r.id;
-        const track = r.tracking ? `, tracking ${r.carrier || ''} ${r.tracking}`.trim() : '';
-        const total = r.total != null ? `, $${Number(r.total).toFixed(2)}` : '';
-        lines.push(`- ${num}: ${sellerStatus(r)}${total}${track}`);
+        const date = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        const total = r.total != null ? ` · $${Number(r.total).toFixed(2)}` : '';
+        lines.push(`- ${num}${date ? ` (placed ${date})` : ''}: ${sellerStatus(r)}${total}`);
+        const items = Array.isArray(r.items) ? r.items : [];
+        if (items.length) {
+          lines.push('    Items: ' + items.map((it) => `${it.qty || 1}× ${it.name}${it.variant ? ` (${it.variant})` : ''}`).join('; '));
+        }
+        if (r.tracking) lines.push(`    Tracking: ${`${r.carrier || ''} ${r.tracking}`.replace(/\s+/g, ' ').trim()}`);
       }
     } else {
       lines.push('This seller has no orders yet.');
