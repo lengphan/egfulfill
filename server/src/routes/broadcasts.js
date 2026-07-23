@@ -116,18 +116,84 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
+// Brand tokens as HEX, because email clients don't understand the oklch() the app theme is
+// authored in. Converted once from web/app/globals.css --primary oklch(0.55 0.245 280).
+const BRAND = {
+  accent: '#604cfa', // --primary, the one violet flourish
+  ink: '#18181b', head: '#0b0b0c', muted: '#71717a', faint: '#a1a1aa',
+  line: '#e4e4e7', pageBg: '#f4f4f5', card: '#ffffff',
+};
+// The whole email is one font family, declared on every text cell rather than once at the
+// top: Outlook and Gmail both drop inherited font-family in places, so "declare it once"
+// silently falls back to Times in exactly the clients that matter most.
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+// The wordmark echoes the app's Fraunces (font-display) with a serif stack — Fraunces
+// itself can't be webfont-loaded in mail, but the editorial serif character carries.
+const WORDMARK_FONT = "Georgia,'Times New Roman',serif";
+
+// Physical postal address in the footer. CAN-SPAM (US) REQUIRES one on marketing mail, and
+// Gmail's bulk-sender rules expect it — its absence is a deliverability risk, not a nicety.
+// Configurable because it's a business fact, not a code constant; the fallback is a legal
+// stopgap, not a real address (see the note surfaced to the user).
+function postalAddress() {
+  return process.env.MAIL_POSTAL_ADDRESS || 'EGFULFILL · egful.store';
+}
+
+// Autolink bare http(s) URLs AFTER escaping, so the source is still fully escaped and only
+// a URL shape becomes a link. A marketing mail almost always carries one, and a raw
+// https://… that isn't clickable reads as broken.
+function linkify(escaped) {
+  return escaped.replace(/(https?:\/\/[^\s<]+[^\s<.,)])/g,
+    (u) => `<a href="${u}" style="color:${BRAND.accent};text-decoration:underline">${u}</a>`);
+}
+
+// The branded shell. innerHtml is the already-safe message body; everything around it is
+// chrome. Kept as one function so header/footer live in a single place — a transactional
+// mail could adopt the same shell later without copying the markup.
+function emailShell(innerHtml, unsubUrl, preheader) {
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light only"></head>
+<body style="margin:0;padding:0;background:${BRAND.pageBg};-webkit-text-size-adjust:100%">
+<!-- Preheader: the inbox-preview line. Hidden in the body, but it's what shows next to the
+     subject in the list, so it's the first thing read. -->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${esc(preheader || '')}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.pageBg}">
+<tr><td align="center" style="padding:28px 16px">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:${BRAND.card};border:1px solid ${BRAND.line};border-radius:14px;overflow:hidden">
+  <!-- The single violet flourish: one accent rule across the top. -->
+  <tr><td style="height:4px;background:${BRAND.accent};line-height:4px;font-size:4px">&nbsp;</td></tr>
+  <!-- Header / wordmark -->
+  <tr><td style="padding:26px 32px 6px 32px">
+    <span style="font-family:${WORDMARK_FONT};font-size:26px;font-weight:600;letter-spacing:-0.5px;color:${BRAND.head}">egfulfill</span>
+  </td></tr>
+  <!-- Body -->
+  <tr><td style="padding:12px 32px 8px 32px;font-family:${FONT};font-size:15px;line-height:1.6;color:${BRAND.ink}">
+    ${innerHtml}
+  </td></tr>
+  <!-- Footer -->
+  <tr><td style="padding:22px 32px 30px 32px;border-top:1px solid ${BRAND.line}">
+    <p style="margin:0 0 6px;font-family:${FONT};font-size:12px;line-height:1.55;color:${BRAND.muted}">
+      You're receiving this because you have an EGFULFILL seller account.
+      <a href="${esc(unsubUrl)}" style="color:${BRAND.muted};text-decoration:underline">Unsubscribe from updates like this</a>.
+      Emails about your account and orders will still reach you.
+    </p>
+    <p style="margin:0;font-family:${FONT};font-size:12px;line-height:1.55;color:${BRAND.faint}">${esc(postalAddress())}</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
 function renderHtml(body, name, unsubUrl) {
   const greeting = name ? `Hi ${esc(name)},` : 'Hi,';
-  const paras = String(body).split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
-  return `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#18181b;max-width:560px">
-<p style="margin:0 0 14px">${greeting}</p>
-${paras}
-<hr style="border:0;border-top:1px solid #e4e4e7;margin:28px 0 12px">
-<p style="margin:0;font-size:12px;color:#71717a">
-You're receiving this because you have an EGFULFILL seller account.
-<a href="${esc(unsubUrl)}" style="color:#71717a">Unsubscribe from updates like this</a>.
-Account and order emails will still reach you.
-</p></div>`;
+  const paras = String(body).split(/\n{2,}/)
+    .map((p) => `<p style="margin:0 0 15px">${linkify(esc(p)).replace(/\n/g, '<br>')}</p>`).join('');
+  const inner = `<p style="margin:0 0 15px">${greeting}</p>${paras}`;
+  // Preheader = the first line of the body, so the inbox preview shows the message's own
+  // opening rather than the greeting or, worse, the hidden-div fallback some clients grab.
+  const preheader = String(body).replace(/\s+/g, ' ').trim().slice(0, 140);
+  return emailShell(inner, unsubUrl, preheader);
 }
 
 function renderText(body, name, unsubUrl) {
