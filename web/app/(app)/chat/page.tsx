@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone } from "@phosphor-icons/react"
+import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability } from "@/lib/api"
@@ -167,7 +167,7 @@ export default function ChatPage() {
   // The right "you're in the queue" line for the moment — in hours vs. offline.
   const queueNote = (o: SupportAvailability | null) =>
     o && !o.open
-      ? `Our team is offline right now (${o.hoursLabel}). Your request is logged — a teammate will reply right here, and email you, as soon as we're back. The assistant is paused.`
+      ? `Our team is out of office right now${o.resumesLabel ? ` — back ${o.resumesLabel}` : ""} (${o.hoursLabel}). Your request is logged; a teammate will reply right here, and email you, when we're back. The assistant is paused.`
       : `You're in the queue — a teammate will reply here${o?.hoursLabel ? `, usually within business hours (${o.hoursLabel})` : ""}. The assistant is paused until they do.`
   const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
   // Announcements are a broadcast, not a conversation — the server 403s a non-admin
@@ -414,6 +414,19 @@ export default function ChatPage() {
             </select>
           )}
         </div>
+
+        {/* Out-of-office notice — persistent (doesn't scroll), shown to the seller whenever
+            the team is closed, so a human's silence reads as "after hours", not "ignored".
+            The assistant still answers below; this just sets expectations about people. */}
+        {isSupport && !isStaffUser && office && !office.open && (
+          <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+            <Moon size={14} weight="fill" className="mt-0.5 shrink-0" />
+            <span>
+              <strong>Our team is out of office.</strong>{office.resumesLabel ? ` We&apos;re back ${office.resumesLabel}.` : ""}{" "}
+              Leave a message — a teammate will reply here, and email you, when we return. The assistant can still look up your orders now.
+            </span>
+          </div>
+        )}
 
         {/* messages */}
         <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">

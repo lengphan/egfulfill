@@ -28,14 +28,18 @@ const AI_MODELS = [
 // around. This is a small, single-timezone team, so it's a simple weekly window — not
 // per-agent presence. Read at CALL time (env, not module load) so a change applies without
 // a restart. ICT (UTC+7), Mon–Fri 09:00–18:00 by default; override via SUPPORT_* env.
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const fmtHour = (hh) => { const H = Math.floor(hh); const M = Math.round((hh - H) * 60); return `${H}:${String(M).padStart(2, '0')}`; };
 function supportHours() {
   const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
+  const tzLabel = process.env.SUPPORT_TZ_LABEL || 'ICT';
+  const startH = n(process.env.SUPPORT_HOURS_START, 9);
+  const endH = n(process.env.SUPPORT_HOURS_END, 18);
   return {
     tzOffset: n(process.env.SUPPORT_TZ_OFFSET, 7),   // hours east of UTC
-    startH: n(process.env.SUPPORT_HOURS_START, 9),
-    endH: n(process.env.SUPPORT_HOURS_END, 18),
+    startH, endH, tzLabel,
     days: [1, 2, 3, 4, 5],                            // Mon–Fri
-    label: process.env.SUPPORT_HOURS_LABEL || '9:00–18:00 ICT, Mon–Fri',
+    label: process.env.SUPPORT_HOURS_LABEL || `${fmtHour(startH)}–${fmtHour(endH)} ${tzLabel}, Mon–Fri`,
   };
 }
 export function supportAvailability() {
@@ -46,7 +50,21 @@ export function supportAvailability() {
   const dow = local.getUTCDay();                       // 0 Sun … 6 Sat, in office tz
   const hour = local.getUTCHours() + local.getUTCMinutes() / 60;
   const open = h.days.includes(dow) && hour >= h.startH && hour < h.endH;
-  return { open, hoursLabel: h.label };
+  // When we're closed, work out the NEXT time the office opens so the seller sees a concrete
+  // "back Monday at 9:00" instead of a vague "soon". Walk forward day by day to the next
+  // working day (today only counts if it's before opening).
+  let resumesLabel = '';
+  if (!open) {
+    for (let i = 0; i <= 7; i++) {
+      const d = (dow + i) % 7;
+      if (!h.days.includes(d)) continue;
+      if (i === 0 && hour >= h.startH) continue;       // today's window already ended
+      const when = i === 0 ? 'today' : i === 1 ? 'tomorrow' : DAY_NAMES[d];
+      resumesLabel = `${when} at ${fmtHour(h.startH)} ${h.tzLabel}`;
+      break;
+    }
+  }
+  return { open, hoursLabel: h.label, resumesLabel };
 }
 
 /**
@@ -84,7 +102,7 @@ async function runSupportNudges() {
   const avail = supportAvailability();
   const body = avail.open
     ? 'Thanks for your patience — your request is still in our queue and a teammate will reply here as soon as they can.'
-    : `Our team is offline right now (${avail.hoursLabel}). Your request is logged — a teammate will reply right here, and email you, as soon as we're back.`;
+    : `Our team is out of office right now${avail.resumesLabel ? ` — back ${avail.resumesLabel}` : ''} (${avail.hoursLabel}). Your request is logged; a teammate will reply right here, and email you, when we're back.`;
   for (const r of rows.rows) {
     try {
       await q(

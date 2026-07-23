@@ -1114,7 +1114,7 @@ export function getMe() {
 }
 // Ask the account-aware AI to reply in the seller's support thread. No-op server-side
 // if ANTHROPIC_API_KEY isn't configured ({ ok:false, disabled:true }).
-export type SupportAvailability = { open: boolean; hoursLabel: string }
+export type SupportAvailability = { open: boolean; hoursLabel: string; resumesLabel?: string }
 /** Is the support team within office hours right now? Drives the handoff copy. */
 export function getSupportAvailability() {
   return api<SupportAvailability>(`/api/support/availability`)
