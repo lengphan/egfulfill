@@ -1,4 +1,4 @@
-import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, Receipt, EnvelopeSimple, type Icon } from "@phosphor-icons/react"
+import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, Receipt, EnvelopeSimple, Needle, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -34,6 +34,11 @@ const STAFF_ITEMS: StaffNavItem[] = [
   // which is why it gets its own entry rather than a tab inside it. The team can draft;
   // only an admin can send, so this is visible to staff and the send button is not.
   { label: "Broadcasts", href: "/broadcasts", icon: EnvelopeSimple, roles: ["admin"] },
+  // Digitizer — the (planned) Wilcom EWA embroidery page: drag a design in → quote +
+  // TrueView review → edit → export a machine file. Dormant for now (the page is a
+  // placeholder + API-key holder). Currently surfaced to admin ONLY so it can be reviewed;
+  // set roles: [] to hide it again, or widen roles to open it up — same toggle as Campaigns.
+  { label: "Digitizer", href: "/digitizer", icon: Needle, roles: ["admin"] },
   // Console retired — Users + Activity live in Settings, Top-ups in Wallet, Products at /products.
 ]
 
@@ -72,7 +77,7 @@ const STAFF_TOOLS: StaffNavItem[] = [
   { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
   // Admin-only seller pages (full superuser access). (Seller "Orders"/Dashboard are
   // redundant with the factory Orders hub, so they're intentionally not here.)
-  { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },
+  { label: "Channels", href: "/stores", icon: Storefront, roles: ["admin"] },
   { label: "Reports", href: "/reports", icon: ChartBar, roles: ["admin"] },
   { label: "Wallet", href: "/wallet", icon: Wallet, roles: ["admin", "warehouse"] },
   // API keys are a SELLER integration concern — an operator minting live keys is
