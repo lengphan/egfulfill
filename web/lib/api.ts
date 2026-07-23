@@ -1385,6 +1385,26 @@ export function deleteDesignLibrary(id: number | string) {
   return api<{ ok?: boolean }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }
 
+// ── Design maker: the seller's reusable Images library ──────────────────────────
+// Two sources, both scoped server-side to the caller. "Your uploads" are stored (R2 +
+// a row); "order uploads" are buyer art referenced by URL off the seller's own orders.
+export type SellerImage = { id: string; url: string; name: string; ts?: number }
+export function getSellerImages() {
+  return api<{ images: SellerImage[] }>(`/api/design/images`)
+}
+export function uploadSellerImage(data: string, name?: string) {
+  return api<{ ok?: boolean; image?: SellerImage; error?: string }>(`/api/design/images`, {
+    method: "POST", body: JSON.stringify({ data, name }),
+  })
+}
+export function deleteSellerImage(id: string) {
+  return api<{ ok?: boolean }>(`/api/design/images/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
+export type OrderUpload = { url: string; orderRef: string; name: string }
+export function getOrderUploads() {
+  return api<{ images: OrderUpload[] }>(`/api/design/order-uploads`)
+}
+
 export function createOrder(order: {
   id: string
   seq?: number
