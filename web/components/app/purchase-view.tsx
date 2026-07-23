@@ -673,24 +673,28 @@ export function PurchaseView() {
     // name their own fields, and arrive one round trip later — "shipping_address.state:
     // California is not a valid choice" is a better message than nothing, but a refusal
     // that names the setting to change is better still.
-    const needsOtto = toOrderGroups.some((g) => g.api === "otto")
-    // Otto want the card on the REQUEST — they have no saved-card API — so ask for it
-    // before sending rather than letting their "card_details is required" come back.
+    // Otto want the card ON THE REQUEST (they have no saved-card API). But that is OTTO's
+    // requirement alone — an S&S order pays by its own saved payment profile and NEVER sees
+    // this card, so the Otto card dialog must not hold an S&S order hostage. We no longer
+    // gate the whole batch: place everything that can go now, defer ONLY the Otto group, and
+    // open the card entry afterwards.
     const payMethod = String(opts.defaults.otto_payment_method || "").toLowerCase().replace(/[^a-z]/g, "")
-    if (needsOtto && payMethod === "creditcard" && !card) {
-      setNeedCard(true)
-      return
-    }
-    if (needsOtto && !(opts.defaults.otto_customer && opts.defaults.otto_contact)) {
-      setMsg({ ok: false, text: "Otto require a customer and contact on every order. Set them in Order settings › Payment — they come from your Otto account." })
-      return
-    }
+    const ottoNeedsCard = payMethod === "creditcard" && !card
+    const ottoMissingParty = !(opts.defaults.otto_customer && opts.defaults.otto_contact)
 
     setBusy("place-all"); setMsg(null)
     const results: string[] = []
     const placedSkus = new Set<string>()
+    let deferOttoForCard = false
     try {
       for (const g of toOrderGroups) {
+        // Otto's blockers are Otto's alone — skip the Otto group (leave it in the pool) but
+        // never stop S&S/manual from going out.
+        if (g.api === "otto" && ottoNeedsCard) { deferOttoForCard = true; continue }
+        if (g.api === "otto" && ottoMissingParty) {
+          results.push(`${g.supplier ?? "Otto"}: needs a customer + contact (Order settings › Payment) — left in the pool`)
+          continue
+        }
         const poNum = nextNum()
         const payload = g.lines.map((l) => ({ sku: l.sku, qty: num(l.qty) })).filter((l) => l.qty > 0)
         if (!payload.length) continue
@@ -737,15 +741,27 @@ export function PurchaseView() {
           meta: { response: resp, placedAt: new Date().toISOString(), api: g.api },
         }).catch(() => {})
         if (ok) g.lines.forEach((l) => placedSkus.add(l.sku))
+        const failMsg = (resp as { error?: string }).error || "failed"
+        // A card decline on an S&S order is S&S's OWN saved payment profile (Order settings ›
+        // Payment) — never the card typed for Otto, which S&S never receives. Spell that out,
+        // because otherwise it reads as "the card I just entered doesn't work".
+        const clarified = g.api === "ss" && /decline|card|payment/i.test(failMsg)
+          ? `${failMsg} — this is S&S's saved payment (Order settings › Payment), not the Otto card`
+          : failMsg
         results.push(ok
           ? `${g.supplier ?? "Unassigned"}: ${g.api ? "sent (test/dry-run)" : "recorded — order it by hand"}`
-          : `${g.supplier ?? "Unassigned"}: failed — ${(resp as { error?: string }).error}`)
+          : `${g.supplier ?? "Unassigned"}: failed — ${clarified}`)
       }
       if (placedSkus.size) putSaved(saved.filter((l) => !placedSkus.has(l.sku)))
       const anyFailed = results.some((r) => r.includes("failed"))
-      setMsg({ ok: !anyFailed, tone: anyFailed && placedSkus.size ? "warn" : undefined,
-               text: (anyFailed && placedSkus.size ? "Partly placed. " : "") + results.join(" · ") })
+      if (results.length) {
+        setMsg({ ok: !anyFailed, tone: anyFailed && placedSkus.size ? "warn" : undefined,
+                 text: (anyFailed && placedSkus.size ? "Partly placed. " : "") + results.join(" · ") })
+      }
       load()
+      // Everything that could place now has. If the only thing left to do is enter Otto's
+      // card, open that dialog — the S&S/manual orders already went without waiting on it.
+      if (deferOttoForCard) setNeedCard(true)
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place these orders." })
     } finally { setBusy(null) }
