@@ -174,6 +174,7 @@ export function BroadcastsView() {
         title="Broadcasts"
         description="Email every seller, or a filtered set. Separate from Campaigns, which is ad spend."
         actions={<Button size="sm" onClick={() => openEditor(null)}><Plus size={14} weight="bold" />New broadcast</Button>}
+        bodyClassName="p-5"
       >
         {!mailOk && (
           <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
