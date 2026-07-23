@@ -77,7 +77,7 @@ const STAFF_TOOLS: StaffNavItem[] = [
   { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
   // Admin-only seller pages (full superuser access). (Seller "Orders"/Dashboard are
   // redundant with the factory Orders hub, so they're intentionally not here.)
-  { label: "Channels", href: "/stores", icon: Storefront, roles: ["admin"] },
+  { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },
   { label: "Reports", href: "/reports", icon: ChartBar, roles: ["admin"] },
   { label: "Wallet", href: "/wallet", icon: Wallet, roles: ["admin", "warehouse"] },
   // API keys are a SELLER integration concern — an operator minting live keys is

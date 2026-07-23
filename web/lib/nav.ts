@@ -24,7 +24,7 @@ export const sellerNav: NavSection[] = [
       { label: "Dashboard", href: "/dashboard", icon: SquaresFour },
       { label: "Orders", href: "/orders", icon: ShoppingBag },
       { label: "Products", href: "/products", icon: Tag },
-      { label: "Channels", href: "/stores", icon: Storefront },
+      { label: "Stores", href: "/stores", icon: Storefront },
       { label: "SpyDeck", href: "/spydeck", icon: Binoculars, gate: "spydeck" },
       { label: "Reports", href: "/reports", icon: ChartBar },
       { label: "Wallet", href: "/wallet", icon: Wallet },
