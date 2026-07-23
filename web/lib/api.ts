@@ -1117,10 +1117,18 @@ export function getOrderMessages(id: string) {
 // `{body}` posts an EMPTY message — the server keys off `text`.
 // `escalated` marks an explicit "talk to a human" request so staff can tell it apart
 // from ordinary chat; the server ignores the flag from staff senders.
-export function postOrderMessage(id: string, text: string, opts?: { by?: string; role?: string; clientId?: string; escalated?: boolean; note?: boolean }) {
+export type ChatAttachment = { url: string; name: string; mime: string; size?: number }
+export function postOrderMessage(id: string, text: string, opts?: { by?: string; role?: string; clientId?: string; escalated?: boolean; note?: boolean; attachment?: ChatAttachment | null }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/messages`, {
     method: "POST",
-    body: JSON.stringify({ text, role: opts?.role ?? "seller", by: opts?.by, clientId: opts?.clientId, escalated: opts?.escalated, note: opts?.note }),
+    body: JSON.stringify({ text, role: opts?.role ?? "seller", by: opts?.by, clientId: opts?.clientId, escalated: opts?.escalated, note: opts?.note, attachment: opts?.attachment ?? undefined }),
+  })
+}
+/** Upload a chat attachment (data URL). Images are downsized client-side before this. Returns
+ *  a same-origin proxy URL to store on the message. */
+export function uploadChatAttachment(dataUrl: string, name: string) {
+  return api<ChatAttachment & { error?: string }>(`/api/support/attachment`, {
+    method: "POST", body: JSON.stringify({ dataUrl, name }),
   })
 }
 

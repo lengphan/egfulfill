@@ -1,10 +1,10 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User, Smiley } from "@phosphor-icons/react"
+import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User, Smiley, Paperclip, X, FileText } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson } from "@/lib/api"
+import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
@@ -45,6 +45,26 @@ type MentionItem = { kind: "order"; o: OrderRow } | { kind: "person"; p: Mention
 // bits that actually come up here. Not a full library; just the common ones.
 const EMOJIS = "😀 😄 😊 🙂 😉 😎 🤔 😅 😂 🤣 😭 😢 😡 🥳 🙏 👍 👎 👌 👏 🙌 💪 🔥 ✨ 🎉 ❤️ 💜 ✅ ❌ ⚠️ ❓ ‼️ 📦 🚚 🏷️ 💳 💰 📸 🎨 🧵 👕 🧢 ⏳ 🕐 👋".split(" ")
 
+// Prepare a file for upload: DOWNSIZE images in the browser first (longest edge capped,
+// re-encoded JPEG) so a phone photo doesn't eat storage or hit the proxy body limit.
+// Non-images (PDF) pass through as-is. Returns a data URL.
+async function fileToUploadUrl(file: File, maxEdge = 1800, quality = 0.82): Promise<string> {
+  const original = await new Promise<string>((res, rej) => {
+    const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error("Couldn't read the file")); fr.readAsDataURL(file)
+  })
+  if (!file.type.startsWith("image/")) return original
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("decode")); i.src = original })
+    const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
+    if (scale === 1 && file.size < 500_000) return original
+    const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale))
+    const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h
+    const ctx = canvas.getContext("2d"); if (!ctx) return original
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL("image/jpeg", quality)
+  } catch { return original }
+}
+
 // Module scope, not a component defined in render (react-hooks/static-components).
 const convoIcon = (kind: Convo["kind"] | undefined, size = 16) => {
   if (kind === "support") return <Headset size={size + 1} weight="duotone" />
@@ -70,6 +90,9 @@ export default function ChatPage() {
   const [office, setOffice] = useState<SupportAvailability | null>(null)
   const [hoursOpen, setHoursOpen] = useState(false)  // staff: support-hours editor dialog
   const [emojiOpen, setEmojiOpen] = useState(false)  // composer emoji picker
+  const [pendingAtt, setPendingAtt] = useState<ChatAttachment | null>(null)  // staged attachment
+  const [attaching, setAttaching] = useState(false)
+  const attachRef = useRef<HTMLInputElement>(null)
   // @-mention autocomplete: the seller's own orders power the suggestions, and `mention`
   // tracks the token being typed after an "@".
   const [orders, setOrders] = useState<OrderRow[]>([])
@@ -243,6 +266,21 @@ export default function ChatPage() {
       if (el) { const pos = mention.start + tag.length + 2; el.focus(); el.setSelectionRange(pos, pos) }
     })
   }
+  // Pick + upload an attachment (image downsized first). Held as `pendingAtt` until send.
+  const onAttach = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > 25 * 1024 * 1024) { setAiNote("That file is over 25MB — pick a smaller one."); return }
+    setAttaching(true); setAiNote(null)
+    try {
+      const dataUrl = await fileToUploadUrl(file)
+      const r = await uploadChatAttachment(dataUrl, file.name)
+      if (r.error || !r.url) throw new Error(r.error || "Upload failed")
+      setPendingAtt({ url: r.url, name: r.name || file.name, mime: r.mime, size: r.size })
+    } catch (e) {
+      setAiNote(e instanceof Error ? e.message : "Couldn't attach that file.")
+    } finally { setAttaching(false); if (attachRef.current) attachRef.current.value = "" }
+  }
+
   // Insert an emoji at the caret (or replacing a selection), then refocus after it.
   const insertEmoji = (emoji: string) => {
     const el = composerRef.current
@@ -308,18 +346,20 @@ export default function ChatPage() {
 
   const submit = async (raw: string) => {
     const text = raw.trim()
-    if (!text || !activeId || sending) return
+    // A message may be just an attachment (no text), so allow either.
+    if ((!text && !pendingAtt) || !activeId || sending) return
     setSending(true)
     setInput(""); setMention(null)
+    const att = pendingAtt; setPendingAtt(null)
     const clientId = `c-${cidBase.current}-${cidSeq.current++}`
     // Staff post as 'staff' ONLY when answering SOMEONE ELSE's support thread — that's what
     // lets the seller see a named teammate replied. But on their OWN "Ask EGFULFILL" thread
     // the staffer is the ASKER, so they post as 'seller'; otherwise the AI mapper reads it as
     // an assistant turn and never answers (the regression this fixes).
     const myRole = (isStaffUser && activeId !== supportId) ? "staff" : "seller"
-    setMessages((prev) => [...(prev ?? []), { id: clientId, role: myRole, by: myName, text, ts: nowMs() }])
+    setMessages((prev) => [...(prev ?? []), { id: clientId, role: myRole, by: myName, text, ts: nowMs(), attachment: att ?? undefined }])
     try {
-      await postOrderMessage(activeId, text, { clientId, by: myName, role: myRole })
+      await postOrderMessage(activeId, text, { clientId, by: myName, role: myRole, attachment: att })
       await load()
       // Only the Support thread gets an AI reply; order threads are seller↔factory.
       if (isSupport) {
@@ -600,7 +640,24 @@ export default function ChatPage() {
                             fixes the factory view: an AI reply is "mine" there, and the old
                             `mine ? m.text` branch showed its ** raw. A plain typed message
                             (literal *asterisks*, line breaks) still renders exactly as sent. */}
-                        {hasMarkdown(m.text) ? <Markdown>{m.text ?? ""}</Markdown> : <span className="whitespace-pre-wrap">{m.text ?? ""}</span>}
+                        {m.text ? (hasMarkdown(m.text) ? <Markdown>{m.text}</Markdown> : <span className="whitespace-pre-wrap">{m.text}</span>) : null}
+                        {(() => {
+                          const att = m.attachment as ChatAttachment | undefined
+                          if (!att?.url) return null
+                          const isImg = (att.mime || "").startsWith("image/")
+                          return (
+                            <a href={att.url} target="_blank" rel="noreferrer" className={"block " + (m.text ? "mt-1.5" : "")}>
+                              {isImg ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={att.url} alt={att.name || "attachment"} className="max-h-60 max-w-full rounded-lg border border-border object-contain" />
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/40 px-2 py-1 text-xs font-medium underline-offset-2 hover:underline">
+                                  <FileText size={14} weight="duotone" />{att.name || "file"}
+                                </span>
+                              )}
+                            </a>
+                          )
+                        })()}
                       </div>
                       <span className="mt-0.5 flex items-center gap-1.5 px-1 text-[10px] text-muted-foreground">
                         {m.orderRef && (
@@ -655,6 +712,20 @@ export default function ChatPage() {
           </div>
         )}
 
+        {/* staged attachment preview */}
+        {pendingAtt && (
+          <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-2 py-1.5 text-xs">
+            {pendingAtt.mime?.startsWith("image/") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={pendingAtt.url} alt="" className="size-8 rounded border border-border object-cover" />
+            ) : (
+              <FileText size={16} weight="duotone" className="text-muted-foreground" />
+            )}
+            <span className="truncate font-medium">{pendingAtt.name}</span>
+            <button onClick={() => setPendingAtt(null)} className="ml-auto shrink-0 text-muted-foreground hover:text-foreground" aria-label="Remove attachment"><X size={14} /></button>
+          </div>
+        )}
+
         {/* composer */}
         <div className="flex items-center gap-2 border-t border-border p-3">
           {isInbox && (
@@ -663,6 +734,12 @@ export default function ChatPage() {
               Draft with AI
             </Button>
           )}
+          {/* Attach a file (images downsized before upload) */}
+          <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />
+          <Button variant="ghost" size="icon" className="size-10 shrink-0" onClick={() => attachRef.current?.click()}
+            disabled={signedOut || !activeId || readOnly || attaching} aria-label="Attach a file">
+            {attaching ? <CircleNotch size={16} className="animate-spin" /> : <Paperclip size={18} />}
+          </Button>
           {/* Emoji picker */}
           <div className="relative shrink-0">
             <Button variant="ghost" size="icon" className="size-10" onClick={() => setEmojiOpen((o) => !o)}
@@ -735,7 +812,7 @@ export default function ChatPage() {
               className="h-10 w-full"
             />
           </div>
-          <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !activeId || readOnly || !input.trim() || sending}>
+          <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !activeId || readOnly || (!input.trim() && !pendingAtt) || sending}>
             <PaperPlaneTilt size={16} weight="fill" />
           </Button>
         </div>

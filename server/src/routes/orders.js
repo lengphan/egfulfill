@@ -1,6 +1,7 @@
 // Orders API. Permissions enforced in code (your backend replaces Supabase RLS):
 //   • seller  → only their own orders
 //   • staff   → all orders
+import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { hashOf, isPhash } from '../fingerprint.js';
 import { isStaff } from '../auth.js';
@@ -16,7 +17,7 @@ import { readAll } from './factory_settings.js';
 import { orderCharges, refundOrder } from './order_refunds.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
 import { autoReplenish } from '../replenish.js';
-import { storageEnabled, putObject, fromDataUrl, presignGet, publicUrl, designUrlTtlDays } from '../storage.js';
+import { storageEnabled, putObject, getObject, fromDataUrl, presignGet, publicUrl, designUrlTtlDays } from '../storage.js';
 import { emitWebhook } from '../webhooks.js';
 
 /**
@@ -1830,6 +1831,44 @@ export function ordersRoutes(app, requireAuth) {
       `select id, seq, customer, store, source, status, factory_status
          from orders where seller_id = $1 order by created_at desc limit 100`, [sellerId]);
     return { orders: r.rows };
+  });
+
+  // Chat attachment upload. The client downsizes images first (canvas), so this just stores
+  // the bytes PRIVATE and hands back a same-origin proxy URL — loads in an <img> without a
+  // public bucket, same pattern as the site assets. Any signed-in user; the file is only
+  // reachable via the unguessable key it's posted into a thread with.
+  const attachBase = () => (process.env.PUBLIC_API_ORIGIN || 'https://egful.store').replace(/\/+$/, '');
+  const ATT_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif', 'application/pdf': 'pdf' };
+  app.post('/api/support/attachment', { preHandler: requireAuth }, async (req, reply) => {
+    if (!storageEnabled()) { reply.code(503); return { error: 'File storage is not configured on the server.' }; }
+    const b = req.body || {};
+    if (!b.dataUrl || typeof b.dataUrl !== 'string') { reply.code(400); return { error: 'dataUrl required' }; }
+    const { mime, buffer } = fromDataUrl(b.dataUrl);
+    // Generous ceiling — images arrive already downsized; this catches an oversized PDF.
+    if (buffer.length > 12 * 1024 * 1024) { reply.code(413); return { error: 'File is too large (max 12MB).' }; }
+    const ext = ATT_EXT[mime] || 'bin';
+    const name = `att-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+    try {
+      await putObject(`chat/${name}`, buffer, mime, 'private');
+      return { url: `${attachBase()}/api/support/asset/${name}`, name: String(b.name || '').slice(0, 120), mime, size: buffer.length };
+    } catch (e) {
+      reply.code(502); return { error: 'Upload failed: ' + (e && e.message ? e.message : 'storage error') };
+    }
+  });
+
+  // Serve a chat attachment through our origin (private object, signed GET). Hard-scoped to
+  // the chat/ prefix via a bare-filename check, so it can't read any other object.
+  app.get('/api/support/asset/:name', async (req, reply) => {
+    const name = String(req.params.name || '');
+    if (!/^[A-Za-z0-9._-]+$/.test(name)) { reply.code(400); return { error: 'bad name' }; }
+    if (!storageEnabled()) { reply.code(503); return { error: 'storage not configured' }; }
+    try {
+      const obj = await getObject(`chat/${name}`);
+      if (!obj) { reply.code(404); return { error: 'not found' }; }
+      reply.header('Content-Type', obj.contentType || 'application/octet-stream');
+      reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+      return reply.send(obj.body);
+    } catch { reply.code(502); return { error: 'unavailable' }; }
   });
 
   // People to suggest when "@"-mentioning a teammate — not everything is about an order.
