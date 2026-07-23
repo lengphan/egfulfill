@@ -118,7 +118,7 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // Three solid coloured pills (Label · Scan · Design), tinted by progress. Fixed — the
   // header cell can't size it — and just wide enough to hold them on one line in English or
   // Vietnamese ("Thiết kế" is the widest); the surplus goes back to the flexible columns.
-  ready:    { id: "ready",    label: "Ready",    grid: "11rem" },
+  ready:    { id: "ready",    label: "Ready",    grid: "12.5rem" },
   action:   { id: "action",   label: "",         grid: "12rem" },  // header stays blank: buttons need no title
 }
 

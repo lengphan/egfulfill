@@ -809,17 +809,17 @@ export function OrdersHub() {
                 ),
                 store: (
                   <div className="min-w-0">
-                    <div className="truncate text-xs font-medium">{o.store || platformOf(o)}</div>
-                    <div className="truncate text-[10px] text-muted-foreground">{platformOf(o)} · {fmtDate(o.created_at)}</div>
+                    <div className="truncate text-sm font-medium">{o.store || platformOf(o)}</div>
+                    <div className="truncate text-xs text-muted-foreground">{platformOf(o)} · {fmtDate(o.created_at)}</div>
                   </div>
                 ),
-                customer: <div className="min-w-0 truncate text-xs font-medium">{o.customer?.name || "—"}</div>,
+                customer: <div className="min-w-0 truncate text-sm font-medium">{o.customer?.name || "—"}</div>,
                 items: (
                   <div className="flex min-w-0 items-center gap-2.5">
                     {items.length > 0 && <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={3} overlap />}
                     <div className="min-w-0">
-                      <div className="truncate text-xs">{itemsLabel(o)}</div>
-                      <div className="truncate text-[10px] text-muted-foreground">
+                      <div className="truncate text-sm">{itemsLabel(o)}</div>
+                      <div className="truncate text-xs text-muted-foreground">
                         {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}
                       </div>
                     </div>

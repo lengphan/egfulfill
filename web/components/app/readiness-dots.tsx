@@ -132,7 +132,7 @@ function Tag({ id, label, state, title, orderId, status, files, dot }: {
           // violet = done) with the word inside — the biggest, clearest hit target and the
           // easiest to read down a column. Bare dots and a faint bordered chip both tested
           // too small/hard to click; the table pill is just a touch tighter than the full one.
-          ? "rounded-md px-2 py-1 text-[11px] "
+          ? "rounded-md px-2.5 py-1 text-xs "
           : "rounded-md px-2.5 py-1 text-xs ") + cls}
       >
         {tl("ui", label)}
