@@ -11,9 +11,16 @@
 // the server would otherwise need its own duplicate of every marketing string.
 
 import { q } from '../db.js';
-import { storageEnabled, putObject, fromDataUrl } from '../storage.js';
+import { storageEnabled, putObject, getObject, fromDataUrl } from '../storage.js';
 
 const KEY = 'site_content';
+
+// The public base for asset URLs we hand out. Absolute (not a relative /api path) because
+// an email logo has to resolve in Gmail, not just same-origin on the homepage. Mirrors
+// broadcasts.js publicOrigin().
+function assetBase() {
+  return (process.env.PUBLIC_API_ORIGIN || 'https://egful.store').replace(/\/+$/, '');
+}
 
 let _ready = null;
 function ensureTable() {
@@ -72,12 +79,40 @@ export function siteContentRoutes(app, requireAdmin) {
     if (buffer.length > MAX_IMG_BYTES) { reply.code(413); return { error: 'Image is over 8MB — resize it first.' }; }
     // A timestamped key so a re-upload never collides with or overwrites the previous one,
     // and cached CDN copies of the old URL don't serve stale bytes.
-    const key = `site/hero-${Date.now()}.${ext}`;
+    const name = `hero-${Date.now()}.${ext}`;
     try {
-      const url = await putObject(key, buffer, mime, 'public-read');
-      return { url };
+      // PRIVATE, not public-read: the image is served back through /asset below (a signed
+      // server-side GET), so it never depends on the storage bucket being publicly readable
+      // — which R2 isn't, and a missing/misconfigured SPACES_CDN made the old public URL
+      // unreachable (the broken-image bug on both the hero banner and the email logo).
+      // 'private' also drops the x-amz-acl header that R2 rejects on PUT. The URL we hand
+      // back is ABSOLUTE so it also resolves inside an email client.
+      await putObject(`site/${name}`, buffer, mime, 'private');
+      return { url: `${assetBase()}/api/site-content/asset/${name}` };
     } catch (e) {
       reply.code(502); return { error: 'Upload failed: ' + (e && e.message ? e.message : 'storage error') };
+    }
+  });
+
+  // PUBLIC serve for the site assets uploaded above (hero banners, the email logo). Streams
+  // the bytes through our own origin so an <img>/background loads whether or not the bucket
+  // is public, and an email logo resolves in Gmail. Scoped HARD to the `site/` prefix via a
+  // bare-filename check (no slashes, no traversal) so it can never read a private
+  // design/print object.
+  app.get('/api/site-content/asset/:name', async (req, reply) => {
+    const name = String(req.params.name || '');
+    if (!/^[A-Za-z0-9._-]+$/.test(name)) { reply.code(400); return { error: 'bad asset name' }; }
+    if (!storageEnabled()) { reply.code(503); return { error: 'storage not configured' }; }
+    try {
+      const obj = await getObject(`site/${name}`);
+      if (!obj) { reply.code(404); return { error: 'not found' }; }
+      reply.header('Content-Type', obj.contentType || 'application/octet-stream');
+      // Keys are timestamped and never overwritten, so cache hard — this keeps repeat views
+      // off the storage backend entirely after the first fetch.
+      reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+      return reply.send(obj.body);
+    } catch {
+      reply.code(502); return { error: 'asset unavailable' };
     }
   });
 }
