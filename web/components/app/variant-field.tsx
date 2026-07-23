@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useLabelT } from "@/lib/i18n"
 
 // Common garment colour names → a hex dot. Unknown names fall back to neutral; the dot
 // is a hint next to the label, never the only way to tell colours apart.
@@ -59,8 +60,10 @@ export function VariantField({
   const hasOptions = options.length > 0
   // Colour values are supplier codes ("031753A - Blk/Dk.Grn/Dk.Kha"). Store the code,
   // show the name — nobody should have to decode a warehouse SKU to pick a colour.
+  const tl = useLabelT()
   const pretty = (v: string) => (swatches ? prettyColorName(v) : v)
-  const shown = value ? pretty(value) : (hasOptions ? placeholder : emptyLabel)
+  const ph = tl("field", placeholder)
+  const shown = value ? pretty(value) : (hasOptions ? ph : tl("field", emptyLabel))
   const unset = !value
 
   const trigger = (
@@ -89,7 +92,7 @@ export function VariantField({
       <DropdownMenuContent align="start" className="max-h-64 w-[--anchor-width] min-w-44 overflow-y-auto">
         {/* Clearing is a real choice — a line can legitimately go back to unset. */}
         <DropdownMenuItem onClick={() => onChange("")} className="text-muted-foreground">
-          {placeholder}
+          {ph}
         </DropdownMenuItem>
         {options.map((o) => (
           <DropdownMenuItem key={o} onClick={() => onChange(o)} className="gap-2">
@@ -107,8 +110,8 @@ export function VariantField({
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-        {required && !value && <span className="font-medium normal-case tracking-normal text-amber-600">Required</span>}
+        {tl("field", label)}
+        {required && !value && <span className="font-medium normal-case tracking-normal text-amber-600">{tl("field", "Required")}</span>}
       </span>
       {control}
     </div>
@@ -137,6 +140,7 @@ export function VariantStrip({
    *  what the floor makes. Shown when it exists and differs. */
   marketplace?: string | null
 }) {
+  const tl = useLabelT()
   const chips = [
     blank ? { key: "blank", label: blank } : null,
     color ? { key: "color", label: color, swatch: true } : null,
@@ -153,7 +157,7 @@ export function VariantStrip({
     return (
       <div className={cn("flex flex-wrap items-center gap-1", className)}>
         {showBuyer && <BuyerChip text={buyerText} />}
-        <span className="text-xs text-muted-foreground">{showBuyer ? "Not set up for production yet" : "No variant set"}</span>
+        <span className="text-xs text-muted-foreground">{showBuyer ? tl("field", "Not set up for production yet") : tl("field", "No variant set")}</span>
       </div>
     )
   }
@@ -188,12 +192,13 @@ export function VariantStrip({
 /** What the buyer picked on the marketplace, verbatim. Visually distinct from the
  *  production chips so nobody mistakes a listing label for a blank spec. */
 function BuyerChip({ text }: { text: string }) {
+  const tl = useLabelT()
   return (
     <span
       title={`Buyer chose "${text}" on the marketplace`}
       className="inline-flex max-w-[14rem] items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
     >
-      <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">Buyer</span>
+      <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">{tl("field", "Buyer")}</span>
       <span className="truncate">{text}</span>
     </span>
   )
