@@ -24,6 +24,9 @@ export type SiteContent = {
     ctaSecondary: string
     worksWithLabel: string
     integrations: string[]
+    /** Optional background banner (public URL). Empty = the default gradient wash. When set,
+     *  it renders behind the hero under a scrim so the dark text stays legible. */
+    image: string
   }
   stats: Stat[]
   features: { heading: string; subhead: string; cards: FeatureCard[] }
@@ -43,6 +46,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     ctaSecondary: "See how it works",
     worksWithLabel: "Works with",
     integrations: ["Etsy", "Shopify", "TikTok Shop", "WooCommerce"],
+    image: "",
   },
   stats: [
     { value: "2.4M+", label: "orders shipped" },
@@ -126,6 +130,9 @@ export function mergeSiteContent(stored: unknown): SiteContent {
       ctaSecondary: str(hero.ctaSecondary, d.hero.ctaSecondary),
       worksWithLabel: str(hero.worksWithLabel, d.hero.worksWithLabel),
       integrations: arr<string>(hero.integrations, d.hero.integrations),
+      // Empty is a valid, intentional value (no banner) — the default is also empty, so a
+      // blank here stays blank rather than resurrecting a default image.
+      image: typeof hero.image === "string" ? hero.image : d.hero.image,
     },
     stats: arr<Stat>(s.stats, d.stats),
     features: {

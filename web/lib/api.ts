@@ -2297,3 +2297,10 @@ export function setSiteContent(content: SiteContent) {
     method: "PUT", body: JSON.stringify({ content }),
   })
 }
+/** Upload a hero banner image (data URL) to object storage; returns its public URL to store
+ *  in hero.image. The bytes go to storage, never into the content blob. */
+export function uploadHeroImage(dataUrl: string) {
+  return api<{ url?: string; error?: string }>(`/api/site-content/hero-image`, {
+    method: "POST", body: JSON.stringify({ dataUrl }),
+  })
+}

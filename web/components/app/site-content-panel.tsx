@@ -1,11 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, Plus, Trash, ArrowSquareOut, FloppyDisk } from "@phosphor-icons/react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { CircleNotch, Plus, Trash, ArrowSquareOut, FloppyDisk, UploadSimple, Image as ImageIcon } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getSiteContentAdmin, setSiteContent } from "@/lib/api"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getSiteContentAdmin, setSiteContent, uploadHeroImage } from "@/lib/api"
 import { DEFAULT_SITE_CONTENT, type SiteContent } from "@/lib/site-content"
 
 // Module-scope so they're stable across renders (react-hooks/static-components forbids
@@ -19,7 +20,7 @@ function Field({ label, hint, value, onChange, mono }: {
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
+      {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
       <Input value={value} onChange={(e) => onChange(e.target.value)} className={mono ? "font-mono" : ""} />
       {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
     </label>
@@ -31,22 +32,27 @@ function Area({ label, hint, value, onChange }: {
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
+      {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
       <textarea className={AREA_CLS} value={value} onChange={(e) => onChange(e.target.value)} />
       {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
     </label>
   )
 }
 
-function Group({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section className="border-t border-border pt-5 first:border-t-0 first:pt-0">
-      <h3 className="text-sm font-semibold">{title}</h3>
-      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
-      <div className="mt-3 space-y-3">{children}</div>
-    </section>
-  )
+// A tab's intro line, so each section still explains itself without the old long-scroll headings.
+function Intro({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs text-muted-foreground">{children}</p>
 }
+
+const SUBTABS: { id: string; label: string }[] = [
+  { id: "hero", label: "Hero" },
+  { id: "stats", label: "Stats" },
+  { id: "features", label: "Features" },
+  { id: "steps", label: "Steps" },
+  { id: "testimonials", label: "Testimonials" },
+  { id: "faq", label: "FAQ" },
+  { id: "cta", label: "Closing CTA" },
+]
 
 /**
  * Edit the public marketing-home copy.
@@ -55,16 +61,19 @@ function Group({ title, hint, children }: { title: string; hint?: string; childr
  * saving falls back to the shipped copy rather than blanking the homepage — the editor
  * reflects that by loading the merged (always-complete) content, never a half-empty form.
  *
- * The bento's four feature cards are FIXED slots (each has bespoke decoration and grid span
- * on the page), so they're edited in place, not added or removed. Stats, steps, testimonials
- * and FAQs are true lists.
+ * Split into sub-tabs (one section each) so it's a short page per section, not one long
+ * scroll. All tabs share ONE content object and ONE save — switching tabs keeps edits; only
+ * Save writes them.
  */
 export function SiteContentPanel() {
   const [content, setContent] = useState<SiteContent | null>(null)
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
+  const [sub, setSub] = useState("hero")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(() => {
     getSiteContentAdmin()
@@ -90,6 +99,30 @@ export function SiteContentPanel() {
     } finally { setSaving(false) }
   }
 
+  const onPickImage = async (file: File | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith("image/")) { setErr("That file isn't an image."); return }
+    if (file.size > 8 * 1024 * 1024) { setErr("Image is over 8MB — resize it first."); return }
+    setUploading(true); setErr(null)
+    try {
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const fr = new FileReader()
+        fr.onload = () => res(String(fr.result))
+        fr.onerror = () => rej(new Error("Couldn't read the file"))
+        fr.readAsDataURL(file)
+      })
+      const r = await uploadHeroImage(dataUrl)
+      if (r.error || !r.url) throw new Error(r.error || "Upload failed")
+      const url = r.url
+      edit((x) => { x.hero.image = url })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Upload failed")
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ""
+    }
+  }
+
   const resetToDefaults = () => { if (confirm("Reset every field to the shipped default copy? This only fills the editor — nothing saves until you press Save.")) setContent(structuredClone(DEFAULT_SITE_CONTENT)) }
 
   if (!content) {
@@ -101,17 +134,23 @@ export function SiteContentPanel() {
     <SectionCard
       title="Site content"
       description="The public marketing homepage copy. Edits appear on the live site within a minute."
+      bodyClassName="p-5"
       actions={
         <a href="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
           View homepage <ArrowSquareOut size={13} />
         </a>
       }
     >
-      <div className="space-y-6">
-        {err && <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{err}</div>}
+      {err && <div className="mb-4 rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{err}</div>}
+
+      <Tabs value={sub} onValueChange={setSub}>
+        <TabsList className="flex flex-wrap">
+          {SUBTABS.map((t) => <TabsTrigger key={t.id} value={t.id}>{t.label}</TabsTrigger>)}
+        </TabsList>
 
         {/* ── Hero ── */}
-        <Group title="Hero" hint="The first thing above the fold.">
+        <TabsContent value="hero" className="mt-4 space-y-3">
+          <Intro>The first thing above the fold.</Intro>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Headline" value={c.hero.headline} onChange={(v) => edit((x) => { x.hero.headline = v })} />
             <Field label="Accent word(s)" hint="Shown italic and in violet, right after the headline." value={c.hero.accent} onChange={(v) => edit((x) => { x.hero.accent = v })} />
@@ -122,6 +161,38 @@ export function SiteContentPanel() {
             <Field label="Secondary button" value={c.hero.ctaSecondary} onChange={(v) => edit((x) => { x.hero.ctaSecondary = v })} />
           </div>
           <Field label="'Works with' label" value={c.hero.worksWithLabel} onChange={(v) => edit((x) => { x.hero.worksWithLabel = v })} />
+
+          {/* Hero banner image */}
+          <div>
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Banner image</span>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPickImage(e.target.files?.[0])} />
+            {c.hero.image ? (
+              <div className="space-y-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.hero.image} alt="Hero banner preview" className="max-h-44 w-full rounded-lg border border-border object-cover" />
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                    {uploading ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} />}Replace
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => edit((x) => { x.hero.image = "" })} disabled={uploading}><Trash size={13} />Remove</Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-8 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-60"
+              >
+                {uploading ? <CircleNotch size={20} className="animate-spin" /> : <ImageIcon size={20} />}
+                {uploading ? "Uploading…" : "Upload a banner image"}
+                <span className="text-xs">JPEG, PNG, WebP or AVIF · up to 8MB · optional</span>
+              </button>
+            )}
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Optional. Sits behind the hero under a scrim so the text stays readable. Leave empty for the default gradient. Press Save to publish.
+            </span>
+          </div>
+
           <div>
             <span className="mb-1 block text-xs font-medium text-muted-foreground">Integrations</span>
             <div className="space-y-2">
@@ -134,10 +205,11 @@ export function SiteContentPanel() {
               <Button variant="outline" size="sm" onClick={() => edit((x) => { x.hero.integrations.push("") })}><Plus size={13} weight="bold" />Add</Button>
             </div>
           </div>
-        </Group>
+        </TabsContent>
 
         {/* ── Stats ── */}
-        <Group title="Stats band" hint="The row of numbers under the hero.">
+        <TabsContent value="stats" className="mt-4 space-y-3">
+          <Intro>The row of numbers under the hero.</Intro>
           {c.stats.map((s, i) => (
             <div key={i} className="grid grid-cols-[1fr_2fr_auto] items-end gap-2">
               <Field label={i === 0 ? "Value" : ""} value={s.value} onChange={(v) => edit((x) => { x.stats[i].value = v })} />
@@ -146,10 +218,11 @@ export function SiteContentPanel() {
             </div>
           ))}
           <Button variant="outline" size="sm" onClick={() => edit((x) => { x.stats.push({ value: "", label: "" }) })}><Plus size={13} weight="bold" />Add stat</Button>
-        </Group>
+        </TabsContent>
 
         {/* ── Features ── */}
-        <Group title="Features" hint="The section heading plus the four feature cards. The cards are fixed slots — edit their text, but their icons and layout stay in the design.">
+        <TabsContent value="features" className="mt-4 space-y-3">
+          <Intro>The section heading plus the four feature cards. The cards are fixed slots — edit their text, but their icons and layout stay in the design.</Intro>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Section heading" value={c.features.heading} onChange={(v) => edit((x) => { x.features.heading = v })} />
             <Field label="Section subhead" value={c.features.subhead} onChange={(v) => edit((x) => { x.features.subhead = v })} />
@@ -166,10 +239,11 @@ export function SiteContentPanel() {
               </div>
             )
           })}
-        </Group>
+        </TabsContent>
 
         {/* ── Steps ── */}
-        <Group title="How it works" hint="The three-step strip.">
+        <TabsContent value="steps" className="mt-4 space-y-3">
+          <Intro>The three-step strip.</Intro>
           <Field label="Section heading" value={c.steps.heading} onChange={(v) => edit((x) => { x.steps.heading = v })} />
           {c.steps.items.map((s, i) => (
             <div key={i} className="rounded-lg border border-border p-3">
@@ -185,10 +259,11 @@ export function SiteContentPanel() {
             </div>
           ))}
           <Button variant="outline" size="sm" onClick={() => edit((x) => { x.steps.items.push({ n: "", title: "", body: "" }) })}><Plus size={13} weight="bold" />Add step</Button>
-        </Group>
+        </TabsContent>
 
         {/* ── Testimonials ── */}
-        <Group title="Testimonials" hint="Quotes with a name and a role. The avatar is a placeholder circle by design — no invented photos.">
+        <TabsContent value="testimonials" className="mt-4 space-y-3">
+          <Intro>Quotes with a name and a role. The avatar is a placeholder circle by design — no invented photos.</Intro>
           <Field label="Section heading" value={c.testimonials.heading} onChange={(v) => edit((x) => { x.testimonials.heading = v })} />
           {c.testimonials.items.map((t, i) => (
             <div key={i} className="rounded-lg border border-border p-3">
@@ -204,10 +279,10 @@ export function SiteContentPanel() {
             </div>
           ))}
           <Button variant="outline" size="sm" onClick={() => edit((x) => { x.testimonials.items.push({ quote: "", name: "", role: "" }) })}><Plus size={13} weight="bold" />Add testimonial</Button>
-        </Group>
+        </TabsContent>
 
         {/* ── FAQ ── */}
-        <Group title="FAQ">
+        <TabsContent value="faq" className="mt-4 space-y-3">
           <Field label="Section heading" value={c.faq.heading} onChange={(v) => edit((x) => { x.faq.heading = v })} />
           {c.faq.items.map((f, i) => (
             <div key={i} className="rounded-lg border border-border p-3">
@@ -220,28 +295,29 @@ export function SiteContentPanel() {
             </div>
           ))}
           <Button variant="outline" size="sm" onClick={() => edit((x) => { x.faq.items.push({ q: "", a: "" }) })}><Plus size={13} weight="bold" />Add question</Button>
-        </Group>
+        </TabsContent>
 
         {/* ── Closing CTA ── */}
-        <Group title="Closing call-to-action" hint="The dark band at the foot of the page.">
+        <TabsContent value="cta" className="mt-4 space-y-3">
+          <Intro>The dark band at the foot of the page.</Intro>
           <Field label="Heading" value={c.cta.heading} onChange={(v) => edit((x) => { x.cta.heading = v })} />
           <Area label="Subhead" value={c.cta.subhead} onChange={(v) => edit((x) => { x.cta.subhead = v })} />
           <Field label="Button" value={c.cta.button} onChange={(v) => edit((x) => { x.cta.button = v })} />
-        </Group>
+        </TabsContent>
+      </Tabs>
 
-        {/* ── Save bar ── */}
-        <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-3 border-t border-border bg-card/95 px-6 py-3 backdrop-blur">
-          <div className="text-xs text-muted-foreground">
-            {saved ? <span className="text-emerald-600 dark:text-emerald-400">Saved — live within a minute.</span>
-              : updatedAt ? `Last edited ${new Date(updatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
-              : "Never edited — showing shipped defaults."}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={resetToDefaults}>Reset to defaults</Button>
-            <Button size="sm" onClick={save} disabled={saving}>
-              {saving ? <CircleNotch size={14} className="animate-spin" /> : <FloppyDisk size={14} />}Save
-            </Button>
-          </div>
+      {/* ── Save bar (shared across every sub-tab) ── */}
+      <div className="sticky bottom-0 -mx-5 -mb-5 mt-6 flex items-center justify-between gap-3 border-t border-border bg-card/95 px-5 py-3 backdrop-blur">
+        <div className="text-xs text-muted-foreground">
+          {saved ? <span className="text-emerald-600 dark:text-emerald-400">Saved — live within a minute.</span>
+            : updatedAt ? `Last edited ${new Date(updatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+            : "Never edited — showing shipped defaults."}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={resetToDefaults}>Reset to defaults</Button>
+          <Button size="sm" onClick={save} disabled={saving}>
+            {saving ? <CircleNotch size={14} className="animate-spin" /> : <FloppyDisk size={14} />}Save
+          </Button>
         </div>
       </div>
     </SectionCard>

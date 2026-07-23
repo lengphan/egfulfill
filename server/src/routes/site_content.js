@@ -11,6 +11,7 @@
 // the server would otherwise need its own duplicate of every marketing string.
 
 import { q } from '../db.js';
+import { storageEnabled, putObject, fromDataUrl } from '../storage.js';
 
 const KEY = 'site_content';
 
@@ -53,5 +54,30 @@ export function siteContentRoutes(app, requireAdmin) {
        on conflict (key) do update set value = excluded.value, updated_at = now()`,
       [KEY, JSON.stringify(content)]);
     return { ok: true, content };
+  });
+
+  // ADMIN: upload a hero banner image to object storage, return its public URL. The panel
+  // then stores that URL in content.hero.image via the PUT above — this route only handles
+  // the bytes. Kept OUT of the content blob because a base64 image would bloat the row that
+  // is served on every homepage view; storage holds the image, the blob holds a URL.
+  const IMG_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' };
+  const MAX_IMG_BYTES = 8 * 1024 * 1024; // a hero photo, not a video
+  app.post('/api/site-content/hero-image', { preHandler: requireAdmin }, async (req, reply) => {
+    if (!storageEnabled()) { reply.code(503); return { error: 'Object storage is not configured on the server.' }; }
+    const dataUrl = req.body && req.body.dataUrl;
+    if (!dataUrl || typeof dataUrl !== 'string') { reply.code(400); return { error: 'dataUrl required' }; }
+    const { mime, buffer } = fromDataUrl(dataUrl);
+    const ext = IMG_TYPES[mime];
+    if (!ext) { reply.code(415); return { error: 'Image must be JPEG, PNG, WebP, AVIF or GIF.' }; }
+    if (buffer.length > MAX_IMG_BYTES) { reply.code(413); return { error: 'Image is over 8MB — resize it first.' }; }
+    // A timestamped key so a re-upload never collides with or overwrites the previous one,
+    // and cached CDN copies of the old URL don't serve stale bytes.
+    const key = `site/hero-${Date.now()}.${ext}`;
+    try {
+      const url = await putObject(key, buffer, mime, 'public-read');
+      return { url };
+    } catch (e) {
+      reply.code(502); return { error: 'Upload failed: ' + (e && e.message ? e.message : 'storage error') };
+    }
   });
 }

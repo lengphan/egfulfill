@@ -50,6 +50,14 @@ export default async function MarketingHome() {
             className="absolute left-1/2 top-[-10%] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-[130px] opacity-[0.18]"
             style={{ background: "radial-gradient(circle at center, oklch(0.55 0.19 285 / 0.55), transparent 70%)" }}
           />
+          {/* Optional admin-set banner image (Settings › Site content). Sits under a scrim so
+              the dark hero text stays legible on any photo; absent, only the gradient shows. */}
+          {hero.image && (
+            <>
+              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${hero.image}")` }} />
+              <div className="absolute inset-0 bg-background/72" />
+            </>
+          )}
         </div>
 
         <div className="mx-auto max-w-6xl px-6 pb-20 pt-20 text-center sm:pt-28">
