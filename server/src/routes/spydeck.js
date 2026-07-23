@@ -623,6 +623,41 @@ export function spydeckRoutes(app, requireAuth) {
     return { shops: rows.map(shopCard).filter(Boolean) };
   });
 
+  // SUGGEST shops by CATEGORY — Etsy has no "shops in category" call, so derive it: search
+  // the category's top listings, aggregate the shops that appear (hit count = relevance),
+  // then enrich the top ones with real stats (batched, to protect the rate limit).
+  app.get('/api/spydeck/shops/by-category', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
+    const taxonomyId = String((req.query || {}).taxonomyId || '').trim();
+    const term = String((req.query || {}).q || '').trim();
+    if (!taxonomyId && !term) { reply.code(400); return { error: 'Pick a category to discover shops.' }; }
+    let listings = [];
+    try {
+      const r = await searchListings(term, { taxonomyId: taxonomyId || undefined, limit: 48, sort: 'score' });
+      listings = r.results || [];
+    } catch (e) { reply.code(502); return { shops: [], error: e.message || 'Etsy search failed' }; }
+    const byShop = new Map();
+    for (const l of listings) {
+      const sid = l.shop_id ? String(l.shop_id) : null;
+      if (!sid) continue;
+      const e = byShop.get(sid) || { shop_id: sid, shop_name: l.shop_name || null, hits: 0, image: l.thumb || l.image || null };
+      e.hits += 1;
+      if (!e.image) e.image = l.thumb || l.image || null;
+      byShop.set(sid, e);
+    }
+    const top = Array.from(byShop.values()).sort((a, b) => b.hits - a.hits).slice(0, 15);
+    const enriched = await inBatches(top, 5, async (s) => {
+      const r = await etsyPublicGet(`/shops/${encodeURIComponent(s.shop_id)}`);
+      const card = r.ok ? shopCard(r.data) : null;
+      // Fall back to what the listing search already gave us if the shop lookup fails.
+      return card || {
+        shop_id: s.shop_id, shop_name: s.shop_name, title: null, icon: s.image,
+        url: s.shop_name ? `https://www.etsy.com/shop/${encodeURIComponent(s.shop_name)}` : null,
+        listings: null, favorers: null, reviews: null, rating: null, sales: null,
+      };
+    });
+    return { shops: enriched.filter(Boolean) };
+  });
+
   // Saved competitor shops — declared BEFORE /shops/:id so "saved" isn't captured as an id
   // (Fastify prefers static over parametric, but registering first makes it unambiguous).
   app.get('/api/spydeck/shops/saved', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {

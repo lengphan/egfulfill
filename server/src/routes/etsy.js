@@ -498,6 +498,7 @@ export function mapListing(l, imgsById = {}, rangeById = {}) {
     created: l.original_creation_timestamp || l.created_timestamp || l.creation_tsz || null,
     views: (typeof l.views === 'number' ? l.views : null),
     shop_name: (l.shop && l.shop.shop_name) || null,
+    shop_id: l.shop_id != null ? String(l.shop_id) : ((l.shop && l.shop.shop_id != null) ? String(l.shop.shop_id) : null),
     num_favorers: l.num_favorers || 0,
   };
 }
