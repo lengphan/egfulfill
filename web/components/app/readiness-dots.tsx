@@ -331,7 +331,11 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
     (it.line_id ? designs?.[it.line_id] : undefined) ?? (it.sku ? designs?.[it.sku] : undefined)
   const withArt = decorated.filter((it) => artFor(it)?.data)
   const buyerUploads = list.filter((it) => it.design_src)
-  const approved = (files ?? []).some((f) => f.kind === "pes" || f.kind === "emb")
+  // A machine file marks the design done. Prefer the loaded file list, but fall back to the
+  // row-level flag the orders list computes — the full list is only fetched on a row that's
+  // been expanded, so without this an uploaded .emb didn't register on a collapsed row and
+  // the tag stayed grey next to a history that already said "Machine file uploaded".
+  const approved = (files ?? []).some((f) => f.kind === "pes" || f.kind === "emb") || order.has_machine_file === true
 
   const designState: State = approved
     ? "done"
@@ -339,12 +343,12 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
       ? "doing"
       : "todo"
   const designStatus = approved
-    ? "Approved — a machine file has been produced for this order."
+    ? "Machine file attached — ready to make."
     : designState === "doing"
-      ? "Artwork attached and with a designer — no machine file yet."
+      ? "Artwork attached — waiting on the machine file."
       : decorated.length === 0
-        ? "No decorated lines on this order."
-        : `${decorated.length - withArt.length} of ${decorated.length} decorated lines still need artwork.`
+        ? "No design added yet."
+        : `${decorated.length - withArt.length} of ${decorated.length} items still need artwork.`
   const designTitle = designStatus
 
   // The label PDF hangs off both Label and Scan: it's the Label tag's own artefact, and

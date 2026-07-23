@@ -614,6 +614,13 @@ export function ordersRoutes(app, requireAuth) {
     // ORDER BY i.id keeps line-item order stable across every board, so the per-line
     // design "slot" (1st vs 2nd same-SKU item) resolves to the same artwork everywhere.
     const agg  = `coalesce(json_agg(i.* order by i.id) filter (where i.id is not null), '[]') as items`;
+    // Does this order have a machine file (a .pes/.emb) already? The Design readiness tag
+    // flips to "done" on one, but the full file list is only fetched when a row is expanded
+    // — so on a collapsed row the tag couldn't tell, and an order with an uploaded .emb read
+    // as "nothing designed yet". This one boolean per row lets the tag be right everywhere
+    // without fetching every order's files. design_file_data is created idempotently with an
+    // order_id index (design_files.js), so the correlated EXISTS is safe and cheap.
+    const machineFile = `exists(select 1 from design_file_data f where f.order_id = o.id and f.kind in ('pes','emb')) as has_machine_file`;
     if (isStaff(req.user)) {
       // Staff (factory) see factory-OWNED orders (the admin marketplace shops, which
       // need factory setup) PLUS any SELLER order that's been PUSHED to production.
@@ -621,7 +628,7 @@ export function ordersRoutes(app, requireAuth) {
       // managing it; Push moves it to 'in_review'. So until Push it stays OFF the
       // factory boards (seller-managed). factory_order rows show regardless of status.
       const r = await q(
-        `select o.*, ${agg} from orders o ${join}
+        `select o.*, ${machineFile}, ${agg} from orders o ${join}
          where o.factory_order = true
             or coalesce(o.factory_status, '') not in ('new', 'draft', '')
             -- ...OR the order belongs to a STAFF account, i.e. the factory created it
@@ -638,7 +645,7 @@ export function ordersRoutes(app, requireAuth) {
     const sel = await resolveSeller(req.user);
     if (!_canSurface(sel, 'orders')) return [];
     const r = await q(
-      `select o.*, ${agg} from orders o ${join} where o.seller_id=$1 and o.factory_order=false group by o.id order by o.created_at desc`,
+      `select o.*, ${machineFile}, ${agg} from orders o ${join} where o.seller_id=$1 and o.factory_order=false group by o.id order by o.created_at desc`,
       [sel.id]
     );
     return r.rows;

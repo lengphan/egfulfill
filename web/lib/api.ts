@@ -843,6 +843,10 @@ export type OrderRow = {
   tracking?: string | null
   /** Stored label file, so a label can be reprinted or batched after purchase. */
   tracking_label_url?: string | null
+  /** The order already has a machine file (.pes/.emb). Computed by the list query so the
+   *  Design readiness tag can read "done" on a collapsed row without fetching every order's
+   *  files. See orders.js. */
+  has_machine_file?: boolean
   /** When the label was actually put on paper — distinct from having bought one. */
   label_printed_at?: string | null
   /** Pre-scanned at dispatch — tracking is LIVE for the buyer even though the parcel may
