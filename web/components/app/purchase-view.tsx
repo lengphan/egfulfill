@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise, Barcode } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
@@ -151,6 +151,16 @@ export function PurchaseView() {
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string; tone?: "warn" } | null>(null)
+  // Every action's outcome lands in ONE banner near the top of the view. But actions are
+  // taken far down the list too — cancelling or receiving a placed PO — so when the banner
+  // changes, scroll it into view. Otherwise the result appears off-screen and the click
+  // reads as "nothing happened", which is exactly what a cancel refusal looked like.
+  const msgRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!msg) return
+    const t = setTimeout(() => msgRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0)
+    return () => clearTimeout(t)
+  }, [msg])
 
   // Lines pulled out of a draft but kept for a later order. Factory-global (staff
   // share one list), so it survives the browser that removed the line.
@@ -476,42 +486,59 @@ export function PurchaseView() {
     const isSsPo = /s&s|activewear/i.test(po.supplier || "")
     if (wasPlaced && sent && !window.confirm(
       isSsPo
-        ? `Cancel ${po.num}?\n\nWe'll ask S&S to cancel it first. If they refuse — usually because it's already picked — nothing changes here and you'll see their reason.`
+        ? `Cancel ${po.num}?\n\nWe'll ask S&S to cancel it first. If they refuse (usually past their 10-minute window), you'll be asked whether you've already cancelled it with them directly.`
         : `Cancel ${po.num}?\n\nThis marks OUR record cancelled. ${po.supplier || "This supplier"} has no cancel API, so contact them directly if the goods haven't shipped.`
     )) return
     setBusy(po.num); setMsg(null)
     try {
       // Ask the SUPPLIER first, where we can. Marking our record cancelled while their
       // order stands is the failure that costs money — stock arrives against an order the
-      // system says doesn't exist.
+      // system says doesn't exist. But an order the operator has ALREADY cancelled with S&S
+      // directly must still be clearable here, or it's stuck as "placed" forever — so when
+      // the API can't confirm, we fall back to an explicit, warned attestation rather than
+      // a dead-end.
       let supplierMsg = ""
+      let supplierCancelled = false   // S&S themselves confirmed (API or status reconcile)
+      let manualCancel = false        // operator attested they cancelled it out-of-band
       const orderNo = supplierOrderNo(po)
       const isSs = /s&s|activewear/i.test(po.supplier || "")
-      // No order number means we CAN'T ask them, which is different from choosing not to.
-      // Saying so beats cancelling our record and letting the goods arrive anyway.
+      // No order number means we CAN'T ask S&S — so we can't verify, but we also can't
+      // leave it stuck. Let the operator attest they've already cancelled it directly.
       if (sent && isSs && !orderNo) {
-        setMsg({ ok: false, text: `${po.num} has no S&S order number recorded, so their API can't be told. Cancel it in the S&S portal, then mark this cancelled again.` })
-        return
-      }
-      if (sent && isSs && orderNo) {
+        if (!window.confirm(
+          `${po.num} has no S&S order number on file, so we can't ask their API to cancel it.\n\n` +
+          `If you've ALREADY cancelled this order with S&S directly, click OK to mark it cancelled here.\n\n` +
+          `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
+        )) { setMsg({ ok: false, text: `${po.num} left as-is. Cancel it in the S&S portal, then use Cancel again to clear it here.` }); return }
+        supplierMsg = ` You confirmed it was already cancelled with S&S directly.`
+        manualCancel = true
+      } else if (sent && isSs && orderNo) {
         const c = await cancelSsOrder(orderNo).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
         if ("error" in c && c.error) {
-          // Their refusal is the whole answer — stop rather than record a cancellation
-          // that only exists here.
-          setMsg({ ok: false, text: `S&S wouldn't cancel ${orderNo}: ${c.error}` })
-          return
+          // S&S declined via the API (almost always past their 10-minute window). Don't
+          // dead-end: show their reason and let the operator attest they cancelled it in
+          // the portal — otherwise a genuinely-cancelled order can never be cleared.
+          if (!window.confirm(
+            `S&S wouldn't cancel ${orderNo} via their API:\n${c.error}\n\n` +
+            `If you've ALREADY cancelled it with S&S directly, click OK to mark it cancelled here.\n\n` +
+            `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
+          )) { setMsg({ ok: false, text: `S&S wouldn't cancel ${orderNo}: ${c.error}` }); return }
+          supplierMsg = ` You confirmed it was already cancelled with S&S (their API declined — past the window).`
+          manualCancel = true
+        } else {
+          const cc = c as { orderStatus?: string; reconciled?: boolean }
+          // Reconciled = the API cancel was too late, but S&S already had it cancelled, so
+          // this is catching our stale record up rather than stopping a live order.
+          supplierMsg = cc.reconciled
+            ? ` S&S already had it cancelled — this caught our record up to match.`
+            : ` S&S confirmed it cancelled (${cc.orderStatus ?? "Cancelled"}).`
+          supplierCancelled = true
         }
-        const cc = c as { orderStatus?: string; reconciled?: boolean }
-        // Reconciled = the API cancel was too late, but S&S already had it cancelled, so
-        // this is catching our stale record up rather than stopping a live order.
-        supplierMsg = cc.reconciled
-          ? ` S&S already had it cancelled — this caught our record up to match.`
-          : ` S&S confirmed it cancelled (${cc.orderStatus ?? "Cancelled"}).`
       }
 
       const r = await savePurchaseOrder({
         ...po, status: "cancelled",
-        meta: { ...(po.meta || {}), cancelledAt: new Date().toISOString(), supplierCancelled: !!supplierMsg },
+        meta: { ...(po.meta || {}), cancelledAt: new Date().toISOString(), supplierCancelled, manualCancel: manualCancel || undefined },
       })
       if (r?.error) throw new Error(r.error)
       setMsg({ ok: true, text: !wasPlaced || !sent
@@ -1085,7 +1112,7 @@ export function PurchaseView() {
       </StatGrid>
 
       {msg && (
-        <div className={"rounded-lg border px-4 py-2 text-sm " + (
+        <div ref={msgRef} className={"rounded-lg border px-4 py-2 text-sm " + (
           msg.tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-800"
             : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
               : "border-destructive/30 bg-destructive/10 text-destructive")}>{msg.text}</div>
