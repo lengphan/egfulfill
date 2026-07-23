@@ -147,10 +147,54 @@ function linkify(escaped) {
     (u) => `<a href="${u}" style="color:${BRAND.accent};text-decoration:underline">${u}</a>`);
 }
 
+// ── Email branding (admin-editable, global) ────────────────────────────────────
+// One row in `settings` under 'email_branding' overrides the BRAND defaults at SEND time,
+// so a logo / accent / footer set in the UI reaches every broadcast with no deploy. Kept
+// deliberately small: a preset only changes the CHROME (accent rule + how the header reads),
+// never the body/footer layout, so a theme can't break the legally-required unsubscribe
+// footer. Read at send time, and every field is validated because it feeds raw into HTML.
+const EMAIL_BRANDING_KEY = 'email_branding';
+const EMAIL_PRESETS = {
+  branded: { accentBar: true, header: 'wordmark' },
+  minimal: { accentBar: false, header: 'wordmark' },
+  bold: { accentBar: false, header: 'block' },
+};
+function cleanBranding(v) {
+  const o = (v && typeof v === 'object') ? v : {};
+  return {
+    preset: EMAIL_PRESETS[o.preset] ? o.preset : 'branded',
+    accent: typeof o.accent === 'string' && /^#[0-9a-f]{6}$/i.test(o.accent) ? o.accent : BRAND.accent,
+    // https only: storage URLs are https, and it lands unescaped in a src attribute.
+    logoUrl: typeof o.logoUrl === 'string' && /^https:\/\//i.test(o.logoUrl) ? o.logoUrl : '',
+    heading: typeof o.heading === 'string' && o.heading.trim() ? o.heading.trim().slice(0, 40) : 'egfulfill',
+    footerNote: typeof o.footerNote === 'string' ? o.footerNote.trim().slice(0, 200) : '',
+  };
+}
+async function getEmailBranding() {
+  try {
+    const r = await q('select value from settings where key = $1', [EMAIL_BRANDING_KEY]);
+    return cleanBranding(r.rows[0] && r.rows[0].value);
+  } catch { return cleanBranding(null); }
+}
+
 // The branded shell. innerHtml is the already-safe message body; everything around it is
-// chrome. Kept as one function so header/footer live in a single place — a transactional
-// mail could adopt the same shell later without copying the markup.
-function emailShell(innerHtml, unsubUrl, preheader) {
+// chrome, driven by the (validated) branding. Kept as one function so header/footer live in
+// a single place.
+function emailShell(innerHtml, unsubUrl, preheader, brand) {
+  const b = cleanBranding(brand);
+  const preset = EMAIL_PRESETS[b.preset] || EMAIL_PRESETS.branded;
+  const header = b.logoUrl
+    ? `<img src="${esc(b.logoUrl)}" alt="${esc(b.heading)}" height="34" style="height:34px;max-height:36px;width:auto;border:0;display:block">`
+    : `<span style="font-family:${WORDMARK_FONT};font-size:26px;font-weight:600;letter-spacing:-0.5px;color:${preset.header === 'block' ? '#ffffff' : BRAND.head}">${esc(b.heading)}</span>`;
+  const headerRow = preset.header === 'block'
+    ? `<tr><td style="padding:22px 32px;background:${b.accent}">${header}</td></tr>`
+    : `<tr><td style="padding:26px 32px 6px 32px">${header}</td></tr>`;
+  const accentBar = preset.accentBar
+    ? `<tr><td style="height:4px;background:${b.accent};line-height:4px;font-size:4px">&nbsp;</td></tr>`
+    : '';
+  const footerNote = b.footerNote
+    ? `<p style="margin:0 0 8px;font-family:${FONT};font-size:12px;line-height:1.55;color:${BRAND.muted}">${linkify(esc(b.footerNote))}</p>`
+    : '';
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light only"></head>
@@ -161,18 +205,15 @@ function emailShell(innerHtml, unsubUrl, preheader) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.pageBg}">
 <tr><td align="center" style="padding:28px 16px">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:${BRAND.card};border:1px solid ${BRAND.line};border-radius:14px;overflow:hidden">
-  <!-- The single violet flourish: one accent rule across the top. -->
-  <tr><td style="height:4px;background:${BRAND.accent};line-height:4px;font-size:4px">&nbsp;</td></tr>
-  <!-- Header / wordmark -->
-  <tr><td style="padding:26px 32px 6px 32px">
-    <span style="font-family:${WORDMARK_FONT};font-size:26px;font-weight:600;letter-spacing:-0.5px;color:${BRAND.head}">egfulfill</span>
-  </td></tr>
+  ${accentBar}
+  ${headerRow}
   <!-- Body -->
   <tr><td style="padding:12px 32px 8px 32px;font-family:${FONT};font-size:15px;line-height:1.6;color:${BRAND.ink}">
     ${innerHtml}
   </td></tr>
-  <!-- Footer -->
+  <!-- Footer. The unsubscribe line + postal address are REQUIRED and are never themed away. -->
   <tr><td style="padding:22px 32px 30px 32px;border-top:1px solid ${BRAND.line}">
+    ${footerNote}
     <p style="margin:0 0 6px;font-family:${FONT};font-size:12px;line-height:1.55;color:${BRAND.muted}">
       You're receiving this because you have an EGFULFILL seller account.
       <a href="${esc(unsubUrl)}" style="color:${BRAND.muted};text-decoration:underline">Unsubscribe from updates like this</a>.
@@ -185,7 +226,7 @@ function emailShell(innerHtml, unsubUrl, preheader) {
 </body></html>`;
 }
 
-function renderHtml(body, name, unsubUrl) {
+function renderHtml(body, name, unsubUrl, brand) {
   const greeting = name ? `Hi ${esc(name)},` : 'Hi,';
   const paras = String(body).split(/\n{2,}/)
     .map((p) => `<p style="margin:0 0 15px">${linkify(esc(p)).replace(/\n/g, '<br>')}</p>`).join('');
@@ -193,7 +234,7 @@ function renderHtml(body, name, unsubUrl) {
   // Preheader = the first line of the body, so the inbox preview shows the message's own
   // opening rather than the greeting or, worse, the hidden-div fallback some clients grab.
   const preheader = String(body).replace(/\s+/g, ' ').trim().slice(0, 140);
-  return emailShell(inner, unsubUrl, preheader);
+  return emailShell(inner, unsubUrl, preheader, brand);
 }
 
 function renderText(body, name, unsubUrl) {
@@ -263,6 +304,24 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
     const rows = await resolveRecipients((req.body || {}).audience);
     const optedOut = await q('select count(*)::int as n from users where role = $1 and coalesce(marketing_opt_out,false) = true', ['seller']);
     return { count: rows.length, optedOut: optedOut.rows[0] ? optedOut.rows[0].n : 0, sample: rows.slice(0, 5).map((x) => x.email) };
+  });
+
+  // ── Global email branding — logo / accent / preset / footer, applied to every send ──
+  // Read is staff (the editor + preview need it); the write is admin, like the site content.
+  // The `settings` table is shared with site_content.js and created idempotently here too,
+  // so this works whichever route registers first.
+  app.get('/api/email-branding', { preHandler: requireStaff }, async () => {
+    return { branding: await getEmailBranding(), presets: Object.keys(EMAIL_PRESETS) };
+  });
+  app.put('/api/email-branding', { preHandler: requireAdmin }, async (req) => {
+    await q('create table if not exists settings (key text primary key, value jsonb, updated_at timestamptz default now())').catch(() => {});
+    const clean = cleanBranding(req.body);
+    await q(
+      `insert into settings (key, value, updated_at) values ($1, $2::jsonb, now())
+       on conflict (key) do update set value = excluded.value, updated_at = now()`,
+      [EMAIL_BRANDING_KEY, JSON.stringify(clean)]);
+    audit(req, 'email_branding.update', { entityType: 'settings', entityId: EMAIL_BRANDING_KEY, after: clean });
+    return { ok: true, branding: clean };
   });
 
   app.post('/api/broadcasts', { preHandler: requireStaff }, async (req, reply) => {
@@ -354,12 +413,14 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
     // what the board polls — nothing here can reject into an unhandled rejection.
     (async () => {
       let ok = 0, bad = 0;
+      // Read the branding ONCE for the whole send, not per recipient.
+      const brand = await getEmailBranding();
       for (const r of recipients) {
         const unsubUrl = `${publicOrigin()}/api/broadcasts/unsubscribe?t=${unsubToken(r.id)}`;
         const sent = await sendMail({
           to: r.email,
           subject: bc.subject,
-          html: renderHtml(bc.body, r.name, unsubUrl),
+          html: renderHtml(bc.body, r.name, unsubUrl, brand),
           text: renderText(bc.body, r.name, unsubUrl),
           headers: {
             // Both forms: the URL is what one-click POSTs to, the mailto is the fallback

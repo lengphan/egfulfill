@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { EnvelopeSimple, CircleNotch, Warning, Plus, PaperPlaneTilt, Trash, PencilSimple } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import {
   getBroadcasts, previewBroadcastAudience, createBroadcast, updateBroadcast, deleteBroadcast,
-  sendBroadcast, type Broadcast, type BroadcastAudience,
+  sendBroadcast, getEmailBranding, setEmailBranding, uploadHeroImage,
+  type Broadcast, type BroadcastAudience, type EmailBranding,
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
@@ -64,6 +65,156 @@ const TEXTAREA_CLS =
   "flex min-h-40 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none " +
   "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 " +
   "disabled:cursor-not-allowed disabled:opacity-50"
+
+const EMAIL_PRESETS: { id: string; label: string; hint: string }[] = [
+  { id: "branded", label: "Branded", hint: "Accent rule across the top + wordmark" },
+  { id: "minimal", label: "Minimal", hint: "No accent bar — clean header" },
+  { id: "bold", label: "Bold", hint: "Solid accent header block" },
+]
+
+/**
+ * Global email branding — one logo / accent / footer for EVERY broadcast, plus a preset.
+ *
+ * Deliberately light: a preset only changes the header chrome and the accent rule; the body
+ * and the required unsubscribe footer never change. Admin-only (the server rejects a
+ * non-admin write anyway). The logo reuses the hero-image upload — any public image URL.
+ */
+function EmailBrandingCard() {
+  const [b, setB] = useState<EmailBranding | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      getEmailBranding()
+        .then((r) => setB(r.branding))
+        .catch(() => setB({ preset: "branded", accent: "#604cfa", logoUrl: "", heading: "egfulfill", footerNote: "" }))
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
+
+  const patch = (p: Partial<EmailBranding>) => setB((prev) => (prev ? { ...prev, ...p } : prev))
+
+  const onLogo = async (file: File | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith("image/")) { setErr("The logo must be an image."); return }
+    if (file.size > 4 * 1024 * 1024) { setErr("Logo is over 4MB — export a smaller PNG."); return }
+    setUploading(true); setErr(null)
+    try {
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error("Couldn't read the file")); fr.readAsDataURL(file)
+      })
+      const r = await uploadHeroImage(dataUrl)
+      if (r.error || !r.url) throw new Error(r.error || "Upload failed")
+      patch({ logoUrl: r.url })
+    } catch (e) { setErr(e instanceof Error ? e.message : "Upload failed") }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = "" }
+  }
+
+  const save = async () => {
+    if (!b) return
+    setBusy(true); setErr(null); setSaved(false)
+    try {
+      const r = await setEmailBranding(b)
+      if (r.error) throw new Error(r.error)
+      if (r.branding) setB(r.branding)
+      setSaved(true); setTimeout(() => setSaved(false), 2500)
+    } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't save — admin only.") }
+    finally { setBusy(false) }
+  }
+
+  if (!b) return null
+  const preset = EMAIL_PRESETS.find((p) => p.id === b.preset) ?? EMAIL_PRESETS[0]
+
+  return (
+    <SectionCard title="Email branding" description="Logo, colour and footer applied to every broadcast email." bodyClassName="p-5">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Theme</label>
+            <select value={b.preset} onChange={(e) => patch({ preset: e.target.value })}
+              className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+              {EMAIL_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-muted-foreground">{preset.hint}</span>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Accent colour</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={b.accent} onChange={(e) => patch({ accent: e.target.value })}
+                className="h-9 w-12 cursor-pointer rounded border border-input bg-transparent p-1" aria-label="Accent colour" />
+              <Input value={b.accent} onChange={(e) => patch({ accent: e.target.value })} className="h-9 font-mono" placeholder="#604cfa" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Logo</label>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onLogo(e.target.files?.[0])} />
+            {b.logoUrl ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={b.logoUrl} alt="Email logo" className="h-8 max-w-[10rem] rounded border border-border bg-white object-contain px-1" />
+                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? <CircleNotch size={13} className="animate-spin" /> : null}Replace</Button>
+                <Button variant="ghost" size="sm" onClick={() => patch({ logoUrl: "" })} disabled={uploading}>Remove</Button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? <CircleNotch size={13} className="animate-spin" /> : null}Upload logo</Button>
+                <span className="text-xs text-muted-foreground">Optional — falls back to the wordmark.</span>
+              </div>
+            )}
+          </div>
+          {!b.logoUrl && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Wordmark</label>
+              <Input value={b.heading} onChange={(e) => patch({ heading: e.target.value })} placeholder="egfulfill" />
+            </div>
+          )}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Footer note (optional)</label>
+            <textarea className={TEXTAREA_CLS + " min-h-16"} value={b.footerNote} onChange={(e) => patch({ footerNote: e.target.value })}
+              placeholder="A tagline or seasonal note. Shown above the required unsubscribe line." />
+          </div>
+        </div>
+
+        {/* Chrome-only preview — the body copy is per-broadcast. Light-only, like the mail. */}
+        <div>
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">Preview</span>
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+            {b.preset === "branded" && <div className="h-1" style={{ background: b.accent }} />}
+            <div className="px-5 py-4" style={b.preset === "bold" ? { background: b.accent } : undefined}>
+              {b.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={b.logoUrl} alt="" className="h-8 max-w-[11rem] object-contain" />
+              ) : (
+                <span className="text-2xl font-semibold tracking-tight"
+                  style={{ color: b.preset === "bold" ? "#ffffff" : "#0b0b0c", fontFamily: "Georgia, 'Times New Roman', serif" }}>
+                  {b.heading || "egfulfill"}
+                </span>
+              )}
+            </div>
+            <div className="px-5 pb-4 text-sm text-zinc-700">
+              <p className="mb-2">Hi Alex,</p>
+              <p className="text-zinc-400">Your broadcast copy appears here…</p>
+            </div>
+            <div className="border-t border-zinc-200 px-5 py-3 text-[11px] leading-relaxed text-zinc-400">
+              {b.footerNote && <p className="mb-1.5 text-zinc-500">{b.footerNote}</p>}
+              <p>You&apos;re receiving this because you have an EGFULFILL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+        {saved && <span className="text-xs text-emerald-600 dark:text-emerald-400">Saved — applies to the next send.</span>}
+        {err && <span className="text-xs text-destructive">{err}</span>}
+        <Button size="sm" onClick={save} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : null}Save branding</Button>
+      </div>
+    </SectionCard>
+  )
+}
 
 /**
  * Seller email broadcasts.
@@ -170,6 +321,9 @@ export function BroadcastsView() {
 
   return (
     <div className="space-y-4">
+      {/* Global look of every broadcast email — editing is admin-only. */}
+      {isAdmin && <EmailBrandingCard />}
+
       <SectionCard
         title="Broadcasts"
         description="Email every seller, or a filtered set. Separate from Campaigns, which is ad spend."

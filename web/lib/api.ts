@@ -2320,3 +2320,16 @@ export function uploadHeroImage(dataUrl: string) {
     method: "POST", body: JSON.stringify({ dataUrl }),
   })
 }
+
+// ── Global email branding (broadcasts) ─────────────────────────────────────────
+/** Logo / accent / preset / footer applied to EVERY broadcast email. Read is staff (editor
+ *  + preview), write is admin. `logoUrl` reuses the hero-image upload (any public image URL). */
+export type EmailBranding = { preset: string; accent: string; logoUrl: string; heading: string; footerNote: string }
+export function getEmailBranding() {
+  return api<{ branding: EmailBranding; presets: string[] }>(`/api/email-branding`)
+}
+export function setEmailBranding(b: EmailBranding) {
+  return api<{ ok?: boolean; branding?: EmailBranding; error?: string }>(`/api/email-branding`, {
+    method: "PUT", body: JSON.stringify(b),
+  })
+}
