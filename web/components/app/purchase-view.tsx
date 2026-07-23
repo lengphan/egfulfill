@@ -209,6 +209,7 @@ export function PurchaseView() {
     return g
   }, [inv])
 
+  const [tab, setTab] = useState("active")  // controlled so reorder can jump to the draft
   const drafts = (pos ?? []).filter((p) => p.status === "draft")
   // In flight: placed and waiting on the supplier. These belong with the drafts, not in
   // history — an order you're still expecting is something to act on, and burying it
@@ -932,11 +933,14 @@ export function PurchaseView() {
     setBusy(po.num); setMsg(null)
     try {
       if (target) {
-        // Await it: this used to fire and forget, so a failed merge reported success and
-        // the line silently wasn't on the draft anyone was about to place.
+        // Await it AND check the result: this once fire-and-forgot, then only awaited, so a
+        // server-REFUSED merge still reported success and updated local state alone — the
+        // line then vanished on the next load. Check r.error like the new-draft path does.
         const merged = mergeLines(target.items, lines)
-        await savePurchaseOrder({ ...target, items: merged })
+        const r = await savePurchaseOrder({ ...target, items: merged })
+        if (r?.error) throw new Error(r.error)
         setPos((prev) => (prev ?? []).map((p) => (p.num === target.num ? { ...p, items: merged } : p)))
+        setTab("active")   // the draft lives on the Active tab — jump there so it's visible
         setMsg({ ok: true, text: `Added ${lines.length} line${lines.length === 1 ? "" : "s"} to the open draft ${target.num} — review the quantities before placing.` })
       } else {
         const draft: PurchaseOrder = { num: nextNum(), supplier: po.supplier ?? null, items: lines, status: "draft" }
@@ -944,6 +948,7 @@ export function PurchaseView() {
         // savePurchaseOrder resolves with {error} for some refusals rather than throwing,
         // so checking only for a thrown error reported a failure as a success.
         if (r?.error) throw new Error(r.error)
+        setTab("active")   // show the new draft on the Active tab
         setMsg({ ok: true, text: `Drafted ${draft.num} from ${po.num} — review the quantities before placing.` })
         load()
       }
@@ -1180,7 +1185,7 @@ export function PurchaseView() {
       )}
 
       {/* Reorder suggestions */}
-      <Tabs defaultValue="active">
+      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
         <TabsList>
           <TabsTrigger value="active">Active{activeCount ? ` (${activeCount})` : ""}</TabsTrigger>
           {/* No count on History. It only grows — hundreds of POs eventually — and a
