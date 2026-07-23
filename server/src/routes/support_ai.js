@@ -425,9 +425,13 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   // ── The seller-facing auto-reply ─────────────────────────────────────────────
   app.post('/api/support/ai-reply', { preHandler: requireAuth }, async (req, reply) => {
     const { key, model } = await aiConfig();
-    if (!key) return { ok: false, disabled: true };
+    if (!key) { req.log?.warn?.('support-ai: no AI key configured (Settings › Integrations)'); return { ok: false, disabled: true }; }
     const sellerId = req.user.sub;
     const threadId = 'support-' + sellerId;
+    // A staffer's own "My EG" is a PERSONAL AI thread — there is no human queue behind it,
+    // so the handoff suppression below (which goes silent until a teammate replies) must
+    // never gate it, or one stray escalated flag would mute their assistant permanently.
+    const isStaffOwn = String(req.user.role || 'seller') !== 'seller';
 
     // HUMAN HANDOFF: once a seller asks for a human, the AI stays OUT until a real teammate
     // replies. Two reasons — it must not talk over the queue, and its own reply (role
@@ -447,7 +451,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
                   and s.sender_role not in ('seller', 'assistant')
                   and s.created_at > e.created_at)
            limit 1`, [threadId]);
-      if (open.rows.length) return { ok: true, escalated: true, office: await supportAvailability() };
+      if (open.rows.length && !isStaffOwn) { req.log?.info?.({ threadId }, 'support-ai: suppressed on open human handoff'); return { ok: true, escalated: true, office: await supportAvailability() }; }
     } catch { /* if the check fails, fall through — a missed suppression is better than a hang */ }
 
     // Exclude INTERNAL rows (staff order briefs, internal notes). They share this
