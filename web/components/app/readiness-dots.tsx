@@ -130,11 +130,14 @@ function Tag({ id, label, state, title, orderId, status, files, dot }: {
         onMouseEnter={openLater}
         onMouseLeave={closeLater}
         onFocus={openNow}
-        className={"eg-tap inline-flex shrink-0 items-center gap-1 whitespace-nowrap transition-colors " + (dot
-          ? "text-[11px] font-medium text-muted-foreground hover:text-foreground"
+        className={"eg-tap inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors " + (dot
+          // A padded chip, not bare text — the dot+word alone gave almost no hit area, so
+          // hovering/tapping the right tag on a dense board was fiddly. Padding + a hover
+          // fill make each an obvious, comfortable target.
+          ? "rounded-md px-2 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
           : "rounded-md px-2.5 py-1 text-xs font-semibold " + cls)}
       >
-        {dot && <span className={"size-2 shrink-0 rounded-full " + dotCls} />}
+        {dot && <span className={"size-2.5 shrink-0 rounded-full " + dotCls} />}
         {tl("ui", label)}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-0"
@@ -381,7 +384,7 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
   const designFiles = designFilesAll.filter((f) => f.href || f.designId)
 
   return (
-    <span className={"inline-flex items-center " + (compact ? "gap-2 " : "gap-1.5 ") + (className ?? "")}>
+    <span className={"inline-flex items-center " + (compact ? "gap-1 " : "gap-1.5 ") + (className ?? "")}>
       {/* Names are fixed. Colour carries progress; the words live in each popover. */}
       <Tag id="label" orderId={order.id} label="Label" state={hasLabel ? "done" : "todo"}
            title={labelTitle} status={labelTitle} files={labelFile} dot={compact} />

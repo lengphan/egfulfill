@@ -24,7 +24,6 @@ import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
 import { useLabelT } from "@/lib/i18n"
-import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
@@ -970,13 +969,13 @@ export function OrdersHub() {
                         canStart ? "start" : canShip ? "ship" : canAdvance ? "advance" : null
                       const busyO = busy?.startsWith(o.id)
                       return (
-                        <div className="flex items-center gap-2 sm:shrink-0">
-                          {/* Readiness sits with the actions, not in the metadata line: the
-                              left of a row is identity, the right is state and what to do
-                              about it. Sharing a line with store/date/address made five
-                              dots read as more clutter rather than a summary. */}
-                          {/* Ours ends at shipped; the carrier's status carries on from there. */}
-                        <DeliveryBadge order={o} onRefreshed={load} className="mr-1" />
+                        <div className="flex items-center justify-end gap-2 sm:shrink-0">
+                          {/* Buttons hug the RIGHT edge (justify-end), aligned with the
+                              header's Columns control above — the action column is fixed, so
+                              left-aligning left an awkward gap before the row padding.
+                              Carrier delivery status was removed: tracking rides Shippo + the
+                              pipeline stage, so a "No carrier update" chip on every row was
+                              noise, not information. */}
                           {/* SAYS the row is stopped, rather than just going blank where
                               every other row has a button. A missing control and a broken
                               one look identical; this names which it is, and points at the
