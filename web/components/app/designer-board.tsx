@@ -621,11 +621,6 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               <PaperPlaneTilt size={14} weight="bold" /> Send to Pink Design
             </Button>
           )}
-          {card.vendor && (
-            <span className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground">
-              With {String(card.vendor)} — paid by invoice, so approving it credits no designer
-            </span>
-          )}
         </div>
 
         {/* Their task ref (= our vendor_ref). Shown so it can be cross-referenced on Pink's
@@ -633,19 +628,25 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             it one click to copy. */}
         {card.vendor && ((card.vendor_ref || card.vendor_task_id) ? (
           // Ref ID + Task ID side by side, big enough to read and copy — labelled to match
-          // Pink's test-webhook form. Either one is enough for our webhook to match, so if
-          // only one is known, use it in both fields.
-          <div className="flex flex-wrap gap-2">
-            {card.vendor_task_id && (
-              <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Task ID</div>
-                <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_task_id)}</div>
-              </div>
-            )}
-            {card.vendor_ref && (
-              <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ref ID</div>
-                <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_ref)}</div>
+          // Pink's test-webhook form. Either one is enough for our webhook to match.
+          <div className="space-y-1">
+            <div className="flex flex-wrap gap-2">
+              {card.vendor_task_id && (
+                <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Task ID</div>
+                  <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_task_id)}</div>
+                </div>
+              )}
+              {card.vendor_ref && (
+                <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ref ID</div>
+                  <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_ref)}</div>
+                </div>
+              )}
+            </div>
+            {card.vendor_ref && !card.vendor_task_id && (
+              <div className="text-[10px] text-muted-foreground">
+                Pink returns only the Ref ID on push — on their test-webhook form, put this in <span className="font-semibold">both</span> the Ref ID and Task ID fields.
               </div>
             )}
           </div>
