@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
     return [
       { source: "/suppliers", destination: "/purchasing?tab=browse", permanent: false },
       { source: "/purchase", destination: "/purchasing?tab=purchase", permanent: false },
+      // Dispatch + Shipments merged into Shipping; Scan folded into Inventory.
+      { source: "/dispatch", destination: "/shipping?tab=dispatch", permanent: false },
+      { source: "/shipments", destination: "/shipping?tab=shipments", permanent: false },
+      { source: "/scan", destination: "/inventory?tab=scan", permanent: false },
     ]
   },
 }

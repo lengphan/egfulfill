@@ -40,10 +40,8 @@ const fmtDate = (s?: string | null) => {
 const SHORTCUT_DESC: Record<string, string> = {
   "/operator": "Production queue",
   "/designer": "Artwork board",
-  "/dispatch": "Ship-out queue",
-  "/shipments": "Tracking archive",
-  "/scan": "Stock in / out",
-  "/inventory": "Stock on hand",
+  "/shipping": "Dispatch + shipments",
+  "/inventory": "Stock levels + scan",
   "/purchasing": "Browse, cart + orders",
   "/finance": "Wallet + costs",
   "/broadcasts": "Seller email",

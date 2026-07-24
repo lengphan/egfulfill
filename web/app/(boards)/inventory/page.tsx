@@ -1,9 +1,7 @@
-import { InventoryView } from "@/components/app/inventory-view"
+import { InventorySection } from "@/components/app/inventory-section"
+
+export const metadata = { title: "Inventory · EGFULFILL" }
 
 export default function InventoryPage() {
-  return (
-    <>
-      <InventoryView />
-    </>
-  )
+  return <InventorySection />
 }

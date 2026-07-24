@@ -1,4 +1,4 @@
-import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, EnvelopeSimple, Needle, type Icon } from "@phosphor-icons/react"
+import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Megaphone, Truck, EnvelopeSimple, Needle, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -9,17 +9,14 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
   // Earnings = a designer's own payout view. Admin sees designer credits in Wallet instead.
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer"] },
-  // Dispatch = orders leaving the building (batch, print, scan out). Distinct from Scan,
-  // which is the stock-in/out station for inventory.
-  { label: "Dispatch", href: "/dispatch", icon: Truck, roles: ["operator", "warehouse", "admin"] },
-  // Shipments sits BESIDE Dispatch, not inside it. Dispatch is a work queue — what's left
-  // to scan today, read by the floor, empty by evening. This is the archive: every parcel
-  // that ever got a tracking number, searched by whoever is on the phone to a buyer. A
-  // growing list nobody works through does not belong underneath a short list they do.
-  { label: "Shipments", href: "/shipments", icon: Package, roles: ["operator", "warehouse", "admin"] },
-  // Operator sees Scan READ-ONLY: stock movements are the warehouse's claim about
-  // physical custody, but an operator needs to look up what's on hand.
-  { label: "Scan", href: "/scan", icon: Barcode, roles: ["operator", "warehouse", "admin"] },
+  // Shipping = Dispatch (today's out-queue) + Shipments (parcel archive) as two tabs.
+  // They stay distinct tabs, NOT one merged list: Dispatch is a short queue emptied by
+  // evening, Shipments is an ever-growing archive — merging the lists would bury the queue.
+  // Old /dispatch + /shipments routes redirect here (next.config).
+  { label: "Shipping", href: "/shipping", icon: Truck, roles: ["operator", "warehouse", "admin"] },
+  // Inventory = Stock (levels on hand) + Scan (the stock in/out station) as two tabs.
+  // Scan keeps its own warehouse-write / operator-read gating inside the station. Old
+  // /scan route redirects to the Scan tab (next.config).
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
   // Purchasing = Suppliers (browse) + Purchase (cart/on-order/history) folded into one
   // section with tabs. Old /suppliers + /purchase routes redirect here (next.config).
