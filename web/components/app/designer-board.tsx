@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, ChatText } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, ChatText, Plus } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -220,8 +220,25 @@ export function DesignerBoard() {
           <h1 className="font-display text-2xl font-semibold tracking-tight">Designer</h1>
           <p className="truncate text-sm text-muted-foreground">{view === "board" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
         </div>
+        {/* Add design — the explicit way in, in EITHER view. Drag-drop onto a lane only
+            works in Board view, which left List view with no way to bring artwork in.
+            Files land in Incoming regardless (see dropFiles), so no lane choice is needed. */}
+        <label className="eg-tap ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+          <Plus size={14} weight="bold" /> Add design
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="sr-only"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? [])
+              e.currentTarget.value = "" // let the same file be picked again after a failure
+              if (files.length) void dropFiles(files, "incoming")
+            }}
+          />
+        </label>
         {/* rounded-full to match the pill buttons inside — see suppliers-view. */}
-        <div className="ml-auto flex rounded-full border border-border p-0.5">
+        <div className="flex rounded-full border border-border p-0.5">
           {([{ id: "board", label: "Board" }, { id: "list", label: "List" }] as const).map((v) => (
             <button key={v.id} onClick={() => setView(v.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (view === v.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{v.label}</button>
           ))}
@@ -430,7 +447,7 @@ function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: str
   const labelOf = (col: ListCol) => labels[col.id] || col.label
   const shown = LIST_COLS.filter((c) => visible.includes(c.id))
 
-  if (rows.length === 0) return <div className="rounded-2xl border border-border py-16 text-center text-sm text-muted-foreground">No design cards yet — send one from the Operator board.</div>
+  if (rows.length === 0) return <div className="rounded-2xl border border-border py-16 text-center text-sm text-muted-foreground">No design cards yet — use <span className="font-medium text-foreground">Add design</span> above, or send one from the Operator board.</div>
 
   return (
     <div className="space-y-2">

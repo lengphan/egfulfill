@@ -99,6 +99,18 @@ export function StaffDashboard() {
 
   const recent = useMemo(() => (orders ?? []).slice(0, 6), [orders])
 
+  // The production line honours the same window the money cards use — but only where the
+  // control is actually shown (admin). For roles without the toggle it stays a full,
+  // unfiltered snapshot so nothing is silently hidden behind a filter they can't see.
+  // "All" means the live floor; a bounded window means "orders from this window, by their
+  // current stage" — which is what makes the toggle useful (e.g. where did today's intake go).
+  const windowed = isAdmin && range !== "all"
+  const lineOrders = useMemo(() => {
+    if (!windowed) return orders ?? []
+    const since = rangeMeta.since()
+    return (orders ?? []).filter((o) => orderTs(o) >= since)
+  }, [orders, windowed, rangeMeta])
+
   // Role-tuned KPI cards. `today` is shown only where it's a real, live delta.
   // Admin gets the money view — revenue, profit, volume, average — read over the chosen
   // window; the production counts it used to show now live in the Production line chart
@@ -180,7 +192,7 @@ export function StaffDashboard() {
 
       <SectionCard
         title="Production line"
-        description="Where the work is right now — every order by stage"
+        description={windowed ? `Orders from the ${rangeMeta.sub}, by current stage` : "Where the work is right now — every order by stage"}
         actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">Open queue <ArrowRight size={13} weight="bold" /></Link>}
         bodyClassName="divide-y divide-border"
       >
@@ -188,7 +200,7 @@ export function StaffDashboard() {
           <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
         ) : (
           <>
-            <ProductionLine orders={orders} />
+            <ProductionLine orders={lineOrders} />
             {stats.attention > 0 && (
               <Link href="/operator" className="flex items-center gap-2 bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50">
                 <Warning size={14} weight="fill" className="shrink-0" />
@@ -223,17 +235,18 @@ export function StaffDashboard() {
         </div>
 
         <SectionCard title="Jump to">
-          <div className="divide-y divide-border">
+          {/* Compact tile grid, not a tall row-list — it reads as a launcher and stays short
+              next to the taller Recent-orders table instead of stretching to match it. */}
+          <div className="grid grid-cols-2 gap-2 p-3">
             {quick.map((q) => {
               const Icon = q.icon
               return (
-                <Link key={q.href} href={q.href} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-accent">
+                <Link key={q.href} href={q.href} className="group flex flex-col gap-2 rounded-lg border border-border p-3 transition-colors hover:border-primary/40 hover:bg-accent">
                   <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon size={16} weight="duotone" /></span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium">{q.label}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{q.desc}</span>
+                    <span className="block text-sm font-medium leading-tight">{q.label}</span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground leading-tight">{q.desc}</span>
                   </span>
-                  <ArrowRight size={14} className="ml-auto shrink-0 text-muted-foreground" />
                 </Link>
               )
             })}
