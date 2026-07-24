@@ -139,7 +139,7 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   let imageUrl = null;
 
   if (cardId) {
-    card = (await q('select id, order_id, sku, title, type, thumb, vendor from design_cards where id=$1::bigint limit 1',
+    card = (await q('select id, order_id, sku, title, type, thumb, vendor, art_key, art_data from design_cards where id=$1::bigint limit 1',
       [String(cardId)])).rows[0] || null;
     if (!card) return { error: 'Card not found', status: 404 };
     if (card.vendor) return { error: `This card is already with ${card.vendor}.`, status: 400 };
@@ -166,6 +166,11 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   // thumb, but ONLY when it's a real URL: a base64 thumb has no address to give them.
   if (directImage && /^https?:\/\//i.test(String(directImage))) imageUrl = String(directImage);
   else if (!imageUrl && card && /^https?:\/\//i.test(String(card.thumb || ''))) imageUrl = String(card.thumb);
+  // A MANUAL card's OWN dropped artwork lives in object storage under art_key (thumb is null
+  // for it), so resolve THAT to a URL. Without this, a reference attachment wrongly became
+  // the artwork and the design the user actually dropped never went out — the exact "my
+  // image got replaced by an attachment" bug.
+  if (!imageUrl && card && card.art_key) imageUrl = urlFor(card.art_key);
 
   // Reference material beyond the artwork itself — a mockup, a spec sheet, a marked-up
   // screenshot of what's wrong. URLs only, same constraint as the artwork, and the
