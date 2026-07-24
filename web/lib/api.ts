@@ -1243,6 +1243,8 @@ export function aiDraft(threadId: string) {
  *  the method_* keys addressable by name from the settings form. */
 export type FactorySettings = {
   designer_payout?: number; ship_first?: number; ship_extra?: number; emb_price?: number
+  /** Seller payout guardrails. payout_max = 0 means "no fixed ceiling — balance is the cap". */
+  payout_min?: number; payout_max?: number
   /** Seller-facing design charges. Exactly ONE of the three applies to a line, decided by
    *  where the machine file came from — see factory_settings.js. */
   design_fee_standard?: number; design_fee_complex?: number; check_fee?: number

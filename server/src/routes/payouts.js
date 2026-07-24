@@ -10,11 +10,22 @@ import { q } from '../db.js';
 import { balanceOf } from './wallet.js';
 import { sendMail, mailConfigured } from '../mailer.js';
 
-// Amount guardrails. A payout must be at least MIN (not worth the manual effort below it)
-// and at most MAX (a large cash-out is worth a second look), AND can never exceed the
-// seller's balance — a debit past zero would invent money the ledger doesn't have.
-const PAYOUT_MIN = 10;
-const PAYOUT_MAX = 5000;
+// Amount guardrails — ADMIN-CONFIGURABLE via factory settings (Settings › Platform):
+//   payout_min  a request must be at least this
+//   payout_max  and at most this, UNLESS it's 0 → no fixed ceiling (balance is the cap)
+// The seller's own balance is ALWAYS the hard cap regardless — a debit past zero would
+// invent money the ledger doesn't have. Read at call time so an admin edit applies with no
+// redeploy, and fall back to sane defaults if the settings row was never written.
+const DEFAULT_MIN = 10;
+async function payoutBounds() {
+  const rows = await q("select key, value from settings where key in ('payout_min','payout_max')")
+    .then((r) => r.rows).catch(() => []);
+  const m = {};
+  for (const r of rows) m[r.key] = Number(r.value);
+  const min = Number.isFinite(m.payout_min) && m.payout_min > 0 ? m.payout_min : DEFAULT_MIN;
+  const max = Number.isFinite(m.payout_max) && m.payout_max > 0 ? m.payout_max : 0; // 0 = balance-limited
+  return { min, max };
+}
 
 const canPay = (u) => ['admin', 'warehouse'].includes(String(u && u.role));
 
@@ -41,7 +52,8 @@ export function payoutsRoutes(app, requireAuth) {
   // knows the limits without a second call.
   app.get('/api/payout/method', { preHandler: requireAuth }, async (req) => {
     const r = await q('select payout_info from users where id=$1', [req.user.sub]).catch(() => null);
-    return { info: (r && r.rows[0] && r.rows[0].payout_info) || null, min: PAYOUT_MIN, max: PAYOUT_MAX, balance: await balanceOf(req.user.sub) };
+    const { min, max } = await payoutBounds();
+    return { info: (r && r.rows[0] && r.rows[0].payout_info) || null, min, max, balance: await balanceOf(req.user.sub) };
   });
   app.put('/api/payout/method', { preHandler: requireAuth }, async (req, reply) => {
     const info = (req.body && req.body.info) || null;
@@ -55,8 +67,9 @@ export function payoutsRoutes(app, requireAuth) {
   app.post('/api/payout/requests', { preHandler: requireAuth }, async (req, reply) => {
     const amount = Number((req.body || {}).amount) || 0;
     const note = (req.body || {}).note || null;
-    if (amount < PAYOUT_MIN) { reply.code(400); return { error: `The minimum payout is $${PAYOUT_MIN}.` }; }
-    if (amount > PAYOUT_MAX) { reply.code(400); return { error: `The maximum payout is $${PAYOUT_MAX}.` }; }
+    const { min, max } = await payoutBounds();
+    if (amount < min) { reply.code(400); return { error: `The minimum payout is $${min}.` }; }
+    if (max > 0 && amount > max) { reply.code(400); return { error: `The maximum payout is $${max}.` }; }
     const bal = await balanceOf(req.user.sub);
     if (amount > bal) { reply.code(400); return { error: `You can withdraw up to $${bal.toFixed(2)}.` }; }
     // name isn't in the JWT (only sub/role/email), so read it from the row along with the

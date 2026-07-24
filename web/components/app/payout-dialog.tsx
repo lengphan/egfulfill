@@ -25,7 +25,8 @@ const BLANK: PayoutMethod = { type: "bank", account_name: "", account_id: "", ac
  */
 export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void }) {
   const [info, setInfo] = useState<PayoutMethod>({ ...BLANK })
-  const [bounds, setBounds] = useState<{ min: number; max: number; balance: number }>({ min: 10, max: 5000, balance: 0 })
+  // max === 0 means "no fixed ceiling — the balance is the cap" (admin-configurable).
+  const [bounds, setBounds] = useState<{ min: number; max: number; balance: number }>({ min: 10, max: 0, balance: 0 })
   const [amount, setAmount] = useState("")
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -64,11 +65,13 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
     !!info.account_id?.trim()   // pingpong / lianlian
   )
   const amt = Number(amount) || 0
-  const max = Math.min(bounds.max, bounds.balance)
+  // What the seller can actually take: their balance, further limited by an admin max if
+  // one is set (max === 0 → balance is the only ceiling).
+  const ceiling = bounds.max > 0 ? Math.min(bounds.max, bounds.balance) : bounds.balance
   const amountErr =
     amt <= 0 ? null :
     amt < bounds.min ? `Minimum payout is ${usd(bounds.min)}.` :
-    amt > bounds.max ? `Maximum payout is ${usd(bounds.max)}.` :
+    (bounds.max > 0 && amt > bounds.max) ? `Maximum payout is ${usd(bounds.max)}.` :
     amt > bounds.balance ? `You can withdraw up to ${usd(bounds.balance)}.` : null
 
   const submit = async () => {
@@ -144,13 +147,13 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amount</div>
-                <button onClick={() => setAmount(String(Math.max(0, Math.floor(max))))} disabled={max < bounds.min} className="text-xs font-medium text-primary hover:underline disabled:opacity-40">Withdraw all</button>
+                <button onClick={() => setAmount(String(Math.max(0, Math.floor(ceiling))))} disabled={ceiling < bounds.min} className="text-xs font-medium text-primary hover:underline disabled:opacity-40">Withdraw all</button>
               </div>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                <Input type="number" min={bounds.min} max={bounds.max} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="h-10 pl-6 text-lg font-semibold tabular-nums" />
+                <Input type="number" min={bounds.min} max={ceiling || undefined} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="h-10 pl-6 text-lg font-semibold tabular-nums" />
               </div>
-              <p className="text-[11px] text-muted-foreground">Balance {usd(bounds.balance)} · min {usd(bounds.min)} · max {usd(bounds.max)}</p>
+              <p className="text-[11px] text-muted-foreground">Balance {usd(bounds.balance)} · min {usd(bounds.min)}{bounds.max > 0 ? ` · max ${usd(bounds.max)}` : ""}</p>
               {amountErr && <p className="text-[11px] font-medium text-amber-700">{amountErr}</p>}
             </div>
 

@@ -845,6 +845,10 @@ function PlatformPanel() {
   const [shipFirst, setShipFirst] = useState("")
   const [shipExtra, setShipExtra] = useState("")
   const [embPrice, setEmbPrice] = useState("")
+  // Seller payout guardrails. Max = 0 means "no fixed ceiling — the seller's balance is the
+  // cap", which always applies regardless.
+  const [payoutMin, setPayoutMin] = useState("")
+  const [payoutMax, setPayoutMax] = useState("")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -881,6 +885,8 @@ function PlatformPanel() {
       setShipFirst(r.ship_first != null ? String(r.ship_first) : "")
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
+      setPayoutMin(r.payout_min != null ? String(r.payout_min) : "")
+      setPayoutMax(r.payout_max != null ? String(r.payout_max) : "")
       setShipFrom(r.ship_from ?? {})
       setTypes(r.product_types ?? [])
       setThreads(r.thread_palette ?? [])
@@ -908,6 +914,8 @@ function PlatformPanel() {
         ship_first: shipFirst === "" ? undefined : Number(shipFirst),
         ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
         emb_price: embPrice === "" ? undefined : Number(embPrice),
+        payout_min: payoutMin === "" ? undefined : Number(payoutMin),
+        payout_max: payoutMax === "" ? undefined : Number(payoutMax),
         ...Object.fromEntries(Object.entries(bands).map(([k, v]) => [k, v === "" ? undefined : Number(v)])),
         ship_from: shipFrom,
         product_types: types,
@@ -979,6 +987,13 @@ function PlatformPanel() {
           hint="Money leaving us, not a seller charge — the only figure on this page that does."
         >
           <MoneyField label="Designer payout" hint="Per approved design, to the designer who claimed it" value={designFee} onChange={setDesignFee} />
+        </FeeGroup>
+        <FeeGroup
+          title="Seller payouts"
+          hint="The limits a seller sees when cashing out their wallet. A payout can never exceed their balance regardless of these."
+        >
+          <MoneyField label="Minimum payout" hint="Smallest amount a seller can request" value={payoutMin} onChange={setPayoutMin} />
+          <MoneyField label="Maximum payout" hint="Largest single request. Set 0 for no cap beyond the seller's balance." value={payoutMax} onChange={setPayoutMax} />
         </FeeGroup>
         <FeeGroup
           title="Product & shipping"

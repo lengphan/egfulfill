@@ -38,6 +38,9 @@ const KEYS = [
   // Expedited dispatch: what the seller pays vs what the partner costs us.
   'expedite_fee', 'expedite_cost', 'design_partner_cost',
   'low_balance_warn',
+  // Seller payout guardrails. payout_max = 0 means "no fixed ceiling — limited only by the
+  // seller's own balance", which is always the hard cap regardless.
+  'payout_min', 'payout_max',
 ];
 
 // Supplier-ordering defaults. Kept OUT of KEYS because those are all numbers coerced with
@@ -96,6 +99,12 @@ export const SETTING_DEFAULTS = {
   // House accounts (factory/designer) are exempt: they're allowed to run negative on
   // purpose, because that's how a loss becomes visible instead of blocking the floor.
   low_balance_warn: 50,
+  // Seller payout guardrails (admin-editable). A request must be at least payout_min, and
+  // at most payout_max UNLESS payout_max is 0, which means "no fixed ceiling — the seller's
+  // own balance is the cap". The balance cap always applies regardless, so a payout can
+  // never exceed what's in the wallet.
+  payout_min: 10,
+  payout_max: 0,
 };
 
 /**
