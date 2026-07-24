@@ -210,21 +210,35 @@ export function vietqrRoutes(app, requireAuth) {
 
   // ── Admin-set USD→VND exchange rate (shared across all sellers) ──────────────
   q(`create table if not exists settings (key text primary key, value text, updated_at timestamptz default now())`).catch(() => {});
+  // Sensible starter tiers so bulk pricing SHOWS out of the box (each a small discount off
+  // the base rate). Admin can edit or clear them; an explicit empty list is respected.
+  const defaultTiers = (rate) => [
+    { usd: 2000, rate: Math.max(1, rate - 500) },
+    { usd: 5000, rate: Math.max(1, rate - 1000) },
+    { usd: 10000, rate: Math.max(1, rate - 1500) },
+  ];
   // Read the admin-set volume tiers ({usd, rate}[], a better VND/$1 the more you add).
   // Stored as a JSON string alongside the base rate; tolerant of a jsonb column too.
+  // Returns null when NEVER configured (→ caller uses defaults) vs [] when set to empty.
   async function readTiers() {
     try {
       const tr = await q("select value from settings where key='vqr_tiers'");
-      let raw = tr.rows[0] ? tr.rows[0].value : null;
+      if (!tr.rows[0]) return null;
+      let raw = tr.rows[0].value;
       if (typeof raw === 'string') raw = JSON.parse(raw);
       if (!Array.isArray(raw)) return [];
       return raw.map((t) => ({ usd: Number(t.usd) || 0, rate: Number(t.rate) || 0 })).filter((t) => t.usd > 0 && t.rate > 0).sort((a, c) => a.usd - c.usd);
-    } catch { return []; }
+    } catch { return null; }
+  }
+  // Effective tiers: what a seller/admin should see — stored ones, or defaults if untouched.
+  async function effectiveTiers(rate) {
+    const stored = await readTiers();
+    return stored === null ? defaultTiers(rate) : stored;
   }
   app.get('/api/vietqr/rate', { preHandler: requireAuth }, async () => {
     const r = await q("select value from settings where key='vqr_rate'");
-    const rate = r.rows[0] ? Number(r.rows[0].value) : 0;
-    return { rate: rate > 0 ? rate : 25400, tiers: await readTiers() };
+    const rate = r.rows[0] && Number(r.rows[0].value) > 0 ? Number(r.rows[0].value) : 25400;
+    return { rate, tiers: await effectiveTiers(rate) };
   });
   app.put('/api/vietqr/rate', { preHandler: requireAuth }, async (req, reply) => {
     if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only — only an admin can set the exchange rate' }; }
@@ -237,7 +251,7 @@ export function vietqrRoutes(app, requireAuth) {
         .filter((t) => t.usd > 0 && t.rate > 0).sort((a, c) => a.usd - c.usd);
       await q("insert into settings (key,value,updated_at) values ('vqr_tiers',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(clean)]);
     }
-    return { ok: true, rate, tiers: await readTiers() };
+    return { ok: true, rate, tiers: await effectiveTiers(rate) };
   });
 
   // ── Mint a VA-backed payment QR (production-reliable callbacks) ──────────────
@@ -291,7 +305,7 @@ export function vietqrRoutes(app, requireAuth) {
       // trusted from the client — so nobody can pay a little VND and claim a big credit.
       // Volume tiers give a better (lower) VND/$1 the more you add: the applicable rate is
       // the highest tier whose cost the payment covers.
-      const tiers = await readTiers();   // ascending by usd
+      const tiers = await effectiveTiers(rate);   // ascending by usd
       let applicable = rate;
       for (let i = tiers.length - 1; i >= 0; i--) { if (amount >= tiers[i].usd * tiers[i].rate) { applicable = tiers[i].rate; break; } }
       const amountUsd = Math.round((amount / applicable) * 100) / 100;
