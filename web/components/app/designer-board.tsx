@@ -6,7 +6,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, type DesignCard } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { AssignCardDialog } from "@/components/app/assign-card-dialog"
@@ -300,11 +300,14 @@ export function DesignerBoard() {
                     list.map((c) => (
                       <button
                         key={String(c.id)}
-                        draggable
-                        onDragStart={() => setDragId(c.id)}
+                        // A vendor card is driven by the partner's board, so it can't be
+                        // dragged through our lanes — the same gate the card dialog applies,
+                        // enforced on the tile so a drag can't route around it.
+                        draggable={!c.vendor}
+                        onDragStart={() => { if (!c.vendor) setDragId(c.id) }}
                         onDragEnd={() => setDragId(null)}
                         onClick={() => setOpenId(c.id)}
-                        className="group cursor-grab overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow active:cursor-grabbing"
+                        className={"group overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow " + (c.vendor ? "cursor-pointer" : "cursor-grab active:cursor-grabbing")}
                       >
                         {/* Large preview so the design is actually visible on the card */}
                         <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
@@ -330,9 +333,11 @@ export function DesignerBoard() {
                             onClick={async (e) => {
                               e.stopPropagation()
                               const ok = await confirm({
-                                title: "Cancel this card?",
-                                body: `"${c.title || "This card"}" will be removed from the board. The order itself isn't affected.`,
-                                confirmLabel: "Cancel card",
+                                title: c.vendor ? `Remove this ${vendorLabel(c.vendor)} card?` : "Cancel this card?",
+                                body: c.vendor
+                                  ? `This was sent to ${vendorLabel(c.vendor)}. Removing it here does NOT cancel it on their board — they have no cancel API, so they may still design and invoice it, and their finished file can no longer reach us. Cancel it on their board first, then remove this.`
+                                  : `"${c.title || "This card"}" will be removed from the board. The order itself isn't affected.`,
+                                confirmLabel: c.vendor ? "Remove anyway" : "Cancel card",
                                 cancelLabel: "Keep it",
                               })
                               if (ok) void removeCard(c.id)
@@ -503,6 +508,34 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
     } finally { setBusy(false) }
   }
 
+  // Send a returned proof BACK to the partner for changes — the one outbound action on a
+  // vendor card that's ours to take. It goes through THEIR API (a note + a status flip on
+  // their board), not a local lane move, so their board and ours stay in step.
+  const requestFix = async () => {
+    const message = (typeof window !== "undefined"
+      ? window.prompt(`What needs changing? This note is sent to ${vendorLabel(card.vendor)}.`) : "")?.trim()
+    if (!message) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await pinkRequestFix({ cardId: card.id, message })
+      if (r?.error) throw new Error(r.error)
+      patch(card.id, { col: "fix" })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : `Couldn't send that back to ${vendorLabel(card.vendor)}.`)
+    } finally { setBusy(false) }
+  }
+
+  // Removing a card only deletes OUR row. For a vendor card that means the partner's task
+  // lives on — they don't offer a cancel API, so it may still be designed AND invoiced, and
+  // we've dropped the vendor_ref their finished-work webhook needs (so the file would land
+  // as an unknown ref and be ignored). Say all of that before letting it go.
+  const removeThis = () => {
+    if (card.vendor && typeof window !== "undefined" && !window.confirm(
+      `This card was sent to ${vendorLabel(card.vendor)}. Removing it here does NOT cancel it on their board — they have no cancel API, so they may still design and invoice it, and their finished file can no longer reach us. Cancel it on ${vendorLabel(card.vendor)}'s board first.\n\nRemove from our board anyway?`
+    )) return
+    remove(card.id)
+  }
+
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-xl">
@@ -556,7 +589,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           )}
         </div>
 
-        {canFee ? (
+        {/* Payout is a DESIGNER's earning — a vendor card is paid by invoice, not a payout,
+            so the field is hidden for it (the notice above already says so). */}
+        {!card.vendor && (canFee ? (
           <label className="flex items-center gap-2">
             <span className="text-sm font-medium">Payout</span>
             <div className="relative w-32">
@@ -566,7 +601,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           </label>
         ) : (
           amt(card.payment) > 0 && <div className="text-sm text-muted-foreground">Payout <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div>
-        )}
+        ))}
 
         {/* Files for this card's order — drop the .emb/.pes/mockup right here. The
             card already knows its order_id + sku, so a dropped file is LINKED to the
@@ -586,33 +621,57 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
 
         {/* Stage actions */}
         <div className="flex flex-wrap gap-2">
-          {col === "incoming" && (card.vendor ? (
-            // Not ours to take — the partner is working it. The server enforces this too
-            // (it preserves claimed_by/col for a designer), so this is the honest label
-            // rather than the guard.
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800">
-              Being designed by {vendorLabel(card.vendor)}
-            </span>
-          ) : (
-            // Sending out lives on the ORDER's item row, not here: the decision is made
-            // while looking at the line and its artwork, and a designer opening a card to
-            // claim it is not the person deciding to outsource it.
-            <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}><Hand size={14} weight="bold" /> Claim</Button>
-          ))}
-          {col === "inprogress" && <Button size="sm" onClick={() => move("review")}><ArrowRight size={14} weight="bold" /> Send for review</Button>}
-          {col === "review" && (
+          {card.vendor ? (
+            /* This portal is OURS; the partner never sees it — they work the task on their
+               own board and their webhook advances OUR lane (In progress → In review →
+               Approved). So the internal designer actions (Claim, Send for review, Back to
+               work, Credit) are GATED off a vendor card: a hand-move here would silently
+               disagree with their board. What's left is a read-only mirror of where it is,
+               plus the two calls that are genuinely ours — accepting a returned proof, and
+               sending one back for changes (which goes through THEIR API, not a local move). */
             <>
-              <Button size="sm" onClick={() => move("approved")}><CheckCircle size={14} weight="bold" /> Approve</Button>
-              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => move("fix")}><ArrowClockwise size={14} weight="bold" /> Fix</Button>
+              {(col === "incoming" || col === "inprogress") && (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800">
+                  Being designed by {vendorLabel(card.vendor)}
+                </span>
+              )}
+              {col === "review" && (
+                <>
+                  <Button size="sm" onClick={() => move("approved")}><CheckCircle size={14} weight="bold" /> Accept</Button>
+                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" disabled={busy} onClick={requestFix}><ArrowClockwise size={14} weight="bold" /> Request changes</Button>
+                </>
+              )}
+              {col === "fix" && (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700">
+                  Sent back to {vendorLabel(card.vendor)} for changes
+                </span>
+              )}
+              {col === "approved" && (
+                <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle size={15} weight="fill" /> Approved · {vendorLabel(card.vendor)} (invoiced)</span>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Sending out lives on the ORDER's item row, not here: the decision is made
+                  while looking at the line and its artwork, and a designer opening a card to
+                  claim it is not the person deciding to outsource it. */}
+              {col === "incoming" && <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}><Hand size={14} weight="bold" /> Claim</Button>}
+              {col === "inprogress" && <Button size="sm" onClick={() => move("review")}><ArrowRight size={14} weight="bold" /> Send for review</Button>}
+              {col === "review" && (
+                <>
+                  <Button size="sm" onClick={() => move("approved")}><CheckCircle size={14} weight="bold" /> Approve</Button>
+                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => move("fix")}><ArrowClockwise size={14} weight="bold" /> Fix</Button>
+                </>
+              )}
+              {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}><ArrowClockwise size={14} weight="bold" /> Back to work</Button>}
+              {col === "approved" && (
+                card.credited
+                  ? <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle size={15} weight="fill" /> Credited {money(amt(card.payment))}</span>
+                  : <Button size="sm" onClick={creditNow} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : <><CurrencyDollar size={14} weight="bold" /> Credit {money(Number(pay) || 0)}</>}</Button>
+              )}
             </>
           )}
-          {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}><ArrowClockwise size={14} weight="bold" /> Back to work</Button>}
-          {col === "approved" && (
-            card.credited
-              ? <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle size={15} weight="fill" /> Credited {money(amt(card.payment))}</span>
-              : <Button size="sm" onClick={creditNow} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : <><CurrencyDollar size={14} weight="bold" /> Credit {money(Number(pay) || 0)}</>}</Button>
-          )}
-          <button onClick={() => remove(card.id)} className="ml-auto text-xs font-medium text-muted-foreground hover:text-red-600">Remove card</button>
+          <button onClick={removeThis} className="ml-auto text-xs font-medium text-muted-foreground hover:text-red-600">Remove card</button>
         </div>
       </DialogContent>
     </Dialog>
