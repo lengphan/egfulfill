@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
   getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsOrder, getSsInventory, getSsDaysInTransit, getOttoInventory, type PoReturn, type SsShipment,
-  ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
+  ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, setFactorySettings, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine, type PaymentProfile,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -152,6 +152,23 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string; tone?: "warn" } | null>(null)
+  // Set when S&S declines the saved card, so we can offer a "Change payment" shortcut
+  // instead of sending the buyer off to Settings.
+  const [declineFix, setDeclineFix] = useState<{ profiles: PaymentProfile[]; current: string; email: string } | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickCard, setPickCard] = useState("")
+  const [pickSaving, setPickSaving] = useState(false)
+  const saveCardPick = async () => {
+    setPickSaving(true)
+    try {
+      const r = await setFactorySettings({ ss_payment_profile: pickCard })
+      if (r.error) { setMsg({ ok: false, text: r.error }); return }
+      setPickerOpen(false)
+      setMsg({ ok: true, text: "Payment updated — place the order again to retry with the new card." })
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't update the payment." })
+    } finally { setPickSaving(false) }
+  }
   // Every action's outcome lands in ONE banner near the top of the view. But actions are
   // taken far down the list too — cancelling or receiving a placed PO — so when the banner
   // changes, scroll it into view. Otherwise the result appears off-screen and the click
@@ -369,6 +386,9 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
               shippingMethod: opts.defaults.ss_shipping_method || undefined,
               email: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
               poNumber: po.num,
+              // Same as the place-all path: send the selected saved card, else account terms.
+              paymentProfileId: opts.defaults.ss_payment_profile || undefined,
+              paymentProfileEmail: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
             })
             if (r.error) throw new Error(r.error); resp = r
           }
@@ -795,6 +815,13 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
         // processor decline also needs a next step, not just a "which card" — the fix is with
         // the card itself, not our code.
         const isBankDecline = g.api === "ss" && /processor_declined|issuing bank|declined/i.test(failMsg)
+        // Surface a "Change payment" shortcut with the account's saved cards, so a decline
+        // is fixable in place rather than a trip to Order settings.
+        if (isBankDecline) setDeclineFix({
+          profiles: opts.suppliers.ss.paymentProfiles?.profiles ?? [],
+          current: opts.defaults.ss_payment_profile || "",
+          email: opts.defaults.ss_order_email || opts.defaults.order_email || "",
+        })
         const clarified = isBankDecline
           ? `${failMsg} — S&S's own saved card (Order settings › Payment), not the Otto card. The bank declined it: check it isn't expired or over its limit, update it with S&S, or pick another saved card.`
           : g.api === "ss" && /card|payment/i.test(failMsg)
@@ -1186,11 +1213,40 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
       </StatGrid>
 
       {msg && (
-        <div ref={msgRef} className={"rounded-lg border px-4 py-2 text-sm " + (
+        <div ref={msgRef} className={"flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-2 text-sm " + (
           msg.tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-800"
             : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-destructive/30 bg-destructive/10 text-destructive")}>{msg.text}</div>
+              : "border-destructive/30 bg-destructive/10 text-destructive")}>
+          <span className="min-w-0">{msg.text}</span>
+          {declineFix && !msg.ok && (
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => { setPickCard(declineFix.current); setPickerOpen(true) }}>Change payment</Button>
+          )}
+        </div>
       )}
+
+      {/* Change S&S payment — pick a different saved card after a bank decline, in place. */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Change S&amp;S payment</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">The bank declined the saved card. Pick a different card on S&amp;S&apos;s account{declineFix?.email ? ` (${declineFix.email})` : ""}, then place the order again.</p>
+          {declineFix && declineFix.profiles.length > 0 ? (
+            <select value={pickCard} onChange={(e) => setPickCard(e.target.value)} className="eg-select h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+              <option value="">Account terms (no card)</option>
+              {declineFix.profiles.map((p) => (
+                <option key={p.id} value={p.id}>{p.name || "Saved card"}{p.type ? ` · ${p.type}` : ""}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              No other saved cards on this S&amp;S account{declineFix?.email ? ` (${declineFix.email})` : ""}. Add or update the card with S&amp;S, then retry.
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={() => setPickerOpen(false)}>Cancel</Button>
+            <Button onClick={saveCardPick} disabled={pickSaving || !(declineFix && declineFix.profiles.length > 0)}>{pickSaving ? <><CircleNotch size={14} className="animate-spin" /> Saving…</> : "Save card"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Reorder suggestions */}
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
