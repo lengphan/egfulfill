@@ -40,7 +40,7 @@ export function ShortcutsCard({
   // absolute child — it gets cut off. Anchor it with position:fixed from the button's rect,
   // which a plain overflow ancestor doesn't clip.
   const addBtnRef = useRef<HTMLButtonElement>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top?: number; bottom?: number; left: number; maxHeight: number } | null>(null)
   const dragFrom = useRef<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
 
@@ -49,7 +49,16 @@ export function ShortcutsCard({
     const r = addBtnRef.current?.getBoundingClientRect()
     if (r) {
       const W = 224 // w-56
-      setMenuPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - W - 8)) })
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8))
+      const below = window.innerHeight - r.bottom
+      const above = r.top
+      // Flip upward when the button sits low and there's more room above, and cap the menu
+      // to whatever space that side actually has so it never runs off the screen edge.
+      if (below < 200 && above > below) {
+        setMenuPos({ bottom: window.innerHeight - r.top + 4, left, maxHeight: above - 12 })
+      } else {
+        setMenuPos({ top: r.bottom + 4, left, maxHeight: below - 12 })
+      }
     }
     setAddOpen(true)
   }
@@ -165,7 +174,7 @@ export function ShortcutsCard({
         {addOpen && menuPos && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setAddOpen(false)} />
-            <div className="fixed z-50 max-h-64 w-56 overflow-auto rounded-xl border border-border bg-card p-1.5 shadow-xl" style={{ top: menuPos.top, left: menuPos.left }}>
+            <div className="fixed z-50 w-56 overflow-auto rounded-xl border border-border bg-card p-1.5 shadow-xl" style={{ top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left, maxHeight: menuPos.maxHeight }}>
               {available.map((c) => {
                 const Icon = c.icon
                 return (
