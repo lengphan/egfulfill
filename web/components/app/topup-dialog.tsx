@@ -145,17 +145,16 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
         <span className="text-sm font-medium">Amount (USD)</span>
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="50" />
       </label>
-      {/* The converted amount the QR will actually charge, at the current admin rate. */}
-      <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+      {/* Left: the rate ($1 = …). Right: the VND the QR will actually charge. */}
+      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
         {rate > 0 ? (
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">You&apos;ll pay</span>
-            <span className="font-semibold tabular-nums">{usdAmt > 0 ? vnd(vndAmt) : "—"}</span>
-          </div>
+          <>
+            <span className="text-muted-foreground">$1 = <span className="font-medium tabular-nums text-foreground">{vnd(rate)}</span></span>
+            <span className="tabular-nums"><span className="text-muted-foreground">You&apos;ll pay </span><span className="font-semibold">{usdAmt > 0 ? vnd(vndAmt) : "—"}</span></span>
+          </>
         ) : (
           <span className="text-muted-foreground">Loading exchange rate…</span>
         )}
-        {rate > 0 && <div className="mt-0.5 text-[11px] text-muted-foreground">Rate: {vnd(rate)} per $1 · set by admin</div>}
       </div>
       {error && <div className="text-sm text-destructive">{error}</div>}
       <Button className="w-full" onClick={start} disabled={!rate || usdAmt <= 0}>Generate QR Code</Button>
