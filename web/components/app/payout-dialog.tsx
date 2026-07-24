@@ -8,14 +8,9 @@ import { Input } from "@/components/ui/input"
 import { getPayoutMethod, savePayoutMethod, createPayoutRequest, type PayoutMethod } from "@/lib/api"
 
 const usd = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const METHODS = [
-  { id: "pingpong", label: "PingPong" },
-  { id: "lianlian", label: "LianLian" },
-  { id: "bank", label: "Vietnam bank transfer" },
-  { id: "vietqr", label: "VietQR image" },
-  { id: "other", label: "Other" },
-]
-const BLANK: PayoutMethod = { type: "bank", account_name: "", account_id: "", account_number: "", bank_name: "", note: "", qr: "" }
+// One channel: a Vietnam bank transfer. The account fields are what a payout is made
+// against; a bank QR image is an optional convenience on top.
+const BLANK: PayoutMethod = { type: "bank", account_name: "", account_number: "", bank_name: "", note: "", qr: "" }
 
 /**
  * Seller withdrawal. No bank API — the seller saves their payout details (which channel +
@@ -56,14 +51,9 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
     r.readAsDataURL(f)
   }
 
-  const type = info.type || "bank"
-  // Enough to pay it: name always, plus the channel's own field (or a QR image / free note).
-  const detailsOk = !!info.account_name?.trim() && (
-    type === "bank" ? !!info.account_number?.trim() :
-    type === "vietqr" ? !!info.qr :
-    type === "other" ? !!info.note?.trim() :
-    !!info.account_id?.trim()   // pingpong / lianlian
-  )
+  // Enough to pay it: the account holder's name and account number. Bank name + QR image
+  // are optional extras.
+  const detailsOk = !!info.account_name?.trim() && !!info.account_number?.trim()
   const amt = Number(amount) || 0
   // What the seller can actually take: their balance, further limited by an admin max if
   // one is set (max === 0 → balance is the only ceiling).
@@ -77,7 +67,9 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
   const submit = async () => {
     setErr(null)
     if (!detailsOk) { setErr("Fill in your payout details first."); return }
-    if (amt < bounds.min || amt > bounds.max || amt > bounds.balance) { setErr(amountErr || "Enter a valid amount."); return }
+    // amountErr already encodes min / admin-max / balance (max 0 = balance-only); a zero
+    // amount has no error but still can't be submitted.
+    if (!amt || amountErr) { setErr(amountErr || "Enter an amount to withdraw."); return }
     setBusy(true)
     try {
       const s = await savePayoutMethod(info)
@@ -108,39 +100,28 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
             {/* Payout details */}
             <div className="space-y-2.5">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your payout details</div>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] text-muted-foreground">Method</span>
-                <select value={type} onChange={(e) => set("type", e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                  {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                </select>
-              </label>
+              <p className="text-[11px] text-muted-foreground">Vietnam bank transfer — the account admin pays your payout into.</p>
               <Input placeholder="Account holder name" value={info.account_name || ""} onChange={(e) => set("account_name", e.target.value)} className="h-9" />
-              {(type === "pingpong" || type === "lianlian") && (
-                <Input placeholder={type === "pingpong" ? "PingPong email or ID" : "LianLian email or ID"} value={info.account_id || ""} onChange={(e) => set("account_id", e.target.value)} className="h-9" />
-              )}
-              {type === "bank" && (
-                <div className="flex gap-2">
-                  <Input placeholder="Account number" value={info.account_number || ""} onChange={(e) => set("account_number", e.target.value)} className="h-9 flex-1" />
-                  <Input placeholder="Bank name" value={info.bank_name || ""} onChange={(e) => set("bank_name", e.target.value)} className="h-9 flex-1" />
-                </div>
-              )}
-              {type === "vietqr" && (
-                <div>
-                  {info.qr ? (
-                    <div className="flex items-center gap-3">
-                      { /* eslint-disable-next-line @next/next/no-img-element */ }
-                      <img src={info.qr} alt="Your VietQR" className="size-20 rounded-lg border border-border object-contain" />
-                      <Button variant="outline" size="sm" onClick={() => set("qr", "")}><X size={14} /> Remove</Button>
-                    </div>
-                  ) : (
-                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground transition-colors hover:bg-accent">
-                      <UploadSimple size={16} /> Upload your VietQR image
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-                    </label>
-                  )}
-                </div>
-              )}
-              <Input placeholder={type === "other" ? "Payout instructions" : "Note (optional)"} value={info.note || ""} onChange={(e) => set("note", e.target.value)} className="h-9" />
+              <div className="flex gap-2">
+                <Input placeholder="Account number" value={info.account_number || ""} onChange={(e) => set("account_number", e.target.value)} className="h-9 flex-1" />
+                <Input placeholder="Bank name" value={info.bank_name || ""} onChange={(e) => set("bank_name", e.target.value)} className="h-9 flex-1" />
+              </div>
+              <div>
+                <div className="mb-1 text-[11px] text-muted-foreground">Bank QR code (optional)</div>
+                {info.qr ? (
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={info.qr} alt="Your bank QR code" className="size-20 rounded-lg border border-border object-contain" />
+                    <Button variant="outline" size="sm" onClick={() => set("qr", "")}><X size={14} /> Remove</Button>
+                  </div>
+                ) : (
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground transition-colors hover:bg-accent">
+                    <UploadSimple size={16} /> Upload your bank QR code
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+                  </label>
+                )}
+              </div>
+              <Input placeholder="Note (optional)" value={info.note || ""} onChange={(e) => set("note", e.target.value)} className="h-9" />
             </div>
 
             {/* Amount */}
