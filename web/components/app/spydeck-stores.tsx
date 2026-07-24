@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { MagnifyingGlass, Heart, Storefront, Star, ArrowLeft, ArrowSquareOut, CircleNotch, Package } from "@phosphor-icons/react"
 import {
-  searchSpydeckShops, getSpydeckShopListings, getSpydeckSavedShops, saveSpydeckShop, unsaveSpydeckShop,
+  searchSpydeckShops, getSpydeckShop, getSpydeckShopListings, getSpydeckSavedShops, saveSpydeckShop, unsaveSpydeckShop,
   getSpydeckShopsByCategory, getEtsyCategories,
   type SpyShop, type EtsyListing, type EtsyCategory,
 } from "@/lib/api"
@@ -18,6 +18,9 @@ type Handlers = {
   onToggleSave: (l: EtsyListing, wasSaved: boolean) => void
   onSearchTag: (t: string) => void
   onMakeProduct: (l: EtsyListing) => void
+  // Set by SpyDeckView when a listing card's shop is clicked — jump straight into that
+  // shop's catalog. A new object each click so the effect re-fires for the same shop.
+  jumpShop?: { shop_id: string; shop_name?: string | null } | null
 }
 
 const fmtK = (n: number | null | undefined) =>
@@ -150,6 +153,23 @@ export function StoresTab(h: Handlers) {
     catch { setCatalog([]) }
     finally { setCatLoading(false) }
   }
+
+  // Open a shop we only know by id/name (arrived from a listing card's shop link). Pull the
+  // full profile for the header stats — falling back to a bare shop if that lookup fails —
+  // then load the catalog via openShop.
+  const openById = useCallback(async (shopId: string, shopName?: string | null) => {
+    let shop: SpyShop = { shop_id: shopId, shop_name: shopName ?? null } as SpyShop
+    try { const r = await getSpydeckShop(shopId); if (r.shop) shop = r.shop } catch { /* keep the bare shop */ }
+    openShop(shop)
+  }, [])
+
+  // A listing card's shop was clicked in SpyDeckView → jump into that shop's catalog.
+  const jump = h.jumpShop
+  useEffect(() => {
+    if (!jump?.shop_id) return
+    const id = setTimeout(() => openById(jump.shop_id, jump.shop_name), 0)
+    return () => clearTimeout(id)
+  }, [jump, openById])
 
   // ── Catalog view (one shop's products) ───────────────────────────────────────
   if (open) {

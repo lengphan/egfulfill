@@ -107,7 +107,7 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
 // Memoised: the trending grid re-renders on every keystroke/filter/save, and each card ran
 // estFor() + detectTrademarks() (a regex over ~40 brands) on every one of those. With stable
 // callbacks from the parent, memo means a card only re-renders when ITS own data changes.
-export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing, wasSaved: boolean) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void }) {
+export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct, onOpenShop }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing, wasSaved: boolean) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void; onOpenShop?: (l: EtsyListing) => void }) {
   const e = estFor(l)
   const trending = e.trending
   const tags = (l.tags ?? []).slice(0, 13)
@@ -154,7 +154,17 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
         </div>
         <div className="flex flex-1 flex-col p-3">
           <div className="line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">{l.shop_name || "—"}</div>
+          {/* Shop name → jump into that shop's full catalog (discover shops via their hot
+              products, not just by searching a name). */}
+          {l.shop_name && onOpenShop && l.shop_id ? (
+            <button type="button" onClick={() => onOpenShop(l)} title={`See ${l.shop_name}'s shop`}
+              className="mt-1 flex max-w-full items-center gap-1 truncate text-left text-xs font-medium text-muted-foreground transition-colors hover:text-primary hover:underline">
+              <Storefront size={11} weight="duotone" className="shrink-0" />
+              <span className="truncate">{l.shop_name}</span>
+            </button>
+          ) : (
+            <div className="mt-1 truncate text-xs text-muted-foreground">{l.shop_name || "—"}</div>
+          )}
 
           {/* Trademark heads-up — static keyword match, not legal advice. */}
           {tmHits.length > 0 && (
@@ -288,6 +298,14 @@ export function SpyDeckView() {
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState("")
   const [view, setView] = useState<"trending" | "search" | "saved" | "uploaded" | "account" | "stores">("trending")
+  // A listing card's shop was clicked → jump to the Stores tab and open that shop's catalog.
+  // New object each time so StoresTab re-opens even the same shop after navigating away.
+  const [jumpShop, setJumpShop] = useState<{ shop_id: string; shop_name?: string | null } | null>(null)
+  const openShopFromListing = useCallback((l: EtsyListing) => {
+    if (!l.shop_id) return
+    setView("stores")
+    setJumpShop({ shop_id: String(l.shop_id), shop_name: l.shop_name ?? null })
+  }, [])
   const [saved, setSaved] = useState<SavedListing[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   // "Make product" → Etsy draft. Track which listings have been uploaded (this session).
@@ -683,6 +701,7 @@ export function SpyDeckView() {
             onToggleSave={toggleSave}
             onSearchTag={onSearchTag}
             onMakeProduct={setMakeListing}
+            jumpShop={jumpShop}
           />
         ) : view === "account" ? (
           <ShopAnalyzer />
@@ -724,7 +743,7 @@ export function SpyDeckView() {
               </div>
               <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {trendingPaged.pageItems.map((l) => (
-                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} />
+                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} />
                 ))}
               </div>
               <Pagination page={trendingPaged.page} pageCount={trendingPaged.pageCount} perPage={trendingPaged.perPage} total={trendingPaged.total} start={trendingPaged.start} onPage={trendingPaged.setPage} onPerPage={trendingPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -743,7 +762,7 @@ export function SpyDeckView() {
             <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {uploadedPaged.pageItems.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} />
               ))}
             </div>
             <Pagination page={uploadedPaged.page} pageCount={uploadedPaged.pageCount} perPage={uploadedPaged.perPage} total={uploadedPaged.total} start={uploadedPaged.start} onPage={uploadedPaged.setPage} onPerPage={uploadedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -762,7 +781,7 @@ export function SpyDeckView() {
             <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {savedPaged.pageItems.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} />
               ))}
             </div>
             <Pagination page={savedPaged.page} pageCount={savedPaged.pageCount} perPage={savedPaged.perPage} total={savedPaged.total} start={savedPaged.start} onPage={savedPaged.setPage} onPerPage={savedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -796,6 +815,7 @@ export function SpyDeckView() {
                 onToggleSave={toggleSave}
                 onSearchTag={onSearchTag}
                 onMakeProduct={setMakeListing}
+                onOpenShop={openShopFromListing}
               />
             ))}
           </div>

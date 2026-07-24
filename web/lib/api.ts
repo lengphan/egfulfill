@@ -845,6 +845,7 @@ export type OrderRow = {
   status?: string | null
   factory_status?: string | null
   total?: number | string | null
+  profit?: number | string | null
   tracking?: string | null
   /** Stored label file, so a label can be reprinted or batched after purchase. */
   tracking_label_url?: string | null
@@ -1557,6 +1558,7 @@ export type EtsyListing = {
   created?: number | null // unix seconds — listing age drives the sales estimates
   tags?: string[] // Etsy listing tags (up to 13) — keyword research
   shop_name: string | null
+  shop_id?: string | null // the shop that listed it — lets a card jump into that shop's catalog
 }
 // SpyDeck saved/favorited research listings (server-authoritative, per seller).
 export type SavedListing = EtsyListing & { saved_at?: string }
