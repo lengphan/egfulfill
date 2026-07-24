@@ -443,6 +443,18 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
     if (!card) { console.log('[pinkdesign webhook] refs', refs.join('/'), 'matched NO card (vendor_ref mismatch)'); return { ok: true, ignored: 'unknown ref' }; }
     console.log('[pinkdesign webhook] matched card', card.id, '· status:', status || '(none)');
 
+    // Backfill Pink's INTERNAL task_id the moment a webhook carries it — create_task returns
+    // only the ref_id, so this is the first time we ever see it, and it lets the card finally
+    // show both ids. Skip when it equals the ref_id (e.g. a test that put the same value in
+    // both form fields), so a test can't stamp the ref as the task id. coalesce = never
+    // overwrite a real one already captured.
+    const nz = (v) => (v != null && String(v).trim() ? String(v).trim() : null);
+    const whTaskId = nz(b.task_id ?? b.taskId);
+    const whRefId = nz(b.ref_id ?? b.refId);
+    if (whTaskId && whTaskId !== whRefId) {
+      await q('update design_cards set vendor_task_id = coalesce(vendor_task_id, $2) where id=$1', [card.id, whTaskId]).catch(() => {});
+    }
+
     // Their review states → our board lanes. "Check"/"inreview" is work in progress on
     // their side; only "done" is finished.
     const col = status.includes('done') ? 'approved'
