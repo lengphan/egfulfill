@@ -4,14 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode, CaretDown, Package } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode, CaretDown, CaretRight, ClockCounterClockwise, Package } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow } from "@/lib/api"
+import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow, type AuditRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
+import { sayAction } from "@/components/app/tag-history"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
 import { canSetStage, canWalk, stagePath, normalizeStage } from "@/lib/factory-status"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
@@ -80,6 +81,18 @@ export function DispatchBoard() {
   // where the scan happens.
   const [view, setView] = useState<"queue" | "history">("queue")
   const [histFilter, setHistFilter] = useState<"all" | DispKey>("all")
+  // Expandable per-label action timeline (lazy-loaded from the audit log). undefined = not
+  // fetched, null = loading, [] = fetched-empty.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [auditByOrder, setAuditByOrder] = useState<Record<string, AuditRow[] | null>>({})
+  const toggleTimeline = (id: string) => {
+    const willOpen = !expanded.has(id)
+    setExpanded((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+    if (willOpen && auditByOrder[id] === undefined) {
+      setAuditByOrder((p) => ({ ...p, [id]: null }))
+      getOrderHistory(id).then((rows) => setAuditByOrder((p) => ({ ...p, [id]: rows ?? [] }))).catch(() => setAuditByOrder((p) => ({ ...p, [id]: [] })))
+    }
+  }
 
   const load = useCallback(() => {
     if (!getUser()) { setOrders([]); return }
@@ -535,34 +548,63 @@ export function DispatchBoard() {
                 const when = o.label_scanned_at
                   ? new Date(o.label_scanned_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
                   : ""
+                const open = expanded.has(o.id)
+                const events = auditByOrder[o.id]
                 return (
-                  <div key={o.id} className="flex items-center gap-3 px-5 py-3">
-                    <span className={"shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold " + DISP_BADGE[d.key]}>{d.label}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
-                        <span className="truncate text-sm">{customerOf(o)}</span>
+                  <div key={o.id}>
+                    {/* Row toggles the action timeline. Click the label-link separately. */}
+                    <div onClick={() => toggleTimeline(o.id)} className="flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40">
+                      <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
+                      <span className={"shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold " + DISP_BADGE[d.key]}>{d.label}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
+                          <span className="truncate text-sm">{customerOf(o)}</span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
+                            {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
+                          </span>
+                          {when
+                            ? <span>Scanned {when}{via ? ` · ${via === "byeastside" ? "byeastside" : "in-house"}` : ""}</span>
+                            : <span>Labelled{o.created_at ? " " + new Date(o.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : ""}</span>}
+                        </div>
                       </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
-                          {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
-                        </span>
-                        {when
-                          ? <span>Scanned {when}{via ? ` · ${via === "byeastside" ? "byeastside" : "in-house"}` : ""}</span>
-                          : <span>Labelled{o.created_at ? " " + new Date(o.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : ""}</span>}
-                      </div>
+                      {o.tracking && (
+                        <span className="shrink-0 font-mono text-xs text-muted-foreground">{o.tracking}</span>
+                      )}
+                      {o.tracking_label_url && (
+                        <a
+                          href={o.tracking_label_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                          className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          aria-label={`Open label for ${numOf(o)}`}
+                        >
+                          <ArrowSquareOut size={13} weight="bold" />
+                        </a>
+                      )}
                     </div>
-                    {o.tracking && (
-                      <span className="shrink-0 font-mono text-xs text-muted-foreground">{o.tracking}</span>
-                    )}
-                    {o.tracking_label_url && (
-                      <a
-                        href={o.tracking_label_url} target="_blank" rel="noopener noreferrer"
-                        className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        aria-label={`Open label for ${numOf(o)}`}
-                      >
-                        <ArrowSquareOut size={13} weight="bold" />
-                      </a>
+                    {/* Timestamped action timeline from the audit log — every scan/action. */}
+                    {open && (
+                      <div className="border-t border-border bg-muted/20 py-1 pl-11 pr-5">
+                        {events === null || events === undefined ? (
+                          <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Loading history…</div>
+                        ) : events.length === 0 ? (
+                          <div className="py-2 text-xs text-muted-foreground">No recorded actions for this label yet.</div>
+                        ) : (
+                          <ol className="space-y-1.5 py-1.5">
+                            {/* Oldest → newest so it reads as the label's story (the API returns newest-first). */}
+                            {[...events].sort((a, b) => String(a.ts).localeCompare(String(b.ts))).map((ev) => (
+                              <li key={String(ev.id)} className="flex items-start gap-2 text-xs">
+                                <ClockCounterClockwise size={12} className="mt-0.5 shrink-0 text-muted-foreground" />
+                                <div className="min-w-0">
+                                  <span className="font-medium">{sayAction(ev.action)}</span>
+                                  <span className="text-muted-foreground"> · {ev.actor_name || ev.actor_role || "system"} · {new Date(ev.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{ev.note ? ` · ${ev.note}` : ""}</span>
+                                </div>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </div>
                     )}
                   </div>
                 )
