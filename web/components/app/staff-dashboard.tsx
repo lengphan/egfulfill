@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { SquaresFour, Package, PenNib, Storefront, ShieldCheck, ArrowRight, CircleNotch, Tag, Warning, Tray, MagnifyingGlass, GearSix, Wrench, Truck, CurrencyDollar, TrendUp, Receipt } from "@phosphor-icons/react"
+import { SquaresFour, Package, ArrowRight, CircleNotch, Warning, Tray, MagnifyingGlass, GearSix, Wrench, Truck, CurrencyDollar, TrendUp, Receipt } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { ProductionLine } from "@/components/app/production-line"
+import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
 import { getOrders, type OrderRow } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
 import { getToken, getUser } from "@/lib/auth"
+import { staffNav, staffTools } from "@/lib/staff-nav"
 import { orderStage } from "@/lib/factory-status"
 import { orderTotalOf, orderProfitOf, orderTs } from "@/lib/analytics"
 
@@ -32,7 +34,27 @@ const fmtDate = (s?: string | null) => {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
-type Quick = { label: string; href: string; icon: typeof Package; desc: string }
+// Short blurbs for the shortcut tiles. Nav items don't carry descriptions; anything not
+// listed just shows its label, which is self-explanatory for a launcher.
+const SHORTCUT_DESC: Record<string, string> = {
+  "/operator": "Production queue",
+  "/designer": "Artwork board",
+  "/dispatch": "Ship-out queue",
+  "/shipments": "Tracking archive",
+  "/scan": "Stock in / out",
+  "/inventory": "Stock on hand",
+  "/purchase": "Reorder blanks",
+  "/suppliers": "S&S + Otto blanks",
+  "/finance": "Wallet + costs",
+  "/broadcasts": "Seller email",
+  "/spydeck": "Competitor research",
+  "/products": "Catalog + blanks",
+  "/published-catalog": "Trade shop window",
+  "/design": "Design lab",
+  "/stores": "Seller stores",
+  "/reports": "Analytics",
+  "/developers": "API keys",
+}
 
 // The staff home — role-meaningful KPIs off the shared order feed, a live production-line
 // snapshot, a recent-orders list, and quick links into the surfaces that role actually uses.
@@ -136,15 +158,17 @@ export function StaffDashboard() {
         { label: "Shipped", value: stats.shipped, sub: `${shippedPct}% of all`, icon: Truck, pos: true },
       ]
 
-  const quick: Quick[] = [
-    { label: "Orders", href: "/operator", icon: Package, desc: "Production queue + fulfillment" },
-    { label: "Design board", href: "/designer", icon: PenNib, desc: "Artwork kanban" },
-    { label: "Suppliers", href: "/suppliers", icon: Storefront, desc: "S&S + Otto blanks" },
-    ...(isAdmin ? [
-      { label: "Admin", href: "/admin", icon: ShieldCheck, desc: "Users, top-ups, activity" },
-      { label: "Products", href: "/products", icon: Tag, desc: "Catalog + blanks" },
-    ] : []),
-  ]
+  // Shortcut catalog = every page this role can actually reach (nav boards + tools), so the
+  // launcher never offers a link that would just bounce. /overview is this page, so it's
+  // dropped. The user picks and reorders from here; the choice persists per user.
+  const catalog: ShortcutItem[] = useMemo(() => {
+    const seen = new Set<string>()
+    return [...staffNav(role), ...staffTools(role)]
+      .filter((i) => i.href !== "/overview" && !seen.has(i.href) && seen.add(i.href))
+      .map((i) => ({ label: i.label, href: i.href, icon: i.icon, desc: SHORTCUT_DESC[i.href] }))
+  }, [role])
+  // Sensible starting set before the user customises — the first handful of their catalog.
+  const shortcutDefaults = useMemo(() => catalog.slice(0, 6).map((c) => c.href), [catalog])
 
   return (
     <div className="space-y-4">
@@ -214,7 +238,7 @@ export function StaffDashboard() {
 
       <div className="grid items-stretch gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SectionCard className="h-full" title="Recent orders" actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">Open queue <ArrowRight size={13} weight="bold" /></Link>}>
+          <SectionCard title="Recent orders" actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">Open queue <ArrowRight size={13} weight="bold" /></Link>}>
             {orders === null ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
             ) : recent.length === 0 ? (
@@ -234,41 +258,7 @@ export function StaffDashboard() {
           </SectionCard>
         </div>
 
-        <SectionCard title="Jump to" className="h-full" bodyClassName="flex flex-1 flex-col">
-          {/* Compact tile grid launcher, with a live-stat footer pinned to the bottom
-              (mt-auto) so the card fills to the Recent-orders table's height instead of
-              leaving a weird gap. Every number below is a real count off the same feed. */}
-          <div className="grid grid-cols-2 gap-2 p-3">
-            {quick.map((q) => {
-              const Icon = q.icon
-              return (
-                <Link key={q.href} href={q.href} className="group flex flex-col gap-2 rounded-lg border border-border p-3 transition-colors hover:border-primary/40 hover:bg-accent">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon size={16} weight="duotone" /></span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium leading-tight">{q.label}</span>
-                    <span className="mt-0.5 block truncate text-xs text-muted-foreground leading-tight">{q.desc}</span>
-                  </span>
-                </Link>
-              )
-            })}
-          </div>
-          {orders !== null && (
-            <div className="mt-auto grid grid-cols-3 gap-px border-t border-border bg-border">
-              <div className="bg-card px-3 py-3">
-                <div className="text-lg font-bold tabular-nums leading-none">{stats.createdToday}</div>
-                <div className="mt-1 text-[11px] text-muted-foreground">New today</div>
-              </div>
-              <div className="bg-card px-3 py-3">
-                <div className={"text-lg font-bold tabular-nums leading-none " + (stats.attention ? "text-amber-600" : "")}>{stats.attention}</div>
-                <div className="mt-1 text-[11px] text-muted-foreground">Need attn.</div>
-              </div>
-              <div className="bg-card px-3 py-3">
-                <div className="text-lg font-bold tabular-nums leading-none text-emerald-600">{shippedPct}%</div>
-                <div className="mt-1 text-[11px] text-muted-foreground">Shipped</div>
-              </div>
-            </div>
-          )}
-        </SectionCard>
+        <ShortcutsCard catalog={catalog} defaults={shortcutDefaults} storageKey="eg_shortcuts_overview" />
       </div>
     </div>
   )
