@@ -1400,6 +1400,10 @@ export type DesignCard = {
   order_id?: string | null
   col?: string | null
   claimed_by?: string | null
+  /** The claimer's resolved role (server-side, from the list query). Only a 'designer' is
+   *  actually credited on approval, so the card uses this to avoid implying a payout that
+   *  won't happen for an operator/warehouse/admin claim. */
+  claimed_role?: string | null
   payment?: number | string | null
   pay_status?: string | null
   credited?: boolean // designer paid once on approval — guards against double-credit

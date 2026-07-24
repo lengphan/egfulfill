@@ -180,7 +180,16 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
 
   app.get('/api/design_cards', { preHandler: requireAuth }, async (req) => {
     if (isStaff(req.user)) {
-      const r = await q('select * from design_cards order by id');
+      // claimed_role resolves the CLAIMER to a role the SAME way the credit route does, so
+      // the board can show whether a payout will actually pay out (designers only) instead of
+      // implying a credit the server would refuse for an operator/warehouse/admin claim.
+      const r = await q(
+        `select *,
+           (select role from users u
+              where lower(u.email) = lower(design_cards.claimed_by)
+                 or lower(u.name)  = lower(design_cards.claimed_by)
+              limit 1) as claimed_role
+           from design_cards order by id`);
       // Manual cards keep their artwork in object storage, and a signed URL expires — so it
       // is minted per read rather than stored. `thumb` is what every client already renders,
       // so the URL goes there and nothing downstream needs to know where it came from.

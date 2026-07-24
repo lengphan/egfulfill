@@ -674,19 +674,33 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           </div>
         )}
 
-        {/* Payout is a DESIGNER's earning — a vendor card is paid by invoice, not a payout,
-            so the field is hidden for it (the notice above already says so). */}
-        {!card.vendor && (canFee ? (
-          <label className="flex items-center gap-2">
-            <span className="text-sm font-medium">Payout</span>
-            <div className="relative w-32">
-              <CurrencyDollar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input value={pay} onChange={(e) => setPay(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" className="h-9 pl-7" inputMode="decimal" onBlur={() => patch(card.id, { payment: Number(pay) || 0 })} />
-            </div>
-          </label>
-        ) : (
-          amt(card.payment) > 0 && <div className="text-sm text-muted-foreground">Payout <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div>
-        ))}
+        {/* Payout is a DESIGNER's earning. A vendor card is paid by invoice (field hidden),
+            and only a designer is actually credited on approval — so if the claimer is an
+            operator/warehouse/admin, don't show an amount that implies a credit the server
+            will refuse. Say plainly it won't pay out instead. */}
+        {(() => {
+          if (card.vendor) return null
+          const claimedRole = String(card.claimed_role || "").toLowerCase()
+          const wontPay = !!card.claimed_by && !!claimedRole && claimedRole !== "designer"
+          if (wontPay) {
+            return (
+              <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+                No payout — claimed by {claimedRole}, and only designers are credited on approval.
+              </div>
+            )
+          }
+          return canFee ? (
+            <label className="flex items-center gap-2">
+              <span className="text-sm font-medium">Payout</span>
+              <div className="relative w-32">
+                <CurrencyDollar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input value={pay} onChange={(e) => setPay(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" className="h-9 pl-7" inputMode="decimal" onBlur={() => patch(card.id, { payment: Number(pay) || 0 })} />
+              </div>
+            </label>
+          ) : (
+            amt(card.payment) > 0 ? <div className="text-sm text-muted-foreground">Payout <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div> : null
+          )
+        })()}
 
         {/* Files for this card's order — drop the .emb/.pes/mockup right here. The
             card already knows its order_id + sku, so a dropped file is LINKED to the
