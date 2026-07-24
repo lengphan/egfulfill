@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { getOrders, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
-import { canSetStage, canWalk, stagePath } from "@/lib/factory-status"
+import { canSetStage, canWalk, stagePath, normalizeStage } from "@/lib/factory-status"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
 
 /**
@@ -36,6 +36,32 @@ const STAGE = "awaiting_scan"
 // has already happened.
 const NEXT = "working"
 
+// History = every order that ever had a label, and WHAT BECAME OF IT — so a label pulled
+// off the board isn't lost track of. `disposition` reads current state into one outcome.
+type DispKey = "scanned" | "shipped" | "awaiting" | "production" | "removed" | "cancelled"
+function disposition(o: OrderRow): { key: DispKey; label: string } {
+  const fs = normalizeStage(o.factory_status)
+  if (fs === "cancelled" || fs === "refunded") return { key: "cancelled", label: fs === "refunded" ? "Refunded" : "Cancelled" }
+  if (fs === "shipped") return { key: "shipped", label: "Shipped" }
+  if (o.label_scanned_at) return { key: "scanned", label: "Scanned" }
+  if (fs === "awaiting_scan") return { key: "awaiting", label: "Awaiting scan" }
+  if (fs === "working" || fs === "printed") return { key: "production", label: "In production" }
+  return { key: "removed", label: "Off the board" }   // has a label but sits before the board
+}
+const DISP_BADGE: Record<DispKey, string> = {
+  scanned: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  shipped: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  awaiting: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  production: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+  removed: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  cancelled: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+}
+const HIST_FILTERS: { key: "all" | DispKey; label: string }[] = [
+  { key: "all", label: "All" }, { key: "scanned", label: "Scanned" }, { key: "awaiting", label: "Awaiting" },
+  { key: "production", label: "In production" }, { key: "shipped", label: "Shipped" },
+  { key: "removed", label: "Off board" }, { key: "cancelled", label: "Cancelled" },
+]
+
 export function DispatchBoard() {
   const role = getUser()?.role || ""
   // Operators work this board too — they are the ones who notice a label shouldn't go
@@ -52,7 +78,8 @@ export function DispatchBoard() {
   // second is a read-only history — "did this order actually get scanned?" was a question
   // that could only be answered by leaving for the Shipments page, so the floor now has it
   // where the scan happens.
-  const [view, setView] = useState<"queue" | "scanned">("queue")
+  const [view, setView] = useState<"queue" | "history">("queue")
+  const [histFilter, setHistFilter] = useState<"all" | DispKey>("all")
 
   const load = useCallback(() => {
     if (!getUser()) { setOrders([]); return }
@@ -82,18 +109,19 @@ export function DispatchBoard() {
       [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
   }, [orders, q])
 
-  // The "Scanned" history. Any order carrying a label_scanned_at has been scanned —
-  // here or by byeastside — whatever stage it has since moved on to, so this reads the
-  // timestamp rather than the current factory_status (which the order leaves behind).
-  const scanned = useMemo(() => {
-    const all = (orders ?? []).filter((o) => o.label_scanned_at)
+  // History — EVERY order that ever had a label (bought → has tracking, or scanned),
+  // whatever became of it. A label pulled off the board still shows here with its outcome,
+  // so nothing vanishes. Searchable, and filterable by disposition.
+  const history = useMemo(() => {
+    const all = (orders ?? []).filter((o) => o.tracking || o.label_scanned_at)
     const term = q.trim().toLowerCase()
-    const list = term
+    let list = term
       ? all.filter((o) => [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
       : all
-    // Most-recently scanned first — the last handover is the one someone's asking about.
-    return [...list].sort((a, b) => String(b.label_scanned_at).localeCompare(String(a.label_scanned_at)))
-  }, [orders, q])
+    if (histFilter !== "all") list = list.filter((o) => disposition(o).key === histFilter)
+    // Most recent activity first — the scan time if there is one, else when it was created.
+    return [...list].sort((a, b) => String(b.label_scanned_at || b.created_at || "").localeCompare(String(a.label_scanned_at || a.created_at || "")))
+  }, [orders, q, histFilter])
 
   // A label is what makes an order dispatchable. Without one there is nothing to scan, so
   // these are surfaced separately rather than silently included in a batch.
@@ -389,7 +417,7 @@ export function DispatchBoard() {
         description={canScanOut
           ? "Labelled and waiting to be scanned. Print the batch, scan it, then move it into production."
           : "Labelled and waiting to be scanned. You can print and pull labels back; warehouse and admin scan the batch out."}
-        actions={view === "scanned" ? undefined : (
+        actions={view === "history" ? undefined : (
           <div className="flex flex-wrap items-center gap-2">
             {/* PRINT / documents — grouped: manifest, labels, and (when scanning out) the
                 USPS SCAN form. All are "produce a document" actions, none touch the scan. */}
@@ -458,13 +486,26 @@ export function DispatchBoard() {
               Awaiting scan
             </button>
             <button
-              onClick={() => setView("scanned")}
-              className={"rounded-md px-3 py-1 font-medium transition-colors " + (view === "scanned" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+              onClick={() => setView("history")}
+              className={"rounded-md px-3 py-1 font-medium transition-colors " + (view === "history" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
             >
-              Scanned{scanned.length ? ` · ${scanned.length}` : ""}
+              History{history.length ? ` · ${history.length}` : ""}
             </button>
           </div>
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search order, customer or tracking…" className="h-9 max-w-xs" />
+          {view === "history" && (
+            <div className="flex flex-wrap items-center gap-1">
+              {HIST_FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setHistFilter(f.key)}
+                  className={"rounded-md px-2 py-1 text-xs font-medium transition-colors " + (histFilter === f.key ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
           {view === "queue" && chosen.length > 0 && <span className="text-xs text-muted-foreground">{chosen.length} in this batch</span>}
           {view === "queue" && (
             <Button size="sm" variant="outline" disabled={!withLabel.length} onClick={toggleAll}>
@@ -479,23 +520,24 @@ export function DispatchBoard() {
           </div>
         )}
 
-        {view === "scanned" ? (
-          scanned.length === 0 ? (
+        {view === "history" ? (
+          history.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
-              <CheckCircle size={26} weight="duotone" className="opacity-50" />
-              <div className="text-sm font-medium text-foreground">Nothing scanned yet</div>
-              <div className="text-xs">Orders show here once they&apos;ve been scanned — here or by byeastside.</div>
+              <ListChecks size={26} weight="duotone" className="opacity-50" />
+              <div className="text-sm font-medium text-foreground">{q || histFilter !== "all" ? "Nothing matches" : "No label activity yet"}</div>
+              <div className="text-xs">Every label and what became of it — scanned, shipped, pulled off the board — shows here.</div>
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {scanned.map((o) => {
+              {history.map((o) => {
+                const d = disposition(o)
                 const via = (o as { scanned_via?: string | null }).scanned_via
                 const when = o.label_scanned_at
                   ? new Date(o.label_scanned_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
                   : ""
                 return (
                   <div key={o.id} className="flex items-center gap-3 px-5 py-3">
-                    <CheckCircle size={16} weight="fill" className="shrink-0 text-emerald-500" />
+                    <span className={"shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold " + DISP_BADGE[d.key]}>{d.label}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
@@ -505,8 +547,9 @@ export function DispatchBoard() {
                         <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
                           {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
                         </span>
-                        {when && <span>Scanned {when}</span>}
-                        {via && <span className="rounded bg-muted px-1.5 py-0.5">{via === "byeastside" ? "byeastside" : "in-house"}</span>}
+                        {when
+                          ? <span>Scanned {when}{via ? ` · ${via === "byeastside" ? "byeastside" : "in-house"}` : ""}</span>
+                          : <span>Labelled{o.created_at ? " " + new Date(o.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : ""}</span>}
                       </div>
                     </div>
                     {o.tracking && (
