@@ -22,6 +22,10 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // stored in vendor_ref) and their internal task_id. We keep the task_id too so the board
   // can show BOTH — their test-webhook form asks for each.
   q('alter table design_cards add column if not exists vendor_task_id text').catch(() => {});
+  // Deliverable links the partner RETURNED (via their webhook) — so the card can show
+  // "Received from <partner>". Often a Google Drive folder we can't copy, so the link
+  // itself is what's kept.
+  q("alter table design_cards add column if not exists vendor_files jsonb default '[]'::jsonb").catch(() => {});
   // Notes WE post to the partner's task. Their board can't send comments back, so this is
   // our own running record of what we asked for — "change to New", "please cancel" — kept
   // APART from the design description. Append-only; the whole-list card save never lists

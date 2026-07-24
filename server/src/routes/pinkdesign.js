@@ -455,16 +455,13 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       await q('update design_cards set vendor_task_id = coalesce(vendor_task_id, $2) where id=$1', [card.id, whTaskId]).catch(() => {});
     }
 
-    // Their review states → our board lanes. "Check"/"inreview" is work in progress on
-    // their side; only "done" is finished.
-    const col = status.includes('done') ? 'approved'
-      : status.includes('fix') ? 'fix'
-        : 'review';
+    // Pink's status NEVER auto-approves on OUR side. Even a "done" from them means the design
+    // is DELIVERED and ready for US to review — a human here checks it, THEN approves, and
+    // that manual approval is what books the partner cost (design_cards.js on the approved
+    // transition) and runs our credit flow. So ANY delivery lands in our "review" lane; only
+    // a "needfix" is distinct. We book nothing here.
+    const col = status.includes('fix') ? 'fix' : 'review';
     await q('update design_cards set col=$1, updated_at=now() where id=$2', [col, card.id]).catch(() => {});
-    // "done" on their side is an approval on ours, so the cost falls due here too — not
-    // only when a human drags the card. Idempotent, so whichever path lands first wins
-    // and the other is a no-op.
-    if (col === 'approved') await bookDesignCost({ orderId: card.order_id, sku: card.sku, cardId: card.id, vendor: 'pinkdesign' }).catch(() => {});
 
     // Deliverables arrive as URLs on THEIR servers. Storing the link alone would leave
     // our production files hostage to someone else's retention policy — a link that dies
@@ -490,6 +487,13 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       .map((f) => (typeof f === 'string' ? f : (f && (f.url || f.file_url || f.link || f.href || f.src || f.download_url))))
       .filter((u) => typeof u === 'string' && /^https?:\/\//i.test(u)))];
     console.log('[pinkdesign webhook] deliverables found:', files.length, files.slice(0, 5));
+    // Keep the returned links ON THE CARD so the board can show "Received from <partner>".
+    // The storage copy below only lands in order_designs, and only for an ORDER-attached card
+    // — without this a speculative card's returned link (often a Drive folder we can't copy)
+    // had nowhere to show. Overwrites with the latest set each webhook.
+    if (files.length) {
+      await q('update design_cards set vendor_files = $2::jsonb, updated_at=now() where id=$1', [card.id, JSON.stringify(files)]).catch(() => {});
+    }
     const { storageEnabled, putObject, designUrlTtlDays } = await import('../storage.js');
     const { createHash } = await import('crypto');
     let copied = 0;

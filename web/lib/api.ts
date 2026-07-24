@@ -1423,6 +1423,9 @@ export type DesignCard = {
   /** The exact image URLs sent to the partner on push — for a "this is what we sent"
    *  preview on the card. */
   pushed_images?: string[]
+  /** Deliverable links the partner RETURNED via their webhook (often a Drive folder) — for
+   *  a "Received from <partner>" section on the card. */
+  vendor_files?: string[]
   customer?: string | null
   [k: string]: unknown // preserve extra columns (specs/files/notes/…) on round-trip
 }

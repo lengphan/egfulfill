@@ -674,6 +674,23 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           </div>
         )}
 
+        {/* What the partner RETURNED (their webhook deliverables — often a Drive folder link).
+            Shown as openable links since a folder can't be previewed. */}
+        {card.vendor && Array.isArray(card.vendor_files) && card.vendor_files.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-emerald-700">Received from {vendorLabel(card.vendor)}</span>
+            <div className="flex flex-col gap-1">
+              {card.vendor_files.map((src, i) => (
+                <a key={i} href={src} target="_blank" rel="noopener noreferrer"
+                   className="inline-flex items-center gap-1.5 truncate rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100">
+                  <LinkSimple size={13} weight="bold" className="shrink-0" />
+                  <span className="truncate">{src}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Payout is a DESIGNER's earning. A vendor card is paid by invoice (field hidden),
             and only a designer is actually credited on approval — so if the claimer is an
             operator/warehouse/admin, don't show an amount that implies a credit the server
@@ -685,7 +702,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           if (wontPay) {
             return (
               <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
-                No payout — claimed by {claimedRole}, and only designers are credited on approval.
+                No payout — claimed by {claimedRole}
               </div>
             )
           }
