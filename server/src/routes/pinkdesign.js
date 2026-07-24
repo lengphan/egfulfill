@@ -384,27 +384,29 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
    * is acknowledged and ignored rather than trusted.
    */
   app.post('/api/webhooks/pinkdesign', async (req, reply) => {
-    const b = req.body || {};
-    // DIAGNOSTIC — log EVERY hit before anything can reject it, so `docker compose logs app`
-    // shows (a) whether Pink is calling us at all, (b) their real payload shape / field names,
-    // (c) whether auth and ref matched. This whole path was written to a GUESSED contract and
-    // the log is how we learn their actual one. Secret fields stripped. If the log stays empty
-    // after a status change on their board, the webhook isn't pointed at us — that's a config
-    // step in Pink's dashboard (URL https://egful.store/api/webhooks/pinkdesign + the secret),
-    // not a code bug on our side.
+    const raw = req.body || {};
+    // DIAGNOSTIC — log EVERY hit before anything can reject it, so `docker compose logs api`
+    // shows whether Pink calls us, their real payload shape, and whether auth/ref matched.
     try {
-      const safe = { ...b }; delete safe.api_key; delete safe.apiKey;
+      const safe = { ...raw }; delete safe.api_key; delete safe.apiKey;
       console.log('[pinkdesign webhook] incoming', JSON.stringify(safe).slice(0, 3000));
     } catch { /* ignore log failure */ }
 
-    // Verify it's really them. They don't document WHERE the key travels, so accept the
-    // conventional places rather than guessing one and silently rejecting everything.
+    // Pink NESTS the real payload under `data` — confirmed from their Webhook Push History:
+    //   {"data":{"description":"…","design_files":null,"designs":"https://drive.google.com/…"}}
+    // Reading top-level was why every call came back {"ok":true,"ignored":"no ref_id"}: a 200
+    // Pink logs as delivered, but a silent no-op for us. Unwrap `data` when present, and fall
+    // back to top-level for any other shape.
+    const b = (raw && typeof raw.data === 'object' && raw.data) ? raw.data : raw;
+
+    // Verify it's really them. Their API key travels in the request HEADER (per their webhook
+    // settings), with body fallbacks on either the wrapper or the unwrapped data.
     const want = webhookSecret();
     if (want) {
       const h = req.headers || {};
       const bearer = String(h.authorization || '').replace(/^Bearer\s+/i, '').trim();
       const got = bearer || String(h['x-api-key'] || h['x-webhook-key'] || h['api-key'] || '').trim()
-        || String(b.api_key || b.apiKey || '').trim();
+        || String(raw.api_key || raw.apiKey || b.api_key || b.apiKey || '').trim();
       if (got !== want) { console.log('[pinkdesign webhook] REJECTED — bad/absent key'); reply.code(401); return { error: 'bad webhook key' }; }
     }
     // Their id + status field names are unknown, so try every plausible one rather than
