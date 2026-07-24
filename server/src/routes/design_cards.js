@@ -18,6 +18,11 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // vendor_ref holds the partner's own task id, so their webhooks can find the card.
   q('alter table design_cards add column if not exists vendor text').catch(() => {});
   q('alter table design_cards add column if not exists vendor_ref text').catch(() => {});
+  // Notes WE post to the partner's task. Their board can't send comments back, so this is
+  // our own running record of what we asked for — "change to New", "please cancel" — kept
+  // APART from the design description. Append-only; the whole-list card save never lists
+  // this column, so a board drag/edit can't wipe the log.
+  q("alter table design_cards add column if not exists partner_notes jsonb default '[]'::jsonb").catch(() => {});
   // Which ORDER LINE this card is for. The client has always sent it (orders-hub builds
   // every card with line_id) but no column existed, so it was dropped on every save and
   // read back as null. That broke the "already has a card" check, which falls back to

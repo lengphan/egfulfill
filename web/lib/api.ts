@@ -1347,6 +1347,9 @@ export type DesignCard = {
    *  goes out. Outsourced cards can't be claimed by a designer and never pay one. */
   vendor?: string | null
   vendor_ref?: string | null
+  /** Notes we've posted to the partner's task (see pinkComment). A running log kept apart
+   *  from the description — their board can't send comments back, so this is our record. */
+  partner_notes?: PartnerNote[]
   customer?: string | null
   [k: string]: unknown // preserve extra columns (specs/files/notes/…) on round-trip
 }
@@ -2075,11 +2078,14 @@ export function pinkRequestFix(body: { cardId: string | number; message: string;
   return api<{ ok?: boolean; cardId?: number; col?: string; error?: string; commented?: boolean }>(
     `/api/pinkdesign/fix`, { method: "POST", body: JSON.stringify(body) })
 }
-/** Leave a note on the partner's task WITHOUT moving it — e.g. "please cancel this".
- *  Outbound only: it doesn't cancel anything on its own, and their replies don't come back
- *  through here (their webhook carries status + files, not messages). */
+/** One note we posted to a partner's task, saved on the card apart from the description. */
+export type PartnerNote = { message: string; by?: string; at?: string }
+/** Leave a note on the partner's task WITHOUT moving it — e.g. "change to New", "please
+ *  cancel". Posts to their board AND appends to the card's own note log (returned as
+ *  `notes`). Outbound only: it doesn't cancel/move anything on its own, and their replies
+ *  don't come back here (their webhook carries status + files, not messages). */
 export function pinkComment(body: { cardId: string | number; message: string; images?: string[] }) {
-  return api<{ ok?: boolean; delivered?: boolean; error?: string }>(
+  return api<{ ok?: boolean; delivered?: boolean; notes?: PartnerNote[]; error?: string }>(
     `/api/pinkdesign/comment`, { method: "POST", body: JSON.stringify(body) })
 }
 

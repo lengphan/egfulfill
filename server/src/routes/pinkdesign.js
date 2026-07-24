@@ -409,9 +409,18 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       return { error: `Their board wouldn't take the note (${said.status}). Nothing was sent — try again, or message them directly.`,
                raw: typeof said.data === 'string' ? said.data.slice(0, 300) : said.data };
     }
+    // Record it on OUR card too — their board can't send comments back, so this is the only
+    // place the ask survives. A JSONB append (kept apart from the design brief); the card's
+    // whole-list save never lists partner_notes, so the log outlives any board edit.
+    const note = { message: message.slice(0, 2000), by: (req.user && (req.user.name || req.user.email)) || 'staff', at: new Date().toISOString() };
+    const upd = await q(
+      `update design_cards set partner_notes = coalesce(partner_notes, '[]'::jsonb) || $2::jsonb, updated_at = now()
+         where id = $1 returning partner_notes`,
+      [card.id, JSON.stringify([note])]
+    ).catch(() => ({ rows: [] }));
     audit(req, 'design.partner_note', { entityType: 'order', entityId: card.order_id,
       after: { sku: card.sku, ref: card.vendor_ref, message: message.slice(0, 500), images: images.length } });
-    return { ok: true, delivered: true };
+    return { ok: true, delivered: true, notes: upd.rows[0]?.partner_notes || [note] };
   });
 
   /**
