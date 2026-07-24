@@ -4,6 +4,7 @@ import type { OrderRow } from "./api"
 
 const DAY = 864e5
 export const orderTotalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
+export const orderProfitOf = (o: OrderRow) => Number(o.profit ?? 0) || 0
 export const orderTs = (o: OrderRow) => (o.created_at ? new Date(o.created_at).getTime() : NaN)
 
 export type RevPoint = { label: string; revenue: number; prev: number }

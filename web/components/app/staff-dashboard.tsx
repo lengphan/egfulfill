@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { SquaresFour, Package, PenNib, Storefront, ShieldCheck, ArrowRight, CircleNotch, Tag, Warning, Tray, MagnifyingGlass, GearSix, Wrench, Truck } from "@phosphor-icons/react"
+import { SquaresFour, Package, PenNib, Storefront, ShieldCheck, ArrowRight, CircleNotch, Tag, Warning, Tray, MagnifyingGlass, GearSix, Wrench, Truck, CurrencyDollar, TrendUp, Receipt } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -11,6 +11,20 @@ import { getOrders, type OrderRow } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
 import { getToken, getUser } from "@/lib/auth"
 import { orderStage } from "@/lib/factory-status"
+import { orderTotalOf, orderProfitOf, orderTs } from "@/lib/analytics"
+
+// Whole-dollar KPI money — cents are noise at this size.
+const usd = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`
+
+// Time windows the money KPIs can be read over. `since` is a cutoff timestamp; "all" = 0.
+const DAY = 864e5
+const RANGES = [
+  { id: "today", label: "Today", sub: "today", since: () => new Date(new Date().toDateString()).getTime() },
+  { id: "7d", label: "7 days", sub: "last 7 days", since: () => Date.now() - 7 * DAY },
+  { id: "30d", label: "30 days", sub: "last 30 days", since: () => Date.now() - 30 * DAY },
+  { id: "all", label: "All", sub: "all time", since: () => 0 },
+] as const
+type RangeId = (typeof RANGES)[number]["id"]
 
 const fmtDate = (s?: string | null) => {
   if (!s) return "—"
@@ -32,6 +46,9 @@ export function StaffDashboard() {
   // with nothing in it. A staff dashboard reading all-zeros during an outage is how a
   // backlog gets missed.
   const [loadErr, setLoadErr] = useState<string | null>(null)
+  // The window the money KPIs are read over. Admin-only surface, so seller-facing roles
+  // never see it. Default to 30 days — a useful horizon without being all-time noise.
+  const [range, setRange] = useState<RangeId>("30d")
 
   const load = useCallback(() => {
     if (!getToken()) { setLoadErr("You're signed out."); return }
@@ -66,15 +83,32 @@ export function StaffDashboard() {
   }, [orders])
 
   const shippedPct = stats.total ? Math.round((stats.shipped / stats.total) * 100) : 0
+
+  // Money read over the chosen window — revenue, platform profit, order volume and the
+  // average order. All live off total/profit/created_at; nothing modelled. An order with
+  // no created_at (orderTs → NaN) falls out of every window rather than landing in "today".
+  const rangeMeta = RANGES.find((r) => r.id === range) ?? RANGES[2]
+  const money = useMemo(() => {
+    const since = rangeMeta.since()
+    const inRange = (orders ?? []).filter((o) => orderTs(o) >= since)
+    const revenue = inRange.reduce((s, o) => s + orderTotalOf(o), 0)
+    const profit = inRange.reduce((s, o) => s + orderProfitOf(o), 0)
+    const count = inRange.length
+    return { revenue, profit, count, aov: count ? revenue / count : 0 }
+  }, [orders, rangeMeta])
+
   const recent = useMemo(() => (orders ?? []).slice(0, 6), [orders])
 
   // Role-tuned KPI cards. `today` is shown only where it's a real, live delta.
-  const cards = isAdmin
+  // Admin gets the money view — revenue, profit, volume, average — read over the chosen
+  // window; the production counts it used to show now live in the Production line chart
+  // below. Warehouse/operator keep the production tiles (a bit less than admin).
+  const cards: { label: string; value: string | number; sub: string; icon: typeof Package; pos?: boolean; neg?: boolean }[] = isAdmin
     ? [
-      { label: "Orders", value: stats.total, sub: stats.createdToday ? `+${stats.createdToday} today` : "all time", icon: Package, pos: !!stats.createdToday },
-      { label: "In production", value: stats.production, sub: "scan → pack", icon: GearSix },
-      { label: "Working", value: stats.ready, sub: "being made", icon: Wrench, pos: true },
-      { label: "Shipped", value: stats.shipped, sub: `${shippedPct}% of all`, icon: Truck, pos: true },
+      { label: "Revenue", value: usd(money.revenue), sub: rangeMeta.sub, icon: CurrencyDollar, pos: true },
+      { label: "Profit", value: usd(money.profit), sub: rangeMeta.sub, icon: TrendUp, pos: true },
+      { label: "Orders", value: money.count, sub: rangeMeta.sub, icon: Package },
+      { label: "Avg order", value: usd(money.aov), sub: "per order", icon: Receipt },
     ]
     : isWarehouse
       ? [
@@ -102,15 +136,32 @@ export function StaffDashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><SquaresFour size={18} weight="fill" /></span>
-        <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {todayLabel}
-            {stats.createdToday > 0 && <> · <span className="font-medium text-foreground">{stats.createdToday}</span> new today</>}
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><SquaresFour size={18} weight="fill" /></span>
+          <div>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
+            <p className="text-sm text-muted-foreground">
+              {todayLabel}
+              {stats.createdToday > 0 && <> · <span className="font-medium text-foreground">{stats.createdToday}</span> new today</>}
+            </p>
+          </div>
         </div>
+        {/* Money window — admin only, since the money cards are. */}
+        {isAdmin && (
+          <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
+            {RANGES.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => setRange(r.id)}
+                aria-pressed={range === r.id}
+                className={"rounded-md px-2.5 py-1 text-xs font-medium transition-colors " + (range === r.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {loadErr && (
