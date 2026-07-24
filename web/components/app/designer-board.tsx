@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -532,6 +532,17 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
   const [err, setErr] = useState<string | null>(null)
   const col = colOf(card)
 
+  // Click-to-rename the card. Saves only on a real change, so opening and closing the editor
+  // by accident doesn't rewrite the title. A vendor card is renameable here too, but note the
+  // change stays on OUR side — it doesn't push back to the partner's board.
+  const [editTitle, setEditTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(card.title || "")
+  const saveTitle = () => {
+    const t = titleDraft.trim()
+    setEditTitle(false)
+    if (t && t !== card.title) patch(card.id, { title: t })
+  }
+
   const move = (to: string, extra?: Partial<DesignCard>) => onMove(card, to, extra)
   // Only warehouse + admin set the design fee / credit; operators & designers can't.
   const canFee = (() => { const r = getUser()?.role; return r === "admin" || r === "warehouse" })()
@@ -582,7 +593,34 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-xl">
-        <DialogHeader><DialogTitle className="line-clamp-2 pr-6 text-base leading-snug">{card.title || "Design card"}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle className="pr-6 text-base leading-snug">
+            {editTitle ? (
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={saveTitle}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); saveTitle() }
+                  else if (e.key === "Escape") { setTitleDraft(card.title || ""); setEditTitle(false) }
+                }}
+                placeholder="Card title"
+                className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-base font-semibold outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setTitleDraft(card.title || ""); setEditTitle(true) }}
+                title="Click to rename"
+                className="group -ml-1 inline-flex max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-accent"
+              >
+                <span className="line-clamp-2">{card.title || "Design card"}</span>
+                <PencilSimple size={13} weight="bold" className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
+            )}
+          </DialogTitle>
+        </DialogHeader>
         <div className="flex gap-4">
           <div className="relative size-44 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
             {card.thumb ? (
