@@ -416,13 +416,20 @@ const LIST_COLS: ListCol[] = [
   { id: "customer", label: "Customer", cell: (c) => <span className="text-muted-foreground">{c.customer ? String(c.customer) : "—"}</span> },
   { id: "product", label: "Product", cell: (c) => <div className="max-w-[220px] truncate text-muted-foreground">{c.product || c.type || "—"}</div> },
   { id: "method", label: "Method", cell: (c) => <span className="text-muted-foreground">{c.type ? String(c.type) : (c.is_emb ? "Embroidery" : "—")}</span> },
-  { id: "claimed", label: "Claimed by", cell: (c) => <span className="text-muted-foreground">{c.claimed_by ? String(c.claimed_by) : "—"}</span> },
+  // Who's actually working it: an OUTSOURCED card is with the partner (shown as their
+  // name, tinted like the board badge), a claimed card is with that designer, and anything
+  // else is genuinely unclaimed — said plainly rather than a bare dash.
+  { id: "claimed", label: "Assigned to", cell: (c) => c.vendor
+    ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{vendorLabel(c.vendor)}</span>
+    : c.claimed_by
+      ? <span className="text-foreground">{String(c.claimed_by)}</span>
+      : <span className="text-muted-foreground">Unclaimed</span> },
   { id: "priority", label: "Priority", cell: (c) => (c.priority && c.priority !== "normal" ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(c.priority)}</span> : <span className="text-muted-foreground">—</span>) },
   { id: "lane", label: "Lane", cell: (c) => { const col = COLS.find((x) => x.id === colOf(c)); return <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs"><span className={"size-1.5 rounded-full " + (col?.accent ?? "bg-muted-foreground")} /> {col?.label}</span> } },
   { id: "status", label: "Status", cell: (c) => (c.credited ? <span className="font-medium text-emerald-600">Credited</span> : <span className="text-muted-foreground">—</span>) },
   { id: "payout", label: "Payout", align: "right", cell: (c) => <span className="font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</span> },
 ]
-const DEFAULT_LIST_COLS = ["design", "order", "product", "lane", "payout"]
+const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "lane", "payout"]
 
 // List view — columns are add/remove + renameable (admin/warehouse/operator), persisted.
 function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: string | number) => void }) {
@@ -435,7 +442,22 @@ function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: str
   const [menuOpen, setMenuOpen] = useState(false)
   useEffect(() => {
     const id = setTimeout(() => {
-      try { const v = JSON.parse(localStorage.getItem("eg_dsn_cols") || "null"); if (Array.isArray(v) && v.length) setVisible(v) } catch { /* default */ }
+      try {
+        let v = JSON.parse(localStorage.getItem("eg_dsn_cols") || "null")
+        if (Array.isArray(v) && v.length) {
+          // One-time: surface the new "Assigned to" column for anyone whose SAVED layout
+          // predates it (a saved list overrides the default, so a default change alone
+          // wouldn't reach them). Inserted just before "lane" and only once, so it never
+          // fights a deliberate hide later.
+          if (!v.includes("claimed") && !localStorage.getItem("eg_dsn_cols_assigned")) {
+            const at = v.indexOf("lane")
+            v = at >= 0 ? [...v.slice(0, at), "claimed", ...v.slice(at)] : [...v, "claimed"]
+            localStorage.setItem("eg_dsn_cols", JSON.stringify(v))
+          }
+          localStorage.setItem("eg_dsn_cols_assigned", "1")
+          setVisible(v)
+        }
+      } catch { /* default */ }
       try { const l = JSON.parse(localStorage.getItem("eg_dsn_labels") || "null"); if (l && typeof l === "object") setLabels(l) } catch { /* default */ }
     }, 0)
     return () => clearTimeout(id)
