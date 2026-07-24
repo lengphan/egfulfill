@@ -465,9 +465,11 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) 
       } else {
         try { const data = JSON.parse(ab.toString('utf8')); tracking = data.trackingNumber || (data.labelMetadata && data.labelMetadata.trackingNumber) || ''; labelImage = data.labelImage || (data.labelMetadata && data.labelMetadata.labelImage) || ''; } catch (e) {}
       }
-      // Persist tracking onto the order if one was passed.
+      // Persist tracking onto the order if one was passed. Pass the parsed postage so the
+      // cost is recorded (Price column + ledger) instead of being parsed then thrown away —
+      // this path had it in `cost` but was storing null.
       if (b.orderId && tracking) {
-        await recordLabel(b.orderId, tracking, 'USPS', null, null, null, b.to);
+        await recordLabel(b.orderId, tracking, 'USPS', null, cost, null, b.to);
       }
       return { ok: true, trackingNumber: tracking, imageType: imgType, labelImage, cost, contentType: ct };
     } catch (e) { reply.code(400); return { error: e.message }; }
