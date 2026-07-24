@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Stack, Barcode, Package } from "@phosphor-icons/react"
+import { Stack, Barcode, Package, UsersThree } from "@phosphor-icons/react"
 import { InventoryView } from "@/components/app/inventory-view"
 import { ScanStation } from "@/components/app/scan-station"
 
-type Tab = "stock" | "scan"
+// One flat row instead of Stock/Scan stacked over Our-stock/Seller-stock: the two stock
+// pools and the scan station are siblings here. `stock` is kept as a legacy ?tab= alias.
+type Tab = "own" | "consigned" | "scan"
 
 /**
  * Inventory — Stock (levels on hand) and Scan (the stock in/out station) under one roof.
@@ -16,12 +18,13 @@ type Tab = "stock" | "scan"
  * redirect and the PWA start_url both deep-link to the Scan tab).
  */
 export function InventorySection() {
-  const [tab, setTab] = useState<Tab>("stock")
+  const [tab, setTab] = useState<Tab>("own")
 
   useEffect(() => {
     const id = setTimeout(() => {
       const p = new URLSearchParams(window.location.search).get("tab")
-      if (p === "stock" || p === "scan") setTab(p)
+      if (p === "own" || p === "consigned" || p === "scan") setTab(p)
+      else if (p === "stock") setTab("own")   // legacy alias
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -47,7 +50,7 @@ export function InventorySection() {
         </div>
       </div>
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "stock", label: "Stock", icon: Stack }, { id: "scan", label: "Scan", icon: Barcode }] as const).map((t) => {
+        {([{ id: "own", label: "Our stock", icon: Stack }, { id: "consigned", label: "Seller stock", icon: UsersThree }, { id: "scan", label: "Scan", icon: Barcode }] as const).map((t) => {
           const Icon = t.icon
           return (
             <button
@@ -61,7 +64,7 @@ export function InventorySection() {
         })}
       </div>
 
-      {tab === "stock" ? <InventoryView embedded /> : <ScanStation embedded />}
+      {tab === "scan" ? <ScanStation embedded /> : <InventoryView embedded pool={tab} />}
     </div>
   )
 }

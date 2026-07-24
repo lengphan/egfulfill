@@ -21,12 +21,15 @@ const isOut = (it: InventoryItem) => num(it.in_stock) <= 0
 const isLow = (it: InventoryItem) => !isOut(it) && num(it.in_stock) <= (it.reorder_at ?? 25)
 
 // `embedded` hides the mobile hero when this sits inside the Inventory tab shell.
-export function InventoryView({ embedded = false }: { embedded?: boolean }) {
+export function InventoryView({ embedded = false, pool }: { embedded?: boolean; pool?: "own" | "consigned" }) {
   const [items, setItems] = useState<InventoryItem[] | null>(null)
   const [search, setSearch] = useState("")
   const [cat, setCat] = useState("")
   const [saving, setSaving] = useState(false)
-  const [tab, setTab] = useState<"own" | "consigned">("own")
+  // When the Inventory shell drives the pool (its single Our stock · Seller stock · Scan
+  // nav), follow it and hide the in-view toggle; standalone, keep our own.
+  const [ownTab, setOwnTab] = useState<"own" | "consigned">("own")
+  const tab = pool ?? ownTab
   const [saved, setSaved] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
@@ -106,19 +109,22 @@ export function InventoryView({ embedded = false }: { embedded?: boolean }) {
         </div>
       </div>
 
-      {/* Two distinct pools, so they get distinct tabs rather than one long scroll:
-          stock WE own, and stock sellers have consigned to us. */}
-      <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Seller stock" }] as const).map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Standalone only: the two pools (stock WE own vs stock sellers consigned to us).
+          When embedded in the Inventory shell, these are two of its top tabs instead — no
+          second stacked pill row. */}
+      {!pool && (
+        <div className="flex w-fit rounded-full border border-border p-0.5">
+          {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Seller stock" }] as const).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setOwnTab(t.id)}
+              className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {tab === "consigned" ? (
         <ConsignmentPanel />
