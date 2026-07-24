@@ -188,6 +188,10 @@ export function WalletDashboard() {
     return [...base, ...extra].sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
   }, [view?.rows, rejected])
   const [topUpOpen, setTopUpOpen] = useState(false)
+  // Admin and warehouse share the FACTORY wallet, which is a pure internal ledger — there
+  // is nothing to withdraw from it and no bank/card account to link, so those controls are
+  // hidden for them. (They were also dead buttons — no handler ever wired.)
+  const isFactoryWallet = ["admin", "warehouse"].includes(getUser()?.role ?? "")
 
   const refresh = useCallback(() => {
     // Signed in → the real server balance (server-authoritative), or zeros if empty.
@@ -257,12 +261,19 @@ export function WalletDashboard() {
     <div className="space-y-4">
       <AdminTopups />
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="outline">
-          <Bank size={16} /> Manage Linked Accounts
-        </Button>
-        <Button variant="outline">
-          <ArrowLineDown size={16} /> Withdraw
-        </Button>
+        {/* Withdraw + Manage Linked Accounts are hidden on the factory ledger (admin /
+            warehouse). Both were also dead — no click handler was ever wired. Add Funds
+            is the one live action (VietQR + Stripe card top-up). */}
+        {!isFactoryWallet && (
+          <>
+            <Button variant="outline">
+              <Bank size={16} /> Manage Linked Accounts
+            </Button>
+            <Button variant="outline">
+              <ArrowLineDown size={16} /> Withdraw
+            </Button>
+          </>
+        )}
         <Button onClick={() => setTopUpOpen(true)}>
           <Plus size={16} weight="bold" /> Add Funds
         </Button>
