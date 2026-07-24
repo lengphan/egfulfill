@@ -17,7 +17,8 @@ const timeNow = () => new Date().toLocaleTimeString("en-US", { hour: "numeric", 
 // Scan station — one screen for a scanner gun (desktop) and a phone camera (PWA).
 // A gun is just a keyboard: it types the SKU then Enter. So the input stays focused
 // and refocuses on blur, and an exact SKU match auto-commits — no clicking, ever.
-export function ScanStation() {
+// `embedded` hides the mobile hero when this sits inside the Inventory tab shell.
+export function ScanStation({ embedded = false }: { embedded?: boolean }) {
   // Operator gets a READ-ONLY station: they need to look up what's on hand, but moving
   // stock is a claim about physical custody that belongs to the warehouse. Enforced here
   // AND by leaving the commit path unreachable, not just by hiding the input.
@@ -198,13 +199,15 @@ export function ScanStation() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 md:hidden">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BarcodeIcon size={18} weight="fill" /></span>
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Scan</h1>
-          <p className="truncate text-sm text-muted-foreground">Scan stock in and out. Works with a scanner gun or your phone camera.</p>
+      {!embedded && (
+        <div className="flex items-center gap-3 md:hidden">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BarcodeIcon size={18} weight="fill" /></span>
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl font-semibold tracking-tight">Scan</h1>
+            <p className="truncate text-sm text-muted-foreground">Scan stock in and out. Works with a scanner gun or your phone camera.</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Mode — big targets; stays put so you can rapid-fire a whole pallet */}
       <div className="grid grid-cols-2 gap-2">

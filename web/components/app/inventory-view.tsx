@@ -20,7 +20,8 @@ const avail = (it: InventoryItem) => num(it.in_stock) - num(it.reserved)
 const isOut = (it: InventoryItem) => num(it.in_stock) <= 0
 const isLow = (it: InventoryItem) => !isOut(it) && num(it.in_stock) <= (it.reorder_at ?? 25)
 
-export function InventoryView() {
+// `embedded` hides the mobile hero when this sits inside the Inventory tab shell.
+export function InventoryView({ embedded = false }: { embedded?: boolean }) {
   const [items, setItems] = useState<InventoryItem[] | null>(null)
   const [search, setSearch] = useState("")
   const [cat, setCat] = useState("")
@@ -93,11 +94,13 @@ export function InventoryView() {
       <div className="flex items-center gap-3">
         {/* Icon+title hidden on desktop (the top bar names the page); the Saving
             indicator on the right stays. On mobile the hero is the title. */}
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><Package size={18} weight="fill" /></span>
-        <div className="min-w-0 md:hidden">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Inventory</h1>
-          <p className="truncate text-sm text-muted-foreground">Track stock per variant, flag low/out, and print SKU barcodes.</p>
-        </div>
+        {!embedded && (<>
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><Package size={18} weight="fill" /></span>
+          <div className="min-w-0 md:hidden">
+            <h1 className="font-display text-2xl font-semibold tracking-tight">Inventory</h1>
+            <p className="truncate text-sm text-muted-foreground">Track stock per variant, flag low/out, and print SKU barcodes.</p>
+          </div>
+        </>)}
         <div className="ml-auto flex items-center gap-2">
           {saving ? <span className="text-xs text-muted-foreground"><CircleNotch size={13} className="inline animate-spin" /> Saving…</span> : saved ? <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><Check size={13} weight="bold" /> Saved</span> : null}
         </div>

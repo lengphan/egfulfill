@@ -38,6 +38,14 @@ export function ShippingView() {
 
   return (
     <div className="space-y-4">
+      {/* One mobile section hero for the whole page (the top bar is desktop-only). */}
+      <div className="flex items-center gap-3 md:hidden">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Truck size={18} weight="fill" /></span>
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Shipping</h1>
+          <p className="truncate text-sm text-muted-foreground">Today&apos;s dispatch queue and the shipment archive.</p>
+        </div>
+      </div>
       <div className="flex w-fit rounded-full border border-border p-0.5">
         {([{ id: "dispatch", label: "Dispatch", icon: Truck }, { id: "shipments", label: "Shipments", icon: Package }] as const).map((t) => {
           const Icon = t.icon

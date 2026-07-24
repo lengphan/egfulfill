@@ -146,7 +146,8 @@ function ottoQty(r: unknown): number | null {
   return walk(r, 0)
 }
 
-export function PurchaseView() {
+// `embedded` hides the mobile hero when this sits inside the Purchasing tab shell.
+export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
   const [inv, setInv] = useState<InventoryItem[] | null>(null)
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -1152,13 +1153,15 @@ export function PurchaseView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 md:hidden">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={18} weight="fill" /></span>
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Purchase</h1>
-          <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
+      {!embedded && (
+        <div className="flex items-center gap-3 md:hidden">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={18} weight="fill" /></span>
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl font-semibold tracking-tight">Purchase</h1>
+            <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center justify-end gap-2">
         {/* Receiving is its own job, done at the bench with a scanner — not something

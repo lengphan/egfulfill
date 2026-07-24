@@ -6,17 +6,21 @@ import { AllSuppliers } from "@/components/app/all-suppliers"
 import { FavoritesView } from "@/components/app/favorites-view"
 
 // Suppliers page — one combined browse across S&S + Otto, plus saved favorites.
-export function SuppliersView() {
+// `embedded` hides the mobile hero when this sits inside the Purchasing tab shell, which
+// provides one section hero for the whole page (the top bar is desktop-only).
+export function SuppliersView({ embedded = false }: { embedded?: boolean }) {
   const [tab, setTab] = useState<"all" | "favorites">("all")
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 md:hidden">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Suppliers</h1>
-          <p className="truncate text-sm text-muted-foreground">Browse S&amp;S and Otto blanks in one feed and add them to your catalog.</p>
+      {!embedded && (
+        <div className="flex items-center gap-3 md:hidden">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl font-semibold tracking-tight">Suppliers</h1>
+            <p className="truncate text-sm text-muted-foreground">Browse S&amp;S and Otto blanks in one feed and add them to your catalog.</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* rounded-full, not rounded-lg — the active tab inside is a pill, so a
           rectangular border around it left visible corner gaps. */}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Stack, Barcode } from "@phosphor-icons/react"
+import { Stack, Barcode, Package } from "@phosphor-icons/react"
 import { InventoryView } from "@/components/app/inventory-view"
 import { ScanStation } from "@/components/app/scan-station"
 
@@ -37,6 +37,15 @@ export function InventorySection() {
 
   return (
     <div className="space-y-4">
+      {/* One mobile section hero for the whole page (the top bar is desktop-only); the
+          inner views hide their own hero via `embedded`. */}
+      <div className="flex items-center gap-3 md:hidden">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Inventory</h1>
+          <p className="truncate text-sm text-muted-foreground">Stock levels on hand and the scan station.</p>
+        </div>
+      </div>
       <div className="flex w-fit rounded-full border border-border p-0.5">
         {([{ id: "stock", label: "Stock", icon: Stack }, { id: "scan", label: "Scan", icon: Barcode }] as const).map((t) => {
           const Icon = t.icon
@@ -52,7 +61,7 @@ export function InventorySection() {
         })}
       </div>
 
-      {tab === "stock" ? <InventoryView /> : <ScanStation />}
+      {tab === "stock" ? <InventoryView embedded /> : <ScanStation embedded />}
     </div>
   )
 }

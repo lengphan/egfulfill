@@ -39,6 +39,15 @@ export function PurchasingView() {
 
   return (
     <div className="space-y-4">
+      {/* One mobile section hero for the whole page (the top bar is desktop-only); the
+          inner views hide their own hero via `embedded`. */}
+      <div className="flex items-center gap-3 md:hidden">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={18} weight="fill" /></span>
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Purchasing</h1>
+          <p className="truncate text-sm text-muted-foreground">Browse suppliers, build a cart, and track orders.</p>
+        </div>
+      </div>
       {/* rounded-full to match the pill toggles used across the boards (suppliers-view). */}
       <div className="flex w-fit rounded-full border border-border p-0.5">
         {([{ id: "browse", label: "Browse", icon: Storefront }, { id: "purchase", label: "Cart & orders", icon: ShoppingCart }] as const).map((t) => {
@@ -55,7 +64,7 @@ export function PurchasingView() {
         })}
       </div>
 
-      {tab === "browse" ? <SuppliersView /> : <PurchaseView />}
+      {tab === "browse" ? <SuppliersView embedded /> : <PurchaseView embedded />}
     </div>
   )
 }
