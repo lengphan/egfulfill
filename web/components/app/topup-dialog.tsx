@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StripeCardForm } from "@/components/app/stripe-card-form"
-import { createVietqrPayment, vietqrStatus, createTopupRequest, VN_BANK_NAMES, type VietqrPayment } from "@/lib/api"
+import { createVietqrPayment, vietqrStatus, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment } from "@/lib/api"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -27,28 +27,41 @@ function Success({ title, sub, onDone }: { title: string; sub: string; onDone: (
 }
 
 // ───────────────────────────── VietQR ─────────────────────────────
-const VND_PRESETS = [50_000, 100_000, 200_000, 500_000]
+// The wallet is in USD, so the seller picks a USD amount; the admin-set rate converts it to
+// the VND the QR actually charges, and that exact USD is what credits on payment.
+const VQR_USD_PRESETS = [20, 50, 100, 200]
 function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () => void }) {
-  const [amount, setAmount] = useState("100000")
+  const [amount, setAmount] = useState("50")   // USD
+  const [rate, setRate] = useState(0)          // VND per $1, admin-set
   const [phase, setPhase] = useState<"amount" | "qr" | "paid" | "error">("amount")
   const [payment, setPayment] = useState<VietqrPayment | null>(null)
   const [qrImg, setQrImg] = useState("")
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  useEffect(() => { getVietqrRate().then((r) => setRate(Number(r.rate) || 0)).catch(() => {}) }, [])
+
   const stopPoll = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }, [])
   useEffect(() => stopPoll, [stopPoll])
 
+  const usdAmt = Number(amount) || 0
+  const vndAmt = rate > 0 ? Math.round(usdAmt * rate) : 0
+
   const start = async () => {
-    const amt = Math.round(Number(amount) || 0)
-    if (amt < 1000) { setError("Enter at least 1,000₫."); return }
+    if (usdAmt <= 0) { setError("Enter a USD amount."); return }
+    if (!rate) { setError("Exchange rate isn't available right now — try again in a moment."); return }
+    if (vndAmt < 1000) { setError("That's below the minimum top-up."); return }
     setError(null); setPhase("qr")
     try {
-      const p = await createVietqrPayment(amt)
+      const p = await createVietqrPayment(vndAmt, usdAmt)
       if (p.error) throw new Error(typeof p.error === "string" ? p.error : JSON.stringify(p.error))
-      if (!(p.qrCode || p.qrLink)) throw new Error("VietQR returned no QR — check the server's VietQR keys, or that you're signed in.")
+      if (!(p.qrCode || p.qrLink)) throw new Error("VietQR returned no QR — nothing was charged or recorded. Check the server's VietQR keys.")
+      // Required receiver fields must all be present before we show a QR to pay — a blank
+      // here could send money to the wrong place. Told right in the window, not after.
+      const gaps = [!p.name && "receiver", !p.bankCode && "bank", !(p.vaAccount || p.account) && "account"].filter(Boolean)
+      if (gaps.length) throw new Error(`VietQR didn't return the ${gaps.join(", ")} — don't pay this. Ask an admin to check the VietQR setup.`)
       setPayment(p)
       // Prefer the EMVCo VA string — we render it locally so it ALWAYS shows.
       // Only fall back to a server image if it's a real http(s) URL (an `imgId`
@@ -90,6 +103,9 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
           <div className="w-full space-y-3">
             <div className="text-center">
               <div className="text-lg font-semibold tabular-nums">{vnd(Number(payment.amount) || 0)}</div>
+              {payment.amountUsd != null && (
+                <div className="text-xs text-muted-foreground">Credits {usd(payment.amountUsd)} to your wallet</div>
+              )}
             </div>
 
             {/* Who the money is going to, so the payer can check it against their banking
@@ -121,17 +137,29 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        {VND_PRESETS.map((v) => (
-          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " + (Number(amount) === v ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}>{vnd(v)}</button>
+        {VQR_USD_PRESETS.map((v) => (
+          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " + (Number(amount) === v ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}>{usd(v)}</button>
         ))}
       </div>
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Amount (VND)</span>
-        <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="100000" />
+        <span className="text-sm font-medium">Amount (USD)</span>
+        <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="50" />
       </label>
+      {/* The converted amount the QR will actually charge, at the current admin rate. */}
+      <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+        {rate > 0 ? (
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">You&apos;ll pay</span>
+            <span className="font-semibold tabular-nums">{usdAmt > 0 ? vnd(vndAmt) : "—"}</span>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">Loading exchange rate…</span>
+        )}
+        {rate > 0 && <div className="mt-0.5 text-[11px] text-muted-foreground">Rate: {vnd(rate)} per $1 · set by admin</div>}
+      </div>
       {error && <div className="text-sm text-destructive">{error}</div>}
-      <Button className="w-full" onClick={start}>Generate QR Code</Button>
-      <p className="text-center text-xs text-muted-foreground">Scan with any VN banking app. Balance updates automatically once paid.</p>
+      <Button className="w-full" onClick={start} disabled={!rate || usdAmt <= 0}>Generate QR Code</Button>
+      <p className="text-center text-xs text-muted-foreground">Pay the VND amount with any VN banking app. Your USD balance updates automatically once paid.</p>
     </div>
   )
 }

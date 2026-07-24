@@ -261,12 +261,19 @@ export function vietqrRoutes(app, requireAuth) {
       });
       const gd = await gr.json().catch(() => ({}));
       if (!gr.ok) { reply.code(502); return { error: 'VietQR generate failed: ' + JSON.stringify(gd).slice(0, 300) }; }
+      // ONLY record a pending top-up when there is a scannable code to pay. A missing QR
+      // means the seller can't pay, so a pending row would just be an orphan the admin
+      // has to reject — return the error instead and write nothing.
+      if (!gd.qrCode && !gd.qrLink) { reply.code(502); return { error: 'VietQR returned no scannable code — nothing was recorded. Check the VietQR keys.' }; }
       // Record a PENDING top-up keyed by our ref (note) BEFORE the seller pays, so the
       // transaction-sync callback can match content→ref, flip it to received, and credit
       // the seller's wallet. Without this row a real VietQR payment lands untracked.
       let rate = 25400;
       try { const rr = await q("select value from settings where key='vqr_rate'"); const n = rr.rows[0] ? Number(rr.rows[0].value) : 0; if (n > 0) rate = n; } catch { /* default rate */ }
-      const amountUsd = Math.round((amount / rate) * 100) / 100;
+      // Credit exactly what the seller picked in USD when the client sends it (the amount
+      // they saw converted at the rate); otherwise fall back to VND ÷ rate.
+      const pickedUsd = Number(body.amountUsd) || 0;
+      const amountUsd = pickedUsd > 0 ? Math.round(pickedUsd * 100) / 100 : Math.round((amount / rate) * 100) / 100;
       try {
         await q(
           `insert into topup_requests (seller_id, seller_email, amount_usd, vnd, ref, method, status)

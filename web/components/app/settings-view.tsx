@@ -36,6 +36,8 @@ import {
   updateTeamMember,
   updateProfile,
   getFactorySettings,
+  getVietqrRate,
+  setVietqrRate,
   deleteUserAdmin,
   adjustBalance,
   type ShipFromAddress,
@@ -849,6 +851,9 @@ function PlatformPanel() {
   // cap", which always applies regardless.
   const [payoutMin, setPayoutMin] = useState("")
   const [payoutMax, setPayoutMax] = useState("")
+  // USD→VND rate for VietQR top-ups (separate endpoint; admin-only to change).
+  const [vqrRate, setVqrRate] = useState("")
+  const isAdminUser = (getUser()?.role || "") === "admin"
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -888,6 +893,7 @@ function PlatformPanel() {
       setPayoutMin(r.payout_min != null ? String(r.payout_min) : "")
       setPayoutMax(r.payout_max != null ? String(r.payout_max) : "")
       setShipFrom(r.ship_from ?? {})
+      getVietqrRate().then((v) => setVqrRate(v.rate ? String(v.rate) : "")).catch(() => {})
       setTypes(r.product_types ?? [])
       setThreads(r.thread_palette ?? [])
       setBands(Object.fromEntries(
@@ -922,6 +928,11 @@ function PlatformPanel() {
         thread_palette: threads,
       })
       if (r.error) throw new Error(r.error)
+      // The VietQR rate lives on its own admin-only endpoint, so it's saved separately.
+      if (isAdminUser && vqrRate !== "" && Number(vqrRate) > 0) {
+        const rr = await setVietqrRate(Number(vqrRate))
+        if (rr.error) throw new Error(rr.error)
+      }
       // Push the new stock into the matcher so open boards stop matching against the
       // palette that was just replaced.
       setActivePalette(r.thread_palette ?? threads)
@@ -995,6 +1006,18 @@ function PlatformPanel() {
           <MoneyField label="Minimum payout" hint="Smallest amount a seller can request" value={payoutMin} onChange={setPayoutMin} />
           <MoneyField label="Maximum payout" hint="Largest single request. Set 0 for no cap beyond the seller's balance." value={payoutMax} onChange={setPayoutMax} />
         </FeeGroup>
+        {isAdminUser && (
+          <FeeGroup
+            title="VietQR top-up rate"
+            hint="USD→VND. A seller picks a dollar amount to add; this converts it to the VND their QR charges, and that exact USD credits on payment."
+          >
+            <label className="flex flex-col gap-1">
+              <span className="text-[13px] font-medium">VND per $1</span>
+              <Input value={vqrRate} onChange={(e) => setVqrRate(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="25400" className="h-9" />
+              <span className="text-[11px] text-muted-foreground">e.g. 25400 means $50 → 1,270,000₫</span>
+            </label>
+          </FeeGroup>
+        )}
         <FeeGroup
           title="Product & shipping"
           hint="What a blank sells for, and what carriage adds. Unrelated to design — separated so the design decisions above can be read on their own."
