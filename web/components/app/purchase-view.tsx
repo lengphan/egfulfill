@@ -827,8 +827,22 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
           : g.api === "ss" && /card|payment/i.test(failMsg)
             ? `${failMsg} — this is S&S's saved payment (Order settings › Payment), not the Otto card`
             : failMsg
+        // Say what ACTUALLY happened. A real placement returns an order number → "placed
+        // successfully"; a dry run (live ordering off) never reached S&S and must NOT read
+        // as placed, or blanks look ordered when they aren't.
+        const rr = resp as Record<string, unknown>
+        const dry = rr.dryRun === true
+        const ssNo = (() => {
+          const os = rr.orders
+          if (Array.isArray(os)) for (const o of os) { const n = (o as { orderNumber?: unknown })?.orderNumber; if (n) return String(n) }
+          return null
+        })()
         results.push(ok
-          ? `${g.supplier ?? "Unassigned"}: ${g.api ? "sent (test/dry-run)" : "recorded — order it by hand"}`
+          ? (g.api
+              ? (dry
+                  ? `${g.supplier}: dry run — not sent to ${g.api === "ss" ? "S&S" : "Otto"} (live ordering off)`
+                  : `${g.supplier}: order placed successfully${ssNo ? ` — order #${ssNo}` : ""}`)
+              : `${g.supplier ?? "Unassigned"}: recorded — order it by hand`)
           : `${g.supplier ?? "Unassigned"}: failed — ${clarified}`)
       }
       if (placedSkus.size) putSaved(saved.filter((l) => !placedSkus.has(l.sku)))
