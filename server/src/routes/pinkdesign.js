@@ -167,19 +167,25 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   if (directImage && /^https?:\/\//i.test(String(directImage))) imageUrl = String(directImage);
   else if (!imageUrl && card && /^https?:\/\//i.test(String(card.thumb || ''))) imageUrl = String(card.thumb);
 
-  if (!imageUrl) {
-    return { status: 400, error: !storageEnabled()
-      ? 'Object storage is not configured, so the artwork has no URL — and Pink Design accepts URLs only. Set SPACES_* first.'
-      : useOrder
-        ? 'No stored artwork on this line, so there is no URL to send. Upload it on the order, or attach an image here, and push again.'
-        : 'This design has no stored image, so there is no URL to send. Attach one and push again.' };
-  }
-
   // Reference material beyond the artwork itself — a mockup, a spec sheet, a marked-up
   // screenshot of what's wrong. URLs only, same constraint as the artwork, and the
   // artwork always leads so their designer opens the file being worked on first.
   const extras = (Array.isArray(extraImages) ? extraImages : [])
     .map(String).filter((u) => /^https?:\/\//i.test(u));
+
+  // No stored artwork, but an image was attached here — promote the FIRST one to be the
+  // artwork. An attachment uploaded through this dialog lands in object storage with a real
+  // URL, which is the one thing that was missing; without this, "attach an image and push
+  // again" was a dead end because the attachment only ever went to the reference list.
+  if (!imageUrl && extras.length) imageUrl = extras.shift();
+
+  if (!imageUrl) {
+    return { status: 400, error: !storageEnabled()
+      ? 'Object storage is not configured, so the artwork has no URL — and Pink Design accepts URLs only. Set SPACES_* first.'
+      : useOrder
+        ? 'No stored artwork on this line, so there is no URL to send. Upload it on the order, or attach an image here, and push again.'
+        : 'This design has no stored image, so there is no URL to send. Attach an image below and push again.' };
+  }
 
   // Fall back through what we actually know. A speculative design has no line and no
   // order, so the defaults have to degrade to something a human still recognises on

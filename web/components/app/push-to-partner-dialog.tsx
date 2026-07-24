@@ -174,42 +174,46 @@ export function PushToPartnerDialog({
               {sku || (orderId ? "" : "No order — speculative work")}{printType ? ` · ${printType}` : ""}
             </div>
             {!artworkUrl && (
-              <p className="text-xs text-destructive">
-                They accept URLs only, so a line with no stored artwork can&apos;t be sent.
+              <p className="text-xs text-muted-foreground">
+                {extras.length
+                  ? "No stored artwork — the image you attached below will be sent as the design."
+                  : "No stored artwork here. Attach an image under Reference files below and it'll be sent as the design."}
               </p>
             )}
           </div>
         </div>
 
-        {/* Field mapping — ours on the left, theirs on the right. */}
         <div className="space-y-3">
-          <Field label="Title" hint="their task title">
+          <Field label="Title">
             <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} className="h-9" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Quantity" hint="qty">
+            <Field label="Quantity">
               <Input value={count} onChange={(e) => setCount(e.target.value.replace(/[^0-9]/g, ""))}
                      inputMode="numeric" disabled={busy} className="h-9" />
             </Field>
-            <Field label="Product type" hint="product_type · optional">
+            <Field label="Product type">
+              {/* min-w-0 lets the select shrink inside the grid cell — a long option label
+                  gives it an intrinsic width that otherwise pushed the whole dialog wider
+                  than its box and clipped on the right. */}
               <select value={productType} onChange={(e) => setProductType(e.target.value)} disabled={busy}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+                className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
                 <option value="">— not set —</option>
                 {productTypes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </Field>
           </div>
           {boards.length > 1 && (
-            <Field label="Board" hint="board_id">
+            <Field label="Board">
               <select value={board} onChange={(e) => setBoard(e.target.value)} disabled={busy}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+                className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
                 {boards.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </Field>
           )}
-          <Field label="Brief" hint="description">
+          <Field label="Description">
             <textarea value={desc} onChange={(e) => setDesc(e.target.value)} disabled={busy} rows={3}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
+              className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
           </Field>
         </div>
 
@@ -226,7 +230,7 @@ export function PushToPartnerDialog({
           </div>
           <p className="text-xs text-muted-foreground">
             Mockups, spec sheets, a marked-up screenshot — anything that tells their designer what you want.
-            Sent alongside the artwork, never in place of it.
+            Sent alongside the artwork; if there&apos;s no stored artwork, the first image here is sent as the design.
           </p>
           {extras.map((f, i) => (
             <div key={f.url} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs">
@@ -250,7 +254,7 @@ export function PushToPartnerDialog({
 
       <DialogFooter>
         <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-        <Button size="sm" onClick={send} disabled={busy || uploading || notReady || !artworkUrl}>
+        <Button size="sm" onClick={send} disabled={busy || uploading || notReady || (!artworkUrl && !extras.length)}>
           {busy ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />}
           Send to partner
         </Button>
@@ -260,15 +264,12 @@ export function PushToPartnerDialog({
   )
 }
 
-/** A labelled row that also names the partner field it maps to, so what's being sent is
- *  legible without cross-referencing their docs. */
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+/** A labelled form row. min-w-0 so a wide child (a select with long options) can shrink
+ *  inside a grid cell instead of overflowing the dialog. */
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-1">
-      <span className="flex items-baseline gap-2">
-        <span className="text-sm font-medium">{label}</span>
-        {hint && <span className="font-mono text-[11px] text-muted-foreground">{hint}</span>}
-      </span>
+    <label className="block min-w-0 space-y-1.5">
+      <span className="text-sm font-medium">{label}</span>
       {children}
     </label>
   )
