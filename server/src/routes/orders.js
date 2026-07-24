@@ -673,19 +673,29 @@ export function ordersRoutes(app, requireAuth) {
       readAll().catch(() => ({})),
     ]);
     const mode = !!Number(cfg.capacity_mode || 0);
+    if (!mode) return { mode: false, limit: 0, usedToday: 0, over: false, notice: null };
     const limit = (row && row.order_limit != null) ? Number(row.order_limit) : Number(cfg.order_limit_default || 0);
-    // Off, or no limit set → nothing to show. The header hides on limit:0.
-    if (!mode || !isFinite(limit) || limit <= 0) return { mode, limit: 0, usedToday: 0, over: false, notice: null };
-    // Count is ORDERS UPLOADED TODAY (created), so the header ticks up on every upload/import
-    // and crosses when an import pushes them past the limit.
+    const hasLimit = isFinite(limit) && limit > 0;
+    // Count is ORDERS UPLOADED TODAY (created), so the header ticks up on every upload/import.
     const used = await q(
       "select count(*)::int as n from orders where seller_id=$1 and created_at >= current_date",
       [String(sellerId)]
     ).then((r) => r.rows[0]?.n || 0).catch(() => 0);
-    const over = used >= limit;
+    const sellerOver = hasLimit && used >= limit;
+    // Whole-floor maxed → notify EVERY seller, even ones with no personal limit (the
+    // "auto-notice all when the factory is at capacity" behaviour). Broadcasts the crunch.
+    const factoryLimit = Number(cfg.factory_daily_limit || 0);
+    let factoryOver = false;
+    if (isFinite(factoryLimit) && factoryLimit > 0) {
+      const fUsed = await q(
+        "select count(*)::int as n from orders where created_at >= current_date and factory_order = false"
+      ).then((r) => r.rows[0]?.n || 0).catch(() => 0);
+      factoryOver = fUsed >= factoryLimit;
+    }
+    const over = sellerOver || factoryOver;
     const notice = String(cfg.capacity_notice || '').trim()
       || 'Due to high order volume, orders submitted now may ship later than usual.';
-    return { mode, limit, usedToday: used, over, notice: over ? notice : null };
+    return { mode: true, limit: hasLimit ? limit : 0, usedToday: used, over, notice: over ? notice : null };
   });
 
   /**

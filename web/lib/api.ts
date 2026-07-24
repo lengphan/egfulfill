@@ -221,6 +221,13 @@ export function adjustBalance(body: { account: string; delta: number; note: stri
 export function deleteUserAdmin(id: string) {
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" })
 }
+/** Distribute the factory daily cap across active sellers, weighted by their recent volume,
+ *  and apply each as their order_limit. Returns what it set. */
+export function suggestOrderLimits() {
+  return api<{ ok?: boolean; applied?: number; cap?: number; error?: string
+               assignments?: { id: string; label: string; avgDaily: number; limit: number }[] }>(
+    `/api/users/suggest-order-limits`, { method: "POST" })
+}
 export function updateUserAdmin(id: string, patch: { role?: string; password?: string; name?: string; active?: boolean; plan?: string; spydeck_addon?: boolean; order_limit?: number | null }) {
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) })
 }

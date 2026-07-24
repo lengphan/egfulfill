@@ -48,6 +48,7 @@ import {
   getUsers,
   updateUserAdmin,
   createUserAdmin,
+  suggestOrderLimits,
   getAudit,
   type ApiKey,
   type TeamMember,
@@ -1458,6 +1459,23 @@ function UsersPanel() {
   }
   // Peak-season: raise (or set) a seller's daily order limit. Blank = platform default,
   // 0 = unlimited. Crossing it never blocks them — it only shows the delay notice on submit.
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestErr, setSuggestErr] = useState<string | null>(null)
+  // Distribute the factory cap across active sellers, weighted by recent volume. Applies to
+  // all of them at once (you then tweak individuals), so confirm first.
+  const suggestLimits = async () => {
+    if (typeof window !== "undefined" && !window.confirm(
+      "Set every active seller's daily limit by splitting the Factory daily limit, weighted by their recent order volume? You can still adjust any seller afterwards."
+    )) return
+    setSuggesting(true); setSuggestErr(null)
+    try {
+      const r = await suggestOrderLimits()
+      if (r?.error) { setSuggestErr(r.error); return }
+      loadUsers()
+    } catch (e) {
+      setSuggestErr(e instanceof Error ? e.message : "Couldn't suggest limits.")
+    } finally { setSuggesting(false) }
+  }
   const changeOrderLimit = async (u: AdminUser) => {
     const cur = u.order_limit == null ? "" : String(u.order_limit)
     const input = typeof window !== "undefined"
@@ -1588,6 +1606,11 @@ function UsersPanel() {
               </button>
             ))}
           </div>
+          {/* Peak-season: distribute the factory cap across sellers, weighted by recent volume. */}
+          <Button size="sm" variant="outline" onClick={suggestLimits} disabled={suggesting} title="Split the Factory daily limit across active sellers by their recent volume">
+            {suggesting ? <CircleNotch size={14} className="animate-spin" /> : <>Suggest limits</>}
+          </Button>
+          {suggestErr && <span className="w-full text-xs text-destructive">{suggestErr}</span>}
           {/* Deactivated accounts are hidden by default — they're kept so their orders
               stay attached, not because anyone needs to see them daily. */}
           {inactiveCount > 0 && (

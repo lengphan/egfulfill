@@ -3,6 +3,7 @@
 import { q } from '../db.js';
 import { hashPassword, isStaff, canManageUsers } from '../auth.js';
 import { audit } from '../audit.js';
+import { readAll } from './factory_settings.js';
 
 const ROLES = ['seller', 'operator', 'admin', 'warehouse', 'designer'];
 const PLANS = ['starter', 'pro', 'enterprise'];
@@ -136,6 +137,43 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
       after: { role, name, active, plan, spydeck_addon, password: password ? 'reset' : undefined },
     });
     return { ok: true };
+  });
+
+  /**
+   * Suggest per-seller limits by distributing the FACTORY daily cap across active sellers,
+   * WEIGHTED by each seller's trailing 14-day average daily upload volume — so a busy seller
+   * gets a bigger slice than a quiet one, rather than a naive even split. A seller with no
+   * history still gets a small floor share (never capped at zero). Applies the numbers (you
+   * then adjust any by hand) and returns what it set. A distribution aid, not a hard gate.
+   */
+  app.post('/api/users/suggest-order-limits', { preHandler: requireUserManager }, async (req, reply) => {
+    const cfg = await readAll().catch(() => ({}));
+    const cap = Number(cfg.factory_daily_limit || 0);
+    if (!isFinite(cap) || cap <= 0) {
+      reply.code(400);
+      return { error: 'Set a Factory daily limit first — that\'s the total being distributed across sellers.' };
+    }
+    const rows = (await q(`
+      select u.id, coalesce(u.store_name, u.name, u.email) as label,
+             (select count(*)::float from orders o
+                where o.seller_id = u.id::text and o.created_at >= now() - interval '14 days') / 14.0 as avg_daily
+        from users u
+       where u.role = 'seller' and u.active = true`).catch(() => ({ rows: [] }))).rows;
+    if (!rows.length) return { ok: true, applied: 0, cap, assignments: [] };
+    // Floor each weight at 0.5 so a new/quiet seller still gets a nonzero share.
+    const weights = rows.map((r) => Math.max(0.5, Number(r.avg_daily) || 0));
+    const total = weights.reduce((a, b) => a + b, 0) || 1;
+    const assignments = rows.map((r, i) => ({
+      id: r.id, label: r.label,
+      avgDaily: Math.round((Number(r.avg_daily) || 0) * 10) / 10,
+      limit: Math.max(1, Math.round((weights[i] / total) * cap)),
+    }));
+    for (const a of assignments) {
+      await q('update users set order_limit=$2 where id=$1', [a.id, a.limit]).catch(() => {});
+    }
+    audit(req, 'capacity.limits_suggested', { entityType: 'settings', entityId: 'order_limits',
+      after: { cap, sellers: assignments.length } });
+    return { ok: true, applied: assignments.length, cap, assignments };
   });
 
   app.delete('/api/users/:id', { preHandler: requireAdmin }, async (req, reply) => {
