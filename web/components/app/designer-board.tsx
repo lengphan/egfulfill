@@ -175,9 +175,13 @@ export function DesignerBoard() {
           r.onerror = () => rej(new Error("unreadable"))
           r.readAsDataURL(f)
         })
-        // The filename minus its extension is the card's name. It is what the person who
-        // sent the file called it, which beats "Untitled 3" every time.
-        const title = f.name.replace(/\.[^.]+$/, "") || "Untitled design"
+        // Use the filename as the name ONLY when a person actually typed it. An
+        // auto-generated name — a screenshot, a random export hash, an IMG_1234 — is noise,
+        // so those become a plain "New design" (and a push later sets the real title). This
+        // is why a card wasn't titled after a design: its file was a screenshot/hash.
+        const base = f.name.replace(/\.[^.]+$/, "").trim()
+        const looksAuto = !base || /screenshot/i.test(base) || /^IMG[-_]?\d/i.test(base) || /^[A-Z0-9]{6,}$/.test(base)
+        const title = looksAuto ? "New design" : base
         const r = await createDesignCard({ title, data })
         if (r?.error) throw new Error(r.error)
         // Cards land in Incoming regardless of which lane took the drop: a brand-new design

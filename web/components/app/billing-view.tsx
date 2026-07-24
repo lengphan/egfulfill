@@ -16,6 +16,7 @@ const usd = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("
 const PARTNER_LABEL: Record<string, string> = {
   byeastside: "byeastside (dispatch)",
   pinkdesign: "Pink Design",
+  designer: "In-house designers",
   carrier: "Carriers (postage)",
   suppliers: "Suppliers (blanks)",
 }
@@ -25,7 +26,7 @@ const label = (p: string) => PARTNER_LABEL[p] ?? p
 // The filter used to list only partners already present in the ledger, so before the
 // first cost is recorded it was empty — which reads as "the filter is broken" rather
 // than "nothing has been spent". Keys match the mapping in wallet.js.
-const KNOWN_PARTNERS = ["byeastside", "pinkdesign", "carrier", "suppliers"]
+const KNOWN_PARTNERS = ["byeastside", "pinkdesign", "designer", "carrier", "suppliers"]
 
 /** First and last day of the current month, as yyyy-mm-dd. */
 function thisMonth() {

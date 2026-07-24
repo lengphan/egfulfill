@@ -240,16 +240,18 @@ export function walletRoutes(app, requireAuth) {
   // without backfilling anything. Kept in SQL so filtering and grouping use the same
   // rule the export prints.
   const PARTNER_SQL = `coalesce(partner, case
-      when type = 'expedite-cost'       then 'byeastside'
-      when type in ('expedite-in','expedite-out') then 'byeastside'
-      when type = 'design-partner-cost' then 'pinkdesign'
+      -- Prefix match so each partner's DEBIT (…-cost) AND its CREDIT reversal (…-cost-credit,
+      -- written by recordCredit) attribute to the SAME partner. Matching only the exact debit
+      -- type dropped every refund/void from the breakdown and overstated what we owed.
+      when type like 'expedite-%'           then 'byeastside'
+      when type like 'design-partner-cost%' then 'pinkdesign'
       -- A design payout to one of OUR designers is a design cost too. Attribute only the
-      -- house-DEBIT side (account='factory'): that's what we paid out, so the summary shows
-      -- it as a cost alongside Pink. The matching credit on the designer's own wallet is
-      -- their earning, not a partner cost, so it's deliberately left unlabelled.
+      -- house-DEBIT side (account='factory'): that's what we paid out, so it sums as a cost
+      -- alongside Pink. The matching credit on the designer's own wallet is their earning,
+      -- not a partner cost, so it's deliberately left unlabelled.
       when type = 'design-pay' and account = 'factory' then 'designer'
-      when type = 'label-cost'          then 'carrier'
-      when type = 'blanks-cost'         then 'suppliers'
+      when type like 'label-cost%'          then 'carrier'
+      when type like 'blanks-cost%'         then 'suppliers'
     end)`;
 
   app.get('/api/wallet/export', { preHandler: requireAuth }, async (req, reply) => {

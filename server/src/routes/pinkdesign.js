@@ -246,8 +246,8 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   let cardOut = card ? String(card.id) : null;
   if (card) {
     await q(`update design_cards set vendor='pinkdesign', vendor_ref=$2, vendor_task_id=$5, col='inprogress',
-                    thumb=coalesce(thumb,$3), pushed_images=$4::jsonb, updated_at=now() where id=$1::bigint`,
-      [String(card.id), vendorRef, imageUrl, sentImages, vendorTaskId]).catch(() => {});
+                    title=$6, thumb=coalesce(thumb,$3), pushed_images=$4::jsonb, updated_at=now() where id=$1::bigint`,
+      [String(card.id), vendorRef, imageUrl, sentImages, vendorTaskId, payload.title]).catch(() => {});
   } else {
     const ins = await q(
       `insert into design_cards (order_id, sku, title, col, type, product, thumb, vendor, vendor_ref, payment, pay_status, pushed_images, vendor_task_id)

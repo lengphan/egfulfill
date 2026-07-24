@@ -197,7 +197,14 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       // Manual cards keep their artwork in object storage, and a signed URL expires — so it
       // is minted per read rather than stored. `thumb` is what every client already renders,
       // so the URL goes there and nothing downstream needs to know where it came from.
-      return r.rows.map((row) => ({ ...row, thumb: artUrlOf(row) || row.art_data || row.thumb }));
+      return r.rows.map((row) => {
+        // A VENDOR card's avatar should be the design we actually SENT — the card's own art
+        // can differ from what went out (e.g. an attached reference became the artwork on
+        // push), and showing the wrong image is worse than showing the real one.
+        const pushed = Array.isArray(row.pushed_images) ? row.pushed_images : [];
+        const thumb = (row.vendor && pushed[0]) ? pushed[0] : (artUrlOf(row) || row.art_data || row.thumb);
+        return { ...row, thumb };
+      });
     }
     // seller → only cards for their own orders
     const r = await q(
