@@ -119,7 +119,12 @@ async function shRates(to, from, pc, extra) {
     days: rt.estimated_days != null ? rt.estimated_days : null
   }));
 }
-async function shBuy(rateObjectId) {
+// `sel` is the rate we picked at rate-shop time ({amount, carrier, service}). Shippo
+// returns the transaction's `rate` as a bare object-id STRING, not an expanded object, so
+// d.rate.amount / d.rate.provider are undefined — which is why cost came back null and the
+// Price column stayed empty. Read the amount/carrier from the rate we already have; only
+// fall back to d.rate.* on the rare occasion Shippo expands it.
+async function shBuy(rateObjectId, sel) {
   const r = await fetch(SH_BASE + '/transactions/', {
     method: 'POST', headers: { Authorization: shAuth(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ rate: rateObjectId, label_file_type: 'PDF_4x6', async: false })
@@ -129,15 +134,20 @@ async function shBuy(rateObjectId) {
     const msg = (d.messages && d.messages.map((m) => m.text).join('; ')) || d.detail || ('Shippo buy HTTP ' + r.status);
     throw new Error(msg);
   }
+  const rate = (d.rate && typeof d.rate === 'object') ? d.rate : null;   // usually a string id
+  sel = sel || {};
   return {
-    provider: 'shippo', carrier: (d.rate && d.rate.provider) || '', service: (d.rate && d.rate.servicelevel && d.rate.servicelevel.name) || '',
-    cost: (d.rate && Number(d.rate.amount)) || null, tracking: d.tracking_number || '',
+    provider: 'shippo',
+    carrier: (rate && rate.provider) || sel.carrier || '',
+    service: (rate && rate.servicelevel && rate.servicelevel.name) || sel.service || '',
+    cost: (rate && Number(rate.amount)) || Number(sel.amount) || null,
+    tracking: d.tracking_number || '',
     labelUrl: d.label_url || '',
     providerId: d.object_id || '',
     // The carrier account this rate was bought under. A manifest (USPS SCAN form) is
     // scoped to ONE carrier account, and there is no way to recover which one a
     // transaction used after the fact — so it is captured here or not at all.
-    carrierAccount: (d.rate && d.rate.carrier_account) || ''
+    carrierAccount: (rate && rate.carrier_account) || ''
   };
 }
 
@@ -222,7 +232,7 @@ export async function aggregatorBuyCheapest(to, from, pc, opts) {
   all.sort((a, c) => a.amount - c.amount);
   const t = dec(all[0].token);
   if (t && t.p === 'ep') return await epBuy(t.s, t.r);
-  if (t && t.p === 'sh') return await shBuy(t.r);
+  if (t && t.p === 'sh') return await shBuy(t.r, all[0]);   // pass the chosen rate for cost/carrier
   return null;
 }
 
