@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Sparkle, Warning } from "@phosphor-icons/react"
+import { Sparkle, Warning, House, Receipt, CurrencyDollar, Package, Wallet } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
-import { getToken } from "@/lib/auth"
+import { getToken, getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus } from "@/lib/order-status"
 import { revenueSeries, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
@@ -99,8 +99,16 @@ export function DashboardView() {
     const in30 = list.filter((o) => !isNaN(tsOf(o)) && now - tsOf(o) < 30 * DAY)
     const rev30 = in30.reduce((s, o) => s + totalOf(o), 0)
     const open = list.filter((o) => OPEN_GROUPS.has(sellerStatus(o).group)).length
-    return { count30: in30.length, rev30, open }
+    const startOfToday = new Date(new Date().toDateString()).getTime()
+    const newToday = list.filter((o) => tsOf(o) >= startOfToday).length
+    return { count30: in30.length, rev30, open, newToday }
   }, [orders, now])
+
+  // Time-of-day greeting — client component, so this is the seller's own local clock.
+  const greetDate = new Date()
+  const greeting = greetDate.getHours() < 12 ? "Good morning" : greetDate.getHours() < 18 ? "Good afternoon" : "Good evening"
+  const todayLabel = greetDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+  const name = getUser()?.name || "there"
 
   const series = useMemo(() => revenueSeries(orders ?? [], now), [orders, now])
 
@@ -111,11 +119,22 @@ export function DashboardView() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><House size={18} weight="fill" /></span>
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {todayLabel}
+            {orders !== null && stats.newToday > 0 && <> · <span className="font-medium text-foreground">{stats.newToday}</span> new today</>}
+          </p>
+        </div>
+      </div>
+
       <StatGrid>
-        <StatCard label="Orders (30d)" value={orders === null ? "—" : String(stats.count30)} sub="last 30 days" />
-        <StatCard label="Revenue (30d)" value={orders === null ? "—" : usd(stats.rev30)} sub="gross, last 30 days" tone="pos" />
-        <StatCard label="Open orders" value={orders === null ? "—" : String(stats.open)} sub="in the pipeline" />
-        <StatCard label="Wallet balance" value={balance === null ? "—" : usd(balance)} sub="available to fulfill" />
+        <StatCard label="Orders (30d)" value={orders === null ? "—" : String(stats.count30)} sub="last 30 days" icon={Receipt} />
+        <StatCard label="Revenue (30d)" value={orders === null ? "—" : usd(stats.rev30)} sub="gross, last 30 days" tone="pos" icon={CurrencyDollar} />
+        <StatCard label="Open orders" value={orders === null ? "—" : String(stats.open)} sub="in the pipeline" icon={Package} />
+        <StatCard label="Wallet balance" value={balance === null ? "—" : usd(balance)} sub="available to fulfill" icon={Wallet} />
       </StatGrid>
 
       {isDemo && (
