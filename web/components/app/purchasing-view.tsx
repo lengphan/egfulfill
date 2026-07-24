@@ -1,21 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Storefront, ShoppingCart } from "@phosphor-icons/react"
-import { SuppliersView } from "@/components/app/suppliers-view"
+import { ShoppingCart } from "@phosphor-icons/react"
+import { AllSuppliers } from "@/components/app/all-suppliers"
+import { FavoritesView } from "@/components/app/favorites-view"
 import { PurchaseView } from "@/components/app/purchase-view"
 
-type Tab = "browse" | "purchase"
+type Tab = "all" | "favorites" | "purchase"
 
 /**
- * Purchasing — the one home for buying blanks. Suppliers (browse) and Purchase (cart +
- * on-order + history) used to be two nav items with purchase history showing in both;
- * this folds them into a single section with two tabs.
- *
- * Deliberately a thin wrapper: each tab renders its ORIGINAL view unchanged, so none of
- * the tested ordering / catalogue logic moves. The initial tab comes from ?tab= (the
- * top-bar cart button and the old-route redirects both deep-link here), and switching
- * tabs updates the URL in place so a refresh or a back-button keeps the tab.
+ * Purchasing — the one home for buying blanks. Flattened to a SINGLE tab row —
+ * All suppliers · Favorites · Cart & orders — instead of a Browse/Cart toggle stacked over
+ * a suppliers' All/Favorites toggle. The browse catalogue views and the cart/orders view
+ * are peers; their tested logic is untouched, just reparented. `browse` is a legacy ?tab=
+ * alias for `all`; switching updates the URL in place.
  */
 export function PurchasingView() {
   const [tab, setTab] = useState<Tab>("purchase")
@@ -23,7 +21,8 @@ export function PurchasingView() {
   useEffect(() => {
     const id = setTimeout(() => {
       const p = new URLSearchParams(window.location.search).get("tab")
-      if (p === "browse" || p === "purchase") setTab(p)
+      if (p === "all" || p === "favorites" || p === "purchase") setTab(p)
+      else if (p === "browse") setTab("all")   // legacy alias
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -48,23 +47,19 @@ export function PurchasingView() {
           <p className="truncate text-sm text-muted-foreground">Browse suppliers, build a cart, and track orders.</p>
         </div>
       </div>
-      {/* rounded-full to match the pill toggles used across the boards (suppliers-view). */}
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "browse", label: "Browse", icon: Storefront }, { id: "purchase", label: "Cart & orders", icon: ShoppingCart }] as const).map((t) => {
-          const Icon = t.icon
-          return (
-            <button
-              key={t.id}
-              onClick={() => pick(t.id)}
-              className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              <Icon size={15} weight={tab === t.id ? "fill" : "regular"} /> {t.label}
-            </button>
-          )
-        })}
+        {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }, { id: "purchase", label: "Cart & orders" }] as const).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => pick(t.id)}
+            className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {tab === "browse" ? <SuppliersView embedded /> : <PurchaseView embedded />}
+      {tab === "all" ? <AllSuppliers /> : tab === "favorites" ? <FavoritesView /> : <PurchaseView embedded />}
     </div>
   )
 }

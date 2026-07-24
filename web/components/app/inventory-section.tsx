@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Stack, Barcode, Package, UsersThree } from "@phosphor-icons/react"
+import { Package } from "@phosphor-icons/react"
 import { InventoryView } from "@/components/app/inventory-view"
 import { ScanStation } from "@/components/app/scan-station"
 
@@ -50,18 +50,15 @@ export function InventorySection() {
         </div>
       </div>
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "own", label: "Our stock", icon: Stack }, { id: "consigned", label: "Seller stock", icon: UsersThree }, { id: "scan", label: "Scan", icon: Barcode }] as const).map((t) => {
-          const Icon = t.icon
-          return (
-            <button
-              key={t.id}
-              onClick={() => pick(t.id)}
-              className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              <Icon size={15} weight={tab === t.id ? "fill" : "regular"} /> {t.label}
-            </button>
-          )
-        })}
+        {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Seller stock" }, { id: "scan", label: "Scan" }] as const).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => pick(t.id)}
+            className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {tab === "scan" ? <ScanStation embedded /> : <InventoryView embedded pool={tab} />}

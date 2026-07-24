@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Truck, Package } from "@phosphor-icons/react"
+import { Truck } from "@phosphor-icons/react"
 import { DispatchBoard } from "@/components/app/dispatch-board"
 import { ShipmentsView } from "@/components/app/shipments-view"
 
@@ -47,18 +47,15 @@ export function ShippingView() {
         </div>
       </div>
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "dispatch", label: "Dispatch", icon: Truck }, { id: "shipments", label: "Shipments", icon: Package }] as const).map((t) => {
-          const Icon = t.icon
-          return (
-            <button
-              key={t.id}
-              onClick={() => pick(t.id)}
-              className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              <Icon size={15} weight={tab === t.id ? "fill" : "regular"} /> {t.label}
-            </button>
-          )
-        })}
+        {([{ id: "dispatch", label: "Dispatch" }, { id: "shipments", label: "Shipments" }] as const).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => pick(t.id)}
+            className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {tab === "dispatch" ? <DispatchBoard /> : <ShipmentsView />}

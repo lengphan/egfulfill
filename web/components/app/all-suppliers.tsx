@@ -304,7 +304,8 @@ export function AllSuppliers() {
   const canLoadMore = (items?.length ?? 0) < total
 
   return (
-    <SectionCard title="All suppliers" description="S&S Activewear + Otto Cap in one feed — each card shows its supplier & brand">
+    // No title — the "All suppliers" tab already names it. The toolbar is the top of the card.
+    <SectionCard>
       <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
         <div className="relative max-w-md flex-1">
           <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
