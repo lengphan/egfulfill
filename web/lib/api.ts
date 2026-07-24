@@ -232,6 +232,49 @@ export function createTopupRequest(body: { amount: number; method: string; note?
   })
 }
 
+// ─────────────────────────── Payouts (manual seller withdrawals) ───────────────────────────
+// A seller saves payout details once, then requests an amount; admin/warehouse pay it by
+// hand and mark it Paid, which DEBITS the wallet. Mirror of top-ups, sign flipped.
+export type PayoutMethod = {
+  type?: string          // pingpong | lianlian | bank | vietqr | other
+  account_name?: string
+  account_id?: string    // PingPong/LianLian email or id
+  account_number?: string
+  bank_name?: string
+  note?: string
+  qr?: string            // uploaded VietQR image, as a data URL
+}
+export type PayoutRequest = {
+  id: string
+  seller_id?: string | null
+  seller_name?: string | null
+  seller_email?: string | null
+  amount_usd: number | string
+  method?: PayoutMethod | null
+  note?: string | null
+  status: "pending" | "paid" | "rejected" | string
+  created_at: string
+  resolved_at?: string | null
+}
+export function getPayoutMethod() {
+  return api<{ info: PayoutMethod | null; min: number; max: number; balance: number }>(`/api/payout/method`)
+}
+export function savePayoutMethod(info: PayoutMethod) {
+  return api<{ ok?: boolean; info?: PayoutMethod; error?: string }>(`/api/payout/method`, { method: "PUT", body: JSON.stringify({ info }) })
+}
+export function getPayoutRequests(status?: string) {
+  return api<PayoutRequest[]>(`/api/payout/requests${status ? `?status=${encodeURIComponent(status)}` : ""}`)
+}
+export function createPayoutRequest(amount: number, note?: string) {
+  return api<PayoutRequest & { error?: string }>(`/api/payout/requests`, { method: "POST", body: JSON.stringify({ amount, note }) })
+}
+export function payPayout(id: string) {
+  return api<PayoutRequest & { error?: string }>(`/api/payout/requests/${encodeURIComponent(id)}/pay`, { method: "POST" })
+}
+export function rejectPayout(id: string) {
+  return api<PayoutRequest & { error?: string }>(`/api/payout/requests/${encodeURIComponent(id)}/reject`, { method: "POST" })
+}
+
 // ─────────────────────────── Catalog ───────────────────────────
 // GET /api/catalog_products → the full product objects (lossless `data` jsonb).
 // Field names mirror the static store, so keep this shape permissive.

@@ -22,6 +22,7 @@ import { consignmentRoutes } from './routes/consignment.js';
 import { mailIngestRoutes } from './routes/mail_ingest.js';
 import { vietqrRoutes } from './routes/vietqr.js';
 import { topupsRoutes } from './routes/topups.js';
+import { payoutsRoutes } from './routes/payouts.js';
 import { paypalRoutes } from './routes/paypal.js';
 import { stripeRoutes } from './routes/stripe.js';
 import { passwordResetRoutes } from './routes/password-reset.js';
@@ -332,6 +333,7 @@ uspsRoutes(app, requireAuth, requireStaff);
 templatesRoutes(app, requireAuth);
 vietqrRoutes(app, requireAuth);   // /vqr/* are PUBLIC (VietQR server-to-server); /api/vietqr/* need auth
 topupsRoutes(app, requireAuth);   // manual top-up reconciliation (pending → admin "Received")
+payoutsRoutes(app, requireAuth);  // manual seller payouts (saved payout details → request → admin/warehouse pay = wallet debit)
 paypalRoutes(app, requireAuth);   // PayPal card/balance wallet top-up (auto-capture)
 stripeRoutes(app, requireAuth);   // Stripe card wallet top-up (Payment Element)
 passwordResetRoutes(app, requireAuth, requireStaff);   // forgot/reset (admin-mediated + email link)

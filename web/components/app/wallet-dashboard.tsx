@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Plus, ArrowLineDown, DownloadSimple, Bank } from "@phosphor-icons/react"
+import { Plus, ArrowLineDown, DownloadSimple } from "@phosphor-icons/react"
 import { TopUpDialog } from "@/components/app/topup-dialog"
+import { PayoutDialog } from "@/components/app/payout-dialog"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,7 +18,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SectionCard } from "@/components/app/section-card"
 import { CircleNotch, CheckCircle, XCircle, Warning } from "@phosphor-icons/react"
-import { getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, type LedgerRow, type TopupRequest } from "@/lib/api"
+import { getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type TopupRequest, type PayoutRequest } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
 const usd2 = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -56,6 +57,57 @@ function AdminTopups() {
             </div>
           </div>
         ))}
+      </div>
+    </SectionCard>
+  )
+}
+
+// Admin/warehouse review of pending seller payouts — the debit side of the top-up panel.
+// They pay the seller off-platform using the details shown, then Mark paid to debit the
+// wallet. Gated to admin/warehouse because it moves money OUT (the server enforces it too).
+function AdminPayouts({ onPaid }: { onPaid: () => void }) {
+  const canPay = ["admin", "warehouse"].includes(getUser()?.role ?? "")
+  const [rows, setRows] = useState<PayoutRequest[] | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const load = useCallback(() => { if (canPay) getPayoutRequests("pending").then((r) => setRows(r ?? [])).catch(() => setRows([])) }, [canPay])
+  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  const act = async (p: PayoutRequest, action: "pay" | "reject") => {
+    setBusy(p.id); setErr(null)
+    try {
+      const r = await (action === "pay" ? payPayout(p.id) : rejectPayout(p.id))
+      if (r.error) { setErr(r.error); load(); return }
+      setRows((prev) => (prev ?? []).filter((x) => x.id !== p.id))
+      if (action === "pay") onPaid()
+    } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't update that payout."); load() } finally { setBusy(null) }
+  }
+  if (!canPay || rows === null || rows.length === 0) return null
+  return (
+    <SectionCard title={`Pending payouts (${rows.length})`} description="Pay the seller with the details shown, then Mark paid to debit their wallet">
+      {err && <div className="mx-4 mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">{err}</div>}
+      <div className="divide-y divide-border">
+        {rows.map((p) => {
+          const m = p.method || {}
+          return (
+            <div key={p.id} className="flex flex-wrap items-start justify-between gap-3 p-4">
+              <div className="min-w-0 space-y-1">
+                <div className="font-semibold tabular-nums">{usd2(Number(p.amount_usd) || 0)} <span className="text-sm font-normal text-muted-foreground">· {p.seller_name || p.seller_email || "seller"}</span></div>
+                <div className="text-xs text-muted-foreground">{fmtDT2(p.created_at)}</div>
+                <div className="mt-1 space-y-0.5 rounded-lg bg-muted/50 px-2.5 py-2 text-xs">
+                  <div className="font-medium capitalize">{(m.type || "payout").replace("vietqr", "VietQR")}{m.account_name ? ` · ${m.account_name}` : ""}</div>
+                  {(m.account_id || m.account_number) && <div className="text-muted-foreground">{m.account_id || m.account_number}{m.bank_name ? ` · ${m.bank_name}` : ""}</div>}
+                  {m.note && <div className="text-muted-foreground">{m.note}</div>}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {m.qr && <img src={m.qr} alt="Seller VietQR" className="mt-1.5 size-24 rounded border border-border object-contain" />}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => act(p, "reject")} disabled={busy === p.id} className="text-red-600 hover:text-red-700"><XCircle size={14} weight="bold" /> Reject</Button>
+                <Button size="sm" onClick={() => act(p, "pay")} disabled={busy === p.id}>{busy === p.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Mark paid</>}</Button>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </SectionCard>
   )
@@ -188,9 +240,10 @@ export function WalletDashboard() {
     return [...base, ...extra].sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
   }, [view?.rows, rejected])
   const [topUpOpen, setTopUpOpen] = useState(false)
+  const [payoutOpen, setPayoutOpen] = useState(false)
   // Admin and warehouse share the FACTORY wallet, which is a pure internal ledger — there
   // is nothing to withdraw from it and no bank/card account to link, so those controls are
-  // hidden for them. (They were also dead buttons — no handler ever wired.)
+  // hidden for them. Sellers keep Withdraw, which now opens the payout flow.
   const isFactoryWallet = ["admin", "warehouse"].includes(getUser()?.role ?? "")
 
   const refresh = useCallback(() => {
@@ -260,19 +313,15 @@ export function WalletDashboard() {
   return (
     <div className="space-y-4">
       <AdminTopups />
+      <AdminPayouts onPaid={() => { refresh(); window.dispatchEvent(new CustomEvent("eg-wallet-changed")) }} />
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {/* Withdraw + Manage Linked Accounts are hidden on the factory ledger (admin /
-            warehouse). Both were also dead — no click handler was ever wired. Add Funds
-            is the one live action (VietQR + Stripe card top-up). */}
+        {/* Factory ledger (admin/warehouse) has nothing to withdraw. Sellers get Withdraw,
+            which opens the payout flow — enter details + an amount for admin to pay out.
+            "Manage Linked Accounts" is gone: those details now live in that dialog. */}
         {!isFactoryWallet && (
-          <>
-            <Button variant="outline">
-              <Bank size={16} /> Manage Linked Accounts
-            </Button>
-            <Button variant="outline">
-              <ArrowLineDown size={16} /> Withdraw
-            </Button>
-          </>
+          <Button variant="outline" onClick={() => setPayoutOpen(true)}>
+            <ArrowLineDown size={16} /> Withdraw
+          </Button>
         )}
         <Button onClick={() => setTopUpOpen(true)}>
           <Plus size={16} weight="bold" /> Add Funds
@@ -289,6 +338,8 @@ export function WalletDashboard() {
           window.dispatchEvent(new CustomEvent("eg-wallet-changed"))
         }}
       />
+
+      <PayoutDialog open={payoutOpen} onOpenChange={setPayoutOpen} onDone={refresh} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (
