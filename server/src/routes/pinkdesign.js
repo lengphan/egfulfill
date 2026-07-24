@@ -409,14 +409,17 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
         || String(raw.api_key || raw.apiKey || b.api_key || b.apiKey || '').trim();
       if (got !== want) { console.log('[pinkdesign webhook] REJECTED — bad/absent key'); reply.code(401); return { error: 'bad webhook key' }; }
     }
-    // Their id + status field names are unknown, so try every plausible one rather than
-    // silently ignoring a payload that IS about a card we have.
-    const ref = String(b.ref_id ?? b.refId ?? b.id ?? b.task_id ?? b.taskId ?? b.reference ?? b.ref ?? '');
-    const status = String(b.status ?? b.state ?? b.stage ?? '').toLowerCase();
-    if (!ref) { console.log('[pinkdesign webhook] no ref found — payload keys:', Object.keys(b).join(',')); return { ok: true, ignored: 'no ref_id' }; }
-    const card = (await q('select id, order_id, sku from design_cards where vendor_ref=$1 limit 1', [ref])
+    // From Pink's real payload: they send BOTH ref_id (what create_task returned, = our
+    // vendor_ref) and task_id (their internal id) — match on EITHER, since which one they
+    // handed back at create time isn't guaranteed. And STATUS lives in `task_status`, echoed
+    // in `event` ("idea.done" / "idea.inreview" / …) — NOT `status`, which is absent.
+    const refs = [b.ref_id, b.refId, b.task_id, b.taskId, b.id, b.reference, b.ref]
+      .map((v) => (v == null ? '' : String(v))).filter(Boolean);
+    const status = String(b.task_status ?? b.status ?? b.state ?? b.stage ?? b.event ?? '').toLowerCase();
+    if (!refs.length) { console.log('[pinkdesign webhook] no ref found — payload keys:', Object.keys(b).join(',')); return { ok: true, ignored: 'no ref_id' }; }
+    const card = (await q('select id, order_id, sku from design_cards where vendor_ref = any($1::text[]) limit 1', [refs])
       .catch(() => ({ rows: [] }))).rows[0];
-    if (!card) { console.log('[pinkdesign webhook] ref', ref, 'matched NO card (vendor_ref mismatch)'); return { ok: true, ignored: 'unknown ref' }; }
+    if (!card) { console.log('[pinkdesign webhook] refs', refs.join('/'), 'matched NO card (vendor_ref mismatch)'); return { ok: true, ignored: 'unknown ref' }; }
     console.log('[pinkdesign webhook] matched card', card.id, '· status:', status || '(none)');
 
     // Their review states → our board lanes. "Check"/"inreview" is work in progress on
