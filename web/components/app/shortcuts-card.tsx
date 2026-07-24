@@ -36,8 +36,23 @@ export function ShortcutsCard({
   const [hrefs, setHrefs] = useState<string[]>(() => clean(defaults))
   const [editing, setEditing] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  // The card clips its own overflow (rounded corners), so the add-menu can't be a plain
+  // absolute child — it gets cut off. Anchor it with position:fixed from the button's rect,
+  // which a plain overflow ancestor doesn't clip.
+  const addBtnRef = useRef<HTMLButtonElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const dragFrom = useRef<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
+
+  const toggleAdd = () => {
+    if (addOpen) { setAddOpen(false); return }
+    const r = addBtnRef.current?.getBoundingClientRect()
+    if (r) {
+      const W = 224 // w-56
+      setMenuPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - W - 8)) })
+    }
+    setAddOpen(true)
+  }
 
   // Load the saved layout after mount (localStorage is client-only). Deferred to dodge
   // react-hooks/set-state-in-effect, the pattern used across the app pages.
@@ -59,8 +74,12 @@ export function ShortcutsCard({
   const shown = hrefs.map((h) => byHref[h]).filter(Boolean) as ShortcutItem[]
   const available = catalog.filter((c) => !hrefs.includes(c.href))
 
+  // Fixed at six slots — a stable 3×2 grid that lines up with the table height and never
+  // grows. To add a seventh you remove one first, which is the whole point: it stays tidy.
+  const MAX = 6
   const remove = (href: string) => persist(hrefs.filter((h) => h !== href))
-  const add = (href: string) => { persist([...hrefs, href]); setAddOpen(false) }
+  const add = (href: string) => { if (hrefs.length < MAX) persist([...hrefs, href]); setAddOpen(false) }
+  const canAdd = hrefs.length < MAX && available.length > 0
 
   const onDrop = (to: number) => {
     const from = dragFrom.current
@@ -133,32 +152,31 @@ export function ShortcutsCard({
           )
         })}
 
-        {editing && available.length > 0 && (
-          <div className="relative">
-            <button
-              onClick={() => setAddOpen((o) => !o)}
-              className="eg-tap flex size-full min-h-[76px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-            >
-              <Plus size={18} weight="bold" />
-              <span className="text-xs font-medium">Add shortcut</span>
-            </button>
-            {addOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setAddOpen(false)} />
-                <div className="absolute left-0 z-50 mt-1 max-h-64 w-56 overflow-auto rounded-xl border border-border bg-card p-1.5 shadow-xl">
-                  {available.map((c) => {
-                    const Icon = c.icon
-                    return (
-                      <button key={c.href} onClick={() => add(c.href)} className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent">
-                        <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary"><Icon size={14} weight="duotone" /></span>
-                        {c.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
-            )}
-          </div>
+        {editing && canAdd && (
+          <button
+            ref={addBtnRef}
+            onClick={toggleAdd}
+            className="eg-tap flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+          >
+            <Plus size={18} weight="bold" />
+            <span className="text-xs font-medium">Add shortcut</span>
+          </button>
+        )}
+        {addOpen && menuPos && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setAddOpen(false)} />
+            <div className="fixed z-50 max-h-64 w-56 overflow-auto rounded-xl border border-border bg-card p-1.5 shadow-xl" style={{ top: menuPos.top, left: menuPos.left }}>
+              {available.map((c) => {
+                const Icon = c.icon
+                return (
+                  <button key={c.href} onClick={() => add(c.href)} className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent">
+                    <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary"><Icon size={14} weight="duotone" /></span>
+                    {c.label}
+                  </button>
+                )
+              })}
+            </div>
+          </>
         )}
 
         {shown.length === 0 && !editing && (
