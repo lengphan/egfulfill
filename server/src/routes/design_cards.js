@@ -18,6 +18,10 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // vendor_ref holds the partner's own task id, so their webhooks can find the card.
   q('alter table design_cards add column if not exists vendor text').catch(() => {});
   q('alter table design_cards add column if not exists vendor_ref text').catch(() => {});
+  // Pink's task carries TWO ids: ref_id (what they send us on push = our primary match key,
+  // stored in vendor_ref) and their internal task_id. We keep the task_id too so the board
+  // can show BOTH — their test-webhook form asks for each.
+  q('alter table design_cards add column if not exists vendor_task_id text').catch(() => {});
   // Notes WE post to the partner's task. Their board can't send comments back, so this is
   // our own running record of what we asked for — "change to New", "please cancel" — kept
   // APART from the design description. Append-only; the whole-list card save never lists

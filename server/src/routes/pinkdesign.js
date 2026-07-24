@@ -220,9 +220,14 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   // stored as NULL (not the string "null") when truly absent.
   const rd = (r.data && typeof r.data === 'object') ? r.data : {};
   const inner = (rd.data && typeof rd.data === 'object') ? rd.data : rd;
-  const refId = inner.ref_id ?? inner.task_id ?? inner.id ?? rd.ref_id ?? rd.task_id ?? rd.id ?? null;
-  const vendorRef = refId != null && String(refId).trim() ? String(refId).trim() : null;
-  console.log('[pinkdesign create_task] captured vendor_ref =', vendorRef);
+  const norm = (v) => (v != null && String(v).trim() ? String(v).trim() : null);
+  // "Ref ID" is the value Pink says is "sent to you when pushed" — our PRIMARY match key.
+  // "Task ID" is their internal id; capture it too so the board can show BOTH, because their
+  // test-webhook form asks for each. Fall back to a bare `id` for the ref when that's all
+  // they return.
+  const vendorRef = norm(inner.ref_id ?? rd.ref_id ?? inner.id ?? rd.id ?? inner.task_id ?? rd.task_id);
+  const vendorTaskId = norm(inner.task_id ?? rd.task_id);
+  console.log('[pinkdesign create_task] captured ref_id =', vendorRef, '· task_id =', vendorTaskId);
 
   // API-created tasks always land in Pink's "Draft" lane, and that is FINAL on their side:
   // they've confirmed there is no way to create or move a task straight into "New", and no
@@ -240,15 +245,15 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   const sentImages = JSON.stringify(payload.images);
   let cardOut = card ? String(card.id) : null;
   if (card) {
-    await q(`update design_cards set vendor='pinkdesign', vendor_ref=$2, col='inprogress',
+    await q(`update design_cards set vendor='pinkdesign', vendor_ref=$2, vendor_task_id=$5, col='inprogress',
                     thumb=coalesce(thumb,$3), pushed_images=$4::jsonb, updated_at=now() where id=$1::bigint`,
-      [String(card.id), vendorRef, imageUrl, sentImages]).catch(() => {});
+      [String(card.id), vendorRef, imageUrl, sentImages, vendorTaskId]).catch(() => {});
   } else {
     const ins = await q(
-      `insert into design_cards (order_id, sku, title, col, type, product, thumb, vendor, vendor_ref, payment, pay_status, pushed_images)
-       values ($1,$2,$3,'inprogress',$4,$5,$6,'pinkdesign',$7,0,'na',$8::jsonb)
+      `insert into design_cards (order_id, sku, title, col, type, product, thumb, vendor, vendor_ref, payment, pay_status, pushed_images, vendor_task_id)
+       values ($1,$2,$3,'inprogress',$4,$5,$6,'pinkdesign',$7,0,'na',$8::jsonb,$9)
        returning id`,
-      [useOrder || null, useSku || null, payload.title, method, item?.name || null, imageUrl, vendorRef, sentImages]
+      [useOrder || null, useSku || null, payload.title, method, item?.name || null, imageUrl, vendorRef, sentImages, vendorTaskId]
     ).catch(() => ({ rows: [] }));
     cardOut = ins.rows[0] ? String(ins.rows[0].id) : null;
   }
@@ -433,7 +438,7 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       .map((v) => (v == null ? '' : String(v))).filter(Boolean);
     const status = String(b.task_status ?? b.status ?? b.state ?? b.stage ?? b.event ?? '').toLowerCase();
     if (!refs.length) { console.log('[pinkdesign webhook] no ref found — payload keys:', Object.keys(b).join(',')); return { ok: true, ignored: 'no ref_id' }; }
-    const card = (await q('select id, order_id, sku from design_cards where vendor_ref = any($1::text[]) limit 1', [refs])
+    const card = (await q('select id, order_id, sku from design_cards where vendor_ref = any($1::text[]) or vendor_task_id = any($1::text[]) limit 1', [refs])
       .catch(() => ({ rows: [] }))).rows[0];
     if (!card) { console.log('[pinkdesign webhook] refs', refs.join('/'), 'matched NO card (vendor_ref mismatch)'); return { ok: true, ignored: 'unknown ref' }; }
     console.log('[pinkdesign webhook] matched card', card.id, '· status:', status || '(none)');

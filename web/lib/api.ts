@@ -1405,6 +1405,9 @@ export type DesignCard = {
    *  goes out. Outsourced cards can't be claimed by a designer and never pay one. */
   vendor?: string | null
   vendor_ref?: string | null
+  /** Pink's internal task id (distinct from vendor_ref = ref_id). Shown on the card because
+   *  their test-webhook form asks for both. */
+  vendor_task_id?: string | null
   /** Notes previously posted to the partner's task. A running log kept apart from the
    *  description; the composer that wrote them was removed, but old entries persist. */
   partner_notes?: PartnerNote[]

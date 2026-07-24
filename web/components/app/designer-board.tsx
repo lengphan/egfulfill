@@ -631,13 +631,27 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         {/* Their task ref (= our vendor_ref). Shown so it can be cross-referenced on Pink's
             board and pasted into their test-webhook form to verify the sync. select-all makes
             it one click to copy. */}
-        {card.vendor && (card.vendor_ref ? (
-          <div className="text-[11px] text-muted-foreground">
-            {vendorLabel(card.vendor)} task ref: <span className="select-all font-mono text-foreground">{String(card.vendor_ref)}</span>
+        {card.vendor && ((card.vendor_ref || card.vendor_task_id) ? (
+          // Ref ID + Task ID side by side, big enough to read and copy — labelled to match
+          // Pink's test-webhook form. Either one is enough for our webhook to match, so if
+          // only one is known, use it in both fields.
+          <div className="flex flex-wrap gap-2">
+            {card.vendor_task_id && (
+              <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Task ID</div>
+                <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_task_id)}</div>
+              </div>
+            )}
+            {card.vendor_ref && (
+              <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ref ID</div>
+                <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_ref)}</div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-[11px] text-amber-600">
-            No task ref was recorded for this card, so status sync is off for it. Re-push to capture it.
+            No Ref/Task ID was recorded for this card, so status sync is off for it. Re-push to capture it.
           </div>
         ))}
 
