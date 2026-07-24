@@ -192,7 +192,9 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
            (select role from users u
               where lower(u.email) = lower(design_cards.claimed_by)
                  or lower(u.name)  = lower(design_cards.claimed_by)
-              limit 1) as claimed_role
+              limit 1) as claimed_role,
+           (select count(*)::int from design_file_data f
+              where f.order_id = design_cards.order_id) as file_count
            from design_cards order by id`);
       // Manual cards keep their artwork in object storage, and a signed URL expires — so it
       // is minted per read rather than stored. `thumb` is what every client already renders,

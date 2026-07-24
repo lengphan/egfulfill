@@ -1428,6 +1428,9 @@ export type DesignCard = {
   /** Deliverable links the partner RETURNED via their webhook (often a Drive folder) — for
    *  a "Received from <partner>" section on the card. */
   vendor_files?: string[]
+  /** How many design files are attached to this card's order (server-computed) — a
+   *  quick-look count on the board tile. */
+  file_count?: number
   customer?: string | null
   [k: string]: unknown // preserve extra columns (specs/files/notes/…) on round-trip
 }

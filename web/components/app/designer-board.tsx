@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple, Paperclip } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -292,7 +292,12 @@ export function DesignerBoard() {
       ) : view === "list" ? (
         <DesignerList cards={cards} onOpen={setOpenId} />
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-2">
+        // All lanes share the width (grid, equal fractions) instead of a fixed 288px each — so
+        // five/six columns fit the page rather than clipping the last one. minmax(9rem, 1fr)
+        // keeps them usable and only falls back to horizontal scroll when the window is
+        // genuinely too narrow (mobile, where the List view is the better tool anyway).
+        <div className="grid gap-3 overflow-x-auto pb-2"
+             style={{ gridTemplateColumns: `repeat(${showPartner ? COLS.length + 1 : COLS.length}, minmax(9rem, 1fr))` }}>
           {[...COLS, ...(showPartner ? [PARTNER_COL] : [])].map((col) => {
             const list = grouped[col.id] ?? []
             return (
@@ -307,14 +312,16 @@ export function DesignerBoard() {
                   if (files.length) { e.preventDefault(); setOverCol(null); void dropFiles(files, col.id); return }
                   drop(col.id)
                 }}
-                className={"flex w-72 shrink-0 flex-col rounded-2xl border bg-card transition-colors " + (overCol === col.id ? "border-primary bg-primary/5" : "border-border")}
+                className={"flex h-[calc(100vh-14rem)] min-h-[22rem] min-w-0 flex-col rounded-2xl border bg-card transition-colors " + (overCol === col.id ? "border-primary bg-primary/5" : "border-border")}
               >
-                <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
-                  <span className={"size-2 rounded-full " + col.accent} />
-                  <span className="text-sm font-semibold">{col.label}</span>
-                  <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{list.length}</span>
+                <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
+                  <span className={"size-2 shrink-0 rounded-full " + col.accent} />
+                  <span className="truncate text-sm font-semibold">{col.label}</span>
+                  <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{list.length}</span>
                 </div>
-                <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
+                {/* Scroll INSIDE the column (min-h-0 lets a flex child scroll) — the page
+                    itself stays put instead of growing down as a lane fills. */}
+                <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
                   {list.length === 0 ? (
                     <div className="py-6 text-center text-xs text-muted-foreground/60">Drop cards or artwork here</div>
                   ) : (
@@ -371,9 +378,21 @@ export function DesignerBoard() {
                         <div className="p-2.5">
                           <div className="truncate text-sm font-medium leading-tight">{c.title || "Design"}</div>
                           <div className="mt-0.5 truncate text-xs text-muted-foreground">{c.product || c.type || "—"}</div>
-                          <div className="mt-1.5 flex items-center gap-1.5">
-                            {c.order_id && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{String(c.order_id).slice(0, 12)}</span>}
-                            {amt(c.payment) > 0 && <span className="ml-auto text-xs font-semibold tabular-nums">{money(amt(c.payment))}</span>}
+                          {/* One consistent quick-look row on EVERY tile: an id (order # or the
+                              partner Ref ID), how many files are attached, and the payout —
+                              so a glance tells the same story on any card, any lane. */}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                            {c.order_id ? (
+                              <span className="rounded bg-muted px-1.5 py-0.5 font-mono">{String(c.order_id).slice(0, 12)}</span>
+                            ) : c.vendor_ref ? (
+                              <span className="rounded bg-muted px-1.5 py-0.5 font-mono" title="Partner Ref ID">{String(c.vendor_ref)}</span>
+                            ) : null}
+                            {(c.file_count ?? 0) > 0 && (
+                              <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5" title={`${c.file_count} design file${c.file_count === 1 ? "" : "s"}`}>
+                                <Paperclip size={9} weight="bold" />{c.file_count}
+                              </span>
+                            )}
+                            {amt(c.payment) > 0 && <span className="ml-auto text-xs font-semibold tabular-nums text-foreground">{money(amt(c.payment))}</span>}
                           </div>
                         </div>
                       </button>
