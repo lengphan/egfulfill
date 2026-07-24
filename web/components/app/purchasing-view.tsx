@@ -48,7 +48,7 @@ export function PurchasingView() {
         </div>
       </div>
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }, { id: "purchase", label: "Cart & orders" }] as const).map((t) => (
+        {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }, { id: "purchase", label: "Orders" }] as const).map((t) => (
           <button
             key={t.id}
             onClick={() => pick(t.id)}
