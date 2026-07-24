@@ -698,7 +698,22 @@ export function spydeckRoutes(app, requireAuth) {
     const r = await etsyPublicGet(`/shops/${id}/listings/active?includes=Images&limit=${limit}&offset=${offset}`);
     if (!r.ok) { reply.code(r.status === 404 ? 404 : 502); return { listings: [], count: 0, error: (r.data && (r.data.error || r.data.message)) || `Etsy error (${r.status})` }; }
     const raw = (r.data && Array.isArray(r.data.results)) ? r.data.results : [];
-    return { listings: raw.map((l) => gridRow(mapListing(l))), count: r.data.count || raw.length };
+    // Inline images on listings/active are unreliable — this endpoint returned blank tiles.
+    // Both the search grid and the own-shop path work around it with ONE batch call, so do
+    // the same here: fetch the images for these listing ids and hand them to mapListing.
+    // One extra GET (app key, read-only, ≤100 ids) — same safe pattern as everywhere else.
+    const imgsById = {};
+    const ids = raw.map((l) => l.listing_id).filter(Boolean);
+    if (ids.length) {
+      const b = await etsyPublicGet(`/listings/batch?listing_ids=${ids.slice(0, 100).join(',')}&includes=Images`);
+      if (b.ok && b.data && Array.isArray(b.data.results)) {
+        for (const l of b.data.results) {
+          const arr = (l.images || []).map((im) => im && (im.url_570xN || im.url_fullxfull || im.url_300x300)).filter(Boolean);
+          if (arr.length) imgsById[l.listing_id] = arr;
+        }
+      }
+    }
+    return { listings: raw.map((l) => gridRow(mapListing(l, imgsById))), count: r.data.count || raw.length };
   });
 
   // ── Pre-warm ─────────────────────────────────────────────────────────────────
