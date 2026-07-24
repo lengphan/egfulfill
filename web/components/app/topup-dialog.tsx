@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import QRCode from "qrcode"
-import { CheckCircle, Warning, CircleNotch, Copy, Check, UploadSimple, X } from "@phosphor-icons/react"
+import { CheckCircle, Warning, CircleNotch, Copy, Check, UploadSimple, X, Sparkle, CaretDown } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StripeCardForm } from "@/components/app/stripe-card-form"
-import { createVietqrPayment, vietqrStatus, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment } from "@/lib/api"
+import { createVietqrPayment, vietqrStatus, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment, type VqrTier } from "@/lib/api"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -29,17 +29,19 @@ function Success({ title, sub, onDone }: { title: string; sub: string; onDone: (
 // ───────────────────────────── VietQR ─────────────────────────────
 // The wallet is in USD, so the seller picks a USD amount; the admin-set rate converts it to
 // the VND the QR actually charges, and that exact USD is what credits on payment.
-const VQR_USD_PRESETS = [20, 50, 100, 200]
+const VQR_USD_PRESETS = [50, 100, 200, 500]
 function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () => void }) {
   const [amount, setAmount] = useState("50")   // USD
-  const [rate, setRate] = useState(0)          // VND per $1, admin-set
+  const [rate, setRate] = useState(0)          // base VND per $1, admin-set
+  const [tiers, setTiers] = useState<VqrTier[]>([])   // volume discounts (ascending by usd)
+  const [showBulk, setShowBulk] = useState(false)
   const [phase, setPhase] = useState<"amount" | "qr" | "paid" | "error">("amount")
   const [payment, setPayment] = useState<VietqrPayment | null>(null)
   const [qrImg, setQrImg] = useState("")
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => { getVietqrRate().then((r) => setRate(Number(r.rate) || 0)).catch(() => {}) }, [])
+  useEffect(() => { getVietqrRate().then((r) => { setRate(Number(r.rate) || 0); setTiers(r.tiers || []) }).catch(() => {}) }, [])
 
   const stopPoll = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -47,7 +49,12 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
   useEffect(() => stopPoll, [stopPoll])
 
   const usdAmt = Number(amount) || 0
-  const vndAmt = rate > 0 ? Math.round(usdAmt * rate) : 0
+  // The best (lowest VND/$1) tier this amount qualifies for — tiers are ascending, so the
+  // last one at or below the amount wins. Below the first tier, the base rate applies.
+  let applicableRate = rate
+  for (const t of tiers) if (usdAmt >= t.usd && t.rate > 0) applicableRate = t.rate
+  const vndAmt = applicableRate > 0 ? Math.round(usdAmt * applicableRate) : 0
+  const discounted = applicableRate > 0 && applicableRate < rate
 
   const start = async () => {
     if (usdAmt <= 0) { setError("Enter a USD amount."); return }
@@ -141,15 +148,54 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
           <button key={v} onClick={() => setAmount(String(v))} className={"rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " + (Number(amount) === v ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}>{usd(v)}</button>
         ))}
       </div>
+
+      {/* Bulk top-ups — a better VND/$1 the more you add. Tucked behind a toggle so the
+          common case stays simple; opens to a grid of amounts with their discounted rate
+          and how much VND each one saves vs the base rate. Admin-configured. */}
+      {tiers.length > 0 && (
+        showBulk ? (
+          <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary"><Sparkle size={13} weight="fill" /> Top up more, pay a better rate</span>
+              <button onClick={() => setShowBulk(false)} className="text-[11px] text-muted-foreground hover:text-foreground">Hide</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {tiers.map((t) => {
+                const active = usdAmt === t.usd
+                const saveVnd = Math.max(0, Math.round(t.usd * (rate - t.rate)))
+                return (
+                  <button
+                    key={t.usd}
+                    onClick={() => setAmount(String(t.usd))}
+                    className={"flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors " + (active ? "border-primary bg-primary text-primary-foreground" : "border-primary/30 bg-card hover:bg-primary/10")}
+                  >
+                    <span className="text-sm font-bold tabular-nums">{usd(t.usd)}</span>
+                    <span className={"text-[11px] tabular-nums " + (active ? "text-primary-foreground/85" : "text-muted-foreground")}>$1 = {vnd(t.rate)}</span>
+                    {saveVnd > 0 && <span className={"mt-0.5 text-[10px] font-medium " + (active ? "text-primary-foreground/90" : "text-emerald-600")}>save {vnd(saveVnd)}</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setShowBulk(true)} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5">
+            <Sparkle size={14} weight="fill" /> Top up more for a better rate <CaretDown size={13} weight="bold" />
+          </button>
+        )
+      )}
+
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Amount (USD)</span>
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="50" />
       </label>
       {/* Left: the rate ($1 = …). Right: the VND the QR will actually charge. */}
-      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+      <div className={"flex items-center justify-between rounded-lg border px-3 py-2 text-sm " + (discounted ? "border-primary/40 bg-primary/5" : "border-border bg-muted/40")}>
         {rate > 0 ? (
           <>
-            <span className="text-muted-foreground">$1 = <span className="font-medium tabular-nums text-foreground">{vnd(rate)}</span></span>
+            <span className="text-muted-foreground">
+              $1 = <span className="font-medium tabular-nums text-foreground">{vnd(applicableRate)}</span>
+              {discounted && <span className="ml-1 rounded bg-primary/15 px-1 py-0.5 text-[10px] font-semibold text-primary">bulk rate</span>}
+            </span>
             <span className="tabular-nums"><span className="text-muted-foreground">You&apos;ll pay </span><span className="font-semibold">{usdAmt > 0 ? vnd(vndAmt) : "—"}</span></span>
           </>
         ) : (

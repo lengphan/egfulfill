@@ -853,7 +853,12 @@ function PlatformPanel() {
   const [payoutMax, setPayoutMax] = useState("")
   // USD→VND rate for VietQR top-ups (separate endpoint; admin-only to change).
   const [vqrRate, setVqrRate] = useState("")
+  // Volume tiers: top up ≥ $usd, get the better $1 = rate₫. Held as strings for editing.
+  const [vqrTiers, setVqrTiers] = useState<{ usd: string; rate: string }[]>([])
   const isAdminUser = (getUser()?.role || "") === "admin"
+  const setTier = (i: number, k: "usd" | "rate", v: string) => setVqrTiers((ts) => ts.map((t, j) => (j === i ? { ...t, [k]: v.replace(/[^0-9]/g, "") } : t)))
+  const addTier = () => setVqrTiers((ts) => [...ts, { usd: "", rate: "" }])
+  const removeTier = (i: number) => setVqrTiers((ts) => ts.filter((_, j) => j !== i))
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -893,7 +898,10 @@ function PlatformPanel() {
       setPayoutMin(r.payout_min != null ? String(r.payout_min) : "")
       setPayoutMax(r.payout_max != null ? String(r.payout_max) : "")
       setShipFrom(r.ship_from ?? {})
-      getVietqrRate().then((v) => setVqrRate(v.rate ? String(v.rate) : "")).catch(() => {})
+      getVietqrRate().then((v) => {
+        setVqrRate(v.rate ? String(v.rate) : "")
+        setVqrTiers((v.tiers || []).map((t) => ({ usd: String(t.usd), rate: String(t.rate) })))
+      }).catch(() => {})
       setTypes(r.product_types ?? [])
       setThreads(r.thread_palette ?? [])
       setBands(Object.fromEntries(
@@ -928,9 +936,12 @@ function PlatformPanel() {
         thread_palette: threads,
       })
       if (r.error) throw new Error(r.error)
-      // The VietQR rate lives on its own admin-only endpoint, so it's saved separately.
+      // The VietQR rate + volume tiers live on their own admin-only endpoint.
       if (isAdminUser && vqrRate !== "" && Number(vqrRate) > 0) {
-        const rr = await setVietqrRate(Number(vqrRate))
+        const cleanTiers = vqrTiers
+          .map((t) => ({ usd: Number(t.usd) || 0, rate: Number(t.rate) || 0 }))
+          .filter((t) => t.usd > 0 && t.rate > 0)
+        const rr = await setVietqrRate(Number(vqrRate), cleanTiers)
         if (rr.error) throw new Error(rr.error)
       }
       // Push the new stock into the matcher so open boards stop matching against the
@@ -1012,10 +1023,29 @@ function PlatformPanel() {
             hint="USD→VND. A seller picks a dollar amount to add; this converts it to the VND their QR charges, and that exact USD credits on payment."
           >
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-medium">VND per $1</span>
+              <span className="text-[13px] font-medium">Base rate — VND per $1</span>
               <Input value={vqrRate} onChange={(e) => setVqrRate(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="25400" className="h-9" />
               <span className="text-[11px] text-muted-foreground">e.g. 25400 means $50 → 1,270,000₫</span>
             </label>
+            {/* Volume discounts — each row: at/above $usd, the seller pays this better $1 = rate₫. */}
+            <div className="sm:col-span-2 space-y-2">
+              <span className="text-[13px] font-medium">Volume discounts</span>
+              <p className="text-[11px] text-muted-foreground">A better rate the more a seller adds. Lower ₫/$1 = a bigger discount. Shown in Add Funds under &ldquo;Top up more for a better rate&rdquo;.</p>
+              {vqrTiers.length === 0 && <p className="text-[11px] italic text-muted-foreground">No tiers yet — everyone gets the base rate.</p>}
+              {vqrTiers.map((t, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className="relative w-24">
+                    <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+                    <Input value={t.usd} onChange={(e) => setTier(i, "usd", e.target.value)} inputMode="numeric" placeholder="2000" className="h-9 pl-5" />
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground">→ $1 =</span>
+                  <Input value={t.rate} onChange={(e) => setTier(i, "rate", e.target.value)} inputMode="numeric" placeholder="26000" className="h-9 flex-1" />
+                  <span className="shrink-0 text-xs text-muted-foreground">₫</span>
+                  <button type="button" onClick={() => removeTier(i)} className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-red-600" aria-label="Remove tier"><X size={15} weight="bold" /></button>
+                </div>
+              ))}
+              <button type="button" onClick={addTier} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Plus size={13} weight="bold" /> Add tier</button>
+            </div>
           </FeeGroup>
         )}
         <FeeGroup

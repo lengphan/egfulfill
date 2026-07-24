@@ -107,12 +107,14 @@ export function createVietqrPayment(amount: number, amountUsd?: number) {
     body: JSON.stringify({ amount, amountUsd }),
   })
 }
-// The shared USD→VND exchange rate. GET is any signed-in user; PUT is admin-only.
+// The shared USD→VND exchange rate + volume tiers (a better VND/$1 the more you add).
+// GET is any signed-in user; PUT is admin-only.
+export type VqrTier = { usd: number; rate: number }
 export function getVietqrRate() {
-  return api<{ rate: number }>(`/api/vietqr/rate`)
+  return api<{ rate: number; tiers: VqrTier[] }>(`/api/vietqr/rate`)
 }
-export function setVietqrRate(rate: number) {
-  return api<{ ok?: boolean; rate?: number; error?: string }>(`/api/vietqr/rate`, { method: "PUT", body: JSON.stringify({ rate }) })
+export function setVietqrRate(rate: number, tiers?: VqrTier[]) {
+  return api<{ ok?: boolean; rate?: number; tiers?: VqrTier[]; error?: string }>(`/api/vietqr/rate`, { method: "PUT", body: JSON.stringify({ rate, tiers }) })
 }
 export function vietqrStatus(ref: string) {
   return api<{ paid: boolean; transaction?: unknown }>(`/api/vietqr/status?ref=${encodeURIComponent(ref)}`)
