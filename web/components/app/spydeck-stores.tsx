@@ -181,19 +181,18 @@ export function StoresTab(h: Handlers) {
         ) : !(catalog && catalog.length) ? (
           <div className="py-16 text-center text-sm text-muted-foreground">No active listings returned for this shop.</div>
         ) : catView === "gallery" ? (
-          // Image-first: big photos, price overlay, title beneath — click through to Etsy.
+          // Image-only: just the photo with a price overlay (title lives in the alt + the
+          // click-through). A pure wall of images to scan the shop's look fast.
           <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {catalog.map((l) => (
-              <a key={l.listing_id} href={l.url} target="_blank" rel="noopener noreferrer" className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-md">
-                <div className="relative aspect-square overflow-hidden bg-muted">
-                  {(l.thumb || l.image) ? (
-                    <Image src={l.thumb || l.image || ""} alt={l.title} fill unoptimized sizes="(max-width:640px) 50vw, 20vw" className="object-cover transition-transform duration-300 group-hover:scale-105" />
-                  ) : (
-                    <span className="flex size-full items-center justify-center text-muted-foreground"><Package size={20} weight="duotone" /></span>
-                  )}
-                  {priceStr(l) && <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-white">{priceStr(l)}</span>}
-                </div>
-                <div className="line-clamp-1 px-2 py-1.5 text-[11px] leading-tight text-muted-foreground">{l.title}</div>
+              <a key={l.listing_id} href={l.url} target="_blank" rel="noopener noreferrer" title={l.title}
+                className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted transition-shadow hover:shadow-md">
+                {(l.thumb || l.image) ? (
+                  <Image src={l.thumb || l.image || ""} alt={l.title} fill unoptimized sizes="(max-width:640px) 50vw, 20vw" className="object-cover transition-transform duration-300 group-hover:scale-105" />
+                ) : (
+                  <span className="flex size-full items-center justify-center text-muted-foreground"><Package size={20} weight="duotone" /></span>
+                )}
+                {priceStr(l) && <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-white">{priceStr(l)}</span>}
               </a>
             ))}
           </div>
