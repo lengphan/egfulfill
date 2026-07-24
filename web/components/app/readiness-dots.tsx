@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { CircleNotch, DownloadSimple } from "@phosphor-icons/react"
 import { getOrderHistory, downloadDesignFile, type AuditRow, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
@@ -29,29 +29,11 @@ import { useLabelT } from "@/lib/i18n"
 
 type State = "todo" | "doing" | "done"
 
-/**
- * Only ONE tag popover may be open at a time, anywhere on the page.
- *
- * Each tag owned its `open` state and nothing coordinated them, so moving from a tag on one
- * card to a tag on another left both panels up: the first one's close is on a 220ms grace
- * timer (deliberately — see below), and the second opens inside that window. Two panels
- * overlapping, and it got worse the faster you moved, because a pointer that leaves a chip
- * diagonally can skip the mouseleave entirely and strand the panel open indefinitely.
- *
- * Every mounted tag registers a closer here; opening one runs all the others. That also
- * cancels their PENDING opens, so a sweep across a row can't queue a panel that appears
- * after you've already settled somewhere else.
- */
-const closers = new Set<() => void>()
-function closeOtherTags(mine: () => void) {
-  for (const c of closers) if (c !== mine) c()
-}
-
 /** A file reachable from a tag. `href` opens directly; `designId` goes through the API so
  *  the paywall and the seller/staff checks still apply. */
 export type TagFile = { key: string; name: string; note?: string; href?: string; designId?: string }
 
-function Tag({ id, label, state, title, orderId, status, files, dot }: {
+function Tag({ id, label, state, title, orderId, status, files }: {
   id: TagId; label: string; state: State; title?: string; orderId: string
   /** Compact form for a table row: a small coloured DOT followed by the word, instead of
    *  the full tinted pill. The dot carries progress (grey/amber/violet) and the word stays
@@ -78,71 +60,35 @@ function Tag({ id, label, state, title, orderId, status, files, dot }: {
         : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
   const tl = useLabelT()
   const [rows, setRows] = useState<AuditRow[] | null>(null)
-  const [open, setOpen] = useState(false)
-  // Hover in, hover out — with two different delays, for two different mistakes.
-  //
-  // OPENING waits ~140ms so sweeping the mouse across a row of tags doesn't flash three
-  // panels open (and fire three history requests) on the way past.
-  //
-  // CLOSING waits ~220ms so the gap between the chip and the panel doesn't count as
-  // leaving. Without that grace, moving down to click a file closes the thing you were
-  // reaching for, which is the single most annoying way a hover menu can fail.
-  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const clearHover = () => { if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null } }
-  // This tag's entry in the page-wide registry. Closing means dropping the panel AND
-  // dropping any pending open — a queued timer that fires later would reopen a tag the
-  // user has already moved on from.
-  const closeSelf = useRef<() => void>(() => {})
-  useEffect(() => {
-    const fn = () => {
-      if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null }
-      setOpen(false)
-    }
-    closeSelf.current = fn
-    closers.add(fn)
-    return () => { closers.delete(fn) }
-  }, [])
 
-  const openNow = () => { closeOtherTags(closeSelf.current); setOpen(true); load(true) }
-  const openLater = () => { clearHover(); hoverTimer.current = setTimeout(openNow, 140) }
-  const closeLater = () => { clearHover(); hoverTimer.current = setTimeout(() => setOpen(false), 220) }
-  // Never leave a timer behind on a board that re-renders constantly.
-  useEffect(() => clearHover, [])
-
-  // History loads on OPEN, not on render — a board of 50 rows would otherwise fire 150
-  // requests for popovers nobody opened.
-  const load = (open: boolean) => {
-    if (!open || rows) return
+  // History loads the FIRST time the panel opens — not on render, or a board of 50 rows
+  // fires 150 requests for popovers nobody looked at.
+  const loadHistory = () => {
+    if (rows) return
     getOrderHistory(orderId).then((r) => setRows(r ?? [])).catch(() => setRows([]))
   }
 
   return (
-    // Click and keyboard go through onOpenChange, hover doesn't — both routes have to
-    // clear the others, or tapping a tag on a phone still stacks panels.
-    <Popover open={open} onOpenChange={(v: boolean) => { if (v) openNow(); else setOpen(false) }}>
+    // Hover open/close is owned by the PRIMITIVE (Base UI's openOnHover), not by hand-rolled
+    // timers. It tracks the real pointer across the trigger→panel gap and closes when the
+    // pointer is over NEITHER element — so a fast or diagonal exit can't strand the panel
+    // open, which is the failure the old two-timer + mouseleave scheme hit at random (a
+    // skipped mouseleave left nothing to fire the close, and the "close others" registry
+    // only helped when you moved onto ANOTHER tag, never into empty space). Click, tap and
+    // keyboard still toggle it because the trigger is a button, so touch and keyboard users
+    // are unaffected. One open at a time falls out for free: hovering shows one, and an
+    // outside press / Escape dismisses per the primitive's own logic.
+    <Popover onOpenChange={(v: boolean) => { if (v) loadHistory() }}>
       <PopoverTrigger
         title={title}
-        // Click still works, and has to: touch devices have no hover at all, so a
-        // hover-only panel would be unreachable on the phone the floor actually uses.
-        onMouseEnter={openLater}
-        onMouseLeave={closeLater}
-        onFocus={openNow}
-        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap font-semibold transition-colors " + (dot
-          // A SOLID coloured pill, tinted by state (grey = to-do · amber = in progress ·
-          // violet = done) with the word inside — the biggest, clearest hit target and the
-          // easiest to read down a column. Bare dots and a faint bordered chip both tested
-          // too small/hard to click; the table pill is just a touch tighter than the full one.
-          ? "rounded-md px-2.5 py-1 text-xs "
-          : "rounded-md px-2.5 py-1 text-xs ") + cls}
+        openOnHover
+        delay={120}
+        closeDelay={200}
+        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + cls}
       >
         {tl("ui", label)}
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-0"
-        // Entering the panel cancels the pending close, so it stays put while you read
-        // it; leaving the panel starts the close again.
-        onMouseEnter={clearHover}
-        onMouseLeave={closeLater}
-      >
+      <PopoverContent align="start" className="w-80 p-0">
         <div className="border-b border-border px-3 py-2">
           <div className="text-xs font-semibold">{tl("ui", label)}</div>
           {/* Where "Design sent" / "Pre-scanned" went. Saying it here keeps the chip's
