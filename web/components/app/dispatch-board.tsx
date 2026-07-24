@@ -57,6 +57,10 @@ const DISP_BADGE: Record<DispKey, string> = {
   removed: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
   cancelled: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
 }
+// The per-label timeline shows DISPATCH actions only — scans, hand-offs to byeastside,
+// pull-backs, label prints/voids, manifests. Order-level noise (order saved/updated, design
+// files, charges) belongs on the order page, not the scan floor.
+const DISPATCH_ACTIONS = /^order\.scan|^dispatch\.|^label\.|^order\.manifested|^order\.(shipped|tracking)/
 const HIST_FILTERS: { key: "all" | DispKey; label: string }[] = [
   { key: "all", label: "All" }, { key: "scanned", label: "Scanned" }, { key: "awaiting", label: "Awaiting" },
   { key: "production", label: "In production" }, { key: "shipped", label: "Shipped" },
@@ -583,29 +587,35 @@ export function DispatchBoard() {
                         </a>
                       )}
                     </div>
-                    {/* Timestamped action timeline from the audit log — every scan/action. */}
-                    {open && (
-                      <div className="border-t border-border bg-muted/20 py-1 pl-11 pr-5">
-                        {events === null || events === undefined ? (
-                          <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Loading history…</div>
-                        ) : events.length === 0 ? (
-                          <div className="py-2 text-xs text-muted-foreground">No recorded actions for this label yet.</div>
-                        ) : (
-                          <ol className="space-y-1.5 py-1.5">
-                            {/* Oldest → newest so it reads as the label's story (the API returns newest-first). */}
-                            {[...events].sort((a, b) => String(a.ts).localeCompare(String(b.ts))).map((ev) => (
-                              <li key={String(ev.id)} className="flex items-start gap-2 text-xs">
-                                <ClockCounterClockwise size={12} className="mt-0.5 shrink-0 text-muted-foreground" />
-                                <div className="min-w-0">
-                                  <span className="font-medium">{sayAction(ev.action)}</span>
-                                  <span className="text-muted-foreground"> · {ev.actor_name || ev.actor_role || "system"} · {new Date(ev.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{ev.note ? ` · ${ev.note}` : ""}</span>
-                                </div>
-                              </li>
-                            ))}
-                          </ol>
-                        )}
-                      </div>
-                    )}
+                    {/* Timestamped DISPATCH timeline — scans, hand-offs, pull-backs, labels.
+                        Not the full order history (order edits, design files) — that's the
+                        order page. Oldest → newest so it reads as the label's story. */}
+                    {open && (() => {
+                      const evs = Array.isArray(events)
+                        ? events.filter((ev) => DISPATCH_ACTIONS.test(ev.action)).sort((a, b) => String(a.ts).localeCompare(String(b.ts)))
+                        : null
+                      return (
+                        <div className="border-t border-border bg-muted/20 py-2 pl-11 pr-5">
+                          {events === null || events === undefined ? (
+                            <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground"><CircleNotch size={14} className="animate-spin" /> Loading dispatch history…</div>
+                          ) : !evs || evs.length === 0 ? (
+                            <div className="py-2 text-sm text-muted-foreground">No dispatch actions recorded for this label yet.</div>
+                          ) : (
+                            <ol className="space-y-3 py-1.5">
+                              {evs.map((ev) => (
+                                <li key={String(ev.id)} className="flex items-start gap-2.5">
+                                  <ClockCounterClockwise size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-medium">{sayAction(ev.action)}</div>
+                                    <div className="text-[13px] text-muted-foreground">{ev.actor_name || ev.actor_role || "system"} · {new Date(ev.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{ev.note ? ` · ${ev.note}` : ""}</div>
+                                  </div>
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}
