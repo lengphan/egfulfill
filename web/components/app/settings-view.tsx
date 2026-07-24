@@ -844,6 +844,8 @@ function PlatformPanel() {
   const [expediteFee, setExpediteFee] = useState("")
   const [expediteCost, setExpediteCost] = useState("")
   const [designPartnerCost, setDesignPartnerCost] = useState("")
+  const [orderLimitDefault, setOrderLimitDefault] = useState("")
+  const [capacityNotice, setCapacityNotice] = useState("")
   const [shipFirst, setShipFirst] = useState("")
   const [shipExtra, setShipExtra] = useState("")
   const [embPrice, setEmbPrice] = useState("")
@@ -892,6 +894,8 @@ function PlatformPanel() {
       setExpediteFee(r.expedite_fee != null ? String(r.expedite_fee) : "")
       setExpediteCost(r.expedite_cost != null ? String(r.expedite_cost) : "")
       setDesignPartnerCost(r.design_partner_cost != null ? String(r.design_partner_cost) : "")
+      setOrderLimitDefault(r.order_limit_default != null ? String(r.order_limit_default) : "")
+      setCapacityNotice(r.capacity_notice != null ? String(r.capacity_notice) : "")
       setShipFirst(r.ship_first != null ? String(r.ship_first) : "")
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
@@ -925,6 +929,8 @@ function PlatformPanel() {
         expedite_fee: expediteFee === "" ? undefined : Number(expediteFee),
         expedite_cost: expediteCost === "" ? undefined : Number(expediteCost),
         design_partner_cost: designPartnerCost === "" ? undefined : Number(designPartnerCost),
+        order_limit_default: orderLimitDefault === "" ? undefined : Number(orderLimitDefault),
+        capacity_notice: capacityNotice,
         ship_first: shipFirst === "" ? undefined : Number(shipFirst),
         ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
         emb_price: embPrice === "" ? undefined : Number(embPrice),
@@ -1086,6 +1092,36 @@ function PlatformPanel() {
             value={designPartnerCost} onChange={setDesignPartnerCost}
           />
         </div>
+      </Fold>
+
+      <Fold title="Peak-season capacity" hint="per-seller order limits + the delay notice">
+        <p className="mb-3 text-xs text-muted-foreground">
+          When a seller crosses their daily order limit they see the notice below at submit — a
+          heads-up, never a block. Set a limit on an individual seller from the Accounts list;
+          this is the <strong>default</strong> for any seller without their own.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Default daily order limit</span>
+            <Input
+              value={orderLimitDefault}
+              onChange={(e) => setOrderLimitDefault(e.target.value.replace(/[^0-9]/g, ""))}
+              inputMode="numeric" placeholder="0" className="h-9"
+            />
+            <span className="block text-[11px] text-muted-foreground">0 = no default cap. A seller&apos;s own limit always wins.</span>
+          </label>
+        </div>
+        <label className="mt-3 block space-y-1">
+          <span className="text-sm font-medium">Delay notice (shown only once a seller is over the limit)</span>
+          <textarea
+            value={capacityNotice}
+            onChange={(e) => setCapacityNotice(e.target.value)}
+            rows={2}
+            placeholder="Due to high order volume, orders submitted now may ship later than usual."
+            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+          />
+          <span className="block text-[11px] text-muted-foreground">Leave blank to use the default wording.</span>
+        </label>
       </Fold>
 
       <Fold title="Embroidery threads" hint="the cones you actually stock">
