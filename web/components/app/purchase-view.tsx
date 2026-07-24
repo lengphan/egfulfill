@@ -790,10 +790,15 @@ export function PurchaseView() {
         const failMsg = (resp as { error?: string }).error || "failed"
         // A card decline on an S&S order is S&S's OWN saved payment profile (Order settings ›
         // Payment) — never the card typed for Otto, which S&S never receives. Spell that out,
-        // because otherwise it reads as "the card I just entered doesn't work".
-        const clarified = g.api === "ss" && /decline|card|payment/i.test(failMsg)
-          ? `${failMsg} — this is S&S's saved payment (Order settings › Payment), not the Otto card`
-          : failMsg
+        // because otherwise it reads as "the card I just entered doesn't work". A bank/
+        // processor decline also needs a next step, not just a "which card" — the fix is with
+        // the card itself, not our code.
+        const isBankDecline = g.api === "ss" && /processor_declined|issuing bank|declined/i.test(failMsg)
+        const clarified = isBankDecline
+          ? `${failMsg} — S&S's own saved card (Order settings › Payment), not the Otto card. The bank declined it: check it isn't expired or over its limit, update it with S&S, or pick another saved card.`
+          : g.api === "ss" && /card|payment/i.test(failMsg)
+            ? `${failMsg} — this is S&S's saved payment (Order settings › Payment), not the Otto card`
+            : failMsg
         results.push(ok
           ? `${g.supplier ?? "Unassigned"}: ${g.api ? "sent (test/dry-run)" : "recorded — order it by hand"}`
           : `${g.supplier ?? "Unassigned"}: failed — ${clarified}`)
