@@ -50,7 +50,7 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
   return (
     <div className="px-5 py-4">
       {/* columns — value label on top, bar grounded on a shared baseline */}
-      <div className="flex items-end gap-2 border-b border-border" style={{ height: CHART_H }}>
+      <div className="flex items-end gap-1.5 border-b border-border" style={{ height: CHART_H }}>
         {counts.map((s) => {
           const hot = s.id === peak.id && peak.n > 0
           const h = s.n ? Math.max(6, Math.round((s.n / max) * BAR_MAX)) : 2
@@ -58,7 +58,7 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
             <div key={s.id || "received"} className="flex flex-1 flex-col items-center justify-end gap-1.5">
               <div className={"text-sm font-bold leading-none tabular-nums " + (hot ? "text-primary" : s.n ? "text-foreground" : "text-muted-foreground")}>{s.n}</div>
               <div
-                className={"w-full max-w-[52px] rounded-t-[5px] transition-[height] duration-500 " + (s.n ? BAR[s.tone] : "bg-muted")}
+                className={"w-full max-w-[88px] rounded-t-[5px] transition-[height] duration-500 " + (s.n ? BAR[s.tone] : "bg-muted")}
                 style={{ height: h }}
                 title={`${s.label}: ${s.n}`}
               />
@@ -67,7 +67,7 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
         })}
       </div>
       {/* stage labels, aligned under each column */}
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex gap-1.5">
         {counts.map((s) => {
           const hot = s.id === peak.id && peak.n > 0
           return (

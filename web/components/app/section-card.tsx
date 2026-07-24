@@ -7,16 +7,18 @@ export function SectionCard({
   description,
   actions,
   bodyClassName,
+  className,
   children,
 }: {
   title?: React.ReactNode
   description?: string
   actions?: React.ReactNode
   bodyClassName?: string
+  className?: string
   children: React.ReactNode
 }) {
   return (
-    <Card className="gap-0 overflow-hidden p-0">
+    <Card className={"gap-0 overflow-hidden p-0" + (className ? " " + className : "")}>
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
