@@ -381,6 +381,40 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
   });
 
   /**
+   * Leave a NOTE on the partner's task without moving it — the in-system channel for
+   * "please cancel this" and anything else that isn't a revision.
+   *
+   * Pink has no cancel API, so a mistaken push can't be retracted programmatically; the
+   * nearest honest thing is telling their team, in the task itself, to stop. This posts to
+   * the same /comment endpoint the revision loop uses but flips no status. It is NOT a
+   * cancellation — their designer still has to action it — so it returns plainly that the
+   * note was delivered, not that anything was cancelled. Comments are outbound only: their
+   * replies live on their board, since their webhook carries status + files, never messages.
+   */
+  app.post('/api/pinkdesign/comment', { preHandler: requireStaff }, async (req, reply) => {
+    if (!pinkEnabled()) { reply.code(400); return { error: 'Pink Design isn\'t connected — add PINKDESIGN_API_KEY first.' }; }
+    const b = req.body || {};
+    const message = String(b.message || '').trim();
+    if (!message) { reply.code(400); return { error: 'Nothing to send — write a message.' }; }
+    const card = (await q('select id, order_id, sku, vendor_ref from design_cards where id=$1 limit 1', [b.cardId])
+      .catch(() => ({ rows: [] }))).rows[0];
+    if (!card) { reply.code(404); return { error: 'Card not found.' }; }
+    if (!card.vendor_ref) { reply.code(400); return { error: 'This card was never sent to a design partner, so there\'s nothing to comment on.' }; }
+    const images = (Array.isArray(b.images) ? b.images : []).map(String).filter((u) => /^https?:\/\//i.test(u));
+    const said = await pink(`/${encodeURIComponent(card.vendor_ref)}/comment`, {
+      method: 'POST', body: JSON.stringify({ message, images }),
+    });
+    if (!said.ok) {
+      reply.code(502);
+      return { error: `Their board wouldn't take the note (${said.status}). Nothing was sent — try again, or message them directly.`,
+               raw: typeof said.data === 'string' ? said.data.slice(0, 300) : said.data };
+    }
+    audit(req, 'design.partner_note', { entityType: 'order', entityId: card.order_id,
+      after: { sku: card.sku, ref: card.vendor_ref, message: message.slice(0, 500), images: images.length } });
+    return { ok: true, delivered: true };
+  });
+
+  /**
    * Their webhook. Fires on Inreview / Done / Check and carries the finished design files
    * as URLs. Public by necessity (they can't hold our JWT); the ref_id is the shared
    * secret-ish handle, and we only ever ACT on a ref we already created — an unknown ref

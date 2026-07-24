@@ -6,7 +6,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, type DesignCard } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, pinkComment, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { AssignCardDialog } from "@/components/app/assign-card-dialog"
@@ -525,6 +525,27 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
     } finally { setBusy(false) }
   }
 
+  // Pink has no cancel API, so the nearest thing to retracting a mistaken push is telling
+  // their team, IN the task, to stop. This posts a note to their board — it does NOT cancel
+  // anything on its own, and their reply won't come back to us, so it's worded as "asked",
+  // not "cancelled".
+  const [notified, setNotified] = useState(false)
+  const notifyCancel = async () => {
+    const why = typeof window !== "undefined"
+      ? window.prompt(`Ask ${vendorLabel(card.vendor)} to cancel this task. Add a reason if you like — it's posted as a note on their board.`, "Please cancel this task — sent by mistake.")
+      : ""
+    const message = (why || "").trim()
+    if (!message) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await pinkComment({ cardId: card.id, message })
+      if (r?.error) throw new Error(r.error)
+      setNotified(true)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : `Couldn't send that note to ${vendorLabel(card.vendor)}.`)
+    } finally { setBusy(false) }
+  }
+
   // Removing a card only deletes OUR row. For a vendor card that means the partner's task
   // lives on — they don't offer a cancel API, so it may still be designed AND invoiced, and
   // we've dropped the vendor_ref their finished-work webhook needs (so the file would land
@@ -649,6 +670,14 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               {col === "approved" && (
                 <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle size={15} weight="fill" /> Approved · {vendorLabel(card.vendor)} (invoiced)</span>
               )}
+              {/* No cancel API on their side, so this posts a "please cancel" note to their
+                  board — an ask, not a cancellation. Hidden once it's approved (too late) or
+                  once already asked. */}
+              {col !== "approved" && (notified ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"><CheckCircle size={13} weight="fill" /> Cancel requested with {vendorLabel(card.vendor)}</span>
+              ) : (
+                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" disabled={busy} onClick={notifyCancel}><X size={13} weight="bold" /> Ask {vendorLabel(card.vendor)} to cancel</Button>
+              ))}
             </>
           ) : (
             <>

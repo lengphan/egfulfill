@@ -2075,6 +2075,13 @@ export function pinkRequestFix(body: { cardId: string | number; message: string;
   return api<{ ok?: boolean; cardId?: number; col?: string; error?: string; commented?: boolean }>(
     `/api/pinkdesign/fix`, { method: "POST", body: JSON.stringify(body) })
 }
+/** Leave a note on the partner's task WITHOUT moving it — e.g. "please cancel this".
+ *  Outbound only: it doesn't cancel anything on its own, and their replies don't come back
+ *  through here (their webhook carries status + files, not messages). */
+export function pinkComment(body: { cardId: string | number; message: string; images?: string[] }) {
+  return api<{ ok?: boolean; delivered?: boolean; error?: string }>(
+    `/api/pinkdesign/comment`, { method: "POST", body: JSON.stringify(body) })
+}
 
 /** Design-partner state for one order's lines, keyed by SKU. Read separately from the
  *  order itself so a failure here costs a badge, not the order page. */
