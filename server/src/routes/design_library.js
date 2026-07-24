@@ -79,11 +79,21 @@ export function designLibraryRoutes(app, requireAuth, requireStaff) {
     const b = req.body || {};
     if (!b.data) { reply.code(400); return { error: 'data required' }; }
     const hash = hashOf(b.data);
-    // De-dupe on the ARTWORK, not the name. Re-adding the exact same image replaces the old
-    // row (no pile-up); but two DIFFERENT images must not collide just because both default
-    // to "Untitled design" — that made every unnamed save overwrite the previous one, so the
-    // library only ever showed one design. See the Design Lab library bug.
-    if (hash) await q('delete from design_library where seller_id=$1 and content_hash=$2', [req.user.sub, hash]).catch(() => {});
+    // De-dupe on the ARTWORK, not the name — two different images both defaulting to
+    // "Untitled design" must not collide (that made every unnamed save overwrite the last).
+    // But identity and the dedup key are SEPARATE concerns: re-adding the same image updates
+    // the existing row IN PLACE, keeping its id, because DSN-<id> is the reference sellers put
+    // on an import sheet. delete+insert would mint a new id and orphan those references.
+    if (hash) {
+      const ex = await q('select id from design_library where seller_id=$1 and content_hash=$2 order by id limit 1', [req.user.sub, hash]);
+      if (ex.rows[0]) {
+        const u = await q(
+          'update design_library set name=$1, data=$2, thumb=$3 where id=$4 returning id, name, thumb, created_at',
+          [b.name || 'Untitled', b.data, b.thumb || null, ex.rows[0].id]
+        );
+        return u.rows[0];
+      }
+    }
     const r = await q(
       'insert into design_library (seller_id, name, data, thumb, content_hash) values ($1,$2,$3,$4,$5) returning id, name, thumb, created_at',
       [req.user.sub, b.name || 'Untitled', b.data, b.thumb || null, hash]
