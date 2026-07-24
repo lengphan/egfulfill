@@ -60,6 +60,7 @@ export function DesignerBoard() {
   const [assignCard, setAssignCard] = useState<DesignCard | null>(null)
   const [openId, setOpenId] = useState<string | number | null>(null)
   const [view, setView] = useState<"board" | "list">("board")
+  const [query, setQuery] = useState("")
   const [designFee, setDesignFee] = useState(0) // platform default payout per design
   const [delErr, setDelErr] = useState<string | null>(null)
   const me = getUser()?.name || "Designer"
@@ -116,11 +117,22 @@ export function DesignerBoard() {
     })
   }, [])
 
+  // One search, both views. Matches the things you'd actually look a card up by — its id,
+  // title, product/method, order #, and the partner Ref/Task ids. Stats above stay on the
+  // FULL set so the totals don't change as you type.
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase()
+    if (!term) return cards ?? []
+    return (cards ?? []).filter((c) =>
+      [c.id, c.title, c.product, c.type, c.sku, c.order_id, c.vendor_ref, c.vendor_task_id]
+        .some((f) => String(f ?? "").toLowerCase().includes(term)))
+  }, [cards, query])
+
   const grouped = useMemo(() => {
     const g: Record<string, DesignCard[]> = Object.fromEntries(COLS.map((c) => [c.id, []]))
-    for (const c of cards ?? []) (g[colOf(c)] ??= []).push(c)
+    for (const c of filtered) (g[colOf(c)] ??= []).push(c)
     return g
-  }, [cards])
+  }, [filtered])
 
   const stats = useMemo(() => {
     const list = cards ?? []
@@ -227,7 +239,15 @@ export function DesignerBoard() {
         {/* Add design — the explicit way in, in EITHER view. Drag-drop onto a lane only
             works in Board view, which left List view with no way to bring artwork in.
             Files land in Incoming regardless (see dropFiles), so no lane choice is needed. */}
-        <label className="eg-tap ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+        {/* One search box for BOTH views — id, title, product, order #, partner ids. */}
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search designs…"
+          className="ml-auto h-9 w-36 sm:w-56"
+          aria-label="Search designs"
+        />
+        <label className="eg-tap inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
           <Plus size={14} weight="bold" /> Add design
           <input
             type="file"
@@ -290,7 +310,7 @@ export function DesignerBoard() {
       {cards === null ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
       ) : view === "list" ? (
-        <DesignerList cards={cards} onOpen={setOpenId} />
+        <DesignerList cards={filtered} onOpen={setOpenId} />
       ) : (
         // All lanes share the width (grid, equal fractions) instead of a fixed 288px each — so
         // five/six columns fit the page rather than clipping the last one. minmax(9rem, 1fr)
