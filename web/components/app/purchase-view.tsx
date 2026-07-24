@@ -521,8 +521,8 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
     const isSsPo = /s&s|activewear/i.test(po.supplier || "")
     if (wasPlaced && sent && !window.confirm(
       isSsPo
-        ? `Cancel ${po.num}?\n\nWe'll ask S&S to cancel it first. If they refuse (usually past their 10-minute window), you'll be asked whether you've already cancelled it with them directly.`
-        : `Cancel ${po.num}?\n\nThis marks OUR record cancelled. ${po.supplier || "This supplier"} has no cancel API, so contact them directly if the goods haven't shipped.`
+        ? `Cancel ${po.num} with S&S?`
+        : `Cancel ${po.num}?\n\n${po.supplier || "This supplier"} has no cancel API — you'll need to contact them directly to stop the actual order.`
     )) return
     setBusy(po.num); setMsg(null)
     try {
@@ -532,9 +532,9 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
       // directly must still be clearable here, or it's stuck as "placed" forever — so when
       // the API can't confirm, we fall back to an explicit, warned attestation rather than
       // a dead-end.
-      let supplierMsg = ""
       let supplierCancelled = false   // S&S themselves confirmed (API or status reconcile)
       let manualCancel = false        // operator attested they cancelled it out-of-band
+      let reconciled = false          // S&S already had it cancelled — we just caught our record up
       const orderNo = supplierOrderNo(po)
       const isSs = /s&s|activewear/i.test(po.supplier || "")
       // No order number means we CAN'T ask S&S — so we can't verify, but we also can't
@@ -562,13 +562,9 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
               `If you've ALREADY cancelled it with S&S directly, click OK to mark it cancelled here.\n\n` +
               `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
             )) { setMsg({ ok: false, text: `S&S wouldn't cancel ${numToCancel}: ${c.error}` }); return }
-            supplierMsg = ` You confirmed it was already cancelled with S&S (their API declined ${numToCancel}).`
             manualCancel = true
           } else {
-            const cc = c as { orderStatus?: string; reconciled?: boolean }
-            supplierMsg = cc.reconciled
-              ? ` S&S already had ${numToCancel} cancelled — this caught our record up.`
-              : ` S&S confirmed ${numToCancel} cancelled (${cc.orderStatus ?? "Cancelled"}).`
+            reconciled = (c as { reconciled?: boolean }).reconciled === true
             supplierCancelled = true
           }
         } else {
@@ -576,7 +572,6 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
             `Mark ${po.num} cancelled here without an order number?\n\n` +
             `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
           )) { setMsg({ ok: false, text: `${po.num} left as-is. Cancel it in the S&S portal, then use Cancel again to clear it here.` }); return }
-          supplierMsg = ` You confirmed it was already cancelled with S&S directly.`
           manualCancel = true
         }
       } else if (sent && isSs && orderNo) {
@@ -590,15 +585,11 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
             `If you've ALREADY cancelled it with S&S directly, click OK to mark it cancelled here.\n\n` +
             `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
           )) { setMsg({ ok: false, text: `S&S wouldn't cancel ${orderNo}: ${c.error}` }); return }
-          supplierMsg = ` You confirmed it was already cancelled with S&S (their API declined — past the window).`
           manualCancel = true
         } else {
-          const cc = c as { orderStatus?: string; reconciled?: boolean }
           // Reconciled = the API cancel was too late, but S&S already had it cancelled, so
           // this is catching our stale record up rather than stopping a live order.
-          supplierMsg = cc.reconciled
-            ? ` S&S already had it cancelled — this caught our record up to match.`
-            : ` S&S confirmed it cancelled (${cc.orderStatus ?? "Cancelled"}).`
+          reconciled = (c as { reconciled?: boolean }).reconciled === true
           supplierCancelled = true
         }
       }
@@ -609,11 +600,13 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
       })
       if (r?.error) throw new Error(r.error)
       setMsg({ ok: true, text: !wasPlaced || !sent
-        ? `${po.num} cancelled. It was never sent to ${po.supplier || "the supplier"}, so there is nothing to cancel with them.`
-        : supplierMsg
-          ? `${po.num} cancelled.${supplierMsg}`
-          // Otto document no cancel endpoint, so theirs is still a phone call.
-          : `${po.num} marked cancelled here — ${po.supplier || "the supplier"} has no cancel API, so contact them directly to stop the actual order.` })
+        ? `${po.num} cancelled.`
+        : supplierCancelled
+          ? `${po.num} cancelled successfully.${reconciled ? " (S&S already had it cancelled.)" : ""}`
+          : manualCancel
+            ? `${po.num} cancelled — you confirmed it was already stopped with ${po.supplier || "the supplier"} directly.`
+            // Otto document no cancel endpoint, so theirs is still a phone call.
+            : `${po.num} cancelled here — ${po.supplier || "the supplier"} has no cancel API, so contact them to stop the actual order.` })
       load()
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't cancel that purchase order." })
