@@ -1399,6 +1399,19 @@ function UsersPanel() {
     setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, active } : x)))
     try { await updateUserAdmin(u.id, { active }) } catch { loadUsers() } finally { setBusy(null) }
   }
+  // Peak-season: raise (or set) a seller's daily order limit. Blank = platform default,
+  // 0 = unlimited. Crossing it never blocks them — it only shows the delay notice on submit.
+  const changeOrderLimit = async (u: AdminUser) => {
+    const cur = u.order_limit == null ? "" : String(u.order_limit)
+    const input = typeof window !== "undefined"
+      ? window.prompt(`Daily order limit for ${u.store_name || u.name || u.email}.\nUsed today: ${u.orders_today ?? 0}. Blank = platform default · 0 = unlimited.`, cur)
+      : null
+    if (input === null) return
+    const val = input.trim() === "" ? null : Math.max(0, parseInt(input, 10) || 0)
+    setBusy(u.id)
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, order_limit: val } : x)))
+    try { await updateUserAdmin(u.id, { order_limit: val }) } catch { loadUsers() } finally { setBusy(null) }
+  }
   const resetPassword = async () => {
     if (!pwFor) return
     if (pwValue.length < 8) { setPwErr("Password must be at least 8 characters."); return }
@@ -1642,6 +1655,11 @@ function UsersPanel() {
                         {u.role === "seller" && (
                           <DropdownMenuItem onClick={() => { setAdjFor(u); setAdjAmt(""); setAdjNote(""); setAdjErr(null) }}>
                             Adjust balance…
+                          </DropdownMenuItem>
+                        )}
+                        {u.role === "seller" && (
+                          <DropdownMenuItem onClick={() => changeOrderLimit(u)}>
+                            Daily order limit{u.order_limit != null ? ` · ${u.orders_today ?? 0}/${u.order_limit}` : ""}…
                           </DropdownMenuItem>
                         )}
                         {u.active === false ? (

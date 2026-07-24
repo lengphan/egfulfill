@@ -168,6 +168,15 @@ export type AdminUser = {
   team_size?: number
   /** Wallet balance (sellers). Staff share the factory wallet, so theirs is always 0. */
   balance?: number
+  /** Peak-season DAILY order limit for this seller. null = use the platform default. */
+  order_limit?: number | null
+  /** Orders this seller has created today — usage against the limit. */
+  orders_today?: number
+}
+/** The current seller's capacity status — information only, never blocks a submit. `over` is
+ *  true only once today's count has actually reached the limit. */
+export function getOrderLimitStatus() {
+  return api<{ limit: number; usedToday: number; over: boolean; notice: string | null }>(`/api/orders/limit-status`)
 }
 export function getUsers() {
   return api<AdminUser[]>(`/api/users`)
@@ -207,7 +216,7 @@ export function adjustBalance(body: { account: string; delta: number; note: stri
 export function deleteUserAdmin(id: string) {
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" })
 }
-export function updateUserAdmin(id: string, patch: { role?: string; password?: string; name?: string; active?: boolean; plan?: string; spydeck_addon?: boolean }) {
+export function updateUserAdmin(id: string, patch: { role?: string; password?: string; name?: string; active?: boolean; plan?: string; spydeck_addon?: boolean; order_limit?: number | null }) {
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) })
 }
 

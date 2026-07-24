@@ -2,10 +2,10 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { PaperPlaneTilt } from "@phosphor-icons/react"
+import { PaperPlaneTilt, Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { updateOrder, getOrderQuote, ApiError, type OrderRow, type OrderQuote } from "@/lib/api"
+import { updateOrder, getOrderQuote, getOrderLimitStatus, ApiError, type OrderRow, type OrderQuote } from "@/lib/api"
 
 const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toFixed(2)}`
 
@@ -45,6 +45,9 @@ export function SubmitOrderButton({
   // Only used when the caller didn't supply one.
   const [fetched, setFetched] = useState<OrderQuote | null>(null)
   const [loadingQuote, setLoadingQuote] = useState(false)
+  // Peak-season delay notice. Only set once the server confirms this seller has CROSSED their
+  // daily order limit — so it never pops up prematurely, and it never blocks the submit.
+  const [limitNotice, setLimitNotice] = useState<string | null>(null)
 
   if (!isSubmittable(order)) return null
 
@@ -52,6 +55,9 @@ export function SubmitOrderButton({
 
   const openDialog = () => {
     setOpen(true)
+    // Ask the server whether this seller is over their limit (it owns the count + the notice
+    // text). Best-effort — a failed check just means no notice, never a blocked submit.
+    getOrderLimitStatus().then((r) => setLimitNotice(r.over ? r.notice : null)).catch(() => {})
     if (quote || fetched || loadingQuote) return
     setLoadingQuote(true)
     getOrderQuote(order.id)
@@ -128,6 +134,14 @@ export function SubmitOrderButton({
               {q.unpriced.length} line{q.unpriced.length === 1 ? "" : "s"} can&apos;t be priced yet — pick a blank on them first.
             </p>
           ) : null}
+
+          {/* Peak-season heads-up — shown only when this seller is over their limit. It warns,
+              it doesn't stop: they can still submit. */}
+          {limitNotice && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <Warning size={15} weight="fill" className="mt-0.5 shrink-0" /> {limitNotice}
+            </div>
+          )}
 
           {err && <p className="text-sm text-destructive">{err}</p>}
 
