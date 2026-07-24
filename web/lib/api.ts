@@ -929,6 +929,11 @@ export type OrderRow = {
   delivery_status?: string | null
   delivery_detail?: string | null
   delivery_checked_at?: string | null
+  /** Carrier's own event times (not our poll time), filled by refreshTracking off the
+   *  Shippo track response — the basis for fulfilment-speed metrics. delivered_at = when
+   *  the parcel was delivered; est_delivery = the ETA frozen at first sighting. */
+  delivered_at?: string | null
+  est_delivery?: string | null
   carrier?: string | null
   timeline?: Array<{ status?: string; at?: string }> | null
   created_at?: string | null

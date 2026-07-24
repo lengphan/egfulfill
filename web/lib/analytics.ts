@@ -7,6 +7,59 @@ export const orderTotalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
 export const orderProfitOf = (o: OrderRow) => Number(o.profit ?? 0) || 0
 export const orderTs = (o: OrderRow) => (o.created_at ? new Date(o.created_at).getTime() : NaN)
 
+// ── Fulfilment speed ─────────────────────────────────────────────────────────
+// Every duration is derived from REAL carrier + factory timestamps, never modelled.
+const ts = (s?: string | null) => (s ? new Date(s).getTime() : NaN)
+
+// When the parcel physically left us — the carrier's acceptance scan.
+const shippedTs = (o: OrderRow) => ts(o.label_scanned_at)
+// When it was delivered. Prefer the exact event time; fall back to the poll time for
+// orders delivered before we started capturing it (approximate, but keeps history in).
+const deliveredTs = (o: OrderRow) => {
+  const exact = ts(o.delivered_at)
+  if (!isNaN(exact)) return exact
+  return o.delivery_status === "delivered" ? ts(o.delivery_checked_at) : NaN
+}
+
+const median = (xs: number[]): number | null => {
+  if (!xs.length) return null
+  const s = [...xs].sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+const daysBetween = (from: number, to: number) => (to - from) / DAY
+
+export type SpeedStat = { days: number | null; n: number }
+export type FulfillmentSpeed = {
+  production: SpeedStat  // placed → carrier acceptance
+  transit: SpeedStat     // carrier acceptance → delivered
+  total: SpeedStat       // placed → delivered
+  onTime: { pct: number | null; n: number } // delivered by the carrier's ETA
+}
+
+/** Median production / transit / total lead times + on-time rate, off real timestamps.
+ *  A metric with no qualifying orders reports n:0 and a null value, so the card can say
+ *  "no data yet" rather than a misleading 0. */
+export function fulfillmentSpeed(orders: OrderRow[]): FulfillmentSpeed {
+  const prod: number[] = [], trans: number[] = [], tot: number[] = []
+  let onTimeHit = 0, onTimeN = 0
+  for (const o of orders) {
+    const placed = orderTs(o), ship = shippedTs(o), deliv = deliveredTs(o)
+    if (!isNaN(placed) && !isNaN(ship) && ship >= placed) prod.push(daysBetween(placed, ship))
+    if (!isNaN(ship) && !isNaN(deliv) && deliv >= ship) trans.push(daysBetween(ship, deliv))
+    if (!isNaN(placed) && !isNaN(deliv) && deliv >= placed) tot.push(daysBetween(placed, deliv))
+    const eta = ts(o.est_delivery)
+    if (!isNaN(deliv) && !isNaN(eta)) { onTimeN++; if (deliv <= eta + DAY) onTimeHit++ } // grace to end of ETA day
+  }
+  const round1 = (n: number | null) => (n === null ? null : Math.round(n * 10) / 10)
+  return {
+    production: { days: round1(median(prod)), n: prod.length },
+    transit: { days: round1(median(trans)), n: trans.length },
+    total: { days: round1(median(tot)), n: tot.length },
+    onTime: { pct: onTimeN ? Math.round((onTimeHit / onTimeN) * 100) : null, n: onTimeN },
+  }
+}
+
 export type RevPoint = { label: string; revenue: number; prev: number }
 
 // Bucket revenue into n buckets of `daysPer` days each (current + previous window).

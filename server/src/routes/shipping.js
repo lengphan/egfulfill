@@ -366,8 +366,12 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
     const raw = (d.tracking_status && d.tracking_status.status) || 'UNKNOWN';
     const m = DELIVERY_MAP[raw] || DELIVERY_MAP.UNKNOWN;
     const detail = (d.tracking_status && d.tracking_status.status_details) || m.detail;
-    await q('update orders set delivery_status=$1, delivery_detail=$2, delivery_checked_at=now() where id=$3',
-      [m.status, detail || null, orderId]).catch(() => {});
+    // Shippo returns the carrier's estimated delivery date on the track response. Freeze the
+    // FIRST one we see (coalesce), not the latest: the ETA slips as a parcel moves, and an
+    // on-time metric wants the promise made near ship time, not a moving target.
+    const eta = d.eta || (d.tracking_status && d.tracking_status.eta) || null;
+    await q('update orders set delivery_status=$1, delivery_detail=$2, delivery_checked_at=now(), est_delivery=coalesce(est_delivery, $4::timestamptz) where id=$3',
+      [m.status, detail || null, orderId, eta]).catch(() => {});
 
     // THE ACCEPTANCE SCAN. PRE_TRANSIT means the label exists and the carrier has never
     // touched the parcel; anything past it means they have it. That transition IS the
@@ -391,6 +395,14 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
         `update orders set label_scanned_at = coalesce($1::timestamptz, now()), scanned_via = coalesce(scanned_via, 'carrier')
           where id = $2 and label_scanned_at is null`,
         [accepted ? accepted.status_date : null, orderId]).catch(() => {});
+      // The delivery event's own timestamp, frozen once — the basis for transit + on-time.
+      // Same reasoning as the acceptance scan: the carrier's stated time beats our poll time.
+      if (raw === 'DELIVERED') {
+        const delivered = hist.find((h) => h && h.status === 'DELIVERED' && h.status_date);
+        await q(
+          `update orders set delivered_at = coalesce(delivered_at, $1::timestamptz, now()) where id = $2 and delivered_at is null`,
+          [delivered ? delivered.status_date : null, orderId]).catch(() => {});
+      }
     }
     return { ok: true, carrier_status: raw, status: m.status, detail };
   };

@@ -578,6 +578,12 @@ export function ordersRoutes(app, requireAuth) {
   q('alter table orders add column if not exists delivery_status text').catch(() => {});
   q('alter table orders add column if not exists delivery_detail text').catch(() => {});
   q('alter table orders add column if not exists delivery_checked_at timestamptz').catch(() => {});
+  // The carrier's own event times (not our poll time), for fulfilment-speed metrics:
+  // delivered_at = when it was delivered; est_delivery = the ETA frozen at first sighting.
+  // Both filled by refreshTracking off the Shippo track response. est_delivery may already
+  // exist from an earlier schema; the guard makes this a no-op then.
+  q('alter table orders add column if not exists delivered_at timestamptz').catch(() => {});
+  q('alter table orders add column if not exists est_delivery timestamptz').catch(() => {});
   q('alter table order_items add column if not exists ship_fee numeric').catch(() => {});
 
   // List

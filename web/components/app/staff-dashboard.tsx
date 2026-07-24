@@ -7,6 +7,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { ProductionLine } from "@/components/app/production-line"
+import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
 import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
 import { getOrders, type OrderRow } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
@@ -214,27 +215,37 @@ export function StaffDashboard() {
         ))}
       </StatGrid>
 
-      <SectionCard
-        title="Production line"
-        description={windowed ? `Orders from the ${rangeMeta.sub}, by current stage` : "Where the work is right now — every order by stage"}
-        actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">Open queue <ArrowRight size={13} weight="bold" /></Link>}
-        bodyClassName="divide-y divide-border"
-      >
-        {orders === null ? (
-          <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
-        ) : (
-          <>
-            <ProductionLine orders={lineOrders} />
-            {stats.attention > 0 && (
-              <Link href="/operator" className="flex items-center gap-2 bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50">
-                <Warning size={14} weight="fill" className="shrink-0" />
-                <span>{stats.attention} order{stats.attention === 1 ? "" : "s"} need attention — flagged, on hold or backordered</span>
-                <ArrowRight size={13} weight="bold" className="ml-auto shrink-0" />
-              </Link>
+      {/* Production line narrowed to two thirds so the fulfilment-speed card fills the
+          space it was wasting — the chart is only a handful of bars wide. */}
+      <div className="grid items-stretch gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-1">
+          <FulfillmentSpeed orders={lineOrders} loading={orders === null} />
+        </div>
+        <div className="lg:col-span-2">
+          <SectionCard
+            className="h-full"
+            title="Production line"
+            description={windowed ? `Orders from the ${rangeMeta.sub}, by current stage` : "Where the work is right now — every order by stage"}
+            actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">Open queue <ArrowRight size={13} weight="bold" /></Link>}
+            bodyClassName="divide-y divide-border"
+          >
+            {orders === null ? (
+              <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+            ) : (
+              <>
+                <ProductionLine orders={lineOrders} />
+                {stats.attention > 0 && (
+                  <Link href="/operator" className="flex items-center gap-2 bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50">
+                    <Warning size={14} weight="fill" className="shrink-0" />
+                    <span>{stats.attention} order{stats.attention === 1 ? "" : "s"} need attention — flagged, on hold or backordered</span>
+                    <ArrowRight size={13} weight="bold" className="ml-auto shrink-0" />
+                  </Link>
+                )}
+              </>
             )}
-          </>
-        )}
-      </SectionCard>
+          </SectionCard>
+        </div>
+      </div>
 
       <div className="grid items-stretch gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
