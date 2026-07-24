@@ -78,10 +78,15 @@ export function designLibraryRoutes(app, requireAuth, requireStaff) {
   app.post('/api/design_library', { preHandler: requireAuth }, async (req, reply) => {
     const b = req.body || {};
     if (!b.data) { reply.code(400); return { error: 'data required' }; }
-    if (b.name) await q('delete from design_library where seller_id=$1 and name=$2', [req.user.sub, b.name]).catch(() => {});
+    const hash = hashOf(b.data);
+    // De-dupe on the ARTWORK, not the name. Re-adding the exact same image replaces the old
+    // row (no pile-up); but two DIFFERENT images must not collide just because both default
+    // to "Untitled design" — that made every unnamed save overwrite the previous one, so the
+    // library only ever showed one design. See the Design Lab library bug.
+    if (hash) await q('delete from design_library where seller_id=$1 and content_hash=$2', [req.user.sub, hash]).catch(() => {});
     const r = await q(
       'insert into design_library (seller_id, name, data, thumb, content_hash) values ($1,$2,$3,$4,$5) returning id, name, thumb, created_at',
-      [req.user.sub, b.name || 'Untitled', b.data, b.thumb || null, hashOf(b.data)]
+      [req.user.sub, b.name || 'Untitled', b.data, b.thumb || null, hash]
     );
     await q(
       `delete from design_library where seller_id=$1 and id not in (
