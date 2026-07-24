@@ -686,7 +686,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
 
 // Preset notes for the commonest asks. They fill the box and stay editable before sending —
 // a starting point, not a fixed menu.
-const NOTE_PRESETS = ["Change to New please", "Please cancel — sent by mistake", "Please prioritise this", "Any update on this?"]
+const NOTE_PRESETS = ["Please cancel — sent by mistake", "Please prioritise this", "Any update on this?"]
 
 /**
  * Post a note to the partner's task and keep our own copy on the card.

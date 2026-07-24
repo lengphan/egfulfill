@@ -214,17 +214,11 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   }
   const refId = r.data && (r.data.ref_id ?? r.data.refId ?? r.data.id);
 
-  // Pink drops API-created tasks into their "Draft" lane; the queue their designers pull
-  // from is "New". Their documented status transitions are done|needfix|inreview, so "new"
-  // is NOT a guaranteed value — this is a BEST-EFFORT nudge: fire-and-forget, never fails
-  // the push (which has already succeeded), and if their board doesn't accept "new" it's a
-  // harmless ignored call. If tasks still land in Draft after this ships, Draft is Pink's
-  // intentional staging and moving to New needs their side — worth confirming with them.
-  if (refId) {
-    await pink(`/${encodeURIComponent(String(refId))}/status`, {
-      method: 'POST', body: JSON.stringify({ status: 'new' }),
-    }).catch(() => {});
-  }
+  // API-created tasks always land in Pink's "Draft" lane, and that is FINAL on their side:
+  // they've confirmed there is no way to create or move a task straight into "New", and no
+  // delete/cancel endpoint either — both are done by hand on their own site. So we make no
+  // status call here; Draft is simply where a pushed task starts. (Don't re-add a "nudge to
+  // New" — it was tried, and Pink says it will never be honoured.)
 
   // Track it as a design card marked OUTSOURCED, so it shows on the board with the
   // partner badge, can't be claimed by one of our designers, and never pays one.
