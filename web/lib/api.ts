@@ -2123,16 +2123,10 @@ export function pinkRequestFix(body: { cardId: string | number; message: string;
   return api<{ ok?: boolean; cardId?: number; col?: string; error?: string; commented?: boolean }>(
     `/api/pinkdesign/fix`, { method: "POST", body: JSON.stringify(body) })
 }
-/** One note we posted to a partner's task, saved on the card apart from the description. */
+/** One note previously posted to a partner's task, stored on the card. Retained for the
+ *  card's `partner_notes` field; the composer that wrote them was removed (comments to Pink
+ *  are unproven against their live API — everything they need goes in the brief instead). */
 export type PartnerNote = { message: string; by?: string; at?: string }
-/** Leave a note on the partner's task WITHOUT moving it — e.g. "change to New", "please
- *  cancel". Posts to their board AND appends to the card's own note log (returned as
- *  `notes`). Outbound only: it doesn't cancel/move anything on its own, and their replies
- *  don't come back here (their webhook carries status + files, not messages). */
-export function pinkComment(body: { cardId: string | number; message: string; images?: string[] }) {
-  return api<{ ok?: boolean; delivered?: boolean; notes?: PartnerNote[]; error?: string }>(
-    `/api/pinkdesign/comment`, { method: "POST", body: JSON.stringify(body) })
-}
 
 /** Design-partner state for one order's lines, keyed by SKU. Read separately from the
  *  order itself so a failure here costs a badge, not the order page. */

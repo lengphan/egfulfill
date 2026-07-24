@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, ChatText, Plus } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, pinkComment, type DesignCard, type PartnerNote } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { AssignCardDialog } from "@/components/app/assign-card-dialog"
@@ -712,82 +712,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           )}
           <button onClick={removeThis} className="ml-auto text-xs font-medium text-muted-foreground hover:text-red-600">Remove card</button>
         </div>
-
-        {/* Notes to the partner — their board can't reply to us, so this posts to their task
-            AND keeps our own running record, separate from the brief. */}
-        {card.vendor && (
-          <PartnerNotes card={card} vendor={vendorLabel(card.vendor)} onSaved={(notes) => patch(card.id, { partner_notes: notes })} />
-        )}
       </DialogContent>
     </Dialog>
-  )
-}
-
-// Preset notes for the commonest asks. They fill the box and stay editable before sending —
-// a starting point, not a fixed menu.
-const NOTE_PRESETS = ["Please cancel — sent by mistake", "Please prioritise this", "Any update on this?"]
-
-/**
- * Post a note to the partner's task and keep our own copy on the card.
- *
- * The partner has no way to comment back to us, so this is a ONE-WAY channel with a local
- * record: what we asked ("change to New", "cancel") lives here, apart from the design brief,
- * because nowhere else would show it. Sending posts to their board and appends to the log;
- * the log is what the server returns, so it stays the source of truth.
- */
-function PartnerNotes({ card, vendor, onSaved }: { card: DesignCard; vendor: string; onSaved: (notes: PartnerNote[]) => void }) {
-  const [text, setText] = useState("")
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const notes: PartnerNote[] = Array.isArray(card.partner_notes) ? card.partner_notes : []
-
-  const send = async () => {
-    const message = text.trim()
-    if (!message) return
-    setBusy(true); setErr(null)
-    try {
-      const r = await pinkComment({ cardId: card.id, message })
-      if (r?.error) throw new Error(r.error)
-      setText("")
-      onSaved(r.notes ?? [...notes, { message, at: new Date().toISOString() }])
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : `Couldn't send that note to ${vendor}.`)
-    } finally { setBusy(false) }
-  }
-
-  return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="flex items-center gap-1.5 text-sm font-medium"><ChatText size={15} weight="bold" /> Notes to {vendor}</div>
-      <p className="text-xs text-muted-foreground">Posted to their task and kept here — they can&apos;t reply on our side, so this is our record, separate from the brief.</p>
-
-      {notes.length > 0 && (
-        <ul className="space-y-1">
-          {notes.map((n, i) => (
-            <li key={i} className="rounded-md bg-muted/50 px-2 py-1.5 text-xs">
-              <div className="whitespace-pre-wrap break-words">{n.message}</div>
-              <div className="mt-0.5 text-[10px] text-muted-foreground">
-                {n.by ? `${n.by} · ` : ""}{n.at ? new Date(n.at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : ""}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="flex flex-wrap gap-1">
-        {NOTE_PRESETS.map((p) => (
-          <button key={p} type="button" onClick={() => setText(p)} disabled={busy}
-            className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-            {p}
-          </button>
-        ))}
-      </div>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} disabled={busy}
-        placeholder={`Write a note to ${vendor}…`}
-        className="w-full min-w-0 rounded-md border border-input bg-transparent px-2 py-1.5 text-xs" />
-      {err && <div className="text-xs text-destructive">{err}</div>}
-      <Button size="sm" disabled={busy || !text.trim()} onClick={send}>
-        {busy ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Send to {vendor}
-      </Button>
-    </div>
   )
 }

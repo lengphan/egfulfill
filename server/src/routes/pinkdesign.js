@@ -375,75 +375,44 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
   });
 
   /**
-   * Leave a NOTE on the partner's task without moving it — the in-system channel for
-   * "please cancel this" and anything else that isn't a revision.
-   *
-   * Pink has no cancel API, so a mistaken push can't be retracted programmatically; the
-   * nearest honest thing is telling their team, in the task itself, to stop. This posts to
-   * the same /comment endpoint the revision loop uses but flips no status. It is NOT a
-   * cancellation — their designer still has to action it — so it returns plainly that the
-   * note was delivered, not that anything was cancelled. Comments are outbound only: their
-   * replies live on their board, since their webhook carries status + files, never messages.
-   */
-  app.post('/api/pinkdesign/comment', { preHandler: requireStaff }, async (req, reply) => {
-    if (!pinkEnabled()) { reply.code(400); return { error: 'Pink Design isn\'t connected — add PINKDESIGN_API_KEY first.' }; }
-    const b = req.body || {};
-    const message = String(b.message || '').trim();
-    if (!message) { reply.code(400); return { error: 'Nothing to send — write a message.' }; }
-    const card = (await q('select id, order_id, sku, vendor_ref from design_cards where id=$1 limit 1', [b.cardId])
-      .catch(() => ({ rows: [] }))).rows[0];
-    if (!card) { reply.code(404); return { error: 'Card not found.' }; }
-    if (!card.vendor_ref) { reply.code(400); return { error: 'This card was never sent to a design partner, so there\'s nothing to comment on.' }; }
-    const images = (Array.isArray(b.images) ? b.images : []).map(String).filter((u) => /^https?:\/\//i.test(u));
-    const said = await pink(`/${encodeURIComponent(card.vendor_ref)}/comment`, {
-      method: 'POST', body: JSON.stringify({ message, images }),
-    });
-    if (!said.ok) {
-      reply.code(502);
-      return { error: `Their board wouldn't take the note (${said.status}). Nothing was sent — try again, or message them directly.`,
-               raw: typeof said.data === 'string' ? said.data.slice(0, 300) : said.data };
-    }
-    // Record it on OUR card too — their board can't send comments back, so this is the only
-    // place the ask survives. A JSONB append (kept apart from the design brief); the card's
-    // whole-list save never lists partner_notes, so the log outlives any board edit.
-    const note = { message: message.slice(0, 2000), by: (req.user && (req.user.name || req.user.email)) || 'staff', at: new Date().toISOString() };
-    const upd = await q(
-      `update design_cards set partner_notes = coalesce(partner_notes, '[]'::jsonb) || $2::jsonb, updated_at = now()
-         where id = $1 returning partner_notes`,
-      [card.id, JSON.stringify([note])]
-    ).catch(() => ({ rows: [] }));
-    audit(req, 'design.partner_note', { entityType: 'order', entityId: card.order_id,
-      after: { sku: card.sku, ref: card.vendor_ref, message: message.slice(0, 500), images: images.length } });
-    return { ok: true, delivered: true, notes: upd.rows[0]?.partner_notes || [note] };
-  });
-
-  /**
    * Their webhook. Fires on Inreview / Done / Check and carries the finished design files
    * as URLs. Public by necessity (they can't hold our JWT); the ref_id is the shared
    * secret-ish handle, and we only ever ACT on a ref we already created — an unknown ref
    * is acknowledged and ignored rather than trusted.
    */
   app.post('/api/webhooks/pinkdesign', async (req, reply) => {
+    const b = req.body || {};
+    // DIAGNOSTIC — log EVERY hit before anything can reject it, so `docker compose logs app`
+    // shows (a) whether Pink is calling us at all, (b) their real payload shape / field names,
+    // (c) whether auth and ref matched. This whole path was written to a GUESSED contract and
+    // the log is how we learn their actual one. Secret fields stripped. If the log stays empty
+    // after a status change on their board, the webhook isn't pointed at us — that's a config
+    // step in Pink's dashboard (URL https://egful.store/api/webhooks/pinkdesign + the secret),
+    // not a code bug on our side.
+    try {
+      const safe = { ...b }; delete safe.api_key; delete safe.apiKey;
+      console.log('[pinkdesign webhook] incoming', JSON.stringify(safe).slice(0, 3000));
+    } catch { /* ignore log failure */ }
+
     // Verify it's really them. They don't document WHERE the key travels, so accept the
-    // three conventional places rather than guessing one and silently rejecting
-    // everything. When no secret is configured we fall back to the ref-must-be-known
-    // check below — permissive, but this endpoint can only ever advance a task we
-    // ourselves created, so the blast radius is a wrong lane on an existing card.
+    // conventional places rather than guessing one and silently rejecting everything.
     const want = webhookSecret();
     if (want) {
       const h = req.headers || {};
       const bearer = String(h.authorization || '').replace(/^Bearer\s+/i, '').trim();
       const got = bearer || String(h['x-api-key'] || h['x-webhook-key'] || h['api-key'] || '').trim()
-        || String((req.body || {}).api_key || (req.body || {}).apiKey || '').trim();
-      if (got !== want) { reply.code(401); return { error: 'bad webhook key' }; }
+        || String(b.api_key || b.apiKey || '').trim();
+      if (got !== want) { console.log('[pinkdesign webhook] REJECTED — bad/absent key'); reply.code(401); return { error: 'bad webhook key' }; }
     }
-    const b = req.body || {};
-    const ref = String(b.ref_id ?? b.refId ?? b.id ?? '');
-    const status = String(b.status || '').toLowerCase();
-    if (!ref) return { ok: true, ignored: 'no ref_id' };
+    // Their id + status field names are unknown, so try every plausible one rather than
+    // silently ignoring a payload that IS about a card we have.
+    const ref = String(b.ref_id ?? b.refId ?? b.id ?? b.task_id ?? b.taskId ?? b.reference ?? b.ref ?? '');
+    const status = String(b.status ?? b.state ?? b.stage ?? '').toLowerCase();
+    if (!ref) { console.log('[pinkdesign webhook] no ref found — payload keys:', Object.keys(b).join(',')); return { ok: true, ignored: 'no ref_id' }; }
     const card = (await q('select id, order_id, sku from design_cards where vendor_ref=$1 limit 1', [ref])
       .catch(() => ({ rows: [] }))).rows[0];
-    if (!card) return { ok: true, ignored: 'unknown ref' };
+    if (!card) { console.log('[pinkdesign webhook] ref', ref, 'matched NO card (vendor_ref mismatch)'); return { ok: true, ignored: 'unknown ref' }; }
+    console.log('[pinkdesign webhook] matched card', card.id, '· status:', status || '(none)');
 
     // Their review states → our board lanes. "Check"/"inreview" is work in progress on
     // their side; only "done" is finished.
@@ -463,8 +432,23 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
     //
     // So copy it into OUR storage and keep our own key. If the copy fails we still record
     // their URL: degraded, but a working link beats nothing, and it can be re-ingested.
-    const files = Array.isArray(b.design_files) ? b.design_files
-      : Array.isArray(b.designs) ? b.designs : [];
+    // Gather deliverables from ANY plausible field — they attach both "Design Files" and
+    // "Design URLs" (e.g. a Google Drive folder), and the exact JSON key is undocumented.
+    // Each entry may be a bare URL string or an object carrying the url under one of several
+    // names. Dedup, keep only real http(s) URLs. A folder link that can't be downloaded is
+    // still stored as a link below, so it isn't lost.
+    const fileFields = ['design_files', 'designs', 'design_urls', 'designUrls', 'attachments',
+                        'files', 'links', 'urls', 'deliverables', 'design_link', 'file_url', 'download_url'];
+    const collected = [];
+    for (const k of fileFields) {
+      const v = b[k];
+      if (Array.isArray(v)) collected.push(...v);
+      else if (v) collected.push(v);
+    }
+    const files = [...new Set(collected
+      .map((f) => (typeof f === 'string' ? f : (f && (f.url || f.file_url || f.link || f.href || f.src || f.download_url))))
+      .filter((u) => typeof u === 'string' && /^https?:\/\//i.test(u)))];
+    console.log('[pinkdesign webhook] deliverables found:', files.length, files.slice(0, 5));
     const { storageEnabled, putObject, designUrlTtlDays } = await import('../storage.js');
     const { createHash } = await import('crypto');
     let copied = 0;
