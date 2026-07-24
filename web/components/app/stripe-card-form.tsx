@@ -27,10 +27,16 @@ function PayForm({ intentId, onPaid, onError }: { intentId: string; onPaid: () =
       try {
         const v = await verifyStripeIntent(intentId)
         if (v.ok) onPaid()
-        else onError(v.error || "Payment couldn't be verified.")
+        else onError(v.error || `Payment ${v.status || "not confirmed"} — nothing was charged. Try again.`)
       } catch {
         onError("Payment verification failed.")
       }
+    } else if (paymentIntent) {
+      // requires_action / requires_payment_method / canceled — never left silent, or the
+      // button reads "Processing…" forever with no reason shown.
+      onError(`Payment ${String(paymentIntent.status).replace(/_/g, " ")} — please check the card details and try again.`)
+    } else {
+      onError("Payment didn't complete. Please try again.")
     }
     setBusy(false)
   }

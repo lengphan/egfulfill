@@ -25,7 +25,7 @@ const usd2 = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minim
 const fmtDT2 = (s?: string | null) => { if (!s) return "—"; const d = new Date(s); return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }
 
 // Admin review of pending seller top-ups (moved here from the old Console).
-function AdminTopups() {
+function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
   // Warehouse shares the factory wallet and sees the same ledger. APPROVING a top-up
   // stays admin-only though: that's confirming money arrived by bank transfer, which is
   // a higher-trust act than reading the balance.
@@ -38,8 +38,14 @@ function AdminTopups() {
   const load = useCallback(() => { if (canReview) getTopups("pending").then((r) => setTopups(r ?? [])).catch(() => setTopups([])) }, [canReview])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
   const review = async (t: TopupRequest, action: "confirm" | "reject") => {
+    // Close it out of the pending list immediately (optimistic), then record the decision.
+    // On success refresh the wallet so the credit lands in the history right away; on
+    // failure put it back by reloading the true pending list.
     setBusy(t.id); setTopups((prev) => (prev ?? []).filter((x) => x.id !== t.id))
-    try { await (action === "confirm" ? confirmTopup(t.id) : rejectTopup(t.id)) } catch { load() } finally { setBusy(null) }
+    try {
+      const r = await (action === "confirm" ? confirmTopup(t.id) : rejectTopup(t.id))
+      if (r && r.error) { load() } else { onReviewed?.() }
+    } catch { load() } finally { setBusy(null) }
   }
   if (!canReview || topups === null || topups.length === 0) return null
   return (
@@ -312,7 +318,7 @@ export function WalletDashboard() {
 
   return (
     <div className="space-y-4">
-      <AdminTopups />
+      <AdminTopups onReviewed={() => { refresh(); window.dispatchEvent(new CustomEvent("eg-wallet-changed")) }} />
       <AdminPayouts onPaid={() => { refresh(); window.dispatchEvent(new CustomEvent("eg-wallet-changed")) }} />
       <div className="flex flex-wrap items-center justify-end gap-2">
         {/* Factory ledger (admin/warehouse) has nothing to withdraw. Sellers get Withdraw,
