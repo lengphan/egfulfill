@@ -1,16 +1,21 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, CheckCircle, Warning, UploadSimple, X } from "@phosphor-icons/react"
+import { CircleNotch, CheckCircle, Warning, UploadSimple, X, MagnifyingGlassPlus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getPayoutMethod, savePayoutMethod, createPayoutRequest, type PayoutMethod } from "@/lib/api"
 
 const usd = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-// One channel: a Vietnam bank transfer. The account fields are what a payout is made
-// against; a bank QR image is an optional convenience on top.
-const BLANK: PayoutMethod = { type: "bank", account_name: "", account_number: "", bank_name: "", note: "", qr: "" }
+// Three channels. PingPong/LianLian each take a single account id (email/id). "Bank QR" is
+// the richer one — account fields plus an optional uploaded bank QR image.
+const METHODS = [
+  { id: "pingpong", label: "PingPong" },
+  { id: "lianlian", label: "LianLian" },
+  { id: "bank", label: "Bank QR" },
+]
+const BLANK: PayoutMethod = { type: "bank", account_name: "", account_id: "", account_number: "", bank_name: "", note: "", qr: "" }
 
 /**
  * Seller withdrawal. No bank API — the seller saves their payout details (which channel +
@@ -26,6 +31,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [zoom, setZoom] = useState(false)   // lightbox for the uploaded QR
 
   const load = useCallback(() => {
     getPayoutMethod()
@@ -38,7 +44,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
   useEffect(() => {
     if (!open) return
     // Deferred: this codebase's lint rule rejects a straight setState in an effect body.
-    const t = setTimeout(() => { setErr(null); setDone(false); load() }, 0)
+    const t = setTimeout(() => { setErr(null); setDone(false); setZoom(false); load() }, 0)
     return () => clearTimeout(t)
   }, [open, load])
 
@@ -51,9 +57,12 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
     r.readAsDataURL(f)
   }
 
-  // Enough to pay it: the account holder's name and account number. Bank name + QR image
-  // are optional extras.
-  const detailsOk = !!info.account_name?.trim() && !!info.account_number?.trim()
+  const type = info.type || "bank"
+  // Enough to pay it: the holder's name, plus the account number (Bank QR) or the account
+  // id (PingPong/LianLian). Bank name + QR image are optional extras.
+  const detailsOk = !!info.account_name?.trim() && (
+    type === "bank" ? !!info.account_number?.trim() : !!info.account_id?.trim()
+  )
   const amt = Number(amount) || 0
   // What the seller can actually take: their balance, further limited by an admin max if
   // one is set (max === 0 → balance is the only ceiling).
@@ -100,27 +109,48 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
             {/* Payout details */}
             <div className="space-y-2.5">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your payout details</div>
-              <p className="text-[11px] text-muted-foreground">Vietnam bank transfer — the account admin pays your payout into.</p>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] text-muted-foreground">Method</span>
+                <select value={type} onChange={(e) => set("type", e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                  {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+              </label>
               <Input placeholder="Account holder name" value={info.account_name || ""} onChange={(e) => set("account_name", e.target.value)} className="h-9" />
-              <div className="flex gap-2">
-                <Input placeholder="Account number" value={info.account_number || ""} onChange={(e) => set("account_number", e.target.value)} className="h-9 flex-1" />
-                <Input placeholder="Bank name" value={info.bank_name || ""} onChange={(e) => set("bank_name", e.target.value)} className="h-9 flex-1" />
-              </div>
-              <div>
-                <div className="mb-1 text-[11px] text-muted-foreground">Bank QR code (optional)</div>
-                {info.qr ? (
-                  <div className="flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={info.qr} alt="Your bank QR code" className="size-20 rounded-lg border border-border object-contain" />
-                    <Button variant="outline" size="sm" onClick={() => set("qr", "")}><X size={14} /> Remove</Button>
+
+              {type === "bank" ? (
+                <>
+                  <div className="flex gap-2">
+                    <Input placeholder="Account number" value={info.account_number || ""} onChange={(e) => set("account_number", e.target.value)} className="h-9 flex-1" />
+                    <Input placeholder="Bank name" value={info.bank_name || ""} onChange={(e) => set("bank_name", e.target.value)} className="h-9 flex-1" />
                   </div>
-                ) : (
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground transition-colors hover:bg-accent">
-                    <UploadSimple size={16} /> Upload your bank QR code
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-                  </label>
-                )}
-              </div>
+                  <div>
+                    <div className="mb-1 text-[11px] text-muted-foreground">Bank QR code (optional)</div>
+                    {info.qr ? (
+                      <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
+                        {/* Click to enlarge — a QR scanned off a phone is unreadable at thumbnail size. */}
+                        <button type="button" onClick={() => setZoom(true)} className="group relative overflow-hidden rounded-lg" title="Click to enlarge">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={info.qr} alt="Your bank QR code" className="size-40 rounded-lg border border-border bg-white object-contain" />
+                          <span className="absolute inset-0 flex items-center justify-center gap-1 bg-black/0 text-[11px] font-medium text-transparent transition group-hover:bg-black/45 group-hover:text-white">
+                            <MagnifyingGlassPlus size={15} weight="bold" /> Enlarge
+                          </span>
+                        </button>
+                        <Button variant="outline" size="sm" onClick={() => set("qr", "")}><X size={14} /> Remove</Button>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent">
+                        <UploadSimple size={20} weight="bold" />
+                        Upload your bank QR code
+                        <span className="text-[10px]">PNG or JPG · up to 2 MB</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+                      </label>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <Input placeholder={type === "pingpong" ? "PingPong email or ID" : "LianLian email or ID"} value={info.account_id || ""} onChange={(e) => set("account_id", e.target.value)} className="h-9" />
+              )}
+
               <Input placeholder="Note (optional)" value={info.note || ""} onChange={(e) => set("note", e.target.value)} className="h-9" />
             </div>
 
@@ -142,6 +172,14 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
             <Button className="w-full" onClick={submit} disabled={busy || !detailsOk || amt < bounds.min || !!amountErr}>
               {busy ? <><CircleNotch size={14} className="animate-spin" /> Submitting…</> : `Request ${amt >= bounds.min ? usd(amt) : "payout"}`}
             </Button>
+          </div>
+        )}
+
+        {/* Full-size QR lightbox — click anywhere to close. */}
+        {zoom && info.qr && (
+          <div onClick={() => setZoom(false)} className="fixed inset-0 z-[70] flex cursor-zoom-out items-center justify-center bg-black/70 p-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={info.qr} alt="Bank QR code" className="max-h-[80vh] max-w-[90vw] rounded-xl border border-white/10 bg-white object-contain p-2" />
           </div>
         )}
       </DialogContent>
