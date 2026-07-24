@@ -1423,6 +1423,7 @@ function UsersPanel() {
   // A real directory gets long fast (sellers outnumber staff), so it needs finding, not
   // just listing. Search covers name/email/store; the role chips answer "show me staff".
   const [qStr, setQStr] = useState("")
+  const [sortBy, setSortBy] = useState<"recent" | "busy">("recent")
   const [roleFilter, setRoleFilter] = useState("all")
   const [showInactive, setShowInactive] = useState(false)
   // Role changes and deletion are admin-only server-side; mirror that here so warehouse
@@ -1570,10 +1571,16 @@ function UsersPanel() {
     return [u.name, u.email, u.store_name, u.role].some((f) => String(f ?? "").toLowerCase().includes(term))
   })
   const inactiveCount = users.filter((u) => u.active === false).length
+  // "Busiest first" = trailing 14-day volume, descending — so after suggesting limits the
+  // heavy hitters float to the top for a quick review. Sorted BEFORE grouping so a team's
+  // leader lands by their own volume (members still sit under them).
+  const ordered = sortBy === "busy"
+    ? [...shown].sort((a, b) => (b.orders_14d ?? 0) - (a.orders_14d ?? 0))
+    : shown
   // Teams have to stay whole: paging the flat list could put a leader on one page and
   // their members on the next, which is exactly the relationship the grouping exists to
   // show. So the list is grouped FIRST, then paged as groups.
-  const grouped = groupTeams(shown)
+  const grouped = groupTeams(ordered)
   const paged = usePaged(grouped, 25)
 
   return (
@@ -1601,6 +1608,19 @@ function UsersPanel() {
                 key={id}
                 onClick={() => setRoleFilter(id)}
                 className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (roleFilter === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Sort: newest account first (default) vs busiest by recent volume — so after
+              suggesting limits, the heavy hitters are at the top to review. */}
+          <div className="flex rounded-full border border-border p-0.5 text-xs">
+            {([["recent", "Newest"], ["busy", "Busiest"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setSortBy(id)}
+                className={"eg-tap rounded-full px-2.5 py-1 font-medium transition-colors " + (sortBy === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
               >
                 {label}
               </button>
@@ -1682,6 +1702,20 @@ function UsersPanel() {
                   {/* Balance, for sellers only — staff share the factory wallet, so a
                       per-account figure would be meaningless for them. Amber at zero or
                       below: that's an account that can't submit work. */}
+                  {/* Peak-season usage — today's uploads vs limit + recent daily average, so
+                      after suggesting limits the busiest sellers can be reviewed at a glance.
+                      Amber once they're at/over. */}
+                  {u.role === "seller" && (
+                    <span
+                      className={"hidden shrink-0 items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] tabular-nums lg:inline-flex " +
+                        (u.order_limit != null && (u.orders_today ?? 0) >= u.order_limit ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground")}
+                      title={`${u.orders_today ?? 0} uploaded today${u.order_limit != null ? ` · limit ${u.order_limit}` : " · no limit set"} · ~${Math.round((u.orders_14d ?? 0) / 14)}/day recently`}
+                    >
+                      {u.order_limit != null ? `${u.orders_today ?? 0}/${u.order_limit}` : `${u.orders_today ?? 0}/—`}
+                      <span className="opacity-70">~{Math.round((u.orders_14d ?? 0) / 14)}/d</span>
+                    </span>
+                  )}
+
                   {u.role === "seller" ? (
                     <span
                       className={"hidden w-20 shrink-0 text-right text-xs tabular-nums sm:block " +

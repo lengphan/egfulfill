@@ -65,6 +65,9 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
              -- Orders this seller has created today — so the admin sees usage against the
              -- limit without opening each account.
              (select count(*)::int from orders o2 where o2.seller_id = u.id and o2.created_at >= current_date) as orders_today,
+             -- Trailing 14-day volume — the "busiest first" sort key, and the same signal the
+             -- limit suggester weights by, so the review lines up with what it distributed.
+             (select count(*)::int from orders o3 where o3.seller_id = u.id and o3.created_at >= now() - interval '14 days') as orders_14d,
              tm.owner_id,
              coalesce(o.store_name, o.name, o.email) as owner_label,
              tm.permissions as team_permissions,

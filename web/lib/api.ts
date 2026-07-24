@@ -172,6 +172,8 @@ export type AdminUser = {
   order_limit?: number | null
   /** Orders this seller has created today — usage against the limit. */
   orders_today?: number
+  /** Orders in the trailing 14 days — the "busiest first" sort key. */
+  orders_14d?: number
 }
 /** The current seller's capacity status — information only, never blocks a submit. `mode` is
  *  the master switch; `over` is true only once today's count has reached the limit. limit:0
