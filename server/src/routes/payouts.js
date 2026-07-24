@@ -29,6 +29,24 @@ async function payoutBounds() {
 
 const canPay = (u) => ['admin', 'warehouse'].includes(String(u && u.role));
 
+// A seller can save details for EACH method (PingPong / LianLian / Bank QR) and have them
+// prefilled next time. Stored as a map keyed by method type. An older single-profile row
+// (one object with a top-level `type`) is wrapped into the map so nothing saved is lost.
+function methodsMap(payout_info) {
+  if (!payout_info || typeof payout_info !== 'object') return {};
+  if (payout_info.type && (payout_info.account_name || payout_info.account_id || payout_info.account_number)) {
+    return { [payout_info.type]: payout_info };
+  }
+  return payout_info;
+}
+// Whichever saved method to snapshot when a request arrives without an explicit one
+// (older client): prefer Bank QR, then the wallet-style channels.
+function firstMethod(map) {
+  for (const t of ['bank', 'pingpong', 'lianlian']) if (map[t]) return map[t];
+  const keys = Object.keys(map);
+  return keys.length ? map[keys[0]] : null;
+}
+
 export function payoutsRoutes(app, requireAuth) {
   // Where a payout landed — a request carries a SNAPSHOT of the seller's details (method),
   // so editing the profile later never rewrites the instructions for a payout already made.
@@ -53,13 +71,17 @@ export function payoutsRoutes(app, requireAuth) {
   app.get('/api/payout/method', { preHandler: requireAuth }, async (req) => {
     const r = await q('select payout_info from users where id=$1', [req.user.sub]).catch(() => null);
     const { min, max } = await payoutBounds();
-    return { info: (r && r.rows[0] && r.rows[0].payout_info) || null, min, max, balance: await balanceOf(req.user.sub) };
+    return { methods: methodsMap(r && r.rows[0] && r.rows[0].payout_info), min, max, balance: await balanceOf(req.user.sub) };
   });
+  // Save ONE method's details, merged into the per-method map by its `type` — so saving
+  // Bank QR never wipes a saved PingPong profile.
   app.put('/api/payout/method', { preHandler: requireAuth }, async (req, reply) => {
     const info = (req.body && req.body.info) || null;
-    if (!info || typeof info !== 'object') { reply.code(400); return { error: 'Payout details are required.' }; }
-    await q('update users set payout_info=$2 where id=$1', [req.user.sub, JSON.stringify(info)]).catch(() => {});
-    return { ok: true, info };
+    if (!info || typeof info !== 'object' || !info.type) { reply.code(400); return { error: 'Payout details (with a method) are required.' }; }
+    const cur = await q('select payout_info from users where id=$1', [req.user.sub]).then((r) => methodsMap(r.rows[0] && r.rows[0].payout_info)).catch(() => ({}));
+    cur[info.type] = info;
+    await q('update users set payout_info=$2 where id=$1', [req.user.sub, JSON.stringify(cur)]).catch(() => {});
+    return { ok: true, methods: cur };
   });
 
   // Seller requests a payout. Validates the amount against the min/max AND the live balance
@@ -73,9 +95,14 @@ export function payoutsRoutes(app, requireAuth) {
     const bal = await balanceOf(req.user.sub);
     if (amount > bal) { reply.code(400); return { error: `You can withdraw up to $${bal.toFixed(2)}.` }; }
     // name isn't in the JWT (only sub/role/email), so read it from the row along with the
-    // saved profile — the admin panel wants a name, not a bare id.
+    // saved profiles — the admin panel wants a name, not a bare id.
     const me = await q('select payout_info, name, email from users where id=$1', [req.user.sub]).then((r) => r.rows[0]).catch(() => null);
-    const prof = me && me.payout_info;
+    // Snapshot the method the seller is paying to. The client sends it explicitly (so an
+    // unsaved one-off still works); fall back to a saved profile for an older client.
+    const bodyMethod = (req.body || {}).method;
+    const prof = (bodyMethod && typeof bodyMethod === 'object' && (bodyMethod.account_name || bodyMethod.account_id || bodyMethod.account_number || bodyMethod.qr))
+      ? bodyMethod
+      : firstMethod(methodsMap(me && me.payout_info));
     if (!prof) { reply.code(400); return { error: 'Add your payout details before requesting a withdrawal.' }; }
     const r = await q(
       `insert into payout_requests (seller_id, seller_name, seller_email, amount_usd, method, note, status)

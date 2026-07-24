@@ -257,16 +257,18 @@ export type PayoutRequest = {
   resolved_at?: string | null
 }
 export function getPayoutMethod() {
-  return api<{ info: PayoutMethod | null; min: number; max: number; balance: number }>(`/api/payout/method`)
+  // `methods` is keyed by method type (pingpong | lianlian | bank) — each remembers its own
+  // saved details so switching the dropdown prefills the right one.
+  return api<{ methods: Record<string, PayoutMethod>; min: number; max: number; balance: number }>(`/api/payout/method`)
 }
 export function savePayoutMethod(info: PayoutMethod) {
-  return api<{ ok?: boolean; info?: PayoutMethod; error?: string }>(`/api/payout/method`, { method: "PUT", body: JSON.stringify({ info }) })
+  return api<{ ok?: boolean; methods?: Record<string, PayoutMethod>; error?: string }>(`/api/payout/method`, { method: "PUT", body: JSON.stringify({ info }) })
 }
 export function getPayoutRequests(status?: string) {
   return api<PayoutRequest[]>(`/api/payout/requests${status ? `?status=${encodeURIComponent(status)}` : ""}`)
 }
-export function createPayoutRequest(amount: number, note?: string) {
-  return api<PayoutRequest & { error?: string }>(`/api/payout/requests`, { method: "POST", body: JSON.stringify({ amount, note }) })
+export function createPayoutRequest(amount: number, note: string | undefined, method: PayoutMethod) {
+  return api<PayoutRequest & { error?: string }>(`/api/payout/requests`, { method: "POST", body: JSON.stringify({ amount, note, method }) })
 }
 export function payPayout(id: string) {
   return api<PayoutRequest & { error?: string }>(`/api/payout/requests/${encodeURIComponent(id)}/pay`, { method: "POST" })

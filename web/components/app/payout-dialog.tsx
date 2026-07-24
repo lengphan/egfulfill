@@ -15,7 +15,10 @@ const METHODS = [
   { id: "lianlian", label: "LianLian" },
   { id: "bank", label: "Bank QR" },
 ]
-const BLANK: PayoutMethod = { type: "bank", account_name: "", account_id: "", account_number: "", bank_name: "", note: "", qr: "" }
+const blankFor = (type: string): PayoutMethod => ({ type, account_name: "", account_id: "", account_number: "", bank_name: "", note: "", qr: "" })
+const BLANK = blankFor("bank")
+// Prefer Bank QR when picking which saved method to open on.
+const firstSavedType = (m: Record<string, PayoutMethod>) => ["bank", "pingpong", "lianlian"].find((t) => m[t]) || "bank"
 
 /**
  * Seller withdrawal. No bank API — the seller saves their payout details (which channel +
@@ -25,6 +28,10 @@ const BLANK: PayoutMethod = { type: "bank", account_name: "", account_id: "", ac
  */
 export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void }) {
   const [info, setInfo] = useState<PayoutMethod>({ ...BLANK })
+  // Saved details per method, so switching the dropdown prefills the right one.
+  const [saved, setSaved] = useState<Record<string, PayoutMethod>>({})
+  // Opt-in: remember these details for next time (default on).
+  const [remember, setRemember] = useState(true)
   // max === 0 means "no fixed ceiling — the balance is the cap" (admin-configurable).
   const [bounds, setBounds] = useState<{ min: number; max: number; balance: number }>({ min: 10, max: 0, balance: 0 })
   const [amount, setAmount] = useState("")
@@ -36,7 +43,11 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
   const load = useCallback(() => {
     getPayoutMethod()
       .then((r) => {
-        if (r.info) setInfo({ ...BLANK, ...r.info })
+        const methods = r.methods || {}
+        setSaved(methods)
+        // Open on a saved method if there is one, prefilled; else a blank Bank QR.
+        const t = firstSavedType(methods)
+        setInfo(methods[t] ? { ...blankFor(t), ...methods[t] } : blankFor(t))
         setBounds({ min: r.min, max: r.max, balance: r.balance })
       })
       .catch(() => {})
@@ -49,6 +60,8 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
   }, [open, load])
 
   const set = (k: keyof PayoutMethod, v: string) => setInfo((i) => ({ ...i, [k]: v }))
+  // Switching method loads THAT method's saved details (or a blank form for it).
+  const changeMethod = (t: string) => setInfo(saved[t] ? { ...blankFor(t), ...saved[t] } : blankFor(t))
   const onFile = (f?: File) => {
     if (!f) return
     if (f.size > 2 * 1024 * 1024) { setErr("That image is over 2 MB — please use a smaller QR image."); return }
@@ -81,9 +94,13 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
     if (!amt || amountErr) { setErr(amountErr || "Enter an amount to withdraw."); return }
     setBusy(true)
     try {
-      const s = await savePayoutMethod(info)
-      if (s.error) { setErr(s.error); return }
-      const r = await createPayoutRequest(amt, info.note?.trim() || undefined)
+      // Save for reuse only if asked; either way the request carries the details for THIS
+      // payout, so an unsaved one-off still works.
+      if (remember) {
+        const s = await savePayoutMethod(info)
+        if (s.error) { setErr(s.error); return }
+      }
+      const r = await createPayoutRequest(amt, info.note?.trim() || undefined, info)
       if (r.error) { setErr(r.error); return }
       setDone(true)
       onDone()
@@ -111,8 +128,8 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your payout details</div>
               <label className="flex flex-col gap-1">
                 <span className="text-[11px] text-muted-foreground">Method</span>
-                <select value={type} onChange={(e) => set("type", e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                  {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                <select value={type} onChange={(e) => changeMethod(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                  {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}{saved[m.id] ? " · saved" : ""}</option>)}
                 </select>
               </label>
               <Input placeholder="Account holder name" value={info.account_name || ""} onChange={(e) => set("account_name", e.target.value)} className="h-9" />
@@ -153,6 +170,11 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
 
               <Input placeholder="Note (optional)" value={info.note || ""} onChange={(e) => set("note", e.target.value)} className="h-9" />
             </div>
+
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="size-4 accent-[var(--primary)]" />
+              Save these details for next time
+            </label>
 
             {/* Amount */}
             <div className="space-y-2">
