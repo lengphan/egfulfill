@@ -449,11 +449,13 @@ const LIST_COLS: ListCol[] = [
       ? <span className="text-foreground">{String(c.claimed_by)}</span>
       : <span className="text-muted-foreground">Unclaimed</span> },
   { id: "priority", label: "Priority", cell: (c) => (c.priority && c.priority !== "normal" ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(c.priority)}</span> : <span className="text-muted-foreground">—</span>) },
-  { id: "lane", label: "Lane", cell: (c) => { const col = COLS.find((x) => x.id === colOf(c)); return <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs"><span className={"size-1.5 rounded-full " + (col?.accent ?? "bg-muted-foreground")} /> {col?.label}</span> } },
-  { id: "status", label: "Status", cell: (c) => (c.credited ? <span className="font-medium text-emerald-600">Credited</span> : <span className="text-muted-foreground">—</span>) },
+  { id: "files", label: "Files", cell: (c) => ((c.file_count ?? 0) > 0 ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Paperclip size={11} weight="bold" /> {c.file_count}</span> : <span className="text-muted-foreground">—</span>) },
+  // The lane IS the status, so it's labelled "Status". (The old separate "Status" column only
+  // said Credited/—, which the Payout column already implies — removed.)
+  { id: "lane", label: "Status", cell: (c) => { const col = COLS.find((x) => x.id === colOf(c)); return <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs"><span className={"size-1.5 rounded-full " + (col?.accent ?? "bg-muted-foreground")} /> {col?.label}</span> } },
   { id: "payout", label: "Payout", align: "right", cell: (c) => <span className="font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</span> },
 ]
-const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "lane", "payout"]
+const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "files", "lane", "payout"]
 
 // List view — columns are add/remove + renameable (admin/warehouse/operator), persisted.
 function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: string | number) => void }) {
@@ -479,6 +481,13 @@ function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: str
             localStorage.setItem("eg_dsn_cols", JSON.stringify(v))
           }
           localStorage.setItem("eg_dsn_cols_assigned", "1")
+          // Same one-time surfacing for the new "Files" column.
+          if (!v.includes("files") && !localStorage.getItem("eg_dsn_cols_files")) {
+            const at = v.indexOf("lane")
+            v = at >= 0 ? [...v.slice(0, at), "files", ...v.slice(at)] : [...v, "files"]
+            localStorage.setItem("eg_dsn_cols", JSON.stringify(v))
+          }
+          localStorage.setItem("eg_dsn_cols_files", "1")
           setVisible(v)
         }
       } catch { /* default */ }
