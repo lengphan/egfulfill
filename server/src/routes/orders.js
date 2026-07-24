@@ -657,6 +657,33 @@ export function ordersRoutes(app, requireAuth) {
     return r.rows;
   });
 
+  /**
+   * Capacity status for the CURRENT seller — information only, never a gate.
+   *
+   * Answers "have I crossed my daily order limit, and if so what should I be told?". A team
+   * member resolves to the OWNER, so a team shares one limit. `over` is true only once the
+   * count has ACTUALLY reached the limit — so the delay notice can't pop up prematurely. When
+   * no limit applies (0/unset) it returns over:false and the client shows nothing.
+   */
+  app.get('/api/orders/limit-status', { preHandler: requireAuth }, async (req) => {
+    const sel = await resolveSeller(req.user).catch(() => null);
+    const sellerId = (sel && sel.id) || req.user.sub;
+    const [row, cfg] = await Promise.all([
+      q('select order_limit from users where id=$1', [String(sellerId)]).then((r) => r.rows[0]).catch(() => null),
+      readAll().catch(() => ({})),
+    ]);
+    const limit = (row && row.order_limit != null) ? Number(row.order_limit) : Number(cfg.order_limit_default || 0);
+    if (!isFinite(limit) || limit <= 0) return { limit: 0, usedToday: 0, over: false, notice: null };
+    const used = await q(
+      "select count(*)::int as n from orders where seller_id=$1 and created_at >= current_date",
+      [String(sellerId)]
+    ).then((r) => r.rows[0]?.n || 0).catch(() => 0);
+    const over = used >= limit;
+    const notice = String(cfg.capacity_notice || '').trim()
+      || 'Due to high order volume, orders submitted now may ship later than usual.';
+    return { limit, usedToday: used, over, notice: over ? notice : null };
+  });
+
   // Create / upsert (the seller who creates it owns it)
   app.post('/api/orders', { preHandler: requireAuth }, async (req, reply) => {
     const o = req.body || {};

@@ -41,6 +41,10 @@ const KEYS = [
   // Seller payout guardrails. payout_max = 0 means "no fixed ceiling — limited only by the
   // seller's own balance", which is always the hard cap regardless.
   'payout_min', 'payout_max',
+  // Peak-season capacity: the DEFAULT per-seller daily order limit (0 = unlimited). A seller
+  // can be given their own higher limit; this is the fallback. Crossing it never blocks a
+  // submit — it only surfaces the editable delay notice below.
+  'order_limit_default',
 ];
 
 // Supplier-ordering defaults. Kept OUT of KEYS because those are all numbers coerced with
@@ -53,7 +57,10 @@ const TEXT_KEYS = ['ss_shipping_method', 'otto_payment_method', 'otto_shipping_m
                    'order_email', 'ss_order_email', 'otto_order_email', 'ss_payment_profile',
                    // Otto require BOTH on every order, and they come from their Customer
                    // API rather than anything we hold.
-                   'otto_customer', 'otto_contact'];
+                   'otto_customer', 'otto_contact',
+                   // Editable delay notice shown to a seller ONLY once they've crossed their
+                   // order limit — e.g. "orders submitted now may ship later than usual".
+                   'capacity_notice'];
 
 // Defaults applied when a key has never been set. Exported so the pricing path and the
 // product editor agree on the starting numbers instead of each hardcoding its own.
@@ -105,6 +112,9 @@ export const SETTING_DEFAULTS = {
   // never exceed what's in the wallet.
   payout_min: 10,
   payout_max: 0,
+  // 0 = no default cap; a seller submits freely and never sees the delay notice unless a
+  // per-seller limit is set. Set a number to make it apply to every seller by default.
+  order_limit_default: 0,
 };
 
 /**

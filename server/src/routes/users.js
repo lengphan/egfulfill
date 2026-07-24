@@ -49,6 +49,10 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   // their orders — nothing is orphaned), but blocks login. schema.sql sets this on
   // fresh installs; this alter covers existing databases.
   q('alter table users add column if not exists active boolean not null default true').catch(() => {});
+  // Peak-season per-seller DAILY order limit. NULL = use the platform default
+  // (order_limit_default). Crossing it never blocks a submit — it only surfaces the editable
+  // delay notice, and only AFTER the limit is actually crossed (no premature warning).
+  q('alter table users add column if not exists order_limit int').catch(() => {});
 
   app.get('/api/users', { preHandler: requireUserManager }, async () => {
     // Include the TEAM relationship so the admin screen can group members under their
@@ -56,6 +60,10 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     // member belongs to whom — the one thing you need before changing anything.
     const r = await q(`
       select u.id, u.email, u.name, u.role, u.store_name, u.active, u.plan, u.spydeck_addon, u.created_at,
+             u.order_limit,
+             -- Orders this seller has created today — so the admin sees usage against the
+             -- limit without opening each account.
+             (select count(*)::int from orders o2 where o2.seller_id = u.id::text and o2.created_at >= current_date) as orders_today,
              tm.owner_id,
              coalesce(o.store_name, o.name, o.email) as owner_label,
              tm.permissions as team_permissions,
@@ -89,7 +97,7 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   });
 
   app.patch('/api/users/:id', { preHandler: requireUserManager }, async (req, reply) => {
-    const { role, password, name, active, plan, spydeck_addon } = req.body || {};
+    const { role, password, name, active, plan, spydeck_addon, order_limit } = req.body || {};
     const isAdminCaller = req.user.role === 'admin';
     if (!isAdminCaller) {
       // Warehouse: no privilege changes, and hands off admin accounts entirely.
@@ -110,6 +118,13 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
       sets.push(`active=$${n++}`); vals.push(active);
     }
     if (password) { if (password.length < 8) { reply.code(400); return { error: 'Password too short' }; } sets.push(`password_hash=$${n++}`); vals.push(await hashPassword(password)); }
+    // Per-seller order limit — a capacity/operations setting, so a user-manager (admin or
+    // warehouse) may set it, not just an admin. Empty/null clears it back to the platform
+    // default; a number floors at 0.
+    if (order_limit !== undefined) {
+      const lim = (order_limit === null || order_limit === '') ? null : Math.max(0, parseInt(order_limit, 10) || 0);
+      sets.push(`order_limit=$${n++}`); vals.push(lim);
+    }
     if (!sets.length) return { ok: true };
     vals.push(req.params.id);
     await q(`update users set ${sets.join(',')} where id=$${n}`, vals);
