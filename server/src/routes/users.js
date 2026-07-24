@@ -64,7 +64,7 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
              u.order_limit,
              -- Orders this seller has created today — so the admin sees usage against the
              -- limit without opening each account.
-             (select count(*)::int from orders o2 where o2.seller_id = u.id::text and o2.created_at >= current_date) as orders_today,
+             (select count(*)::int from orders o2 where o2.seller_id = u.id and o2.created_at >= current_date) as orders_today,
              tm.owner_id,
              coalesce(o.store_name, o.name, o.email) as owner_label,
              tm.permissions as team_permissions,
@@ -156,7 +156,7 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     const rows = (await q(`
       select u.id, coalesce(u.store_name, u.name, u.email) as label,
              (select count(*)::float from orders o
-                where o.seller_id = u.id::text and o.created_at >= now() - interval '14 days') / 14.0 as avg_daily
+                where o.seller_id = u.id and o.created_at >= now() - interval '14 days') / 14.0 as avg_daily
         from users u
        where u.role = 'seller' and u.active = true`).catch(() => ({ rows: [] }))).rows;
     if (!rows.length) return { ok: true, applied: 0, cap, assignments: [] };
