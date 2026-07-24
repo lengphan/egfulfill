@@ -1392,9 +1392,12 @@ export type DesignCard = {
    *  goes out. Outsourced cards can't be claimed by a designer and never pay one. */
   vendor?: string | null
   vendor_ref?: string | null
-  /** Notes we've posted to the partner's task (see pinkComment). A running log kept apart
-   *  from the description — their board can't send comments back, so this is our record. */
+  /** Notes previously posted to the partner's task. A running log kept apart from the
+   *  description; the composer that wrote them was removed, but old entries persist. */
   partner_notes?: PartnerNote[]
+  /** The exact image URLs sent to the partner on push — for a "this is what we sent"
+   *  preview on the card. */
+  pushed_images?: string[]
   customer?: string | null
   [k: string]: unknown // preserve extra columns (specs/files/notes/…) on round-trip
 }

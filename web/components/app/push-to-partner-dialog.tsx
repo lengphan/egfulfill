@@ -65,7 +65,6 @@ export function PushToPartnerDialog({
   const [boards, setBoards] = useState<Opt[]>([])
 
   const [title, setTitle] = useState("")
-  const [count, setCount] = useState("")
   const [desc, setDesc] = useState("")
   const [productType, setProductType] = useState("")
   const [board, setBoard] = useState("")
@@ -93,7 +92,6 @@ export function PushToPartnerDialog({
     const t = setTimeout(() => {
       load()
       setTitle(orderId ? `${itemName || sku || "Design"} · order ${orderId}` : (itemName || sku || "Design"))
-      setCount(String(qty || 1))
       setDesc([
         printType ? `Print method: ${printType}.` : null,
         orderId ? `Order ${orderId}${sku ? `, SKU ${sku}` : ""}.` : "Not tied to an order.",
@@ -127,7 +125,9 @@ export function PushToPartnerDialog({
       const r = await pushToPink({
         orderId, sku, cardId,
         title: title.trim() || undefined,
-        qty: Number(count) || undefined,
+        // The order's real quantity is still sent as context (server falls back to the line's
+        // qty when absent); it just isn't an editable field, because a design is one job.
+        qty: qty ?? undefined,
         description: desc.trim() || undefined,
         productType: productType || undefined,
         boardId: board || undefined,
@@ -187,22 +187,19 @@ export function PushToPartnerDialog({
           <Field label="Title">
             <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} className="h-9" />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Quantity">
-              <Input value={count} onChange={(e) => setCount(e.target.value.replace(/[^0-9]/g, ""))}
-                     inputMode="numeric" disabled={busy} className="h-9" />
-            </Field>
-            <Field label="Product type">
-              {/* min-w-0 lets the select shrink inside the grid cell — a long option label
-                  gives it an intrinsic width that otherwise pushed the whole dialog wider
-                  than its box and clipped on the right. */}
-              <select value={productType} onChange={(e) => setProductType(e.target.value)} disabled={busy}
-                className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
-                <option value="">— not set —</option>
-                {productTypes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </Field>
-          </div>
+          {/* No "Quantity" field: a design is made ONCE regardless of how many units get
+              printed, so a per-task quantity is meaningless to a design partner and only
+              confused people. The order's real qty is still sent in the payload (below) as
+              context, just not surfaced as an editable box. */}
+          <Field label="Product type">
+            {/* min-w-0 lets the select shrink so a long option label can't push the dialog
+                wider than its box. */}
+            <select value={productType} onChange={(e) => setProductType(e.target.value)} disabled={busy}
+              className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
+              <option value="">— not set —</option>
+              {productTypes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
           {boards.length > 1 && (
             <Field label="Board">
               <select value={board} onChange={(e) => setBoard(e.target.value)} disabled={busy}

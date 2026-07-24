@@ -225,17 +225,20 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   //
   // An EXISTING card is updated rather than duplicated — dragging a card to the partner
   // lane must not leave the original sitting in Incoming looking like unclaimed work.
+  // The EXACT images we handed Pink, stored on the card so the board can show a "this is
+  // what we sent" preview — otherwise there's no way to tell which files already went.
+  const sentImages = JSON.stringify(payload.images);
   let cardOut = card ? String(card.id) : null;
   if (card) {
     await q(`update design_cards set vendor='pinkdesign', vendor_ref=$2, col='inprogress',
-                    thumb=coalesce(thumb,$3), updated_at=now() where id=$1::bigint`,
-      [String(card.id), String(refId), imageUrl]).catch(() => {});
+                    thumb=coalesce(thumb,$3), pushed_images=$4::jsonb, updated_at=now() where id=$1::bigint`,
+      [String(card.id), String(refId), imageUrl, sentImages]).catch(() => {});
   } else {
     const ins = await q(
-      `insert into design_cards (order_id, sku, title, col, type, product, thumb, vendor, vendor_ref, payment, pay_status)
-       values ($1,$2,$3,'inprogress',$4,$5,$6,'pinkdesign',$7,0,'na')
+      `insert into design_cards (order_id, sku, title, col, type, product, thumb, vendor, vendor_ref, payment, pay_status, pushed_images)
+       values ($1,$2,$3,'inprogress',$4,$5,$6,'pinkdesign',$7,0,'na',$8::jsonb)
        returning id`,
-      [useOrder || null, useSku || null, payload.title, method, item?.name || null, imageUrl, String(refId)]
+      [useOrder || null, useSku || null, payload.title, method, item?.name || null, imageUrl, String(refId), sentImages]
     ).catch(() => ({ rows: [] }));
     cardOut = ins.rows[0] ? String(ins.rows[0].id) : null;
   }

@@ -628,6 +628,24 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           )}
         </div>
 
+        {/* What we actually SENT them — small previews so it's obvious which files already
+            went, no filenames needed. Click one to open it full size. */}
+        {card.vendor && Array.isArray(card.pushed_images) && card.pushed_images.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Sent to {vendorLabel(card.vendor)}</span>
+            <div className="flex flex-wrap gap-2">
+              {card.pushed_images.map((src, i) => (
+                <a key={i} href={src} target="_blank" rel="noopener noreferrer"
+                   className="block size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
+                   title="Open full size">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" loading="lazy" className="size-full object-cover" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Payout is a DESIGNER's earning — a vendor card is paid by invoice, not a payout,
             so the field is hidden for it (the notice above already says so). */}
         {!card.vendor && (canFee ? (

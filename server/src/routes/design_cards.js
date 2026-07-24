@@ -23,6 +23,10 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // APART from the design description. Append-only; the whole-list card save never lists
   // this column, so a board drag/edit can't wipe the log.
   q("alter table design_cards add column if not exists partner_notes jsonb default '[]'::jsonb").catch(() => {});
+  // The exact image URLs we sent to the partner on push — so the card can show a small
+  // "this is what we sent" preview. Not listed in the whole-list save, so a board edit
+  // can't wipe it.
+  q("alter table design_cards add column if not exists pushed_images jsonb default '[]'::jsonb").catch(() => {});
   // Which ORDER LINE this card is for. The client has always sent it (orders-hub builds
   // every card with line_id) but no column existed, so it was dropped on every save and
   // read back as null. That broke the "already has a card" check, which falls back to
