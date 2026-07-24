@@ -8,7 +8,7 @@ import { DesignLabTabs, useDesignLabTab } from "@/components/app/design-lab-tabs
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { DesignStudioDialog } from "@/components/app/design-studio"
-import { getDesignLibrary, deleteDesignLibrary, type LibraryDesign } from "@/lib/api"
+import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, type LibraryDesign } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 
 const fmtDate = (s?: string) => {
@@ -43,7 +43,20 @@ function DesignLab() {
   }
 
   const [copied, setCopied] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | number | null>(null)
   const list = designs ?? []
+
+  // Rename in place. Reads the input's own value (uncontrolled) so there's no stale-draft
+  // state, and skips the request when the name is unchanged. The id — the import reference —
+  // never changes; only the label does.
+  const commitName = async (id: string | number, value: string) => {
+    setEditId(null)
+    const name = value.trim()
+    const cur = list.find((d) => d.id === id)
+    if (!name || (cur && (cur.name || "") === name)) return
+    setDesigns((prev) => (prev ?? []).map((d) => (d.id === id ? { ...d, name } : d)))
+    try { await renameDesignLibrary(id, name) } catch { load() }
+  }
 
   return (
     <div className="space-y-4">
@@ -100,18 +113,40 @@ function DesignLab() {
                     </button>
                   </div>
                   <div className="p-3">
-                    <div className="truncate text-sm font-semibold">{d.name || "Untitled"}</div>
-                    <div className="mt-0.5 flex items-center gap-1.5">
+                    {/* Click the title to rename. Uncontrolled input keyed off the design id
+                        so remounting per row starts from the right value; Enter/blur saves,
+                        Esc reverts. */}
+                    {editId === d.id ? (
+                      <input
+                        autoFocus
+                        defaultValue={d.name || ""}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onBlur={(e) => commitName(d.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur() }
+                          else if (e.key === "Escape") { e.currentTarget.value = d.name || ""; e.currentTarget.blur() }
+                        }}
+                        className="w-full rounded-md border border-primary/50 bg-background px-1.5 py-0.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/40"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setEditId(d.id)}
+                        title="Click to rename"
+                        className="eg-tap block max-w-full truncate text-left text-sm font-semibold transition-colors hover:text-primary"
+                      >
+                        {d.name || "Untitled"}
+                      </button>
+                    )}
+                    <div className="mt-1.5 flex items-center gap-1.5">
                       <span className="text-xs text-muted-foreground">{fmtDate(d.created_at)}</span>
-                      {/* The ID, visible and copyable. Import accepts a design reference, but
-                          nobody could fill that column in while the id was only ever in the
-                          database. */}
+                      {/* The ID, visible and copyable — the reference sellers put on an import
+                          sheet, so it's shown at a readable size, not a tiny caption. */}
                       <button
                         onClick={() => { navigator.clipboard?.writeText(`DSN-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
-                        title="Copy this design's ID"
-                        className="eg-tap ml-auto rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                        title="Copy this design's ID for an import sheet"
+                        className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 font-mono text-[13px] font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                       >
-                        {copied === String(d.id) ? "Copied" : `DSN-${d.id}`}
+                        {copied === String(d.id) ? "Copied ✓" : `DSN-${d.id}`}
                       </button>
                     </div>
                   </div>

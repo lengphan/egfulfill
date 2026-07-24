@@ -106,6 +106,18 @@ export function designLibraryRoutes(app, requireAuth, requireStaff) {
     return r.rows[0];
   });
 
+  // Rename one (only the seller's own). Name only — the artwork bytes and the id (the
+  // import reference) are untouched, so a rename never affects an import sheet.
+  app.patch('/api/design_library/:id', { preHandler: requireAuth }, async (req, reply) => {
+    const name = String((req.body || {}).name || '').trim().slice(0, 200);
+    if (!name) { reply.code(400); return { error: 'name required' }; }
+    const r = await q(
+      'update design_library set name=$1 where id=$2 and seller_id=$3 returning id, name, thumb, created_at',
+      [name, req.params.id, req.user.sub]);
+    if (!r.rows[0]) { reply.code(404); return { error: 'not found' }; }
+    return r.rows[0];
+  });
+
   // Remove one (only the seller's own).
   app.delete('/api/design_library/:id', { preHandler: requireAuth }, async (req) => {
     await q('delete from design_library where id=$1 and seller_id=$2', [req.params.id, req.user.sub]).catch(() => {});

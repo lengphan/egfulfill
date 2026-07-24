@@ -1499,6 +1499,9 @@ export function getDesignLibraryItem(id: number | string) {
 export function saveDesignLibrary(body: { name?: string; data: string; thumb?: string }) {
   return api<LibraryDesign & { error?: string }>(`/api/design_library`, { method: "POST", body: JSON.stringify(body) })
 }
+export function renameDesignLibrary(id: number | string, name: string) {
+  return api<LibraryDesign & { error?: string }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "PATCH", body: JSON.stringify({ name }) })
+}
 export function deleteDesignLibrary(id: number | string) {
   return api<{ ok?: boolean }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }
