@@ -14,6 +14,16 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_ORIGIN}/api/:path*` }]
   },
+  // Suppliers + Purchase merged into one "Purchasing" section. These run at the routing
+  // layer, BEFORE the (boards) auth guard, so old links/bookmarks land on the right tab
+  // instead of racing the guard to the landing board. Non-permanent (307) so the mapping
+  // can change later without browsers caching it.
+  async redirects() {
+    return [
+      { source: "/suppliers", destination: "/purchasing?tab=browse", permanent: false },
+      { source: "/purchase", destination: "/purchasing?tab=purchase", permanent: false },
+    ]
+  },
 }
 
 export default nextConfig

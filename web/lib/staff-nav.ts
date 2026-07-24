@@ -1,4 +1,4 @@
-import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, EnvelopeSimple, Needle, type Icon } from "@phosphor-icons/react"
+import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, EnvelopeSimple, Needle, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -21,8 +21,9 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   // physical custody, but an operator needs to look up what's on hand.
   { label: "Scan", href: "/scan", icon: Barcode, roles: ["operator", "warehouse", "admin"] },
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
-  { label: "Purchase", href: "/purchase", icon: ShoppingBag, roles: ["operator", "warehouse", "admin"] },
-  { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
+  // Purchasing = Suppliers (browse) + Purchase (cart/on-order/history) folded into one
+  // section with tabs. Old /suppliers + /purchase routes redirect here (next.config).
+  { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, roles: ["operator", "warehouse", "admin"] },
   // Partner billing — what byeastside / Pink Design / carriers / suppliers are owed.
   // Money, so warehouse and admin only, matching every other spend boundary.
   // Finance = Wallet (balances/transactions) + Partner costs (byeastside/carriers/suppliers)

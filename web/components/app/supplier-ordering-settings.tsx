@@ -211,8 +211,8 @@ export function SupplierOrderingSettings() {
         </Button>
         {saved && <span className="text-sm text-emerald-600">Saved — purchases will use these.</span>}
         {err && <span className="text-sm text-destructive">{err}</span>}
-        <a href="/purchase" className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-          Purchase board <ArrowSquareOut size={11} weight="bold" />
+        <a href="/purchasing?tab=purchase" className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+          Purchasing <ArrowSquareOut size={11} weight="bold" />
         </a>
       </div>
     </div>

@@ -9,6 +9,7 @@ import {
   Sun,
   Plus,
   CaretDown,
+  ShoppingCart,
 } from "@phosphor-icons/react"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { navTitle } from "@/lib/nav"
 import { staffNavTitle } from "@/lib/staff-nav"
-import { getWallet } from "@/lib/api"
+import { getWallet, getFactoryList } from "@/lib/api"
 import { getUser, clearSession, type User } from "@/lib/auth"
 import { UserAvatar } from "@/components/app/user-avatar"
 import { NotificationBell } from "@/components/app/notification-bell"
@@ -119,6 +120,23 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
   }, [])
 
   const isStaff = !!role && role !== "seller"
+  // The purchasing cart lives at the top bar so the to-order pool is reachable from any
+  // page — the whole point of merging Suppliers + Purchase. Same roles that can reach the
+  // Purchasing section. Count is the number of saved to-order lines (`po_saved`).
+  const showCart = isStaff && (role === "operator" || role === "warehouse" || role === "admin")
+  const [cartCount, setCartCount] = useState(0)
+  useEffect(() => {
+    if (!showCart) return
+    let cancelled = false
+    const load = () => getFactoryList<unknown[]>("po_saved")
+      .then((r) => { if (!cancelled) setCartCount(Array.isArray(r) ? r.length : 0) })
+      .catch(() => {})
+    load()
+    // Refresh when anything changes the pool, and on navigation (e.g. leaving the cart).
+    window.addEventListener("eg-cart-changed", load)
+    return () => { cancelled = true; window.removeEventListener("eg-cart-changed", load) }
+  }, [showCart, pathname])
+
   const title = nl("nav", isStaff ? staffNavTitle(pathname) : navTitle(pathname))
   // Balance only for accounts with a selling wallet — sellers, admin, warehouse. Not operator/designer.
   const showBalance = !isStaff || role === "admin" || role === "warehouse"
@@ -141,6 +159,17 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
         >
           {mounted && resolvedTheme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </IconButton>
+
+        {showCart && (
+          <IconButton label="Purchasing cart" onClick={() => router.push("/purchasing?tab=purchase")}>
+            <ShoppingCart size={18} />
+            {cartCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </IconButton>
+        )}
 
         <Separator orientation="vertical" className="mx-2 !h-6" />
 
