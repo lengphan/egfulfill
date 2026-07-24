@@ -23,13 +23,48 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { navTitle } from "@/lib/nav"
 import { staffNavTitle } from "@/lib/staff-nav"
-import { getWallet, getFactoryList } from "@/lib/api"
+import { getWallet, getFactoryList, getOrderLimitStatus, getFactoryCapacity } from "@/lib/api"
+import { onLive } from "@/lib/live"
 import { getUser, clearSession, type User } from "@/lib/auth"
 import { UserAvatar } from "@/components/app/user-avatar"
 import { NotificationBell } from "@/components/app/notification-bell"
 import { OrderSearch } from "@/components/app/order-search"
 import { LanguageSwitcher } from "@/components/app/language-switcher"
 import { useT, useLabelT } from "@/lib/i18n"
+
+/**
+ * Peak-season capacity readout in the header. A SELLER sees their own uploads-today vs their
+ * limit ("Orders 3/10"); STAFF see the whole-floor total ("Factory 45/200"). Shows only when
+ * peak-season mode is on, and re-fetches on the live "orders" ping so it ticks up as orders
+ * are uploaded. Amber once the limit is reached.
+ */
+function CapacityBadge({ staff }: { staff: boolean }) {
+  const [s, setS] = useState<{ mode: boolean; limit: number; usedToday: number; over?: boolean } | null>(null)
+  useEffect(() => {
+    let alive = true
+    const load = () => {
+      ;(staff ? getFactoryCapacity() : getOrderLimitStatus())
+        .then((r) => { if (alive) setS(r) })
+        .catch(() => {})
+    }
+    const t = setTimeout(load, 0)
+    const off = onLive("orders", load)
+    return () => { alive = false; clearTimeout(t); off() }
+  }, [staff])
+  if (!s || !s.mode) return null
+  // A seller needs a limit to show anything; staff show the count even with no ceiling.
+  if (!staff && (!s.limit || s.limit <= 0)) return null
+  const over = staff ? (s.limit > 0 && s.usedToday >= s.limit) : !!s.over
+  const cap = s.limit > 0 ? `${s.usedToday}/${s.limit}` : String(s.usedToday)
+  return (
+    <span
+      title={staff ? "Orders taken in today across the floor" : "Orders you've uploaded today vs your daily limit"}
+      className={"hidden items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold tabular-nums sm:inline-flex " + (over ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground")}
+    >
+      {staff ? "Factory" : "Orders"} {cap}
+    </span>
+  )
+}
 
 function IconButton({
   label,
@@ -151,6 +186,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
           <MagnifyingGlass size={18} />
         </IconButton>
         <OrderSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+        <CapacityBadge staff={isStaff} />
         <NotificationBell />
         <LanguageSwitcher />
         <IconButton

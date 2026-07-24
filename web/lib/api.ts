@@ -173,10 +173,15 @@ export type AdminUser = {
   /** Orders this seller has created today — usage against the limit. */
   orders_today?: number
 }
-/** The current seller's capacity status — information only, never blocks a submit. `over` is
- *  true only once today's count has actually reached the limit. */
+/** The current seller's capacity status — information only, never blocks a submit. `mode` is
+ *  the master switch; `over` is true only once today's count has reached the limit. limit:0
+ *  means "nothing to show" (mode off or no limit set). */
 export function getOrderLimitStatus() {
-  return api<{ limit: number; usedToday: number; over: boolean; notice: string | null }>(`/api/orders/limit-status`)
+  return api<{ mode: boolean; limit: number; usedToday: number; over: boolean; notice: string | null }>(`/api/orders/limit-status`)
+}
+/** Whole-factory intake today — staff only. limit:0 = show as a plain count (no ceiling). */
+export function getFactoryCapacity() {
+  return api<{ mode: boolean; limit: number; usedToday: number }>(`/api/orders/factory-capacity`)
 }
 export function getUsers() {
   return api<AdminUser[]>(`/api/users`)

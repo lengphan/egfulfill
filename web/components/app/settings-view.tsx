@@ -846,6 +846,8 @@ function PlatformPanel() {
   const [designPartnerCost, setDesignPartnerCost] = useState("")
   const [orderLimitDefault, setOrderLimitDefault] = useState("")
   const [capacityNotice, setCapacityNotice] = useState("")
+  const [capacityMode, setCapacityMode] = useState(false)
+  const [factoryDailyLimit, setFactoryDailyLimit] = useState("")
   const [shipFirst, setShipFirst] = useState("")
   const [shipExtra, setShipExtra] = useState("")
   const [embPrice, setEmbPrice] = useState("")
@@ -896,6 +898,8 @@ function PlatformPanel() {
       setDesignPartnerCost(r.design_partner_cost != null ? String(r.design_partner_cost) : "")
       setOrderLimitDefault(r.order_limit_default != null ? String(r.order_limit_default) : "")
       setCapacityNotice(r.capacity_notice != null ? String(r.capacity_notice) : "")
+      setCapacityMode(!!Number(r.capacity_mode || 0))
+      setFactoryDailyLimit(r.factory_daily_limit != null ? String(r.factory_daily_limit) : "")
       setShipFirst(r.ship_first != null ? String(r.ship_first) : "")
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
@@ -931,6 +935,8 @@ function PlatformPanel() {
         design_partner_cost: designPartnerCost === "" ? undefined : Number(designPartnerCost),
         order_limit_default: orderLimitDefault === "" ? undefined : Number(orderLimitDefault),
         capacity_notice: capacityNotice,
+        capacity_mode: capacityMode ? 1 : 0,
+        factory_daily_limit: factoryDailyLimit === "" ? undefined : Number(factoryDailyLimit),
         ship_first: shipFirst === "" ? undefined : Number(shipFirst),
         ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
         emb_price: embPrice === "" ? undefined : Number(embPrice),
@@ -1095,6 +1101,12 @@ function PlatformPanel() {
       </Fold>
 
       <Fold title="Peak-season capacity" hint="per-seller order limits + the delay notice">
+        {/* Master switch — off = no header counters, no notice, limits ignored. */}
+        <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+          <input type="checkbox" checked={capacityMode} onChange={(e) => setCapacityMode(e.target.checked)} className="size-4 accent-primary" />
+          <span className="text-sm font-medium">Peak-season mode {capacityMode ? "on" : "off"}</span>
+          <span className="text-xs text-muted-foreground">— turns on the order counters in the header (sellers see their own, staff see the factory total) and the delay notice.</span>
+        </label>
         <p className="mb-3 text-xs text-muted-foreground">
           When a seller crosses their daily order limit they see the notice below at submit — a
           heads-up, never a block. Set a limit on an individual seller from the Accounts list;
@@ -1109,6 +1121,15 @@ function PlatformPanel() {
               inputMode="numeric" placeholder="0" className="h-9"
             />
             <span className="block text-[11px] text-muted-foreground">0 = no default cap. A seller&apos;s own limit always wins.</span>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Factory daily limit (staff only)</span>
+            <Input
+              value={factoryDailyLimit}
+              onChange={(e) => setFactoryDailyLimit(e.target.value.replace(/[^0-9]/g, ""))}
+              inputMode="numeric" placeholder="0" className="h-9"
+            />
+            <span className="block text-[11px] text-muted-foreground">Total orders/day the whole floor can take — shown in the staff header. 0 = shown as a plain count.</span>
           </label>
         </div>
         <label className="mt-3 block space-y-1">

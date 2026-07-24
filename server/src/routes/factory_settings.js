@@ -45,6 +45,10 @@ const KEYS = [
   // can be given their own higher limit; this is the fallback. Crossing it never blocks a
   // submit — it only surfaces the editable delay notice below.
   'order_limit_default',
+  // capacity_mode = the 0/1 MASTER SWITCH for the whole feature: off = no header counters,
+  // no notice, limits ignored. factory_daily_limit = the whole-factory daily intake ceiling
+  // shown in the STAFF header (0 = shown as a plain count, no ceiling).
+  'capacity_mode', 'factory_daily_limit',
 ];
 
 // Supplier-ordering defaults. Kept OUT of KEYS because those are all numbers coerced with
@@ -115,6 +119,8 @@ export const SETTING_DEFAULTS = {
   // 0 = no default cap; a seller submits freely and never sees the delay notice unless a
   // per-seller limit is set. Set a number to make it apply to every seller by default.
   order_limit_default: 0,
+  capacity_mode: 0,        // 0 = peak-season mode OFF (no counters/notices)
+  factory_daily_limit: 0,  // whole-factory daily intake ceiling for the staff header
 };
 
 /**

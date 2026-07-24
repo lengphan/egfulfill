@@ -672,8 +672,12 @@ export function ordersRoutes(app, requireAuth) {
       q('select order_limit from users where id=$1', [String(sellerId)]).then((r) => r.rows[0]).catch(() => null),
       readAll().catch(() => ({})),
     ]);
+    const mode = !!Number(cfg.capacity_mode || 0);
     const limit = (row && row.order_limit != null) ? Number(row.order_limit) : Number(cfg.order_limit_default || 0);
-    if (!isFinite(limit) || limit <= 0) return { limit: 0, usedToday: 0, over: false, notice: null };
+    // Off, or no limit set → nothing to show. The header hides on limit:0.
+    if (!mode || !isFinite(limit) || limit <= 0) return { mode, limit: 0, usedToday: 0, over: false, notice: null };
+    // Count is ORDERS UPLOADED TODAY (created), so the header ticks up on every upload/import
+    // and crosses when an import pushes them past the limit.
     const used = await q(
       "select count(*)::int as n from orders where seller_id=$1 and created_at >= current_date",
       [String(sellerId)]
@@ -681,7 +685,22 @@ export function ordersRoutes(app, requireAuth) {
     const over = used >= limit;
     const notice = String(cfg.capacity_notice || '').trim()
       || 'Due to high order volume, orders submitted now may ship later than usual.';
-    return { limit, usedToday: used, over, notice: over ? notice : null };
+    return { mode, limit, usedToday: used, over, notice: over ? notice : null };
+  });
+
+  /**
+   * Whole-factory intake today — STAFF only, for the capacity readout in their header.
+   * "used" is seller orders created today (the incoming load). Sellers never see this.
+   */
+  app.get('/api/orders/factory-capacity', { preHandler: requireAuth }, async (req) => {
+    if (!isStaff(req.user)) return { mode: false, limit: 0, usedToday: 0 };
+    const cfg = await readAll().catch(() => ({}));
+    if (!Number(cfg.capacity_mode || 0)) return { mode: false, limit: 0, usedToday: 0 };
+    const limit = Number(cfg.factory_daily_limit || 0);
+    const used = await q(
+      "select count(*)::int as n from orders where created_at >= current_date and factory_order = false"
+    ).then((r) => r.rows[0]?.n || 0).catch(() => 0);
+    return { mode: true, limit: isFinite(limit) && limit > 0 ? limit : 0, usedToday: used };
   });
 
   // Create / upsert (the seller who creates it owns it)
