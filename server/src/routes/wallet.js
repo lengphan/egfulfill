@@ -243,6 +243,11 @@ export function walletRoutes(app, requireAuth) {
       when type = 'expedite-cost'       then 'byeastside'
       when type in ('expedite-in','expedite-out') then 'byeastside'
       when type = 'design-partner-cost' then 'pinkdesign'
+      -- A design payout to one of OUR designers is a design cost too. Attribute only the
+      -- house-DEBIT side (account='factory'): that's what we paid out, so the summary shows
+      -- it as a cost alongside Pink. The matching credit on the designer's own wallet is
+      -- their earning, not a partner cost, so it's deliberately left unlabelled.
+      when type = 'design-pay' and account = 'factory' then 'designer'
       when type = 'label-cost'          then 'carrier'
       when type = 'blanks-cost'         then 'suppliers'
     end)`;
