@@ -296,7 +296,7 @@ export function DesignerBoard() {
         // five/six columns fit the page rather than clipping the last one. minmax(9rem, 1fr)
         // keeps them usable and only falls back to horizontal scroll when the window is
         // genuinely too narrow (mobile, where the List view is the better tool anyway).
-        <div className="grid gap-3 overflow-x-auto pb-2"
+        <div className="grid gap-2 overflow-x-auto pb-2"
              style={{ gridTemplateColumns: `repeat(${showPartner ? COLS.length + 1 : COLS.length}, minmax(9rem, 1fr))` }}>
           {[...COLS, ...(showPartner ? [PARTNER_COL] : [])].map((col) => {
             const list = grouped[col.id] ?? []
@@ -337,8 +337,9 @@ export function DesignerBoard() {
                         onClick={() => setOpenId(c.id)}
                         className={"group overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow " + (c.vendor ? "cursor-pointer" : "cursor-grab active:cursor-grabbing")}
                       >
-                        {/* Large preview so the design is actually visible on the card */}
-                        <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+                        {/* Fixed SQUARE preview so every tile is the same shape regardless of
+                            lane width — the design fills a consistent 1:1 frame. */}
+                        <div className="relative aspect-square w-full overflow-hidden bg-muted">
                           {c.thumb ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={String(c.thumb)} alt="" className="size-full object-cover" />
