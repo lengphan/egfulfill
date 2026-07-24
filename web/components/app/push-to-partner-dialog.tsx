@@ -134,7 +134,9 @@ export function PushToPartnerDialog({
         extraImages: extras.map((e) => e.url),
       })
       if (r.error) { setMsg({ ok: false, text: r.error }); return }
-      setMsg({ ok: true, text: `Sent — their task ref is ${r.refId}.` })
+      // A warning means the task WAS created but we couldn't capture its reference, so status
+      // sync won't work for it — show that plainly rather than a cheerful "sent".
+      setMsg(r.warning ? { ok: false, text: r.warning } : { ok: true, text: `Sent — their task ref is ${r.refId}.` })
       onPushed?.(r.refId)
       setTimeout(() => onOpenChange(false), 1200)
     } catch (e) {

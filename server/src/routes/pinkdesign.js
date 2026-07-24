@@ -207,12 +207,22 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
     ...(designType ? { design_type: designType } : {}),
   };
   const r = await pink('/create_task', { method: 'POST', body: JSON.stringify(payload) });
+  console.log('[pinkdesign create_task] status', r.status, '· response', JSON.stringify(r.data).slice(0, 600));
   if (!r.ok) {
     const msg = (r.data && (r.data.message || r.data.error)) || r.error || `create_task failed (${r.status})`;
     // Their words verbatim — with no documented error codes this is the only diagnostic.
     return { error: msg, status: 502, retryable: isRetryable(r) };
   }
-  const refId = r.data && (r.data.ref_id ?? r.data.refId ?? r.data.id);
+  // Pink ENVELOPES responses under `data` (same shape as their webhook), so the task id may
+  // sit at r.data.ref_id OR r.data.data.ref_id, under ref_id / task_id / id. Capture whichever
+  // — this becomes our vendor_ref, and the webhook later matches a card on it, so getting it
+  // wrong silently breaks the ENTIRE status/file sync. Logged so a bad shape is visible, and
+  // stored as NULL (not the string "null") when truly absent.
+  const rd = (r.data && typeof r.data === 'object') ? r.data : {};
+  const inner = (rd.data && typeof rd.data === 'object') ? rd.data : rd;
+  const refId = inner.ref_id ?? inner.task_id ?? inner.id ?? rd.ref_id ?? rd.task_id ?? rd.id ?? null;
+  const vendorRef = refId != null && String(refId).trim() ? String(refId).trim() : null;
+  console.log('[pinkdesign create_task] captured vendor_ref =', vendorRef);
 
   // API-created tasks always land in Pink's "Draft" lane, and that is FINAL on their side:
   // they've confirmed there is no way to create or move a task straight into "New", and no
@@ -232,18 +242,24 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   if (card) {
     await q(`update design_cards set vendor='pinkdesign', vendor_ref=$2, col='inprogress',
                     thumb=coalesce(thumb,$3), pushed_images=$4::jsonb, updated_at=now() where id=$1::bigint`,
-      [String(card.id), String(refId), imageUrl, sentImages]).catch(() => {});
+      [String(card.id), vendorRef, imageUrl, sentImages]).catch(() => {});
   } else {
     const ins = await q(
       `insert into design_cards (order_id, sku, title, col, type, product, thumb, vendor, vendor_ref, payment, pay_status, pushed_images)
        values ($1,$2,$3,'inprogress',$4,$5,$6,'pinkdesign',$7,0,'na',$8::jsonb)
        returning id`,
-      [useOrder || null, useSku || null, payload.title, method, item?.name || null, imageUrl, String(refId), sentImages]
+      [useOrder || null, useSku || null, payload.title, method, item?.name || null, imageUrl, vendorRef, sentImages]
     ).catch(() => ({ rows: [] }));
     cardOut = ins.rows[0] ? String(ins.rows[0].id) : null;
   }
 
-  return { ok: true, refId, board, cardId: cardOut, orderId: useOrder || null };
+  return {
+    ok: true, refId: vendorRef, board, cardId: cardOut, orderId: useOrder || null,
+    // If Pink returned no id we can recognise, the task WAS created on their side but we
+    // can't tie their status webhook back to this card — say so rather than implying it's
+    // fully wired. The create_task log above shows what they actually returned.
+    ...(vendorRef ? {} : { warning: 'Pink accepted the task but returned no reference we recognised, so automatic status/file sync is off for it. Check the create_task log for their response shape.' }),
+  };
 }
 
 export function pinkDesignRoutes(app, requireAuth, requireStaff) {

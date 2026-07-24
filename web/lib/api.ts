@@ -82,6 +82,8 @@ export type VietqrPayment = {
    *  alone is why the description here didn't match the VietQR side. */
   content?: string
   amount?: number
+  /** USD credited to the wallet once paid (VND ÷ rate). */
+  amountUsd?: number
   /** Receiver, for the payer to check against their banking app before sending. */
   name?: string
   bankCode?: string
@@ -97,11 +99,20 @@ export const VN_BANK_NAMES: Record<string, string> = {
   MSB: "MSB", SHB: "SHB", OCB: "OCB", SEAB: "SeABank", EIB: "Eximbank",
   VBA: "Agribank", ICB: "VietinBank", NAB: "Nam A Bank", ABB: "ABBANK",
 }
-export function createVietqrPayment(amount: number) {
+// `amount` is VND (what the QR charges); `amountUsd` is the USD the seller picked, credited
+// exactly on payment. The admin-set USD→VND rate (getVietqrRate) converts one to the other.
+export function createVietqrPayment(amount: number, amountUsd?: number) {
   return api<VietqrPayment>(`/api/vietqr/create-payment`, {
     method: "POST",
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify({ amount, amountUsd }),
   })
+}
+// The shared USD→VND exchange rate. GET is any signed-in user; PUT is admin-only.
+export function getVietqrRate() {
+  return api<{ rate: number }>(`/api/vietqr/rate`)
+}
+export function setVietqrRate(rate: number) {
+  return api<{ ok?: boolean; rate?: number; error?: string }>(`/api/vietqr/rate`, { method: "PUT", body: JSON.stringify({ rate }) })
 }
 export function vietqrStatus(ref: string) {
   return api<{ paid: boolean; transaction?: unknown }>(`/api/vietqr/status?ref=${encodeURIComponent(ref)}`)
@@ -2115,7 +2126,7 @@ export function pushToPink(body: {
   productType?: string; designType?: string; boardId?: string; extraImages?: string[]
 }) {
   return api<{ ok?: boolean; refId?: string; board?: string; cardId?: string | null
-               orderId?: string | null; error?: string; retryable?: boolean }>(
+               orderId?: string | null; error?: string; retryable?: boolean; warning?: string }>(
     `/api/pinkdesign/push`, { method: "POST", body: JSON.stringify(body) })
 }
 /** Store a reference file and get a URL back — Pink Design accepts URLs only. */

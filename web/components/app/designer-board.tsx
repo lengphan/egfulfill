@@ -631,11 +631,15 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         {/* Their task ref (= our vendor_ref). Shown so it can be cross-referenced on Pink's
             board and pasted into their test-webhook form to verify the sync. select-all makes
             it one click to copy. */}
-        {card.vendor && card.vendor_ref && (
+        {card.vendor && (card.vendor_ref ? (
           <div className="text-[11px] text-muted-foreground">
             {vendorLabel(card.vendor)} task ref: <span className="select-all font-mono text-foreground">{String(card.vendor_ref)}</span>
           </div>
-        )}
+        ) : (
+          <div className="text-[11px] text-amber-600">
+            No task ref was recorded for this card, so status sync is off for it. Re-push to capture it.
+          </div>
+        ))}
 
         {/* What we actually SENT them — small previews so it's obvious which files already
             went, no filenames needed. Click one to open it full size. */}
