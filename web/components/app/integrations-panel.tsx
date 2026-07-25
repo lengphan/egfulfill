@@ -202,9 +202,16 @@ const INTEGRATIONS: Integration[] = [
       return { level: "off" }
     },
   },
+  // Status via config only — a live EWA round-trip runs behind the Digitizer's "Test
+  // connection" button, not on every Settings load. `key` must match the server's
+  // SECRET_DEFS `integration` value so the WILCOM_APP_ID/KEY edit fields attach here.
+  {
+    key: "wilcom", name: "Wilcom EWA", blurb: "Embroidery digitizing engine", group: "Embroidery",
+    check: configOnly("/api/wilcom/config"),
+  },
 ]
 
-const GROUPS = ["Channels", "Ads", "Payments", "Shipping", "Suppliers", "Other"]
+const GROUPS = ["Channels", "Ads", "Payments", "Shipping", "Suppliers", "Embroidery", "Other"]
 
 export function IntegrationsPanel() {
   const [results, setResults] = useState<Record<string, Result>>(
