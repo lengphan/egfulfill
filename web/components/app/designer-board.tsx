@@ -16,11 +16,10 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 
 // Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
 // once (no separate Paid lane; the credit is idempotent per card).
-// The partner lane is a DESTINATION, not a status: dropping a card here means "send this
-// out". It's appended rather than inserted so existing lane order is untouched, and it's
-// hidden entirely from designers — sending work out spends money and gives away a job
-// they'd otherwise do.
-const PARTNER_COL = { id: "partner", label: "Design partner", accent: "bg-amber-500" } as const
+// There is no Design-partner LANE: outsourcing is an action on a card ("Send to partner"
+// in the card dialog), not a column, and the old drop-lane was always empty anyway — a
+// vendor card groups into whichever real lane its status maps to, carrying its vendor
+// badge. canOutsource still gates that action; it just no longer paints a column.
 const canOutsource = () => { const r = getUser()?.role; return r === "admin" || r === "warehouse" || r === "operator" }
 /**
  * Deleting a card destroys the record of work someone did, so it is a custody call —
@@ -213,10 +212,6 @@ export function DesignerBoard() {
     const card = (cards ?? []).find((c) => c.id === dragId)
     setDragId(null)
     if (!card) return
-    // Dropping on the partner lane OPENS the send window rather than sending. A drag is
-    // easy to do by accident and this one spends money and hands the job to someone
-    // outside the building — so the drop proposes it and a person confirms.
-    if (col === PARTNER_COL.id) { setPushCard(card); return }
     moveCard(card, col)
   }
 
@@ -312,13 +307,17 @@ export function DesignerBoard() {
       ) : view === "list" ? (
         <DesignerList cards={filtered} onOpen={setOpenId} />
       ) : (
-        // All lanes share the width (grid, equal fractions) instead of a fixed 288px each — so
-        // five/six columns fit the page rather than clipping the last one. minmax(9rem, 1fr)
-        // keeps them usable and only falls back to horizontal scroll when the window is
-        // genuinely too narrow (mobile, where the List view is the better tool anyway).
+        // Five lanes share the width as equal fractions. minmax(15rem, 1fr) gives each a
+        // genuine working width — enough for a square preview that reads at a glance — and
+        // only falls back to horizontal scroll on a window too narrow for that (mobile,
+        // where the List view is the better tool anyway). The Design-partner lane is gone:
+        // it was always empty (vendor cards group into the real lanes with their badge, so
+        // colOf never routes anything to it), so it only ever served as a drag-to-outsource
+        // drop target — and outsourcing still runs from inside a card via "Send to partner".
+        // Dropping the sixth, always-blank column is what buys the other five their width.
         <div className="grid gap-2 overflow-x-auto pb-2"
-             style={{ gridTemplateColumns: `repeat(${showPartner ? COLS.length + 1 : COLS.length}, minmax(9rem, 1fr))` }}>
-          {[...COLS, ...(showPartner ? [PARTNER_COL] : [])].map((col) => {
+             style={{ gridTemplateColumns: `repeat(${COLS.length}, minmax(15rem, 1fr))` }}>
+          {COLS.map((col) => {
             const list = grouped[col.id] ?? []
             return (
               <div
