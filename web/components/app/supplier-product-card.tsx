@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { SupplierFlag } from "@/components/app/supplier-flag"
-import { Heart, Plus, CheckCircle, CircleNotch, ShoppingCart } from "@phosphor-icons/react"
+import { Heart, Plus, CheckCircle, CircleNotch, ShoppingCart, ArrowsClockwise } from "@phosphor-icons/react"
 import { swatchBg } from "@/lib/color-swatch"
 import { prettyColorName } from "@/lib/color-name"
 
@@ -39,7 +39,7 @@ export type SupplierCardData = {
 }
 
 export function SupplierProductCard({
-  data, added, adding, onAdd, onFavorite, loadColors, supplierLabel, onQuickOrder,
+  data, added, adding, onAdd, onFavorite, loadColors, supplierLabel, onQuickOrder, onSync,
 }: {
   data: SupplierCardData
   added: boolean
@@ -53,6 +53,11 @@ export function SupplierProductCard({
    *  sell, ordering is about what we buy, and conflating them is how a blank ends up
    *  listed for sale because someone needed six of it. */
   onQuickOrder?: () => void
+  /** Re-sync THIS product from the supplier. Passed only where a per-item sync exists —
+   *  S&S, whose full sync-all takes hours; an Otto card has no live per-style fetch, so it
+   *  gets no button rather than one that does nothing. Resolves when the sync completes so
+   *  the card can show the outcome. */
+  onSync?: () => Promise<void> | void
 }) {
   const [img, setImg] = useState<string | null>(data.image ?? null)
   const [activeColor, setActiveColor] = useState<string | null>(null)
@@ -63,6 +68,16 @@ export function SupplierProductCard({
   const [showAllColors, setShowAllColors] = useState(false)
   // Same expand affordance the colour row has, now that sizes are the card's only size UI.
   const [showAllSizes, setShowAllSizes] = useState(false)
+  // Per-card sync state. `done` briefly confirms so a card that looked unchanged (already
+  // fresh) doesn't read as a no-op, then clears.
+  const [syncing, setSyncing] = useState(false)
+  const [synced, setSynced] = useState(false)
+  const runSync = async () => {
+    if (!onSync || syncing) return
+    setSyncing(true); setSynced(false)
+    try { await onSync(); setSynced(true); setTimeout(() => setSynced(false), 1800) }
+    finally { setSyncing(false) }
+  }
 
   const price = data.price != null && data.price !== "" ? Number(data.price) : null
   const priceMax = data.priceMax != null && data.priceMax !== "" ? Number(data.priceMax) : null
@@ -112,6 +127,22 @@ export function SupplierProductCard({
           </button>
         )}
         {supplierLabel && <SupplierFlag label={supplierLabel} className="absolute left-2 top-2" />}
+        {/* Per-card sync, bottom-left — the empty image corner (flag top-left, heart
+            top-right). Offered only where onSync is wired (S&S), so a click always does
+            something. This is the answer to "sync-all takes hours": refresh the one style
+            whose data didn't load, not the whole catalogue. */}
+        {onSync && (
+          <button onClick={runSync} disabled={syncing}
+            title={synced ? "Synced" : "Re-sync this style from the supplier"}
+            aria-label="Re-sync this product"
+            className={"absolute bottom-2 left-2 flex size-7 items-center justify-center rounded-full border transition-colors " +
+              (synced ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                : "border-border bg-background/80 text-muted-foreground hover:text-primary disabled:opacity-60")}>
+            {syncing ? <CircleNotch size={14} className="animate-spin" />
+              : synced ? <CheckCircle size={14} weight="fill" />
+              : <ArrowsClockwise size={14} weight="bold" />}
+          </button>
+        )}
         {loadingColor && <div className="absolute inset-0 flex items-center justify-center bg-background/40"><CircleNotch size={18} className="animate-spin text-muted-foreground" /></div>}
       </div>
 

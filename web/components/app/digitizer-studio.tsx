@@ -37,14 +37,6 @@ function download(name: string, dataUrl: string) {
   const a = document.createElement("a"); a.href = dataUrl; a.download = name
   document.body.appendChild(a); a.click(); a.remove()
 }
-// EWA returns the machine file AND the TrueView PNG in one response — grab both.
-function downloadBoth(res: WilcomResult, fallbackName: string) {
-  if (res.machineFile) download(res.machineFile.filename, `data:application/octet-stream;base64,${res.machineFile.base64}`)
-  if (res.trueview) {
-    const stem = res.machineFile ? res.machineFile.filename.replace(/\.[^.]+$/, "") : fallbackName
-    download(`${stem}.png`, `data:image/png;base64,${res.trueview}`)
-  }
-}
 function readFile(file: File): Promise<string> {
   return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error("read failed")); fr.readAsDataURL(file) })
 }
@@ -208,7 +200,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <button className="absolute inset-0 bg-foreground/50" aria-label="Close" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <div className="flex items-center gap-2 border-b border-border px-5 py-3">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{item.name}</div>
@@ -217,53 +209,59 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
           <button onClick={onClose} className="ml-auto grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent"><X size={16} /></button>
         </div>
 
-        <div className="grid flex-1 gap-4 overflow-y-auto p-5 md:grid-cols-[200px_1fr]">
-          {/* Original + actions */}
-          <div className="space-y-3">
-            <div className="overflow-hidden rounded-xl border border-border bg-muted"><div className="aspect-square"><Thumb src={item.thumb} alt="original" className="size-full object-contain" /></div></div>
-            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Original artwork</div>
-            <div className="flex flex-col gap-2">
-              <button onClick={() => run(false)} disabled={busy} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
-                {status === "previewing" ? <CircleNotch size={14} className="animate-spin" /> : <Eye size={14} />} Preview
-              </button>
-              {res?.machineFile ? (
-                <button onClick={() => downloadBoth(res, item.name)} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90">
-                  <DownloadSimple size={14} weight="bold" /> Download {res.machineFile.filename.split(".").pop()?.toUpperCase()} + PNG
-                </button>
-              ) : (
-                <button onClick={() => run(true)} disabled={busy} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-                  {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : null} Generate file
-                </button>
-              )}
-              {res?.machineFile && <button onClick={() => run(true)} disabled={busy} className="text-xs text-muted-foreground hover:text-foreground">Regenerate</button>}
-            </div>
+        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          {/* One fixed SQUARE window — the full image always fits (object-contain). Shows the
+              original until you preview, then the embroidery TrueView. */}
+          <div className="relative mx-auto aspect-square w-full max-w-[360px] overflow-hidden rounded-xl border border-border bg-muted">
+            {busy ? (
+              <div className="grid size-full place-items-center"><CircleNotch size={24} className="animate-spin text-muted-foreground" /></div>
+            ) : res?.trueview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`data:image/png;base64,${res.trueview}`} alt="embroidery preview" className="absolute inset-0 size-full object-contain" />
+            ) : (
+              <Thumb src={item.thumb} alt="original" className="absolute inset-0 size-full object-contain" />
+            )}
+            <span className="absolute left-2 top-2 rounded-md bg-background/85 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{res?.trueview ? "Embroidery" : "Original"}</span>
           </div>
 
-          {/* Embroidery preview + facts + threads */}
-          <div className="min-w-0 space-y-3">
-            <div className="grid aspect-video place-items-center overflow-hidden rounded-xl border border-border bg-muted">
-              {res?.trueview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`data:image/png;base64,${res.trueview}`} alt="embroidery preview" className="size-full object-contain" />
-              ) : (
-                <div className="p-8 text-center text-sm text-muted-foreground">{busy ? <CircleNotch size={22} className="mx-auto animate-spin" /> : "Preview to see the embroidery TrueView, stitch count and thread matches."}</div>
-              )}
+          {res && (
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              {res.stitches != null && <span><b className="tabular-nums text-foreground">{res.stitches.toLocaleString()}</b> stitches</span>}
+              {res.colours != null && <span><b className="text-foreground">{res.colours}</b> colours</span>}
+              {res.width != null && res.height != null && <span className="tabular-nums text-foreground">{Math.round(res.width)} × {Math.round(res.height)} mm</span>}
+              {res.machineFile && <span className="font-mono text-foreground">{res.machineFile.filename.split(".").pop()?.toUpperCase()}</span>}
             </div>
+          )}
 
-            {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
-
-            {res && (
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                {res.stitches != null && <span><b className="tabular-nums text-foreground">{res.stitches.toLocaleString()}</b> stitches</span>}
-                {res.colours != null && <span><b className="text-foreground">{res.colours}</b> colours</span>}
-                {res.width != null && res.height != null && <span className="tabular-nums text-foreground">{Math.round(res.width)} × {Math.round(res.height)} mm</span>}
-                {res.machineFile && <span className="font-mono text-foreground">{res.machineFile.filename.split(".").pop()?.toUpperCase()}</span>}
-              </div>
+          <div className="flex gap-2">
+            {res?.machineFile ? (
+              <>
+                {/* Two downloads — the machine file and the preview PNG, separately. */}
+                <button onClick={() => download(res.machineFile!.filename, `data:application/octet-stream;base64,${res.machineFile!.base64}`)} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90">
+                  <DownloadSimple size={14} weight="bold" /> {res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB"}
+                </button>
+                <button onClick={() => { if (res.trueview) download(`${res.machineFile!.filename.replace(/\.[^.]+$/, "")}.png`, `data:image/png;base64,${res.trueview}`) }} disabled={!res.trueview} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
+                  <DownloadSimple size={14} weight="bold" /> PNG
+                </button>
+                <button onClick={() => run(true)} disabled={busy} title="Regenerate" className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-accent disabled:opacity-50"><ArrowsClockwise size={15} /></button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => run(false)} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
+                  {status === "previewing" ? <CircleNotch size={14} className="animate-spin" /> : <Eye size={14} />} Preview
+                </button>
+                <button onClick={() => run(true)} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+                  {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : null} Generate file
+                </button>
+              </>
             )}
+          </div>
 
-            {res && (
-              <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Threads → your library</div>
+          {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
+
+          {res && (
+            <div>
+              <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Threads → your library</div>
                 {res.threads && res.threads.length > 0 ? (
                   <div className="space-y-1">
                     {res.threads.map((t, i) => {
@@ -291,7 +289,6 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 )}
               </div>
             )}
-          </div>
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@ import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
 import { decodeEntities, usd } from "@/lib/order-format"
-import { matchThreadColors, nearestThread, hexToRgb, matchQuality, matchThreadRegions, type Thread, type ThreadRegion } from "@/lib/thread-match"
+import { matchThreadColors, nearestThread, hexToRgb, matchQuality, matchThreadRegions, canvasReadableSrc, type Thread, type ThreadRegion } from "@/lib/thread-match"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { Eyedropper, MapPinSimple } from "@phosphor-icons/react"
 
@@ -879,8 +879,10 @@ export function DesignCanvasDialog({
         {(item.design_src || item.personalization) && (
           <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
             {item.design_src && (
+              // Etsy blocks direct hotlinking, so the buyer's file must load through the
+              // same-origin proxy (not just for canvas reads — for display too).
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.design_src} alt="Customer file" className="size-14 shrink-0 rounded-md border border-border object-cover" />
+              <img src={canvasReadableSrc(item.design_src)} alt="Customer file" className="size-14 shrink-0 rounded-md border border-border object-cover" />
             )}
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-foreground">Customer&apos;s file</div>

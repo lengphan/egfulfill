@@ -555,8 +555,13 @@ export function getSsWarmStatus() {
 export function getSsStyle(id: string) {
   return api<SsStyleDetail>(`/api/ss/style/${encodeURIComponent(id)}`)
 }
-export function ssSync() {
-  return api<{ ok?: boolean; count?: number; error?: string }>(`/api/ss/sync`, { method: "POST" })
+/** Sync specific S&S styles from the live feed into ss_products — the per-style path, so a
+ *  card whose data is missing or stale can be refreshed on its own instead of waiting on
+ *  the hours-long full sync-all. The route requires styleIds (or brands); a bare call would
+ *  be rejected, which is why this always sends them. */
+export function ssSync(styleIds: string[]) {
+  return api<{ ok?: boolean; synced?: number; fetched?: number; styles?: number; error?: string }>(
+    `/api/ss/sync`, { method: "POST", body: JSON.stringify({ styleIds }) })
 }
 // Synced S&S products at SKU level (style search only gets you a style — a PO line
 // needs the orderable sku, i.e. a specific colour + size).

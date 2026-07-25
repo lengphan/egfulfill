@@ -68,10 +68,11 @@ function composeDesign(designUrl: string, pos: Pos, texts: TextLayer[], size = 9
 const rid = () => "t" + Math.random().toString(36).slice(2, 8)
 
 // One image in the library grid. Click to place it on the canvas; buyer art carries the
-// order it came from, and your own uploads carry a remove control. The thumbnail loads
-// the URL directly (display is fine cross-origin — only CANVAS reads need the proxy).
-function ImageThumb({ url, name, badge, onPlace, onDelete }: {
-  url: string; name?: string; badge?: string; onPlace: () => void; onDelete?: () => void
+// order it came from, and your own uploads carry a remove control. `src` is the DISPLAY
+// url (Etsy blocks hotlinking, so buyer art must come through the proxy); `url` is the raw
+// value handed to onPlace. R2 uploads pass raw — the proxy only allows etsystatic.
+function ImageThumb({ url, src, name, badge, onPlace, onDelete }: {
+  url: string; src?: string; name?: string; badge?: string; onPlace: () => void; onDelete?: () => void
 }) {
   return (
     <div className="group/thumb relative">
@@ -80,7 +81,7 @@ function ImageThumb({ url, name, badge, onPlace, onDelete }: {
         className="block aspect-square w-full overflow-hidden rounded-md border border-border bg-muted transition-colors hover:border-primary/50"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt={name || ""} className="size-full object-cover" />
+        <img src={src ?? url} alt={name || ""} className="size-full object-cover" />
       </button>
       {badge && <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1 text-[9px] font-medium text-white">{badge}</span>}
       {onDelete && (
@@ -328,7 +329,7 @@ export function DesignMaker() {
                   <>
                     <div className="mt-1 text-[10px] font-medium text-muted-foreground">From your orders</div>
                     <div className="grid grid-cols-3 gap-1.5">
-                      {orderUploads.map((im, i) => <ImageThumb key={im.url + i} url={im.url} name={im.name} badge={im.orderRef} onPlace={() => placeImage(im.url)} />)}
+                      {orderUploads.map((im, i) => <ImageThumb key={im.url + i} url={im.url} src={canvasReadableSrc(im.url)} name={im.name} badge={im.orderRef} onPlace={() => placeImage(im.url)} />)}
                     </div>
                   </>
                 )}

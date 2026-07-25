@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { parseCSV } from "@/lib/order-import"
 import {
-  getSsStylesAll, getSsStyleImgs, getSsStyle, toggleSsFavorite, ssWarm,
+  getSsStylesAll, getSsStyleImgs, getSsStyle, toggleSsFavorite, ssWarm, ssSync,
   getOttoProducts, getOttoStyle, getSsStyleSkus, getCatalogFilters, toggleOttoFavorite, importOttoProducts,
   getCatalogProducts, saveCatalogProducts, colorNames,
   type SsStyle, type OttoStyle, type OttoImportRow, type CatalogProduct,
@@ -394,6 +394,14 @@ export function AllSuppliers() {
                   }}
                   onFavorite={(on) => favorite(it, on)}
                   loadColors={loadColors(it)}
+                  // S&S only — Otto has no live per-style fetch, so it gets no button.
+                  // Sync this one style, then reload the grid so its fresh sizes/colours
+                  // (and price) replace the "—" without touching the rest of the page.
+                  onSync={it.supplier === "ss" ? async () => {
+                    const r = await ssSync([it.ss.styleID])
+                    if (r?.error) { setMsg(r.error); return }
+                    reload(debounced)
+                  } : undefined}
                 />
               ))}
             </div>
