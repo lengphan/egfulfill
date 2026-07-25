@@ -62,6 +62,13 @@ export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpe
           </div>
           <Button className="w-full" onClick={check} disabled={loading}>{loading ? <><CircleNotch size={14} className="animate-spin" /> Checking…</> : <><Truck size={14} weight="bold" /> Check rates</>}</Button>
           {err && <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">{err}</div>}
+          {/* USPS is on by default in Shippo; UPS only shows once a UPS carrier account is
+              connected there. If nothing UPS came back, say why rather than leave a gap. */}
+          {rates && rates.length > 0 && !rates.some((r) => (r.carrier || "").toLowerCase().includes("ups") && !(r.carrier || "").toLowerCase().includes("usps")) && (
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+              No UPS rates came back. Connect a UPS account in your Shippo dashboard (Settings → Carriers → UPS) and they’ll appear here automatically.
+            </div>
+          )}
           {rates && rates.length > 0 && (
             <div className="max-h-64 space-y-1.5 overflow-y-auto">
               {rates.map((r) => (
