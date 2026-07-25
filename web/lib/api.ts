@@ -1529,6 +1529,7 @@ export type WilcomResult = {
   ok?: boolean; error?: string; status?: number; sample?: string
   trueview?: string | null; machineFile?: { filename: string; base64: string } | null
   stitches?: number | null; colours?: number | null; width?: number | null; height?: number | null
+  threads?: { r: number; g: number; b: number; code?: string | null; brand?: string | null; name?: string | null }[]
   id?: string; trueviewUrl?: string | null; fileUrl?: string | null
 }
 export function wilcomPreview(body: { image: string; filename?: string; width?: number; height?: number }) {

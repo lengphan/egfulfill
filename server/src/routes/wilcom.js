@@ -92,6 +92,26 @@ function parseDesignInfo(xml) {
   const n = (v) => (v == null || v === '' ? null : Number(v));
   return { stitches: n(g('num_stitches')), colours: n(g('num_colours')), width: n(g('width')), height: n(g('height')), machine: g('machine_name') };
 }
+// Threads used in the result. EWA encodes colour as an int R+(G<<8)+(B<<16); decode to RGB
+// so the UI can match each against the admin thread library.
+function parseThreads(xml) {
+  const out = [], seen = new Set();
+  const re = /<thread\b([^>]*?)\/?>/gi;
+  let m;
+  while ((m = re.exec(xml))) {
+    const g = (k) => { const mm = new RegExp(k + '="([^"]*)"', 'i').exec(m[1]); return mm ? mm[1] : null; };
+    const ci = g('color');
+    if (ci == null) continue;
+    const c = Number(ci);
+    if (!Number.isFinite(c)) continue;
+    const r = c & 255, gg = (c >> 8) & 255, b = (c >> 16) & 255;
+    const key = `${r},${gg},${b}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ r, g: gg, b, code: g('code'), brand: g('brand'), name: g('description') });
+  }
+  return out;
+}
 const isPng = (f) => /\.png$/i.test(f);
 const isMachine = (f) => /\.(emb|dst|pes|exp|jef|vp3|xxx|hus)$/i.test(f);
 const MAX_INPUT_BYTES = 2 * 1024 * 1024; // EWA auto-digitize cap
@@ -139,6 +159,7 @@ async function runBitmap(req, reply, { design }) {
       machineFile: machine ? { filename: machine.filename, base64: machine.base64 } : null,
       stitches: info.stitches ?? null, colours: info.colours ?? null,
       width: info.width ?? null, height: info.height ?? null,
+      threads: parseThreads(res.body),
     };
     // Persist a GENERATION (not a preview) so it shows in History. Best-effort: a storage
     // hiccup must not fail the response the operator is waiting on.
