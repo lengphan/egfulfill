@@ -21,10 +21,14 @@ import {
   getShopifyConfig,
   getShopifyConnections,
   disconnectShopify,
+  getTiktokConfig,
+  getTiktokConnections,
+  disconnectTiktok,
   type EtsyConnection,
 } from "@/lib/api"
 import { startEtsyConnect } from "@/lib/etsy-oauth"
 import { startShopifyConnect } from "@/lib/shopify-oauth"
+import { startTikTokConnect } from "@/lib/tiktok-oauth"
 import { getUser } from "@/lib/auth"
 
 const fmtDate = (s: string | null) => {
@@ -37,7 +41,7 @@ const fmtDate = (s: string | null) => {
 const CHANNELS = [
   { key: "etsy", name: "Etsy", blurb: "Sync orders & push tracking back", live: true },
   { key: "shopify", name: "Shopify", blurb: "Storefront order sync", live: true },
-  { key: "tiktok", name: "TikTok Shop", blurb: "Marketplace order sync", live: false },
+  { key: "tiktok", name: "TikTok Shop", blurb: "Marketplace order sync", live: true },
   { key: "woocommerce", name: "WooCommerce", blurb: "WordPress store sync", live: false },
 ]
 
@@ -58,7 +62,8 @@ export function StoresManager() {
     Promise.all([
       getEtsyConnections().catch(() => [] as EtsyConnection[]),
       getShopifyConnections().catch(() => [] as EtsyConnection[]),
-    ]).then(([e, s]) => { setConns([...(e ?? []), ...(s ?? [])]); setIsDemo(false) })
+      getTiktokConnections().catch(() => [] as EtsyConnection[]),
+    ]).then(([e, s, t]) => { setConns([...(e ?? []), ...(s ?? []), ...(t ?? [])]); setIsDemo(false) })
       .catch(() => { setConns([]); setIsDemo(true) })
   }, [])
 
@@ -72,6 +77,27 @@ export function StoresManager() {
     return () => clearTimeout(id)
   }, [load])
 
+  // A connect opens a popup; the /oauth-callback posts back a result (handled by the effect
+  // below). Keep the button busy until then — and clear it if the popup is closed unfinished.
+  const watch = useCallback((popup: Window | null) => {
+    if (!popup) return // redirect fallback took over
+    const iv = setInterval(() => { if (popup.closed) { clearInterval(iv); setBusy(null) } }, 600)
+    setTimeout(() => clearInterval(iv), 300000)
+  }, [])
+
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return
+      const d = e.data as { source?: string; ok?: boolean; shop?: string; message?: string } | null
+      if (!d || d.source !== "eg-oauth") return
+      setBusy(null)
+      if (d.ok) { setNotice({ tone: "ok", msg: `Connected ${d.shop || "your shop"}.` }); load() }
+      else setNotice({ tone: "err", msg: d.message || "Couldn't connect." })
+    }
+    window.addEventListener("message", onMsg)
+    return () => window.removeEventListener("message", onMsg)
+  }, [load])
+
   const onConnect = async () => {
     setBusy("connect")
     setNotice(null)
@@ -82,7 +108,7 @@ export function StoresManager() {
         setBusy(null)
         return
       }
-      await startEtsyConnect(cfg) // redirects away
+      watch(await startEtsyConnect(cfg))
     } catch (e) {
       setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Couldn't start the Etsy connection." })
       setBusy(null)
@@ -96,9 +122,23 @@ export function StoresManager() {
       if (!cfg.configured || !cfg.api_key) {
         setNotice({ tone: "err", msg: "Shopify isn't configured on the server yet (SHOPIFY_API_KEY / SECRET)." }); setBusy(null); return
       }
-      startShopifyConnect(cfg, shopDomain) // redirects away
+      watch(startShopifyConnect(cfg, shopDomain))
     } catch (e) {
       setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Enter your store as mystore.myshopify.com" })
+      setBusy(null)
+    }
+  }
+
+  const onConnectTiktok = async () => {
+    setBusy("connect-tiktok"); setNotice(null)
+    try {
+      const cfg = await getTiktokConfig()
+      if (!cfg.configured || !cfg.service_id) {
+        setNotice({ tone: "err", msg: "TikTok isn't configured on the server yet (TIKTOK_APP_KEY / SECRET / SERVICE_ID)." }); setBusy(null); return
+      }
+      watch(startTikTokConnect(cfg))
+    } catch (e) {
+      setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Couldn't start the TikTok connection." })
       setBusy(null)
     }
   }
@@ -122,7 +162,9 @@ export function StoresManager() {
     setBusy(c.shop_id)
     setNotice(null)
     try {
-      if ((c.platform || "").toLowerCase() === "shopify") await disconnectShopify(c.shop_id)
+      const plat = (c.platform || "").toLowerCase()
+      if (plat === "shopify") await disconnectShopify(c.shop_id)
+      else if (plat === "tiktok") await disconnectTiktok(c.shop_id)
       else await disconnectEtsy(c.shop_id)
       setNotice({ tone: "ok", msg: `Disconnected ${c.shop_name || "shop"}.` })
       setConns((prev) => (prev ?? []).filter((x) => x.shop_id !== c.shop_id))
@@ -141,7 +183,7 @@ export function StoresManager() {
       <StatGrid>
         <StatCard label="Connected shops" value={String(connected.length)} sub="syncing orders" />
         <StatCard label="Channels live" value="1" sub="Etsy" tone="pos" />
-        <StatCard label="Coming soon" value="3" sub="Shopify · TikTok · Woo" />
+        <StatCard label="Coming soon" value="1" sub="WooCommerce" />
         <StatCard
           label="Last sync"
           value={connected.length ? fmtDate(connected[0].last_sync_at).split(",")[0] : "—"}
@@ -273,13 +315,13 @@ export function StoresManager() {
                 <div className="mt-4 space-y-2">
                   <Input value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} placeholder="mystore.myshopify.com" className="h-9 text-sm" />
                   <Button size="sm" className="w-full" onClick={onConnectShopify} disabled={busy === "connect-shopify" || !shopDomain.trim()}>
-                    <Plus size={14} weight="bold" /> {busy === "connect-shopify" ? "Redirecting…" : "Connect"}
+                    <Plus size={14} weight="bold" /> {busy === "connect-shopify" ? "Connecting…" : "Connect"}
                   </Button>
                 </div>
               ) : ch.live ? (
-                <Button size="sm" className="mt-4" onClick={onConnect} disabled={busy === "connect"}>
+                <Button size="sm" className="mt-4" onClick={ch.key === "tiktok" ? onConnectTiktok : onConnect} disabled={busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect")}>
                   <Plus size={14} weight="bold" />
-                  {busy === "connect" ? "Redirecting…" : "Connect"}
+                  {busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect") ? "Connecting…" : "Connect"}
                 </Button>
               ) : (
                 <span className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground">

@@ -1936,6 +1936,16 @@ export function exchangeTiktok(body: { auth_code: string }) {
   return api<{ ok?: boolean; shop_id?: string; shop_name?: string; scopes?: string; error?: string }>(
     `/api/tiktok/exchange`, { method: "POST", body: JSON.stringify(body) })
 }
+export type TiktokConfig = { service_id: string; authorize_url: string; configured: boolean }
+export function getTiktokConfig() {
+  return api<TiktokConfig>(`/api/tiktok/config`)
+}
+export function getTiktokConnections() {
+  return api<EtsyConnection[]>(`/api/tiktok/connections`)
+}
+export function disconnectTiktok(shopId: string) {
+  return api<{ ok?: boolean }>(`/api/tiktok/disconnect`, { method: "POST", body: JSON.stringify({ shop_id: shopId }) })
+}
 
 export function exchangeEtsy(body: { code: string; code_verifier: string; redirect_uri: string }) {
   return api<{ shop_name?: string; error?: string }>(`/api/etsy/exchange`, {

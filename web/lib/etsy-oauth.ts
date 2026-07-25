@@ -2,6 +2,7 @@
 // flow, but same-origin: authorize + callback both live on the Next app so the
 // verifier (stored here) is readable when Etsy redirects back to /oauth-callback.
 import type { EtsyConfig } from "./api"
+import { openOAuthPopup } from "./oauth-popup"
 
 export const ETSY_PKCE_KEY = "eg_etsy_pkce"
 
@@ -25,15 +26,16 @@ async function challenge(verifier: string): Promise<string> {
   return b64url(d)
 }
 
-/** Build the PKCE challenge, stash the verifier, and redirect to Etsy's consent screen. */
-export async function startEtsyConnect(cfg: EtsyConfig): Promise<void> {
+/** Build the PKCE challenge, stash the verifier, and open Etsy's consent screen in a popup
+ *  (redirect fallback if the popup is blocked). Same-origin callback so the verifier + the
+ *  shared localStorage are in scope on return. */
+export async function startEtsyConnect(cfg: EtsyConfig): Promise<Window | null> {
   const verifier = randStr()
   const state = randStr().slice(0, 24)
-  // Same-origin callback so the verifier below is in scope on return.
   const redirect = window.location.origin + "/oauth-callback"
   const ch = await challenge(verifier)
   localStorage.setItem(ETSY_PKCE_KEY, JSON.stringify({ verifier, state, redirect } satisfies Pkce))
-  window.location.href =
+  const url =
     "https://www.etsy.com/oauth/connect?response_type=code" +
     "&client_id=" + encodeURIComponent(cfg.keystring) +
     "&redirect_uri=" + encodeURIComponent(redirect) +
@@ -41,6 +43,9 @@ export async function startEtsyConnect(cfg: EtsyConfig): Promise<void> {
     "&state=" + encodeURIComponent(state) +
     "&code_challenge=" + encodeURIComponent(ch) +
     "&code_challenge_method=S256"
+  const p = openOAuthPopup(url)
+  if (!p) window.location.href = url
+  return p
 }
 
 export function readPkce(): Pkce | null {

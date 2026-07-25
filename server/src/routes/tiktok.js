@@ -90,6 +90,18 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
     return r.rows;
   });
 
+  // Disconnect a TikTok shop. A seller can only drop their own; staff can drop any factory one.
+  app.post('/api/tiktok/disconnect', { preHandler: requireAuth }, async (req) => {
+    const shopId = String((req.body || {}).shop_id || '');
+    if (!shopId) return { ok: false };
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    await q(
+      staff ? `delete from platform_connections where platform='tiktok' and shop_id=$1`
+            : `delete from platform_connections where platform='tiktok' and shop_id=$1 and connected_by=$2`,
+      staff ? [shopId] : [shopId, req.user.sub]).catch(() => {});
+    return { ok: true };
+  });
+
   // OAuth code → tokens. Called by oauth-callback.html after TikTok redirects back.
   // requireAuth (not staff): a SELLER connects their OWN shop; connected_by = caller.
   app.post('/api/tiktok/exchange', { preHandler: requireAuth }, async (req, reply) => {

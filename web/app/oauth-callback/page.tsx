@@ -17,6 +17,23 @@ export default function OAuthCallbackPage() {
   const [state, setState] = useState<State>({ kind: "working" })
 
   useEffect(() => {
+    // finish/fail either close the popup (posting the result to the opener) or, when this
+    // isn't a popup, fall back to the full-page redirect the flow used before.
+    const finish = (shop: string) => {
+      setState({ kind: "ok", shop })
+      if (window.opener && window.opener !== window) {
+        try { window.opener.postMessage({ source: "eg-oauth", ok: true, shop }, window.location.origin) } catch { /* ignore */ }
+        setTimeout(() => { try { window.close() } catch { /* ignore */ } }, 900)
+      } else {
+        setTimeout(() => { window.location.href = "/stores?connected=1" }, 1200)
+      }
+    }
+    const fail = (message: string) => {
+      setState({ kind: "error", message })
+      if (window.opener && window.opener !== window) {
+        try { window.opener.postMessage({ source: "eg-oauth", ok: false, message }, window.location.origin) } catch { /* ignore */ }
+      }
+    }
     // All state updates live inside this async runner (not the effect body) so
     // they're deferred, not synchronous mount renders.
     const run = async () => {
@@ -31,11 +48,11 @@ export default function OAuthCallbackPage() {
       const oauthErr = params.get("error")
 
       if (oauthErr) {
-        setState({ kind: "error", message: params.get("error_description") || oauthErr })
+        fail(params.get("error_description") || oauthErr)
         return
       }
       if (!code) {
-        setState({ kind: "error", message: "No authorization code returned." })
+        fail("No authorization code returned.")
         return
       }
 
@@ -47,11 +64,10 @@ export default function OAuthCallbackPage() {
           const data = await exchangeShopify({ shop: shopParam.toLowerCase(), code, params: allParams })
           if (data.error) throw new Error(data.error)
           clearShopifyOAuth()
-          setState({ kind: "ok", shop: data.shop_name || "your Shopify store" })
-          setTimeout(() => { window.location.href = "/stores?connected=1" }, 1200)
+          finish(data.shop_name || "your Shopify store")
         } catch (e: unknown) {
           clearShopifyOAuth()
-          setState({ kind: "error", message: e instanceof Error ? e.message : "Connection failed." })
+          fail(e instanceof Error ? e.message : "Connection failed.")
         }
         return
       }
@@ -74,10 +90,9 @@ export default function OAuthCallbackPage() {
         try {
           const data = await exchangeTiktok({ auth_code: authCode })
           if (data.error) throw new Error(data.error)
-          setState({ kind: "ok", shop: data.shop_name || "your TikTok shop" })
-          setTimeout(() => { window.location.href = "/stores?connected=1" }, 1200)
+          finish(data.shop_name || "your TikTok shop")
         } catch (e: unknown) {
-          setState({ kind: "error", message: e instanceof Error ? e.message : "Connection failed." })
+          fail(e instanceof Error ? e.message : "Connection failed.")
         }
         return
       }
@@ -95,7 +110,7 @@ export default function OAuthCallbackPage() {
 
       const pkce = readPkce()
       if (!pkce?.verifier) {
-        setState({ kind: "error", message: "Lost the security key. Start the connection again from Stores — don't reload this window." })
+        fail("Lost the security key. Start the connection again from Stores — don't reload this window.")
         return
       }
       if (pkce.state && returnedState && pkce.state !== returnedState) {
@@ -106,13 +121,10 @@ export default function OAuthCallbackPage() {
       try {
         const data = await exchangeEtsy({ code, code_verifier: pkce.verifier, redirect_uri: pkce.redirect })
         clearPkce()
-        setState({ kind: "ok", shop: data.shop_name || "your Etsy shop" })
-        setTimeout(() => {
-          window.location.href = "/stores?connected=1"
-        }, 1200)
+        finish(data.shop_name || "your Etsy shop")
       } catch (e: unknown) {
         clearPkce()
-        setState({ kind: "error", message: e instanceof Error ? e.message : "Connection failed." })
+        fail(e instanceof Error ? e.message : "Connection failed.")
       }
     }
     run()
