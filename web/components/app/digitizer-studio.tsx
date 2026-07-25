@@ -58,6 +58,23 @@ const libItem = (d: LibraryDesign): ArtItem => ({
   getImage: async () => { try { const full = await getDesignLibraryItem(d.id); return await toDataUrl(full.data || d.thumb || "") } catch { return toDataUrl(d.thumb || "") } },
 })
 
+// Confidence gate — after a Preview, decide whether auto-digitize is likely to disappoint, so
+// the modal can nudge toward a human digitizer. Heuristic, deliberately conservative: many
+// colours (photographic/detailed art muddles), a very high stitch count (too dense/complex), or
+// most colours not matching the thread library. Returns a reason string, or null when it looks fine.
+function complexityFlag(res: WilcomResult, pal?: ThreadColor[]): string | null {
+  const colours = res.colours ?? 0
+  const stitches = res.stitches ?? 0
+  const threads = res.threads ?? []
+  let poor = 0
+  for (const t of threads) { const m = nearestThread(t.r, t.g, t.b, pal); if (!m || matchQuality(t.r, t.g, t.b, m).poor) poor++ }
+  const poorRatio = threads.length ? poor / threads.length : 0
+  if (colours >= 8) return "lots of colours — auto-digitize tends to muddy detailed, multi-colour art"
+  if (stitches >= 30000) return "very high stitch count — likely too dense or complex for a clean auto result"
+  if (poorRatio >= 0.4) return "several colours don't map well to your thread library"
+  return null
+}
+
 export function DigitizerStudio() {
   const [tab, setTab] = useState<Tab>("browse")
   return (
@@ -211,6 +228,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
   }
   const busy = status !== "idle"
   const pal = palette.length ? palette : undefined
+  const flag = res ? complexityFlag(res, pal) : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -265,11 +283,24 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
 
             {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
 
+            {/* Confidence gate — when auto-digitize is likely poor, say so and nudge the handoff. */}
+            {flag && !routed && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+                <span><b>This may need a human.</b> {flag} — send the original to a digitizer for a cleaner file.</span>
+              </div>
+            )}
+
             {/* Extra route — hand the ORIGINAL off to a human digitizer when auto won't do. */}
             <button
               onClick={sendToBoard}
               disabled={routing || routed}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-70"
+              className={"inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-70 " +
+                (routed
+                  ? "border-border text-muted-foreground"
+                  : flag
+                    ? "border-amber-400 bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
+                    : "border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
             >
               {routing ? <CircleNotch size={14} className="animate-spin" /> : routed ? <Check size={14} weight="bold" className="text-emerald-600" /> : <PaperPlaneTilt size={14} />}
               {routed ? "Sent to Designer board" : "Send original to Designer board"}
