@@ -497,24 +497,41 @@ export function DesignerBoard() {
                             <X size={11} weight="bold" />
                           </button>}
                         </div>
-                        <div className="p-2.5">
+                        {/* min-h so a sparse card (a fresh drop with only a title + id) is the
+                            same height as a full one (order #, method, files) — every tile in
+                            a lane matches, which is the "same size" the drop sets. */}
+                        <div className="min-h-[4.75rem] p-2.5">
                           <div className="truncate text-sm font-medium leading-tight">{c.title || "Design"}</div>
-                          <div className="mt-0.5 truncate text-xs text-muted-foreground">{c.product || c.type || "—"}</div>
-                          {/* One consistent quick-look row on EVERY tile: an id (order # or the
-                              partner Ref ID), how many files are attached, and the payout —
-                              so a glance tells the same story on any card, any lane. */}
+                          {/* The DESIGN ID and what it paid — the two facts you track a card
+                              by. This line used to be product/type, or a bare "—" when a card
+                              (a dropped design, say) had neither, which read as broken. The id
+                              is always present, so the line always says something, which also
+                              keeps every tile the same height. Money: the amount CREDITED to
+                              the designer once approved; $0 while it's only claimed (work
+                              underway, nothing earned yet); nothing at all before anyone
+                              claims it. */}
+                          <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+                            <span className="shrink-0 font-mono text-muted-foreground">DSN-{c.id}</span>
+                            {c.credited ? (
+                              <span className="shrink-0 font-semibold tabular-nums text-emerald-600">{money(amt(c.payment))} paid</span>
+                            ) : c.claimed_by ? (
+                              <span className="shrink-0 tabular-nums text-muted-foreground" title={`Claimed by ${c.claimed_by} — not credited yet`}>$0.00 · claimed</span>
+                            ) : null}
+                          </div>
+                          {/* The rest: order #, method, files. Money moved up to the id line,
+                              so it isn't shown twice. */}
                           <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
                             {c.order_id ? (
                               <span className="rounded bg-muted px-1.5 py-0.5 font-mono">{String(c.order_id).slice(0, 12)}</span>
-                            ) : c.vendor_ref ? (
-                              <span className="rounded bg-muted px-1.5 py-0.5 font-mono" title="Partner Ref ID">{String(c.vendor_ref)}</span>
                             ) : null}
+                            {(c.product || c.type) && (
+                              <span className="rounded bg-muted px-1.5 py-0.5">{c.product || c.type}</span>
+                            )}
                             {(c.file_count ?? 0) > 0 && (
                               <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5" title={`${c.file_count} design file${c.file_count === 1 ? "" : "s"}`}>
                                 <Paperclip size={9} weight="bold" />{c.file_count}
                               </span>
                             )}
-                            {amt(c.payment) > 0 && <span className="ml-auto text-xs font-semibold tabular-nums text-foreground">{money(amt(c.payment))}</span>}
                           </div>
                         </div>
                       </button>
