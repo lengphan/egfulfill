@@ -1511,6 +1511,18 @@ export function saveDesignLibrary(body: { name?: string; data: string; thumb?: s
 export function renameDesignLibrary(id: number | string, name: string) {
   return api<LibraryDesign & { error?: string }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "PATCH", body: JSON.stringify({ name }) })
 }
+
+// ── Wilcom EWA (embroidery) ──────────────────────────────────────────────────
+// Credentials live in Settings › Integrations (WILCOM_APP_ID / WILCOM_APP_KEY) and never
+// reach the browser; these only report whether it's set and whether a live call succeeds.
+export type WilcomConfig = { configured: boolean; base?: string }
+export function getWilcomConfig() {
+  return api<WilcomConfig>(`/api/wilcom/config`)
+}
+export type WilcomTest = { ok?: boolean; status?: number; message?: string | null; sample?: string; error?: string }
+export function testWilcomConnection() {
+  return api<WilcomTest>(`/api/wilcom/test`, { method: "POST" })
+}
 export function deleteDesignLibrary(id: number | string) {
   return api<{ ok?: boolean }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }

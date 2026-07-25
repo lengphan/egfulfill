@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import { Needle, UploadSimple, Receipt, MagnifyingGlass, FileArrowDown, Key, LockSimple } from "@phosphor-icons/react"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { Needle, UploadSimple, Receipt, MagnifyingGlass, FileArrowDown, Key, LockSimple, CircleNotch, CheckCircle, Warning, Plug } from "@phosphor-icons/react"
+import { getWilcomConfig, testWilcomConnection, type WilcomConfig, type WilcomTest } from "@/lib/api"
 
-// The intended pipeline — shown as a preview of what the page will do once the Wilcom EWA
-// subscription is connected. Nothing here is live yet; this is a dormant placeholder.
+// The intended pipeline — a preview of what the page does once the EWA flow is built.
 const STEPS = [
   { icon: UploadSimple, title: "Drop a design", body: "Drag in artwork or a machine file (PES / DST / EMB)." },
   { icon: Receipt, title: "Instant quote", body: "Stitch count, colours and price back in seconds." },
@@ -13,13 +14,38 @@ const STEPS = [
 ]
 
 /**
- * Digitizer — the planned Wilcom EWA embroidery page. Kept deliberately DORMANT: the flow
- * is described, the dropzone is disabled, and the API-key card is present but not wired to
- * anything (honest per the "don't ship an empty state that looks broken" rule). Flipping it
- * on is a separate build once the Wilcom EWA subscription exists.
+ * Digitizer — the Wilcom EWA embroidery page. The credentials now live in Settings ›
+ * Integrations (server-side, never in the browser); this page checks whether they're set
+ * and lets staff run a LIVE connectivity test. The upload → quote → export flow is still
+ * dormant (needs the EWA XML recipes wired) — shown as a preview, not a broken control.
  */
 export function DigitizerStudio() {
-  const [apiKey, setApiKey] = useState("")
+  const [cfg, setCfg] = useState<WilcomConfig | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [result, setResult] = useState<WilcomTest | null>(null)
+  const [testErr, setTestErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      getWilcomConfig().then(setCfg).catch(() => setCfg({ configured: false }))
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
+
+  const runTest = async () => {
+    setTesting(true); setResult(null); setTestErr(null)
+    try {
+      setResult(await testWilcomConnection())
+    } catch (e) {
+      // The server returns 400 (not configured) / 502 (unreachable) as errors — surface the
+      // message. A 404 here means the backend route isn't deployed yet.
+      setTestErr(e instanceof Error ? e.message : "Couldn't reach the test endpoint.")
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const configured = cfg?.configured === true
 
   return (
     <div className="mx-auto w-full max-w-4xl p-5 sm:p-8">
@@ -36,12 +62,67 @@ export function DigitizerStudio() {
         </div>
       </div>
 
-      {/* Dormant banner — say plainly it isn't live yet. */}
+      {/* Honest status: the flow isn't built yet, even once the key connects. */}
       <div className="mt-6 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
         <LockSimple size={18} weight="fill" className="mt-0.5 shrink-0" />
         <div>
-          <span className="font-semibold">Not active yet.</span> This is a placeholder for the Wilcom EWA integration. Add the API key below to activate it once the subscription is live.
+          <span className="font-semibold">Preview.</span> The upload → quote → export flow below isn&apos;t wired yet. The connection to Wilcom EWA is — test it below once the key is saved in Settings.
         </div>
+      </div>
+
+      {/* Connection card — the live part */}
+      <div className="mt-6 rounded-2xl border border-border bg-card p-5">
+        <div className="flex items-center gap-2">
+          <Key size={16} weight="bold" className="text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Wilcom EWA connection</h2>
+          <span className={"ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium " +
+            (cfg === null ? "bg-muted text-muted-foreground" : configured ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400")}>
+            {cfg === null ? <><CircleNotch size={12} className="animate-spin" /> Checking</> : configured ? <><CheckCircle size={12} weight="fill" /> Key installed</> : <><Warning size={12} weight="fill" /> No key</>}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          The Application ID &amp; key live in{" "}
+          <Link href="/settings" className="text-primary hover:underline">Settings › Integrations</Link>{" "}
+          (admin), server-side — never here. This runs a real call to EWA to confirm they work.
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={runTest}
+            disabled={testing || cfg === null || !configured}
+            title={!configured ? "Add the Application ID + key in Settings › Integrations first" : "Run a live api/info call"}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          >
+            {testing ? <CircleNotch size={15} className="animate-spin" /> : <Plug size={15} weight="bold" />}
+            {testing ? "Testing…" : "Test connection"}
+          </button>
+          {!configured && cfg !== null && (
+            <span className="text-xs text-muted-foreground">Add the key in Settings first.</span>
+          )}
+        </div>
+
+        {/* Result */}
+        {result && (
+          <div className={"mt-3 rounded-lg border px-3 py-2.5 text-sm " +
+            (result.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300"
+                       : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300")}>
+            <div className="font-medium">
+              {result.ok
+                ? `Connected — EWA responded${result.status ? ` (HTTP ${result.status})` : ""}.`
+                : `EWA rejected the request${result.status ? ` (HTTP ${result.status})` : ""}${result.message ? `: ${result.message}` : ""}.`}
+            </div>
+            {result.sample && (
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-background/60 p-2 text-[11px] text-muted-foreground">{result.sample}</pre>
+            )}
+          </div>
+        )}
+        {testErr && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+            <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
+            <span>{testErr}</span>
+          </div>
+        )}
       </div>
 
       {/* Flow preview */}
@@ -59,40 +140,11 @@ export function DigitizerStudio() {
         ))}
       </div>
 
-      {/* Disabled dropzone */}
+      {/* Disabled dropzone — the flow isn't wired yet */}
       <div className="mt-4 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/30 py-12 text-center opacity-60">
         <UploadSimple size={26} className="text-muted-foreground" />
         <div className="text-sm font-medium text-muted-foreground">Drag &amp; drop — coming soon</div>
-        <div className="text-xs text-muted-foreground">Enabled once the Wilcom EWA key is connected.</div>
-      </div>
-
-      {/* API-key settings (dormant) */}
-      <div className="mt-6 rounded-2xl border border-border bg-card p-5">
-        <div className="flex items-center gap-2">
-          <Key size={16} weight="bold" className="text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Wilcom EWA API key</h2>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Held here for when we open the integration — it isn&apos;t sent anywhere yet.
-        </p>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="ewa_…"
-            autoComplete="off"
-            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          />
-          <button
-            type="button"
-            disabled
-            title="Available once the Wilcom EWA plan is subscribed"
-            className="rounded-lg bg-primary/10 px-4 py-2 text-sm font-semibold text-primary opacity-50"
-          >
-            Save
-          </button>
-        </div>
+        <div className="text-xs text-muted-foreground">The upload → quote → export flow lands in the next build.</div>
       </div>
     </div>
   )
