@@ -6,7 +6,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, type DesignCard } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, type DesignCard, type AuditRow } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { AssignCardDialog } from "@/components/app/assign-card-dialog"
@@ -58,7 +58,11 @@ export function DesignerBoard() {
   const [err, setErr] = useState<string | null>(null)
   const [assignCard, setAssignCard] = useState<DesignCard | null>(null)
   const [openId, setOpenId] = useState<string | number | null>(null)
-  const [view, setView] = useState<"board" | "list">("board")
+  const [view, setView] = useState<"board" | "list" | "history">("board")
+  // The History tab is warehouse+admin, matching who may delete — it's the record of
+  // deletions and moves, so the people who make those calls are the ones who see it. An
+  // operator or designer gets no tab rather than one that 403s on load.
+  const canSeeHistory = canDeleteCard()
   const [query, setQuery] = useState("")
   const [designFee, setDesignFee] = useState(0) // platform default payout per design
   const [delErr, setDelErr] = useState<string | null>(null)
@@ -258,7 +262,7 @@ export function DesignerBoard() {
         </label>
         {/* rounded-full to match the pill buttons inside — see suppliers-view. */}
         <div className="flex rounded-full border border-border p-0.5">
-          {([{ id: "board", label: "Board" }, { id: "list", label: "List" }] as const).map((v) => (
+          {([{ id: "board", label: "Board" }, { id: "list", label: "List" }, ...(canSeeHistory ? [{ id: "history", label: "History" }] as const : [])] as const).map((v) => (
             <button key={v.id} onClick={() => setView(v.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (view === v.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{v.label}</button>
           ))}
         </div>
@@ -304,19 +308,22 @@ export function DesignerBoard() {
 
       {cards === null ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
+      ) : view === "history" && canSeeHistory ? (
+        <BoardHistory />
       ) : view === "list" ? (
         <DesignerList cards={filtered} onOpen={setOpenId} />
       ) : (
-        // Five lanes share the width as equal fractions. minmax(15rem, 1fr) gives each a
-        // genuine working width — enough for a square preview that reads at a glance — and
-        // only falls back to horizontal scroll on a window too narrow for that (mobile,
-        // where the List view is the better tool anyway). The Design-partner lane is gone:
-        // it was always empty (vendor cards group into the real lanes with their badge, so
-        // colOf never routes anything to it), so it only ever served as a drag-to-outsource
-        // drop target — and outsourcing still runs from inside a card via "Send to partner".
-        // Dropping the sixth, always-blank column is what buys the other five their width.
+        // FIXED lane width, not 1fr. Equal fractions kept every lane on screen by shrinking
+        // them all — so five lanes were fine but ten would each be unreadably thin. A fixed
+        // 17rem means a lane is always a proper working width, and once they no longer fit
+        // the row scrolls horizontally (overflow-x-auto) rather than squeezing. Add lanes
+        // freely; the board grows sideways instead of starving what's already there.
+        // The Design-partner lane is gone: it was always empty (vendor cards group into the
+        // real lanes with their badge, so colOf never routes anything to it), so it only
+        // served as a drag-to-outsource drop target — and outsourcing still runs from
+        // inside a card via "Send to partner".
         <div className="grid gap-2 overflow-x-auto pb-2"
-             style={{ gridTemplateColumns: `repeat(${COLS.length}, minmax(15rem, 1fr))` }}>
+             style={{ gridTemplateColumns: `repeat(${COLS.length}, 17rem)` }}>
           {COLS.map((col) => {
             const list = grouped[col.id] ?? []
             return (
@@ -881,5 +888,91 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ── Board history ──────────────────────────────────────────────────────────────
+// The record of what happened to cards — deletions first in prominence, then moves,
+// credits, assignments and creations. Reads the warehouse+admin board-history endpoint
+// (its own, so a warehouse never touches the admin-only global audit feed).
+const HIST_META: Record<string, { label: string; tone: string; icon: typeof X }> = {
+  "design_card.deleted":  { label: "Deleted",   tone: "bg-red-100 text-red-700",       icon: X },
+  "design.card.created":  { label: "Created",   tone: "bg-slate-100 text-slate-700",   icon: Plus },
+  "design.card.assigned": { label: "Assigned",  tone: "bg-sky-100 text-sky-700",       icon: LinkSimple },
+  "design.credited":      { label: "Credited",  tone: "bg-emerald-100 text-emerald-700", icon: CurrencyDollar },
+  "design.lane":          { label: "Moved",     tone: "bg-violet-100 text-violet-700", icon: ArrowRight },
+}
+const histMeta = (a: string) => HIST_META[a] ?? { label: a.replace(/^design[._]/, ""), tone: "bg-muted text-muted-foreground", icon: PencilSimple }
+
+function BoardHistory() {
+  const [rows, setRows] = useState<AuditRow[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [onlyDeletes, setOnlyDeletes] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      getDesignBoardHistory()
+        .then((r) => setRows(Array.isArray(r) ? r : []))
+        .catch(() => setErr("Couldn't load the board history."))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
+  if (err) return <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{err}</div>
+  if (rows === null) return <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
+
+  const shown = onlyDeletes ? rows.filter((r) => r.action === "design_card.deleted") : rows
+  const deletes = rows.filter((r) => r.action === "design_card.deleted").length
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">{rows.length} action{rows.length === 1 ? "" : "s"} recorded · {deletes} deletion{deletes === 1 ? "" : "s"}</span>
+        {/* The tab exists mainly to answer "what got deleted?" — so a one-click filter to
+            exactly that, without hunting through moves and credits. */}
+        <button onClick={() => setOnlyDeletes((v) => !v)}
+          className={"eg-tap ml-auto rounded-full border px-3 py-1 text-xs font-medium transition-colors " + (onlyDeletes ? "border-red-300 bg-red-50 text-red-700" : "border-border text-muted-foreground hover:bg-accent")}>
+          {onlyDeletes ? "Showing deletions only" : "Deletions only"}
+        </button>
+      </div>
+
+      {shown.length === 0 ? (
+        <div className="rounded-2xl border border-border py-12 text-center text-sm text-muted-foreground">
+          {onlyDeletes ? "No cards have been deleted." : "Nothing recorded yet."}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-border">
+          {shown.map((r, i) => {
+            const m = histMeta(r.action)
+            const Icon = m.icon
+            // The deleted card's own fields were snapshotted into `before` at delete time —
+            // its title and payout survive even though the card is gone.
+            const b = (r.before ?? {}) as Record<string, unknown>
+            const title = String(b.title || "") || (r.entity_id ? `Card ${r.entity_id}` : "a card")
+            const when = r.ts ? new Date(r.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""
+            const who = r.actor_name || r.actor_email || "someone"
+            return (
+              <div key={String(r.id ?? i)} className={"flex items-center gap-3 px-3 py-2.5 text-sm " + (i ? "border-t border-border " : "") + (r.action === "design_card.deleted" ? "bg-red-50/40" : "")}>
+                <span className={"inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold " + m.tone}>
+                  <Icon size={11} weight="bold" /> {m.label}
+                </span>
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-medium">{title}</span>
+                  {r.action === "design.lane" && (() => {
+                    const from = String(((r.before ?? {}) as Record<string, unknown>).col ?? "")
+                    const to = String(((r.after ?? {}) as Record<string, unknown>).col ?? "")
+                    return from || to ? <span className="text-muted-foreground"> · {from || "?"} → {to || "?"}</span> : null
+                  })()}
+                  {r.action === "design_card.deleted" && amt(b.payment) > 0 && (
+                    <span className="text-muted-foreground"> · was worth {money(amt(b.payment))}</span>
+                  )}
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">{who}</span>
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">{when}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }

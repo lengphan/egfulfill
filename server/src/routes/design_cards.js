@@ -182,6 +182,27 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   });
 
 
+  /**
+   * Board history — every audited board action, deletions foremost, newest first.
+   *
+   * Its own endpoint rather than the general /api/audit feed because THAT one is admin-only,
+   * and this is warehouse-and-admin: the same people who may delete a card are the ones who
+   * need to see what was deleted and by whom. Scoped to entity_type='design_card', so it's
+   * the board's story and nothing else — a warehouse reading it never sees orders, wallet
+   * or seller data it isn't entitled to.
+   *
+   * Declared BEFORE '/api/design_cards/:id' so the static path wins the route match.
+   */
+  app.get('/api/design_cards/history', { preHandler: requireWarehouse }, async () => {
+    const r = await q(
+      `select id, ts, action, actor as actor_email, actor_name, actor_role,
+              entity_id, before, after, note
+         from audit_log
+        where entity_type = 'design_card'
+        order by ts desc, id desc limit 300`).catch(() => ({ rows: [] }));
+    return r.rows;
+  });
+
   app.get('/api/design_cards', { preHandler: requireAuth }, async (req) => {
     if (isStaff(req.user)) {
       // claimed_role resolves the CLAIMER to a role the SAME way the credit route does, so

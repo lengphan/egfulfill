@@ -234,7 +234,10 @@ export function updateUserAdmin(id: string, patch: { role?: string; password?: s
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) })
 }
 
-export type AuditRow = { id: number | string; ts: string; actor?: string | null; actor_email?: string | null; actor_name?: string | null; actor_role?: string | null; action: string; entity_type?: string | null; entity_id?: string | null; note?: string | null }
+export type AuditRow = { id: number | string; ts: string; actor?: string | null; actor_email?: string | null; actor_name?: string | null; actor_role?: string | null; action: string; entity_type?: string | null; entity_id?: string | null; note?: string | null;
+  /** State snapshots the audit row carries — a deleted card's title/payout survive here even
+   *  though the card is gone, and a lane move records its from/to cols. Shape varies by action. */
+  before?: Record<string, unknown> | null; after?: Record<string, unknown> | null }
 /**
  * Everything that has happened to one order, newest first. Staff-readable (the unfiltered
  * admin log is separate) — an operator working an order needs its story.
@@ -1473,6 +1476,11 @@ export type DesignCard = {
 }
 export function getDesignCards() {
   return api<DesignCard[]>(`/api/design_cards`)
+}
+/** The board's audit history — deletions, lane moves, credits, assignments — newest first.
+ *  Warehouse + admin only (the server gates it), the same people who may delete a card. */
+export function getDesignBoardHistory() {
+  return api<AuditRow[]>(`/api/design_cards/history`)
 }
 /** Credit the designer who claimed a card. The SERVER decides who (and whether) —
  *  staff uploads aren't billable, and a shared board pays the claimer, not a pool. */
