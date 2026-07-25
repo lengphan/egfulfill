@@ -18,7 +18,8 @@ const CARRIERS = ["usps", "ups"]
 export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const [fromZip, setFromZip] = useState("")
   const [toZip, setToZip] = useState("")
-  const [pkg, setPkg] = useState({ weightOz: 8, length: 10, width: 8, height: 2 })
+  const [pkg, setPkg] = useState({ lb: 0, oz: 8, length: 10, width: 8, height: 2 })
+  const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0)
   const [rates, setRates] = useState<ShippingRate[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -31,7 +32,7 @@ export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpe
       const r = await getShippingRates({
         from: { street: "1 Main St", city: "", state: "", zip: fromZip },
         to: { street: "1 Main St", city: "", state: "", zip: toZip },
-        parcel: { weightOz: pkg.weightOz, length: pkg.length, width: pkg.width, height: pkg.height },
+        parcel: { weightOz, length: pkg.length, width: pkg.width, height: pkg.height },
       })
       if (r.error) { setErr(r.error); return }
       const shown = (r.rates || []).filter((rt) => CARRIERS.some((c) => (rt.carrier || "").toLowerCase().includes(c))).sort((a, b) => a.amount - b.amount)
@@ -53,7 +54,8 @@ export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpe
             <label className="flex flex-1 flex-col gap-1"><span className="text-[11px] text-muted-foreground">To ZIP</span><Input value={toZip} onChange={(e) => setToZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="18405" className="h-9" /></label>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <label className="flex w-20 flex-col gap-1"><span className="text-[11px] text-muted-foreground">Weight oz</span><Input type="number" min={1} value={pkg.weightOz} onChange={(e) => setPkg({ ...pkg, weightOz: Number(e.target.value) })} className="h-9" /></label>
+            <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">Weight lb</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) })} className="h-9" /></label>
+            <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">oz</span><Input type="number" min={0} value={pkg.oz} onChange={(e) => setPkg({ ...pkg, oz: Math.max(0, Number(e.target.value) || 0) })} className="h-9" /></label>
             <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">L in</span><Input type="number" min={1} value={pkg.length} onChange={(e) => setPkg({ ...pkg, length: Number(e.target.value) })} className="h-9" /></label>
             <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => setPkg({ ...pkg, width: Number(e.target.value) })} className="h-9" /></label>
             <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" /></label>

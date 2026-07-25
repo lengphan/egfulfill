@@ -286,6 +286,49 @@ export async function aggregatorRefundLabel(provider, providerId) {
   return { ok: false, message: `Labels bought via ${provider || 'this provider'} can't be voided automatically — refund it in the carrier's dashboard.` };
 }
 
+/**
+ * Fetch what a label ACTUALLY cost, after the fact, from the provider's transaction — the
+ * number on their dashboard. Labels bought before the buy-time cost capture landed (Shippo
+ * returns the rate as a bare id, so `cost` came back null) show an empty Price; this reads
+ * the billed amount straight from the source so those rows can be backfilled.
+ *
+ * Returns { cost, carrier, service } or null when it can't be recovered (no key, unknown
+ * provider, provider error). Never throws — a backfill over many labels must skip, not abort.
+ */
+export async function aggregatorFetchCost(provider, providerId) {
+  if (!providerId) return null;
+  try {
+    if (provider === 'shippo') {
+      if (!shToken()) return null;
+      const r = await fetch(SH_BASE + '/transactions/' + encodeURIComponent(providerId), { headers: { Authorization: shAuth() } });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return null;
+      let rate = (d.rate && typeof d.rate === 'object') ? d.rate : null;
+      // Shippo hands back `rate` as a bare object-id string on the transaction — resolve it
+      // to the rate object to read the amount/carrier/service.
+      if (!rate && typeof d.rate === 'string' && d.rate) {
+        const rr = await fetch(SH_BASE + '/rates/' + encodeURIComponent(d.rate), { headers: { Authorization: shAuth() } });
+        rate = await rr.json().catch(() => null);
+        if (!rr.ok) rate = null;
+      }
+      const cost = rate && isFinite(Number(rate.amount)) ? Number(rate.amount) : null;
+      if (cost == null) return null;
+      return { cost, carrier: (rate.provider || ''), service: (rate.servicelevel && rate.servicelevel.name) || '' };
+    }
+    if (provider === 'easypost') {
+      if (!epKey()) return null;
+      const r = await fetch(EP_BASE + '/shipments/' + encodeURIComponent(providerId), { headers: { Authorization: epAuth() } });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return null;
+      const sr = d.selected_rate || null;
+      const cost = sr && isFinite(Number(sr.rate)) ? Number(sr.rate) : null;
+      if (cost == null) return null;
+      return { cost, carrier: (sr.carrier || ''), service: (sr.service || '') };
+    }
+  } catch { /* fall through */ }
+  return null;
+}
+
 export function shippingRoutes(app, requireAuth, requireStaff) {
   const guard = { preHandler: requireStaff };
 

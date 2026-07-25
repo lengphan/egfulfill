@@ -29,7 +29,8 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
   const [pasteText, setPasteText] = useState("")
   const [to, setTo] = useState<ShipAddress>({ ...BLANK })
   const [from, setFrom] = useState<ShipAddress>({ ...BLANK })
-  const [pkg, setPkg] = useState({ weightOz: 6, length: 10, width: 8, height: 1 })
+  const [pkg, setPkg] = useState({ lb: 0, oz: 6, length: 10, width: 8, height: 1 })
+  const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0)
   // Add-ons the carrier prices into the rate: signature on delivery, declared insurance.
   const [svc, setSvc] = useState<{ signature: boolean; insurance: number }>({ signature: false, insurance: 0 })
   const [busy, setBusy] = useState(false)
@@ -89,7 +90,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
     if (!addrComplete(from)) { setErr("No warehouse ‘From’ address saved — set it in Settings › Platform first."); return }
     setRatesLoading(true); setPickedToken(null)
     try {
-      const r = await getShippingRates({ to, from, parcel: { weightOz: pkg.weightOz, length: pkg.length, width: pkg.width, height: pkg.height }, extra: (svc.signature || svc.insurance) ? { signature: svc.signature, insurance: svc.insurance } : undefined })
+      const r = await getShippingRates({ to, from, parcel: { weightOz, length: pkg.length, width: pkg.width, height: pkg.height }, extra: (svc.signature || svc.insurance) ? { signature: svc.signature, insurance: svc.insurance } : undefined })
       if (r.error) { setErr(r.error); setRates([]); return }
       // Only the carriers this warehouse offers (admin-set; defaults to USPS + UPS), cheapest first.
       const filtered = (r.rates || []).filter((rt) => carriers.some((c) => (rt.carrier || "").toLowerCase().includes(c)))
@@ -112,7 +113,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
     const t = setTimeout(() => { if (alive) getRates() }, 900)
     return () => { alive = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [to.street, to.street2, to.city, to.state, to.zip, from.street, from.zip, pkg.weightOz, pkg.length, pkg.width, pkg.height, svc.signature, svc.insurance, result, rates, ratesLoading])
+  }, [to.street, to.street2, to.city, to.state, to.zip, from.street, from.zip, pkg.lb, pkg.oz, pkg.length, pkg.width, pkg.height, svc.signature, svc.insurance, result, rates, ratesLoading])
 
   const buy = async () => {
     setErr(null)
@@ -140,7 +141,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
         const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
         if (v && !v.ok && v.error && !window.confirm(`Address check couldn't confirm this is deliverable:\n\n${v.error}\n\nBuy the label anyway?`)) return
       } catch { /* validation unavailable — proceed */ }
-      const r = await buyUspsLabel({ to, from, orderId, weightOz: pkg.weightOz, length: pkg.length, width: pkg.width, height: pkg.height, signature: svc.signature, insurance: svc.insurance || undefined, rateToken: picked.token, rate: { amount: picked.amount, carrier: picked.carrier, service: picked.service } })
+      const r = await buyUspsLabel({ to, from, orderId, weightOz, length: pkg.length, width: pkg.width, height: pkg.height, signature: svc.signature, insurance: svc.insurance || undefined, rateToken: picked.token, rate: { amount: picked.amount, carrier: picked.carrier, service: picked.service } })
       if (!r.ok) { setErr(r.error || "Couldn't buy the label."); return }
       setResult(r)
       onCreated()
@@ -194,7 +195,8 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
 
               <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Parcel</div>
               <div className="flex flex-wrap items-end gap-2">
-                <label className="flex w-20 flex-col gap-1"><span className="text-[11px] text-muted-foreground">Weight oz</span><Input type="number" min={1} value={pkg.weightOz} onChange={(e) => { setPkg({ ...pkg, weightOz: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
+                <label className="flex w-16 flex-col gap-1"><span className="text-[11px] text-muted-foreground">Weight lb</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => { setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
+                <label className="flex w-16 flex-col gap-1"><span className="text-[11px] text-muted-foreground">oz</span><Input type="number" min={0} value={pkg.oz} onChange={(e) => { setPkg({ ...pkg, oz: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
                 <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">L in</span><Input type="number" min={1} value={pkg.length} onChange={(e) => { setPkg({ ...pkg, length: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
                 <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => { setPkg({ ...pkg, width: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
                 <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => { setPkg({ ...pkg, height: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>

@@ -2511,6 +2511,12 @@ export function getShipments(p: { search?: string; limit?: number } = {}) {
 export function voidLabel(orderId: string) {
   return api<{ ok?: boolean; refunded?: number; error?: string }>(`/api/shipments/${encodeURIComponent(orderId)}/void`, { method: "POST" })
 }
+// Backfill missing label fees from the provider (Shippo/EasyPost) for labels bought before
+// buy-time cost capture landed — reads the real billed amount off the transaction and books
+// it. Warehouse/admin only, server-side. `updated` = fees recovered, `failed` = no ref/error.
+export function backfillLabelCosts() {
+  return api<{ ok?: boolean; scanned?: number; updated?: number; failed?: number; error?: string }>(`/api/shipments/backfill-costs`, { method: "POST" })
+}
 
 // ── Broadcasts — one-to-many email to sellers ────────────────────────────────
 // Named apart from `ads` campaigns on purpose: those are Meta/Google ad spend, this is

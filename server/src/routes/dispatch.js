@@ -24,7 +24,7 @@ import { q, softQ } from '../db.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 import { refundOrder } from './order_refunds.js';
-import { aggregatorRefundLabel } from './shipping.js';
+import { aggregatorRefundLabel, aggregatorFetchCost } from './shipping.js';
 
 /**
  * Undo the money booked by a successful push, when a label is cancelled BEFORE it's picked.
@@ -267,6 +267,38 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         createdAt: x.created_at,
       })),
     };
+  });
+
+  /**
+   * Backfill missing label fees from the provider. Labels bought before buy-time cost
+   * capture landed show an empty Price even though the carrier billed them — the fee sits
+   * on the Shippo/EasyPost dashboard but never made it here. This walks the labels that
+   * have a provider reference but no recorded cost, reads the real billed amount from the
+   * transaction, writes it to the order and books it to the ledger (idempotent on ref, so
+   * a re-run or a since-fixed row is a no-op). Warehouse/admin only — it moves money.
+   */
+  app.post('/api/shipments/backfill-costs', { preHandler: requireWarehouse }, async (req) => {
+    // Only rows we can actually recover: a stored provider ref, and no cost on the order
+    // nor in the ledger. Cap the batch so one click can't hammer the provider for hours.
+    const rows = (await q(
+      `select o.id, o.label_provider, o.label_ref
+         from orders o
+        where coalesce(o.tracking,'') <> '' and coalesce(o.label_ref,'') <> ''
+          and o.label_cost is null
+          and not exists (select 1 from wallet_ledger w where w.type='label-cost' and w.ref='label-'||o.id)
+        order by coalesce(o.label_scanned_at, o.created_at) desc
+        limit 200`).catch(() => ({ rows: [] }))).rows;
+    let updated = 0, failed = 0;
+    for (const o of rows) {
+      const got = await aggregatorFetchCost(o.label_provider, o.label_ref).catch(() => null);
+      if (!got || !isFinite(Number(got.cost)) || Number(got.cost) <= 0) { failed++; continue; }
+      await q(`update orders set label_cost=$1, ship_service=coalesce(nullif(ship_service,''), nullif($2,'')) where id=$3`,
+        [Number(got.cost), got.service || '', o.id]).catch(() => {});
+      await recordCost('label', Number(got.cost), `label-${o.id}`, `Postage · ${got.carrier || 'carrier'} · order ${o.id} (backfilled)`, { orderId: o.id });
+      updated++;
+    }
+    audit(req, 'label.backfill_cost', { after: { scanned: rows.length, updated, failed } });
+    return { ok: true, scanned: rows.length, updated, failed };
   });
 
   /**
