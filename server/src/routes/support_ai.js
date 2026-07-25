@@ -393,11 +393,15 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   });
 
   // ── Admin config (Settings › Integrations): key status + model selector ──────
-  app.get('/api/admin/ai-config', { preHandler: requireStaff }, async () => {
+  // Admins get a head…tail preview of the key; other staff last-4 only (same rule as
+  // admin_secrets). Reads role off the request.
+  const maskKey = (k, full) => !k ? null : (full && k.length >= 12 ? `${k.slice(0, 6)}…${k.slice(-4)}` : `${'•'.repeat(8)}${k.slice(-4)}`);
+  app.get('/api/admin/ai-config', { preHandler: requireStaff }, async (req) => {
     const cfg = await aiConfig();
     return {
       keySet: !!cfg.key,
       last4: cfg.key ? cfg.key.slice(-4) : null,
+      masked: maskKey(cfg.key, req.user?.role === 'admin'),
       fromEnv: cfg.fromEnv,        // true if the active key comes from the env (can't be cleared here)
       model: cfg.model,
       models: AI_MODELS,
@@ -419,7 +423,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       await q("insert into settings (key,value,updated_at) values ('support_ai_model', to_jsonb($1::text), now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [b.model.trim()]);
     }
     const cfg = await aiConfig();
-    return { ok: true, keySet: !!cfg.key, last4: cfg.key ? cfg.key.slice(-4) : null, fromEnv: cfg.fromEnv, model: cfg.model };
+    return { ok: true, keySet: !!cfg.key, last4: cfg.key ? cfg.key.slice(-4) : null, masked: maskKey(cfg.key, true), fromEnv: cfg.fromEnv, model: cfg.model };
   });
 
   // ── The seller-facing auto-reply ─────────────────────────────────────────────

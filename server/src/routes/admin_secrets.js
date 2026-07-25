@@ -54,15 +54,13 @@ const SECRET_DEFS = [
  * Short values are masked entirely rather than half-revealed — for a 12-char key,
  * head+tail would expose most of it.
  */
-function maskSecret(v) {
+function maskSecret(v, full) {
   const s = String(v || '');
   if (!s) return null;
-  // Last 4 only. This used to return the first 12 AND last 8 characters, which for the
-  // shorter credentials here (SS_API_KEY, OTTOCAP_CLIENT_SECRET, PINKDESIGN_API_KEY,
-  // VIETQR_API_PASSWORD — typically 24-32 chars) handed ~20 of them to any operator or
-  // designer, since this route is requireStaff while the write path below is admin-only.
-  // The docstring's real goal — telling a live key from a test one — is served by the
-  // separate `mode` field, which reports the prefix's meaning without printing it.
+  // ADMINS get a head…tail preview (first 6 + last 4) — the shape Stripe/GitHub show, and
+  // what makes "is the right key installed?" answerable at a glance. Non-admin staff on this
+  // requireStaff route get last-4 only, so a shorter secret isn't largely revealed to them.
+  if (full && s.length >= 12) return `${s.slice(0, 6)}…${s.slice(-4)}`;
   return `${'•'.repeat(8)}${s.slice(-4)}`;
 }
 
@@ -76,15 +74,18 @@ function keyMode(v) {
 }
 
 export function adminSecretsRoutes(app, requireStaff) {
-  app.get('/api/admin/secrets', { preHandler: requireStaff }, async () => ({
-    secrets: SECRET_DEFS.map((d) => {
-      const v = (process.env[d.name] || '').trim();
-      const editable = SECRET_NAMES.includes(d.name);
-      // `last4` stays for older clients; `masked` is the preview to show.
-      return { name: d.name, label: d.label, integration: d.integration, set: !!v,
-               masked: maskSecret(v), last4: v ? v.slice(-4) : null, mode: keyMode(v), editable };
-    }),
-  }));
+  app.get('/api/admin/secrets', { preHandler: requireStaff }, async (req) => {
+    const full = req.user?.role === 'admin';
+    return {
+      secrets: SECRET_DEFS.map((d) => {
+        const v = (process.env[d.name] || '').trim();
+        const editable = SECRET_NAMES.includes(d.name);
+        // `last4` stays for older clients; `masked` is the preview to show (head…tail for admins).
+        return { name: d.name, label: d.label, integration: d.integration, set: !!v,
+                 masked: maskSecret(v, full), last4: v ? v.slice(-4) : null, mode: keyMode(v), editable };
+      }),
+    };
+  });
 
   // Admin: set/replace/clear one secret in the DB (loaded into env at boot; also
   // applied live). Whitelisted names only. Takes full effect on the next restart.
@@ -96,6 +97,6 @@ export function adminSecretsRoutes(app, requireStaff) {
     try { await setSecret(name, b.value, req.user.sub); }
     catch (e) { reply.code(400); return { error: (e && e.message) || 'Save failed' }; }
     const v = (process.env[name] || '').trim();
-    return { ok: true, name, set: !!v, masked: maskSecret(v), last4: v ? v.slice(-4) : null };
+    return { ok: true, name, set: !!v, masked: maskSecret(v, true), last4: v ? v.slice(-4) : null };
   });
 }

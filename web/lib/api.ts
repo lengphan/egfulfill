@@ -476,7 +476,7 @@ export type CatalogProduct = {
 
 // AI assistant config (admin) — key status + model, editable in Settings › Integrations.
 export type AiModel = { id: string; label: string }
-export type AiConfig = { keySet?: boolean; last4?: string | null; fromEnv?: boolean; model?: string; models?: AiModel[]; ok?: boolean; error?: string }
+export type AiConfig = { keySet?: boolean; last4?: string | null; masked?: string | null; fromEnv?: boolean; model?: string; models?: AiModel[]; ok?: boolean; error?: string }
 export function getAiConfig() {
   return api<AiConfig>(`/api/admin/ai-config`)
 }
@@ -1596,7 +1596,7 @@ export function googleLogin(credential: string) {
 }
 
 // ─────────────────── Integration credentials (masked, read-only, staff) ───────────────────
-export type SecretMeta = { name: string; label: string; integration: string; set: boolean; last4: string | null; editable?: boolean }
+export type SecretMeta = { name: string; label: string; integration: string; set: boolean; last4: string | null; masked?: string | null; editable?: boolean }
 export function getAdminSecrets() {
   return api<{ secrets: SecretMeta[] }>(`/api/admin/secrets`)
 }

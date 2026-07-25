@@ -34,7 +34,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
     <div className="flex items-center justify-between gap-2 text-[13px]">
       <span className="text-muted-foreground">{s.label}</span>
       <span className="flex items-center gap-1.5 font-mono">
-        {s.set ? <span className="text-foreground">••••{s.last4}</span> : <span className="text-muted-foreground">not set</span>}
+        {s.set ? <span className="text-foreground">{s.masked || `••••${s.last4 ?? ""}`}</span> : <span className="text-muted-foreground">not set</span>}
         {s.editable && (
           <button onClick={() => setEditing(true)} className="text-muted-foreground transition-colors hover:text-primary" title={s.set ? "Replace" : "Set"} aria-label="Edit credential">
             <PencilSimple size={12} />
@@ -48,10 +48,13 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
 type Level = "live" | "configured" | "off" | "error" | "restricted" | "checking"
 type Result = { level: Level; detail?: string }
 
+// Two states that matter at a glance: Active (a working/installed credential, green) or
+// Inactive (grey). "live" (test-verified) and "configured" (key present) both read as
+// Active — the purple "Configured" vs green "Live" split just looked like two things.
 const LEVEL_META: Record<Level, { label: string; dot: string; text: string }> = {
-  live: { label: "Live", dot: "bg-emerald-500", text: "text-emerald-700" },
-  configured: { label: "Configured", dot: "bg-violet-500", text: "text-violet-700" },
-  off: { label: "Not configured", dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
+  live: { label: "Active", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400" },
+  configured: { label: "Active", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400" },
+  off: { label: "Inactive", dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
   error: { label: "Error", dot: "bg-red-500", text: "text-red-600" },
   restricted: { label: "Staff only", dot: "bg-amber-400", text: "text-amber-600" },
   checking: { label: "Checking…", dot: "bg-muted-foreground/40 animate-pulse", text: "text-muted-foreground" },
@@ -207,7 +210,7 @@ const INTEGRATIONS: Integration[] = [
   // SECRET_DEFS `integration` value so the WILCOM_APP_ID/KEY edit fields attach here.
   {
     key: "wilcom", name: "Wilcom EWA", blurb: "Embroidery digitizing engine", group: "Embroidery",
-    check: configOnly("/api/wilcom/config"),
+    check: configThenTest("/api/wilcom/config", "/api/wilcom/test", "configured"),
   },
 ]
 
@@ -230,6 +233,15 @@ export function IntegrationsPanel() {
       })
       .catch(() => {})
   }, [])
+
+  // Re-check ONE integration (the per-card refresh) — re-runs its status check and its
+  // secrets, without disturbing the others. The card shows "Checking…" while it runs.
+  const recheckOne = useCallback(async (i: Integration) => {
+    setResults((prev) => ({ ...prev, [i.key]: { level: "checking" } }))
+    try { const res = await i.check(); setResults((prev) => ({ ...prev, [i.key]: res })) }
+    catch { setResults((prev) => ({ ...prev, [i.key]: { level: "error" } })) }
+    reloadSecrets()
+  }, [reloadSecrets])
 
   const runChecks = useCallback(() => {
     setChecking(true)
@@ -299,10 +311,21 @@ export function IntegrationsPanel() {
                           <div className="truncate font-medium">{i.name}</div>
                           <div className="truncate text-[13px] text-muted-foreground">{i.blurb}</div>
                         </div>
-                        <span className={"inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium " + meta.text}>
-                          <span className={"size-2 rounded-full " + meta.dot} />
-                          {meta.label}
-                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className={"inline-flex items-center gap-1.5 text-[13px] font-medium " + meta.text}>
+                            <span className={"size-2 rounded-full " + meta.dot} />
+                            {meta.label}
+                          </span>
+                          <button
+                            onClick={() => recheckOne(i)}
+                            disabled={res.level === "checking"}
+                            title={`Refresh ${i.name}`}
+                            aria-label={`Refresh ${i.name}`}
+                            className="text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
+                          >
+                            <ArrowsClockwise size={13} weight="bold" className={res.level === "checking" ? "animate-spin" : ""} />
+                          </button>
+                        </div>
                       </div>
                       {res.detail && (
                         <div className="mt-2 truncate font-mono text-[12px] text-muted-foreground" title={res.detail}>
@@ -332,6 +355,7 @@ export function IntegrationsPanel() {
 function AiAssistantCard() {
   const [cfg, setCfg] = useState<AiConfig | null>(null)
   const [keyInput, setKeyInput] = useState("")
+  const [editingKey, setEditingKey] = useState(false)
   const [model, setModel] = useState("")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -357,6 +381,7 @@ function AiAssistantCard() {
       if (r.error) throw new Error(r.error)
       setCfg((prev) => ({ ...(prev ?? {}), ...r }))
       setKeyInput("")
+      setEditingKey(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e) {
@@ -404,21 +429,36 @@ function AiAssistantCard() {
             <div className="text-xs text-muted-foreground">Powers the account-aware auto-reply in seller Support chat.</div>
           </div>
         </div>
-        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (cfg?.keySet ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground")}>
-          {cfg?.keySet ? `Key ••••${cfg.last4 ?? ""}${cfg.fromEnv ? " · env" : ""}` : "No key"}
+        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (cfg?.keySet ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+          {cfg?.keySet ? "Active" : "Inactive"}
         </span>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Anthropic API key</span>
-          <Input
-            type="password"
-            value={keyInput}
-            onChange={(e) => { setKeyInput(e.target.value); setSaved(false) }}
-            placeholder={cfg?.keySet ? "Enter a new key to replace" : "sk-ant-…"}
-            className="font-mono text-xs"
-          />
+          {/* Key shown next to its input, not up in the status chip. The input stays hidden
+              behind "Replace" so you don't accidentally overwrite a working key. */}
+          {cfg?.keySet && !editingKey ? (
+            <div className="flex h-9 items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3">
+              <span className="flex-1 truncate font-mono text-xs text-foreground">{cfg.masked || `••••${cfg.last4 ?? ""}`}</span>
+              {cfg.fromEnv
+                ? <span className="shrink-0 text-[11px] text-muted-foreground">from env</span>
+                : <button type="button" onClick={() => setEditingKey(true)} className="shrink-0 text-xs font-medium text-primary hover:underline">Replace</button>}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Input
+                type="password"
+                value={keyInput}
+                onChange={(e) => { setKeyInput(e.target.value); setSaved(false) }}
+                placeholder="sk-ant-…"
+                className="flex-1 font-mono text-xs"
+                autoFocus={editingKey}
+              />
+              {editingKey && <button type="button" onClick={() => { setEditingKey(false); setKeyInput("") }} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">Cancel</button>}
+            </div>
+          )}
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Model</span>
