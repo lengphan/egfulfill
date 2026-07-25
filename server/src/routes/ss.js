@@ -639,9 +639,14 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     const offset = Math.max(0, parseInt(req.query?.offset, 10) || 0);
     const proxify = (u) => (!u ? null : (/^https:\/\/cdn\.ssactivewear\.com\//i.test(u) ? '/api/ss/img?u=' + encodeURIComponent(u) : u));
     try {
+      // sizes aggregated alongside colours — ss_products stores a size per sku, so the
+      // synced list can carry them for free, exactly as the Otto list does. Without this
+      // the browse card had no sizes until a colour swatch was clicked (which is what
+      // triggered the per-style detail call), so every S&S row read "—" until touched.
       const g = await q(`select style_id, min(brand) as brand, min(style_name) as title, min(category) as category,
                                 (array_agg(image) filter (where image is not null))[1] as image,
                                 array_agg(distinct color) filter (where color is not null) as colors,
+                                array_agg(distinct size) filter (where size is not null) as sizes,
                                 min(price) as price, count(*)::int as variants
                          from ss_products where style_id is not null group by style_id`);
       if (!g.rows.length) return { synced: false, total: 0, styles: [] };
@@ -651,6 +656,9 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         styleID: String(r.style_id), brand: r.brand || '', title: r.title || ('Style ' + r.style_id),
         category: r.category || '', image: proxify(r.image), price: r.price != null ? Number(r.price) : null,
         colors: Array.isArray(r.colors) ? r.colors : [],
+        // Present (possibly empty) so the client can tell "synced, no size dimension" —
+        // one size — apart from "not loaded", which is what an ABSENT sizes field means.
+        sizes: Array.isArray(r.sizes) ? r.sizes : [],
         favorited: favs.has(String(r.style_id)),
       }));
       // Search the NUMBERS as well as the words. "18500" and "Gildan 5000" are how a
