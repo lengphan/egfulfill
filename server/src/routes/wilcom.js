@@ -15,6 +15,10 @@
 // sample, and a small regex pulls out an error message if EWA returned one. A proper XML
 // parse (into design/trueview bytes) comes with the digitizing build, added as a real dep.
 
+import crypto from 'node:crypto';
+import { q } from '../db.js';
+import { storageEnabled, putObject } from '../storage.js';
+
 const EWA_BASE = 'https://public.ewa.wilcomapps.com/';
 const appId = () => (process.env.WILCOM_APP_ID || '').trim();
 const appKey = () => (process.env.WILCOM_APP_KEY || '').trim();
@@ -93,6 +97,21 @@ const isMachine = (f) => /\.(emb|dst|pes|exp|jef|vp3|xxx|hus)$/i.test(f);
 const MAX_INPUT_BYTES = 2 * 1024 * 1024; // EWA auto-digitize cap
 const tooBig = (base64) => Math.floor(base64.length * 3 / 4) > MAX_INPUT_BYTES;
 
+// History store — created idempotently at first use, like the other late tables. Holds one
+// row per GENERATED design (previews aren't persisted); the TrueView + machine file live in
+// object storage, not base64 in Postgres.
+let _genReady = null;
+function ensureGen() {
+  if (_genReady) return _genReady;
+  _genReady = q(`create table if not exists wilcom_generations (
+      id text primary key, by_user uuid, name text, order_ref text, source text, type text,
+      stitches int, colours int, width numeric, height numeric, formats text[],
+      trueview_url text, file_url text, created_at timestamptz default now())`)
+    .then(() => q(`create index if not exists wilcom_gen_created on wilcom_generations (created_at desc)`))
+    .catch((e) => { _genReady = null; throw e; });
+  return _genReady;
+}
+
 // Shared handler for preview (trueview only) and digitize (+ machine file).
 async function runBitmap(req, reply, { design }) {
   if (!configured()) { reply.code(400); return { ok: false, error: 'Wilcom EWA is not configured — add the key in Settings › Integrations.' }; }
@@ -114,13 +133,31 @@ async function runBitmap(req, reply, { design }) {
     const info = parseDesignInfo(res.body) || {};
     const tv = files.find((f) => isPng(f.filename));
     const machine = design ? files.find((f) => isMachine(f.filename)) : null;
-    return {
+    const out = {
       ok: true,
       trueview: tv ? tv.base64 : null,                                   // base64 PNG (no data: prefix)
       machineFile: machine ? { filename: machine.filename, base64: machine.base64 } : null,
       stitches: info.stitches ?? null, colours: info.colours ?? null,
       width: info.width ?? null, height: info.height ?? null,
     };
+    // Persist a GENERATION (not a preview) so it shows in History. Best-effort: a storage
+    // hiccup must not fail the response the operator is waiting on.
+    if (design && storageEnabled()) {
+      try {
+        await ensureGen();
+        const gid = 'WG-' + crypto.randomBytes(8).toString('hex');
+        const ext = machine ? (machine.filename.split('.').pop() || 'emb').toLowerCase() : null;
+        const tvUrl = tv ? await putObject(`wilcom/${gid}-tv.png`, Buffer.from(tv.base64, 'base64'), 'image/png') : null;
+        const fileUrl = machine ? await putObject(`wilcom/${gid}-${stem}.${ext}`, Buffer.from(machine.base64, 'base64'), 'application/octet-stream') : null;
+        await q(
+          `insert into wilcom_generations (id, by_user, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [gid, req.user?.sub || null, b.name || stem, b.orderRef || null, b.source || 'order', 'auto',
+           out.stitches, out.colours, out.width, out.height, ext ? [ext.toUpperCase()] : [], tvUrl, fileUrl]);
+        out.id = gid; out.trueviewUrl = tvUrl; out.fileUrl = fileUrl;
+      } catch (e) { req.log?.warn?.({ err: String(e) }, 'wilcom generation persist failed'); }
+    }
+    return out;
   } catch (e) {
     reply.code(502);
     return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' };
@@ -159,4 +196,12 @@ export function wilcomRoutes(app, requireStaff) {
   app.post('/api/wilcom/preview', { preHandler: requireStaff }, (req, reply) => runBitmap(req, reply, { design: false }));
   // Digitize — auto-digitize to a machine file (+ TrueView + stitch count).
   app.post('/api/wilcom/digitize', { preHandler: requireStaff }, (req, reply) => runBitmap(req, reply, { design: true }));
+
+  // History — every generated design, newest first (searched client-side).
+  app.get('/api/wilcom/generations', { preHandler: requireStaff }, async () => {
+    await ensureGen();
+    const r = await q(`select id, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url, created_at
+                         from wilcom_generations order by created_at desc limit 200`);
+    return { generations: r.rows };
+  });
 }

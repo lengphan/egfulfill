@@ -395,7 +395,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   // ── Admin config (Settings › Integrations): key status + model selector ──────
   // Admins get a head…tail preview of the key; other staff last-4 only (same rule as
   // admin_secrets). Reads role off the request.
-  const maskKey = (k, full) => !k ? null : (full && k.length >= 12 ? `${k.slice(0, 6)}…${k.slice(-4)}` : `${'•'.repeat(8)}${k.slice(-4)}`);
+  const maskKey = (k, full) => !k ? null : (full && k.length >= 10 ? `${k.slice(0, 4)}${'•'.repeat(8)}${k.slice(-4)}` : `${'•'.repeat(8)}${k.slice(-4)}`);
   app.get('/api/admin/ai-config', { preHandler: requireStaff }, async (req) => {
     const cfg = await aiConfig();
     return {

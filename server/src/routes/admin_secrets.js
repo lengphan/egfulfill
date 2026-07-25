@@ -57,10 +57,10 @@ const SECRET_DEFS = [
 function maskSecret(v, full) {
   const s = String(v || '');
   if (!s) return null;
-  // ADMINS get a head…tail preview (first 6 + last 4) — the shape Stripe/GitHub show, and
-  // what makes "is the right key installed?" answerable at a glance. Non-admin staff on this
-  // requireStaff route get last-4 only, so a shorter secret isn't largely revealed to them.
-  if (full && s.length >= 12) return `${s.slice(0, 6)}…${s.slice(-4)}`;
+  // Consistent "first 4 · dot run · last 4" across every credential — the shape a Kiloship /
+  // Stripe dashboard shows, easy to eyeball "is the right key in?". ADMINS only; other staff
+  // on this requireStaff route get last-4, so a short secret isn't largely revealed to them.
+  if (full && s.length >= 10) return `${s.slice(0, 4)}${'•'.repeat(8)}${s.slice(-4)}`;
   return `${'•'.repeat(8)}${s.slice(-4)}`;
 }
 

@@ -1523,6 +1523,28 @@ export type WilcomTest = { ok?: boolean; status?: number; message?: string | nul
 export function testWilcomConnection() {
   return api<WilcomTest>(`/api/wilcom/test`, { method: "POST" })
 }
+// Auto-digitize: preview (TrueView + stitch count, no file) and digitize (+ machine file).
+// `image` is a data URL; downscale to under 2MB client-side before sending.
+export type WilcomResult = {
+  ok?: boolean; error?: string; status?: number; sample?: string
+  trueview?: string | null; machineFile?: { filename: string; base64: string } | null
+  stitches?: number | null; colours?: number | null; width?: number | null; height?: number | null
+  id?: string; trueviewUrl?: string | null; fileUrl?: string | null
+}
+export function wilcomPreview(body: { image: string; filename?: string; width?: number; height?: number }) {
+  return api<WilcomResult>(`/api/wilcom/preview`, { method: "POST", body: JSON.stringify(body) })
+}
+export function wilcomDigitize(body: { image: string; filename?: string; name?: string; orderRef?: string; source?: string; width?: number; height?: number }) {
+  return api<WilcomResult>(`/api/wilcom/digitize`, { method: "POST", body: JSON.stringify(body) })
+}
+export type WilcomGeneration = {
+  id: string; name?: string | null; order_ref?: string | null; source?: string | null; type?: string | null
+  stitches?: number | null; colours?: number | null; width?: number | null; height?: number | null
+  formats?: string[] | null; trueview_url?: string | null; file_url?: string | null; created_at?: string
+}
+export function getWilcomGenerations() {
+  return api<{ generations: WilcomGeneration[] }>(`/api/wilcom/generations`)
+}
 export function deleteDesignLibrary(id: number | string) {
   return api<{ ok?: boolean }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }
