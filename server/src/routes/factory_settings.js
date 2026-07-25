@@ -62,6 +62,10 @@ const TEXT_KEYS = ['ss_shipping_method', 'otto_payment_method', 'otto_shipping_m
                    // Otto require BOTH on every order, and they come from their Customer
                    // API rather than anything we hold.
                    'otto_customer', 'otto_contact',
+                   // Which carriers the multi-carrier rate picker offers (comma-separated
+                   // substrings matched against the rate's carrier name), e.g. "usps,ups".
+                   // Empty = show every carrier the Shippo account returns.
+                   'enabled_carriers',
                    // Editable delay notice shown to a seller ONLY once they've crossed their
                    // order limit — e.g. "orders submitted now may ship later than usual".
                    'capacity_notice'];

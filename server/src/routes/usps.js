@@ -15,7 +15,7 @@
 import { q } from '../db.js';
 import { recordCost } from '../costs.js';
 import { readShipFrom } from './factory_settings.js';
-import { shippingEnabled, aggregatorBuyCheapest, aggregatorVerifyAddress } from './shipping.js';
+import { shippingEnabled, aggregatorBuyCheapest, aggregatorBuyRate, aggregatorVerifyAddress } from './shipping.js';
 import { missingArtwork } from './orders.js';
 
 // Map a USPS mailClass to a service-name hint for the aggregator rate filter.
@@ -371,6 +371,21 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) 
       const from = (b.from && b.from.street) ? b.from : (saved || {});
       if (!to.zip || !to.street) { reply.code(400); return { error: 'Recipient street + ZIP are required' }; }
       if (!from.zip || !from.street) { reply.code(400); return { error: 'No warehouse ship-from address set — add it in Settings → Shipping' }; }
+      // A SPECIFIC rate the operator picked in the multi-carrier rate table (UPS, USPS, …).
+      // Bought and recorded through the SAME path as a USPS label, so cost/PDF/void-ref land
+      // on the order identically — the only difference is which carrier's rate it is.
+      if (b.rateToken) {
+        try {
+          const buy = await aggregatorBuyRate(b.rateToken, b.rate || {});
+          if (buy && buy.tracking) {
+            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy, b.to);
+            return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
+          }
+          reply.code(502); return { error: 'The shipping provider returned no label for that rate. Nothing was charged.' };
+        } catch (e0) {
+          reply.code(502); return { error: 'Label purchase failed: ' + (e0 && e0.message ? e0.message : String(e0)) };
+        }
+      }
       // PREFERRED PATH — when a shipping aggregator (Shippo/EasyPost) is configured,
       // buy a REAL label through it (test keys → real design, watermarked, no charge).
       // Restricted to USPS here so a UPS test-account gap can't fail the buy.

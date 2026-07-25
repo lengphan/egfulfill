@@ -236,6 +236,19 @@ export async function aggregatorBuyCheapest(to, from, pc, opts) {
   return null;
 }
 
+// Buy a SPECIFIC rate the operator picked in the rate table (its `token` from
+// /api/shipping/rates). `sel` carries that rate's amount/carrier/service so the cost is
+// captured even though Shippo's transaction response doesn't expand the rate. Reused by
+// /api/usps/label so a UPS/USPS/any label records exactly like a USPS one (cost, PDF,
+// provider ref for voiding).
+export async function aggregatorBuyRate(rateToken, sel) {
+  const t = dec(rateToken);
+  if (!t) throw new Error('That rate is unreadable or expired — fetch fresh rates and try again.');
+  if (t.p === 'ep') return await epBuy(t.s, t.r);
+  if (t.p === 'sh') return await shBuy(t.r, sel || {});
+  throw new Error('Unknown rate provider on that rate.');
+}
+
 
 /**
  * Void a bought label and reclaim the postage.
@@ -309,7 +322,7 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
     if (!from.zip || !from.street1) { reply.code(400); return { error: 'Sender street + ZIP required' }; }
     const jobs = [];
     if (epKey()) jobs.push(epRates(to, from, pc).catch((e) => ({ _err: 'EasyPost: ' + e.message })));
-    if (shToken()) jobs.push(shRates(to, from, pc).catch((e) => ({ _err: 'Shippo: ' + e.message })));
+    if (shToken()) jobs.push(shRates(to, from, pc, b.extra).catch((e) => ({ _err: 'Shippo: ' + e.message })));
     const results = await Promise.all(jobs);
     const rates = [], errors = [];
     results.forEach((r) => { if (Array.isArray(r)) rates.push(...r); else if (r && r._err) errors.push(r._err); });

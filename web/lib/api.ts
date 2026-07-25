@@ -779,7 +779,14 @@ export function undoScan(id: string) {
 // ── USPS-direct label (Labels 3.0) — buys a real label + writes tracking onto the order ──
 export type ShipAddress = { name?: string; street?: string; street2?: string; city?: string; state?: string; zip?: string }
 export type UspsLabelResult = { ok?: boolean; error?: string; mock?: boolean; trackingNumber?: string; labelUrl?: string; labelImage?: string; labelHtml?: string; imageType?: string; carrier?: string; service?: string; cost?: number }
-export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightOz?: number; length?: number; width?: number; height?: number; mailClass?: string; orderId?: string; directUsps?: boolean; signature?: boolean; insurance?: number; refNo?: string; refNo2?: string; contents?: string }) {
+// One quoted rate from the multi-carrier rate-shop. `token` is what you buy against.
+export type ShippingRate = { token: string; provider: string; carrier: string; service: string; amount: number; currency?: string; days?: number | null }
+export function getShippingRates(body: { to: ShipAddress; from?: ShipAddress; parcel: { weightOz?: number; length?: number; width?: number; height?: number }; extra?: { signature?: boolean; insurance?: number } }) {
+  return api<{ rates: ShippingRate[]; errors?: string[]; error?: string }>(`/api/shipping/rates`, { method: "POST", body: JSON.stringify(body) })
+}
+// `rate`/`rateToken` buys a SPECIFIC carrier rate the operator picked; otherwise the body
+// falls back to the USPS-cheapest path. Both record the label the same way.
+export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightOz?: number; length?: number; width?: number; height?: number; mailClass?: string; orderId?: string; directUsps?: boolean; signature?: boolean; insurance?: number; refNo?: string; refNo2?: string; contents?: string; rateToken?: string; rate?: { amount?: number; carrier?: string; service?: string } }) {
   // Route through the aggregator (Shippo/EasyPost) when one is configured — it needs no
   // USPS EPS billing approval, and a test key buys free sample labels.
   //
@@ -1301,6 +1308,8 @@ export type FactorySettings = {
 } & {
   ship_from?: ShipFromAddress | null
   ship_from_complete?: boolean
+  /** Carriers the rate picker offers (comma-separated substrings, e.g. "usps,ups"). Empty = all. */
+  enabled_carriers?: string
   product_types?: ProductType[]
   /** The factory's own cone stock. Empty = fall back to the built-in starter palette. */
   thread_palette?: ThreadColor[]
