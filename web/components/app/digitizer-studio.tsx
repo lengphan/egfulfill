@@ -6,6 +6,7 @@ import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-mat
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
   wilcomPreview, wilcomDigitize, getWilcomGenerations, createDesignCard,
+  getWilcomAlphabets, wilcomLetteringPreview, wilcomLettering,
   type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration,
 } from "@/lib/api"
 
@@ -366,13 +367,110 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
   )
 }
 
-// ── Maker (Phase 2) ──────────────────────────────────────────────────────────────
+// ── Maker — lettering (text → embroidery via EWA newLettering/newDesign) ─────────
 function MakerTab() {
+  const [text, setText] = useState("Sunrise Co.")
+  const [alphabet, setAlphabet] = useState("")
+  const [height, setHeight] = useState(20)
+  const [color, setColor] = useState("")
+  const [alphabets, setAlphabets] = useState<string[]>([])
+  const [palette, setPalette] = useState<ThreadColor[]>([])
+  const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
+  const [res, setRes] = useState<WilcomResult | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      getWilcomAlphabets().then((r) => { const a = r.alphabets ?? []; setAlphabets(a); setAlphabet((p) => p || a[0] || "") }).catch(() => {})
+      getThreadPalette().then((p) => { const pal = Array.isArray(p) ? p : []; setPalette(pal); setColor((c) => c || pal[0]?.hex || "#111827") }).catch(() => setColor("#111827"))
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
+
+  const busy = status !== "idle"
+  const ready = !!text.trim() && !!alphabet
+  const run = async (design: boolean) => {
+    if (!ready) return
+    setStatus(design ? "generating" : "previewing"); setErr(null)
+    try {
+      const body = { text: text.trim(), alphabet, height, color }
+      const r = design ? await wilcomLettering(body) : await wilcomLetteringPreview(body)
+      if (!r.ok) throw new Error(r.error || "EWA rejected the request")
+      setRes(r)
+    } catch (e) { setErr(e instanceof Error ? e.message : "Failed") } finally { setStatus("idle") }
+  }
+
+  const inputCls = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
+  const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+
   return (
-    <div className="rounded-2xl border border-dashed border-border py-16 text-center">
-      <PencilSimple size={26} weight="duotone" className="mx-auto text-muted-foreground/50" />
-      <div className="mt-2 text-sm font-medium">Lettering &amp; monogram maker</div>
-      <div className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">Type text, pick an alphabet and thread, preview the TrueView, and export — lands in the next build (Phase 2).</div>
+    <div className="grid gap-5 sm:grid-cols-2">
+      {/* Controls */}
+      <div className="space-y-4">
+        <div>
+          <label className={labelCls}>Text</label>
+          <input value={text} onChange={(e) => { setText(e.target.value); setRes(null) }} placeholder="Your text" className={inputCls} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Alphabet</label>
+            <select value={alphabet} onChange={(e) => { setAlphabet(e.target.value); setRes(null) }} className={inputCls}>
+              {alphabets.length === 0 && <option value="">Loading…</option>}
+              {alphabets.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Height (mm)</label>
+            <input type="number" min={5} max={50} value={height} onChange={(e) => { setHeight(Number(e.target.value) || 20); setRes(null) }} className={inputCls} />
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Thread colour</label>
+          {palette.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {palette.map((c) => (
+                <button key={c.code} onClick={() => { setColor(c.hex); setRes(null) }} title={`${c.name} · ${c.code}`} className={"size-7 rounded-md border-2 transition-transform hover:scale-105 " + (color === c.hex ? "border-foreground" : "border-transparent")} style={{ background: c.hex }} />
+              ))}
+            </div>
+          ) : <p className="text-xs text-muted-foreground">No thread library set — add cones in Settings › Thread palette.</p>}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => run(false)} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
+            {status === "previewing" ? <CircleNotch size={14} className="animate-spin" /> : <Eye size={14} />} Preview
+          </button>
+          <button onClick={() => run(true)} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+            {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : null} Generate file
+          </button>
+        </div>
+        {res?.machineFile && (
+          <div className="flex gap-2">
+            <button onClick={() => download(res.machineFile!.filename, `data:application/octet-stream;base64,${res.machineFile!.base64}`)} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"><DownloadSimple size={14} weight="bold" /> {res.machineFile.filename.split(".").pop()?.toUpperCase()}</button>
+            <button onClick={() => { if (res.trueview) download(`${res.machineFile!.filename.replace(/\.[^.]+$/, "")}.png`, `data:image/png;base64,${res.trueview}`) }} disabled={!res.trueview} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"><DownloadSimple size={14} weight="bold" /> PNG</button>
+          </div>
+        )}
+        {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
+      </div>
+
+      {/* Preview */}
+      <div className="space-y-3">
+        <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border bg-muted">
+          {busy ? (
+            <div className="grid size-full place-items-center"><CircleNotch size={24} className="animate-spin text-muted-foreground" /></div>
+          ) : res?.trueview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`data:image/png;base64,${res.trueview}`} alt="lettering preview" className="absolute inset-0 size-full object-contain" />
+          ) : (
+            <div className="grid size-full place-items-center p-8 text-center text-sm text-muted-foreground">Preview to see your lettering stitched out.</div>
+          )}
+        </div>
+        {res && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            {res.stitches != null && <span><b className="tabular-nums text-foreground">{res.stitches.toLocaleString()}</b> stitches</span>}
+            {res.width != null && res.height != null && <span className="tabular-nums text-foreground">{Math.round(res.width)} × {Math.round(res.height)} mm</span>}
+            {res.machineFile && <span className="font-mono text-foreground">{res.machineFile.filename.split(".").pop()?.toUpperCase()}</span>}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

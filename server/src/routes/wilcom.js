@@ -185,6 +185,80 @@ async function runBitmap(req, reply, { design }) {
   }
 }
 
+// ── Lettering (text → embroidery) ──────────────────────────────────────────────
+// EWA colour is an int R+(G<<8)+(B<<16); the Maker picks a hex from the admin thread palette.
+const hexToColorInt = (hex) => {
+  const h = String(hex || '').replace('#', '');
+  if (h.length < 6) return 0;
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return (r || 0) + ((g || 0) << 8) + ((b || 0) << 16);
+};
+function buildLetteringXml({ text, alphabet, height, colorInt, designFile }) {
+  const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="preview.png"', 'dpi="120"'].filter(Boolean).join(' ');
+  const h = Math.min(50, Math.max(5, Number(height) || 20));
+  return '<xml><recipe>'
+    + '<decorations><lettering>'
+    + `<simple_lettering text="${XML_ESC(text)}" alphabet_name="${XML_ESC(alphabet)}" height="${h.toFixed(1)}"/>`
+    + `<thread color="${colorInt}"/>`
+    + '</lettering></decorations>'
+    + `<output ${out}/>`
+    + '</recipe></xml>';
+}
+async function runLettering(req, reply, { design }) {
+  if (!configured()) { reply.code(400); return { ok: false, error: 'Wilcom EWA is not configured — add the key in Settings › Integrations.' }; }
+  const b = req.body || {};
+  const text = String(b.text || '').trim();
+  const alphabet = String(b.alphabet || '').trim();
+  if (!text) { reply.code(400); return { ok: false, error: 'Enter some text to stitch.' }; }
+  if (!alphabet) { reply.code(400); return { ok: false, error: 'Pick an alphabet.' }; }
+  const stem = safeName(text, 'lettering');
+  const xml = buildLetteringXml({ text, alphabet, height: b.height, colorInt: hexToColorInt(b.color), designFile: design ? `${stem}.emb` : null });
+  try {
+    // Preview uses the fast lettering preview; generate uses newDesign to emit a machine file.
+    const res = await ewaCall(design ? 'api/newDesign' : 'api/newLetteringPreview', xml);
+    if (!res.ok) {
+      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
+      reply.code(502);
+      return { ok: false, status: res.status, error: m ? m[1].trim() : 'EWA rejected the request', sample: (res.body || '').slice(0, 400) };
+    }
+    const files = parseFiles(res.body);
+    const info = parseDesignInfo(res.body) || {};
+    const tv = files.find((f) => isPng(f.filename));
+    const machine = design ? files.find((f) => isMachine(f.filename)) : null;
+    const out = {
+      ok: true,
+      trueview: tv ? tv.base64 : null,
+      machineFile: machine ? { filename: machine.filename, base64: machine.base64 } : null,
+      stitches: info.stitches ?? null, colours: info.colours ?? null,
+      width: info.width ?? null, height: info.height ?? null,
+      threads: parseThreads(res.body),
+    };
+    if (design && storageEnabled()) {
+      try {
+        await ensureGen();
+        const gid = 'WG-' + crypto.randomBytes(8).toString('hex');
+        const ext = machine ? (machine.filename.split('.').pop() || 'emb').toLowerCase() : null;
+        const tvUrl = tv ? await putObject(`wilcom/${gid}-tv.png`, Buffer.from(tv.base64, 'base64'), 'image/png') : null;
+        const fileUrl = machine ? await putObject(`wilcom/${gid}-${stem}.${ext}`, Buffer.from(machine.base64, 'base64'), 'application/octet-stream') : null;
+        await q(`insert into wilcom_generations (id, by_user, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [gid, req.user?.sub || null, text, null, 'maker', 'lettering', out.stitches, out.colours, out.width, out.height, ext ? [ext.toUpperCase()] : [], tvUrl, fileUrl]);
+        out.id = gid; out.trueviewUrl = tvUrl; out.fileUrl = fileUrl;
+      } catch (e) { req.log?.warn?.({ err: String(e) }, 'wilcom lettering persist failed'); }
+    }
+    return out;
+  } catch (e) { reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' }; }
+}
+
+// Alphabet list for the Maker dropdown — parsed from api/info's <alphabet name="…"> entries.
+async function ewaAlphabets() {
+  const res = await ewaCall('api/info', '');
+  const out = [];
+  const re = /<alphabet\b[^>]*\bname="([^"]*)"[^>]*\/?>/gi;
+  let m;
+  while ((m = re.exec(res.body || '')) && out.length < 500) out.push(m[1]);
+  return out;
+}
+
 export function wilcomRoutes(app, requireStaff) {
   // Is the integration configured? Masked — never returns the key itself.
   app.get('/api/wilcom/config', { preHandler: requireStaff }, async () => ({
@@ -225,4 +299,13 @@ export function wilcomRoutes(app, requireStaff) {
                          from wilcom_generations order by created_at desc limit 200`);
     return { generations: r.rows };
   });
+
+  // Maker — lettering: alphabet list for the dropdown, fast preview, and generate-to-file.
+  app.get('/api/wilcom/alphabets', { preHandler: requireStaff }, async (req, reply) => {
+    if (!configured()) { reply.code(400); return { alphabets: [] }; }
+    try { return { alphabets: await ewaAlphabets() }; }
+    catch { reply.code(502); return { alphabets: [] }; }
+  });
+  app.post('/api/wilcom/lettering-preview', { preHandler: requireStaff }, (req, reply) => runLettering(req, reply, { design: false }));
+  app.post('/api/wilcom/lettering', { preHandler: requireStaff }, (req, reply) => runLettering(req, reply, { design: true }));
 }

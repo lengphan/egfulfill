@@ -1551,6 +1551,16 @@ export type WilcomGeneration = {
 export function getWilcomGenerations() {
   return api<{ generations: WilcomGeneration[] }>(`/api/wilcom/generations`)
 }
+// Maker — lettering: alphabet list, fast preview, and generate-to-file.
+export function getWilcomAlphabets() {
+  return api<{ alphabets: string[] }>(`/api/wilcom/alphabets`)
+}
+export function wilcomLetteringPreview(body: { text: string; alphabet: string; height?: number; color?: string }) {
+  return api<WilcomResult>(`/api/wilcom/lettering-preview`, { method: "POST", body: JSON.stringify(body) })
+}
+export function wilcomLettering(body: { text: string; alphabet: string; height?: number; color?: string }) {
+  return api<WilcomResult>(`/api/wilcom/lettering`, { method: "POST", body: JSON.stringify(body) })
+}
 export function deleteDesignLibrary(id: number | string) {
   return api<{ ok?: boolean }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }
