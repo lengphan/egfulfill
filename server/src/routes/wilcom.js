@@ -39,6 +39,94 @@ async function ewaCall(method, xml) {
   return { status: r.status, ok: r.ok, body: text };
 }
 
+// ── Bitmap auto-digitize ───────────────────────────────────────────────────────
+// Preview = api/bitmapArtTrueview (proof + stitch count, no machine file); Digitize =
+// api/bitmapArtDesign (+ the machine file). Same request shape; `design` toggles the
+// design_file output. Contract: docs/WILCOM-EWA-PHASE1.md.
+const XML_ESC = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// EWA filenames accept only 0-9 a-z A-Z - _ space; sanitize anything else.
+const safeName = (s, fallback) => (String(s || '').replace(/[^0-9A-Za-z _-]/g, '_').trim() || fallback);
+
+function fromDataUrl(dataUrl) {
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,([\s\S]+)$/i.exec(String(dataUrl || ''));
+  if (!m) return null;
+  const mime = m[1].toLowerCase();
+  const ext = ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/webp': 'webp', 'image/bmp': 'bmp' })[mime] || 'png';
+  return { mime, ext, base64: m[2].replace(/\s+/g, '') };
+}
+
+function buildBitmapXml({ filename, base64, width, height, designFile }) {
+  const dims = [width ? `width="${Number(width)}"` : '', height ? `height="${Number(height)}"` : ''].filter(Boolean).join(' ');
+  const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="trueview.png"', 'dpi="120"'].filter(Boolean).join(' ');
+  // NB: the <bitmap> file-reference attribute name is UNCONFIRMED in the spec — `file` is the
+  // best read of "specifies which file element will be processed". If the first live call
+  // rejects it, the EWA error says so; fix the attribute here.
+  return '<xml>'
+    + `<bitmap file="${XML_ESC(filename)}"/>`
+    + `<autodigitize_options ${dims}/>`
+    + `<output ${out}/>`
+    + `<files><file filename="${XML_ESC(filename)}" filecontents="${base64}"/></files>`
+    + '</xml>';
+}
+
+// Dependency-free parse: base64 contains no `"` or `>`, so attribute regex is safe here.
+function parseFiles(xml) {
+  const files = [];
+  const tagRe = /<file\b([^>]*?)\/?>/gi;
+  let t;
+  while ((t = tagRe.exec(xml))) {
+    const fn = /filename="([^"]*)"/i.exec(t[1]);
+    const fc = /filecontents="([^"]*)"/i.exec(t[1]);
+    if (fn && fc) files.push({ filename: fn[1], base64: fc[1] });
+  }
+  return files;
+}
+function parseDesignInfo(xml) {
+  const seg = /<design_info\b([^>]*?)\/?>/i.exec(xml);
+  if (!seg) return null;
+  const g = (k) => { const m = new RegExp(k + '="([^"]*)"', 'i').exec(seg[1]); return m ? m[1] : null; };
+  const n = (v) => (v == null || v === '' ? null : Number(v));
+  return { stitches: n(g('num_stitches')), colours: n(g('num_colours')), width: n(g('width')), height: n(g('height')), machine: g('machine_name') };
+}
+const isPng = (f) => /\.png$/i.test(f);
+const isMachine = (f) => /\.(emb|dst|pes|exp|jef|vp3|xxx|hus)$/i.test(f);
+const MAX_INPUT_BYTES = 2 * 1024 * 1024; // EWA auto-digitize cap
+const tooBig = (base64) => Math.floor(base64.length * 3 / 4) > MAX_INPUT_BYTES;
+
+// Shared handler for preview (trueview only) and digitize (+ machine file).
+async function runBitmap(req, reply, { design }) {
+  if (!configured()) { reply.code(400); return { ok: false, error: 'Wilcom EWA is not configured — add the key in Settings › Integrations.' }; }
+  const b = req.body || {};
+  const img = fromDataUrl(b.image);
+  if (!img) { reply.code(400); return { ok: false, error: 'Send an image data URL (PNG / JPG / WEBP).' }; }
+  if (tooBig(img.base64)) { reply.code(413); return { ok: false, error: 'Image is over 2 MB — auto-digitize needs a smaller file. Downscale it first.' }; }
+  const stem = safeName(b.filename, 'art');
+  const filename = `${stem}.${img.ext}`;
+  const xml = buildBitmapXml({ filename, base64: img.base64, width: b.width, height: b.height, designFile: design ? `${stem}.emb` : null });
+  try {
+    const res = await ewaCall(design ? 'api/bitmapArtDesign' : 'api/bitmapArtTrueview', xml);
+    if (!res.ok) {
+      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
+      reply.code(502);
+      return { ok: false, status: res.status, error: m ? m[1].trim() : 'EWA rejected the request', sample: (res.body || '').slice(0, 400) };
+    }
+    const files = parseFiles(res.body);
+    const info = parseDesignInfo(res.body) || {};
+    const tv = files.find((f) => isPng(f.filename));
+    const machine = design ? files.find((f) => isMachine(f.filename)) : null;
+    return {
+      ok: true,
+      trueview: tv ? tv.base64 : null,                                   // base64 PNG (no data: prefix)
+      machineFile: machine ? { filename: machine.filename, base64: machine.base64 } : null,
+      stitches: info.stitches ?? null, colours: info.colours ?? null,
+      width: info.width ?? null, height: info.height ?? null,
+    };
+  } catch (e) {
+    reply.code(502);
+    return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' };
+  }
+}
+
 export function wilcomRoutes(app, requireStaff) {
   // Is the integration configured? Masked — never returns the key itself.
   app.get('/api/wilcom/config', { preHandler: requireStaff }, async () => ({
@@ -66,4 +154,9 @@ export function wilcomRoutes(app, requireStaff) {
       return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' };
     }
   });
+
+  // Preview — auto-digitize to a TrueView proof + stitch count, no machine file.
+  app.post('/api/wilcom/preview', { preHandler: requireStaff }, (req, reply) => runBitmap(req, reply, { design: false }));
+  // Digitize — auto-digitize to a machine file (+ TrueView + stitch count).
+  app.post('/api/wilcom/digitize', { preHandler: requireStaff }, (req, reply) => runBitmap(req, reply, { design: true }));
 }
