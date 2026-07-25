@@ -1,4 +1,5 @@
 import type { AuditRow } from "@/lib/api"
+import { actionMeta } from "@/components/app/activity-meta"
 
 /**
  * Which audit actions belong to which tag, and how to say them in words.
@@ -20,29 +21,11 @@ const MATCH: Record<TagId, RegExp> = {
   design: /^design\.|^design_file\./,
 }
 
-/** Human wording for an action. Unknown actions fall back to the raw key rather than
- *  being hidden — an unexplained event is still evidence. */
-const SAID: Record<string, string> = {
-  "label.printed": "Label printed",
-  "label.unprinted": "Label print undone",
-  "design.saved": "Artwork attached",
-  "design.pushed": "Sent to the designer board",
-  "design.approved": "Design approved",
-  "design_file.uploaded": "Machine file uploaded",
-  "design_file.removed": "Machine file removed",
-  "item.status": "Item status changed",
-  "order.stage": "Order stage changed",
-  // The scanning steps. Without these the fallback prints the raw action with the dots
-  // swapped for spaces ("dispatch push"), which reads like a debug log rather than a
-  // record of what someone did.
-  "order.scan": "Scanned here",
-  "order.scan.undo": "Scan undone",
-  "dispatch.push": "Sent to byeastside",
-  "dispatch.cancel": "Cancelled with byeastside",
-}
-
+/** Human wording for an action. Delegates to the shared action registry (activity-meta) so
+ *  the word here and the badge in every feed are the same string — they used to be two maps
+ *  that drifted. Unknown actions fall back to a humanised key rather than being hidden. */
 export function sayAction(a: string): string {
-  return SAID[a] ?? a.replace(/[._]/g, " ")
+  return actionMeta(a).label
 }
 
 export function forTag(tag: TagId, rows: AuditRow[]): AuditRow[] {

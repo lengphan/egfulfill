@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode, CaretDown, CaretRight, ClockCounterClockwise, Package } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode, CaretDown, CaretRight, Package } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow, type AuditRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
-import { sayAction } from "@/components/app/tag-history"
+import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
 import { canSetStage, canWalk, stagePath, normalizeStage } from "@/lib/factory-status"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
@@ -601,17 +601,7 @@ export function DispatchBoard() {
                           ) : !evs || evs.length === 0 ? (
                             <div className="py-2 text-sm text-muted-foreground">No dispatch actions recorded for this label yet.</div>
                           ) : (
-                            <ol className="space-y-3 py-1.5">
-                              {evs.map((ev) => (
-                                <li key={String(ev.id)} className="flex items-start gap-2.5">
-                                  <ClockCounterClockwise size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
-                                  <div className="min-w-0">
-                                    <div className="text-sm font-medium">{sayAction(ev.action)}</div>
-                                    <div className="text-[13px] text-muted-foreground">{ev.actor_name || ev.actor_role || "system"} · {new Date(ev.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{ev.note ? ` · ${ev.note}` : ""}</div>
-                                  </div>
-                                </li>
-                              ))}
-                            </ol>
+                            <ActivityFeed rows={evs} variant="bare" note />
                           )}
                         </div>
                       )

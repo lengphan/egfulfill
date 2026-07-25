@@ -1,21 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ClockCounterClockwise, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { ActivityFeed } from "@/components/app/activity-feed"
 import { getOrderHistory, type AuditRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
-import { sayAction } from "@/components/app/tag-history"
-
-/** "Helen · Warehouse" — a team asks "who did this" by name, and the role is what makes
- *  the name meaningful when two people share one. Falls back through name → email →
- *  role so an entry is never anonymous. */
-function actorOf(r: AuditRow): string {
-  const who = r.actor_name || r.actor_email || r.actor || ""
-  const role = r.actor_role ? r.actor_role.charAt(0).toUpperCase() + r.actor_role.slice(1) : ""
-  if (who && role) return `${who} · ${role}`
-  return who || role || "System"
-}
 
 /**
  * Everything that has happened to one order, newest first.
@@ -60,32 +49,13 @@ export function OrderHistory({ orderId }: { orderId: string }) {
       title="Order history"
       description="Internal — who changed what, and when. Never shown to the seller."
     >
-      {rows === null ? (
-        <div className="flex items-center justify-center py-8 text-muted-foreground"><CircleNotch size={18} className="animate-spin" /></div>
-      ) : (
-        rows.length === 0 ? (
-          <div className="px-5 py-6 text-center text-sm text-muted-foreground">
-            Nothing recorded for this order yet — changes from here on will appear.
-          </div>
-        ) : (
-        <div className="max-h-72 divide-y divide-border overflow-y-auto">
-          {rows.map((r) => (
-            <div key={String(r.id)} className="flex items-start gap-3 px-5 py-2.5">
-              <ClockCounterClockwise size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{sayAction(r.action)}</div>
-                <div className="text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground/70">{actorOf(r)}</span>
-                  {" · "}
-                  {new Date(r.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                  {r.note ? ` · ${r.note}` : ""}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        )
-      )}
+      <div className="max-h-72 overflow-y-auto p-3">
+        <ActivityFeed
+          rows={rows}
+          variant="card"
+          empty="Nothing recorded for this order yet — changes from here on will appear."
+        />
+      </div>
     </SectionCard>
   )
 }

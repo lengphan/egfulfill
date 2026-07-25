@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
+import { ActivityFeed } from "@/components/app/activity-feed"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { AssignCardDialog } from "@/components/app/assign-card-dialog"
@@ -1019,15 +1020,27 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
 // ── Board history ──────────────────────────────────────────────────────────────
 // The record of what happened to cards — deletions first in prominence, then moves,
 // credits, assignments and creations. Reads the warehouse+admin board-history endpoint
-// (its own, so a warehouse never touches the admin-only global audit feed).
-const HIST_META: Record<string, { label: string; tone: string; icon: typeof X }> = {
-  "design_card.deleted":  { label: "Deleted",   tone: "bg-red-100 text-red-700",       icon: X },
-  "design.card.created":  { label: "Created",   tone: "bg-slate-100 text-slate-700",   icon: Plus },
-  "design.card.assigned": { label: "Assigned",  tone: "bg-sky-100 text-sky-700",       icon: LinkSimple },
-  "design.credited":      { label: "Credited",  tone: "bg-emerald-100 text-emerald-700", icon: CurrencyDollar },
-  "design.lane":          { label: "Moved",     tone: "bg-violet-100 text-violet-700", icon: ArrowRight },
+// (its own, so a warehouse never touches the admin-only global audit feed). The action
+// badges + wording come from the shared activity registry (activity-meta), same as every
+// other history feed; only the per-row SUBJECT (card title, lane move, lost payout) is
+// board-specific and lives here.
+function boardSubject(r: AuditRow) {
+  const b = (r.before ?? {}) as Record<string, unknown>
+  const title = String(b.title || "") || (r.entity_id ? `Card ${r.entity_id}` : "a card")
+  const from = String(((r.before ?? {}) as Record<string, unknown>).col ?? "")
+  const to = String(((r.after ?? {}) as Record<string, unknown>).col ?? "")
+  return (
+    <>
+      <span className="font-medium">{title}</span>
+      {r.action === "design.lane" && (from || to) && (
+        <span className="text-muted-foreground"> · {from || "?"} → {to || "?"}</span>
+      )}
+      {r.action === "design_card.deleted" && amt(b.payment) > 0 && (
+        <span className="text-muted-foreground"> · was worth {money(amt(b.payment))}</span>
+      )}
+    </>
+  )
 }
-const histMeta = (a: string) => HIST_META[a] ?? { label: a.replace(/^design[._]/, ""), tone: "bg-muted text-muted-foreground", icon: PencilSimple }
 
 function BoardHistory() {
   const [rows, setRows] = useState<AuditRow[] | null>(null)
@@ -1060,44 +1073,13 @@ function BoardHistory() {
         </button>
       </div>
 
-      {shown.length === 0 ? (
-        <div className="rounded-2xl border border-border py-12 text-center text-sm text-muted-foreground">
-          {onlyDeletes ? "No cards have been deleted." : "Nothing recorded yet."}
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-border">
-          {shown.map((r, i) => {
-            const m = histMeta(r.action)
-            const Icon = m.icon
-            // The deleted card's own fields were snapshotted into `before` at delete time —
-            // its title and payout survive even though the card is gone.
-            const b = (r.before ?? {}) as Record<string, unknown>
-            const title = String(b.title || "") || (r.entity_id ? `Card ${r.entity_id}` : "a card")
-            const when = r.ts ? new Date(r.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""
-            const who = r.actor_name || r.actor_email || "someone"
-            return (
-              <div key={String(r.id ?? i)} className={"flex items-center gap-3 px-3 py-2.5 text-sm " + (i ? "border-t border-border " : "") + (r.action === "design_card.deleted" ? "bg-red-50/40" : "")}>
-                <span className={"inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold " + m.tone}>
-                  <Icon size={11} weight="bold" /> {m.label}
-                </span>
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="font-medium">{title}</span>
-                  {r.action === "design.lane" && (() => {
-                    const from = String(((r.before ?? {}) as Record<string, unknown>).col ?? "")
-                    const to = String(((r.after ?? {}) as Record<string, unknown>).col ?? "")
-                    return from || to ? <span className="text-muted-foreground"> · {from || "?"} → {to || "?"}</span> : null
-                  })()}
-                  {r.action === "design_card.deleted" && amt(b.payment) > 0 && (
-                    <span className="text-muted-foreground"> · was worth {money(amt(b.payment))}</span>
-                  )}
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">{who}</span>
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">{when}</span>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      <ActivityFeed
+        rows={shown}
+        variant="card"
+        note={false}
+        subject={boardSubject}
+        empty={onlyDeletes ? "No cards have been deleted." : "Nothing recorded yet."}
+      />
     </div>
   )
 }

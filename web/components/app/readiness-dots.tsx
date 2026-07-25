@@ -4,7 +4,8 @@ import { useState } from "react"
 import { CircleNotch, DownloadSimple } from "@phosphor-icons/react"
 import { getOrderHistory, downloadDesignFile, type AuditRow, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
-import { forTag, sayAction, EMPTY_HINT, DONE_NO_HISTORY, type TagId } from "@/components/app/tag-history"
+import { ActivityFeed } from "@/components/app/activity-feed"
+import { forTag, EMPTY_HINT, DONE_NO_HISTORY, type TagId } from "@/components/app/tag-history"
 import { useLabelT } from "@/lib/i18n"
 
 /**
@@ -117,15 +118,7 @@ function Tag({ id, label, state, title, orderId, status, files }: {
               {state === "todo" ? EMPTY_HINT[id] : DONE_NO_HISTORY[id]}
             </div>
           ) : (
-            forTag(id, rows).map((r) => (
-              <div key={String(r.id)} className="rounded px-2 py-1.5 hover:bg-accent">
-                <div className="text-xs font-medium">{sayAction(r.action)}</div>
-                <div className="text-[11px] text-muted-foreground">
-                  {new Date(r.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                  {r.actor_email ? ` · ${r.actor_email}` : r.actor_role ? ` · ${r.actor_role}` : ""}
-                </div>
-              </div>
-            ))
+            <ActivityFeed rows={forTag(id, rows)} variant="bare" compact note={false} />
           )}
         </div>
       </PopoverContent>
