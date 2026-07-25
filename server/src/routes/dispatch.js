@@ -109,6 +109,45 @@ async function bes(path, init = {}) {
  */
 const isRetryable = (r) => r.status === 0 || r.status === 429 || r.status >= 500;
 
+// Recover label fees missing from the Price column. Labels bought before buy-time cost
+// capture landed (Shippo returns the rate as a bare id, so `cost` came back null) show an
+// empty Price even though the carrier billed them — the number sits on the provider's
+// dashboard. This reads the real billed amount off the transaction, writes it to the order
+// and books it to the ledger. Idempotent on `ref`, so a re-run or a since-fixed row is a
+// no-op. Only touches rows with a stored provider reference (nothing else is recoverable).
+//
+// Runs automatically when the shipments list is read — no button, no manual step. A
+// module-level lock stops overlapping loads from firing duplicate provider calls, and the
+// candidate query is cheap and returns nothing once everything is recovered, so a page that
+// has no gaps does one throwaway SELECT and no provider calls.
+let _feeBackfillRunning = false;
+async function recoverLabelCosts(limit = 200) {
+  if (_feeBackfillRunning) return { skipped: true, updated: 0 };
+  _feeBackfillRunning = true;
+  try {
+    const rows = (await q(
+      `select o.id, o.label_provider, o.label_ref
+         from orders o
+        where coalesce(o.tracking,'') <> '' and coalesce(o.label_ref,'') <> ''
+          and o.label_cost is null
+          and not exists (select 1 from wallet_ledger w where w.type='label-cost' and w.ref='label-'||o.id)
+        order by coalesce(o.label_scanned_at, o.created_at) desc
+        limit $1`, [limit]).catch(() => ({ rows: [] }))).rows;
+    let updated = 0, failed = 0;
+    for (const o of rows) {
+      const got = await aggregatorFetchCost(o.label_provider, o.label_ref).catch(() => null);
+      if (!got || !isFinite(Number(got.cost)) || Number(got.cost) <= 0) { failed++; continue; }
+      await q(`update orders set label_cost=$1, ship_service=coalesce(nullif(ship_service,''), nullif($2,'')) where id=$3`,
+        [Number(got.cost), got.service || '', o.id]).catch(() => {});
+      await recordCost('label', Number(got.cost), `label-${o.id}`, `Postage · ${got.carrier || 'carrier'} · order ${o.id} (backfilled)`, { orderId: o.id });
+      updated++;
+    }
+    return { scanned: rows.length, updated, failed };
+  } finally {
+    _feeBackfillRunning = false;
+  }
+}
+
 export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   // Their PDF id + when we pushed. On the ORDER rather than a join table: we upload one
   // label per PDF, so the relationship is 1:1 and a table would add joins for nothing.
@@ -247,6 +286,12 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     // Total label spend (all time), for the page's stat tile — straight off the ledger.
     const spend = await q("select coalesce(-sum(delta),0)::float as total from wallet_ledger where type='label-cost'")
       .then((x) => (x.rows[0] || {}).total || 0).catch(() => 0);
+    // Fill in any missing label fees in the background. It runs off the critical path so the
+    // list returns immediately; when it recovers anything, a live 'orders' event nudges the
+    // page to reload and the newly-priced rows appear on their own. Converges to nothing —
+    // once every label with a provider reference has its fee, this does a cheap SELECT and
+    // stops. (Rows with no reference, e.g. externally-scanned parcels, stay blank by design.)
+    recoverLabelCosts(50).then((res) => { if (res && res.updated) egBroadcast({ type: 'orders' }); }).catch(() => {});
     return {
       labelSpend: spend,
       shipments: r.rows.map((x) => ({
@@ -270,35 +315,15 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   });
 
   /**
-   * Backfill missing label fees from the provider. Labels bought before buy-time cost
-   * capture landed show an empty Price even though the carrier billed them — the fee sits
-   * on the Shippo/EasyPost dashboard but never made it here. This walks the labels that
-   * have a provider reference but no recorded cost, reads the real billed amount from the
-   * transaction, writes it to the order and books it to the ledger (idempotent on ref, so
-   * a re-run or a since-fixed row is a no-op). Warehouse/admin only — it moves money.
+   * Manual trigger for the same fee recovery that runs automatically on the shipments list.
+   * Kept as an escape hatch (force a sweep without waiting for a page load); the UI no longer
+   * needs it. Warehouse/admin only — it moves money.
    */
   app.post('/api/shipments/backfill-costs', { preHandler: requireWarehouse }, async (req) => {
-    // Only rows we can actually recover: a stored provider ref, and no cost on the order
-    // nor in the ledger. Cap the batch so one click can't hammer the provider for hours.
-    const rows = (await q(
-      `select o.id, o.label_provider, o.label_ref
-         from orders o
-        where coalesce(o.tracking,'') <> '' and coalesce(o.label_ref,'') <> ''
-          and o.label_cost is null
-          and not exists (select 1 from wallet_ledger w where w.type='label-cost' and w.ref='label-'||o.id)
-        order by coalesce(o.label_scanned_at, o.created_at) desc
-        limit 200`).catch(() => ({ rows: [] }))).rows;
-    let updated = 0, failed = 0;
-    for (const o of rows) {
-      const got = await aggregatorFetchCost(o.label_provider, o.label_ref).catch(() => null);
-      if (!got || !isFinite(Number(got.cost)) || Number(got.cost) <= 0) { failed++; continue; }
-      await q(`update orders set label_cost=$1, ship_service=coalesce(nullif(ship_service,''), nullif($2,'')) where id=$3`,
-        [Number(got.cost), got.service || '', o.id]).catch(() => {});
-      await recordCost('label', Number(got.cost), `label-${o.id}`, `Postage · ${got.carrier || 'carrier'} · order ${o.id} (backfilled)`, { orderId: o.id });
-      updated++;
-    }
-    audit(req, 'label.backfill_cost', { after: { scanned: rows.length, updated, failed } });
-    return { ok: true, scanned: rows.length, updated, failed };
+    const res = await recoverLabelCosts(200);
+    audit(req, 'label.backfill_cost', { after: res });
+    if (res.updated) egBroadcast({ type: 'orders' });
+    return { ok: true, scanned: res.scanned || 0, updated: res.updated || 0, failed: res.failed || 0 };
   });
 
   /**

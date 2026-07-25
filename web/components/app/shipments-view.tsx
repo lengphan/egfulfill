@@ -7,7 +7,7 @@ import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getShipments, refreshTracking, voidLabel, backfillLabelCosts, type ShipmentRow } from "@/lib/api"
+import { getShipments, refreshTracking, voidLabel, type ShipmentRow } from "@/lib/api"
 import { onLive } from "@/lib/live"
 import { getUser } from "@/lib/auth"
 
@@ -124,22 +124,6 @@ export function ShipmentsView() {
     }
   }, [rows])
 
-  // Some labels show no Price because they were bought before the fee was captured — the
-  // carrier billed them, the number is on the provider's dashboard, it just never reached
-  // us. Pull it back from the transaction. Only offered when there's actually a gap to fill.
-  const [syncing, setSyncing] = useState(false)
-  const missingPrice = useMemo(() => (rows ?? []).some((x) => x.price == null), [rows])
-  const syncFees = async () => {
-    setSyncing(true)
-    try {
-      const r = await backfillLabelCosts()
-      if (r.ok) setErr(r.updated ? `Recovered ${r.updated} label fee${r.updated === 1 ? "" : "s"} from the carrier.${r.failed ? ` ${r.failed} couldn't be matched (no provider reference).` : ""}` : (r.scanned ? "No fees could be recovered — those labels have no provider reference to look them up by." : "Nothing to sync — every label already has its fee."))
-      else setErr(r.error || "Fee sync failed.")
-      load(q)
-    } catch (e) { setErr((e as Error).message) }
-    finally { setSyncing(false) }
-  }
-
   return (
     <>
     <SectionCard
@@ -164,11 +148,6 @@ export function ShipmentsView() {
           <Button size="sm" variant="outline" onClick={() => setRateCheckOpen(true)}>
             <Truck size={14} weight="bold" /> Rate check
           </Button>
-          {canVoid && missingPrice && (
-            <Button size="sm" variant="outline" onClick={syncFees} disabled={syncing}>
-              {syncing ? <CircleNotch size={14} className="animate-spin" /> : <ArrowClockwise size={14} weight="bold" />} Sync fees
-            </Button>
-          )}
           {canVoid && (
             <Button size="sm" onClick={() => setNewLabelOpen(true)}>
               <Plus size={14} weight="bold" /> New label
