@@ -175,13 +175,22 @@ export function DesignerBoard() {
   // One search, both views. Matches the things you'd actually look a card up by — its id,
   // title, product/method, order #, and the partner Ref/Task ids. Stats above stay on the
   // FULL set so the totals don't change as you type.
+  // OUTSOURCED cards are not this board's work. A card with a vendor (Pink Design, etc.) is
+  // being made by a partner and paid by invoice — it can't be dragged, claimed, or credited
+  // here, so it was pure clutter interleaved with the internal queue. It's tracked where it
+  // belongs: the order's own design status, and the partner's board. The board — kanban,
+  // list and stats — now shows only internal cards; `outsourced` is surfaced as a count so
+  // the work isn't silently dropped, per the app's "say what's missing" rule.
+  const internalCards = useMemo(() => (cards ?? []).filter((c) => !c.vendor), [cards])
+  const outsourced = (cards?.length ?? 0) - internalCards.length
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
-    if (!term) return cards ?? []
-    return (cards ?? []).filter((c) =>
+    if (!term) return internalCards
+    return internalCards.filter((c) =>
       [c.id, c.title, c.product, c.type, c.sku, c.order_id, c.vendor_ref, c.vendor_task_id]
         .some((f) => String(f ?? "").toLowerCase().includes(term)))
-  }, [cards, query])
+  }, [internalCards, query])
 
   const grouped = useMemo(() => {
     const g: Record<string, DesignCard[]> = Object.fromEntries(lanes.map((l) => [l.id, []]))
@@ -190,14 +199,14 @@ export function DesignerBoard() {
   }, [filtered, lanes])
 
   const stats = useMemo(() => {
-    const list = cards ?? []
+    const list = internalCards
     const approved = list.filter((c) => laneOf(c, lanes) === "approved").length
     const credited = list.filter((c) => c.credited).reduce((s, c) => s + amt(c.payment), 0)
     // "In progress" = anything past the fallback and short of approved — computed from the
     // lanes rather than a hardcoded id list, so a custom lane counts too.
     const active = list.filter((c) => { const l = laneOf(c, lanes); return l !== (lanes[0]?.id ?? "incoming") && l !== "approved" }).length
     return { total: list.length, active, approved, credited }
-  }, [cards, lanes])
+  }, [internalCards, lanes])
 
   // Move a card; entering "approved" credits the designer ONCE (idempotent by DSN-<id> +
   // the card's `credited` flag), so re-dragging it never double-pays.
@@ -329,6 +338,14 @@ export function DesignerBoard() {
         <StatCard label="Approved" value={String(stats.approved)} sub="in the approved lane" />
         <StatCard label="Credited" value={money(stats.credited)} sub="paid to designers" tone={stats.credited ? "pos" : undefined} />
       </StatGrid>
+
+      {/* Outsourced work is off the board, but not hidden: it's named so nobody wonders
+          where a card went. Its status lives on the order and the partner's board. */}
+      {outsourced > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {outsourced} card{outsourced === 1 ? "" : "s"} outsourced to a design partner — tracked on the order, not on this board.
+        </p>
+      )}
 
       {/* One window serves the row menu, the toolbar button and the lane drop. A card
           with an order sends that line; one without sends the artwork on its own. */}
