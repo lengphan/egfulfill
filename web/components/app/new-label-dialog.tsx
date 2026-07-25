@@ -102,6 +102,18 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
     } finally { setRatesLoading(false) }
   }
 
+  // Auto-quote once the address + parcel are ready — no "Get rates" click needed. Debounced
+  // so editing the box or dimensions doesn't fire a request per keystroke; the button below
+  // stays as a manual refresh.
+  useEffect(() => {
+    if (result || rates || ratesLoading) return
+    if (!addrComplete(to) || !addrComplete(from)) return
+    let alive = true
+    const t = setTimeout(() => { if (alive) getRates() }, 900)
+    return () => { alive = false; clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [to.street, to.street2, to.city, to.state, to.zip, from.street, from.zip, pkg.weightOz, pkg.length, pkg.width, pkg.height, svc.signature, svc.insurance, result, rates, ratesLoading])
+
   const buy = async () => {
     setErr(null)
     if (!addrComplete(to)) { setErr("Recipient needs a street, city, state and ZIP."); return }

@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { MagnifyingGlass, CircleNotch, ArrowSquareOut, Package, ArrowClockwise, DownloadSimple, X, Plus } from "@phosphor-icons/react"
+import { MagnifyingGlass, CircleNotch, ArrowSquareOut, Package, ArrowClockwise, DownloadSimple, X, Plus, Truck } from "@phosphor-icons/react"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
+import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -100,6 +101,7 @@ export function ShipmentsView() {
   // (so it shows in Billing). Warehouse/admin only — the server enforces it too.
   const [voiding, setVoiding] = useState<string | null>(null)
   const [newLabelOpen, setNewLabelOpen] = useState(false)
+  const [rateCheckOpen, setRateCheckOpen] = useState(false)
   const canVoid = role === "warehouse" || role === "admin"
   const doVoid = async (s: ShipmentRow) => {
     if (!window.confirm(`Void the label for ${s.num}? This refunds the postage with the carrier and credits it back.`)) return
@@ -142,6 +144,9 @@ export function ShipmentsView() {
           )}
           <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows || rows.length === 0}>
             <DownloadSimple size={14} weight="bold" /> Export CSV
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setRateCheckOpen(true)}>
+            <Truck size={14} weight="bold" /> Rate check
           </Button>
           {canVoid && (
             <Button size="sm" onClick={() => setNewLabelOpen(true)}>
@@ -310,6 +315,7 @@ export function ShipmentsView() {
       )}
     </SectionCard>
     <NewLabelDialog open={newLabelOpen} onOpenChange={setNewLabelOpen} onCreated={() => load(q)} />
+    <RateCheckerDialog open={rateCheckOpen} onOpenChange={setRateCheckOpen} />
     </>
   )
 }
