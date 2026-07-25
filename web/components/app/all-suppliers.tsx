@@ -142,8 +142,13 @@ export function AllSuppliers() {
     // Favourites arrive WITH their sizes joined from the synced skus, so prefer those over
     // the lazily-fetched detail — the favourites tab was showing em-dashes because it was
     // waiting on a detail call that only fires when you open a card.
-    ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, sizes: (it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`]) ?? [], sizesCount: it.ss.sizes?.length ?? undefined, favorited: it.ss.favorited }
-    : { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizes: it.otto.sizes ?? [], sizesCount: it.otto.sizes?.length ?? 0, favorited: it.otto.favorited }
+    // S&S: assert one-size ONLY once its sizes are actually resolved (favourite-joined, or
+    // a detail call has returned) and came back empty — before that, empty means unloaded,
+    // so oneSize stays undefined and the card shows "—".
+    ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, sizes: (it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`]) ?? [], sizesCount: it.ss.sizes?.length ?? undefined, oneSize: ((it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`])?.length === 0) && (it.ss.sizes !== undefined || detailSizes[`ss:${it.ss.styleID}`] !== undefined), favorited: it.ss.favorited }
+    // Otto: the list returns every size, so an empty set is a real fact — the product has
+    // no size dimension, i.e. one size / OSFM.
+    : { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizes: it.otto.sizes ?? [], sizesCount: it.otto.sizes?.length ?? 0, oneSize: (it.otto.sizes?.length ?? 0) === 0, favorited: it.otto.favorited }
 
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
 

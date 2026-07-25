@@ -24,6 +24,17 @@ export type SupplierCardData = {
   /** Actual size names (S, M, L…). Otto ships these on the list; S&S only on the style
    *  detail, so they arrive once loadDetail resolves. */
   sizes?: string[] | null
+  /**
+   * The supplier's size data is COMPLETE and shows no size dimension → one size (OSFM).
+   *
+   * This exists to break a genuine ambiguity: an empty `sizes` array means two opposite
+   * things depending on the supplier. Otto returns every size on the list, so empty there
+   * is "this product isn't sized" — a real fact. S&S returns sizes only on the style
+   * detail, so empty there is "not loaded yet" — no fact at all. Only the caller knows
+   * which, so only the caller sets this; the card must NOT infer "one size" from an empty
+   * array, or it would label an unloaded S&S product as OSFM.
+   */
+  oneSize?: boolean
   favorited?: boolean
 }
 
@@ -160,7 +171,16 @@ export function SupplierProductCard({
             With it gone, the full size set expands here rather than hiding behind it. */}
         <div className={"mt-1 flex items-center gap-1 " + (showAllSizes ? "flex-wrap" : "h-5 overflow-hidden")}>
           {sizeNames.length === 0 ? (
-            <span className="text-[10px] text-muted-foreground/60">{(data.sizesCount ?? 0) > 0 ? `${data.sizesCount} sizes` : "—"}</span>
+            // Three DIFFERENT empty states, said apart. "One size" is a fact the supplier
+            // gave us (OSFM); a bare count is names-missing; "—" is genuinely unknown, which
+            // for S&S means the sizes just haven't loaded — never dressed up as one-size.
+            data.oneSize ? (
+              <span className="rounded border border-border px-1 py-0.5 text-[9px] font-medium text-muted-foreground" title="One size fits most — this product isn't broken out by size">
+                One size
+              </span>
+            ) : (
+              <span className="text-[10px] text-muted-foreground/60">{(data.sizesCount ?? 0) > 0 ? `${data.sizesCount} sizes` : "—"}</span>
+            )
           ) : (
             <>
               {(showAllSizes ? sizeNames : sizeNames.slice(0, 6)).map((sz) => (
