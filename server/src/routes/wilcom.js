@@ -220,8 +220,9 @@ async function runLettering(req, reply, { design }) {
   const stem = safeName(text, 'lettering');
   const xml = buildLetteringXml({ text, alphabet, height: b.height, colorInt: hexToColorInt(b.color), designFile: design ? `${stem}.emb` : null });
   try {
-    // Preview uses the fast lettering preview; generate uses newDesign to emit a machine file.
-    const res = await ewaCall(design ? 'api/newDesign' : 'api/newLetteringPreview', xml);
+    // Preview uses newDesignTrueview for the REAL stitched embroidery look (newLetteringPreview
+    // returns a flat, non-TrueView bitmap); generate uses newDesign to emit the machine file.
+    const res = await ewaCall(design ? 'api/newDesign' : 'api/newDesignTrueview', xml);
     if (!res.ok) {
       const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
       reply.code(502);
