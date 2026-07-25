@@ -515,14 +515,14 @@ function HistoryTab() {
             <tbody>
               {list.map((g) => (
                 <tr key={g.id} className="border-b border-border last:border-0 hover:bg-accent/50">
-                  <td className="px-4 py-2.5"><span className="flex size-10 items-center justify-center overflow-hidden rounded-md bg-muted"><Thumb src={g.trueview_url ?? ""} className="size-full object-cover" /></span></td>
+                  <td className="px-4 py-2.5"><span className="relative flex size-10 items-center justify-center overflow-hidden rounded-md bg-muted"><Thumb src={g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? "")} className="absolute inset-0 size-full object-cover" /></span></td>
                   <td className="px-4 py-2.5 font-medium">{g.name || "Untitled"}</td>
                   <td className="px-4 py-2.5 text-muted-foreground">{g.order_ref || (g.source === "maker" ? "Maker" : "—")}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{g.stitches != null ? g.stitches.toLocaleString() : "—"}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{g.colours ?? "—"}</td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{(g.formats ?? []).join(" · ") || "—"}</td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{fmtDate(g.created_at)}</td>
-                  <td className="px-4 py-2.5">{g.file_url && <a href={g.file_url} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><DownloadSimple size={13} weight="bold" /> Download</a>}</td>
+                  <td className="px-4 py-2.5"><a href={`/api/wilcom/asset/${g.id}/file`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><DownloadSimple size={13} weight="bold" /> Download</a></td>
                 </tr>
               ))}
             </tbody>

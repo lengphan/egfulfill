@@ -17,7 +17,7 @@
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
-import { storageEnabled, putObject } from '../storage.js';
+import { storageEnabled, putObject, getObject } from '../storage.js';
 
 const EWA_BASE = 'https://public.ewa.wilcomapps.com/';
 const appId = () => (process.env.WILCOM_APP_ID || '').trim();
@@ -128,6 +128,10 @@ function ensureGen() {
       stitches int, colours int, width numeric, height numeric, formats text[],
       trueview_url text, file_url text, created_at timestamptz default now())`)
     .then(() => q(`create index if not exists wilcom_gen_created on wilcom_generations (created_at desc)`))
+    // Storage KEYS (not just the public URL) so assets serve same-origin — a raw R2/S3 host
+    // URL isn't publicly loadable in an <img> unless a CDN is configured.
+    .then(() => q(`alter table wilcom_generations add column if not exists tv_key text`))
+    .then(() => q(`alter table wilcom_generations add column if not exists file_key text`))
     .catch((e) => { _genReady = null; throw e; });
   return _genReady;
 }
@@ -168,13 +172,15 @@ async function runBitmap(req, reply, { design }) {
         await ensureGen();
         const gid = 'WG-' + crypto.randomBytes(8).toString('hex');
         const ext = machine ? (machine.filename.split('.').pop() || 'emb').toLowerCase() : null;
-        const tvUrl = tv ? await putObject(`wilcom/${gid}-tv.png`, Buffer.from(tv.base64, 'base64'), 'image/png') : null;
-        const fileUrl = machine ? await putObject(`wilcom/${gid}-${stem}.${ext}`, Buffer.from(machine.base64, 'base64'), 'application/octet-stream') : null;
+        const tvKey = tv ? `wilcom/${gid}-tv.png` : null;
+        const fileKey = machine ? `wilcom/${gid}-${stem}.${ext}` : null;
+        const tvUrl = tvKey ? await putObject(tvKey, Buffer.from(tv.base64, 'base64'), 'image/png') : null;
+        const fileUrl = fileKey ? await putObject(fileKey, Buffer.from(machine.base64, 'base64'), 'application/octet-stream') : null;
         await q(
-          `insert into wilcom_generations (id, by_user, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          `insert into wilcom_generations (id, by_user, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url, tv_key, file_key)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
           [gid, req.user?.sub || null, b.name || stem, b.orderRef || null, b.source || 'order', 'auto',
-           out.stitches, out.colours, out.width, out.height, ext ? [ext.toUpperCase()] : [], tvUrl, fileUrl]);
+           out.stitches, out.colours, out.width, out.height, ext ? [ext.toUpperCase()] : [], tvUrl, fileUrl, tvKey, fileKey]);
         out.id = gid; out.trueviewUrl = tvUrl; out.fileUrl = fileUrl;
       } catch (e) { req.log?.warn?.({ err: String(e) }, 'wilcom generation persist failed'); }
     }
@@ -238,10 +244,12 @@ async function runLettering(req, reply, { design }) {
         await ensureGen();
         const gid = 'WG-' + crypto.randomBytes(8).toString('hex');
         const ext = machine ? (machine.filename.split('.').pop() || 'emb').toLowerCase() : null;
-        const tvUrl = tv ? await putObject(`wilcom/${gid}-tv.png`, Buffer.from(tv.base64, 'base64'), 'image/png') : null;
-        const fileUrl = machine ? await putObject(`wilcom/${gid}-${stem}.${ext}`, Buffer.from(machine.base64, 'base64'), 'application/octet-stream') : null;
-        await q(`insert into wilcom_generations (id, by_user, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-          [gid, req.user?.sub || null, text, null, 'maker', 'lettering', out.stitches, out.colours, out.width, out.height, ext ? [ext.toUpperCase()] : [], tvUrl, fileUrl]);
+        const tvKey = tv ? `wilcom/${gid}-tv.png` : null;
+        const fileKey = machine ? `wilcom/${gid}-${stem}.${ext}` : null;
+        const tvUrl = tvKey ? await putObject(tvKey, Buffer.from(tv.base64, 'base64'), 'image/png') : null;
+        const fileUrl = fileKey ? await putObject(fileKey, Buffer.from(machine.base64, 'base64'), 'application/octet-stream') : null;
+        await q(`insert into wilcom_generations (id, by_user, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url, tv_key, file_key) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+          [gid, req.user?.sub || null, text, null, 'maker', 'lettering', out.stitches, out.colours, out.width, out.height, ext ? [ext.toUpperCase()] : [], tvUrl, fileUrl, tvKey, fileKey]);
         out.id = gid; out.trueviewUrl = tvUrl; out.fileUrl = fileUrl;
       } catch (e) { req.log?.warn?.({ err: String(e) }, 'wilcom lettering persist failed'); }
     }
@@ -308,4 +316,27 @@ export function wilcomRoutes(app, requireStaff) {
   });
   app.post('/api/wilcom/lettering-preview', { preHandler: requireStaff }, (req, reply) => runLettering(req, reply, { design: false }));
   app.post('/api/wilcom/lettering', { preHandler: requireStaff }, (req, reply) => runLettering(req, reply, { design: true }));
+
+  // Same-origin serve for a generation's TrueView (kind=tv) or machine file (kind=file).
+  // Unauthenticated on purpose — like the image proxy, it only re-serves bytes addressed by
+  // an unguessable random id (WG-…), so an <img>/download works without an auth header, and
+  // it doesn't depend on a public storage URL being configured.
+  app.get('/api/wilcom/asset/:id/:kind', async (req, reply) => {
+    await ensureGen();
+    const kind = req.params.kind === 'file' ? 'file' : 'tv';
+    const col = kind === 'file' ? 'file_key' : 'tv_key';
+    const r = await q(`select ${col} as key, name, formats from wilcom_generations where id=$1`, [String(req.params.id)]);
+    const row = r.rows[0];
+    if (!row || !row.key) { reply.code(404); return { error: 'not found' }; }
+    const obj = await getObject(row.key).catch(() => null);
+    if (!obj) { reply.code(404); return { error: 'not found' }; }
+    reply.header('Content-Type', obj.contentType || (kind === 'file' ? 'application/octet-stream' : 'image/png'));
+    reply.header('Cache-Control', 'public, max-age=86400');
+    if (kind === 'file') {
+      const fmt = String((row.formats && row.formats[0]) || 'emb').toLowerCase();
+      const base = String(row.name || 'design').replace(/[^0-9A-Za-z._-]/g, '_');
+      reply.header('Content-Disposition', `attachment; filename="${base}.${fmt}"`);
+    }
+    return reply.send(obj.body);
+  });
 }
