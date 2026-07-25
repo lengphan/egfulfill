@@ -375,7 +375,6 @@ export function AllSuppliers() {
                   added={added.has(keyOf(it))}
                   adding={addingId === keyOf(it)}
                   onAdd={() => addToCatalog(it)}
-                  onEditVariants={() => addToCatalog(it)}
                   onQuickOrder={async () => {
                     const base = quickOrderFor(it)
                     // Otto sizes have no sku on the card; fetch the real ones so what's
