@@ -225,6 +225,29 @@ export function PublishProductDialog({
 
   const anyLoss = sizeRows.some((r) => r.margin != null && r.margin < 0)
 
+  /**
+   * The price the listing actually publishes at — which is NOT always the top Retail
+   * field.
+   *
+   * The size table says, in as many words, "leave a row blank to use the price above", so
+   * pricing every size and leaving Retail blank is a COMPLETE product. But the gate only
+   * ever checked `retailN`, so that exact configuration — the one in the screenshot — was
+   * rejected as missing a price it plainly had; and even past the gate, `price: retailN`
+   * would have sent 0 as the listing's base.
+   *
+   * base = the Retail field when set, otherwise the CHEAPEST size, so Etsy gets a real
+   * floor price and each size_prices entry overrides from there. `priceReady` mirrors what
+   * the table promises: a product with sizes is priced when every published size resolves
+   * to a price (its own, or the shared one); a product without sizes needs the one Retail
+   * price. sizeRows[].price already resolves override-or-shared, so this reads straight off
+   * it rather than re-deriving the rule and risking the two drifting apart.
+   */
+  const pricedSizeRows = sizeRows.filter((r) => r.price > 0)
+  const basePrice = retailN > 0 ? retailN : (pricedSizeRows.length ? Math.min(...pricedSizeRows.map((r) => r.price)) : 0)
+  const priceReady = pickedSizes.length > 0
+    ? sizeRows.length > 0 && sizeRows.every((r) => r.price > 0)
+    : retailN > 0
+
   const addTag = (raw: string) => {
     const t = cleanTag(raw)
     if (!t) return
@@ -241,12 +264,25 @@ export function PublishProductDialog({
   const removeImage = (i: number) => setImages((p) => p.filter((_, x) => x !== i))
 
   const publish = async () => {
-    if (!title.trim() || !(retailN > 0)) { setResult({ ok: false, text: "A title and a retail price are required." }); return }
+    if (!title.trim() || !priceReady) {
+      // Say WHICH is missing, and — when it's the price — name the two ways to supply it,
+      // because "a retail price is required" on a screen where every size shows a price is
+      // exactly what made this look broken.
+      const msg = !title.trim()
+        ? (priceReady ? "A title is required." : "A title and a retail price are required.")
+        : pickedSizes.length > 0
+          ? "Every size needs a price — fill each row, or set the Retail price above to cover the blank ones."
+          : "A retail price is required."
+      setResult({ ok: false, text: msg })
+      return
+    }
     setBusy(true); setResult(null)
     try {
       const r = await publishEtsy({
         title: title.trim(), description: desc.trim() || title.trim(),
-        price: retailN, quantity: Number(qty) || 999,
+        // basePrice, not retailN — a per-size-priced product has a 0 in the Retail field
+        // but a real cheapest-size floor, and sending retailN would list it at $0.
+        price: basePrice, quantity: Number(qty) || 999,
         image: images[0], images, tags,
         // Real Etsy variants, each stamped with OUR sku so the buyer's order line
         // resolves back to this exact blank+colour+size no matter how the seller renames
