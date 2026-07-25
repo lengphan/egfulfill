@@ -1482,6 +1482,22 @@ export function getDesignCards() {
 export function getDesignBoardHistory() {
   return api<AuditRow[]>(`/api/design_cards/history`)
 }
+
+/** A kanban lane. `system` lanes (incoming = fallback, approved = credits the designer)
+ *  can be renamed but never deleted — the server enforces it too. */
+export type DesignLane = { id: string; label: string; accent: string; sort: number; system: boolean }
+export function getDesignLanes() {
+  return api<DesignLane[]>(`/api/design_lanes`)
+}
+export function createDesignLane(body: { label: string; accent?: string }) {
+  return api<DesignLane & { ok?: boolean; error?: string }>(`/api/design_lanes`, { method: "POST", body: JSON.stringify(body) })
+}
+export function renameDesignLane(id: string, body: { label?: string; sort?: number; accent?: string }) {
+  return api<DesignLane & { ok?: boolean; error?: string }>(`/api/design_lanes/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) })
+}
+export function deleteDesignLane(id: string) {
+  return api<{ ok?: boolean; deleted?: number; cards_moved?: number; error?: string }>(`/api/design_lanes/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
 /** Credit the designer who claimed a card. The SERVER decides who (and whether) —
  *  staff uploads aren't billable, and a shared board pays the claimer, not a pool. */
 export function creditDesignCard(id: string | number, amount: number) {

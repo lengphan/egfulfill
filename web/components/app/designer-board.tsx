@@ -6,7 +6,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, type DesignCard, type AuditRow } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { AssignCardDialog } from "@/components/app/assign-card-dialog"
@@ -28,17 +28,26 @@ const canOutsource = () => { const r = getUser()?.role; return r === "admin" || 
  */
 const canDeleteCard = () => { const r = getUser()?.role; return r === "admin" || r === "warehouse" }
 
-const COLS = [
-  { id: "incoming", label: "Incoming", accent: "bg-slate-400" },
-  { id: "inprogress", label: "In progress", accent: "bg-violet-500" },
-  { id: "review", label: "In review", accent: "bg-amber-500" },
-  { id: "fix", label: "Fix", accent: "bg-red-500" },
-  { id: "approved", label: "Approved", accent: "bg-emerald-500" },
-] as const
-const colOf = (c: DesignCard) => {
+// The seed set + the fallback the board renders with before the server's lanes load.
+// Mirrors the design_lanes seed in server/src/routes/design_cards.js. `system` marks the
+// two load-bearing lanes: incoming (the fallback) and approved (which credits a designer).
+const DEFAULT_LANES: DesignLane[] = [
+  { id: "incoming", label: "Incoming", accent: "bg-slate-400", sort: 0, system: true },
+  { id: "inprogress", label: "In progress", accent: "bg-violet-500", sort: 1, system: false },
+  { id: "review", label: "In review", accent: "bg-amber-500", sort: 2, system: false },
+  { id: "fix", label: "Fix", accent: "bg-red-500", sort: 3, system: false },
+  { id: "approved", label: "Approved", accent: "bg-emerald-500", sort: 4, system: true },
+]
+// A card's lane, validated against the CURRENT lanes — an unknown col (a lane that was
+// deleted, say) falls back to the first lane rather than vanishing from the board.
+const laneOf = (c: DesignCard, lanes: DesignLane[]) => {
   const v = String(c.col || "incoming").toLowerCase()
-  return COLS.some((x) => x.id === v) ? v : "incoming"
+  return lanes.some((l) => l.id === v) ? v : (lanes[0]?.id ?? "incoming")
 }
+// Label + accent for a lane id, live lanes first, defaults as a fallback, and the raw id
+// last so a card in a lane we somehow don't know still shows *something* rather than blank.
+const laneMeta = (id: string, lanes: DesignLane[]) =>
+  lanes.find((l) => l.id === id) ?? DEFAULT_LANES.find((l) => l.id === id) ?? { id, label: id, accent: "bg-muted-foreground", sort: 99, system: false }
 // Partner keys are storage values ("pinkdesign"); the board shows a human name. Unknown
 // vendors fall back to the raw key rather than hiding that the card is outsourced.
 const VENDOR_NAMES: Record<string, string> = { pinkdesign: "Pink Design" }
@@ -67,6 +76,16 @@ export function DesignerBoard() {
   const [designFee, setDesignFee] = useState(0) // platform default payout per design
   const [delErr, setDelErr] = useState<string | null>(null)
   const me = getUser()?.name || "Designer"
+
+  // Lanes as data. Seeded with the defaults so the board paints immediately, then replaced
+  // by the server's set (which may add/rename/remove). canManageLanes matches card
+  // deletion — a lane holds work, so re-homing or removing it is the same custody call.
+  const [lanes, setLanes] = useState<DesignLane[]>(DEFAULT_LANES)
+  const canManageLanes = canDeleteCard()
+  const loadLanes = useCallback(() => {
+    getDesignLanes().then((r) => { if (Array.isArray(r) && r.length) setLanes(r) }).catch(() => {})
+  }, [])
+  useEffect(() => { const t = setTimeout(loadLanes, 0); return () => clearTimeout(t) }, [loadLanes])
 
   // Reload the board from the server. Named because a partner push writes the card on the
   // SERVER (vendor badge + their task ref), so the local list has to be re-read rather
@@ -112,6 +131,39 @@ export function DesignerBoard() {
     }
   }, [load])
 
+  // ── Lane management (warehouse+admin) ──
+  const addLane = useCallback(async () => {
+    const label = window.prompt("Name the new lane")?.trim()
+    if (!label) return
+    const r = await createDesignLane({ label })
+    if (r?.error) { setDelErr(r.error); return }
+    loadLanes()
+  }, [loadLanes])
+
+  const renameLane = useCallback(async (lane: DesignLane, label: string) => {
+    const next = label.trim()
+    if (!next || next === lane.label) return
+    setLanes((prev) => prev.map((l) => (l.id === lane.id ? { ...l, label: next } : l)))
+    const r = await renameDesignLane(lane.id, { label: next })
+    if (r?.error) { setDelErr(r.error); loadLanes() }
+  }, [loadLanes])
+
+  const removeLane = useCallback(async (lane: DesignLane) => {
+    const n = (cards ?? []).filter((c) => laneOf(c, lanes) === lane.id).length
+    const ok = await confirm({
+      title: `Delete the “${lane.label}” lane?`,
+      body: n > 0
+        ? `${n} card${n === 1 ? "" : "s"} in this lane will move to “${lanes[0]?.label ?? "Incoming"}”. The lane itself is removed for everyone.`
+        : `This lane is empty. It's removed for everyone.`,
+      confirmLabel: "Delete lane",
+      cancelLabel: "Keep it",
+    })
+    if (!ok) return
+    const r = await deleteDesignLane(lane.id)
+    if (r?.error) { setDelErr(r.error); return }
+    loadLanes(); load()   // cards may have been re-homed to the fallback
+  }, [cards, lanes, confirm, loadLanes, load])
+
   const patch = useCallback((id: string | number, p: Partial<DesignCard>) => {
     setCards((prev) => {
       const next = (prev ?? []).map((c) => (c.id === id ? { ...c, ...p } : c))
@@ -132,17 +184,20 @@ export function DesignerBoard() {
   }, [cards, query])
 
   const grouped = useMemo(() => {
-    const g: Record<string, DesignCard[]> = Object.fromEntries(COLS.map((c) => [c.id, []]))
-    for (const c of filtered) (g[colOf(c)] ??= []).push(c)
+    const g: Record<string, DesignCard[]> = Object.fromEntries(lanes.map((l) => [l.id, []]))
+    for (const c of filtered) (g[laneOf(c, lanes)] ??= []).push(c)
     return g
-  }, [filtered])
+  }, [filtered, lanes])
 
   const stats = useMemo(() => {
     const list = cards ?? []
-    const approved = list.filter((c) => colOf(c) === "approved").length
+    const approved = list.filter((c) => laneOf(c, lanes) === "approved").length
     const credited = list.filter((c) => c.credited).reduce((s, c) => s + amt(c.payment), 0)
-    return { total: list.length, active: list.filter((c) => ["inprogress", "review", "fix"].includes(colOf(c))).length, approved, credited }
-  }, [cards])
+    // "In progress" = anything past the fallback and short of approved — computed from the
+    // lanes rather than a hardcoded id list, so a custom lane counts too.
+    const active = list.filter((c) => { const l = laneOf(c, lanes); return l !== (lanes[0]?.id ?? "incoming") && l !== "approved" }).length
+    return { total: list.length, active, approved, credited }
+  }, [cards, lanes])
 
   // Move a card; entering "approved" credits the designer ONCE (idempotent by DSN-<id> +
   // the card's `credited` flag), so re-dragging it never double-pays.
@@ -311,20 +366,18 @@ export function DesignerBoard() {
       ) : view === "history" && canSeeHistory ? (
         <BoardHistory />
       ) : view === "list" ? (
-        <DesignerList cards={filtered} onOpen={setOpenId} />
+        <DesignerList cards={filtered} onOpen={setOpenId} lanes={lanes} />
       ) : (
-        // FIXED lane width, not 1fr. Equal fractions kept every lane on screen by shrinking
-        // them all — so five lanes were fine but ten would each be unreadably thin. A fixed
-        // 17rem means a lane is always a proper working width, and once they no longer fit
-        // the row scrolls horizontally (overflow-x-auto) rather than squeezing. Add lanes
-        // freely; the board grows sideways instead of starving what's already there.
-        // The Design-partner lane is gone: it was always empty (vendor cards group into the
-        // real lanes with their badge, so colOf never routes anything to it), so it only
-        // served as a drag-to-outsource drop target — and outsourcing still runs from
-        // inside a card via "Send to partner".
+        // minmax(17rem, 1fr): FILL when there's room, SCROLL when there isn't. With a few
+        // lanes the 1fr max stretches them to span the full content width — same margins as
+        // the stat cards above, no dead gutter on the right. Add enough that 17rem each no
+        // longer fits and the min forces a horizontal scroll instead of shrinking them into
+        // slivers. Fixed 17rem (the previous attempt) never filled; pure 1fr never stopped
+        // shrinking — minmax is the one rule that does both.
+        // A trailing auto track holds the "Add lane" affordance for warehouse/admin.
         <div className="grid gap-2 overflow-x-auto pb-2"
-             style={{ gridTemplateColumns: `repeat(${COLS.length}, 17rem)` }}>
-          {COLS.map((col) => {
+             style={{ gridTemplateColumns: `repeat(${lanes.length}, minmax(17rem, 1fr))${canManageLanes ? " auto" : ""}` }}>
+          {lanes.map((col) => {
             const list = grouped[col.id] ?? []
             return (
               <div
@@ -342,8 +395,33 @@ export function DesignerBoard() {
               >
                 <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
                   <span className={"size-2 shrink-0 rounded-full " + col.accent} />
-                  <span className="truncate text-sm font-semibold">{col.label}</span>
+                  {/* Rename in place (warehouse+admin) — click the name, edit, Enter/blur
+                      saves. A system lane renames too; only its DELETION is blocked. */}
+                  {canManageLanes ? (
+                    <input
+                      defaultValue={col.label}
+                      onClick={(e) => e.stopPropagation()}
+                      onBlur={(e) => void renameLane(col, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); else if (e.key === "Escape") { e.currentTarget.value = col.label; e.currentTarget.blur() } }}
+                      aria-label={`Rename ${col.label} lane`}
+                      className="min-w-0 flex-1 truncate rounded bg-transparent px-1 text-sm font-semibold outline-none hover:bg-accent focus:bg-background focus:ring-2 focus:ring-ring/40"
+                    />
+                  ) : (
+                    <span className="truncate text-sm font-semibold">{col.label}</span>
+                  )}
                   <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{list.length}</span>
+                  {/* Delete — non-system lanes only. Its cards move to the fallback, so this
+                      never strands work; system lanes (fallback + payout) carry no button. */}
+                  {canManageLanes && !col.system && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); void removeLane(col) }}
+                      title={`Delete the ${col.label} lane`}
+                      aria-label={`Delete ${col.label} lane`}
+                      className="eg-tap shrink-0 rounded p-0.5 text-muted-foreground/60 transition-colors hover:bg-red-50 hover:text-red-600"
+                    >
+                      <X size={13} weight="bold" />
+                    </button>
+                  )}
                 </div>
                 {/* Scroll INSIDE the column (min-h-0 lets a flex child scroll) — the page
                     itself stays put instead of growing down as a lane fills. */}
@@ -429,6 +507,18 @@ export function DesignerBoard() {
               </div>
             )
           })}
+          {/* Add a lane — a slim column so it never competes with a real lane for width,
+              only offered to warehouse/admin. */}
+          {canManageLanes && (
+            <button
+              onClick={() => void addLane()}
+              className="flex h-[calc(100vh-14rem)] min-h-[22rem] w-11 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              title="Add a lane"
+            >
+              <Plus size={18} weight="bold" />
+              <span className="[writing-mode:vertical-rl] text-xs font-medium">Add lane</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -440,14 +530,14 @@ export function DesignerBoard() {
       )}
       {openCard && <CardDialog card={openCard} me={me} designFee={designFee} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => void removeCard(id)}
         onAssign={() => { setAssignCard(openCard); setOpenId(null) }}
-        onPush={() => { setPushCard(openCard); setOpenId(null) }} canPush={showPartner} />}
+        onPush={() => { setPushCard(openCard); setOpenId(null) }} canPush={showPartner} lanes={lanes} />}
     </div>
   )
 }
 
 // Every column the list CAN show. `design` is locked on (the thumb + title).
 type ListCol = { id: string; label: string; align?: "right"; locked?: boolean; cell: (c: DesignCard) => React.ReactNode }
-const LIST_COLS: ListCol[] = [
+const makeListCols = (lanes: DesignLane[]): ListCol[] => [
   { id: "design", label: "Design", locked: true, cell: (c) => (
     <div className="flex items-center gap-3">
       <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
@@ -478,15 +568,16 @@ const LIST_COLS: ListCol[] = [
   { id: "files", label: "Files", cell: (c) => ((c.file_count ?? 0) > 0 ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Paperclip size={11} weight="bold" /> {c.file_count}</span> : <span className="text-muted-foreground">—</span>) },
   // The lane IS the status, so it's labelled "Status". (The old separate "Status" column only
   // said Credited/—, which the Payout column already implies — removed.)
-  { id: "lane", label: "Status", cell: (c) => { const col = COLS.find((x) => x.id === colOf(c)); return <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs"><span className={"size-1.5 rounded-full " + (col?.accent ?? "bg-muted-foreground")} /> {col?.label}</span> } },
+  { id: "lane", label: "Status", cell: (c) => { const col = laneMeta(laneOf(c, lanes), lanes); return <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs"><span className={"size-1.5 rounded-full " + col.accent} /> {col.label}</span> } },
   { id: "payout", label: "Payout", align: "right", cell: (c) => <span className="font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</span> },
 ]
 const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "files", "lane", "payout"]
 
 // List view — columns are add/remove + renameable (admin/warehouse/operator), persisted.
-function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: string | number) => void }) {
-  const order: string[] = COLS.map((c) => c.id)
-  const rows = [...cards].sort((a, b) => order.indexOf(colOf(a)) - order.indexOf(colOf(b)))
+function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (id: string | number) => void; lanes: DesignLane[] }) {
+  const LIST_COLS = makeListCols(lanes)
+  const order: string[] = lanes.map((l) => l.id)
+  const rows = [...cards].sort((a, b) => order.indexOf(laneOf(a, lanes)) - order.indexOf(laneOf(b, lanes)))
   const canEdit = (() => { const r = getUser()?.role; return r === "admin" || r === "warehouse" || r === "operator" })()
 
   const [visible, setVisible] = useState<string[]>(DEFAULT_LIST_COLS)
@@ -580,12 +671,12 @@ function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: str
 }
 
 // Card detail — claim, move, set payout. Approving auto-credits the designer (via onMove).
-function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAssign, onPush, canPush }: { card: DesignCard; me: string; designFee: number; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void; onAssign: () => void; onPush: () => void; canPush: boolean }) {
+function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAssign, onPush, canPush, lanes }: { card: DesignCard; me: string; designFee: number; lanes: DesignLane[]; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void; onAssign: () => void; onPush: () => void; canPush: boolean }) {
   // Default the payout to the platform Design fee when the card hasn't set one.
   const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const col = colOf(card)
+  const col = laneOf(card, lanes)
 
   // Click-to-rename the card. Saves only on a real change, so opening and closing the editor
   // by accident doesn't rewrite the title. A vendor card is renameable here too, but note the
@@ -687,7 +778,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           </div>
           <div className="min-w-0 flex-1 space-y-1 text-sm">
             <div className="flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{COLS.find((c) => c.id === col)?.label}</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{laneMeta(col, lanes).label}</span>
               {card.is_emb && <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700"><Needle size={10} weight="bold" /> Embroidery</span>}
               {card.priority && card.priority !== "normal" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(card.priority)}</span>}
             </div>

@@ -12,6 +12,84 @@ import { putObject } from '../storage.js';
 import { hashOf } from '../fingerprint.js';
 
 export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
+  // ── Board lanes, as data ───────────────────────────────────────────────────────
+  // The kanban columns were a hardcoded list; they're a table now so warehouse/admin can
+  // add and remove them for their own workflow. `system` marks the two that are
+  // load-bearing and must never be deleted: `incoming` is the fallback every unknown col
+  // resolves to, and `approved` is what triggers a designer's payout. Both can be renamed,
+  // neither can be removed — so the credit path and the fallback can't be pulled out from
+  // under the board.
+  q(`create table if not exists design_lanes (
+       id text primary key,
+       label text not null,
+       accent text default 'bg-slate-400',
+       sort int default 0,
+       system boolean default false,
+       created_at timestamptz default now()
+     )`).catch(() => {});
+  // Seed the current five ONCE (only when the table is empty), preserving the exact ids
+  // cards already store so nothing is orphaned by the switch to data.
+  q(`insert into design_lanes (id, label, accent, sort, system)
+     select * from (values
+       ('incoming','Incoming','bg-slate-400',0,true),
+       ('inprogress','In progress','bg-violet-500',1,false),
+       ('review','In review','bg-amber-500',2,false),
+       ('fix','Fix','bg-red-500',3,false),
+       ('approved','Approved','bg-emerald-500',4,true)
+     ) as v(id,label,accent,sort,system)
+     where not exists (select 1 from design_lanes)`).catch(() => {});
+
+  const slugify = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || ('lane-' + Date.now().toString(36));
+
+  app.get('/api/design_lanes', { preHandler: requireStaff }, async () => {
+    const r = await q('select id, label, accent, sort, system from design_lanes order by sort, id').catch(() => ({ rows: [] }));
+    return r.rows;
+  });
+
+  app.post('/api/design_lanes', { preHandler: requireWarehouse }, async (req, reply) => {
+    const label = String((req.body || {}).label || '').trim();
+    if (!label) { reply.code(400); return { error: 'A lane needs a name.' }; }
+    const accent = String((req.body || {}).accent || 'bg-slate-400');
+    let id = slugify(label);
+    // Uniqueness: a second "QC" becomes qc-2 rather than colliding with the first.
+    const exists = await q('select 1 from design_lanes where id=$1', [id]).then((r) => r.rowCount).catch(() => 0);
+    if (exists) id = id + '-' + Date.now().toString(36).slice(-4);
+    const sort = await q('select coalesce(max(sort),0)+1 as n from design_lanes').then((r) => r.rows[0]?.n || 0).catch(() => 0);
+    await q('insert into design_lanes (id, label, accent, sort, system) values ($1,$2,$3,$4,false)', [id, label, accent, sort]).catch(() => {});
+    audit(req, 'design.lane.created', { entityType: 'design_lane', entityId: id, after: { label, accent } });
+    return { ok: true, id, label, accent, sort, system: false };
+  });
+
+  app.patch('/api/design_lanes/:id', { preHandler: requireWarehouse }, async (req, reply) => {
+    const id = String(req.params.id || '');
+    const cur = await q('select id, label, accent, sort, system from design_lanes where id=$1', [id]).then((r) => r.rows[0]).catch(() => null);
+    if (!cur) { reply.code(404); return { error: 'No such lane.' }; }
+    const label = (req.body || {}).label != null ? String((req.body || {}).label).trim() : cur.label;
+    const sort = (req.body || {}).sort != null ? Number((req.body || {}).sort) : cur.sort;
+    const accent = (req.body || {}).accent != null ? String((req.body || {}).accent) : cur.accent;
+    if (!label) { reply.code(400); return { error: 'A lane needs a name.' }; }
+    await q('update design_lanes set label=$2, sort=$3, accent=$4 where id=$1', [id, label, sort, accent]).catch(() => {});
+    // A rename is worth recording — a lane called "QC" becoming "Final check" changes what
+    // every card in it appears to mean.
+    if (label !== cur.label) audit(req, 'design.lane.renamed', { entityType: 'design_lane', entityId: id, before: { label: cur.label }, after: { label } });
+    return { ok: true, id, label, accent, sort, system: cur.system };
+  });
+
+  app.delete('/api/design_lanes/:id', { preHandler: requireWarehouse }, async (req, reply) => {
+    const id = String(req.params.id || '');
+    const cur = await q('select id, label, system from design_lanes where id=$1', [id]).then((r) => r.rows[0]).catch(() => null);
+    if (!cur) { reply.code(404); return { error: 'No such lane.' }; }
+    // The two load-bearing lanes are protected in the API, not just hidden in the UI — the
+    // fallback and the credit trigger can't be deleted through any path.
+    if (cur.system) { reply.code(400); return { error: 'This lane is built in and can’t be removed — it’s where cards fall back to, or where designers get paid.' }; }
+    // Cards in the lane move to the fallback rather than vanish. Recorded in the audit
+    // entry so the History tab can say how many were rehomed.
+    const moved = await q("update design_cards set col='incoming' where col=$1", [id]).then((r) => r.rowCount).catch(() => 0);
+    await q('delete from design_lanes where id=$1', [id]).catch(() => {});
+    audit(req, 'design.lane.deleted', { entityType: 'design_lane', entityId: id, before: { label: cur.label }, after: { cards_moved: moved } });
+    return { ok: true, deleted: 1, cards_moved: moved };
+  });
+
   // Where this card's design work happens. null = our own designers (the default and the
   // whole history of this table). A value means it's OUTSOURCED — e.g. 'pinkdesign' —
   // because our designers are embroidery specialists and DTG/DTF goes to a partner.
@@ -198,7 +276,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       `select id, ts, action, actor as actor_email, actor_name, actor_role,
               entity_id, before, after, note
          from audit_log
-        where entity_type = 'design_card'
+        where entity_type in ('design_card', 'design_lane')
         order by ts desc, id desc limit 300`).catch(() => ({ rows: [] }));
     return r.rows;
   });
