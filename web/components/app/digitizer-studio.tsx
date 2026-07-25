@@ -414,7 +414,7 @@ function MakerTab() {
   const ext = res?.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : null
 
   return (
-    <div className="grid items-start gap-6 sm:grid-cols-[1fr_320px]">
+    <div className="mx-auto grid max-w-2xl items-start gap-6 sm:grid-cols-[1fr_280px]">
       {/* Controls + readout (left carries the info so it's not dwarfed by the preview) */}
       <div className="space-y-4">
         <div>
