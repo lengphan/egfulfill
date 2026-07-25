@@ -96,11 +96,18 @@ function DesignLab() {
           ) : (
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {list.map((d) => (
-                <Card key={String(d.id)} className="group gap-0 overflow-hidden p-0">
-                  <div className="relative flex aspect-square items-center justify-center bg-muted">
+                <Card key={String(d.id)} className="group flex flex-col gap-0 overflow-hidden p-0">
+                  <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
                     {d.thumb ? (
+                      // object-COVER, not contain. A design library holds artwork of every
+                      // shape — a square logo, a wide banner, a tall label — and contain sat
+                      // each one at a different visual size inside the square, floating in
+                      // grey bands, so a tidy grid read as crooked even though the frames
+                      // were identical. Cover fills every frame edge to edge, so the
+                      // thumbnails are uniform; the whole artwork is one click (or one drop)
+                      // away, which is where its exact bounds actually matter.
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={d.thumb} alt={d.name ?? ""} className="size-full object-contain" />
+                      <img src={d.thumb} alt={d.name ?? ""} className="size-full object-cover" />
                     ) : (
                       <PenNib size={26} weight="duotone" className="text-muted-foreground/40" />
                     )}
@@ -112,7 +119,13 @@ function DesignLab() {
                       <Trash size={13} weight="bold" />
                     </button>
                   </div>
-                  <div className="p-3">
+                  {/* flex-1 + flex-col so the meta row can pin to the BOTTOM (mt-auto below).
+                      The card stretches to its grid row's height, and without this the
+                      date + ID sat directly under the title — so a one-line title and a
+                      wrapped one put their badges at different heights across a row, which
+                      is the other half of the crooked look. Pinned, every badge lands on
+                      the same line regardless of title length. */}
+                  <div className="flex flex-1 flex-col p-3">
                     {/* Click the title to rename. Uncontrolled input keyed off the design id
                         so remounting per row starts from the right value; Enter/blur saves,
                         Esc reverts. */}
@@ -137,7 +150,7 @@ function DesignLab() {
                         {d.name || "Untitled"}
                       </button>
                     )}
-                    <div className="mt-1.5 flex items-center gap-1.5">
+                    <div className="mt-auto flex items-center gap-1.5 pt-1.5">
                       <span className="text-xs text-muted-foreground">{fmtDate(d.created_at)}</span>
                       {/* The ID, visible and copyable — the reference sellers put on an import
                           sheet, so it's shown at a readable size, not a tiny caption. */}
