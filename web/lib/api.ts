@@ -1939,7 +1939,7 @@ export function exchangeTiktok(body: { auth_code: string; backfill_days?: number
   return api<{ ok?: boolean; shop_id?: string; shop_name?: string; scopes?: string; error?: string }>(
     `/api/tiktok/exchange`, { method: "POST", body: JSON.stringify(body) })
 }
-export type TiktokConfig = { service_id: string; authorize_url: string; configured: boolean }
+export type TiktokConfig = { service_id: string; authorize_url: string; region?: string; configured: boolean }
 export function getTiktokConfig() {
   return api<TiktokConfig>(`/api/tiktok/config`)
 }

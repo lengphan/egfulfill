@@ -62,6 +62,10 @@ export function StoresManager() {
   const [shopDomain, setShopDomain] = useState("")
   // Which channel is awaiting a "how far back to import" choice (pre-connect modal), if any.
   const [pending, setPending] = useState<"etsy" | "shopify" | "tiktok" | null>(null)
+  // Which TikTok region the server's authorize URL targets ("us" | "global"). Shown in the
+  // connect modal so a US seller can catch a wrong-region login BEFORE hitting "account not
+  // found" — that error means the popup opened the other region's separate account system.
+  const [tiktokRegion, setTiktokRegion] = useState<string | null>(null)
 
   const load = useCallback(() => {
     Promise.all([
@@ -70,6 +74,12 @@ export function StoresManager() {
       getTiktokConnections().catch(() => [] as EtsyConnection[]),
     ]).then(([e, s, t]) => { setConns([...(e ?? []), ...(s ?? []), ...(t ?? [])]); setIsDemo(false) })
       .catch(() => { setConns([]); setIsDemo(true) })
+  }, [])
+
+  // The TikTok authorize page is region-split (US vs global); fetch which one this server
+  // opens so the connect modal can show it. Best-effort — a failure just hides the hint.
+  useEffect(() => {
+    getTiktokConfig().then((c) => setTiktokRegion(c.region || "global")).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -397,6 +407,13 @@ export function StoresManager() {
               How far back should we pull existing orders? This only affects the first import —
               new orders always sync automatically afterward.
             </p>
+            {pending === "tiktok" && tiktokRegion && (
+              <div className="mt-3 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                Opens the <span className="font-medium text-foreground">{tiktokRegion === "us" ? "US" : "global"}</span> TikTok Shop
+                login. If your shop is {tiktokRegion === "us" ? "not US" : "US"} and it can&apos;t find your account, the
+                server&apos;s <code className="font-mono">TIKTOK_REGION</code> is set to the wrong region.
+              </div>
+            )}
             <div className="mt-4 space-y-2">
               {SCOPE_OPTIONS.map((o) => (
                 <button

@@ -10,11 +10,26 @@ import { q } from '../db.js';
 const APP_KEY    = process.env.TIKTOK_APP_KEY || '';
 const APP_SECRET = process.env.TIKTOK_APP_SECRET || '';
 const SERVICE_ID = process.env.TIKTOK_SERVICE_ID || '';
-// Auth host is stable across regions; the authorize page is services.tiktokshop.com.
+// Auth host is stable across regions; the token exchange is always auth.tiktok-shops.com.
 const AUTH_HOST     = (process.env.TIKTOK_AUTH_HOST || 'https://auth.tiktok-shops.com').replace(/\/+$/, '');
-const AUTHORIZE_URL = process.env.TIKTOK_AUTHORIZE_URL || 'https://services.tiktokshop.com/open/authorize';
+// The AUTHORIZE page is the ONE region-split URL. TikTok Shop US runs a SEPARATE account
+// system (services.us.tiktokshop.com); everywhere else uses the global Partner Center page
+// (services.tiktokshop.com). A US seller sent to the global page gets "we couldn't find an
+// account with that email" for a perfectly valid account. TIKTOK_REGION=us is the friendly
+// switch; an explicit TIKTOK_AUTHORIZE_URL still wins for anything unusual.
+const REGION = (process.env.TIKTOK_REGION || 'global').trim().toLowerCase();
+const AUTHORIZE_BY_REGION = {
+  us:     'https://services.us.tiktokshop.com/open/authorize',
+  global: 'https://services.tiktokshop.com/open/authorize',
+};
+const AUTHORIZE_URL = process.env.TIKTOK_AUTHORIZE_URL
+  || AUTHORIZE_BY_REGION[REGION]
+  || AUTHORIZE_BY_REGION.global;
+// Which region the resolved authorize URL actually targets (derived, so it's right even when
+// TIKTOK_AUTHORIZE_URL was set by hand). Surfaced in /config so the UI can show it.
+const RESOLVED_REGION = /services\.us\.tiktokshop\.com/i.test(AUTHORIZE_URL) ? 'us' : 'global';
 // Open API host for signed data calls (orders, shops). Global host serves every region;
-// only the AUTHORIZE page is region-split (US = services.us.tiktokshop.com, set via env).
+// only the AUTHORIZE page is region-split.
 const API_HOST      = (process.env.TIKTOK_API_HOST || 'https://open-api.tiktokglobalshop.com').replace(/\/+$/, '');
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
@@ -296,7 +311,7 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
 
   // Frontend reads this to build the authorize URL (service_id is not a secret).
   app.get('/api/tiktok/config', async () => ({
-    service_id: SERVICE_ID, authorize_url: AUTHORIZE_URL,
+    service_id: SERVICE_ID, authorize_url: AUTHORIZE_URL, region: RESOLVED_REGION,
     configured: !!(APP_KEY && APP_SECRET && SERVICE_ID)
   }));
 
