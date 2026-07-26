@@ -176,22 +176,34 @@ export function DesignerBoard() {
   // One search, both views. Matches the things you'd actually look a card up by — its id,
   // title, product/method, order #, and the partner Ref/Task ids. Stats above stay on the
   // FULL set so the totals don't change as you type.
-  // OUTSOURCED cards are not this board's work. A card with a vendor (Pink Design, etc.) is
-  // being made by a partner and paid by invoice — it can't be dragged, claimed, or credited
-  // here, so it was pure clutter interleaved with the internal queue. It's tracked where it
-  // belongs: the order's own design status, and the partner's board. The board — kanban,
-  // list and stats — now shows only internal cards; `outsourced` is surfaced as a count so
-  // the work isn't silently dropped, per the app's "say what's missing" rule.
-  const internalCards = useMemo(() => (cards ?? []).filter((c) => !c.vendor), [cards])
-  const outsourced = (cards?.length ?? 0) - internalCards.length
+  // WHO sees outsourced (Pink Design, etc.) cards is a ROLE decision, not a blanket one.
+  //
+  //  • DESIGNER — the internal design portal. A partner card is someone else's work, made
+  //    outside and paid by invoice; a designer can't claim, drag or be credited for it, so
+  //    it's hidden entirely. Their board is internal work, full stop.
+  //  • FACTORY (operator / warehouse / admin) — sees BOTH. The factory tracks the whole
+  //    pipeline, internal and outsourced, so a partner card stays on their board, badged
+  //    and non-draggable (the partner drives its status, so it can't be dragged through
+  //    our lanes).
+  //
+  // This is the gate the designer portal needs: the same /designer route serves both, and
+  // the viewer's role — not the card — decides whether outsourced work is visible.
+  const isDesigner = getUser()?.role === "designer"
+  const boardCards = useMemo(
+    () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor) : (cards ?? [])),
+    [cards, isDesigner],
+  )
+  // Only meaningful on the designer portal, where partner cards are the ones being hidden;
+  // the factory sees them, so nothing is withheld there.
+  const outsourced = isDesigner ? (cards?.length ?? 0) - boardCards.length : 0
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
-    if (!term) return internalCards
-    return internalCards.filter((c) =>
+    if (!term) return boardCards
+    return boardCards.filter((c) =>
       [c.id, c.title, c.product, c.type, c.sku, c.order_id, c.vendor_ref, c.vendor_task_id]
         .some((f) => String(f ?? "").toLowerCase().includes(term)))
-  }, [internalCards, query])
+  }, [boardCards, query])
 
   const grouped = useMemo(() => {
     const g: Record<string, DesignCard[]> = Object.fromEntries(lanes.map((l) => [l.id, []]))
@@ -200,14 +212,14 @@ export function DesignerBoard() {
   }, [filtered, lanes])
 
   const stats = useMemo(() => {
-    const list = internalCards
+    const list = boardCards
     const approved = list.filter((c) => laneOf(c, lanes) === "approved").length
     const credited = list.filter((c) => c.credited).reduce((s, c) => s + amt(c.payment), 0)
     // "In progress" = anything past the fallback and short of approved — computed from the
     // lanes rather than a hardcoded id list, so a custom lane counts too.
     const active = list.filter((c) => { const l = laneOf(c, lanes); return l !== (lanes[0]?.id ?? "incoming") && l !== "approved" }).length
     return { total: list.length, active, approved, credited }
-  }, [internalCards, lanes])
+  }, [boardCards, lanes])
 
   // Move a card; entering "approved" credits the designer ONCE (idempotent by DSN-<id> +
   // the card's `credited` flag), so re-dragging it never double-pays.
