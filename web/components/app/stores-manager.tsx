@@ -21,9 +21,11 @@ import {
   getShopifyConfig,
   getShopifyConnections,
   disconnectShopify,
+  syncShopify,
   getTiktokConfig,
   getTiktokConnections,
   disconnectTiktok,
+  syncTiktok,
   type EtsyConnection,
 } from "@/lib/api"
 import { startEtsyConnect } from "@/lib/etsy-oauth"
@@ -144,13 +146,32 @@ export function StoresManager() {
     }
   }
 
+  // Sync every connected order-importing channel at once (Etsy · TikTok · Shopify). Each
+  // endpoint 400s when that channel has no connected shop, so we only call the ones actually
+  // present and never surface a "no shop connected" error for a channel the user doesn't use.
   const onSync = async () => {
     setBusy("sync")
     setNotice(null)
+    const platforms = new Set((conns ?? []).map((c) => (c.platform || "etsy").toLowerCase()))
+    const jobs: Promise<{ imported?: number; error?: string }>[] = []
+    if (platforms.has("etsy")) jobs.push(syncEtsy())
+    if (platforms.has("tiktok")) jobs.push(syncTiktok())
+    if (platforms.has("shopify")) jobs.push(syncShopify())
     try {
-      const r = await syncEtsy()
-      if (r.error) throw new Error(r.error)
-      setNotice({ tone: "ok", msg: r.imported != null ? `Synced — ${r.imported} order(s) imported.` : "Sync complete." })
+      const results = await Promise.allSettled(jobs)
+      const imported = results.reduce(
+        (n, r) => n + (r.status === "fulfilled" ? r.value.imported || 0 : 0), 0)
+      // A per-channel failure shouldn't hide the others' success; only report an error when
+      // every channel failed (or one did with nothing imported anywhere).
+      const failed = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && r.value.error))
+      if (failed.length === results.length && results.length > 0) {
+        const first = failed[0]
+        const msg = first.status === "rejected"
+          ? (first.reason instanceof Error ? first.reason.message : "Sync failed.")
+          : (first.value.error || "Sync failed.")
+        throw new Error(msg)
+      }
+      setNotice({ tone: "ok", msg: `Synced — ${imported} order(s) imported.` })
       load()
     } catch (e) {
       setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Sync failed." })
@@ -183,7 +204,7 @@ export function StoresManager() {
     <div className="space-y-5">
       <StatGrid>
         <StatCard label="Connected shops" value={String(connected.length)} sub="syncing orders" />
-        <StatCard label="Channels live" value="1" sub="Etsy" tone="pos" />
+        <StatCard label="Channels live" value="3" sub="Etsy · TikTok · Shopify" tone="pos" />
         <StatCard label="Coming soon" value="1" sub="WooCommerce" />
         <StatCard
           label="Last sync"

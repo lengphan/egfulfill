@@ -1920,6 +1920,9 @@ export function exchangeShopify(body: { shop: string; code: string; params: Reco
 export function disconnectShopify(shopId: string) {
   return api<{ ok: boolean }>(`/api/shopify/connections/${encodeURIComponent(shopId)}`, { method: "DELETE" })
 }
+export function syncShopify() {
+  return api<{ ok?: boolean; synced?: unknown[]; error?: string }>(`/api/shopify/sync`, { method: "POST" })
+}
 
 /**
  * Finish a TikTok Shop connection.
@@ -1945,6 +1948,9 @@ export function getTiktokConnections() {
 }
 export function disconnectTiktok(shopId: string) {
   return api<{ ok?: boolean }>(`/api/tiktok/disconnect`, { method: "POST", body: JSON.stringify({ shop_id: shopId }) })
+}
+export function syncTiktok() {
+  return api<{ ok?: boolean; imported?: number; synced?: unknown[]; error?: string }>(`/api/tiktok/sync`, { method: "POST" })
 }
 
 export function exchangeEtsy(body: { code: string; code_verifier: string; redirect_uri: string }) {
