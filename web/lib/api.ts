@@ -1914,7 +1914,7 @@ export function getShopifyConfig() {
 export function getShopifyConnections() {
   return api<EtsyConnection[]>(`/api/shopify/connections`)
 }
-export function exchangeShopify(body: { shop: string; code: string; params: Record<string, string> }) {
+export function exchangeShopify(body: { shop: string; code: string; params: Record<string, string>; backfill_days?: number }) {
   return api<{ shop_name?: string; error?: string }>(`/api/shopify/exchange`, { method: "POST", body: JSON.stringify(body) })
 }
 export function disconnectShopify(shopId: string) {
@@ -1935,7 +1935,7 @@ export function syncShopify() {
  * Authenticated, like the Etsy and Shopify exchanges: the shop attaches to an account, so
  * it cannot complete while signed out.
  */
-export function exchangeTiktok(body: { auth_code: string }) {
+export function exchangeTiktok(body: { auth_code: string; backfill_days?: number }) {
   return api<{ ok?: boolean; shop_id?: string; shop_name?: string; scopes?: string; error?: string }>(
     `/api/tiktok/exchange`, { method: "POST", body: JSON.stringify(body) })
 }
@@ -1953,7 +1953,7 @@ export function syncTiktok() {
   return api<{ ok?: boolean; imported?: number; synced?: unknown[]; error?: string }>(`/api/tiktok/sync`, { method: "POST" })
 }
 
-export function exchangeEtsy(body: { code: string; code_verifier: string; redirect_uri: string }) {
+export function exchangeEtsy(body: { code: string; code_verifier: string; redirect_uri: string; backfill_days?: number }) {
   return api<{ shop_name?: string; error?: string }>(`/api/etsy/exchange`, {
     method: "POST",
     body: JSON.stringify(body),

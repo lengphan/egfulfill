@@ -34,9 +34,23 @@ export default function OAuthCallbackPage() {
         try { window.opener.postMessage({ source: "eg-oauth", ok: false, message }, window.location.origin) } catch { /* ignore */ }
       }
     }
+    // The "how far back to import" scope the user picked in the pre-connect modal on Stores.
+    // It's stashed in localStorage (same-origin, so this popup shares it with the opener) and
+    // read here so the exchange can persist it on the connection. Cleared once consumed.
+    const takeBackfillDays = (): number | undefined => {
+      try {
+        const raw = localStorage.getItem("eg_connect_backfill_days")
+        localStorage.removeItem("eg_connect_backfill_days")
+        if (raw == null || raw === "") return undefined
+        const n = Math.floor(Number(raw))
+        return Number.isFinite(n) ? Math.max(0, Math.min(365, n)) : undefined
+      } catch { return undefined }
+    }
+
     // All state updates live inside this async runner (not the effect body) so
     // they're deferred, not synchronous mount renders.
     const run = async () => {
+      const backfill_days = takeBackfillDays()
       const params = new URLSearchParams(window.location.search)
       // TikTok Shop returns `auth_code`; Etsy and Shopify return `code`. Reading only
       // `code` is why TikTok never worked here — the guard below fired before any
@@ -61,7 +75,7 @@ export default function OAuthCallbackPage() {
       if (shopParam) {
         try {
           const allParams = Object.fromEntries(params.entries())
-          const data = await exchangeShopify({ shop: shopParam.toLowerCase(), code, params: allParams })
+          const data = await exchangeShopify({ shop: shopParam.toLowerCase(), code, params: allParams, backfill_days })
           if (data.error) throw new Error(data.error)
           clearShopifyOAuth()
           finish(data.shop_name || "your Shopify store")
@@ -88,7 +102,7 @@ export default function OAuthCallbackPage() {
           return
         }
         try {
-          const data = await exchangeTiktok({ auth_code: authCode })
+          const data = await exchangeTiktok({ auth_code: authCode, backfill_days })
           if (data.error) throw new Error(data.error)
           finish(data.shop_name || "your TikTok shop")
         } catch (e: unknown) {
@@ -119,7 +133,7 @@ export default function OAuthCallbackPage() {
       }
 
       try {
-        const data = await exchangeEtsy({ code, code_verifier: pkce.verifier, redirect_uri: pkce.redirect })
+        const data = await exchangeEtsy({ code, code_verifier: pkce.verifier, redirect_uri: pkce.redirect, backfill_days })
         clearPkce()
         finish(data.shop_name || "your Etsy shop")
       } catch (e: unknown) {

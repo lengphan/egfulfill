@@ -60,6 +60,8 @@ export function StoresManager() {
   const [openScopes, setOpenScopes] = useState<Set<string>>(new Set())
 
   const [shopDomain, setShopDomain] = useState("")
+  // Which channel is awaiting a "how far back to import" choice (pre-connect modal), if any.
+  const [pending, setPending] = useState<"etsy" | "shopify" | "tiktok" | null>(null)
 
   const load = useCallback(() => {
     Promise.all([
@@ -149,6 +151,27 @@ export function StoresManager() {
   // Sync every connected order-importing channel at once (Etsy · TikTok · Shopify). Each
   // endpoint 400s when that channel has no connected shop, so we only call the ones actually
   // present and never surface a "no shop connected" error for a channel the user doesn't use.
+  // Pre-connect scope options — how much order history the FIRST import reaches back for.
+  // New orders always sync automatically afterward, so this only bounds the initial backfill.
+  const SCOPE_OPTIONS: { days: number; label: string; sub: string; rec?: boolean }[] = [
+    { days: 0, label: "New orders only", sub: "From now on — nothing from the past" },
+    { days: 7, label: "Past 7 days", sub: "Roughly this week" },
+    { days: 30, label: "Past 30 days", sub: "About a month", rec: true },
+    { days: 90, label: "Past 90 days", sub: "The last quarter" },
+  ]
+  const channelName = (k: string) => CHANNELS.find((c) => c.key === k)?.name || "shop"
+
+  // A channel's Connect button opens this chooser first; picking a window stashes it for the
+  // OAuth callback to persist on the connection, then starts the real connect flow.
+  const chooseScope = (days: number) => {
+    try { localStorage.setItem("eg_connect_backfill_days", String(days)) } catch { /* ignore */ }
+    const ch = pending
+    setPending(null)
+    if (ch === "etsy") onConnect()
+    else if (ch === "shopify") onConnectShopify()
+    else if (ch === "tiktok") onConnectTiktok()
+  }
+
   const onSync = async () => {
     setBusy("sync")
     setNotice(null)
@@ -336,12 +359,12 @@ export function StoresManager() {
               {ch.key === "shopify" ? (
                 <div className="mt-4 space-y-2">
                   <Input value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} placeholder="mystore.myshopify.com" className="h-9 text-sm" />
-                  <Button size="sm" className="w-full" onClick={onConnectShopify} disabled={busy === "connect-shopify" || !shopDomain.trim()}>
+                  <Button size="sm" className="w-full" onClick={() => setPending("shopify")} disabled={busy === "connect-shopify" || !shopDomain.trim()}>
                     <Plus size={14} weight="bold" /> {busy === "connect-shopify" ? "Connecting…" : "Connect"}
                   </Button>
                 </div>
               ) : ch.live ? (
-                <Button size="sm" className="mt-4" onClick={ch.key === "tiktok" ? onConnectTiktok : onConnect} disabled={busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect")}>
+                <Button size="sm" className="mt-4" onClick={() => setPending(ch.key as "etsy" | "tiktok")} disabled={busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect")}>
                   <Plus size={14} weight="bold" />
                   {busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect") ? "Connecting…" : "Connect"}
                 </Button>
@@ -354,6 +377,59 @@ export function StoresManager() {
           ))}
         </div>
       </div>
+
+      {/* Pre-connect scope chooser — appears for every channel, both seller and staff. Bounds
+          how far back the FIRST import reaches so connecting a busy shop can't pull thousands
+          of historical orders. New orders always sync automatically after connect. */}
+      {pending && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPending(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-base font-semibold">Import orders from {channelName(pending)}</div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              How far back should we pull existing orders? This only affects the first import —
+              new orders always sync automatically afterward.
+            </p>
+            <div className="mt-4 space-y-2">
+              {SCOPE_OPTIONS.map((o) => (
+                <button
+                  key={o.days}
+                  type="button"
+                  onClick={() => chooseScope(o.days)}
+                  className="flex w-full items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:border-primary hover:bg-primary/5"
+                >
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2 font-medium">
+                      {o.label}
+                      {o.rec && (
+                        <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                          Recommended
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{o.sub}</span>
+                  </span>
+                  <Plus size={15} weight="bold" className="shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setPending(null)}
+              className="mt-4 w-full rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   )

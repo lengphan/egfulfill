@@ -37,6 +37,14 @@ const API = 'https://api.etsy.com/v3/application';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function money(m) { return m && m.divisor ? (m.amount / m.divisor) : 0; }
+// Sanitize the connect-time "how far back to import" choice → whole days in [0,365], or null
+// when the caller didn't choose (older connection). 0 = new orders only (from connect forward).
+function clampDays(v) {
+  if (v == null || v === '') return null;
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(365, n));
+}
 // Stable per-line id stamped at creation, so itemDK() on the client never shifts from
 // the SKU to a later-assigned id and orphans the line's design/blank.
 function genLineId() { return 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
@@ -343,10 +351,19 @@ async function syncConnection(conn, opts = {}) {
   } else {
     // Full/first sync — SCOPED so we never pull the entire shipped history (that's
     // what blew the quota). Two narrow passes:
-    //   1) orders CREATED since you connected (from the import date forward)
+    //   1) orders CREATED within the chosen window (see below)
     //   2) any order still UNSHIPPED/open, regardless of date (the active queue)
-    // Together: "today's orders onward + everything not yet shipped" — nothing else.
-    if (connectedSec) await pullPass(`&min_created=${connectedSec}`);
+    // Together: "the chosen window of history + everything not yet shipped" — nothing else.
+    //
+    // The window respects the scope the seller chose at connect (conn.backfill_days):
+    //   null (older connection) or 0 → from the connect date forward (the original behavior);
+    //   N → the last N days (may reach back BEFORE connect if they asked for history).
+    // The unshipped pass stays UNBOUNDED on purpose: an open order is active work you want
+    // regardless of when it was placed — the scope only limits how much created-date HISTORY
+    // gets pulled, which is the "thousands of old orders" case the seller is guarding against.
+    const days = conn.backfill_days;
+    const minCreated = (days != null && days > 0) ? (Math.floor(Date.now() / 1000) - days * 86400) : connectedSec;
+    if (minCreated) await pullPass(`&min_created=${minCreated}`);
     await pullPass(`&was_shipped=false`);
   }
   await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
@@ -570,7 +587,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
        created_at timestamptz default now(), updated_at timestamptz default now(),
        unique (platform, shop_id))`)
     .catch(() => {})
-    .then(() => q('alter table platform_connections add column if not exists seller_email text').catch(() => {}));
+    .then(() => q('alter table platform_connections add column if not exists seller_email text').catch(() => {}))
+    // How far back the first import reaches, chosen at connect time (null = older connection).
+    .then(() => q('alter table platform_connections add column if not exists backfill_days integer').catch(() => {}));
   // Buyer personalization text per item (added with the customer-upload feature).
   q('alter table order_items add column if not exists personalization text').catch(() => {});
   // factory_order: orders from the ADMIN/factory shop belong to the factory boards;
@@ -1067,6 +1086,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // set to the caller, so importReceipt routes their orders to them (factory_order=false).
   app.post('/api/etsy/exchange', { preHandler: requireAuth }, async (req, reply) => {
     const { code, code_verifier, redirect_uri } = req.body || {};
+    const bd = clampDays((req.body || {}).backfill_days);   // how far back the first import reaches
     if (!KEYSTRING) { reply.code(500); return { error: 'Server missing ETSY_KEYSTRING' }; }
     if (!code || !code_verifier) { reply.code(400); return { error: 'Missing code or verifier' }; }
     try {
@@ -1097,14 +1117,15 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // NB: last_sync_at=null on reconnect → the next sync is a FULL pull, so a newly-granted scope
       // (e.g. address_r just approved by Etsy) BACKFILLS shipping addresses onto existing unshipped orders.
       await q(
-        `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by)
-         values ('etsy',$1,$2,$3,$4,$5,$6,$7)
+        `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by, backfill_days)
+         values ('etsy',$1,$2,$3,$4,$5,$6,$7,$8)
          on conflict (platform, shop_id) do update set
            shop_name=excluded.shop_name, access_token=excluded.access_token,
            refresh_token=excluded.refresh_token, token_expires_at=excluded.token_expires_at,
            scopes=excluded.scopes, connected_by=excluded.connected_by,
+           backfill_days=excluded.backfill_days,
            last_sync_at=null, updated_at=now()`,
-        [shopId, shopName, t.access_token, t.refresh_token, expires, SCOPES, req.user.sub]
+        [shopId, shopName, t.access_token, t.refresh_token, expires, SCOPES, req.user.sub, bd]
       );
       return { ok: true, shop_id: shopId, shop_name: shopName };
     } catch (e) {

@@ -45,6 +45,14 @@ function verifyWebhookHmac(rawBody, header) {
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 const genLineId = () => 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+// Sanitize the connect-time "how far back to import" choice → whole days in [0,365], or null
+// when the caller didn't choose (older connection). 0 = new orders only (no history).
+function clampDays(v) {
+  if (v == null || v === '') return null;
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(365, n));
+}
 
 // A Shopify line item's custom properties ([{name,value}]) carry the buyer's uploaded
 // file + personalization, exactly like Etsy variations. Same split rule as importReceipt.
@@ -128,7 +136,16 @@ async function connIsFactory(conn) {
 async function syncShopifyConnection(conn) {
   const isFactory = await connIsFactory(conn);
   let imported = 0, cancelled = 0;
-  const url = `https://${conn.shop_id}/admin/api/${API_VERSION}/orders.json?status=any&limit=250`;
+  // Bound the pull to the scope chosen at connect (conn.backfill_days): N → the last N days;
+  // 0 → new orders only (from when the store connected); null (older connection) → unchanged
+  // (up to Shopify's 250 most recent, as before). Webhooks keep things current after connect.
+  let url = `https://${conn.shop_id}/admin/api/${API_VERSION}/orders.json?status=any&limit=250`;
+  if (conn.backfill_days != null) {
+    const sinceIso = conn.backfill_days > 0
+      ? new Date(Date.now() - conn.backfill_days * 86400000).toISOString()
+      : (conn.created_at ? new Date(conn.created_at).toISOString() : null);
+    if (sinceIso) url += `&created_at_min=${encodeURIComponent(sinceIso)}`;
+  }
   const r = await fetch(url, { headers: { 'X-Shopify-Access-Token': conn.access_token } });
   if (!r.ok) throw new Error(`Shopify orders fetch failed (${r.status})`);
   const data = await r.json().catch(() => ({}));
@@ -170,7 +187,11 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
        access_token text, refresh_token text, token_expires_at timestamptz, scopes text,
        last_sync_at timestamptz, connected_by uuid references users(id) on delete set null,
        created_at timestamptz default now(), updated_at timestamptz default now(),
-       unique (platform, shop_id))`).catch(() => {});
+       unique (platform, shop_id))`)
+    .catch(() => {})
+    // How far back the first import reaches, chosen at connect time (null = older connection).
+    // CHAINED off the create so it can't ALTER before the table exists on a fresh DB.
+    .then(() => q('alter table platform_connections add column if not exists backfill_days integer').catch(() => {}));
 
   // Frontend reads this to build the per-store authorize URL (api_key is public).
   app.get('/api/shopify/config', async () => ({
@@ -207,6 +228,7 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
     const body = req.body || {};
     const shop = String(body.shop || '').trim().toLowerCase();
     const code = body.code;
+    const bd = clampDays(body.backfill_days);   // how far back the first import reaches
     // Params for the HMAC check: an explicit object, or parse the raw callback query string.
     let params = body.params;
     if (!params && typeof body.query === 'string') params = Object.fromEntries(new URLSearchParams(body.query.replace(/^\?/, '')));
@@ -229,12 +251,13 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
       } catch (e) {}
       // Offline token → no expiry; refresh_token stays null.
       await q(
-        `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by)
-         values ('shopify',$1,$2,$3,null,null,$4,$5)
+        `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by, backfill_days)
+         values ('shopify',$1,$2,$3,null,null,$4,$5,$6)
          on conflict (platform, shop_id) do update set
            shop_name=excluded.shop_name, access_token=excluded.access_token,
-           scopes=excluded.scopes, connected_by=excluded.connected_by, updated_at=now()`,
-        [shop, shopName, t.access_token, t.scope || SCOPES, req.user.sub]
+           scopes=excluded.scopes, connected_by=excluded.connected_by,
+           backfill_days=excluded.backfill_days, updated_at=now()`,
+        [shop, shopName, t.access_token, t.scope || SCOPES, req.user.sub, bd]
       );
       // Register order webhooks now, so real-time sync works without manual setup.
       // Best-effort: a failure here doesn't block the connection (the backfill sync

@@ -18,6 +18,14 @@ const AUTHORIZE_URL = process.env.TIKTOK_AUTHORIZE_URL || 'https://services.tikt
 const API_HOST      = (process.env.TIKTOK_API_HOST || 'https://open-api.tiktokglobalshop.com').replace(/\/+$/, '');
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+// Sanitize the connect-time "how far back to import" choice → whole days in [0,365], or null
+// when the caller didn't choose (older connections). 0 = new orders only (no history).
+function clampDays(v) {
+  if (v == null || v === '') return null;
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(365, n));
+}
 
 // ── token helpers ────────────────────────────────────────────────────────────
 // TikTok wraps every response as { code, message, data, request_id }; code===0 = ok.
@@ -215,16 +223,25 @@ async function syncTiktokConnection(conn, opts = {}) {
   const firstSync = !conn.last_sync_at;
   const full = !!opts.full || firstSync;
   let imported = 0, cancelled = 0, skipped = 0;
+  const nowSec = Math.floor(Date.now() / 1000);
   const body = {};
   if (full) {
+    // Bound the FIRST/full pull so connecting a busy shop never drags in its entire history.
+    // The window is the scope the user chose at connect (conn.backfill_days): 0 = new orders
+    // only (forward from connect); N = the last N days; null (older connection) = the env
+    // default. After this, the 5-min incremental poll keeps the queue current on its own.
     const connectedSec = conn.created_at ? Math.floor(new Date(conn.created_at).getTime() / 1000) : 0;
-    if (connectedSec) body.create_time_ge = connectedSec;   // this shop's orders from connect forward
+    const days = conn.backfill_days != null
+      ? conn.backfill_days
+      : Math.max(0, parseInt(process.env.TIKTOK_BACKFILL_DAYS, 10) || 30);
+    body.create_time_ge = days > 0 ? (nowSec - days * 86400) : (connectedSec || nowSec);
   } else {
     body.update_time_ge = Math.max(0, Math.floor(new Date(conn.last_sync_at).getTime() / 1000) - 300);
   }
   let pageToken = '';
-  // Cap at 20 pages (1000 orders) per run — a backstop; incremental runs return far fewer.
-  for (let page = 0; page < 20; page++) {
+  // Backstop at 10 pages (500 orders) per run — a real monthly volume is a handful; this only
+  // ever bites a shop with an unusually large recent window, and the incremental poll follows.
+  for (let page = 0; page < 10; page++) {
     const query = { shop_cipher: cipher, page_size: '50', sort_field: 'create_time', sort_order: 'DESC' };
     if (pageToken) query.page_token = pageToken;
     const d = await ttSignedRequest(conn, 'POST', '/order/202309/orders/search', { query, body });
@@ -266,7 +283,9 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
     .catch(() => {})
     // Per-shop cipher for the Open API order calls (fetched on first sync). CHAINED off the
     // create so the column can't ALTER before the table exists on a fresh DB (see etsy.js).
-    .then(() => q('alter table platform_connections add column if not exists shop_cipher text').catch(() => {}));
+    .then(() => q('alter table platform_connections add column if not exists shop_cipher text').catch(() => {}))
+    // How far back the first import reaches, chosen at connect time (null = older connection).
+    .then(() => q('alter table platform_connections add column if not exists backfill_days integer').catch(() => {}));
 
   // Auto-sync: poll TikTok incrementally so new orders land without anyone clicking "Sync
   // now" — mirrors the Etsy poll. Incremental (update_time_ge) → a couple of calls per run.
@@ -322,6 +341,7 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
   app.post('/api/tiktok/exchange', { preHandler: requireAuth }, async (req, reply) => {
     const { code, auth_code } = req.body || {};
     const authCode = code || auth_code;
+    const bd = clampDays((req.body || {}).backfill_days);   // how far back the first import reaches
     if (!APP_KEY || !APP_SECRET) { reply.code(500); return { error: 'Server missing TIKTOK_APP_KEY / TIKTOK_APP_SECRET' }; }
     if (!authCode) { reply.code(400); return { error: 'Missing auth code' }; }
     try {
@@ -332,13 +352,14 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       const shopName = d.seller_name || ('TikTok shop ' + shopId.slice(0, 8));
       const scopes   = Array.isArray(d.granted_scopes) ? d.granted_scopes.join(' ') : (d.granted_scopes || '');
       await q(
-        `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by)
-         values ('tiktok',$1,$2,$3,$4,$5,$6,$7)
+        `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by, backfill_days)
+         values ('tiktok',$1,$2,$3,$4,$5,$6,$7,$8)
          on conflict (platform, shop_id) do update set
            shop_name=excluded.shop_name, access_token=excluded.access_token,
            refresh_token=excluded.refresh_token, token_expires_at=excluded.token_expires_at,
-           scopes=excluded.scopes, connected_by=excluded.connected_by, updated_at=now()`,
-        [shopId, shopName, d.access_token, d.refresh_token, expires, scopes, req.user.sub]
+           scopes=excluded.scopes, connected_by=excluded.connected_by,
+           backfill_days=excluded.backfill_days, updated_at=now()`,
+        [shopId, shopName, d.access_token, d.refresh_token, expires, scopes, req.user.sub, bd]
       );
       return { ok: true, shop_id: shopId, shop_name: shopName, scopes };
     } catch (e) {
