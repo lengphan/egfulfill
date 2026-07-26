@@ -1043,7 +1043,7 @@ function boardSubject(r: AuditRow) {
   const to = String(((r.after ?? {}) as Record<string, unknown>).col ?? "")
   return (
     <>
-      <span className="font-medium">{title}</span>
+      <span className="text-foreground">{title}</span>
       {r.action === "design.lane" && (from || to) && (
         <span className="text-muted-foreground"> · {from || "?"} → {to || "?"}</span>
       )}

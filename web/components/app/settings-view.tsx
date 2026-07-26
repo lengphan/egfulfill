@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ActivityFeed } from "@/components/app/activity-feed"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { SiteContentPanel } from "@/components/app/site-content-panel"
@@ -1888,26 +1888,18 @@ function UsersPanel() {
 function ActivityPanel() {
   const [audit, setAudit] = useState<AuditRow[] | null>(null)
   useEffect(() => { const id = setTimeout(() => { getAudit({ limit: 200 }).then((r) => setAudit(r ?? [])).catch(() => setAudit([])) }, 0); return () => clearTimeout(id) }, [])
-  const fmtDT = (s?: string | null) => { if (!s) return "—"; const d = new Date(s); return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }
+  // Same feed as everywhere else (activity-feed) — a global log rather than one entity's, so
+  // the subject is WHICH entity the action touched ("order 4099", "design_card 13").
   return (
     <SectionCard title="Activity log" description="Audited actions across the platform">
-      {audit === null ? <div className="flex items-center justify-center py-14 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
-        : audit.length === 0 ? <div className="py-14 text-center text-sm text-muted-foreground">No activity recorded yet.</div>
-          : (
-            <Table>
-              <TableHeader><TableRow><TableHead>When</TableHead><TableHead>Actor</TableHead><TableHead>Action</TableHead><TableHead>Entity</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {audit.map((a) => (
-                  <TableRow key={String(a.id)}>
-                    <TableCell className="text-muted-foreground">{fmtDT(a.ts)}</TableCell>
-                    <TableCell>{a.actor || "—"}{a.actor_role ? <span className="text-xs text-muted-foreground"> · {a.actor_role}</span> : null}</TableCell>
-                    <TableCell className="font-mono text-xs">{a.action}</TableCell>
-                    <TableCell className="text-muted-foreground">{a.entity_type ? `${a.entity_type} ${a.entity_id ?? ""}` : "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+      <div className="p-3">
+        <ActivityFeed
+          rows={audit}
+          variant="card"
+          empty="No activity recorded yet."
+          subject={(a) => (a.entity_type ? <span className="text-muted-foreground">{a.entity_type} {a.entity_id ?? ""}</span> : null)}
+        />
+      </div>
     </SectionCard>
   )
 }

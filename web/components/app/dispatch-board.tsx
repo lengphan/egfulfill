@@ -49,13 +49,16 @@ function disposition(o: OrderRow): { key: DispKey; label: string } {
   if (fs === "working" || fs === "printed") return { key: "production", label: "In production" }
   return { key: "removed", label: "Off the board" }   // has a label but sits before the board
 }
-const DISP_BADGE: Record<DispKey, string> = {
-  scanned: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-  shipped: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-  awaiting: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  production: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
-  removed: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
-  cancelled: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+// A small status DOT, not a colour-filled pill — the disposition sits next to a calm mono
+// timeline, so the outcome is carried by a quiet coloured dot + neutral label rather than a
+// second loud badge. Green = done, violet = in production, amber = stuck, red = cancelled.
+const DISP_DOT: Record<DispKey, string> = {
+  scanned: "bg-emerald-500",
+  shipped: "bg-emerald-500",
+  awaiting: "bg-muted-foreground/40",
+  production: "bg-violet-500",
+  removed: "bg-amber-500",
+  cancelled: "bg-red-500",
 }
 // The per-label timeline shows DISPATCH actions only — scans, hand-offs to byeastside,
 // pull-backs, label prints/voids, manifests. Order-level noise (order saved/updated, design
@@ -559,7 +562,10 @@ export function DispatchBoard() {
                     {/* Row toggles the action timeline. Click the label-link separately. */}
                     <div onClick={() => toggleTimeline(o.id)} className="flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40">
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
-                      <span className={"shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold " + DISP_BADGE[d.key]}>{d.label}</span>
+                      <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                        <span className={"size-1.5 rounded-full " + DISP_DOT[d.key]} />
+                        {d.label}
+                      </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
