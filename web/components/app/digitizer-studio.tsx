@@ -378,6 +378,10 @@ function MakerTab() {
   const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
   const [res, setRes] = useState<WilcomResult | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  // Colour-change mode — the palette grid is tucked away until "Change colour", so the
+  // controls stay short until you want to recolour.
+  const [showPalette, setShowPalette] = useState(false)
+  const [pQuery, setPQuery] = useState("")
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -412,10 +416,14 @@ function MakerTab() {
   const inputCls = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
   const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
   const ext = res?.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : null
+  // The cone currently selected, so the colour control can name it rather than show a bare hex.
+  const selCone = palette.find((c) => c.hex.toLowerCase() === color.toLowerCase())
+  const pal = palette.length ? palette : undefined
+  const cones = pQuery ? palette.filter((c) => `${c.name} ${c.code}`.toLowerCase().includes(pQuery.toLowerCase())) : palette
 
   return (
-    <div className="mx-auto grid max-w-2xl items-start gap-6 sm:grid-cols-[1fr_280px]">
-      {/* Controls + readout (left carries the info so it's not dwarfed by the preview) */}
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(340px,400px)_1fr]">
+      {/* LEFT — controls, colour, sequence, readout, actions */}
       <div className="space-y-4">
         <div>
           <label className={labelCls}>Text</label>
@@ -434,18 +442,64 @@ function MakerTab() {
             <input type="number" min={5} max={50} value={height} onChange={(e) => setHeight(Number(e.target.value) || 20)} className={inputCls} />
           </div>
         </div>
+
+        {/* Colour — Wilcom's "change colour" as a named cone + a tucked-away palette. */}
         <div>
-          <label className={labelCls}>Thread colour</label>
+          <div className="mb-1 flex items-center justify-between">
+            <span className={labelCls + " mb-0"}>Thread colour</span>
+            {palette.length > 0 && (
+              <button onClick={() => setShowPalette((v) => !v)} className="text-[11px] font-medium text-primary hover:underline">{showPalette ? "Done" : "Change colour"}</button>
+            )}
+          </div>
           {palette.length ? (
-            <div className="flex flex-wrap gap-1.5">
-              {palette.map((c) => (
-                <button key={c.code} onClick={() => setColor(c.hex)} title={`${c.name} · ${c.code}`} className={"size-7 rounded-md border-2 transition-transform hover:scale-105 " + (color === c.hex ? "border-foreground" : "border-transparent")} style={{ background: c.hex }} />
-              ))}
-            </div>
+            <>
+              <button onClick={() => setShowPalette((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:border-primary/40">
+                <span className="size-6 shrink-0 rounded-md border border-border" style={{ background: color }} />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">{selCone?.name ?? "Custom colour"}</span>
+                  <span className="block font-mono text-[11px] text-muted-foreground">{selCone?.code ?? color}</span>
+                </span>
+              </button>
+              {showPalette && (
+                <div className="mt-2 rounded-lg border border-border bg-card p-2.5">
+                  <input value={pQuery} onChange={(e) => setPQuery(e.target.value)} placeholder="Search cones by name or code…" className="mb-2 h-8 w-full rounded-md border border-border bg-background px-2.5 text-xs outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
+                  <div className="grid max-h-44 grid-cols-8 gap-1.5 overflow-y-auto">
+                    {cones.map((c) => (
+                      <button key={c.code} onClick={() => { setColor(c.hex); setShowPalette(false); setPQuery("") }} title={`${c.name} · ${c.code}`} className={"aspect-square rounded-md border-2 transition-transform hover:scale-110 " + (color.toLowerCase() === c.hex.toLowerCase() ? "border-foreground" : "border-transparent")} style={{ background: c.hex }} />
+                    ))}
+                    {cones.length === 0 && <div className="col-span-8 py-3 text-center text-xs text-muted-foreground">No cone matches “{pQuery}”.</div>}
+                  </div>
+                </div>
+              )}
+            </>
           ) : <p className="text-xs text-muted-foreground">No thread library set — add cones in Settings › Thread palette.</p>}
         </div>
 
-        {/* Live readout — fills the left column and updates with the preview. */}
+        {/* Colour sequence — the stops EWA reports, Wilcom-style. Lettering stitches in one
+            thread, so this is usually a single stop; each row's "Change" recolours it. */}
+        {res?.threads && res.threads.length > 0 && (
+          <div>
+            <span className={labelCls}>Colour sequence</span>
+            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+              {res.threads.map((t, i) => {
+                const m = nearestThread(t.r, t.g, t.b, pal)
+                return (
+                  <div key={i} className="flex items-center gap-2.5 px-3 py-2 text-sm">
+                    <span className="w-4 shrink-0 text-center text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
+                    <span className="size-5 shrink-0 rounded border border-border" style={{ background: `rgb(${t.r},${t.g},${t.b})` }} />
+                    <span className="min-w-0 flex-1 truncate">{t.name || m?.name || `rgb(${t.r}, ${t.g}, ${t.b})`}{m && <span className="font-mono text-[11px] text-muted-foreground"> · {m.code}</span>}</span>
+                    {res.threads!.length === 1 && (
+                      <button onClick={() => { setShowPalette(true); setPQuery("") }} className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">Change</button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {res.threads.length > 1 && <p className="mt-1 text-[11px] text-muted-foreground">Lettering stitches in one thread — recolour it above.</p>}
+          </div>
+        )}
+
+        {/* Live readout — stitch count, size, file format. */}
         <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-muted/30 p-3 text-center">
           <div><div className="text-base font-semibold tabular-nums">{res?.stitches != null ? res.stitches.toLocaleString() : "—"}</div><div className="text-[11px] text-muted-foreground">stitches</div></div>
           <div><div className="text-base font-semibold tabular-nums">{res?.width != null && res?.height != null ? `${Math.round(res.width)}×${Math.round(res.height)}` : "—"}</div><div className="text-[11px] text-muted-foreground">mm</div></div>
@@ -464,18 +518,18 @@ function MakerTab() {
         {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
       </div>
 
-      {/* Live preview — fixed 320px column so it stays proportional to the controls */}
-      <div className="space-y-2">
-        <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border bg-muted">
+      {/* RIGHT — the big preview, the hero of the tab; sticks while you scroll the controls. */}
+      <div className="space-y-2 lg:sticky lg:top-4">
+        <div className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
           {res?.trueview ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={`data:image/png;base64,${res.trueview}`} alt="lettering preview" className="absolute inset-0 size-full object-contain" />
+            <img src={`data:image/png;base64,${res.trueview}`} alt="lettering preview" className="max-h-full max-w-full object-contain p-4" />
           ) : (
-            <div className="grid size-full place-items-center p-6 text-center text-xs text-muted-foreground">{ready ? "Rendering…" : "Type some text to see it stitched."}</div>
+            <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">{ready ? "Rendering…" : "Type some text to see it stitched."}</div>
           )}
-          {status === "previewing" && res?.trueview && <div className="absolute right-2 top-2 rounded-full bg-background/85 p-1"><CircleNotch size={14} className="animate-spin text-muted-foreground" /></div>}
+          {status === "previewing" && res?.trueview && <div className="absolute right-3 top-3 rounded-full bg-background/85 p-1.5"><CircleNotch size={16} className="animate-spin text-muted-foreground" /></div>}
         </div>
-        <div className="text-center text-[11px] text-muted-foreground">Live preview{status === "previewing" ? " · updating…" : ""}</div>
+        <div className="text-center text-[11px] text-muted-foreground">Live preview{status === "previewing" ? " · updating…" : ""} — the true stitched look, on the real fabric render.</div>
       </div>
     </div>
   )
