@@ -37,11 +37,12 @@ const fmtDate = (s: string | null) => {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-// Channels shown even when unconnected. Only Etsy has a live OAuth route today.
+// Channels shown even when unconnected. Etsy + TikTok are granted/live and lead; Shopify
+// and WooCommerce follow. (Etsy + Shopify also import orders; TikTok is connect-only so far.)
 const CHANNELS = [
   { key: "etsy", name: "Etsy", blurb: "Sync orders & push tracking back", live: true },
-  { key: "shopify", name: "Shopify", blurb: "Storefront order sync", live: true },
   { key: "tiktok", name: "TikTok Shop", blurb: "Marketplace order sync", live: true },
+  { key: "shopify", name: "Shopify", blurb: "Storefront order sync", live: true },
   { key: "woocommerce", name: "WooCommerce", blurb: "WordPress store sync", live: false },
 ]
 
