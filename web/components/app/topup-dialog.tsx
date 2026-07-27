@@ -30,6 +30,9 @@ function Success({ title, sub, onDone }: { title: string; sub: string; onDone: (
 // The wallet is in USD, so the seller picks a USD amount; the admin-set rate converts it to
 // the VND the QR actually charges, and that exact USD is what credits on payment.
 const VQR_USD_PRESETS = [50, 100, 200, 500]
+// Bulk top-up suggestion amounts — the "top up more" tiers. Shared so VietQR (with a rate)
+// and Transfer (plain USD, no rate) suggest the same big amounts. $20k is the top.
+const BULK_USD_PRESETS = [2000, 5000, 10000, 20000]
 function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () => void }) {
   const [amount, setAmount] = useState("50")   // USD
   const [rate, setRate] = useState(0)          // base VND per $1, admin-set
@@ -55,6 +58,11 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
   for (const t of tiers) if (usdAmt >= t.usd && t.rate > 0) applicableRate = t.rate
   const vndAmt = applicableRate > 0 ? Math.round(usdAmt * applicableRate) : 0
   const discounted = applicableRate > 0 && applicableRate < rate
+  // Show a $20k tier even if the admin only configured up to $10k — a $20k top-up already
+  // gets the best (top-tier) rate, so surfacing it is honest, not a made-up discount.
+  const bestRate = tiers.reduce((m, t) => (t.rate > 0 && t.rate < m ? t.rate : m), rate)
+  const maxTierUsd = tiers.reduce((m, t) => Math.max(m, t.usd), 0)
+  const displayTiers = maxTierUsd >= 20000 || tiers.length === 0 ? tiers : [...tiers, { usd: 20000, rate: bestRate }]
 
   const start = async () => {
     if (usdAmt <= 0) { setError("Enter a USD amount."); return }
@@ -159,19 +167,21 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary"><Sparkle size={13} weight="fill" /> Top up more, pay a better rate</span>
               <button onClick={() => setShowBulk(false)} className="text-[11px] text-muted-foreground hover:text-foreground">Hide</button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {tiers.map((t) => {
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {displayTiers.map((t) => {
                 const active = usdAmt === t.usd
                 const saveVnd = Math.max(0, Math.round(t.usd * (rate - t.rate)))
+                const best = displayTiers.length > 1 && t === displayTiers[displayTiers.length - 1]
                 return (
                   <button
                     key={t.usd}
                     onClick={() => setAmount(String(t.usd))}
-                    className={"flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors " + (active ? "border-primary bg-primary text-primary-foreground" : "border-primary/30 bg-card hover:bg-primary/10")}
+                    className={"relative flex flex-col gap-2 overflow-hidden rounded-xl border p-4 text-left transition-colors " + (active ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}
                   >
-                    <span className="text-sm font-bold tabular-nums">{usd(t.usd)}</span>
-                    <span className={"text-[11px] tabular-nums " + (active ? "text-primary-foreground/85" : "text-muted-foreground")}>$1 = {vnd(t.rate)}</span>
-                    {saveVnd > 0 && <span className={"mt-0.5 text-[10px] font-medium " + (active ? "text-primary-foreground/90" : "text-emerald-600")}>save {vnd(saveVnd)}</span>}
+                    {best && <span className="absolute right-0 top-0 rounded-bl-lg bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground">Best rate</span>}
+                    <span className="text-xl font-bold tabular-nums">{usd(t.usd)}</span>
+                    <span className="w-fit rounded-lg bg-muted px-2.5 py-1.5 text-xs tabular-nums text-muted-foreground">$1 = <span className="font-semibold text-foreground">{vnd(t.rate)}</span></span>
+                    {saveVnd > 0 && <span className="w-fit rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">save {vnd(saveVnd)}</span>}
                   </button>
                 )
               })}
@@ -332,6 +342,21 @@ function TransferTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: (
         </div>
       )}
 
+      {/* Suggested amounts — same small + bulk picks as VietQR, but PLAIN USD: a transfer
+          is USD → our USD wallet, so there's no exchange rate or "save" here. */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {USD_PRESETS.map((v) => (
+            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " + (Number(amount) === v ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}>{usd(v)}</button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {BULK_USD_PRESETS.map((v) => (
+            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-lg border px-3 py-2 text-sm font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
+          ))}
+        </div>
+      </div>
+
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Amount (USD)</span>
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="50" />
@@ -379,7 +404,7 @@ export function TopUpDialog({ open, onOpenChange, onFunded }: { open: boolean; o
   const close = () => onOpenChange(false)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Add funds</DialogTitle>
         </DialogHeader>
