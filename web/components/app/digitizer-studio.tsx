@@ -574,7 +574,11 @@ function CreateTab() {
         <div className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
           {res?.trueview ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={`data:image/png;base64,${res.trueview}`} alt="lettering preview" className="max-h-full max-w-full object-contain p-4" />
+            <img src={`data:image/png;base64,${res.trueview}`} alt="embroidery preview" className="max-h-full max-w-full object-contain p-4" />
+          ) : err ? (
+            // Surface EWA's own message right in the frame — a blank preview otherwise looks
+            // broken with no reason. This is also what tells us why a combine failed.
+            <div className="grid size-full place-items-center gap-2 p-6 text-center text-sm text-amber-700 dark:text-amber-300"><Warning size={22} weight="fill" /><span className="max-w-md">{err}</span></div>
           ) : (
             <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">{ready ? "Rendering…" : "Drop an image or type text to see it stitched."}</div>
           )}
