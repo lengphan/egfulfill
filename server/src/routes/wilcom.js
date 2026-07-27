@@ -342,7 +342,7 @@ async function runCombine(req, reply, { design }) {
       if (!artRes.ok) {
         const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(artRes.body || '');
         reply.code(502);
-        return { ok: false, status: artRes.status, error: m ? m[1].trim() : 'EWA could not auto-digitize the image', sample: (artRes.body || '').slice(0, 400) };
+        return { ok: false, status: artRes.status, error: m ? m[1].trim() : 'EWA could not auto-digitize the image', sample: (artRes.body || '').replace(/filecontents="[^"]*"/gi, 'filecontents="[base64]"').slice(0, 2000) };
       }
       const artEmb = parseFiles(artRes.body).find((f) => /\.emb$/i.test(f.filename));
       if (!artEmb) { reply.code(502); return { ok: false, error: 'Auto-digitize returned no .emb to combine with the text.', sample: (artRes.body || '').slice(0, 400) }; }
@@ -357,7 +357,7 @@ async function runCombine(req, reply, { design }) {
       reply.code(502);
       // The sample is deliberately returned: the combine recipe is a prototype, so the raw
       // EWA response is what we iterate the XML against.
-      return { ok: false, status: res.status, error: m ? m[1].trim() : 'EWA rejected the combined design', sample: (res.body || '').slice(0, 400) };
+      return { ok: false, status: res.status, error: m ? m[1].trim() : 'EWA rejected the combined design', sample: (res.body || '').replace(/filecontents="[^"]*"/gi, 'filecontents="[base64]"').slice(0, 2000) };
     }
     const files = parseFiles(res.body);
     const info = parseDesignInfo(res.body) || {};

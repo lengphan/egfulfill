@@ -391,6 +391,7 @@ function CreateTab() {
   const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
   const [res, setRes] = useState<WilcomResult | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [debug, setDebug] = useState<string | null>(null) // TEMP: EWA's raw response (success OR reject)
   // The dropped/chosen artwork to embroider alongside the text. dataUrl is downscaled under
   // EWA's 2 MB cap; thumb keeps the full-res original for the little in-panel preview.
   const [image, setImage] = useState<{ dataUrl: string; thumb: string; name: string } | null>(null)
@@ -421,12 +422,13 @@ function CreateTab() {
   const ready = !!image || (hasText && !!alphabet)
   const run = async (design: boolean) => {
     if (!ready) return
-    setStatus(design ? "generating" : "previewing"); setErr(null)
+    setStatus(design ? "generating" : "previewing"); setErr(null); setDebug(null)
     try {
       const body = { image: image?.dataUrl, text: hasText ? text.trim() : undefined, alphabet, height, color, filename: image?.name, name: image?.name || (hasText ? text.trim() : undefined) }
       const r = design ? await wilcomCombine(body) : await wilcomCombinePreview(body)
-      if (!r.ok) throw new Error(r.error || "EWA rejected the request")
-      setRes(r)
+      setDebug(r.sample ?? null) // capture EWA's raw response whether it succeeded or rejected
+      if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null) }
+      else setRes(r)
     } catch (e) { setErr(e instanceof Error ? e.message : "Failed") } finally { setStatus("idle") }
   }
 
@@ -570,10 +572,10 @@ function CreateTab() {
         {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
         {/* TEMP debug — EWA's raw response for a combined design, so we can see why only one
             decoration renders. Copy the whole thing and paste it back. Removed once fixed. */}
-        {res?.sample && (
-          <details className="rounded-lg border border-border bg-muted/30">
-            <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground">EWA response (debug) — click, then copy &amp; paste this back to me</summary>
-            <pre className="max-h-56 select-all overflow-auto whitespace-pre-wrap break-all px-3 pb-3 font-mono text-[10px] leading-snug text-muted-foreground">{res.sample}</pre>
+        {debug && (
+          <details className="rounded-lg border border-border bg-muted/30" open>
+            <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground">EWA response (debug) — copy &amp; paste this back to me</summary>
+            <pre className="max-h-56 select-all overflow-auto whitespace-pre-wrap break-all px-3 pb-3 font-mono text-[10px] leading-snug text-muted-foreground">{debug}</pre>
           </details>
         )}
       </div>
