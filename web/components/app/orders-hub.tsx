@@ -1473,31 +1473,38 @@ export function OrdersHub() {
                                 const cones = (threads[o.id] ?? []).find((t) => String(t.sku).toUpperCase() === skuU)?.threads ?? []
                                 const file = (dfiles[o.id] ?? []).find((f) => String(f.sku ?? "").toUpperCase() === skuU)
                                 if (have == null && !cones.length && !file) return null
+                                // One uniform pill language for the line's make-spec, matching
+                                // the Label/Scan/Design + Stock pills above: same rounded-md
+                                // px-2 py-0.5 shape, tinted by meaning. Stock is purple when
+                                // there's enough, amber when short (with the PO it's on); the
+                                // thread + file pills are neutral info, not status.
+                                const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium"
                                 return (
-                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                     {have != null && (
                                       <span
-                                        className={"inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium " + (have >= need ? "bg-muted text-muted-foreground" : "bg-amber-100 text-amber-800")}
+                                        className={pill + " " + (have >= need ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-800")}
                                         title={have >= need ? "Enough blank stock for this line" : `Only ${have} in stock, this line needs ${need}${onPO ? ` — on PO ${onPO.num}` : ""}`}
                                       >
-                                        {have >= need ? `${have} in stock` : `Short — ${have} of ${need}`}{onPO ? ` · PO ${onPO.num}` : ""}
+                                        {have >= need ? `${have} in stock` : `Short — ${have} of ${need}`}{onPO ? ` · ${onPO.num}` : ""}
                                       </span>
                                     )}
                                     {cones.length > 0 && (
-                                      // The chip said WHICH cones; it now opens the map of
-                                      // which cone covers which part of the artwork — the
-                                      // half a digitiser was previously guessing at.
+                                      // Mini-swatches + count in a neutral pill; click opens the
+                                      // map of which cone covers which part of the artwork.
                                       <ThreadBreakdown artwork={artworkFor(o, it)}>
-                                        <span className="inline-flex items-center gap-1 text-muted-foreground">
-                                          {cones.map((c) => (
-                                            <span key={c.code} className="size-3 rounded-full border border-black/10" style={{ background: c.hex }} />
-                                          ))}
-                                          <span>{cones.length} cone{cones.length === 1 ? "" : "s"}</span>
+                                        <span className={pill + " bg-muted text-muted-foreground hover:bg-muted/80"} title={`${cones.length} thread colour${cones.length === 1 ? "" : "s"} matched — click for the cone map`}>
+                                          <span className="flex items-center -space-x-0.5">
+                                            {cones.slice(0, 8).map((c) => (
+                                              <span key={c.code} className="size-2.5 rounded-full border border-black/10" style={{ background: c.hex }} />
+                                            ))}
+                                          </span>
+                                          {cones.length} thread{cones.length === 1 ? "" : "s"}
                                         </span>
                                       </ThreadBreakdown>
                                     )}
                                     {file && (
-                                      <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground" title={`Machine file ${file.name ?? ""} · ${file.designId}`}>
+                                      <span className={pill + " bg-muted font-mono text-muted-foreground"} title={`Machine file ${file.name ?? ""} · ${file.designId}`}>
                                         <FileArrowDown size={10} weight="bold" /> {file.designId}
                                       </span>
                                     )}
