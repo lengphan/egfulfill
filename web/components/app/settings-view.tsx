@@ -2092,7 +2092,9 @@ export function SettingsView() {
       // A plan is a seller subscription; staff roles don't have one.
       setIsSeller(!u?.role || u.role === "seller")
       setCanUseKeys(!u?.role || u.role === "seller" || u.role === "admin")
-      const wanted = new URLSearchParams(window.location.search).get("tab")
+      const wantedRaw = new URLSearchParams(window.location.search).get("tab")
+      // "integrations" merged into the "keys" tab — keep old deep links working.
+      const wanted = wantedRaw === "integrations" ? "keys" : wantedRaw
       if (wanted) setTab(wanted)
       getMyInvites().then((r) => {
         const any = (r ?? []).length > 0
@@ -2111,13 +2113,14 @@ export function SettingsView() {
         {/* API keys are for building AGAINST the platform — a seller integrating their
             own systems, or an admin. An operator works the floor and has nothing to
             integrate, so the tab is noise on their settings. */}
-        {canUseKeys && <TabsTrigger value="keys">API keys</TabsTrigger>}
+        {/* Merged: your own live/test keys (top) + the platform's connected-service
+            credentials (admin-only, below). One tab so keys live in one place. */}
+        {canUseKeys && <TabsTrigger value="keys">Keys &amp; integrations</TabsTrigger>}
         {canPlatform && <TabsTrigger value="platform">Platform</TabsTrigger>}
         {canPlatform && <TabsTrigger value="users">Users</TabsTrigger>}
         {/* Supplier ordering defaults. Warehouse/admin, matching who may spend — these
             decide how a purchase order pays and ships. */}
         {canPlatform && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
-        {isAdmin && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
         {isAdmin && <TabsTrigger value="site">Site content</TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
@@ -2135,8 +2138,11 @@ export function SettingsView() {
         <ProfilePanel />
       </TabsContent>
       {canUseKeys && (
-        <TabsContent value="keys">
+        <TabsContent value="keys" className="space-y-4">
+          {/* Your own keys sit up top; the platform's connected-service credentials
+              (admin-only) follow below as collapsible rows. */}
           <ApiKeysPanel />
+          {isAdmin && <IntegrationsPanel />}
         </TabsContent>
       )}
       {canPlatform && (
@@ -2167,11 +2173,6 @@ export function SettingsView() {
       {isAdmin && (
         <TabsContent value="permissions">
           <PermissionsMatrix />
-        </TabsContent>
-      )}
-      {isAdmin && (
-        <TabsContent value="integrations">
-          <IntegrationsPanel />
         </TabsContent>
       )}
       {isAdmin && (

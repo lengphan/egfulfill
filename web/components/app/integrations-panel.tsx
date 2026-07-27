@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ArrowsClockwise, ShieldCheck, Sparkle, Check, PencilSimple, X, CircleNotch } from "@phosphor-icons/react"
+import { ArrowsClockwise, ShieldCheck, Sparkle, Check, PencilSimple, X, CircleNotch, CaretRight } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -73,7 +73,7 @@ async function raw(path: string): Promise<Raw> {
   }
 }
 const hasFail = (o: Record<string, unknown>) =>
-  Object.values(o).some((v) => typeof v === "string" && /fail|error/i.test(v))
+  Object.values(o ?? {}).some((v) => typeof v === "string" && /fail|error/i.test(v))
 
 // One check per integration. Kept declarative so a "swap key" editor can attach later.
 type Integration = {
@@ -222,6 +222,10 @@ export function IntegrationsPanel() {
   )
   const [secrets, setSecrets] = useState<Record<string, SecretMeta[]>>({})
   const [checking, setChecking] = useState(false)
+  // A light copy of the AI config, just for the collapsed Claude row's summary (model +
+  // whether a key is set). The editable card below fetches its own.
+  const [aiCfg, setAiCfg] = useState<AiConfig | null>(null)
+  useEffect(() => { const id = setTimeout(() => { getAiConfig().then(setAiCfg).catch(() => {}) }, 0); return () => clearTimeout(id) }, [])
 
   // Re-fetch just the secret metadata (after an edit) — no full integration recheck.
   const reloadSecrets = useCallback(() => {
@@ -270,10 +274,11 @@ export function IntegrationsPanel() {
     return () => clearTimeout(id)
   }, [runChecks])
 
+  const aiSummary = aiCfg == null ? "" : (aiCfg.keySet || aiCfg.fromEnv ? `${aiCfg.model || "Claude"} · key set` : "no key")
   return (
     <SectionCard
-      title="Integrations"
-      description="Live status of every server credential. Keys are set in the server .env."
+      title="Connected services"
+      description="The platform's own credentials — Claude, channels, shipping, payments. Click a row to view or set its key."
       actions={
         <Button size="sm" variant="outline" onClick={runChecks} disabled={checking}>
           <ArrowsClockwise size={14} weight="bold" className={checking ? "animate-spin" : ""} />
@@ -281,70 +286,74 @@ export function IntegrationsPanel() {
         </Button>
       }
     >
-      {/* The one editable credential — the AI assistant key + model. */}
-      <div className="border-b border-border p-5">
-        <AiAssistantCard />
-      </div>
-
       <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-5 py-2.5 text-xs text-muted-foreground">
         <ShieldCheck size={14} weight="fill" className="text-emerald-600" />
-        Click the <PencilSimple size={11} className="inline" /> to set or replace a credential — it&apos;s saved to
-        the database and used straight away. Shipping and payment keys take effect on the next request; a few
-        integrations still read their credential once at boot and need a server restart to pick up a change.
+        Set or replace a credential inside its row — saved to the database and used straight away. A few read
+        their credential once at boot and need a server restart to pick up a change.
       </div>
 
-      <div className="space-y-6 p-5">
+      {/* Collapsed status rows — a dot + label until you open one. Claude leads (the one
+          editable credential), then the service groups. */}
+      <div className="divide-y divide-border">
+        <details className="group/row">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 transition-colors hover:bg-accent/40 [&::-webkit-details-marker]:hidden">
+            <span className="flex min-w-0 items-center gap-2">
+              <CaretRight size={13} className="shrink-0 text-muted-foreground transition-transform group-open/row:rotate-90" />
+              <Sparkle size={14} weight="fill" className="text-primary" />
+              <span className="font-medium">AI Assistant (Claude)</span>
+            </span>
+            <span className="shrink-0 text-[13px] text-muted-foreground">{aiSummary}</span>
+          </summary>
+          <div className="border-t border-border bg-muted/20 px-5 py-4">
+            <AiAssistantCard onChanged={() => getAiConfig().then(setAiCfg).catch(() => {})} />
+          </div>
+        </details>
+
         {GROUPS.map((group) => {
           const items = INTEGRATIONS.filter((i) => i.group === group)
           if (!items.length) return null
-          return (
-            <div key={group}>
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {items.map((i) => {
-                  const res = results[i.key] ?? { level: "checking" as Level }
-                  const meta = LEVEL_META[res.level]
-                  return (
-                    <div key={i.key} className="rounded-xl border border-border bg-card p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">{i.name}</div>
-                          <div className="truncate text-[13px] text-muted-foreground">{i.blurb}</div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <span className={"inline-flex items-center gap-1.5 text-[13px] font-medium " + meta.text}>
-                            <span className={"size-2 rounded-full " + meta.dot} />
-                            {meta.label}
-                          </span>
-                          <button
-                            onClick={() => recheckOne(i)}
-                            disabled={res.level === "checking"}
-                            title={`Refresh ${i.name}`}
-                            aria-label={`Refresh ${i.name}`}
-                            className="text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
-                          >
-                            <ArrowsClockwise size={13} weight="bold" className={res.level === "checking" ? "animate-spin" : ""} />
-                          </button>
-                        </div>
-                      </div>
-                      {res.detail && (
-                        <div className="mt-2 truncate font-mono text-[12px] text-muted-foreground" title={res.detail}>
-                          {res.detail}
-                        </div>
-                      )}
-                      {(secrets[i.key] ?? []).length > 0 && (
-                        <div className="mt-2 space-y-1.5 border-t border-border pt-2">
-                          {(secrets[i.key] ?? []).map((s) => (
-                            <SecretRow key={s.name} s={s} onSaved={reloadSecrets} />
-                          ))}
-                        </div>
-                      )}
+          return items.map((i, idx) => {
+            const res = results[i.key] ?? { level: "checking" as Level }
+            const meta = LEVEL_META[res.level]
+            return (
+              <details key={i.key} className="group/row">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 transition-colors hover:bg-accent/40 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <CaretRight size={13} className="shrink-0 text-muted-foreground transition-transform group-open/row:rotate-90" />
+                    <span className="truncate font-medium">{i.name}</span>
+                    {idx === 0 && <span className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:inline">{group}</span>}
+                  </span>
+                  <span className={"inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium " + meta.text}>
+                    <span className={"size-2 rounded-full " + meta.dot} />
+                    {meta.label}
+                  </span>
+                </summary>
+                <div className="space-y-2 border-t border-border bg-muted/20 px-5 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] text-muted-foreground">{i.blurb}</span>
+                    <button
+                      onClick={() => recheckOne(i)}
+                      disabled={res.level === "checking"}
+                      title={`Refresh ${i.name}`}
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
+                    >
+                      <ArrowsClockwise size={12} weight="bold" className={res.level === "checking" ? "animate-spin" : ""} /> Recheck
+                    </button>
+                  </div>
+                  {res.detail && (
+                    <div className="break-all font-mono text-[12px] text-muted-foreground">{res.detail}</div>
+                  )}
+                  {(secrets[i.key] ?? []).length > 0 && (
+                    <div className="space-y-1.5 border-t border-border pt-2">
+                      {(secrets[i.key] ?? []).map((s) => (
+                        <SecretRow key={s.name} s={s} onSaved={reloadSecrets} />
+                      ))}
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
+                  )}
+                </div>
+              </details>
+            )
+          })
         })}
       </div>
     </SectionCard>
@@ -352,7 +361,7 @@ export function IntegrationsPanel() {
 }
 
 // ── AI Assistant (Claude) — the one editable credential + model selector ──────
-function AiAssistantCard() {
+function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
   const [cfg, setCfg] = useState<AiConfig | null>(null)
   const [keyInput, setKeyInput] = useState("")
   const [editingKey, setEditingKey] = useState(false)
@@ -383,6 +392,7 @@ function AiAssistantCard() {
       setKeyInput("")
       setEditingKey(false)
       setSaved(true)
+      onChanged?.()
       setTimeout(() => setSaved(false), 2000)
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save. Admin only.")
@@ -395,6 +405,7 @@ function AiAssistantCard() {
     try {
       const r = await setAiConfig({ clearKey: true })
       setCfg((prev) => ({ ...(prev ?? {}), ...r }))
+      onChanged?.()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't remove the key.")
     } finally {
