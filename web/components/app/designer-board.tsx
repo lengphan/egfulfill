@@ -1074,7 +1074,10 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
 
         {/* Reference files kept ON OUR card — mockups, spec sheets, the several refs a custom
             design usually needs. Persisted (specs.reference_files) so they stay with the card,
-            and reused as the attachments when it's sent to Pink Design. */}
+            and reused as the attachments when it's sent to Pink Design. Hidden on EMB-check
+            cards: they never go to Pink Design, so there's nothing to attach — the actual
+            .emb lives in the Files drop zone below. */}
+        {!card.is_emb && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Reference files{refFiles.length ? ` (${refFiles.length})` : ""}</span>
@@ -1086,9 +1089,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           </div>
           {refErr && <p className="text-xs text-destructive">{refErr}</p>}
           {refFiles.length === 0 ? (
-            <p className="text-xs text-muted-foreground">{card.is_emb
-              ? "Mockups, spec sheets, marked-up screenshots — anything to check the stitch file against. Kept on the card."
-              : "Mockups, spec sheets, marked-up screenshots — anything that tells the designer what you want. Kept on the card and sent with a Pink Design push."}</p>
+            <p className="text-xs text-muted-foreground">Mockups, spec sheets, marked-up screenshots — anything that tells the designer what you want. Kept on the card and sent with a Pink Design push.</p>
           ) : (
             <div className="space-y-1">
               {refFiles.map((f, i) => (
@@ -1101,6 +1102,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             </div>
           )}
         </div>
+        )}
 
         {/* Partner send, inline in THIS window — revealed by the "Send to Pink Design" button
             above, no separate popup. The card supplies the artwork, title and notes; only the
