@@ -2115,7 +2115,7 @@ export function SettingsView() {
             integrate, so the tab is noise on their settings. */}
         {/* Merged: your own live/test keys (top) + the platform's connected-service
             credentials (admin-only, below). One tab so keys live in one place. */}
-        {canUseKeys && <TabsTrigger value="keys">Keys &amp; integrations</TabsTrigger>}
+        {canUseKeys && <TabsTrigger value="keys">API keys</TabsTrigger>}
         {canPlatform && <TabsTrigger value="platform">Platform</TabsTrigger>}
         {canPlatform && <TabsTrigger value="users">Users</TabsTrigger>}
         {/* Supplier ordering defaults. Warehouse/admin, matching who may spend — these
