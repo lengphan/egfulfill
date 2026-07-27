@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
+import { packagingHint } from "@/lib/dim-weight"
 import { createOrder, validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, type ShipAddress, type UspsLabelResult, type ShippingRate } from "@/lib/api"
 
 const BLANK: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
@@ -201,6 +202,18 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
                 <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => { setPkg({ ...pkg, width: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
                 <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => { setPkg({ ...pkg, height: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
               </div>
+              {/* Dim-weight guard (÷166, USPS/Shippo) — warns before you buy if this box will
+                  be rated on size rather than weight, and how small to go to avoid it. */}
+              {(() => {
+                const h = packagingHint(weightOz, pkg.length, pkg.width, pkg.height)
+                if (!h || !h.billedOnSize) return null
+                return (
+                  <p className="flex items-start gap-1.5 text-[11px] text-primary">
+                    <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
+                    <span>Rated on size: dim weight {h.dimLb!.toFixed(2)} lb &gt; {h.actualLb.toFixed(2)} lb actual. A box under {Math.round(h.maxVolumeIn3)} in³ (≈{h.suggestedCube.toFixed(1)}″ cube) would rate on weight instead.</span>
+                  </p>
+                )
+              })()}
 
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
