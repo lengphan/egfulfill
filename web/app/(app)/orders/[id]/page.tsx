@@ -503,25 +503,38 @@ export default function OrderDetailPage() {
                     <dd className="tabular-nums">{usd(quote.subtotal)}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Shipping</dt>
+                    <dt className="text-muted-foreground">
+                      Shipping
+                      {quote.units > 1 && <span className="opacity-70"> · {quote.units} items</span>}
+                    </dt>
                     <dd className="tabular-nums">{usd(quote.shipping)}</dd>
                   </div>
                   <div className="flex justify-between border-t border-border pt-2 font-semibold">
                     <dt>Total</dt>
                     <dd className="tabular-nums">{usd(quote.total)}</dd>
                   </div>
-                  <p className="pt-1 text-xs text-muted-foreground">Charged when you submit to production.</p>
+                  <p className="pt-1 text-xs text-muted-foreground">Charged when you submit to production. Design digitising, if we cut the file for you, is billed separately.</p>
                 </>
               ) : (
                 <>
+                  {/* Submitted → the price is frozen. Show the SAME breakdown, not just a
+                      lump total: production, then whatever else was charged (shipping +
+                      any extra-item/expedite fees) as the difference to the total. */}
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Items</dt>
+                    <dt className="text-muted-foreground">Production</dt>
                     <dd className="tabular-nums">{usd(itemsTotal)}</dd>
                   </div>
+                  {total - itemsTotal > 0.005 && (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Shipping &amp; fees</dt>
+                      <dd className="tabular-nums">{usd(total - itemsTotal)}</dd>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-border pt-2 font-semibold">
                     <dt>Total</dt>
                     <dd className="tabular-nums">{usd(total)}</dd>
                   </div>
+                  <p className="pt-1 text-xs text-muted-foreground">Design digitising, if we cut the file for you, is billed separately.</p>
                 </>
               )}
               {quote?.unpriced?.length ? (

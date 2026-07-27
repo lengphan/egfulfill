@@ -420,13 +420,14 @@ export function WalletDashboard() {
               <TableHead>Method</TableHead>
               <TableHead>Type</TableHead>
               <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="text-right">Balance before</TableHead>
               <TableHead className="text-right">Balance after</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {histRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                   No transactions yet
                 </TableCell>
               </TableRow>
@@ -454,7 +455,11 @@ export function WalletDashboard() {
                         and it did not move. Struck-through, unsigned, no balance. */}
                     {usd(t.amount, t.type !== "Rejected")}
                   </TableCell>
-                  {/* No balance for a declined attempt — it never moved. */}
+                  {/* Balance before this entry = balance after − the amount it moved. Both
+                      dashes for a declined attempt, which never moved money. */}
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {Number.isFinite(t.balance) ? usd(t.balance - t.amount) : "—"}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {Number.isFinite(t.balance) ? usd(t.balance) : "—"}
                   </TableCell>
