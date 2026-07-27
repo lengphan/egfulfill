@@ -1468,6 +1468,9 @@ export type DesignCard = {
   credited?: boolean // designer paid once on approval — guards against double-credit
   priority?: string | null
   is_emb?: boolean
+  /** The card's seller (store, else name/email), resolved server-side from the order —
+   *  shown as the name tag, and the reason an EMB card needn't read "Seller file". */
+  seller_name?: string | null
   /** Where the design work happens. null/absent = our own designers. A value means it's
    *  OUTSOURCED to a partner (e.g. "pinkdesign") — our designers do embroidery, so DTG/DTF
    *  goes out. Outsourced cards can't be claimed by a designer and never pay one. */
@@ -1583,6 +1586,12 @@ export function wilcomPreview(body: { image: string; filename?: string; width?: 
 }
 export function wilcomDigitize(body: { image: string; filename?: string; name?: string; orderRef?: string; source?: string; width?: number; height?: number }) {
   return api<WilcomResult>(`/api/wilcom/digitize`, { method: "POST", body: JSON.stringify(body) })
+}
+/** TrueView PNG for an already-uploaded .emb, by order+sku (or design id). `unavailable`
+ *  (Wilcom off / not a native .emb) is a normal outcome — the caller keeps its placeholder. */
+export type EmbPreviewResult = { ok: boolean; png?: string; stitches?: number | null; colours?: number | null; unavailable?: boolean; error?: string }
+export function getEmbPreview(body: { orderId?: string | null; sku?: string | null; designId?: string }) {
+  return api<EmbPreviewResult>(`/api/wilcom/design-preview`, { method: "POST", body: JSON.stringify(body) })
 }
 export type WilcomGeneration = {
   id: string; name?: string | null; order_ref?: string | null; source?: string | null; type?: string | null

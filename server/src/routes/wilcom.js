@@ -73,6 +73,21 @@ function buildBitmapXml({ filename, base64, width, height, designFile }) {
     + '</xml>';
 }
 
+// ── designTrueview: photoreal PNG from an EXISTING machine file (.emb) ─────────
+// Recipe skeleton from the spec (api-designtrueview): <design/> + <trueview_options/> +
+// <files><file/></files>. The exact attribute NAMES aren't published, so these mirror the
+// bitmap recipe above and are a BEST-EFFORT — a wrong attribute just makes EWA return an
+// error we surface, and the board falls back to its placeholder (nothing breaks). Fix the
+// two attributes here once validated against a live account. EMB is Wilcom-native, so
+// designTrueview reads it directly; other formats aren't guaranteed and are skipped.
+function buildDesignTrueviewXml({ filename, base64 }) {
+  return '<xml>'
+    + `<design file="${XML_ESC(filename)}"/>`
+    + `<trueview_options trueview_file="trueview.png" dpi="120"/>`
+    + `<files><file filename="${XML_ESC(filename)}" filecontents="${base64}"/></files>`
+    + '</xml>';
+}
+
 // Dependency-free parse: base64 contains no `"` or `>`, so attribute regex is safe here.
 function parseFiles(xml) {
   const files = [];
@@ -134,6 +149,19 @@ function ensureGen() {
     .then(() => q(`alter table wilcom_generations add column if not exists file_key text`))
     .catch((e) => { _genReady = null; throw e; });
   return _genReady;
+}
+
+// Cache for rendered EMB TrueViews — keyed by the file's design_id, invalidated by a
+// content hash so an edited file re-renders. Its OWN table, owned by this module, so
+// removing Wilcom (drop the route + this table) leaves nothing dangling elsewhere.
+let _pvReady = null;
+function ensurePreviews() {
+  if (_pvReady) return _pvReady;
+  _pvReady = q(`create table if not exists wilcom_previews (
+      design_id text primary key, hash text, png text, stitches int, colours int,
+      created_at timestamptz default now())`)
+    .catch((e) => { _pvReady = null; throw e; });
+  return _pvReady;
 }
 
 // Shared handler for preview (trueview only) and digitize (+ machine file).
@@ -317,6 +345,58 @@ export function wilcomRoutes(app, requireStaff) {
   });
   app.post('/api/wilcom/lettering-preview', { preHandler: requireStaff }, (req, reply) => runLettering(req, reply, { design: false }));
   app.post('/api/wilcom/lettering', { preHandler: requireStaff }, (req, reply) => runLettering(req, reply, { design: true }));
+
+  // TrueView preview of an already-uploaded machine file (.emb), for the board card that
+  // otherwise shows a blank placeholder. Resolve the file by its own id or by order+sku,
+  // render once, cache by content hash. ISOLATED + graceful: returns { unavailable:true }
+  // (not an error) when Wilcom isn't configured or the file isn't a native .emb, so the
+  // caller quietly keeps its placeholder. Removing the WILCOM keys can't break the board.
+  app.post('/api/wilcom/design-preview', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    let row = null;
+    if (b.designId) {
+      row = (await q(`select design_id, file_name, mime, data from design_file_data where design_id=$1`, [String(b.designId)])).rows[0];
+    } else if (b.orderId) {
+      row = (await q(`select design_id, file_name, mime, data from design_file_data
+                        where order_id=$1 and sku is not distinct from $2
+                          and (kind='emb' or lower(file_name) like '%.emb')
+                        order by created_at desc limit 1`,
+        [String(b.orderId), b.sku == null ? null : String(b.sku)])).rows[0];
+    }
+    if (!row || !row.data) { reply.code(404); return { ok: false, error: 'No machine file for that design.' }; }
+    // designTrueview reads Wilcom-native .emb; skip anything else rather than guessing.
+    if (!/\.emb$/i.test(row.file_name || '') && !/emb/i.test(row.mime || '')) {
+      return { ok: false, unavailable: true, reason: 'not-emb' };
+    }
+    await ensurePreviews();
+    const dataStr = String(row.data);
+    const hash = crypto.createHash('sha1').update(dataStr).digest('hex').slice(0, 16);
+    const cached = (await q(`select png, stitches, colours from wilcom_previews where design_id=$1 and hash=$2`, [row.design_id, hash])).rows[0];
+    if (cached && cached.png) return { ok: true, png: cached.png, stitches: cached.stitches, colours: cached.colours, cached: true };
+    if (!configured()) return { ok: false, unavailable: true, reason: 'not-configured' };
+    const m = /base64,([\s\S]+)$/.exec(dataStr);
+    const base64 = (m ? m[1] : dataStr).replace(/\s+/g, '');
+    const filename = safeName(String(row.file_name || 'design').replace(/\.[^.]+$/, ''), 'design') + '.emb';
+    try {
+      const res = await ewaCall('api/designTrueview', buildDesignTrueviewXml({ filename, base64 }));
+      if (!res.ok) {
+        const em = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
+        reply.code(502);
+        return { ok: false, error: em ? em[1].trim() : 'EWA rejected the request', sample: (res.body || '').slice(0, 300) };
+      }
+      const files = parseFiles(res.body);
+      const info = parseDesignInfo(res.body) || {};
+      const tv = files.find((f) => isPng(f.filename));
+      if (!tv) { reply.code(502); return { ok: false, error: 'EWA returned no preview image.' }; }
+      await q(`insert into wilcom_previews (design_id, hash, png, stitches, colours) values ($1,$2,$3,$4,$5)
+               on conflict (design_id) do update set hash=excluded.hash, png=excluded.png,
+                 stitches=excluded.stitches, colours=excluded.colours, created_at=now()`,
+        [row.design_id, hash, tv.base64, info.stitches ?? null, info.colours ?? null]).catch(() => {});
+      return { ok: true, png: tv.base64, stitches: info.stitches ?? null, colours: info.colours ?? null };
+    } catch (e) {
+      reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' };
+    }
+  });
 
   // Same-origin serve for a generation's TrueView (kind=tv) or machine file (kind=file).
   // Unauthenticated on purpose — like the image proxy, it only re-serves bytes addressed by

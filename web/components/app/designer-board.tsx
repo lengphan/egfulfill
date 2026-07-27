@@ -1,12 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, getEmbPreview, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
@@ -14,6 +14,27 @@ import { AssignCardDialog } from "@/components/app/assign-card-dialog"
 import { PushToPartnerInline } from "@/components/app/push-to-partner-dialog"
 import { OrderHistory } from "@/components/app/order-history"
 import { useConfirm } from "@/components/app/confirm-dialog"
+
+/**
+ * Renders a Wilcom TrueView PNG for an EMB card's raw .emb, falling back to `children` (the
+ * usual pen-nib placeholder) whenever there's nothing to show. Deliberately ISOLATED and
+ * best-effort: any failure — Wilcom not configured, keys removed, route gone, not a native
+ * .emb, network error — just leaves the placeholder. Deleting this component + the one call
+ * site restores the old behaviour with nothing else touched, and the preview never blocks
+ * the card render (it swaps in asynchronously if it arrives).
+ */
+function EmbPreview({ orderId, sku, children }: { orderId?: string | null; sku?: string | null; children: ReactNode }) {
+  const [png, setPng] = useState<string | null>(null)
+  useEffect(() => {
+    if (!orderId) return
+    let live = true
+    getEmbPreview({ orderId, sku }).then((r) => { if (live && r.ok && r.png) setPng(r.png) }).catch(() => {})
+    return () => { live = false }
+  }, [orderId, sku])
+  // eslint-disable-next-line @next/next/no-img-element
+  if (png) return <img src={`data:image/png;base64,${png}`} alt="" className="size-full object-cover" />
+  return <>{children}</>
+}
 
 // Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
 // once (no separate Paid lane; the credit is idempotent per card).
@@ -53,6 +74,15 @@ const laneMeta = (id: string, lanes: DesignLane[]) =>
 // vendors fall back to the raw key rather than hiding that the card is outsourced.
 const VENDOR_NAMES: Record<string, string> = { pinkdesign: "Pink Design" }
 const vendorLabel = (v?: string | null) => (v ? (VENDOR_NAMES[v] ?? v) : "")
+
+// The card's display name. EMB cards arrive titled "Seller file · Ambar.emb"; the seller
+// now shows as its own tag, so strip that prefix and show just the file — the "who" is the
+// tag, the "what" is the title.
+const cardLabel = (c: { title?: string | null; is_emb?: boolean }): string => {
+  const t = String(c.title ?? "").trim()
+  if (c.is_emb) return t.replace(/^seller file\s*[·:–-]?\s*/i, "").trim() || t || "Embroidery file"
+  return t || "Design"
+}
 
 const amt = (v: unknown) => Number(v) || 0
 const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -196,7 +226,10 @@ export function DesignerBoard() {
   // the viewer's role — not the card — decides whether outsourced work is visible.
   const isDesigner = getUser()?.role === "designer"
   const boardCards = useMemo(
-    () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor) : (cards ?? [])),
+    // Designers see neither outsourced (vendor) cards nor EMB-check cards: a seller-supplied
+    // .emb is already digitised and only needs a factory check before stitching, so it never
+    // enters the designer claim/payout flow — it's factory-internal until it's sent out.
+    () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor && !c.is_emb) : (cards ?? [])),
     [cards, isDesigner],
   )
   // Only meaningful on the designer portal, where partner cards are the ones being hidden;
@@ -467,7 +500,9 @@ export function DesignerBoard() {
                         // scrolled. Pinned to their natural height, the lane scrolls as intended.
                         // `relative` anchors the hover-revealed delete button, now a SIBLING of
                         // the image (a button can't be nested inside the image button).
-                        className={"group relative shrink-0 overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow " + (c.vendor ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
+                        // EMB-check cards get a distinct amber frame so the floor spots "already
+                        // digitised — verify only", set apart from normal and pink vendor cards.
+                        className={"group relative shrink-0 overflow-hidden rounded-xl border text-left shadow-sm transition-shadow hover:shadow " + (c.is_emb ? "border-amber-400 bg-amber-50/60 " : "border-border bg-background ") + (c.vendor ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
                       >
                         {/* IMAGE = open full details on a single click. FIXED-height cover (h-48)
                             so every card is the same height; object-cover fills the frame at any
@@ -482,6 +517,11 @@ export function DesignerBoard() {
                           {c.thumb ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={String(c.thumb)} alt="" className="size-full object-cover" />
+                          ) : c.is_emb ? (
+                            // No thumbnail for a stitch file — try a Wilcom TrueView, else the placeholder.
+                            <EmbPreview orderId={c.order_id} sku={c.sku}>
+                              <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
+                            </EmbPreview>
                           ) : (
                             <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
                           )}
@@ -499,6 +539,13 @@ export function DesignerBoard() {
                               className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-[10px] font-medium text-white " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary/90" : "bg-slate-600/90")}
                             >
                               <span className="truncate">{String(c.claimed_by)}</span>
+                            </span>
+                          ) : c.seller_name ? (
+                            // Unclaimed: show WHOSE order this is — the seller name tag, same
+                            // as every other card carries an owner, so an EMB card reads as
+                            // "Ambar's file" rather than a faceless "Seller file".
+                            <span title={`Seller · ${c.seller_name}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded bg-slate-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                              <span className="truncate">{String(c.seller_name)}</span>
                             </span>
                           ) : null}
                         </button>
@@ -545,7 +592,7 @@ export function DesignerBoard() {
                               title="Click to rename"
                               className="line-clamp-2 rounded text-left text-sm font-medium leading-tight transition-colors hover:bg-accent"
                             >
-                              {c.title || "Design"}
+                              {cardLabel(c)}
                             </button>
                           )}
                           {/* Order ID + file number ALWAYS show so a card is readable at a glance —
@@ -635,7 +682,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
           <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={18} weight="duotone" /></div>
         )}
       </div>
-      <span className="max-w-[220px] truncate font-medium">{c.title || "Design"}</span>
+      <span className="max-w-[220px] truncate font-medium">{cardLabel(c)}</span>
       {c.is_emb && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
     </div>
   ) },
@@ -894,7 +941,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
                   title="Click to rename"
                   className="group -ml-1 inline-flex max-w-full items-start gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-accent"
                 >
-                  <span className="line-clamp-2">{card.title || "Design card"}</span>
+                  <span className="line-clamp-2">{cardLabel(card)}</span>
                   <PencilSimple size={13} weight="bold" className="mt-1 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                 </button>
               )}
@@ -919,6 +966,10 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             {card.thumb ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={String(card.thumb)} alt="" className="size-full object-contain" />
+            ) : card.is_emb ? (
+              <EmbPreview orderId={card.order_id} sku={card.sku}>
+                <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={40} weight="duotone" /></div>
+              </EmbPreview>
             ) : (
               <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={40} weight="duotone" /></div>
             )}
@@ -963,7 +1014,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               <LinkSimple size={14} weight="bold" /> Assign to an order
             </Button>
           )}
-          {canPush && !card.vendor && (
+          {/* EMB-check cards are already digitised — Pink Design DIGITISES raw art, so it's
+              not an option here. They only get a factory check before stitching. */}
+          {canPush && !card.vendor && !card.is_emb && (
             <Button size="sm" variant={showPush ? "secondary" : "outline"} onClick={() => setShowPush((v) => !v)}>
               <PaperPlaneTilt size={14} weight="bold" /> Send to Pink Design
             </Button>
