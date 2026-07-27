@@ -2,7 +2,7 @@
 // flow, but same-origin: authorize + callback both live on the Next app so the
 // verifier (stored here) is readable when Etsy redirects back to /oauth-callback.
 import type { EtsyConfig } from "./api"
-import { openOAuthPopup } from "./oauth-popup"
+import { openOAuthPopup, markOAuthProvider } from "./oauth-popup"
 
 export const ETSY_PKCE_KEY = "eg_etsy_pkce"
 
@@ -34,6 +34,7 @@ export async function startEtsyConnect(cfg: EtsyConfig): Promise<Window | null> 
   const state = randStr().slice(0, 24)
   const redirect = window.location.origin + "/oauth-callback"
   const ch = await challenge(verifier)
+  markOAuthProvider("etsy")
   localStorage.setItem(ETSY_PKCE_KEY, JSON.stringify({ verifier, state, redirect } satisfies Pkce))
   const url =
     "https://www.etsy.com/oauth/connect?response_type=code" +

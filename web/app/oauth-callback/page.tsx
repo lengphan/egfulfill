@@ -7,6 +7,7 @@ import { exchangeEtsy, exchangeShopify, exchangeTiktok } from "@/lib/api"
 import { readPkce, clearPkce } from "@/lib/etsy-oauth"
 import { getToken } from "@/lib/auth"
 import { clearShopifyOAuth } from "@/lib/shopify-oauth"
+import { OAUTH_PROVIDER_KEY } from "@/lib/oauth-popup"
 
 type State =
   | { kind: "working" }
@@ -47,10 +48,22 @@ export default function OAuthCallbackPage() {
       } catch { return undefined }
     }
 
+    // Which provider started this connect, stashed at connect time. Authoritative over
+    // param-name guessing: TikTok's US Seller Center returns `code`, the global page returns
+    // `auth_code`, so shape-detection alone misrouted US TikTok into the Etsy branch.
+    const takeProvider = (): string | null => {
+      try {
+        const p = localStorage.getItem(OAUTH_PROVIDER_KEY)
+        localStorage.removeItem(OAUTH_PROVIDER_KEY)
+        return p
+      } catch { return null }
+    }
+
     // All state updates live inside this async runner (not the effect body) so
     // they're deferred, not synchronous mount renders.
     const run = async () => {
       const backfill_days = takeBackfillDays()
+      const provider = takeProvider()
       const params = new URLSearchParams(window.location.search)
       // TikTok Shop returns `auth_code`; Etsy and Shopify return `code`. Reading only
       // `code` is why TikTok never worked here — the guard below fired before any
@@ -70,9 +83,10 @@ export default function OAuthCallbackPage() {
         return
       }
 
-      // Shopify callbacks carry a `shop` param (+ hmac). Etsy's don't.
+      // Shopify — the provider marker, or the tell-tale `shop` param (+ hmac) it carries.
       const shopParam = params.get("shop")
-      if (shopParam) {
+      if (provider === "shopify" || shopParam) {
+        if (!shopParam) { fail("Shopify didn't return the store domain. Start the connection again from Stores."); return }
         try {
           const allParams = Object.fromEntries(params.entries())
           const data = await exchangeShopify({ shop: shopParam.toLowerCase(), code, params: allParams, backfill_days })
@@ -86,14 +100,11 @@ export default function OAuthCallbackPage() {
         return
       }
 
-      // TIKTOK SHOP. Identified by the `auth_code` param, the same shape-detection the
-      // legacy callback used — TikTok sends no `shop` (that's Shopify's marker) and no
-      // PKCE verifier is involved, so the parameter name is what distinguishes it.
-      //
-      // Checked BEFORE the sign-in guard below only in ordering, not in strictness: the
-      // guard applies here too, and is repeated inside this branch, because attaching a
-      // shop to an account is impossible without one.
-      if (authCode) {
+      // TIKTOK SHOP. Routed by the provider marker set at connect time — NOT by param name:
+      // the US Seller Center returns `code`, the global page returns `auth_code`, so we pass
+      // whichever is present. (authCode kept as a fallback for a marker-less redirect.) The
+      // sign-in guard is repeated here because attaching a shop to an account needs a session.
+      if (provider === "tiktok" || authCode) {
         if (!getToken()) {
           setState({
             kind: "error",
@@ -102,7 +113,7 @@ export default function OAuthCallbackPage() {
           return
         }
         try {
-          const data = await exchangeTiktok({ auth_code: authCode, backfill_days })
+          const data = await exchangeTiktok({ auth_code: authCode || code, backfill_days })
           if (data.error) throw new Error(data.error)
           finish(data.shop_name || "your TikTok shop")
         } catch (e: unknown) {

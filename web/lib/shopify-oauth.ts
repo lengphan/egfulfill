@@ -2,7 +2,7 @@
 // redirect to that store's authorize screen, Shopify returns to /oauth-callback (same
 // origin), which posts code + params to /api/shopify/exchange (HMAC-verified server-side).
 import type { ShopifyConfig } from "./api"
-import { openOAuthPopup } from "./oauth-popup"
+import { openOAuthPopup, markOAuthProvider } from "./oauth-popup"
 
 export const SHOPIFY_OAUTH_KEY = "eg_shopify_oauth"
 type ShopifyOAuth = { shop: string; state: string; redirect: string }
@@ -26,6 +26,7 @@ export function normalizeShop(input: string): string | null {
 export function startShopifyConnect(cfg: ShopifyConfig, shopInput: string): Window | null {
   const shop = normalizeShop(shopInput)
   if (!shop) throw new Error("Enter your store as mystore.myshopify.com")
+  markOAuthProvider("shopify")
   const state = randStr()
   const redirect = window.location.origin + "/oauth-callback"
   localStorage.setItem(SHOPIFY_OAUTH_KEY, JSON.stringify({ shop, state, redirect } satisfies ShopifyOAuth))
