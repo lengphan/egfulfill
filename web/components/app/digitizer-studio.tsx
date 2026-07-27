@@ -444,7 +444,6 @@ function CreateTab() {
   const ext = res?.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : null
   // The cone currently selected, so the colour control can name it rather than show a bare hex.
   const selCone = palette.find((c) => c.hex.toLowerCase() === color.toLowerCase())
-  const pal = palette.length ? palette : undefined
   const cones = pQuery ? palette.filter((c) => `${c.name} ${c.code}`.toLowerCase().includes(pQuery.toLowerCase())) : palette
 
   return (
@@ -526,27 +525,29 @@ function CreateTab() {
           ) : <p className="text-xs text-muted-foreground">No thread library set — add cones in Settings › Thread palette.</p>}
         </div>
 
-        {/* Colour sequence — the stops EWA reports, Wilcom-style. Lettering stitches in one
-            thread, so this is usually a single stop; each row's "Change" recolours it. */}
-        {res?.threads && res.threads.length > 0 && (
+        {/* Layers — the elements in this design (the image and the text). Display for now;
+            multi-file + drag-to-reorder is the next step once the combine renders both. */}
+        {(image || hasText) && (
           <div>
-            <span className={labelCls}>Colour sequence</span>
+            <span className={labelCls}>Layers</span>
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-              {res.threads.map((t, i) => {
-                const m = nearestThread(t.r, t.g, t.b, pal)
-                return (
-                  <div key={i} className="flex items-center gap-2.5 px-3 py-2 text-sm">
-                    <span className="w-4 shrink-0 text-center text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
-                    <span className="size-5 shrink-0 rounded border border-border" style={{ background: `rgb(${t.r},${t.g},${t.b})` }} />
-                    <span className="min-w-0 flex-1 truncate">{t.name || m?.name || `rgb(${t.r}, ${t.g}, ${t.b})`}{m && <span className="font-mono text-[11px] text-muted-foreground"> · {m.code}</span>}</span>
-                    {res.threads!.length === 1 && (
-                      <button onClick={() => { setShowPalette(true); setPQuery("") }} className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">Change</button>
-                    )}
-                  </div>
-                )
-              })}
+              {image && (
+                <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
+                  <ImageSquare size={15} className="shrink-0 text-muted-foreground" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={image.thumb} alt="" className="size-6 shrink-0 rounded border border-border object-contain" />
+                  <span className="min-w-0 flex-1 truncate">{image.name}</span>
+                  <button onClick={() => setImage(null)} title="Remove image layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
+                </div>
+              )}
+              {hasText && (
+                <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
+                  <PencilSimple size={15} className="shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">“{text}”</span>
+                  <button onClick={() => setText("")} title="Remove text layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
+                </div>
+              )}
             </div>
-            {res.threads.length > 1 && <p className="mt-1 text-[11px] text-muted-foreground">Lettering stitches in one thread — recolour it above.</p>}
           </div>
         )}
 
@@ -567,6 +568,14 @@ function CreateTab() {
           </div>
         )}
         {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
+        {/* TEMP debug — EWA's raw response for a combined design, so we can see why only one
+            decoration renders. Copy the whole thing and paste it back. Removed once fixed. */}
+        {res?.sample && (
+          <details className="rounded-lg border border-border bg-muted/30">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground">EWA response (debug) — click, then copy &amp; paste this back to me</summary>
+            <pre className="max-h-56 select-all overflow-auto whitespace-pre-wrap break-all px-3 pb-3 font-mono text-[10px] leading-snug text-muted-foreground">{res.sample}</pre>
+          </details>
+        )}
       </div>
 
       {/* RIGHT — the big preview, the hero of the tab; sticks while you scroll the controls. */}

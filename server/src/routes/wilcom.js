@@ -385,6 +385,10 @@ async function runCombine(req, reply, { design }) {
         out.id = gid; out.trueviewUrl = tvUrl; out.fileUrl = fileUrl;
       } catch (e) { req.log?.warn?.({ err: String(e) }, 'wilcom combine persist failed'); }
     }
+    // DEBUG (temporary): EWA's raw response, base64 stripped — so we can see WHY only one
+    // decoration renders (design_info num_objects, thread/colour list, any note). Remove once
+    // the combine is confirmed rendering both the design and the lettering.
+    out.sample = (res.body || '').replace(/filecontents="[^"]*"/gi, 'filecontents="[base64]"').slice(0, 2500);
     return out;
   } catch (e) { reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' }; }
 }
