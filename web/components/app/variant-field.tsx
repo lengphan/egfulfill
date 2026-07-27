@@ -129,12 +129,15 @@ export function VariantField({
  * dot-joined string in one place and labelled controls in another.
  */
 export function VariantStrip({
-  color, size, method, blank, className, locked, marketplace,
+  color, size, method, blank, sku, className, locked, marketplace,
 }: {
   color?: string | null
   size?: string | null
   method?: string | null
   blank?: string | null
+  /** The line item's own SKU — the identifier the floor and support both reference. Shown
+   *  as a leading mono chip so it reads as an id, not a variant word. */
+  sku?: string | null
   className?: string
   /** Submitted order — variants are frozen (the server rejects changes once the cost is
    *  locked). Shown greyed with a lock so it reads as "settled", not "broken". */
@@ -146,11 +149,12 @@ export function VariantStrip({
 }) {
   const tl = useLabelT()
   const chips = [
+    sku ? { key: "sku", label: sku, mono: true } : null,
     blank ? { key: "blank", label: blank } : null,
     color ? { key: "color", label: color, swatch: true } : null,
     size ? { key: "size", label: size } : null,
     method ? { key: "method", label: method } : null,
-  ].filter(Boolean) as { key: string; label: string; swatch?: boolean }[]
+  ].filter(Boolean) as { key: string; label: string; swatch?: boolean; mono?: boolean }[]
 
   // Nothing chosen yet is worth saying plainly — a blank row reads as a rendering bug.
   const buyerText = (marketplace || "").trim()
@@ -173,6 +177,7 @@ export function VariantStrip({
           key={c.key}
           className={cn(
             "inline-flex max-w-[12rem] items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium",
+            c.mono && "font-mono",
             locked
               ? "border-border/60 bg-muted/30 text-muted-foreground"
               : "border-border bg-muted/50 text-foreground/80"
