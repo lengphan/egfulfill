@@ -1266,7 +1266,7 @@ function PlatformPanel() {
         </div>
       </Fold>
 
-      <Fold title="Product types" hint="sides + positioning outlines per category">
+      <Fold title="Positions / Design Surfaces" hint="sides + positioning outlines per category">
 
         <p className="mb-3 text-xs text-muted-foreground">
           Sides and outlines are set once per category and inherited by every product in it —
