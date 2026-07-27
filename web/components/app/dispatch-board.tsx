@@ -124,9 +124,12 @@ export function DispatchBoard() {
   const queue = useMemo(() => {
     const all = (orders ?? []).filter((o) => String(o.factory_status ?? "") === STAGE)
     const term = q.trim().toLowerCase()
-    if (!term) return all
-    return all.filter((o) =>
-      [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
+    const matched = term
+      ? all.filter((o) => [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
+      : all
+    // Newest first — a just-dispatched order belongs at the top of the queue, not wherever
+    // the server happened to return it.
+    return [...matched].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
   }, [orders, q])
 
   // History — EVERY order that ever had a label (bought → has tracking, or scanned),
@@ -625,12 +628,16 @@ export function DispatchBoard() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {[...withLabel, ...noLabel].map((o) => {
+            {/* Newest first (queue is already sorted by created/scan time), NOT grouped by
+                label — a just-dispatched order should stay on top, not sink below older
+                labelled ones. Whether it has a label yet is shown by a per-row tag, not by
+                dimming the whole row (which read as "cancelled"). */}
+            {queue.map((o) => {
               const ready = !!o.tracking
               return (
                 <label
                   key={o.id}
-                  className={"flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40 " + (ready ? "" : "opacity-70")}
+                  className="flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40"
                 >
                   {/* Selectable whether or not it has a label. Only the label-dependent
                       ACTIONS need one; tying the checkbox itself to a label left an
@@ -644,7 +651,11 @@ export function DispatchBoard() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
                       <span className="truncate text-sm">{customerOf(o)}</span>
-
+                      {/* Not-yet-labelled is a state, not a cancellation — say so plainly
+                          rather than greying the whole row. */}
+                      {!ready && (
+                        <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Needs label</span>
+                      )}
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
