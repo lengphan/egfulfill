@@ -573,6 +573,32 @@ export async function shopListings(conn) {
   };
 }
 
+/**
+ * Push a tracking number to Etsy for one order — this MARKS THE RECEIPT SHIPPED and EMAILS
+ * the buyer. Reused by both the manual /api/etsy/fulfill route and the gated auto-push on
+ * ship. Bound to the order's OWNER shop with NO fallback: a wrong push emails the wrong
+ * buyer, and repeated bogus fulfilments are how Etsy flags an account. Throws on any problem.
+ */
+export async function etsyPushTracking(order, tracking_code, carrier_name) {
+  const m = String((order && order.id) || '').match(/^etsy-(.+)$/i);
+  if (!m) throw new Error('Not an Etsy order');
+  const receiptId = m[1];
+  const conns = (await q(`select * from platform_connections where platform='etsy'`)).rows;
+  const conn = conns.find((c) => order && String(c.connected_by) === String(order.seller_id))
+    || conns.find((c) => order && c.shop_name && c.shop_name === order.store)
+    || null;
+  if (!conn) throw new Error("Couldn't tell which connected Etsy shop this order belongs to");
+  const token = await validToken(conn);
+  const res = await fetch(`${API}/shops/${conn.shop_id}/receipts/${receiptId}/tracking`, {
+    method: 'POST',
+    headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ tracking_code: tracking_code || '', carrier_name: (carrier_name || 'usps').toLowerCase(), send_bcc: 'false' }).toString(),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data && data.error) || ('Etsy ' + res.status));
+  return { ok: true, channel: 'etsy' };
+}
+
 // ── routes ───────────────────────────────────────────────────────────────--
 export function etsyRoutes(app, requireAuth, requireStaff) {
   // ensure table exists even on a DB that booted before this feature (idempotent).
@@ -1542,40 +1568,11 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // buyer). Customer-facing — call it deliberately, not on every status change.
   app.post('/api/etsy/fulfill', { preHandler: requireStaff }, async (req, reply) => {
     const { order_id, tracking_code, carrier_name } = req.body || {};
-    const m = String(order_id || '').match(/^etsy-(.+)$/i);
-    if (!m) { reply.code(400); return { error: 'Not an Etsy order' }; }
-    const receiptId = m[1];
-    const ord = (await q('select store, seller_id from orders where id=$1', [order_id])).rows[0];
-    const conns = (await q(`select * from platform_connections where platform='etsy'`)).rows;
-    // Bind to the order's OWNER, not to a display string. This matched on shop_name — a
-    // free-text label Etsy lets sellers rename at will — and fell back to `conns[0]` when
-    // it missed. So the moment a seller renamed their shop, every fulfilment for them was
-    // pushed through whichever shop connected first: a tracking write, and a
-    // customer-facing "your order shipped" email, against a shop we were never asked to
-    // touch. Repeated bogus fulfilment writes are also how Etsy flags an account.
-    //
-    // No fallback: if we cannot say WHICH shop this order belongs to, refuse. Guessing
-    // wrong here is not recoverable — the buyer has already been emailed.
-    const conn = conns.find((c) => ord && String(c.connected_by) === String(ord.seller_id))
-      || conns.find((c) => ord && c.shop_name && c.shop_name === ord.store)
-      || null;
-    if (!conn) {
-      reply.code(400);
-      return { error: conns.length
-        ? "Couldn't tell which connected Etsy shop this order belongs to, so nothing was sent. Reconnect the shop for this seller."
-        : 'No Etsy shop connected' };
-    }
-    try {
-      const token = await validToken(conn);
-      const res = await fetch(`${API}/shops/${conn.shop_id}/receipts/${receiptId}/tracking`, {
-        method: 'POST',
-        headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ tracking_code: tracking_code || '', carrier_name: (carrier_name || 'usps').toLowerCase(), send_bcc: 'false' }).toString()
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { reply.code(400); return { error: data.error || ('Etsy ' + res.status) }; }
-      return { ok: true };
-    } catch (e) { reply.code(400); return { error: e.message }; }
+    if (!/^etsy-/i.test(String(order_id || ''))) { reply.code(400); return { error: 'Not an Etsy order' }; }
+    const ord = (await q('select id, store, seller_id from orders where id=$1', [order_id])).rows[0];
+    if (!ord) { reply.code(404); return { error: 'Order not found' }; }
+    try { return await etsyPushTracking(ord, tracking_code, carrier_name); }
+    catch (e) { reply.code(400); return { error: e.message }; }
   });
 
   // Debug (staff): return the RAW Etsy receipt(s) + transactions so we can see

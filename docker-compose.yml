@@ -70,6 +70,10 @@ services:
       # supplier at a time, and place a single cheap line first.
       OTTOCAP_ORDER_LIVE: ${OTTOCAP_ORDER_LIVE:-}
       SS_ORDER_LIVE: ${SS_ORDER_LIVE:-}
+      # Marketplace tracking auto-push on ship (Etsy receipt shipped + buyer email). Absent =
+      # DRY RUN, the intended default while the app runs on a limited/test keystring: the
+      # routing runs but nothing is sent. Set to 1 to push to LIVE shops, one deliberate flip.
+      MARKETPLACE_FULFILL_LIVE: ${MARKETPLACE_FULFILL_LIVE:-}
       # USPS Labels — values come from .env. Defaults to the TEM test environment
       # (watermarked labels, no postage charged); set USPS_BASE=https://apis.usps.com
       # only when going live.

@@ -387,9 +387,38 @@ async function refundForCancel(orderId, sellerId, by) {
  *  quantities — "came to 2" is not a price. */
 const fmtMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
 
+/**
+ * Push a shipped order's tracking to its marketplace so the buyer's shop marks it shipped
+ * (and, for Etsy, emails the buyer). Routes by the order's id prefix.
+ *
+ * GATED. It only sends for real when MARKETPLACE_FULFILL_LIVE=1 — a deliberate flip. Until
+ * then it returns a logged DRY RUN (no send, no buyer email), so the whole routing is in
+ * place and testable on a limited/test app without touching live buyers. The switch flips it
+ * to production with no code change. Best-effort: the caller must never fail a ship over it.
+ * Shopify + TikTok fulfilment aren't wired yet — the routing is here for when they are.
+ */
+async function pushMarketplaceTracking(order, tracking, carrier) {
+  const id = String((order && order.id) || '');
+  const channel = /^etsy-/i.test(id) ? 'etsy' : /^shopify-/i.test(id) ? 'shopify' : /^tiktok-/i.test(id) ? 'tiktok' : null;
+  if (!channel || !tracking) return { skipped: 'not-applicable' };
+  if (process.env.MARKETPLACE_FULFILL_LIVE !== '1') return { channel, dryRun: true, wouldSend: { tracking, carrier } };
+  try {
+    if (channel === 'etsy') {
+      const { etsyPushTracking } = await import('./etsy.js');
+      return await etsyPushTracking(order, tracking, carrier);
+    }
+    return { channel, skipped: 'not-wired' };
+  } catch (e) {
+    return { channel, error: (e && e.message) || 'push failed' };
+  }
+}
+
 export function ordersRoutes(app, requireAuth) {
   // Idempotent: ensure the factory_order column exists (also created in etsy.js).
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
+  // When we successfully pushed tracking to the marketplace (Etsy receipt shipped + buyer
+  // email). Stamped once so a re-save can't re-email the buyer; a DRY RUN never stamps it.
+  q('alter table orders add column if not exists marketplace_fulfilled_at timestamptz').catch(() => {});
   // Per-seller display number ("#1, #2 …" for manual orders). The id stays the
   // globally-unique PK; this is just the friendly number the seller sees.
   q('alter table orders add column if not exists seq integer').catch(() => {});
@@ -1005,7 +1034,23 @@ export function ordersRoutes(app, requireAuth) {
           } })]
         ).catch(() => {});
       }
-      if (body.tracking !== undefined || stage === 'shipped') notifyOrderEvent(req.params.id, 'order.shipped');
+      if (body.tracking !== undefined || stage === 'shipped') {
+        notifyOrderEvent(req.params.id, 'order.shipped');
+        // Auto-push tracking to the marketplace (GATED — a dry run until MARKETPLACE_FULFILL_LIVE=1).
+        // Best-effort: a marketplace hiccup must never fail the ship. Guarded by
+        // marketplace_fulfilled_at so a re-save can't re-email the buyer; a dry run doesn't
+        // stamp it, so flipping the gate later still fires the real push.
+        try {
+          const o = (await q('select id, store, seller_id, tracking, carrier, marketplace_fulfilled_at from orders where id=$1', [req.params.id])).rows[0];
+          if (o && o.tracking && !o.marketplace_fulfilled_at) {
+            const push = await pushMarketplaceTracking(o, o.tracking, o.carrier);
+            if (push && push.ok) {
+              await q('update orders set marketplace_fulfilled_at=now() where id=$1', [req.params.id]).catch(() => {});
+              audit(req, 'order.marketplace_fulfilled', { entityType: 'order', entityId: req.params.id, after: { channel: push.channel } });
+            }
+          }
+        } catch (e) { req.log && req.log.warn && req.log.warn({ err: String(e) }, 'marketplace tracking push failed'); }
+      }
       else if (stage === 'cancelled' || stage === 'refunded') notifyOrderEvent(req.params.id, 'order.cancelled');
       else if (stage) notifyOrderEvent(req.params.id, 'order.status_changed');
     }
