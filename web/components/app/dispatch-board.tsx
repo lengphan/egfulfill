@@ -150,6 +150,29 @@ export function DispatchBoard() {
     return [...matched].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
   }, [orders, q])
 
+  // Orders still LINKED to the partner (dispatch_pdf_id) but OFF the board and not scanned —
+  // i.e. a recall that failed (byeastside 500). They read amber forever with no way to fix it
+  // from the queue, so surface them with an admin force-clear.
+  const stuck = useMemo(() =>
+    (orders ?? []).filter((o) => o.dispatch_pdf_id && !o.label_scanned_at && normalizeStage(o.factory_status) !== STAGE),
+    [orders])
+
+  // Admin escape hatch for a stuck link (partner refused the recall). Clears OUR dispatch_pdf_id
+  // even on a partner error; the server records it. Use only after confirming the label is
+  // actually removed on byeastside, since it may still be in their queue.
+  const forceClear = async (ids: string[]) => {
+    if (!ids.length) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await cancelDispatch(ids, true)
+      const done = (r.results ?? []).filter((x) => x.ok).length
+      setErr(done
+        ? `Force-cleared ${done} — the byeastside link is removed and logged in history.`
+        : (r.error || "Nothing to clear."))
+    } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't force-clear.") }
+    finally { setBusy(false); load() }
+  }
+
   // History — EVERY order that ever had a label (bought → has tracking, or scanned),
   // whatever became of it. A label pulled off the board still shows here with its outcome,
   // so nothing vanishes. Searchable, and filterable by disposition.
@@ -469,6 +492,40 @@ export function DispatchBoard() {
         <StatCard label="Ready to dispatch" value={String(withLabel.length)} sub="labelled, waiting to scan" tone="pos" />
         <StatCard label="Missing a label" value={String(noLabel.length)} sub="can&apos;t go out yet" tone="neg" />
       </StatGrid>
+
+      {/* Stuck with the partner: still linked (dispatch_pdf_id) but off the board and unscanned,
+          because the recall failed. Admin-only force-clear — the ONE way to un-stick the amber
+          Scan tag when byeastside won't take the label back. */}
+      {role === "admin" && stuck.length > 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+            <Warning size={15} weight="fill" />
+            {stuck.length} order{stuck.length === 1 ? "" : "s"} still linked to byeastside but off the board
+          </div>
+          <p className="mt-1 text-xs text-amber-700">
+            Their recall failed, so the Scan tag stays amber. <b>Only after you&apos;ve confirmed the label is removed on byeastside</b>, force-clear our link — it may still be in their queue otherwise.
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {stuck.map((o) => (
+              <button
+                key={o.id} type="button" disabled={busy} onClick={() => void forceClear([o.id])}
+                className="eg-tap inline-flex items-center gap-1 rounded-lg border border-amber-400 bg-white px-2 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                title={`Force-clear ${numOf(o)}'s byeastside link`}
+              >
+                <span className="font-mono">{numOf(o)}</span> · Force-clear
+              </button>
+            ))}
+            {stuck.length > 1 && (
+              <button
+                type="button" disabled={busy} onClick={() => void forceClear(stuck.map((o) => o.id))}
+                className="eg-tap inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+              >
+                Force-clear all {stuck.length}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <SectionCard
         title="Dispatch"
