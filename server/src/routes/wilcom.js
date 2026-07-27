@@ -74,16 +74,15 @@ function buildBitmapXml({ filename, base64, width, height, designFile }) {
 }
 
 // ── designTrueview: photoreal PNG from an EXISTING machine file (.emb) ─────────
-// Recipe skeleton from the spec (api-designtrueview): <design/> + <trueview_options/> +
-// <files><file/></files>. The exact attribute NAMES aren't published, so these mirror the
-// bitmap recipe above and are a BEST-EFFORT — a wrong attribute just makes EWA return an
-// error we surface, and the board falls back to its placeholder (nothing breaks). Fix the
-// two attributes here once validated against a live account. EMB is Wilcom-native, so
-// designTrueview reads it directly; other formats aren't guaranteed and are skipped.
+// Per the spec: <file> has ONLY filename + filecontents, and the INPUT design is identified
+// by being in <files> (the method's context makes it the input) — there is NO <design
+// file="…"> reference. `<design>` is an OPTIONAL colorway parameter, not a file pointer, so
+// including it as a file reference made EWA report "Call to EmbServer_GenerateDesign failed"
+// (it had no design to render). We therefore pass just the .emb in <files> plus
+// <trueview_options> and let designTrueview return the PNG in <files>.
 function buildDesignTrueviewXml({ filename, base64 }) {
   return '<xml>'
-    + `<design file="${XML_ESC(filename)}"/>`
-    + `<trueview_options trueview_file="trueview.png" dpi="120"/>`
+    + `<trueview_options dpi="120"/>`
     + `<files><file filename="${XML_ESC(filename)}" filecontents="${base64}"/></files>`
     + '</xml>';
 }
@@ -496,7 +495,7 @@ export function wilcomRoutes(app, requireStaff) {
       if (!res.ok) {
         const em = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
         reply.code(502);
-        return { ok: false, error: em ? em[1].trim() : 'EWA rejected the request', sample: (res.body || '').slice(0, 300) };
+        return { ok: false, error: em ? em[1].trim() : 'EWA rejected the request', sample: (res.body || '').slice(0, 1200) };
       }
       const files = parseFiles(res.body);
       const info = parseDesignInfo(res.body) || {};
