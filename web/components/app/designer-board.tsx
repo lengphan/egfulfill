@@ -475,16 +475,16 @@ export function DesignerBoard() {
                         // scrolled. Pinned to their natural height, the lane scrolls as intended.
                         className={"group shrink-0 overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow " + (c.vendor ? "cursor-pointer" : "cursor-grab active:cursor-grabbing")}
                       >
-                        {/* Trello-style cover: the design shows at its NATURAL aspect (capped
-                            at max-h-80) — a tall design stays tall, a wide one stays wide —
-                            instead of being squeezed into a uniform square. The card height
-                            follows the artwork, like a Trello card cover. */}
-                        <div className="relative w-full overflow-hidden bg-muted">
+                        {/* FIXED-height cover (h-48) — every card is the same height, so the
+                            design ID + price row below always lands in the same place and stays
+                            clearly readable. object-cover fills the frame at any aspect; a fixed
+                            landscape frame, not the old square that cropped designs badly. */}
+                        <div className="relative h-48 w-full overflow-hidden bg-muted">
                           {c.thumb ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={String(c.thumb)} alt="" className="block max-h-64 w-full object-cover" />
+                            <img src={String(c.thumb)} alt="" className="size-full object-cover" />
                           ) : (
-                            <div className="flex h-32 w-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
+                            <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
                           )}
                           {c.is_emb && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
                           {/* Outsourced: whose queue this is actually in. Our designers do
@@ -516,10 +516,10 @@ export function DesignerBoard() {
                             <X size={11} weight="bold" />
                           </button>}
                         </div>
-                        {/* Content-driven height (no forced min-h) so a card is as tall as what
-                            it holds — the Trello way. The title WRAPS up to two lines instead of
-                            truncating, so a real design name is readable on the card face. */}
-                        <div className="p-2.5">
+                        {/* Fixed footer height so every card matches and the DSN id + price row
+                            lands in the same spot on each. Title wraps up to two lines (readable
+                            name), then the always-present DSN id + what it paid. */}
+                        <div className="min-h-[4.75rem] p-2.5">
                           <div className="line-clamp-2 text-sm font-medium leading-tight">{c.title || "Design"}</div>
                           {/* The DESIGN ID and what it paid — the two facts you track a card
                               by. This line used to be product/type, or a bare "—" when a card
