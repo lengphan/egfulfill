@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { setActivePalette } from "@/lib/thread-match"
+import { nearestColorName } from "@/lib/color-name"
 import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight, X } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -1194,7 +1195,7 @@ function PlatformPanel() {
                   <input
                     type="color"
                     value={t.hex}
-                    onChange={(e) => setThreads((p) => p.map((x, j) => (j === i ? { ...x, hex: e.target.value.toUpperCase() } : x)))}
+                    onChange={(e) => { const hex = e.target.value.toUpperCase(); setThreads((p) => p.map((x, j) => (j === i ? { ...x, hex, name: x.name.trim() ? x.name : nearestColorName(hex) } : x))) }}
                     className="size-6 cursor-pointer rounded border border-border bg-transparent p-0"
                     aria-label={`Colour for ${t.name || t.code}`}
                   />
@@ -1228,7 +1229,7 @@ function PlatformPanel() {
           <input
             type="color"
             value={newThread.hex}
-            onChange={(e) => setNewThread((p) => ({ ...p, hex: e.target.value.toUpperCase() }))}
+            onChange={(e) => { const hex = e.target.value.toUpperCase(); setNewThread((p) => ({ ...p, hex, name: p.name.trim() ? p.name : nearestColorName(hex) })) }}
             className="size-9 cursor-pointer rounded border border-border bg-transparent p-0"
             aria-label="New thread colour"
           />

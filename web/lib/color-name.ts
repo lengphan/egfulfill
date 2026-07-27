@@ -18,6 +18,34 @@ const WORDS: Record<string, string> = {
   fst: "Forest", frst: "Forest", mil: "Military", mlt: "Military", ant: "Antique",
 }
 
+// A compact spread of human colour names for suggesting a name from a picked hex — so
+// adding a thread cone only needs the colour + code, not typing the name. Generic names
+// (not a thread brand's), matched by nearest RGB distance; always editable afterwards.
+const NAMED: [string, number, number, number][] = [
+  ["White", 255, 255, 255], ["Ivory", 245, 240, 225], ["Cream", 255, 253, 208],
+  ["Light Grey", 205, 205, 205], ["Silver", 192, 192, 192], ["Grey", 128, 128, 128],
+  ["Charcoal", 70, 74, 78], ["Black", 20, 20, 22],
+  ["Red", 216, 30, 30], ["Dark Red", 139, 0, 0], ["Maroon", 128, 0, 32], ["Crimson", 220, 20, 60],
+  ["Coral", 255, 127, 80], ["Salmon", 250, 128, 114], ["Pink", 255, 105, 180], ["Light Pink", 255, 182, 193], ["Hot Pink", 255, 20, 147],
+  ["Orange", 255, 140, 0], ["Rust", 183, 65, 14], ["Gold", 240, 190, 45], ["Yellow", 255, 221, 0], ["Light Yellow", 255, 244, 150],
+  ["Beige", 245, 235, 200], ["Tan", 210, 180, 140], ["Khaki", 189, 183, 107], ["Brown", 120, 72, 40], ["Dark Brown", 80, 50, 28],
+  ["Lime", 140, 200, 40], ["Green", 34, 150, 60], ["Light Green", 144, 238, 144], ["Dark Green", 0, 90, 40], ["Forest", 34, 90, 34], ["Olive", 110, 110, 30], ["Mint", 150, 220, 180], ["Teal", 0, 128, 128],
+  ["Sky Blue", 110, 190, 235], ["Light Blue", 150, 200, 235], ["Blue", 30, 90, 220], ["Royal", 65, 90, 210], ["Navy", 15, 25, 80], ["Denim", 60, 95, 140],
+  ["Lavender", 200, 180, 235], ["Purple", 120, 50, 160], ["Violet", 150, 90, 210], ["Indigo", 75, 40, 130], ["Magenta", 200, 40, 170],
+]
+/** Nearest human colour name for a hex (e.g. "#1E5ADC" → "Blue"). "" if not a valid hex. */
+export function nearestColorName(hex: string): string {
+  const h = String(hex || "").replace("#", "")
+  if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) return ""
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+  let best = "", bestD = Infinity
+  for (const [name, cr, cg, cb] of NAMED) {
+    const d = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2
+    if (d < bestD) { bestD = d; best = name }
+  }
+  return best
+}
+
 // Words we leave alone when already spelled out (so "Green" doesn't become "Green Green").
 const expandToken = (t: string): string => {
   const key = t.toLowerCase().replace(/\./g, "")
