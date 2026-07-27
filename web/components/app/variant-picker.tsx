@@ -81,6 +81,13 @@ export function VariantPicker({
         />
       </div>
 
+      {/* Colour/Size/Method are disabled until a blank is chosen — the blank decides which
+          options exist. Without saying so, those greyed "Any" fields read as broken ("can't
+          select them"); this line names the gate and the next action. */}
+      {!product && (
+        <p className="mt-2 text-xs text-muted-foreground">Pick a blank first — it sets the colour, size &amp; method options.</p>
+      )}
+
       {/* Errors only — no transient "Saving…" line.
           That row was mounted on `busy`, so every single pick grew the item by its height
           and then shrank it again the moment the save landed: the row jumped on each
