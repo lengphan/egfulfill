@@ -292,6 +292,13 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
               where lower(u.email) = lower(design_cards.claimed_by)
                  or lower(u.name)  = lower(design_cards.claimed_by)
               limit 1) as claimed_role,
+           -- The card's SELLER (store, else name, else email), resolved from the order it's
+           -- attached to — so an EMB/seller-file card shows a real name tag like every other
+           -- card instead of a generic "Seller file" label. Store/name/email live on users;
+           -- the order's own store text is the last-resort fallback.
+           (select coalesce(u.store_name, u.name, u.email, o.store)
+              from orders o left join users u on u.id = o.seller_id
+              where o.id = design_cards.order_id) as seller_name,
            (select count(*)::int from design_file_data f
               where f.order_id = design_cards.order_id) as file_count
            from design_cards order by id`);

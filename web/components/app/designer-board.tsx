@@ -618,7 +618,9 @@ export function DesignerBoard() {
                               plain rate. */}
                           <div className="mt-auto flex items-center justify-between gap-1.5 pt-1.5 text-xs text-muted-foreground">
                             <span className="shrink-0 font-mono">DSN-{c.id}</span>
-                            {!isDesigner && (() => {
+                            {/* EMB-check cards carry no payout (factory check, not designer
+                                work), so the footer figure is suppressed for them. */}
+                            {!isDesigner && !c.is_emb && (() => {
                               // Always show a figure — including $0.00 — so the whole board can be
                               // scanned for payout at a glance (a blank used to read as "unknown").
                               const payout = c.vendor ? partnerCost : (amt(c.payment) || designFee)
@@ -980,13 +982,15 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             )}
           </button>
           <div className="flex min-w-0 flex-1 flex-col">
-            <label htmlFor={`card-desc-${card.id}`} className="mb-1 text-sm font-medium">Description / notes</label>
+            <label htmlFor={`card-desc-${card.id}`} className="mb-1 text-sm font-medium">{card.is_emb ? "Check notes" : "Description / notes"}</label>
             <textarea
               id={`card-desc-${card.id}`}
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               onBlur={saveDesc}
-              placeholder="Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."
+              placeholder={card.is_emb
+                ? "Notes for the factory check — thread colours, placement, anything to verify before stitching. Saved to the card."
+                : "Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."}
               className="min-h-[9rem] w-full flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
             />
           </div>
@@ -1037,7 +1041,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           </div>
           {refErr && <p className="text-xs text-destructive">{refErr}</p>}
           {refFiles.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Mockups, spec sheets, marked-up screenshots — anything that tells the designer what you want. Kept on the card and sent with a Pink Design push.</p>
+            <p className="text-xs text-muted-foreground">{card.is_emb
+              ? "Mockups, spec sheets, marked-up screenshots — anything to check the stitch file against. Kept on the card."
+              : "Mockups, spec sheets, marked-up screenshots — anything that tells the designer what you want. Kept on the card and sent with a Pink Design push."}</p>
           ) : (
             <div className="space-y-1">
               {refFiles.map((f, i) => (
@@ -1146,7 +1152,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             operator/warehouse/admin, don't show an amount that implies a credit the server
             will refuse. Say plainly it won't pay out instead. */}
         {(() => {
-          if (card.vendor) return null
+          // No payout on a vendor card (invoiced) or an EMB-check card (a factory check, not
+          // designer work — nobody is credited for it).
+          if (card.vendor || card.is_emb) return null
           const claimedRole = String(card.claimed_role || "").toLowerCase()
           const wontPay = !!card.claimed_by && !!claimedRole && claimedRole !== "designer"
           if (wontPay) {
