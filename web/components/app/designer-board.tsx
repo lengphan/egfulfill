@@ -37,6 +37,23 @@ function EmbPreview({ designId, orderId, sku, children }: { designId?: string | 
   return <>{children}</>
 }
 
+// A card's artwork — resilient and WILCOM-INDEPENDENT, so a card never shows a torn-image
+// icon. Order of preference: the stored thumb (with an onError guard, so a broken/expired URL
+// falls through instead of showing broken) → the Wilcom EMB TrueView (itself isolated: it
+// only renders when Wilcom is configured AND the render succeeds, otherwise it shows the
+// placeholder) → the plain pen placeholder. Removing the Wilcom key changes nothing here
+// except that EMB cards show the placeholder instead of a stitch preview.
+function CardArt({ card, imgClass, iconSize }: { card: DesignCard; imgClass: string; iconSize: number }) {
+  const [broken, setBroken] = useState(false)
+  const placeholder = <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={iconSize} weight="duotone" /></div>
+  if (card.thumb && !broken) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={String(card.thumb)} alt="" className={imgClass} onError={() => setBroken(true)} />
+  }
+  if (isEmbCard(card)) return <EmbPreview designId={card.design_id} orderId={card.order_id} sku={card.sku}>{placeholder}</EmbPreview>
+  return placeholder
+}
+
 // Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
 // once (no separate Paid lane; the credit is idempotent per card).
 // There is no Design-partner LANE: outsourcing is an action on a card ("Send to partner"
@@ -540,17 +557,7 @@ export function DesignerBoard() {
                           aria-label={`Open ${c.title || "card"} details`}
                           className="relative block h-48 w-full cursor-pointer overflow-hidden bg-muted"
                         >
-                          {c.thumb ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={String(c.thumb)} alt="" className="size-full object-cover" />
-                          ) : isEmbCard(c) ? (
-                            // No thumbnail for a stitch file — try a Wilcom TrueView, else the placeholder.
-                            <EmbPreview designId={c.design_id} orderId={c.order_id} sku={c.sku}>
-                              <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
-                            </EmbPreview>
-                          ) : (
-                            <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
-                          )}
+                          <CardArt key={String(c.thumb ?? c.id)} card={c} imgClass="size-full object-cover" iconSize={26} />
                           {isEmbCard(c) && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
                           {/* Top-right tag = WHO owns this card's queue. A partner card shows the
                               partner (pink). Otherwise, if someone on OUR side has claimed it, their
@@ -1022,16 +1029,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             title={card.thumb ? "Click to view full size" : undefined}
             className="group relative size-52 shrink-0 overflow-hidden rounded-xl border border-border bg-muted disabled:cursor-default"
           >
-            {card.thumb ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={String(card.thumb)} alt="" className="size-full object-contain" />
-            ) : isEmbCard(card) ? (
-              <EmbPreview designId={card.design_id} orderId={card.order_id} sku={card.sku}>
-                <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={40} weight="duotone" /></div>
-              </EmbPreview>
-            ) : (
-              <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={40} weight="duotone" /></div>
-            )}
+            <CardArt key={String(card.thumb ?? card.id)} card={card} imgClass="size-full object-contain" iconSize={40} />
             {card.thumb && (
               <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-background/80 py-1 text-[10px] font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
                 <MagnifyingGlassPlus size={11} weight="bold" /> Full size
