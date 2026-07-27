@@ -258,7 +258,7 @@ export function ProductsCatalog() {
                   )}
                   <span
                     className={
-                      "absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium backdrop-blur " +
+                      "absolute left-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium backdrop-blur " +
                       (status === "Active"
                         ? "bg-emerald-500/15 text-emerald-700"
                         : status === "Draft"
@@ -266,12 +266,6 @@ export function ProductsCatalog() {
                           : "bg-amber-500/15 text-amber-700")
                     }
                   >
-                    <span
-                      className={
-                        "size-1.5 rounded-full " +
-                        (status === "Active" ? "bg-emerald-500" : status === "Draft" ? "bg-muted-foreground" : "bg-amber-500")
-                      }
-                    />
                     {status}
                   </span>
                 </div>

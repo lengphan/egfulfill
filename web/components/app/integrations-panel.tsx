@@ -51,13 +51,14 @@ type Result = { level: Level; detail?: string }
 // Two states that matter at a glance: Active (a working/installed credential, green) or
 // Inactive (grey). "live" (test-verified) and "configured" (key present) both read as
 // Active — the purple "Configured" vs green "Live" split just looked like two things.
-const LEVEL_META: Record<Level, { label: string; dot: string; text: string }> = {
-  live: { label: "Active", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400" },
-  configured: { label: "Active", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400" },
-  off: { label: "Inactive", dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
-  error: { label: "Error", dot: "bg-red-500", text: "text-red-600" },
-  restricted: { label: "Staff only", dot: "bg-amber-400", text: "text-amber-600" },
-  checking: { label: "Checking…", dot: "bg-muted-foreground/40 animate-pulse", text: "text-muted-foreground" },
+// A solid tinted pill per status — no coloured dot.
+const LEVEL_META: Record<Level, { label: string; pill: string }> = {
+  live: { label: "Active", pill: "bg-emerald-100 text-emerald-700" },
+  configured: { label: "Active", pill: "bg-emerald-100 text-emerald-700" },
+  off: { label: "Inactive", pill: "bg-muted text-muted-foreground" },
+  error: { label: "Error", pill: "bg-red-100 text-red-700" },
+  restricted: { label: "Staff only", pill: "bg-amber-100 text-amber-700" },
+  checking: { label: "Checking…", pill: "bg-muted text-muted-foreground animate-pulse" },
 }
 
 // Fetch a JSON endpoint without throwing on non-2xx — we want to read {ok:false} bodies
@@ -323,8 +324,7 @@ export function IntegrationsPanel() {
                     <span className="truncate font-medium">{i.name}</span>
                     {idx === 0 && <span className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:inline">{group}</span>}
                   </span>
-                  <span className={"inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium " + meta.text}>
-                    <span className={"size-2 rounded-full " + meta.dot} />
+                  <span className={"inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[11px] font-medium " + meta.pill}>
                     {meta.label}
                   </span>
                 </summary>
