@@ -116,10 +116,10 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // WOULD have fitted whole.
   items:    { id: "items",    label: "Items",    grid: "minmax(0,1.2fr)" },
   // Four solid coloured pills now — Label · Scan · Design + the Stock chip, all tinted by
-  // state. Fixed (the header cell can't size it) and wide enough to hold the four on ONE
-  // line incl. the widest label ("Out of stock"); the surplus is taken from the flexible
-  // Customer/Items columns, which is why the name sits a little tighter than before.
-  ready:    { id: "ready",    label: "Ready",    grid: "18rem" },
+  // state. Fixed (the header cell can't size it), sized to hold the four on ONE line with
+  // the short stock labels ("In stock" / "No stock" / "Stock —"); the rest goes back to the
+  // flexible Customer/Items columns so the name breathes a little more than at 18rem.
+  ready:    { id: "ready",    label: "Ready",    grid: "16rem" },
   action:   { id: "action",   label: "",         grid: "12rem" },  // header stays blank: buttons need no title
 }
 
