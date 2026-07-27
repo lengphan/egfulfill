@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode, CaretDown, CaretRight, Package } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode, CaretDown, CaretRight, Package, Tag } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow, type AuditRow } from "@/lib/api"
+import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow, type AuditRow, type ShipAddress } from "@/lib/api"
+import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
@@ -31,6 +32,20 @@ import { ReadinessStrip } from "@/components/app/readiness-dots"
  */
 
 const STAGE = "awaiting_scan"
+
+// Ship-to for the inline label dialog, read from the order's address with the same loose
+// fallbacks the boards use (marketplace payloads spell the fields a dozen ways).
+const toShip = (o: OrderRow): ShipAddress => {
+  const a = (o.address ?? {}) as Record<string, string>
+  return {
+    name: o.customer?.name || a.name || "",
+    street: a.street || a.first_line || a.line1 || a.address1 || "",
+    street2: a.street2 || a.second_line || a.line2 || a.address2 || "",
+    city: a.city || "",
+    state: a.state || a.province || "",
+    zip: a.zip || a.postal_code || a.postcode || "",
+  }
+}
 // Scanned parcels go to WORKING: once the scan service has scanned the label and it's been
 // combined with the design, the item is production work with its tasks checked. "printed"
 // sits between the two in the pipeline but describes the label step, which by this point
@@ -78,6 +93,8 @@ export function DispatchBoard() {
   // Everything else here — printing, and pulling a label back — is theirs.
   const canScanOut = role !== "operator"
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
+  // The order whose label we're buying inline (a queue row with no label yet).
+  const [labelFor, setLabelFor] = useState<OrderRow | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -666,8 +683,17 @@ export function DispatchBoard() {
                       <ReadinessStrip order={o} />
                     </div>
                   </div>
-                  {o.tracking && (
+                  {o.tracking ? (
                     <span className="shrink-0 font-mono text-xs text-muted-foreground">{o.tracking}</span>
+                  ) : (
+                    // No label yet → give the action right here rather than a dead gap. Buys
+                    // the label for this order (stopPropagation: the row is a <label>).
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLabelFor(o) }}
+                      className="eg-tap shrink-0 inline-flex items-center gap-1 rounded-lg border border-primary/40 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                    >
+                      <Tag size={12} weight="bold" /> Create label
+                    </button>
                   )}
                   {o.tracking_label_url && (
                     <a
@@ -707,6 +733,15 @@ export function DispatchBoard() {
         open={manifestOpen}
         onOpenChange={setManifestOpen}
         onDone={() => { setPicked(new Set()); load() }}
+      />
+
+      {/* Buy a label for a queue order that arrived without one — opened from the row's
+          "Create label" button, seeded with that order's ship-to. */}
+      <NewLabelDialog
+        open={!!labelFor}
+        onOpenChange={(v) => { if (!v) setLabelFor(null) }}
+        onCreated={() => { setLabelFor(null); load() }}
+        order={labelFor ? { id: String(labelFor.id), num: numOf(labelFor), to: toShip(labelFor) } : undefined}
       />
     </div>
   )
