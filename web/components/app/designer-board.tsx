@@ -469,7 +469,11 @@ export function DesignerBoard() {
                         onDragStart={() => { if (!c.vendor) setDragId(c.id) }}
                         onDragEnd={() => setDragId(null)}
                         onClick={() => setOpenId(c.id)}
-                        className={"group overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow " + (c.vendor ? "cursor-pointer" : "cursor-grab active:cursor-grabbing")}
+                        // shrink-0 is load-bearing: the card area is a flex column, and without
+                        // it flexbox COMPRESSES every card to fit the fixed-height lane instead
+                        // of overflowing — so cards shrank as you added them and the column never
+                        // scrolled. Pinned to their natural height, the lane scrolls as intended.
+                        className={"group shrink-0 overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow " + (c.vendor ? "cursor-pointer" : "cursor-grab active:cursor-grabbing")}
                       >
                         {/* Trello-style cover: the design shows at its NATURAL aspect (capped
                             at max-h-80) — a tall design stays tall, a wide one stays wide —
@@ -478,7 +482,7 @@ export function DesignerBoard() {
                         <div className="relative w-full overflow-hidden bg-muted">
                           {c.thumb ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={String(c.thumb)} alt="" className="block max-h-80 w-full object-cover" />
+                            <img src={String(c.thumb)} alt="" className="block max-h-64 w-full object-cover" />
                           ) : (
                             <div className="flex h-32 w-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
                           )}
