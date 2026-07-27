@@ -329,27 +329,37 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
               <div>
                 <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Threads → your library</div>
                 {res.threads && res.threads.length > 0 ? (
-                  <div className="space-y-1">
-                    {res.threads.map((t, i) => {
-                      const m = nearestThread(t.r, t.g, t.b, pal)
-                      const poor = m ? matchQuality(t.r, t.g, t.b, m).poor : true
-                      return (
-                        <div key={i} className="flex items-center gap-2 text-sm">
-                          <span className="size-4 shrink-0 rounded border border-border" style={{ background: `rgb(${t.r},${t.g},${t.b})` }} />
-                          <span className="text-xs text-muted-foreground">{t.name || `rgb(${t.r},${t.g},${t.b})`}</span>
-                          <ArrowRight size={12} className="shrink-0 text-muted-foreground/60" />
-                          {m ? (
-                            <>
-                              <span className="size-4 shrink-0 rounded border border-border" style={{ background: m.hex }} />
-                              <span className="truncate font-medium">{m.name} <span className="font-mono text-xs text-muted-foreground">{m.code}</span></span>
-                              {poor && <span className="ml-auto shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">poor</span>}
-                            </>
-                          ) : <span className="text-muted-foreground">no library match</span>}
-                        </div>
-                      )
-                    })}
-                    <div className="pt-1 text-[11px] text-muted-foreground">Suggested from the admin thread library — a person confirms before it&apos;s used.</div>
-                  </div>
+                  <>
+                    {/* Fixed columns so every row lines up: design swatch → cone swatch, name +
+                        code (flex, truncates), then the quality flag. The raw RGB text is gone
+                        (it wrapped and broke alignment) — it's in the swatch's tooltip instead. */}
+                    <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                      {res.threads.map((t, i) => {
+                        const m = nearestThread(t.r, t.g, t.b, pal)
+                        const poor = m ? matchQuality(t.r, t.g, t.b, m).poor : true
+                        const srcHex = "#" + [t.r, t.g, t.b].map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, "0")).join("")
+                        return (
+                          <div key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
+                            <span className="size-5 shrink-0 rounded border border-border" style={{ background: `rgb(${t.r},${t.g},${t.b})` }} title={t.name ? `${t.name} · ${srcHex}` : srcHex} />
+                            <ArrowRight size={13} weight="bold" className="shrink-0 text-muted-foreground/50" />
+                            {m ? (
+                              <>
+                                <span className="size-5 shrink-0 rounded border border-border" style={{ background: m.hex }} />
+                                <span className="min-w-0 flex-1 truncate">
+                                  <span className="font-medium">{m.name}</span>
+                                  <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">{m.code}</span>
+                                </span>
+                              </>
+                            ) : (
+                              <span className="min-w-0 flex-1 text-muted-foreground">No close match in your library</span>
+                            )}
+                            {m && poor && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">poor</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p className="mt-1.5 text-[11px] leading-tight text-muted-foreground">Suggested from the admin thread library — a person confirms before it&apos;s used.</p>
+                  </>
                 ) : (
                   <div className="text-xs text-muted-foreground">{res.colours != null ? `${res.colours} colours — per-thread list not returned.` : "No thread data."}</div>
                 )}
