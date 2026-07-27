@@ -573,13 +573,14 @@ export function DesignCanvasDialog({
       })
       if (r?.error) throw new Error(r.error)
       setErr(null)
-      // Says what to do NEXT, not just what happened. Dropping an image afterwards has
-      // always worked — the two live side by side — but a message that only reported the
-      // filing read as the end of the interaction, so the placement never got set and the
-      // floor had a stitch file with no idea where on the garment it goes.
-      setAttached(`${f.name} is filed as your machine file — we'll check it before production, so this line is charged the check fee rather than a design fee. Now drop an IMAGE too: the stitch file can't be shown on the mockup, and without one there's nothing to say where on the garment it belongs.`)
+      // Keep it SHORT. Sellers got a four-line paragraph that read as an error; they need a
+      // calm one-liner. Staff keep the one actionable nudge — add an image so the stitch
+      // file has somewhere to sit on the mockup — because that's their job, not the seller's.
+      setAttached(isStaff
+        ? `${f.name} filed as the machine file — check fee, not a design fee. Add an image too so it shows on the mockup.`
+        : `Machine file uploaded — ${f.name}. Just a check fee applies (not a design fee); we'll take it from here and reach out if we need anything.`)
     } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
-  }, [orderId, item.line_id, item.sku])
+  }, [orderId, item.line_id, item.sku, isStaff])
 
   /**
    * Put THIS line's artwork on every other line of the order.
