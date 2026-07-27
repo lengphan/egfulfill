@@ -1,7 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Needle, Storefront, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, UploadSimple, X, ArrowRight, PaperPlaneTilt, Check } from "@phosphor-icons/react"
+// NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
+// toDataUrl below. Use ImageSquare for the mode toggle instead.
+import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, UploadSimple, X, ArrowRight, PaperPlaneTilt, Check } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
@@ -10,7 +12,7 @@ import {
   type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration,
 } from "@/lib/api"
 
-type Tab = "browse" | "maker" | "history"
+type Tab = "create" | "history"
 type Source = "order" | "library"
 
 // Load an image (remote → same-origin proxy so the canvas isn't tainted; data URL → direct),
@@ -77,7 +79,7 @@ function complexityFlag(res: WilcomResult, pal?: ThreadColor[]): string | null {
 }
 
 export function DigitizerStudio() {
-  const [tab, setTab] = useState<Tab>("browse")
+  const [tab, setTab] = useState<Tab>("create")
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
@@ -89,7 +91,7 @@ export function DigitizerStudio() {
       </div>
 
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "browse", label: "Browse", icon: Storefront }, { id: "maker", label: "Maker", icon: PencilSimple }, { id: "history", label: "History", icon: ClockCounterClockwise }] as const).map((t) => {
+        {([{ id: "create", label: "Create", icon: PencilSimple }, { id: "history", label: "History", icon: ClockCounterClockwise }] as const).map((t) => {
           const Icon = t.icon
           return (
             <button key={t.id} onClick={() => setTab(t.id)} className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
@@ -99,7 +101,31 @@ export function DigitizerStudio() {
         })}
       </div>
 
-      {tab === "browse" ? <BrowseTab /> : tab === "maker" ? <MakerTab /> : <HistoryTab />}
+      {tab === "create" ? <CreateTab /> : <HistoryTab />}
+    </div>
+  )
+}
+
+// ── Create: ONE workspace for both image auto-digitize and lettering ─────────────
+// Formerly two tabs (Browse + Maker). An Image / Text toggle switches the workspace:
+// Image mode picks or drops artwork and auto-digitizes it; Text mode types lettering.
+// Each still exports its own EMB + PNG. (Named "Create" — deliberately NOT "Library",
+// which is the design-maker's own thing.)
+function CreateTab() {
+  const [mode, setMode] = useState<"image" | "text">("image")
+  return (
+    <div className="space-y-4">
+      <div className="flex w-fit rounded-full border border-border p-0.5">
+        {([{ id: "image", label: "Image", icon: ImageSquare }, { id: "text", label: "Text", icon: PencilSimple }] as const).map((m) => {
+          const Icon = m.icon
+          return (
+            <button key={m.id} onClick={() => setMode(m.id)} className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (mode === m.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+              <Icon size={14} weight={mode === m.id ? "fill" : "regular"} /> {m.label}
+            </button>
+          )
+        })}
+      </div>
+      {mode === "image" ? <BrowseTab /> : <MakerTab />}
     </div>
   )
 }
