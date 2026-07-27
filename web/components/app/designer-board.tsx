@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash, DotsSixVertical } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -771,7 +771,15 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
   const rename = (id: string, label: string) => { const next = { ...labels, [id]: label }; setLabels(next); save(visible, next) }
   const reset = () => { setVisible(DEFAULT_LIST_COLS); setLabels({}); save(DEFAULT_LIST_COLS, {}) }
   const labelOf = (col: ListCol) => labels[col.id] || col.label
-  const shown = LIST_COLS.filter((c) => visible.includes(c.id))
+  // Display follows the SAVED order (visible is an ordered list), so drag-reordering it in
+  // the menu reorders the table — persisted per board in localStorage like the others.
+  const shown = visible.map((id) => LIST_COLS.find((c) => c.id === id)).filter(Boolean) as ListCol[]
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const moveCol = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= visible.length || to >= visible.length) return
+    const next = [...visible]; const [m] = next.splice(from, 1); next.splice(to, 0, m)
+    setVisible(next); save(next, labels)
+  }
 
   if (rows.length === 0) return <div className="rounded-2xl border border-border py-16 text-center text-sm text-muted-foreground">No design cards yet — use <span className="font-medium text-foreground">Add design</span> above, or send one from the Operator board.</div>
 
@@ -785,11 +793,31 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 z-50 mt-1 w-72 rounded-xl border border-border bg-card p-2 shadow-xl">
-                  <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Columns — toggle & rename</div>
-                  {LIST_COLS.map((col) => (
-                    <div key={col.id} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-accent">
-                      <button onClick={() => !col.locked && toggle(col.id)} disabled={col.locked} title={col.locked ? "Always shown" : "Toggle"} className="flex size-5 shrink-0 items-center justify-center disabled:opacity-40">
-                        {visible.includes(col.id) ? <CheckSquare size={16} weight="fill" className="text-primary" /> : <Square size={16} className="text-muted-foreground" />}
+                  <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Columns — drag to reorder, toggle &amp; rename</div>
+                  {/* Shown columns, in display order — drag the handle to reorder. */}
+                  {shown.map((col, idx) => (
+                    <div
+                      key={col.id}
+                      draggable
+                      onDragStart={() => setDragIdx(idx)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => { if (dragIdx !== null) moveCol(dragIdx, idx); setDragIdx(null) }}
+                      onDragEnd={() => setDragIdx(null)}
+                      className={"flex items-center gap-1.5 rounded-md px-1 py-1 hover:bg-accent " + (dragIdx === idx ? "opacity-50" : "")}
+                    >
+                      <DotsSixVertical size={14} weight="bold" className="shrink-0 cursor-grab text-muted-foreground" />
+                      <button onClick={() => !col.locked && toggle(col.id)} disabled={col.locked} title={col.locked ? "Always shown" : "Hide"} className="flex size-5 shrink-0 items-center justify-center disabled:opacity-40">
+                        <CheckSquare size={16} weight="fill" className="text-primary" />
+                      </button>
+                      <Input value={labelOf(col)} onChange={(e) => rename(col.id, e.target.value)} className="h-7 flex-1 text-xs" />
+                    </div>
+                  ))}
+                  {/* Hidden columns — toggle to add (they append to the end). */}
+                  {LIST_COLS.filter((c) => !visible.includes(c.id)).map((col) => (
+                    <div key={col.id} className="flex items-center gap-1.5 rounded-md px-1 py-1 hover:bg-accent">
+                      <span className="size-3.5 shrink-0" />
+                      <button onClick={() => toggle(col.id)} title="Show" className="flex size-5 shrink-0 items-center justify-center">
+                        <Square size={16} className="text-muted-foreground" />
                       </button>
                       <Input value={labelOf(col)} onChange={(e) => rename(col.id, e.target.value)} className="h-7 flex-1 text-xs" />
                     </div>
