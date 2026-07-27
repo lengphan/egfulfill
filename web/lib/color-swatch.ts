@@ -43,6 +43,15 @@ function oneHex(raw: string): string | null {
   return null
 }
 
+// A single reference hex for a colour name (the first token of a two-tone name), or null
+// when we don't recognise it. Used by the product editor's auto-match to compare a colour
+// name against a photo's dominant colour — a null just means "leave that one for manual".
+export function swatchHex(raw: string): string | null {
+  const stripped = prettyColorName(raw || "") || (raw || "")
+  const first = stripped.split("/").map((p) => p.trim()).filter(Boolean)[0] || raw
+  return oneHex(first)
+}
+
 // CSS background for a swatch — a solid colour, or a split gradient for a two-tone name.
 export function swatchBg(raw: string): string | null {
   const stripped = prettyColorName(raw || "") || (raw || "").replace(/^\s*\d+\s*[-–]\s*/, "")

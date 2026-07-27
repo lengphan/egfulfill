@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check } from "@phosphor-icons/react"
+import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,8 @@ import { readImageFile } from "@/components/app/design-canvas"
 import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { getFactorySettings, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
+import { swatchHex } from "@/lib/color-swatch"
+import { extractDominant, hexToRgb, rgbToOklab } from "@/lib/thread-match"
 import { normalizeMethods, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 
@@ -101,6 +103,11 @@ export function ProductEditorDialog({
   const [gallery, setGallery] = useState<string[]>([])
   /** colour → which gallery image represents it. */
   const [colorImgs, setColorImgs] = useState<Record<string, string>>({})
+  /** After an auto-match run: how sure each colour's guess was — 'high' (supplier map or the
+   *  colour name is in the filename) shows ✓, 'low' (matched by the photo's dominant colour)
+   *  shows ? so you know which few to eyeball. Cleared per run. */
+  const [matchConf, setMatchConf] = useState<Record<string, "high" | "low">>({})
+  const [matching, setMatching] = useState(false)
   /**
    * Per-side outline OVERRIDES for this product. Empty means "inherit the type's" —
    * a factory board can override what admin defined in Settings, but a product that
@@ -206,6 +213,75 @@ export function ProductEditorDialog({
     setColorInput("")
   }
   const supplier = product?.supplier
+
+  // Lowercase word tokens of a colour name, for matching against an image filename/URL:
+  // "Wild Plum" → ["wild","plum"], "Caribbean Blue" → ["caribbean","blue"]. ≥3 chars so a
+  // stray "of"/"and" can't match half the gallery.
+  const colorWords = (c: string) =>
+    prettyColorName(c).toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 3)
+
+  /**
+   * One-click colour → photo matcher. Three passes, best-evidence first, each colour taken
+   * by the first pass that lands it so a strong signal never loses to a weak one:
+   *   1. Supplier map — if this product came from a supplier, its colour→image mapping is
+   *      ground truth. (high ✓)
+   *   2. Filename/URL — the colour's name appears in the image path (e.g. …/black_1.jpg). (high ✓)
+   *   3. Dominant colour — compare the colour NAME's reference swatch to each remaining
+   *      photo's dominant colour (OKLab distance) and take the nearest. (low ?)
+   * Only fills BLANK colours (never clobbers a manual pick) and never reuses a photo. A
+   * colour we can't place is left blank for the human — an honest "?", not a wrong guess.
+   */
+  const autoMatch = async () => {
+    setMatching(true)
+    try {
+      const next: Record<string, string> = { ...colorImgs }
+      const conf: Record<string, "high" | "low"> = {}
+      const used = new Set(Object.values(next).filter(Boolean))
+      const take = (c: string, u: string, k: "high" | "low") => { next[c] = u; used.add(u); conf[c] = k }
+
+      // 1) supplier ground-truth map
+      const supplierMap = (product?.colorImages ?? {}) as Record<string, string>
+      for (const c of colors) {
+        if (next[c]) continue
+        const u = supplierMap[c]
+        if (u && gallery.includes(u) && !used.has(u)) take(c, u, "high")
+      }
+      // 2) colour name in the filename/URL
+      for (const c of colors) {
+        if (next[c]) continue
+        const words = colorWords(c)
+        const hit = gallery.find((u) => !used.has(u) && words.some((w) => u.toLowerCase().includes(w)))
+        if (hit) take(c, hit, "high")
+      }
+      // 3) dominant-colour match for whatever's left (needs a recognisable colour name)
+      const unplaced = colors.filter((c) => !next[c] && swatchHex(c))
+      if (unplaced.length) {
+        const free = gallery.filter((u) => !used.has(u))
+        const dom = new Map<string, { L: number; a: number; b: number }>()
+        for (const u of free) {
+          const d = await extractDominant(u, 1)
+          if (d[0]) dom.set(u, rgbToOklab(d[0].r, d[0].g, d[0].b))
+        }
+        for (const c of unplaced) {
+          const hex = swatchHex(c)!
+          const rgb = hexToRgb(hex)
+          const target = rgbToOklab(rgb.r, rgb.g, rgb.b)
+          let best: string | null = null, bestD = Infinity
+          for (const [u, lab] of dom) {
+            if (used.has(u)) continue
+            const dL = target.L - lab.L, da = target.a - lab.a, db = target.b - lab.b
+            const dist = dL * dL + da * da + db * db
+            if (dist < bestD) { bestD = dist; best = u }
+          }
+          if (best) take(c, best, "low")
+        }
+      }
+      setColorImgs(next)
+      setMatchConf(conf)
+    } finally {
+      setMatching(false)
+    }
+  }
 
   // Platform pricing policy: the per-method surcharge and the flat shipping band. Loaded
   // so the editor can PREFILL a sensible retail price rather than leaving the seller to
@@ -321,39 +397,46 @@ export function ProductEditorDialog({
             </div>
             <div className="flex-1 space-y-2">
               <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
+              {/* Type + Status share the top row; Status used to sit alone far down the
+                  form. Methods drop to their own full-width line below (see next block) so
+                  the chips flow across the whole width instead of wrapping inside a cramped
+                  half-column and leaving a blank gap beside Type. */}
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Type</span>
                   <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{typeNames.map((t) => <option key={t}>{t}</option>)}</select>
                 </label>
-                {/* METHODS ARE MULTIPLE. A blank commonly takes several techniques — the
-                    single select forced one, which is why a product that can be embroidered
-                    AND screen printed had to lie about itself. The data already worked this
-                    way: `method` holds a multi-value string ("DTG Print / Embroidery") and
-                    normalizeMethods() splits it, which is exactly what methodsOf() reads.
-                    Only this control was single-valued. Stored in the same joined format,
-                    so nothing downstream changes. */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm text-muted-foreground">Methods</span>
-                  <div className="flex flex-wrap gap-1.5 rounded-2xl border border-border bg-card px-2 py-2">
-                    {METHODS.map((m) => {
-                      const on = pickedMethods.includes(m)
-                      return (
-                        <button
-                          key={m}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => {
-                            const next = on ? pickedMethods.filter((x) => x !== m) : [...pickedMethods, m]
-                            setMethod(next.join(" / "))
-                          }}
-                          className={"rounded-md border px-2 py-0.5 text-xs font-medium transition-colors " +
-                            (on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground")}
-                        >
-                          {on && <Check size={10} weight="bold" className="mr-1 inline" />}{m}
-                        </button>
-                      )
-                    })}
-                  </div>
+                <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Status</span>
+                  <select value={status} onChange={(e) => setStatus(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"><option>Active</option><option>Draft</option><option>Archived</option></select>
+                </label>
+              </div>
+              {/* METHODS ARE MULTIPLE. A blank commonly takes several techniques — the
+                  single select forced one, which is why a product that can be embroidered
+                  AND screen printed had to lie about itself. The data already worked this
+                  way: `method` holds a multi-value string ("DTG Print / Embroidery") and
+                  normalizeMethods() splits it, which is exactly what methodsOf() reads.
+                  Only this control was single-valued. Stored in the same joined format,
+                  so nothing downstream changes. Full width so all chips sit on one line. */}
+              <div className="flex flex-col gap-1">
+                <span className="text-sm text-muted-foreground">Methods</span>
+                <div className="flex flex-wrap gap-1.5 rounded-2xl border border-border bg-card px-2 py-2">
+                  {METHODS.map((m) => {
+                    const on = pickedMethods.includes(m)
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => {
+                          const next = on ? pickedMethods.filter((x) => x !== m) : [...pickedMethods, m]
+                          setMethod(next.join(" / "))
+                        }}
+                        className={"rounded-md border px-2 py-0.5 text-xs font-medium transition-colors " +
+                          (on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground")}
+                      >
+                        {on && <Check size={10} weight="bold" className="mr-1 inline" />}{m}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
               {typeMockup && !img && (
@@ -701,26 +784,53 @@ export function ProductEditorDialog({
               {colors.length > 0 && <button onClick={() => setColors([])} className="text-xs font-medium text-primary hover:underline">Clear</button>}
             </div>
             {/* Each colour can point at one of the gallery images. A colour with none
-                falls back to the product's main image, same as before. */}
+                falls back to the product's main image, same as before. "Auto-match" fills
+                every blank in one click; ✓ = matched from the supplier map or filename,
+                ? = guessed from the photo's dominant colour (eyeball those). */}
             {colors.length > 0 && gallery.length > 0 && (
-              <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/30 p-2">
-                {colors.map((c) => (
-                  <div key={c} className="flex items-center gap-1.5 rounded-md bg-card px-1.5 py-1">
-                    <span className="max-w-[110px] truncate text-xs font-medium">{prettyColorName(c)}</span>
-                    <select
-                      value={colorImgs[c] ?? ""}
-                      onChange={(e) => setColorImgs((m) => ({ ...m, [c]: e.target.value }))}
-                      className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-xs transition-colors hover:border-primary/40"
-                    >
-                      <option value="">Main image</option>
-                      {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
-                    </select>
-                    {colorImgs[c] && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={colorImgs[c]} alt="" className="size-6 rounded border border-border object-cover" />
-                    )}
-                  </div>
-                ))}
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Match each colour to its photo</span>
+                  <button
+                    type="button"
+                    onClick={autoMatch}
+                    disabled={matching}
+                    className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+                  >
+                    {matching ? <CircleNotch size={12} weight="bold" className="animate-spin" /> : <MagicWand size={12} weight="fill" />}
+                    {matching ? "Matching…" : "Auto-match photos"}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {colors.map((c) => (
+                    <div key={c} className="flex items-center gap-1.5 rounded-md bg-card px-1.5 py-1">
+                      <span className="max-w-[110px] truncate text-xs font-medium">{prettyColorName(c)}</span>
+                      <select
+                        value={colorImgs[c] ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setColorImgs((m) => ({ ...m, [c]: v }))
+                          // A manual pick is authoritative — drop any auto-match ✓/? marker on it.
+                          setMatchConf((m) => { const n = { ...m }; delete n[c]; return n })
+                        }}
+                        className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-xs transition-colors hover:border-primary/40"
+                      >
+                        <option value="">Main image</option>
+                        {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
+                      </select>
+                      {colorImgs[c] && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={colorImgs[c]} alt="" className="size-6 rounded border border-border object-cover" />
+                      )}
+                      {matchConf[c] === "high" && (
+                        <Check size={13} weight="bold" className="text-emerald-600" aria-label="Confident match" />
+                      )}
+                      {matchConf[c] === "low" && (
+                        <Question size={13} weight="bold" className="text-amber-500" aria-label="Guessed from the photo colour — please verify" />
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             {colors.length > 0 && (
@@ -757,9 +867,7 @@ export function ProductEditorDialog({
             <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder={supplier ? "Auto-filled from the supplier — edit as needed." : "Product description…"} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
           </label>
 
-          <label className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">Status</span>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"><option>Active</option><option>Draft</option><option>Archived</option></select>
-          </label>
+          {/* Status moved to the top row beside Type. */}
 
           {err && <div className="text-sm text-destructive">{err}</div>}
         </div>
