@@ -8,11 +8,11 @@ import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-mat
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
   wilcomPreview, wilcomDigitize, getWilcomGenerations, createDesignCard,
-  getWilcomAlphabets, wilcomLetteringPreview, wilcomLettering,
+  getWilcomAlphabets, wilcomCombinePreview, wilcomCombine,
   type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration,
 } from "@/lib/api"
 
-type Tab = "create" | "history"
+type Tab = "create" | "library" | "history"
 type Source = "order" | "library"
 
 // Load an image (remote → same-origin proxy so the canvas isn't tainted; data URL → direct),
@@ -91,7 +91,7 @@ export function DigitizerStudio() {
       </div>
 
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "create", label: "Create", icon: PencilSimple }, { id: "history", label: "History", icon: ClockCounterClockwise }] as const).map((t) => {
+        {([{ id: "create", label: "Create", icon: PencilSimple }, { id: "library", label: "Library", icon: ImageSquare }, { id: "history", label: "History", icon: ClockCounterClockwise }] as const).map((t) => {
           const Icon = t.icon
           return (
             <button key={t.id} onClick={() => setTab(t.id)} className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
@@ -101,31 +101,7 @@ export function DigitizerStudio() {
         })}
       </div>
 
-      {tab === "create" ? <CreateTab /> : <HistoryTab />}
-    </div>
-  )
-}
-
-// ── Create: ONE workspace for both image auto-digitize and lettering ─────────────
-// Formerly two tabs (Browse + Maker). An Image / Text toggle switches the workspace:
-// Image mode picks or drops artwork and auto-digitizes it; Text mode types lettering.
-// Each still exports its own EMB + PNG. (Named "Create" — deliberately NOT "Library",
-// which is the design-maker's own thing.)
-function CreateTab() {
-  const [mode, setMode] = useState<"image" | "text">("image")
-  return (
-    <div className="space-y-4">
-      <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "image", label: "Image", icon: ImageSquare }, { id: "text", label: "Text", icon: PencilSimple }] as const).map((m) => {
-          const Icon = m.icon
-          return (
-            <button key={m.id} onClick={() => setMode(m.id)} className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (mode === m.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-              <Icon size={14} weight={mode === m.id ? "fill" : "regular"} /> {m.label}
-            </button>
-          )
-        })}
-      </div>
-      {mode === "image" ? <BrowseTab /> : <MakerTab />}
+      {tab === "create" ? <CreateTab /> : tab === "library" ? <BrowseTab /> : <HistoryTab />}
     </div>
   )
 }
@@ -403,9 +379,10 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
   )
 }
 
-// ── Maker — lettering (text → embroidery via EWA newLettering/newDesign) ─────────
-function MakerTab() {
-  const [text, setText] = useState("Sunrise Co.")
+// ── Create — ONE workspace: drop an image AND/OR type text, combined into a single live
+// embroidery preview + machine file via the EWA combine endpoint (prototype). ──────────
+function CreateTab() {
+  const [text, setText] = useState("")
   const [alphabet, setAlphabet] = useState("")
   const [height, setHeight] = useState(20)
   const [color, setColor] = useState("")
@@ -414,6 +391,16 @@ function MakerTab() {
   const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
   const [res, setRes] = useState<WilcomResult | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  // The dropped/chosen artwork to embroider alongside the text. dataUrl is downscaled under
+  // EWA's 2 MB cap; thumb keeps the full-res original for the little in-panel preview.
+  const [image, setImage] = useState<{ dataUrl: string; thumb: string; name: string } | null>(null)
+  const [over, setOver] = useState(false)
+  const takeImage = async (file?: File) => {
+    if (!file || !file.type.startsWith("image/")) return
+    const thumb = await readFile(file)
+    try { const dataUrl = await toDataUrl(thumb); setImage({ dataUrl, thumb, name: file.name.replace(/\.[^.]+$/, "") }) }
+    catch { setImage({ dataUrl: thumb, thumb, name: file.name.replace(/\.[^.]+$/, "") }) }
+  }
   // Colour-change mode — the palette grid is tucked away until "Change colour", so the
   // controls stay short until you want to recolour.
   const [showPalette, setShowPalette] = useState(false)
@@ -428,13 +415,16 @@ function MakerTab() {
   }, [])
 
   const busy = status !== "idle"
-  const ready = !!text.trim() && !!alphabet
+  const hasText = !!text.trim()
+  // Ready when there's SOMETHING to stitch: an image, or text with an alphabet. (Lettering
+  // needs an alphabet; an image on its own doesn't.)
+  const ready = !!image || (hasText && !!alphabet)
   const run = async (design: boolean) => {
     if (!ready) return
     setStatus(design ? "generating" : "previewing"); setErr(null)
     try {
-      const body = { text: text.trim(), alphabet, height, color }
-      const r = design ? await wilcomLettering(body) : await wilcomLetteringPreview(body)
+      const body = { image: image?.dataUrl, text: hasText ? text.trim() : undefined, alphabet, height, color, filename: image?.name, name: image?.name || (hasText ? text.trim() : undefined) }
+      const r = design ? await wilcomCombine(body) : await wilcomCombinePreview(body)
       if (!r.ok) throw new Error(r.error || "EWA rejected the request")
       setRes(r)
     } catch (e) { setErr(e instanceof Error ? e.message : "Failed") } finally { setStatus("idle") }
@@ -447,7 +437,7 @@ function MakerTab() {
     const id = setTimeout(() => { void run(false) }, 650)
     return () => clearTimeout(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, alphabet, height, color, ready])
+  }, [image?.dataUrl, text, alphabet, height, color, ready])
 
   const inputCls = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
   const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
@@ -459,11 +449,36 @@ function MakerTab() {
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(340px,400px)_1fr]">
-      {/* LEFT — controls, colour, sequence, readout, actions */}
+      {/* LEFT — image, text, colour, sequence, readout, actions */}
       <div className="space-y-4">
+        {/* Drop / choose the artwork to embroider. Optional — text can stitch on its own,
+            an image can stitch on its own, or both combine into one preview. */}
         <div>
-          <label className={labelCls}>Text</label>
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type to preview…" className={inputCls} />
+          <label className={labelCls}>Image</label>
+          {image ? (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={image.thumb} alt="" className="size-12 shrink-0 rounded-md border border-border object-contain" />
+              <span className="min-w-0 flex-1 truncate text-sm">{image.name}</span>
+              <button onClick={() => setImage(null)} title="Remove image" className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={14} /></button>
+            </div>
+          ) : (
+            <label
+              onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+              onDragLeave={() => setOver(false)}
+              onDrop={(e) => { e.preventDefault(); setOver(false); void takeImage(e.dataTransfer.files?.[0]) }}
+              className={"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-5 text-center transition-colors " + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
+            >
+              <ImageSquare size={20} className="text-muted-foreground" />
+              <span className="text-xs font-medium">Drop an image to embroider</span>
+              <span className="text-[11px] text-muted-foreground">or click to choose — optional</span>
+              <input type="file" accept="image/*" className="sr-only" onChange={(e) => { void takeImage(e.target.files?.[0]); e.currentTarget.value = "" }} />
+            </label>
+          )}
+        </div>
+        <div>
+          <label className={labelCls}>Text {image ? "(stitched with the image)" : "(optional)"}</label>
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type to add lettering…" className={inputCls} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -561,7 +576,7 @@ function MakerTab() {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={`data:image/png;base64,${res.trueview}`} alt="lettering preview" className="max-h-full max-w-full object-contain p-4" />
           ) : (
-            <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">{ready ? "Rendering…" : "Type some text to see it stitched."}</div>
+            <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">{ready ? "Rendering…" : "Drop an image or type text to see it stitched."}</div>
           )}
           {status === "previewing" && res?.trueview && <div className="absolute right-3 top-3 rounded-full bg-background/85 p-1.5"><CircleNotch size={16} className="animate-spin text-muted-foreground" /></div>}
         </div>
@@ -591,7 +606,7 @@ function HistoryTab() {
       {rows === null ? (
         <div className="h-40 animate-pulse rounded-2xl bg-muted" />
       ) : list.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">{q ? `No generations match “${q}”.` : "Nothing generated yet — generate a design from Browse."}</div>
+        <div className="rounded-2xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">{q ? `No generations match “${q}”.` : "Nothing generated yet — generate a design from Create."}</div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-border bg-card">
           <table className="w-full min-w-[640px] text-sm">
