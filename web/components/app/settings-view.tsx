@@ -266,6 +266,9 @@ function ApiKeysPanel() {
   const [fresh, setFresh] = useState<{ key: string; label: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // Active keys are all most people need to see; revoked ones pile up and used to push the
+  // whole Integrations page down. Tuck them behind a History tab so the panel stays short.
+  const [view, setView] = useState<"active" | "history">("active")
 
   const load = useCallback(() => {
     getApiKeys()
@@ -312,6 +315,8 @@ function ApiKeysPanel() {
   }
 
   const active = (keys ?? []).filter((k) => !k.revoked_at)
+  const revoked = (keys ?? []).filter((k) => k.revoked_at)
+  const shown = view === "active" ? active : revoked
 
   return (
     <SectionCard
@@ -374,6 +379,19 @@ function ApiKeysPanel() {
         </div>
       )}
 
+      {/* Active / History tabs — keep the panel short by hiding revoked keys by default. */}
+      <div className="flex items-center gap-1 border-b border-border px-5 py-2">
+        {(["active", "history"] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={"eg-tap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + (view === v ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+          >
+            {v === "active" ? `Active${active.length ? ` (${active.length})` : ""}` : `History${revoked.length ? ` (${revoked.length})` : ""}`}
+          </button>
+        ))}
+      </div>
+
       {/* list */}
       {keys === null ? (
         <div className="space-y-3 p-5">
@@ -381,19 +399,19 @@ function ApiKeysPanel() {
             <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
           ))}
         </div>
-      ) : active.length === 0 ? (
+      ) : shown.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-12 text-center">
           <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
             <Key size={22} weight="duotone" />
           </span>
-          <div className="font-medium">No active keys</div>
+          <div className="font-medium">{view === "active" ? "No active keys" : "No revoked keys"}</div>
           <div className="max-w-xs text-sm text-muted-foreground">
-            Generate a test key to call the sandbox endpoints.
+            {view === "active" ? "Generate a test key to call the sandbox endpoints." : "Keys you revoke will show up here."}
           </div>
         </div>
       ) : (
         <div className="divide-y divide-border">
-          {(keys ?? []).map((k) => (
+          {shown.map((k) => (
             <div key={String(k.id)} className={"flex items-center justify-between gap-4 px-5 py-3.5 " + (k.revoked_at ? "opacity-50" : "")}>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
