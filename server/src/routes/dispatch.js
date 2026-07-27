@@ -556,6 +556,11 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     if (!dispatchEnabled()) { reply.code(400); return { error: 'Dispatch partner not configured (BYEASTSIDE_API_KEY).' }; }
     const ids = Array.isArray((req.body || {}).orderIds) ? req.body.orderIds.map(String).filter(Boolean) : [];
     if (!ids.length) { reply.code(400); return { error: 'orderIds required' }; }
+    // Admin escape hatch: when the PARTNER refuses the recall (e.g. a 500 on their side), the
+    // order is stuck with a dispatch_pdf_id we can't clear the normal way, and the Scan tag
+    // stays amber forever. force lets an admin clear OUR link anyway — recorded honestly,
+    // because the label may still be in the partner's queue. Admin-only; ignored otherwise.
+    const force = !!(req.body || {}).force && req.user && req.user.role === 'admin';
 
     const rows = (await q(
       'select id, dispatch_pdf_id, label_scanned_at, tracking, seller_id from orders where id = any($1)', [ids]
@@ -575,7 +580,17 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         continue;
       }
       if (!r.ok && r.status !== 404) {   // 404 = already gone their side; treat as cancelled
-        results.push({ id: o.id, ok: false, reason: (r.data && (r.data.message || r.data.error)) || `partner error (${r.status})` });
+        const msg = (r.data && (r.data.message || r.data.error)) || `partner error (${r.status})`;
+        if (force) {
+          // Partner won't recall it, but the admin wants it off OUR board. Clear the link and
+          // RECORD why (the label may still be in their queue). No money reversal — that only
+          // runs on a genuine recall; a forced clear isn't proof the partner charge went away.
+          await q('update orders set dispatch_pdf_id=null, dispatch_error=$2 where id=$1',
+            [o.id, `force-cleared after recall failed: ${String(msg).slice(0, 200)}`]).catch(() => {});
+          results.push({ id: o.id, ok: true, forced: true, partnerError: msg });
+          continue;
+        }
+        results.push({ id: o.id, ok: false, reason: msg });
         continue;
       }
       await q('update orders set dispatch_pdf_id=null where id=$1', [o.id]).catch(() => {});
@@ -587,8 +602,10 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     const cancelled = results.filter((x) => x.ok).length;
     for (const r of results) {
       if (!r.ok) continue;
-      audit(req, 'dispatch.cancel', { entityType: 'order', entityId: String(r.id),
-        after: { partner: 'byeastside', pulledBack: true } });
+      audit(req, r.forced ? 'dispatch.force_clear' : 'dispatch.cancel', { entityType: 'order', entityId: String(r.id),
+        after: r.forced
+          ? { partner: 'byeastside', forced: true, note: 'partner recall failed — link force-cleared; label may still be in their queue', partnerError: r.partnerError }
+          : { partner: 'byeastside', pulledBack: true } });
     }
     if (cancelled) egBroadcast({ type: 'orders' });
     return { ok: true, cancelled, results };

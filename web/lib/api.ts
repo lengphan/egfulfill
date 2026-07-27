@@ -1184,8 +1184,10 @@ export function ledgerExportUrl(p: { partner?: string; account?: string; type?: 
   return `${API_BASE}/api/wallet/export?${s}`
 }
 
-export function cancelDispatch(orderIds: string[]) {
-  return api<DispatchCancelResult>(`/api/dispatch/cancel`, { method: "POST", body: JSON.stringify({ orderIds }) })
+/** `force` (admin only) clears our dispatch link even when the partner refuses the recall
+ *  (e.g. a 500), for an order stuck amber that can't be pulled back the normal way. */
+export function cancelDispatch(orderIds: string[], force = false) {
+  return api<DispatchCancelResult>(`/api/dispatch/cancel`, { method: "POST", body: JSON.stringify({ orderIds, force }) })
 }
 export function syncDispatch() {
   return api<{ ok?: boolean; checked?: number; scanned?: number }>(`/api/dispatch/sync`, { method: "POST" })
