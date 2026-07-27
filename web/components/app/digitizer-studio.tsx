@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent } from "react"
 // NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
 import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, UploadSimple, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal } from "@phosphor-icons/react"
@@ -381,26 +381,59 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
 
 const IDENTITY_TF: WilcomTransform = { x: 0, y: 0, scale: 1, angle: 0 }
 
-// One labelled slider for a transform value.
-function TfSlider({ label, value, min, max, step, unit, onChange }: { label: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }) {
-  return (
-    <label className="flex items-center gap-2 text-[11px]">
-      <span className="w-12 shrink-0 text-muted-foreground">{label}</span>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="min-w-0 flex-1 accent-[var(--primary)]" />
-      <span className="w-14 shrink-0 text-right tabular-nums text-muted-foreground">{value}{unit}</span>
-    </label>
-  )
-}
+// Direct-manipulation box over the preview: drag the body to MOVE, the corner nub to RESIZE,
+// the top nub to ROTATE — instant client-side feedback (a ghost of the element). EWA's live
+// preview ignores the transform, so the box + ghost is what you position against; the value
+// bakes into the generated .emb. BOX_SPAN_MM maps the preview's span to millimetres — a
+// nominal hoop width; tune once checked against real output.
+const BOX_SPAN_MM = 120
+type DragState = { mode: "move" | "resize" | "rotate"; sx: number; sy: number; start: WilcomTransform; cx: number; cy: number; d0: number; a0: number; rw: number; rh: number }
+function LayerBoxEditor({ tf, onChange, ghost }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode }) {
+  const drag = useRef<DragState | null>(null)
 
-// Move / resize / rotate a layer — maps to the decoration's <transform x y scale angle>.
-function TransformControls({ tf, onChange }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void }) {
+  // Single handlers, no ref-in-render: the host rect is read off the DOM via closest() at
+  // pointer-down time, and `data-mode` on the grabbed element says what to do.
+  const down = (e: RPointerEvent<HTMLElement>) => {
+    e.preventDefault(); e.stopPropagation()
+    const el = e.currentTarget
+    const host = el.closest("[data-boxhost]") as HTMLElement | null
+    const r = host?.getBoundingClientRect(); if (!r) return
+    const cx = r.left + r.width / 2 + (tf.x / BOX_SPAN_MM) * r.width
+    const cy = r.top + r.height / 2 - (tf.y / BOX_SPAN_MM) * r.height
+    drag.current = { mode: (el.dataset.mode as DragState["mode"]) || "move", sx: e.clientX, sy: e.clientY, start: { ...tf }, cx, cy, d0: Math.hypot(e.clientX - cx, e.clientY - cy) || 1, a0: Math.atan2(e.clientY - cy, e.clientX - cx), rw: r.width, rh: r.height }
+    try { el.setPointerCapture(e.pointerId) } catch { /* ignore */ }
+  }
+  const move = (e: RPointerEvent<HTMLElement>) => {
+    const d = drag.current; if (!d) return
+    e.preventDefault()
+    if (d.mode === "move") {
+      const dx = ((e.clientX - d.sx) / d.rw) * BOX_SPAN_MM
+      const dy = ((e.clientY - d.sy) / d.rh) * BOX_SPAN_MM
+      onChange({ ...d.start, x: Math.round(d.start.x + dx), y: Math.round(d.start.y - dy) })
+    } else if (d.mode === "resize") {
+      const dist = Math.hypot(e.clientX - d.cx, e.clientY - d.cy)
+      onChange({ ...d.start, scale: Math.max(0.2, Math.min(3, Math.round((dist / d.d0) * d.start.scale * 20) / 20)) })
+    } else {
+      const a = Math.atan2(e.clientY - d.cy, e.clientX - d.cx)
+      let deg = d.start.angle + ((a - d.a0) * 180) / Math.PI
+      deg = Math.round((((deg + 180) % 360) + 360) % 360 - 180)
+      onChange({ ...d.start, angle: deg })
+    }
+  }
+  const up = (e: RPointerEvent<HTMLElement>) => { drag.current = null; try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* ignore */ } }
+
+  const nub = "pointer-events-auto absolute size-4 touch-none rounded-full border-2 border-primary bg-background shadow"
   return (
-    <div className="space-y-1.5 border-t border-border bg-muted/20 px-3 py-2">
-      <TfSlider label="Move X" value={tf.x} min={-80} max={80} step={1} unit=" mm" onChange={(v) => onChange({ ...tf, x: v })} />
-      <TfSlider label="Move Y" value={tf.y} min={-80} max={80} step={1} unit=" mm" onChange={(v) => onChange({ ...tf, y: v })} />
-      <TfSlider label="Size" value={tf.scale} min={0.2} max={3} step={0.05} unit="×" onChange={(v) => onChange({ ...tf, scale: v })} />
-      <TfSlider label="Rotate" value={tf.angle} min={-180} max={180} step={5} unit="°" onChange={(v) => onChange({ ...tf, angle: v })} />
-      <button type="button" onClick={() => onChange(IDENTITY_TF)} className="text-[11px] font-medium text-primary hover:underline">Reset</button>
+    <div data-boxhost className="pointer-events-none absolute inset-0 z-10">
+      <div
+        data-mode="move" onPointerDown={down} onPointerMove={move} onPointerUp={up}
+        className="pointer-events-auto absolute flex cursor-move touch-none items-center justify-center rounded border-2 border-primary/80 bg-primary/5"
+        style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${34 * tf.scale}%`, aspectRatio: "1", transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
+      >
+        <div className="pointer-events-none flex max-h-full max-w-full items-center justify-center overflow-hidden opacity-70">{ghost}</div>
+        <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />
+        <div title="Drag to rotate" data-mode="rotate" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-7 left-1/2 -translate-x-1/2 cursor-grab"} />
+      </div>
     </div>
   )
 }
@@ -573,7 +606,12 @@ function CreateTab() {
                     <button onClick={() => setOpenLayer((o) => (o === "image" ? null : "image"))} title="Move / resize / rotate" className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === "image" ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
                     <button onClick={() => { setImage(null); setImgTf(IDENTITY_TF) }} title="Remove image layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
                   </div>
-                  {openLayer === "image" && <TransformControls tf={imgTf} onChange={setImgTf} />}
+                  {openLayer === "image" && (
+                    <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-[11px] text-muted-foreground">
+                      <span className="min-w-0 truncate">Drag the box on the preview — corner to resize, top nub to rotate</span>
+                      <button type="button" onClick={() => setImgTf(IDENTITY_TF)} className="shrink-0 font-medium text-primary hover:underline">Reset</button>
+                    </div>
+                  )}
                 </div>
               )}
               {hasText && (
@@ -584,7 +622,12 @@ function CreateTab() {
                     <button onClick={() => setOpenLayer((o) => (o === "text" ? null : "text"))} title="Move / resize / rotate" className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === "text" ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
                     <button onClick={() => { setText(""); setTxtTf(IDENTITY_TF) }} title="Remove text layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
                   </div>
-                  {openLayer === "text" && <TransformControls tf={txtTf} onChange={setTxtTf} />}
+                  {openLayer === "text" && (
+                    <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-[11px] text-muted-foreground">
+                      <span className="min-w-0 truncate">Drag the box on the preview — corner to resize, top nub to rotate</span>
+                      <button type="button" onClick={() => setTxtTf(IDENTITY_TF)} className="shrink-0 font-medium text-primary hover:underline">Reset</button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -624,6 +667,19 @@ function CreateTab() {
             <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">{ready ? "Rendering…" : "Drop an image or type text to see it stitched."}</div>
           )}
           {status === "previewing" && res?.trueview && <div className="absolute right-3 top-3 rounded-full bg-background/85 p-1.5"><CircleNotch size={16} className="animate-spin text-muted-foreground" /></div>}
+          {/* Direct-manipulation box for the active layer — the ghost is a live proxy since EWA's
+              preview doesn't reflect the transform; the value bakes into the generated file. */}
+          {openLayer === "image" && image && (
+            <LayerBoxEditor tf={imgTf} onChange={setImgTf} ghost={
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={image.thumb} alt="" className="max-h-full max-w-full object-contain" />
+            } />
+          )}
+          {openLayer === "text" && hasText && (
+            <LayerBoxEditor tf={txtTf} onChange={setTxtTf} ghost={
+              <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>
+            } />
+          )}
         </div>
         <div className="text-center text-[11px] text-muted-foreground">Live preview{status === "previewing" ? " · updating…" : ""} — the true stitched look, on the real fabric render.</div>
       </div>
