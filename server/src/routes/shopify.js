@@ -11,7 +11,9 @@ const API_SECRET  = process.env.SHOPIFY_API_SECRET || '';
 // Keep in lockstep with the scopes configured on the Shopify app (the authorize
 // request must be a subset of the app's allowed scopes). Fulfillment scopes get added
 // when order-sync/tracking is built.
-const SCOPES      = process.env.SHOPIFY_SCOPES || 'read_orders,write_orders,read_products';
+// Fulfillment-order scopes are needed to push tracking (create a fulfillment). A store
+// connected before these were added must RECONNECT to grant them, or the fulfillment 403s.
+const SCOPES      = process.env.SHOPIFY_SCOPES || 'read_orders,write_orders,read_products,write_merchant_managed_fulfillment_orders,read_merchant_managed_fulfillment_orders';
 // Force canonical (non-www) so the authorize redirect_uri matches the popup origin.
 const REDIRECT_URI = (process.env.SHOPIFY_REDIRECT_URI || 'https://egful.store/oauth-callback.html').replace('://www.', '://');
 const API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-07';
@@ -177,6 +179,53 @@ async function registerWebhooks(shop, token) {
     } catch (e) { results.push({ topic, ok: false, error: e.message }); }
   }
   return results;
+}
+
+// Our carrier → Shopify's tracking "company" (its supported carrier list auto-builds the
+// tracking URL). Unknown carriers pass through verbatim, which Shopify accepts as a custom name.
+function shopifyCarrier(c) {
+  const s = String(c || '').trim().toLowerCase();
+  if (!s) return 'Other';
+  if (s.includes('usps')) return 'USPS';
+  if (s.includes('ups')) return 'UPS';
+  if (s.includes('fedex')) return 'FedEx';
+  if (s.includes('dhl')) return 'DHL Express';
+  return String(c);
+}
+
+/**
+ * Push tracking to Shopify for one order — creates a Fulfillment against the order's open
+ * fulfillment orders, which marks it fulfilled and (notify_customer) EMAILS the buyer.
+ * VERIFIED against the Admin REST docs: GET the order's fulfillment_orders, then
+ * POST /fulfillments.json with line_items_by_fulfillment_order + tracking_info. Bound to the
+ * order's OWNER store (no fallback). Throws on any problem. NB: needs the fulfillment-order
+ * scopes below — an existing connection must RECONNECT before this works.
+ */
+export async function shopifyPushTracking(order, tracking, carrier) {
+  const m = String((order && order.id) || '').match(/^shopify-(.+)$/i);
+  if (!m) throw new Error('Not a Shopify order');
+  const orderNumId = m[1];
+  const conns = (await q(`select * from platform_connections where platform='shopify'`)).rows;
+  const conn = conns.find((c) => order && String(c.connected_by) === String(order.seller_id))
+    || conns.find((c) => order && c.shop_name && c.shop_name === order.store)
+    || null;
+  if (!conn) throw new Error("Couldn't tell which connected Shopify store this order belongs to");
+  const base = `https://${conn.shop_id}/admin/api/${API_VERSION}`;
+  const headers = { 'X-Shopify-Access-Token': conn.access_token, 'Content-Type': 'application/json' };
+  const foRes = await fetch(`${base}/orders/${encodeURIComponent(orderNumId)}/fulfillment_orders.json`, { headers });
+  const foData = await foRes.json().catch(() => ({}));
+  if (!foRes.ok) throw new Error(`Shopify fulfillment_orders ${foRes.status}`);
+  const open = (foData.fulfillment_orders || []).filter((f) => ['open', 'in_progress', 'scheduled'].includes(String(f.status)));
+  if (!open.length) return { ok: true, channel: 'shopify', already: true };   // nothing left to fulfil
+  const body = { fulfillment: {
+    line_items_by_fulfillment_order: open.map((f) => ({ fulfillment_order_id: f.id })),
+    tracking_info: { number: tracking, company: shopifyCarrier(carrier) },
+    notify_customer: true,
+  } };
+  const fRes = await fetch(`${base}/fulfillments.json`, { method: 'POST', headers, body: JSON.stringify(body) });
+  const fData = await fRes.json().catch(() => ({}));
+  if (!fRes.ok) throw new Error((fData.errors && JSON.stringify(fData.errors)) || `Shopify fulfillment ${fRes.status}`);
+  return { ok: true, channel: 'shopify' };
 }
 
 export function shopifyRoutes(app, requireAuth, requireStaff) {
