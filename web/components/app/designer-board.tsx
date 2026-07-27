@@ -488,10 +488,21 @@ export function DesignerBoard() {
                             <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
                           )}
                           {c.is_emb && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
-                          {/* Outsourced: whose queue this is actually in. Our designers do
-                              embroidery, so DTG/DTF is worked by a partner — showing it on
-                              the tile stops anyone reaching for a job that isn't theirs. */}
-                          {c.vendor && <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-pink-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{vendorLabel(c.vendor)}</span>}
+                          {/* Top-right tag = WHO owns this card's queue. A partner card shows the
+                              partner (pink). Otherwise, if someone on OUR side has claimed it, their
+                              NAME shows here — VIOLET when a designer claimed it (e.g. Abdul), SLATE
+                              (secondary) when it's factory (operator/warehouse/admin, e.g. Linh) —
+                              so at a glance you see who's on the job. */}
+                          {c.vendor ? (
+                            <span className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-pink-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{vendorLabel(c.vendor)}</span>
+                          ) : c.claimed_by ? (
+                            <span
+                              title={`Claimed by ${c.claimed_by}${c.claimed_role ? ` (${c.claimed_role})` : ""}`}
+                              className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-[10px] font-medium text-white " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary/90" : "bg-slate-600/90")}
+                            >
+                              <span className="truncate">{String(c.claimed_by)}</span>
+                            </span>
+                          ) : null}
                           {/* Cancel the card without opening it. Hover-revealed so a full
                               column isn't a grid of delete buttons, and it confirms —
                               removal is not undoable and these sit under a drag handle.
@@ -522,22 +533,20 @@ export function DesignerBoard() {
                             NEUTRAL — no green/amber tint on the bottom row. */}
                         <div className="flex min-h-[4.75rem] flex-col p-2.5">
                           <div className="line-clamp-2 text-sm font-medium leading-tight">{c.title || "Design"}</div>
-                          {/* Essential meta, only when present: order #, method/product, file count. */}
-                          {(c.order_id || c.product || c.type || (c.file_count ?? 0) > 0) && (
-                            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
-                              {c.order_id ? (
-                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono">{String(c.order_id).slice(0, 12)}</span>
-                              ) : null}
-                              {(c.product || c.type) && (
-                                <span className="rounded bg-muted px-1.5 py-0.5">{c.product || c.type}</span>
-                              )}
-                              {(c.file_count ?? 0) > 0 && (
-                                <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5" title={`${c.file_count} design file${c.file_count === 1 ? "" : "s"}`}>
-                                  <Paperclip size={9} weight="bold" />{c.file_count}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          {/* Order ID + file number ALWAYS show so a card is readable at a glance —
+                              a card with no order says "No order" rather than going blank, and the
+                              file count shows even at 0. Method/product sits between them when set. */}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono" title={c.order_id ? `Order ${c.order_id}` : "Not attached to an order"}>
+                              {c.order_id ? String(c.order_id).slice(0, 14) : "No order"}
+                            </span>
+                            {(c.product || c.type) && (
+                              <span className="rounded bg-muted px-1.5 py-0.5">{c.product || c.type}</span>
+                            )}
+                            <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5" title={`${c.file_count ?? 0} design file${(c.file_count ?? 0) === 1 ? "" : "s"}`}>
+                              <Paperclip size={9} weight="bold" />{c.file_count ?? 0}
+                            </span>
+                          </div>
                           {/* Docked to the bottom: DSN id (left) + what the design pays (right).
                               The amount is FACTORY-ONLY — a designer never sees it (their earnings
                               live in their wallet), on internal AND partner cards. Internal = the
