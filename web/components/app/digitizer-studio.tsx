@@ -8,7 +8,7 @@ import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-mat
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
   wilcomPreview, wilcomDigitize, getWilcomGenerations, createDesignCard,
-  getWilcomAlphabets, wilcomCombinePreview, wilcomCombine,
+  getWilcomAlphabets, wilcomCombine, wilcomLetteringPreview,
   type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration, type WilcomTransform,
 } from "@/lib/api"
 
@@ -455,7 +455,9 @@ function CreateTab() {
   const [alphabets, setAlphabets] = useState<string[]>([])
   const [palette, setPalette] = useState<ThreadColor[]>([])
   const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
-  const [res, setRes] = useState<WilcomResult | null>(null)
+  const [res, setRes] = useState<WilcomResult | null>(null)   // the GENERATED combined .emb (download + readout)
+  const [imgRes, setImgRes] = useState<WilcomResult | null>(null) // the image's OWN stitched preview
+  const [txtRes, setTxtRes] = useState<WilcomResult | null>(null) // the text's OWN stitched preview
   const [err, setErr] = useState<string | null>(null)
   // Per-layer move / resize / rotate → the decoration's <transform>. Identity by default so a
   // fresh combine renders exactly as before until you actually adjust something.
@@ -491,32 +493,52 @@ function CreateTab() {
   // Ready when there's SOMETHING to stitch: an image, or text with an alphabet. (Lettering
   // needs an alphabet; an image on its own doesn't.)
   const ready = !!image || (hasText && !!alphabet)
-  const run = async (design: boolean) => {
+  // GENERATE — the real single .emb: EWA combines the layers with their transforms. Runs only
+  // on the button, never live, so arranging on the canvas costs nothing.
+  const generate = async () => {
     if (!ready) return
-    setStatus(design ? "generating" : "previewing"); setErr(null)
+    setStatus("generating"); setErr(null)
     try {
       const body = { image: image?.dataUrl, text: hasText ? text.trim() : undefined, alphabet, height, color, filename: image?.name, name: image?.name || (hasText ? text.trim() : undefined),
         designTransform: image ? imgTf : undefined, letterTransform: hasText ? txtTf : undefined }
-      const r = design ? await wilcomCombine(body) : await wilcomCombinePreview(body)
+      const r = await wilcomCombine(body)
       if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null) }
       else setRes(r)
     } catch (e) { setErr(e instanceof Error ? e.message : "Failed") } finally { setStatus("idle") }
   }
 
-  // Live preview — auto-render as you type/tweak (debounced), no button press. Pauses while a
-  // file is generating so it isn't interrupted; Generate still emits the machine file on demand.
+  // Each layer previews on its OWN (a stitched TrueView), then you arrange it directly on the
+  // canvas — so what you drag IS the rendered element, not a proxy floating over a separate
+  // combined render (that was the "two separate" problem). The image preview fetches once per
+  // image; the text preview re-fetches as the text/font/size/colour changes. Neither re-fires
+  // on move/resize/rotate — that's client-side.
   useEffect(() => {
-    if (!ready || status === "generating") return
-    const id = setTimeout(() => { void run(false) }, 650)
-    return () => clearTimeout(id)
-    // NB: imgTf/txtTf are deliberately NOT deps — moving/resizing a layer is client-side only
-    // (the box + ghost), so it must NOT re-call EWA. The transform is still sent on Generate.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image?.dataUrl, text, alphabet, height, color, ready])
+    let live = true
+    // setState happens inside the timeout (deferred), never synchronously in the effect body.
+    const id = setTimeout(() => {
+      if (!live) return
+      if (!image) { setImgRes(null); return }
+      void wilcomPreview({ image: image.dataUrl, filename: image.name }).then((r) => { if (live && r.ok) setImgRes(r) }).catch(() => {})
+    }, image ? 300 : 0)
+    return () => { live = false; clearTimeout(id) }
+  }, [image])
+  useEffect(() => {
+    const active = hasText && !!alphabet
+    let live = true
+    const id = setTimeout(() => {
+      if (!live) return
+      if (!active) { setTxtRes(null); return }
+      void wilcomLetteringPreview({ text: text.trim(), alphabet, height, color }).then((r) => { if (live && r.ok) setTxtRes(r) }).catch(() => {})
+    }, active ? 550 : 0)
+    return () => { live = false; clearTimeout(id) }
+  }, [text, alphabet, height, color, hasText])
 
   const inputCls = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
   const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
   const ext = res?.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : null
+  // Live stitch estimate while arranging = sum of the layers' own previews (the generated
+  // combine gives the exact figure once you Generate).
+  const shownStitches = res?.stitches ?? (((imgRes?.stitches ?? 0) + (txtRes?.stitches ?? 0)) || null)
   // The cone currently selected, so the colour control can name it rather than show a bare hex.
   const selCone = palette.find((c) => c.hex.toLowerCase() === color.toLowerCase())
   const cones = pQuery ? palette.filter((c) => `${c.name} ${c.code}`.toLowerCase().includes(pQuery.toLowerCase())) : palette
@@ -646,12 +668,12 @@ function CreateTab() {
 
         {/* Live readout — stitch count, size, file format. */}
         <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-muted/30 p-3 text-center">
-          <div><div className="text-base font-semibold tabular-nums">{res?.stitches != null ? res.stitches.toLocaleString() : "—"}</div><div className="text-[11px] text-muted-foreground">stitches</div></div>
+          <div><div className="text-base font-semibold tabular-nums">{shownStitches != null ? shownStitches.toLocaleString() : "—"}</div><div className="text-[11px] text-muted-foreground">stitches</div></div>
           <div><div className="text-base font-semibold tabular-nums">{res?.width != null && res?.height != null ? `${Math.round(res.width)}×${Math.round(res.height)}` : "—"}</div><div className="text-[11px] text-muted-foreground">mm</div></div>
-          <div><div className="text-base font-semibold">{ext ?? (status === "previewing" ? "…" : "—")}</div><div className="text-[11px] text-muted-foreground">file</div></div>
+          <div><div className="text-base font-semibold">{ext ?? "—"}</div><div className="text-[11px] text-muted-foreground">file</div></div>
         </div>
 
-        <button onClick={() => run(true)} disabled={busy || !ready} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+        <button onClick={generate} disabled={busy || !ready} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
           {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : <DownloadSimple size={14} weight="bold" />} Generate file
         </button>
         {res?.machineFile && (
@@ -666,34 +688,34 @@ function CreateTab() {
       {/* RIGHT — the big preview, the hero of the tab; sticks while you scroll the controls. */}
       <div className="space-y-2 lg:sticky lg:top-4">
         <div className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
-          {res?.trueview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={`data:image/png;base64,${res.trueview}`} alt="embroidery preview" className="max-h-full max-w-full object-contain p-4" />
-          ) : err ? (
-            // Surface EWA's own message right in the frame — a blank preview otherwise looks
-            // broken with no reason. This is also what tells us why a combine failed.
-            <div className="grid size-full place-items-center gap-2 p-6 text-center text-sm text-amber-700 dark:text-amber-300"><Warning size={22} weight="fill" /><span className="max-w-md">{err}</span></div>
-          ) : (
-            <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">{ready ? "Rendering…" : "Drop an image or type text to see it stitched."}</div>
+          {!ready && (
+            <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">Drop an image or type text — then arrange it here.</div>
           )}
-          {status === "previewing" && res?.trueview && <div className="absolute right-3 top-3 rounded-full bg-background/85 p-1.5"><CircleNotch size={16} className="animate-spin text-muted-foreground" /></div>}
-          {/* Direct-manipulation boxes — one per layer, ALWAYS shown so you click the element
-              itself to select + drag (no separate toggle). The ghost is a live client-side proxy
-              since EWA's preview ignores the transform; the value bakes into the generated file.
-              Dragging never calls EWA. */}
+          {ready && err && (
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-30 m-2 flex items-start gap-2 rounded-lg bg-amber-50/95 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/70 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{err}</span></div>
+          )}
+          {/* Layers arranged DIRECTLY — each shows its own stitched TrueView (or a placeholder
+              while it renders) and you drag / resize / rotate it in place. This IS the design;
+              Generate merges the layers into one .emb. No divergent combined render underneath. */}
           {image && (
             <LayerBoxEditor tf={imgTf} onChange={setImgTf} selected={openLayer === "image"} onSelect={() => setOpenLayer("image")} ghost={
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={image.thumb} alt="" className="max-h-full max-w-full object-contain" />
+              imgRes?.trueview
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={`data:image/png;base64,${imgRes.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
+                // eslint-disable-next-line @next/next/no-img-element
+                : <img src={image.thumb} alt="" className="max-h-full max-w-full object-contain opacity-60" />
             } />
           )}
           {hasText && (
             <LayerBoxEditor tf={txtTf} onChange={setTxtTf} selected={openLayer === "text"} onSelect={() => setOpenLayer("text")} ghost={
-              <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>
+              txtRes?.trueview
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={`data:image/png;base64,${txtRes.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
+                : <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>
             } />
           )}
         </div>
-        <div className="text-center text-[11px] text-muted-foreground">Live preview{status === "previewing" ? " · updating…" : ""} — the true stitched look, on the real fabric render.</div>
+        <div className="text-center text-[11px] text-muted-foreground">Arrange the layers here — each shows its stitched look. Generate merges them into one file.</div>
       </div>
     </div>
   )
