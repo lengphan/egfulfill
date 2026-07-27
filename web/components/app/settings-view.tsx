@@ -1697,9 +1697,13 @@ function UsersPanel() {
   // so it's flagged separately. Lets an admin see head-room before hand-editing a number,
   // without changing anything: the cap stays the master knob (raise it in Platform to take
   // more overall), an edit here only moves that one seller.
-  const activeSellers = users.filter((u) => u.role === "seller" && u.active !== false)
-  const unlimitedSellers = activeSellers.filter((u) => u.order_limit === 0).length
-  const allocated = activeSellers.reduce((s, u) => s + (u.order_limit != null ? u.order_limit : defaultLimit), 0)
+  // Everything that eats into the factory cap: sellers, plus any account that has orders of
+  // its own (the factory/admin shop). A seller with no limit inherits the platform default;
+  // a factory account contributes only its explicit limit (0 = unlimited → counts as 0).
+  const hasOwnOrders = (u: AdminUser) => (u.orders_total ?? 0) > 0 || (u.orders_today ?? 0) > 0
+  const limitContributors = users.filter((u) => u.active !== false && (u.role === "seller" || hasOwnOrders(u)))
+  const unlimitedSellers = limitContributors.filter((u) => u.order_limit === 0).length
+  const allocated = limitContributors.reduce((s, u) => s + (u.order_limit != null ? u.order_limit : (u.role === "seller" ? defaultLimit : 0)), 0)
   // "Busiest first" = trailing 14-day volume, descending — so after suggesting limits the
   // heavy hitters float to the top for a quick review. Sorted BEFORE grouping so a team's
   // leader lands by their own volume (members still sit under them).
@@ -1763,7 +1767,7 @@ function UsersPanel() {
               only moves that one row. Amber when the sum runs past the cap. */}
           {cap?.mode && cap.limit > 0 && (
             <span className="w-full text-xs text-muted-foreground">
-              Factory cap <span className="font-medium text-foreground tabular-nums">{cap.limit}</span>/day · allocated to sellers <span className="tabular-nums">~{allocated}</span>
+              Factory cap <span className="font-medium text-foreground tabular-nums">{cap.limit}</span>/day · allocated <span className="tabular-nums">~{allocated}</span>
               {allocated > cap.limit
                 ? <span className="font-medium text-primary"> · over by {allocated - cap.limit} (raise the cap in Platform to take more)</span>
                 : <span> · {cap.limit - allocated} free</span>}
@@ -1854,13 +1858,14 @@ function UsersPanel() {
                   {/* Joined — context, not a control, so it stays quiet. */}
                   <span className="hidden truncate text-sm text-muted-foreground lg:block">{fmtDate(u.created_at)}</span>
 
-                  {/* Activity — sellers carry orders. Today's uploads over their daily limit
-                      (edit the limit inline; amber once at/over), then how long since the last
-                      order so a dormant account is obvious. Staff have no orders of their own. */}
+                  {/* Order limit — sellers, plus any account that syncs its own orders (the
+                      factory/admin shop). Edit inline; amber once today hits the limit. A
+                      seller with none set inherits the platform default; a factory account
+                      shows "No limit" until you set one. Staff with no orders stay "—". */}
                   <div className="hidden min-w-0 text-xs lg:block">
-                    {isSeller ? (
+                    {isSeller || hasOwnOrders(u) ? (
                       <>
-                        <LimitCell user={u} canEdit={isAdminCaller} defaultLimit={defaultLimit} saving={busy === u.id} onSave={(v) => saveOrderLimit(u, v)} />
+                        <LimitCell user={u} canEdit={isAdminCaller} defaultLimit={isSeller ? defaultLimit : 0} saving={busy === u.id} onSave={(v) => saveOrderLimit(u, v)} />
                         {lastActive && (
                           <div className="mt-0.5 truncate text-xs text-muted-foreground">last order {lastActive}</div>
                         )}
