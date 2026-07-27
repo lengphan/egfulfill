@@ -38,6 +38,7 @@ import {
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
 import { OrderStageMenu } from "@/components/app/order-stage-menu"
+import { LabelActionButton } from "@/components/app/label-action-button"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { designSrc } from "@/lib/order-image"
 
@@ -258,11 +259,19 @@ export default function OrderDetailPage() {
               Staff also get the factory move set here: the board row is the quick option,
               but the detail page is where an order is actually worked. */}
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {/* Label control sits next to Cancel; it shows "Create label" until one is bought,
+                then a "Download label" split (download / create another / refund). The ⋯ stage
+                menu moves to the END of the row. */}
             {isStaff && canFulfill && (
-              <Button variant="outline" size="sm" onClick={() => setLabelOpen(true)}>
-                <Truck size={14} weight="bold" /> New label
-              </Button>
+              <LabelActionButton
+                order={order}
+                onOpenLabel={() => setLabelOpen(true)}
+                onChanged={reloadAll}
+                onError={setActionErr}
+              />
             )}
+            <CancelOrderButton order={order} onDone={reload} />
+            <SubmitOrderButton order={order} quote={quote} onDone={reload} />
             {isStaff && (
               <OrderStageMenu
                 order={order}
@@ -273,8 +282,6 @@ export default function OrderDetailPage() {
                 onError={setActionErr}
               />
             )}
-            <CancelOrderButton order={order} onDone={reload} />
-            <SubmitOrderButton order={order} quote={quote} onDone={reload} />
           </div>
         </div>
         {isStaff && actionErr && (
