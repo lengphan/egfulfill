@@ -45,7 +45,7 @@ const readFile = (f: File) => new Promise<string>((res, rej) => {
  * notice you're sending the wrong file is before, not after.
  */
 export function PushToPartnerDialog({
-  open, onOpenChange, orderId, sku, cardId, itemName, qty, printType, artworkUrl, onPushed,
+  open, onOpenChange, orderId, sku, cardId, itemName, qty, printType, artworkUrl, initialDescription, onPushed,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -58,6 +58,9 @@ export function PushToPartnerDialog({
   qty?: number | null
   printType?: string | null
   artworkUrl?: string | null
+  // The card's own description/notes, pre-filled so the notes typed on the card carry into
+  // the push rather than being retyped in a second window.
+  initialDescription?: string | null
   onPushed?: (refId?: string) => void
 }) {
   const [status, setStatus] = useState<{ configured: boolean; ok?: boolean; error?: string } | null>(null)
@@ -92,7 +95,9 @@ export function PushToPartnerDialog({
     const t = setTimeout(() => {
       load()
       setTitle(orderId ? `${itemName || sku || "Design"} · order ${orderId}` : (itemName || sku || "Design"))
-      setDesc([
+      // Prefer the card's own notes when it has some; otherwise fall back to the auto summary.
+      const seeded = (initialDescription ?? "").trim()
+      setDesc(seeded || [
         printType ? `Print method: ${printType}.` : null,
         orderId ? `Order ${orderId}${sku ? `, SKU ${sku}` : ""}.` : "Not tied to an order.",
       ].filter(Boolean).join(" "))
@@ -100,7 +105,7 @@ export function PushToPartnerDialog({
       setExtras([])
     }, 0)
     return () => clearTimeout(t)
-  }, [open, load, itemName, sku, orderId, qty, printType])
+  }, [open, load, itemName, sku, orderId, qty, printType, initialDescription])
 
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return

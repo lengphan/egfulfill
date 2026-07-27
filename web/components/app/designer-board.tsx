@@ -377,6 +377,8 @@ export function DesignerBoard() {
         itemName={pushCard?.title}
         printType={pushCard?.type}
         artworkUrl={pushCard?.thumb ? String(pushCard.thumb) : null}
+        // Carry the card's own notes into the push so it's one set of notes, one window.
+        initialDescription={pushCard ? String(((pushCard.specs && typeof pushCard.specs === "object" ? pushCard.specs : {}) as Record<string, unknown>).description ?? "") : undefined}
         onPushed={() => { setPushCard(null); load() }}
       />
 
@@ -789,6 +791,18 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
     if (t && t !== card.title) patch(card.id, { title: t })
   }
 
+  // Card DESCRIPTION / notes — free text for customised-design instructions. Persisted in the
+  // card's `specs` blob (specs.description), which already round-trips through the whole-list
+  // save, so no schema change. This is the single place notes live; the partner push reads
+  // the same text, so there aren't two separate windows to keep in sync.
+  const cardSpecs = (card.specs && typeof card.specs === "object" ? card.specs : {}) as Record<string, unknown>
+  const [desc, setDesc] = useState(String(cardSpecs.description ?? ""))
+  const saveDesc = () => {
+    const next = desc.trim()
+    if (next === String(cardSpecs.description ?? "")) return
+    patch(card.id, { specs: { ...cardSpecs, description: next } })
+  }
+
   const move = (to: string, extra?: Partial<DesignCard>) => onMove(card, to, extra)
   // Only warehouse + admin set the design fee / credit; operators & designers can't.
   const canFee = (() => { const r = getUser()?.role; return r === "admin" || r === "warehouse" })()
@@ -909,6 +923,22 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               <PaperPlaneTilt size={14} weight="bold" /> Send to Pink Design
             </Button>
           )}
+        </div>
+
+        {/* Description / notes — the single place instructions for a customised design live
+            (placement, colours, personalisation). Saved to the card on blur, and pre-filled
+            into the partner push, so it's one set of notes in one window. */}
+        <div className="space-y-1.5">
+          <label htmlFor={`card-desc-${card.id}`} className="text-sm font-medium">Description / notes</label>
+          <textarea
+            id={`card-desc-${card.id}`}
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            onBlur={saveDesc}
+            rows={4}
+            placeholder="Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."
+            className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+          />
         </div>
 
         {/* Their task ref (= our vendor_ref). Shown so it can be cross-referenced on Pink's
