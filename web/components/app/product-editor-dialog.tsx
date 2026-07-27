@@ -9,7 +9,7 @@ import { readImageFile } from "@/components/app/design-canvas"
 import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { getFactorySettings, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
-import { normTech, normalizeMethods, PRODUCT_METHODS } from "@/lib/print-method"
+import { normalizeMethods, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 
 // Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
@@ -117,7 +117,11 @@ export function ProductEditorDialog({
   const typeMockup = types.find((t) => t.name === type)?.mockup ?? null
   const typeSides = types.find((t) => t.name === type)?.sides ?? []
   const [method, setMethod] = useState("DTG")
-  const [price, setPrice] = useState("")
+  // Product cost = what the blank costs US from the supplier (COGS). Base cost = what we
+  // charge the seller. Shipping = the fee. There is no separate "retail price" here — the
+  // server charges Base cost + shipping and never a retail figure (see server/pricing.js),
+  // so the margin that matters is Base cost − Product cost.
+  const [productCost, setProductCost] = useState("")
   const [basePrice, setBasePrice] = useState("")
   const [shipping, setShipping] = useState("")
   const [desc, setDesc] = useState("")
@@ -156,7 +160,7 @@ export function ProductEditorDialog({
       setName(p?.name ?? "")
       setType(p?.type ?? "Apparel")
       setMethod(p?.method ?? "DTG")
-      setPrice(p?.price != null ? String(p.price) : "")
+      setProductCost(p?.productCost != null ? String(p.productCost) : "")
       setBasePrice(p?.basePrice != null ? String(p.basePrice) : p?.base_price != null ? String(p.base_price) : "")
       setShipping(p?.shippingFee != null ? String(p.shippingFee) : p?.shipping_fee != null ? String(p.shipping_fee) : "")
       // Supplier feeds send HTML fragments (<p><strong>95% Cotton…</strong></p>), which
@@ -231,25 +235,13 @@ export function ProductEditorDialog({
     return "ship_garment"
   })()
   const bandFee = fees?.[bandKey]
-  const methodKey = "method_" + (normTech(method)?.key ?? "dtg")
-  const surcharge = fees?.[methodKey] ?? 0
 
-  // Prefill retail = base cost + method surcharge, but ONLY until the seller types their
-  // own price. Recomputing after that would overwrite a deliberate figure on every
-  // keystroke elsewhere in the form.
-  const [priceTouched, setPriceTouched] = useState(false)
-  useEffect(() => {
-    if (priceTouched || !fees) return
-    const base = Number(basePrice)
-    if (!isFinite(base) || base <= 0) return
-    const id = setTimeout(() => setPrice(String(Math.round((base + surcharge) * 100) / 100)), 0)
-    return () => clearTimeout(id)
-  }, [basePrice, surcharge, fees, priceTouched])
-
-  // Live margin readout.
-  const retail = num(price), cost = num(basePrice), ship = num(shipping)
-  const profit = !isNaN(retail) ? retail - (isNaN(cost) ? 0 : cost) - (isNaN(ship) ? 0 : ship) : NaN
-  const marginPct = !isNaN(profit) && retail > 0 ? Math.round((profit / retail) * 100) : NaN
+  // Live margin readout — our margin as the factory: what we charge the seller (Base cost)
+  // minus what the blank cost us (Product cost). Shipping is a pass-through fee, not part of
+  // the product margin, so it's shown as its own column rather than folded in here.
+  const base = num(basePrice), pcost = num(productCost)
+  const profit = !isNaN(base) && !isNaN(pcost) ? base - pcost : NaN
+  const marginPct = !isNaN(profit) && base > 0 ? Math.round((profit / base) * 100) : NaN
 
   const save = () => {
     if (!name.trim()) { setErr("Give the product a name."); return }
@@ -260,8 +252,12 @@ export function ProductEditorDialog({
       id: product?.id ?? genId(newIdSeed),
       name: name.trim(),
       type, method, status,
-      price: Number(price) || 0,
-      basePrice: Number(basePrice) || Number(price) || 0,
+      // Product cost = supplier COGS; Base cost = what the seller is charged. Save both as
+      // undefined when blank so the server derives base = productCost + markup rather than
+      // treating a blank as $0 (see server/pricing.js). `price` (any legacy retail figure)
+      // is preserved untouched via the spread above — it's no longer edited here.
+      productCost: productCost.trim() === "" ? undefined : Number(productCost) || 0,
+      basePrice: basePrice.trim() === "" ? undefined : Number(basePrice) || 0,
       shippingFee: shipping.trim() === "" ? undefined : Number(shipping) || 0,
       sizePrices: strToTiers(tiers, sizes),
       description: desc.trim() || undefined,
@@ -371,14 +367,14 @@ export function ProductEditorDialog({
           {/* Pricing + live margin */}
           <div className="rounded-xl border border-border p-4">
             <div className="grid grid-cols-3 gap-3">
-              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Retail price ($)</span><Input value={price} onChange={(e) => { setPriceTouched(true); setPrice(e.target.value.replace(/[^0-9.]/g, "")) }} placeholder="42.00" className="h-9" inputMode="decimal" /></label>
-              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Base cost ($)</span><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="18.00" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Product cost ($)</span><Input value={productCost} onChange={(e) => setProductCost(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="from supplier" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Base cost ($)</span><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={pcost > 0 && markup ? `${(pcost + markup).toFixed(2)} (cost + markup)` : "18.00"} className="h-9" inputMode="decimal" /></label>
               <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Shipping fee ($)</span><Input value={shipping} onChange={(e) => setShipping(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={bandFee != null ? `default ${bandFee}` : "default"} className="h-9" inputMode="decimal" /></label>
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
-              <span className="text-muted-foreground">Margin per unit</span>
+              <span className="text-muted-foreground">Margin per unit <span className="opacity-70">(base − product cost)</span></span>
               {isNaN(profit) ? (
-                <span className="text-muted-foreground">enter a retail price</span>
+                <span className="text-muted-foreground">enter product + base cost</span>
               ) : (
                 <span className={"font-semibold tabular-nums " + (profit >= 0 ? "text-emerald-600" : "text-destructive")}>
                   ${profit.toFixed(2)}{!isNaN(marginPct) ? ` · ${marginPct}%` : ""}
@@ -443,22 +439,21 @@ export function ProductEditorDialog({
                         title={shipping.trim() !== "" ? "Using the product-level shipping fee above" : (bandFee != null ? "Platform default for this weight band" : undefined)}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Shipping fee for size ${s}`}
                       />
-                      {/* Margin for THIS size, at the end of its own row. Retail is the
-                          product's retail price (there is one per product, not per size);
-                          the base cost is this row's if set, otherwise the derived
-                          cost + markup, otherwise the product-level base. Without this
-                          the only margin shown was the product-level one, which is wrong
-                          the moment a 3XL costs more to buy or to ship. */}
+                      {/* Margin for THIS size = its Base cost − its Product cost (what we
+                          charge the seller minus what the blank costs us). Base is this
+                          row's if typed, else the derived product-cost + markup, else the
+                          product-level base; product cost is this row's, else the product
+                          level. A 3XL that costs more to buy shows a thinner margin here. */}
                       {(() => {
-                        const retailN = Number(price)
                         const baseN = t?.price?.trim() ? Number(t.price)
                           : derived ? Number(derived)
                           : Number(basePrice)
-                        const m = retailN - baseN
+                        const costRow = t?.cost?.trim() ? Number(t.cost) : Number(productCost)
+                        const m = baseN - costRow
                         return (
                           <span
                             className={"text-right text-xs font-semibold tabular-nums " + (!isFinite(m) ? "text-muted-foreground" : m >= 0 ? "text-emerald-600" : "text-destructive")}
-                            title={isFinite(m) ? `Retail ${retailN.toFixed(2)} − base ${baseN.toFixed(2)}` : "Enter a retail price and a cost"}
+                            title={isFinite(m) ? `Base ${baseN.toFixed(2)} − product cost ${costRow.toFixed(2)}` : "Enter a product cost and a base cost"}
                           >
                             {isFinite(m) ? `$${m.toFixed(2)}` : "—"}
                           </span>
