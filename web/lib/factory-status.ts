@@ -4,9 +4,10 @@
 //   (new) → In review → Awaiting scan → Scanned → Printing → Packing → Shipped
 //
 // (Queued / QC / Packed were the OLDER model — kept only as normalize() aliases.) Plus
-// off-pipeline EXCEPTION states an order can drop into: On hold, Flagged, Backorder,
-// Cancelled, Refunded. An order's overall stage = its least-advanced item (only "Shipped"
-// when every line is), unless any item is in an exception state.
+// off-pipeline EXCEPTION states an order can drop into: On hold, Cancelled, Refunded.
+// (Flagged + Backorder were retired — normalizeStage collapses any legacy value onto On
+// hold, the one remaining stop.) An order's overall stage = its least-advanced item (only
+// "Shipped" when every line is), unless any item is in an exception state.
 
 export type FactoryTone = "new" | "review" | "neutral" | "prod" | "qc" | "packed" | "shipped" | "hold" | "alert" | "backorder" | "closed"
 export type FactoryStage = { id: string; label: string; tone: FactoryTone }
@@ -30,8 +31,6 @@ const ORDER = FACTORY_STAGES.map((s) => s.id)
 // Off-pipeline exception states (set manually, not reached by advancing).
 export const EXCEPTION_STAGES: FactoryStage[] = [
   { id: "on_hold", label: "On hold", tone: "hold" },
-  { id: "flagged", label: "Flagged", tone: "alert" },
-  { id: "backorder", label: "Backorder", tone: "backorder" },
   { id: "cancelled", label: "Cancelled", tone: "closed" },
   { id: "refunded", label: "Refunded", tone: "closed" },
 ]
@@ -59,8 +58,9 @@ export function normalizeStage(s?: string | null): string {
   if (["printing", "qc", "production", "in_production", "in-prod", "prepress",
        "packing", "packed", "ready", "finished"].includes(v)) return "working"
   if (["fulfilled", "delivered", "in_transit"].includes(v)) return "shipped"
-  if (["escalated", "action"].includes(v)) return "flagged"
-  if (["replacement"].includes(v)) return "backorder"
+  // Flagged + Backorder were retired — collapse them and their aliases onto On hold, the one
+  // remaining stop, so an existing order at either keeps a valid, actionable stage.
+  if (["flagged", "escalated", "action", "backorder", "replacement"].includes(v)) return "on_hold"
   return "" // unknown → treat as new
 }
 
@@ -108,7 +108,7 @@ export function orderStage(items: { factory_status?: string | null }[]): string 
 // review can pull the andon cord at any stage; cancelled/refunded are admin money calls
 // and backorder is a warehouse/admin stock call.
 const OP_ZONE = new Set(["", "in_review", "awaiting_scan"])
-const OP_STOPS = new Set(["flagged", "on_hold"])
+const OP_STOPS = new Set(["on_hold"])
 const MONEY_STAGES = new Set(["cancelled", "refunded"])
 
 // The linear order, '' (Received) first, for adjacency. Exceptions are deliberately absent:
@@ -142,8 +142,7 @@ export function stageDenialReason(role: string, current: string | null | undefin
     return MONEY_STAGES.has(to) ? "Cancelling or refunding is an admin decision." : null
   }
   if (role === "operator") {
-    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision — flag the order instead."
-    if (to === "backorder") return "Backorder is a stock call — warehouse or admin."
+    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision — put the order on hold instead."
     if (OP_STOPS.has(to)) return null                       // andon cord: any stage
     // Tested on the DESTINATION, not the origin. As `at === "in_review"` it blocked only
     // the direct hop, and OP_ZONE also holds awaiting_scan — so the same move went through

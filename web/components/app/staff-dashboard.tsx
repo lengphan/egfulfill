@@ -98,7 +98,9 @@ export function StaffDashboard() {
       shipped: by("shipped"),
       // Real counts, not modelled: orders created today, and orders sitting in a STOP state.
       createdToday: list.filter((o) => o.created_at && new Date(o.created_at).toDateString() === todayStr).length,
-      attention: list.filter((o) => ["flagged", "on_hold", "backorder"].includes(orderStage(o.items ?? []))).length,
+      // Flagged + Backorder were retired and collapse to on_hold, so that one stop is the
+      // whole "needs attention" set now.
+      attention: list.filter((o) => orderStage(o.items ?? []) === "on_hold").length,
     }
   }, [orders])
 
@@ -234,7 +236,7 @@ export function StaffDashboard() {
                 {stats.attention > 0 && (
                   <Link href="/operator" className="flex items-center gap-2 bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50">
                     <Warning size={14} weight="fill" className="shrink-0" />
-                    <span>{stats.attention} order{stats.attention === 1 ? "" : "s"} need attention — flagged, on hold or backordered</span>
+                    <span>{stats.attention} order{stats.attention === 1 ? "" : "s"} on hold — need attention</span>
                     <ArrowRight size={13} weight="bold" className="ml-auto shrink-0" />
                   </Link>
                 )}
