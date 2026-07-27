@@ -29,7 +29,9 @@ function Success({ title, sub, onDone }: { title: string; sub: string; onDone: (
 // ───────────────────────────── VietQR ─────────────────────────────
 // The wallet is in USD, so the seller picks a USD amount; the admin-set rate converts it to
 // the VND the QR actually charges, and that exact USD is what credits on payment.
-const VQR_USD_PRESETS = [50, 100, 200, 500]
+// Small quick amounts — a clean ladder up to the bulk tiers. Shared by every method and laid
+// out in the SAME full-width grid as the bulk cards so both hit the same margins.
+const SMALL_USD_PRESETS = [50, 100, 200, 500, 1000]
 // Bulk top-up suggestion amounts — the "top up more" tiers. Shared so VietQR (with a rate)
 // and Transfer (plain USD, no rate) suggest the same big amounts. $20k is the top.
 const BULK_USD_PRESETS = [2000, 5000, 10000, 20000]
@@ -151,9 +153,9 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
     )
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {VQR_USD_PRESETS.map((v) => (
-          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " + (Number(amount) === v ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}>{usd(v)}</button>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        {SMALL_USD_PRESETS.map((v) => (
+          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
         ))}
       </div>
 
@@ -179,7 +181,7 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
                     className={"relative flex flex-col gap-2 overflow-hidden rounded-xl border p-4 text-left transition-colors " + (active ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}
                   >
                     {best && <span className="absolute right-0 top-0 rounded-bl-lg bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground">Best rate</span>}
-                    <span className="text-xl font-bold tabular-nums">{usd(t.usd)}</span>
+                    <span className="text-lg font-bold tabular-nums">{usd(t.usd)}</span>
                     <span className="w-fit rounded-lg bg-muted px-2.5 py-1.5 text-xs tabular-nums text-muted-foreground">$1 = <span className="font-semibold text-foreground">{vnd(t.rate)}</span></span>
                     {saveVnd > 0 && <span className="w-fit rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">save {vnd(saveVnd)}</span>}
                   </button>
@@ -237,7 +239,6 @@ function Detail({ label, value, mono, missing }: { label: string; value?: string
 }
 
 // ───────────────────────────── Card (Stripe) ─────────────────────────────
-const USD_PRESETS = [20, 50, 100, 200]
 function CardTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () => void }) {
   const [amount, setAmount] = useState("50")
   const [phase, setPhase] = useState<"amount" | "pay" | "paid">("amount")
@@ -258,9 +259,9 @@ function CardTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () =>
     )
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {USD_PRESETS.map((v) => (
-          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " + (Number(amount) === v ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}>{usd(v)}</button>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        {SMALL_USD_PRESETS.map((v) => (
+          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
         ))}
       </div>
       <label className="flex flex-col gap-1.5">
@@ -345,14 +346,14 @@ function TransferTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: (
       {/* Suggested amounts — same small + bulk picks as VietQR, but PLAIN USD: a transfer
           is USD → our USD wallet, so there's no exchange rate or "save" here. */}
       <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          {USD_PRESETS.map((v) => (
-            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " + (Number(amount) === v ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}>{usd(v)}</button>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          {SMALL_USD_PRESETS.map((v) => (
+            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {BULK_USD_PRESETS.map((v) => (
-            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-lg border px-3 py-2 text-sm font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
+            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
           ))}
         </div>
       </div>
