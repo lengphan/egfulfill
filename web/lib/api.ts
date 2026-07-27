@@ -965,6 +965,14 @@ export type OrderRow = {
   /** Pre-scanned at dispatch — tracking is LIVE for the buyer even though the parcel may
    *  still be in production. Separate from factory_status on purpose; see orders.js. */
   label_scanned_at?: string | null
+  /** How label_scanned_at was recorded: 'partner' (dispatch partner), 'in-house', 'carrier'. */
+  scanned_via?: string | null
+  /** Sent OUT to the dispatch partner (byeastside) — their PDF id is present once pushed, so
+   *  this is the "already sent externally" flag. dispatch_pushed_at = when; dispatch_error =
+   *  last push failure. The server skips a re-push; the UI uses this to lock re-sends. */
+  dispatch_pdf_id?: string | null
+  dispatch_pushed_at?: string | null
+  dispatch_error?: string | null
   /** Who bought the label and their own reference for it. Recorded at purchase because
    *  the provider says it exactly once; without it a label can be neither voided nor put
    *  on a SCAN form. Null on anything bought before that was recorded. */

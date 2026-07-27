@@ -626,7 +626,11 @@ export function OrdersHub() {
   }, [])
 
   // Only orders with a bought label can be dispatched — there's nothing to scan otherwise.
-  const dispatchable = (o: OrderRow) => !!o.tracking && !o.label_scanned_at
+  // Dispatchable = has a label, not yet pre-scanned, AND not already sent to the partner.
+  // The last clause is the lock: an order already pushed (dispatch_pdf_id set) must not be
+  // re-selectable, or you keep re-sending a label that's already out — the server skips the
+  // re-push, but the row gave no sign it was already gone.
+  const dispatchable = (o: OrderRow) => !!o.tracking && !o.label_scanned_at && !o.dispatch_pdf_id
 
   // User-reorderable / hideable DATA columns (persisted per browser). `action` is pinned
   // last and always shown; `order` can't be hidden. Read after mount (localStorage).
@@ -1038,11 +1042,13 @@ export function OrdersHub() {
                         onChange={() => toggleOne(o.id)}
                         aria-label={dispatchable(o)
                           ? `Select ${numOf(o)} for dispatch`
-                          : `${numOf(o)} can't be dispatched — ${o.label_scanned_at ? "already pre-scanned" : "no label bought yet"}`}
+                          : `${numOf(o)} can't be dispatched — ${o.label_scanned_at ? "already pre-scanned" : o.dispatch_pdf_id ? "already sent to the partner" : "no label bought yet"}`}
                         title={dispatchable(o) ? undefined
                           : o.label_scanned_at
                             ? "Already pre-scanned — its tracking is live."
-                            : "No label bought yet, so there's nothing for the partner to scan."}
+                            : o.dispatch_pdf_id
+                              ? "Already sent to the dispatch partner — waiting on their scan. Re-sending does nothing."
+                              : "No label bought yet, so there's nothing for the partner to scan."}
                         className="size-4 shrink-0 rounded border-input accent-primary disabled:cursor-not-allowed disabled:opacity-40"
                       />
                     )}
