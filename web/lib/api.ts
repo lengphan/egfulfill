@@ -953,6 +953,9 @@ export type OrderRow = {
   factory_status?: string | null
   total?: number | string | null
   profit?: number | string | null
+  /** Who uploaded it — resolved server-side ONLY when it's the shop owner or one of their
+   *  own team members (else null). Never a factory account. Used for the seller's history. */
+  created_by_name?: string | null
   tracking?: string | null
   /** Stored label file, so a label can be reprinted or batched after purchase. */
   tracking_label_url?: string | null

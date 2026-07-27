@@ -386,6 +386,11 @@ export function ordersRoutes(app, requireAuth) {
   // Per-seller display number ("#1, #2 …" for manual orders). The id stays the
   // globally-unique PK; this is just the friendly number the seller sees.
   q('alter table orders add column if not exists seq integer').catch(() => {});
+  // Who CREATED the order (the acting user, which may be a team member of the seller) —
+  // distinct from seller_id (the shop owner it belongs to). Only ever surfaced to a seller
+  // when the creator is the owner or one of the owner's own team members; never leaks a
+  // factory account. See the getOrders seller query.
+  q('alter table orders add column if not exists created_by uuid').catch(() => {});
   // Free-form editable order info (notes, priority, gift message, …) kept on the
   // seller's order-detail panel. One jsonb bag so new fields don't need migrations.
   q(`alter table orders add column if not exists meta jsonb default '{}'`).catch(() => {});
@@ -652,7 +657,17 @@ export function ordersRoutes(app, requireAuth) {
     const sel = await resolveSeller(req.user);
     if (!_canSurface(sel, 'orders')) return [];
     const r = await q(
-      `select o.*, ${machineFile}, ${agg} from orders o ${join} where o.seller_id=$1 and o.factory_order=false group by o.id order by o.created_at desc`,
+      // created_by_name: WHO uploaded it, resolved to a name ONLY when the creator is the
+      // shop owner ($1) or one of the owner's own active team members. A factory account or
+      // anyone outside the team resolves to null — a seller never learns of factory hands.
+      `select o.*, ${machineFile}, ${agg},
+         (select coalesce(cu.name, cu.email) from users cu
+            where cu.id = o.created_by
+              and (cu.id = $1
+                or exists (select 1 from team_members tm
+                             where tm.owner_id = $1::text and lower(tm.email) = lower(cu.email) and tm.status = 'active'))
+         ) as created_by_name
+       from orders o ${join} where o.seller_id=$1 and o.factory_order=false group by o.id order by o.created_at desc`,
       [sel.id]
     );
     return r.rows;
@@ -743,21 +758,22 @@ export function ordersRoutes(app, requireAuth) {
     // `(xmax = 0) as inserted` distinguishes a fresh INSERT from an ON CONFLICT
     // UPDATE — needed so editing an order doesn't re-alert the floor as if it were new.
     const up = await q(
-      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, seq, meta, factory_order)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, false)
+      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, seq, meta, factory_order, created_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, false, $16)
        on conflict (id) do update set
          store=excluded.store, customer=excluded.customer, address=excluded.address,
          status=excluded.status, factory_status=excluded.factory_status,
          total=excluded.total, profit=excluded.profit, delivery=excluded.delivery,
          carrier=excluded.carrier, tracking=excluded.tracking,
          seq=coalesce(orders.seq, excluded.seq),
-         meta=coalesce(excluded.meta, orders.meta), factory_order=false
+         meta=coalesce(excluded.meta, orders.meta), factory_order=false,
+         created_by=coalesce(orders.created_by, excluded.created_by)
        returning (xmax = 0) as inserted`,
       [o.id, ownerId, o.store || null, o.source || 'manual', o.customer || {}, o.address || {},
        o.status || 'new', o.factoryStatus || o.status || 'new', o.total || 0, o.profit || 0,
        o.delivery || null, o.carrier || null, o.tracking || null,
        (o.seq != null && o.seq !== '') ? parseInt(o.seq, 10) : null,
-       (o.meta && typeof o.meta === 'object') ? o.meta : {}]
+       (o.meta && typeof o.meta === 'object') ? o.meta : {}, req.user.sub || null]
     );
     const isNew = !!(up.rows[0] && up.rows[0].inserted);
     if (Array.isArray(o.items)) await replaceItems(o.id, o.items);

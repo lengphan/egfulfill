@@ -45,6 +45,10 @@ export function SellerUploadHistory() {
       .filter((o) => !term || [numOf(o), customerOf(o), o.store, o.tracking, itemsLabel(o)].some((f) => String(f ?? "").toLowerCase().includes(term)))
   }, [orders, q, filter])
   const today = useMemo(() => (orders ?? []).filter((o) => new Date(o.created_at || 0).getTime() >= startOfToday()).length, [orders])
+  // Only surface a "By" column when a team member is actually involved — a solo seller
+  // needn't see a column of their own name. (Server only ever fills this for the owner or
+  // the owner's own team, never a factory account.)
+  const hasTeam = useMemo(() => (orders ?? []).some((o) => !!o.created_by_name), [orders])
   const paged = usePaged(rows, 25)
 
   return (
@@ -87,6 +91,7 @@ export function SellerUploadHistory() {
             <TableHeader>
               <TableRow>
                 <TableHead>Uploaded</TableHead>
+                {hasTeam && <TableHead>By</TableHead>}
                 <TableHead>Order</TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Destination</TableHead>
@@ -98,6 +103,7 @@ export function SellerUploadHistory() {
               {paged.pageItems.map((o) => (
                 <TableRow key={o.id}>
                   <TableCell className="whitespace-nowrap text-muted-foreground">{fmtWhen(o.created_at)}</TableCell>
+                  {hasTeam && <TableCell className="text-sm">{o.created_by_name || <span className="text-muted-foreground">—</span>}</TableCell>}
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-sm font-medium">{numOf(o)}</span>
