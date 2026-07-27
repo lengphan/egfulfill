@@ -21,7 +21,10 @@ export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<Catal
   if (d.error) throw new Error(d.error)
   return {
     id: "SS-" + styleID, name: d.title || fb.title || styleID, type: "Apparel", method: "DTG", status: "Active",
-    price: d.price ?? fb.price ?? 0, basePrice: d.price ?? fb.price ?? 0,
+    // The supplier's price IS our cost (S&S returns wholesale/net). It belongs in Product
+    // cost, NOT Base cost — writing it to Base cost charged the seller our raw cost with no
+    // margin. Base is left blank so it derives as productCost + the base_markup setting.
+    productCost: d.price ?? fb.price ?? undefined,
     sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: colorNames(d.colors)[0] ?? fb.colors?.[0],
     img: d.image ?? fb.image ?? undefined, images: d.extraImages ?? [], sku: styleID,
     description: d.description ?? undefined, supplier: "S&S",
@@ -33,7 +36,9 @@ export async function ottoCatalogProduct(style: string, fb: OttoFb): Promise<Cat
   if (Object.keys(colorImages).length === 0) for (const c of fb.colors ?? []) colorImages[c] = driveImg(fb.image)
   return {
     id: "OTTO-" + style, name: d?.name || fb.name || style, type: "Headwear", method: "Embroidery", status: "Active",
-    price: Number(d?.price ?? fb.price) || 0, basePrice: Number(d?.price ?? fb.price) || 0,
+    // Otto's price is our wholesale cost → Product cost, not Base cost (which derives as
+    // productCost + markup). See the S&S note above.
+    productCost: Number(d?.price ?? fb.price) || undefined,
     sizes: d?.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (fb.colors ?? [])[0],
     img: driveImg(d?.image ?? fb.image) || undefined, sku: d?.skus?.[0] || style,
     description: d?.description ?? undefined, supplier: "Otto Cap",
