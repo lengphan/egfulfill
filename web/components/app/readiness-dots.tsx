@@ -275,22 +275,31 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
   // the stale row-level flag keeping it "done". Only when the list hasn't been fetched (a
   // collapsed row) do we fall back to has_machine_file from the orders query, which is what
   // lets the tag be right on a row nobody expanded.
-  const approved = files
+  const hasFile = files
     ? files.some((f) => f.kind === "pes" || f.kind === "emb")
     : order.has_machine_file === true
+  const onBoard = order.design_on_board === true
+  const boardApproved = order.design_approved === true
 
+  // VIOLET ("done") only when APPROVED — the design board approved the card, or a finished
+  // machine file exists and it never went through the board (a direct upload, nothing to
+  // review). A card SENT to the board for review, or a check file waiting on sign-off, stays
+  // AMBER until it's approved — a file existing is not the same as it being approved.
+  const approved = boardApproved || (hasFile && !onBoard)
   const designState: State = approved
     ? "done"
-    : decorated.length > 0 && withArt.length === decorated.length
+    : onBoard || hasFile || (decorated.length > 0 && withArt.length === decorated.length)
       ? "doing"
       : "todo"
   const designStatus = approved
-    ? "Machine file attached — ready to make."
-    : designState === "doing"
-      ? "Artwork attached — waiting on the machine file."
-      : decorated.length === 0
-        ? "No design added yet."
-        : `${decorated.length - withArt.length} of ${decorated.length} items still need artwork.`
+    ? "Design approved — ready to make."
+    : onBoard
+      ? "On the design board — waiting on approval."
+      : designState === "doing"
+        ? hasFile ? "File attached — waiting on approval." : "Artwork attached — waiting on the machine file."
+        : decorated.length === 0
+          ? "No design added yet."
+          : `${decorated.length - withArt.length} of ${decorated.length} items still need artwork.`
   const designTitle = designStatus
 
   // The label PDF hangs off both Label and Scan: it's the Label tag's own artefact, and

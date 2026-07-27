@@ -968,6 +968,11 @@ export type OrderRow = {
    *  Design readiness tag can read "done" on a collapsed row without fetching every order's
    *  files. See orders.js. */
   has_machine_file?: boolean
+  /** A design card exists on the board for this order (sent for review/check). */
+  design_on_board?: boolean
+  /** That design card has reached the APPROVED lane — the Design chip goes violet only then;
+   *  before it (on the board, being checked) the chip stays amber. Staff list query only. */
+  design_approved?: boolean
   /** When the label was actually put on paper — distinct from having bought one. */
   label_printed_at?: string | null
   /** Pre-scanned at dispatch — tracking is LIVE for the buyer even though the parcel may
