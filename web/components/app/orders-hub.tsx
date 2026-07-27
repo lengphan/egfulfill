@@ -38,60 +38,39 @@ const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
 // stock here (purple), short (amber → send to a PO), or untracked/unknown (grey)? Hovering
 // breaks it down per line and shows any PO a short blank is already on. Module-scope (not
 // defined inside the row render) to satisfy react-hooks/static-components.
-function StockChip({ order, items, catalog, stock, pos, canPO, sending, onSend }: {
+function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
   order: OrderRow
   items: OrderItem[]
   catalog: CatalogProduct[]
   stock: Record<string, number>
-  pos: PurchaseOrder[]
   canPO: boolean
   sending: boolean
   onSend: (o: OrderRow) => void
 }) {
-  const { state, lines } = orderStock(items, catalog, stock)
-  // A PO that already lists this blank FOR THIS ORDER (so a re-look shows "on PO", not a
-  // prompt to send it again).
-  const poFor = (sku: string) =>
-    pos.find((p) => (p.items ?? []).some((it) => String(it.sku).toUpperCase() === sku && (it.sources ?? []).some((s) => s.order === order.id)))
+  const { state } = orderStock(items, catalog, stock)
   // Same solid-tinted pill as the Label/Scan/Design chips beside it (readiness-dots.tsx):
   // purple = ready/in-stock, amber = needs action/out, grey = unknown. The colour IS the
-  // status, and it recomputes every render — so picking a blank on a line flips it live.
+  // status, and it recomputes every render — so picking a blank on a line flips it live. The
+  // per-line NUMBERS live in the expanded detail, not here, to keep the row a clean pill.
   const tone =
     state === "in" ? "bg-primary/10 text-primary hover:bg-primary/15"
     : state === "out" ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
     : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
   const label = state === "in" ? "In stock" : state === "out" ? "Out of stock" : "Stock —"
   const clickable = state === "out" && canPO
+  const title = state === "in" ? "Blank stock is on hand for every line"
+    : state === "out" ? (canPO ? "Short on blank stock — click to add to a draft purchase order. Open the order for the per-line breakdown." : "Short on blank stock — open the order for the per-line breakdown")
+    : "Blank stock not tracked, or no blank picked yet — open the order to check"
   return (
-    <span className="group relative inline-flex">
-      <button
-        type="button"
-        disabled={!clickable || sending}
-        onClick={clickable ? () => onSend(order) : undefined}
-        title={clickable ? "Send short blanks to a draft purchase order" : undefined}
-        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
-      >
-        {sending ? "Sending…" : label}
-      </button>
-      {/* Hover breakdown — per line: on-hand/needed, or which PO it's already on. */}
-      <span className="pointer-events-none absolute right-0 top-full z-30 mt-1 hidden w-64 rounded-lg border border-border bg-popover p-2 text-left text-[11px] text-popover-foreground shadow-lg group-hover:block">
-        {lines.map((l, i) => {
-          const on = l.have != null && l.have < l.need ? poFor(l.sku) : null
-          return (
-            <span key={i} className="flex items-center justify-between gap-2 py-0.5">
-              <span className="min-w-0 truncate">{l.name}{l.sku ? ` · ${l.sku}` : ""}</span>
-              <span className="shrink-0 tabular-nums">
-                {l.have == null ? <span className="text-muted-foreground">not tracked</span>
-                  : l.have < l.need ? <span className="text-amber-600">{l.have}/{l.need}{on ? ` · PO ${on.num}` : ""}</span>
-                  : <span className="text-primary">{l.have}/{l.need}</span>}
-              </span>
-            </span>
-          )
-        })}
-        {state === "out" && canPO && <span className="mt-1 block border-t border-border pt-1 text-muted-foreground">Click to add short blanks to a draft PO.</span>}
-        {state === "out" && !canPO && <span className="mt-1 block border-t border-border pt-1 text-muted-foreground">Short on stock — warehouse can send to a PO.</span>}
-      </span>
-    </span>
+    <button
+      type="button"
+      disabled={!clickable || sending}
+      onClick={clickable ? () => onSend(order) : undefined}
+      title={title}
+      className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
+    >
+      {sending ? "Sending…" : label}
+    </button>
   )
 }
 
@@ -1000,7 +979,7 @@ export function OrdersHub() {
                 ready: (
                   <div className="flex flex-wrap items-center gap-2">
                     <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} compact />
-                    <StockChip order={o} items={items} catalog={catalog} stock={stock} pos={pos} canPO={canPO} sending={poBusy === o.id} onSend={sendToPO} />
+                    <StockChip order={o} items={items} catalog={catalog} stock={stock} canPO={canPO} sending={poBusy === o.id} onSend={sendToPO} />
                   </div>
                 ),
                 action: null, // rendered inline below, pinned last
@@ -1484,6 +1463,13 @@ export function OrdersHub() {
                                 const skuU = String(stockSku || it.sku || "").toUpperCase()
                                 const have = stockSku ? stock[skuU] : undefined
                                 const need = Number(it.qty) || 1
+                                // The full stock number lives HERE in the detail (the row just
+                                // carries the coloured status pill). When a line is short and
+                                // already on a purchase order, name that PO so the warehouse can
+                                // see it's handled without leaving the row.
+                                const onPO = have != null && have < need
+                                  ? pos.find((p) => (p.items ?? []).some((pi) => String(pi.sku).toUpperCase() === skuU && (pi.sources ?? []).some((s) => s.order === o.id)))
+                                  : null
                                 const cones = (threads[o.id] ?? []).find((t) => String(t.sku).toUpperCase() === skuU)?.threads ?? []
                                 const file = (dfiles[o.id] ?? []).find((f) => String(f.sku ?? "").toUpperCase() === skuU)
                                 if (have == null && !cones.length && !file) return null
@@ -1492,9 +1478,9 @@ export function OrdersHub() {
                                     {have != null && (
                                       <span
                                         className={"inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium " + (have >= need ? "bg-muted text-muted-foreground" : "bg-amber-100 text-amber-800")}
-                                        title={have >= need ? "Enough blank stock for this line" : `Only ${have} in stock, this line needs ${need}`}
+                                        title={have >= need ? "Enough blank stock for this line" : `Only ${have} in stock, this line needs ${need}${onPO ? ` — on PO ${onPO.num}` : ""}`}
                                       >
-                                        {have >= need ? `${have} in stock` : `Short — ${have} of ${need}`}
+                                        {have >= need ? `${have} in stock` : `Short — ${have} of ${need}`}{onPO ? ` · PO ${onPO.num}` : ""}
                                       </span>
                                     )}
                                     {cones.length > 0 && (
