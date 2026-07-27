@@ -357,11 +357,20 @@ export function wilcomRoutes(app, requireStaff) {
     if (b.designId) {
       row = (await q(`select design_id, file_name, mime, data from design_file_data where design_id=$1`, [String(b.designId)])).rows[0];
     } else if (b.orderId) {
-      row = (await q(`select design_id, file_name, mime, data from design_file_data
-                        where order_id=$1 and sku is not distinct from $2
-                          and (kind='emb' or lower(file_name) like '%.emb')
-                        order by created_at desc limit 1`,
-        [String(b.orderId), b.sku == null ? null : String(b.sku)])).rows[0];
+      // Prefer the sku's own .emb; but a "Seller file" card may carry a different (or null)
+      // sku than the file was stored under, so fall back to ANY .emb on the order rather
+      // than showing nothing. A preview of the order's stitch file still beats a blank tile.
+      const embWhere = `(kind='emb' or lower(file_name) like '%.emb')`;
+      if (b.sku != null && b.sku !== '') {
+        row = (await q(`select design_id, file_name, mime, data from design_file_data
+                          where order_id=$1 and sku=$2 and ${embWhere} order by created_at desc limit 1`,
+          [String(b.orderId), String(b.sku)])).rows[0];
+      }
+      if (!row) {
+        row = (await q(`select design_id, file_name, mime, data from design_file_data
+                          where order_id=$1 and ${embWhere} order by created_at desc limit 1`,
+          [String(b.orderId)])).rows[0];
+      }
     }
     if (!row || !row.data) { reply.code(404); return { ok: false, error: 'No machine file for that design.' }; }
     // designTrueview reads Wilcom-native .emb; skip anything else rather than guessing.
