@@ -226,13 +226,30 @@ export function DispatchBoard() {
   const removeFromBoard = async (ids: string[]) => {
     if (!ids.length) return
     setBusy(true); setErr(null)
+    // An order that's with the partner must be PULLED BACK first. Otherwise "remove" only
+    // changes the stage while the label stays in their queue — they can still scan it (starting
+    // the buyer's clock) and the Scan tag rightly stays amber. Cancelling clears dispatch_pdf_id
+    // (→ the tag greys, since it's no longer with anyone) and records it in history.
+    const list = orders ?? []
+    const withPartner = list.filter((o) => ids.includes(o.id) && o.dispatch_pdf_id && !o.label_scanned_at)
+    const blocked = new Set<string>()   // pulled-back attempt found it already scanned — leave it
+    if (withPartner.length) {
+      try {
+        const r = await cancelDispatch(withPartner.map((o) => o.id))
+        for (const res of r.results ?? []) if (!res.ok && res.reason === "already-scanned") blocked.add(res.id)
+      } catch { /* best-effort — still move the rest back */ }
+    }
     const failed: string[] = []
     for (const id of ids) {
+      if (blocked.has(id)) continue   // it got scanned; its tracking is live — don't un-review it
       try { await updateOrder(id, { factoryStatus: "in_review" }) } catch { failed.push(id) }
     }
     setBusy(false)
     setPicked(new Set())
-    if (failed.length) setErr(`Couldn't remove ${failed.length} order${failed.length === 1 ? "" : "s"} — your role may not be able to move them back.`)
+    const msgs: string[] = []
+    if (blocked.size) msgs.push(`${blocked.size} already scanned by the partner — left as they are.`)
+    if (failed.length) msgs.push(`Couldn't remove ${failed.length} order${failed.length === 1 ? "" : "s"} — your role may not be able to move them back.`)
+    if (msgs.length) setErr(msgs.join(" "))
     load()
   }
 
