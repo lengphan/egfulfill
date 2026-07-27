@@ -687,8 +687,11 @@ export function ordersRoutes(app, requireAuth) {
     const factoryLimit = Number(cfg.factory_daily_limit || 0);
     let factoryOver = false;
     if (isFinite(factoryLimit) && factoryLimit > 0) {
+      // Whole-floor load today, counting EVERY order that needs producing — including the
+      // factory's own synced shop (factory_order = true). Those consume the same machines
+      // and hours as a seller's, so leaving them out understated the crunch.
       const fUsed = await q(
-        "select count(*)::int as n from orders where created_at >= current_date and factory_order = false"
+        "select count(*)::int as n from orders where created_at >= current_date"
       ).then((r) => r.rows[0]?.n || 0).catch(() => 0);
       factoryOver = fUsed >= factoryLimit;
     }
@@ -700,7 +703,8 @@ export function ordersRoutes(app, requireAuth) {
 
   /**
    * Whole-factory intake today — STAFF only, for the capacity readout in their header.
-   * "used" is seller orders created today (the incoming load). Sellers never see this.
+   * "used" is EVERY order created today — seller uploads AND the factory's own synced shop
+   * (factory_order) — since both take the same production capacity. Sellers never see this.
    */
   app.get('/api/orders/factory-capacity', { preHandler: requireAuth }, async (req) => {
     if (!isStaff(req.user)) return { mode: false, limit: 0, usedToday: 0 };
@@ -708,7 +712,7 @@ export function ordersRoutes(app, requireAuth) {
     if (!Number(cfg.capacity_mode || 0)) return { mode: false, limit: 0, usedToday: 0 };
     const limit = Number(cfg.factory_daily_limit || 0);
     const used = await q(
-      "select count(*)::int as n from orders where created_at >= current_date and factory_order = false"
+      "select count(*)::int as n from orders where created_at >= current_date"
     ).then((r) => r.rows[0]?.n || 0).catch(() => 0);
     return { mode: true, limit: isFinite(limit) && limit > 0 ? limit : 0, usedToday: used };
   });

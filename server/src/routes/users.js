@@ -155,6 +155,11 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
    * gets a bigger slice than a quiet one, rather than a naive even split. A seller with no
    * history still gets a small floor share (never capped at zero). Applies the numbers (you
    * then adjust any by hand) and returns what it set. A distribution aid, not a hard gate.
+   *
+   * The factory's OWN synced shop (factory_order) consumes the same capacity, so its recent
+   * daily load is RESERVED off the top and only the remainder is split across sellers —
+   * otherwise the full cap would go to sellers while the factory's orders ran on top of it,
+   * blowing past the very cap this is meant to respect.
    */
   app.post('/api/users/suggest-order-limits', { preHandler: requireUserManager }, async (req, reply) => {
     const cfg = await readAll().catch(() => ({}));
@@ -163,27 +168,35 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
       reply.code(400);
       return { error: 'Set a Factory daily limit first — that\'s the total being distributed across sellers.' };
     }
+    // Reserve the factory shop's own recent daily volume (14-day avg of its synced orders)
+    // before splitting the rest. If it already meets/exceeds the cap, sellers fall to the
+    // floor of 1 — the limits never block a submit, so that just signals the crunch.
+    const reserved = await q(
+      `select count(*)::float / 14.0 as n from orders
+         where factory_order = true and created_at >= now() - interval '14 days'`
+    ).then((r) => Math.round(Number(r.rows[0]?.n) || 0)).catch(() => 0);
+    const distributable = Math.max(0, cap - reserved);
     const rows = (await q(`
       select u.id, coalesce(u.store_name, u.name, u.email) as label,
              (select count(*)::float from orders o
                 where o.seller_id = u.id and o.created_at >= now() - interval '14 days') / 14.0 as avg_daily
         from users u
        where u.role = 'seller' and u.active = true`).catch(() => ({ rows: [] }))).rows;
-    if (!rows.length) return { ok: true, applied: 0, cap, assignments: [] };
+    if (!rows.length) return { ok: true, applied: 0, cap, reserved, distributable, assignments: [] };
     // Floor each weight at 0.5 so a new/quiet seller still gets a nonzero share.
     const weights = rows.map((r) => Math.max(0.5, Number(r.avg_daily) || 0));
     const total = weights.reduce((a, b) => a + b, 0) || 1;
     const assignments = rows.map((r, i) => ({
       id: r.id, label: r.label,
       avgDaily: Math.round((Number(r.avg_daily) || 0) * 10) / 10,
-      limit: Math.max(1, Math.round((weights[i] / total) * cap)),
+      limit: Math.max(1, Math.round((weights[i] / total) * distributable)),
     }));
     for (const a of assignments) {
       await q('update users set order_limit=$2 where id=$1', [a.id, a.limit]).catch(() => {});
     }
     audit(req, 'capacity.limits_suggested', { entityType: 'settings', entityId: 'order_limits',
-      after: { cap, sellers: assignments.length } });
-    return { ok: true, applied: assignments.length, cap, assignments };
+      after: { cap, reserved, distributable, sellers: assignments.length } });
+    return { ok: true, applied: assignments.length, cap, reserved, distributable, assignments };
   });
 
   app.delete('/api/users/:id', { preHandler: requireAdmin }, async (req, reply) => {
