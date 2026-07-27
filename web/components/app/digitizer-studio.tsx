@@ -388,13 +388,16 @@ const IDENTITY_TF: WilcomTransform = { x: 0, y: 0, scale: 1, angle: 0 }
 // nominal hoop width; tune once checked against real output.
 const BOX_SPAN_MM = 120
 type DragState = { mode: "move" | "resize" | "rotate"; sx: number; sy: number; start: WilcomTransform; cx: number; cy: number; d0: number; a0: number; rw: number; rh: number }
-function LayerBoxEditor({ tf, onChange, ghost }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode }) {
+function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode; selected: boolean; onSelect: () => void }) {
   const drag = useRef<DragState | null>(null)
 
   // Single handlers, no ref-in-render: the host rect is read off the DOM via closest() at
-  // pointer-down time, and `data-mode` on the grabbed element says what to do.
+  // pointer-down time, and `data-mode` on the grabbed element says what to do. Grabbing a box
+  // also SELECTS its layer, so one gesture = click-to-select + drag. No EWA call happens here —
+  // it's pure client-side manipulation; the transform only reaches EWA on Generate.
   const down = (e: RPointerEvent<HTMLElement>) => {
     e.preventDefault(); e.stopPropagation()
+    onSelect()
     const el = e.currentTarget
     const host = el.closest("[data-boxhost]") as HTMLElement | null
     const r = host?.getBoundingClientRect(); if (!r) return
@@ -424,15 +427,19 @@ function LayerBoxEditor({ tf, onChange, ghost }: { tf: WilcomTransform; onChange
 
   const nub = "pointer-events-auto absolute size-4 touch-none rounded-full border-2 border-primary bg-background shadow"
   return (
-    <div data-boxhost className="pointer-events-none absolute inset-0 z-10">
+    <div data-boxhost className="pointer-events-none absolute inset-0" style={{ zIndex: selected ? 20 : 10 }}>
       <div
         data-mode="move" onPointerDown={down} onPointerMove={move} onPointerUp={up}
-        className="pointer-events-auto absolute flex cursor-move touch-none items-center justify-center rounded border-2 border-primary/80 bg-primary/5"
+        className={"pointer-events-auto absolute flex touch-none items-center justify-center rounded border-2 " + (selected ? "cursor-move border-primary/80 bg-primary/5" : "cursor-pointer border-dashed border-primary/40 hover:border-primary/70")}
         style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${34 * tf.scale}%`, aspectRatio: "1", transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
       >
-        <div className="pointer-events-none flex max-h-full max-w-full items-center justify-center overflow-hidden opacity-70">{ghost}</div>
-        <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />
-        <div title="Drag to rotate" data-mode="rotate" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-7 left-1/2 -translate-x-1/2 cursor-grab"} />
+        <div className={"pointer-events-none flex max-h-full max-w-full items-center justify-center overflow-hidden " + (selected ? "opacity-70" : "opacity-40")}>{ghost}</div>
+        {selected && (
+          <>
+            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />
+            <div title="Drag to rotate" data-mode="rotate" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-7 left-1/2 -translate-x-1/2 cursor-grab"} />
+          </>
+        )}
       </div>
     </div>
   )
@@ -464,6 +471,7 @@ function CreateTab() {
     const thumb = await readFile(file)
     try { const dataUrl = await toDataUrl(thumb); setImage({ dataUrl, thumb, name: file.name.replace(/\.[^.]+$/, "") }) }
     catch { setImage({ dataUrl: thumb, thumb, name: file.name.replace(/\.[^.]+$/, "") }) }
+    setOpenLayer("image") // ready to drag straight away
   }
   // Colour-change mode — the palette grid is tucked away until "Change colour", so the
   // controls stay short until you want to recolour.
@@ -501,8 +509,10 @@ function CreateTab() {
     if (!ready || status === "generating") return
     const id = setTimeout(() => { void run(false) }, 650)
     return () => clearTimeout(id)
+    // NB: imgTf/txtTf are deliberately NOT deps — moving/resizing a layer is client-side only
+    // (the box + ghost), so it must NOT re-call EWA. The transform is still sent on Generate.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image?.dataUrl, text, alphabet, height, color, ready, imgTf, txtTf])
+  }, [image?.dataUrl, text, alphabet, height, color, ready])
 
   const inputCls = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
   const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
@@ -667,16 +677,18 @@ function CreateTab() {
             <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">{ready ? "Rendering…" : "Drop an image or type text to see it stitched."}</div>
           )}
           {status === "previewing" && res?.trueview && <div className="absolute right-3 top-3 rounded-full bg-background/85 p-1.5"><CircleNotch size={16} className="animate-spin text-muted-foreground" /></div>}
-          {/* Direct-manipulation box for the active layer — the ghost is a live proxy since EWA's
-              preview doesn't reflect the transform; the value bakes into the generated file. */}
-          {openLayer === "image" && image && (
-            <LayerBoxEditor tf={imgTf} onChange={setImgTf} ghost={
+          {/* Direct-manipulation boxes — one per layer, ALWAYS shown so you click the element
+              itself to select + drag (no separate toggle). The ghost is a live client-side proxy
+              since EWA's preview ignores the transform; the value bakes into the generated file.
+              Dragging never calls EWA. */}
+          {image && (
+            <LayerBoxEditor tf={imgTf} onChange={setImgTf} selected={openLayer === "image"} onSelect={() => setOpenLayer("image")} ghost={
               // eslint-disable-next-line @next/next/no-img-element
               <img src={image.thumb} alt="" className="max-h-full max-w-full object-contain" />
             } />
           )}
-          {openLayer === "text" && hasText && (
-            <LayerBoxEditor tf={txtTf} onChange={setTxtTf} ghost={
+          {hasText && (
+            <LayerBoxEditor tf={txtTf} onChange={setTxtTf} selected={openLayer === "text"} onSelect={() => setOpenLayer("text")} ghost={
               <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>
             } />
           )}
