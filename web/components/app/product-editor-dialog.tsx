@@ -137,6 +137,12 @@ export function ProductEditorDialog({
   // Per-size price tiers, held as strings so a half-typed "12." doesn't round-trip
   // through Number and fight the input. Empty = no override for that size.
   const [tiers, setTiers] = useState<Record<string, Tier>>({})
+  // Bulk-fill the whole size table in one go. Base can be a flat $ or a % markup over each
+  // size's own product cost (so a pricier 3XL still lands a proportional base); shipping is
+  // always a flat $. Writes into the editable rows — nothing is charged until you Save.
+  const [bulkBase, setBulkBase] = useState("")
+  const [bulkShip, setBulkShip] = useState("")
+  const [bulkPct, setBulkPct] = useState(false)
   const [colorInput, setColorInput] = useState("")
   const [status, setStatus] = useState("Active")
   const [img, setImg] = useState("")
@@ -319,6 +325,32 @@ export function ProductEditorDialog({
   const profit = !isNaN(base) && !isNaN(pcost) ? base - pcost : NaN
   const marginPct = !isNaN(profit) && base > 0 ? Math.round((profit / base) * 100) : NaN
 
+  // Apply the bulk Base/Shipping to every size at once. In % mode the base is a markup over
+  // each size's product cost (its own tier cost, else the product-level one); in $ mode it's
+  // the literal amount. A blank field is left alone, so you can bulk-set just one column.
+  const applyBulk = () => {
+    const b = bulkBase.trim(), sh = bulkShip.trim()
+    if (b === "" && sh === "") return
+    const pct = Number(b)
+    setTiers((prev) => {
+      const nextT: Record<string, Tier> = { ...prev }
+      for (const s of sizes) {
+        const cur = nextT[s] ?? { price: "", shipping: "", cost: "" }
+        let price = cur.price
+        if (b !== "") {
+          if (bulkPct) {
+            const rowCost = num(cur.cost) || num(productCost)
+            price = !isNaN(rowCost) ? String(Math.round(rowCost * (1 + pct / 100) * 100) / 100) : cur.price
+          } else {
+            price = String(Number(b) || 0)
+          }
+        }
+        nextT[s] = { ...cur, price, shipping: sh !== "" ? String(Number(sh) || 0) : cur.shipping }
+      }
+      return nextT
+    })
+  }
+
   const save = () => {
     if (!name.trim()) { setErr("Give the product a name."); return }
     const colorImages: Record<string, string> = {}
@@ -480,6 +512,27 @@ export function ProductEditorDialog({
                     <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">Clear pricing</button>
                   )}
                 </div>
+                {/* Bulk-fill — set Base cost + Shipping for every size at once. $ = flat
+                    amount; % = markup over each size's product cost. Blank field = leave
+                    that column as-is. */}
+                {sizes.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-2.5 py-2">
+                    <span className="text-xs font-medium text-muted-foreground">Set all sizes:</span>
+                    <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
+                      {([[false, "$"], [true, "%"]] as const).map(([v, lbl]) => (
+                        <button key={lbl} type="button" onClick={() => setBulkPct(v)}
+                          className={"eg-tap rounded px-2 py-0.5 font-medium transition-colors " + (bulkPct === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                          {lbl}
+                        </button>
+                      ))}
+                    </div>
+                    <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
+                      placeholder={bulkPct ? "base markup %" : "base cost $"} className="h-8 w-28 text-xs" inputMode="decimal" aria-label="Bulk base cost" />
+                    <Input value={bulkShip} onChange={(e) => setBulkShip(e.target.value.replace(/[^0-9.]/g, ""))}
+                      placeholder="shipping $" className="h-8 w-24 text-xs" inputMode="decimal" aria-label="Bulk shipping" />
+                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim()}>Apply to all</Button>
+                  </div>
+                )}
                 <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
                   <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span><span className="text-right">Margin</span><span />
                 </div>
