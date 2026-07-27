@@ -1447,6 +1447,79 @@ const USER_ROW_GRID =
   "grid-cols-[minmax(0,1fr)_11rem] " +
   "sm:grid-cols-[minmax(0,1fr)_5.5rem_15rem] " +
   "lg:grid-cols-[minmax(0,1fr)_6.5rem_10rem_5.5rem_17rem]"
+
+/**
+ * The seller's Activity cell: today's uploads over their daily limit, plus the recent
+ * per-day average. The LIMIT is edited right here — click the number, type, Enter (or blur)
+ * saves. This is the value "Suggest limits" seeds automatically from the factory + seller
+ * volume formula; an admin can then override any one directly. `null` = inherit the platform
+ * default (shown faded), `0` = unlimited (∞). Limits never block a submit — they only decide
+ * when the "may ship later" notice shows — so an over-allocation is safe, just visible.
+ */
+function LimitCell({
+  user, canEdit, defaultLimit, saving, onSave,
+}: {
+  user: AdminUser
+  canEdit: boolean
+  defaultLimit: number
+  saving: boolean
+  onSave: (val: number | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const limit = user.order_limit
+  const today = user.orders_today ?? 0
+  const perDay = Math.round((user.orders_14d ?? 0) / 14)
+  const over = limit != null && limit > 0 && today >= limit
+  const commit = (raw: string) => {
+    setEditing(false)
+    const t = raw.trim()
+    onSave(t === "" ? null : Math.max(0, parseInt(t, 10) || 0))
+  }
+  const label = limit != null ? (limit === 0 ? "∞" : String(limit)) : (defaultLimit > 0 ? String(defaultLimit) : "—")
+  const inherited = limit == null
+  return (
+    <div className="text-sm">
+      <span
+        className={"inline-flex items-center gap-1 rounded-md px-2 py-0.5 tabular-nums " +
+          (over ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}
+        title={`${today} uploaded today · ~${perDay}/day recently · ${
+          limit == null ? `no personal limit (platform default ${defaultLimit || "none"})` : limit === 0 ? "unlimited" : `limit ${limit}`
+        }`}
+      >
+        <span>{today}</span>
+        <span className="opacity-50">/</span>
+        {editing ? (
+          <input
+            autoFocus
+            type="number"
+            min={0}
+            defaultValue={limit ?? ""}
+            onBlur={(e) => commit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); commit((e.target as HTMLInputElement).value) }
+              else if (e.key === "Escape") setEditing(false)
+            }}
+            placeholder={defaultLimit ? String(defaultLimit) : "—"}
+            className="w-12 rounded border border-primary/50 bg-card px-1 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          />
+        ) : canEdit ? (
+          <button
+            onClick={() => setEditing(true)}
+            disabled={saving}
+            className={"rounded px-0.5 underline decoration-dotted underline-offset-2 hover:text-foreground " + (inherited ? "opacity-60" : "font-medium")}
+            title="Click to set this seller's daily limit"
+          >
+            {label}
+          </button>
+        ) : (
+          <span className={inherited ? "opacity-60" : ""}>{label}</span>
+        )}
+      </span>
+      <span className="ml-1 opacity-70">~{perDay}/d</span>
+    </div>
+  )
+}
+
 function UsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -1476,6 +1549,20 @@ function UsersPanel() {
 
   const loadUsers = useCallback(() => { getUsers().then((r) => { setUsers(r ?? []); setLoaded(true) }).catch(() => setLoaded(true)) }, [])
   useEffect(() => { const id = setTimeout(loadUsers, 0); return () => clearTimeout(id) }, [loadUsers])
+  // The factory cap + platform default, so the row limits read against the master ceiling
+  // (set in Platform) and the header can show how much of it is allocated to sellers.
+  const [cap, setCap] = useState<{ mode: boolean; limit: number; def: number } | null>(null)
+  useEffect(() => {
+    const id = setTimeout(() => {
+      getFactorySettings().then((s) => setCap({
+        mode: !!Number(s?.capacity_mode || 0),
+        limit: Number(s?.factory_daily_limit || 0),
+        def: Number(s?.order_limit_default || 0),
+      })).catch(() => {})
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
+  const defaultLimit = cap?.def ?? 0
 
   const changeRole = async (u: AdminUser, role: string) => {
     setBusy(u.id); setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role } : x)))
@@ -1510,13 +1597,10 @@ function UsersPanel() {
       setSuggestErr(e instanceof Error ? e.message : "Couldn't suggest limits.")
     } finally { setSuggesting(false) }
   }
-  const changeOrderLimit = async (u: AdminUser) => {
-    const cur = u.order_limit == null ? "" : String(u.order_limit)
-    const input = typeof window !== "undefined"
-      ? window.prompt(`Daily order limit for ${u.store_name || u.name || u.email}.\nUsed today: ${u.orders_today ?? 0}. Blank = platform default · 0 = unlimited.`, cur)
-      : null
-    if (input === null) return
-    const val = input.trim() === "" ? null : Math.max(0, parseInt(input, 10) || 0)
+  // Direct save from the inline editor in the row. null = platform default · 0 = unlimited.
+  // Optimistic so the number sticks the instant you leave the field; reloads only on error.
+  const saveOrderLimit = async (u: AdminUser, val: number | null) => {
+    if (val === (u.order_limit ?? null)) return
     setBusy(u.id)
     setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, order_limit: val } : x)))
     try { await updateUserAdmin(u.id, { order_limit: val }) } catch { loadUsers() } finally { setBusy(null) }
@@ -1617,6 +1701,14 @@ function UsersPanel() {
     roleFilter === "all" ? true : roleFilter === "staff" ? u.role !== "seller" : u.role === roleFilter
   )
   const inactiveCount = users.filter((u) => u.active === false).length
+  // How much of the factory cap the seller limits currently claim — a seller with no
+  // personal limit is counted at the platform default, an unlimited one (0) can't be summed
+  // so it's flagged separately. Lets an admin see head-room before hand-editing a number,
+  // without changing anything: the cap stays the master knob (raise it in Platform to take
+  // more overall), an edit here only moves that one seller.
+  const activeSellers = users.filter((u) => u.role === "seller" && u.active !== false)
+  const unlimitedSellers = activeSellers.filter((u) => u.order_limit === 0).length
+  const allocated = activeSellers.reduce((s, u) => s + (u.order_limit != null ? u.order_limit : defaultLimit), 0)
   // "Busiest first" = trailing 14-day volume, descending — so after suggesting limits the
   // heavy hitters float to the top for a quick review. Sorted BEFORE grouping so a team's
   // leader lands by their own volume (members still sit under them).
@@ -1680,6 +1772,18 @@ function UsersPanel() {
             {suggesting ? <CircleNotch size={14} className="animate-spin" /> : <>Suggest limits</>}
           </Button>
           {suggestErr && <span className="w-full text-xs text-destructive">{suggestErr}</span>}
+          {/* Head-room: how much of the factory cap the seller limits claim. The cap is the
+              master knob (raise it in Platform to take more overall); editing a seller here
+              only moves that one row. Amber when the sum runs past the cap. */}
+          {cap?.mode && cap.limit > 0 && (
+            <span className="w-full text-xs text-muted-foreground">
+              Factory cap <span className="font-medium text-foreground tabular-nums">{cap.limit}</span>/day · allocated to sellers <span className="tabular-nums">~{allocated}</span>
+              {allocated > cap.limit
+                ? <span className="font-medium text-primary"> · over by {allocated - cap.limit} (raise the cap in Platform to take more)</span>
+                : <span> · {cap.limit - allocated} free</span>}
+              {unlimitedSellers > 0 && <span className="opacity-70"> · {unlimitedSellers} unlimited</span>}
+            </span>
+          )}
           {/* Deactivated accounts are hidden by default — they're kept so their orders
               stay attached, not because anyone needs to see them daily. */}
           {inactiveCount > 0 && (
@@ -1703,7 +1807,7 @@ function UsersPanel() {
                 as a claim, not a loose number. Same grid + same per-cell breakpoints as the
                 rows, so each label sits exactly above its values. */}
             {paged.pageItems.length > 0 && (
-              <div className={USER_ROW_GRID + " py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"}>
+              <div className={USER_ROW_GRID + " py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"}>
                 <span className="min-w-0">Account</span>
                 <span className="hidden lg:block">Joined</span>
                 <span className="hidden lg:block">Activity</span>
@@ -1717,8 +1821,6 @@ function UsersPanel() {
               paged.pageItems.map(({ u, child }) => {
                 const isSeller = u.role === "seller"
                 const displayName = u.name || u.store_name || (u.username ? `@${u.username}` : "") || u.email || "—"
-                const perDay = Math.round((u.orders_14d ?? 0) / 14)
-                const overLimit = u.order_limit != null && (u.orders_today ?? 0) >= u.order_limit
                 const lastActive = fmtAgo(u.last_order_at)
                 return (
                 <div
@@ -1736,18 +1838,18 @@ function UsersPanel() {
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className={child ? "truncate text-sm" : "truncate text-sm font-medium"}>{displayName}</span>
                         {!child && (u.team_size ?? 0) > 0 && (
-                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Leads {u.team_size}</span>
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">Leads {u.team_size}</span>
                         )}
                         {child && (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                             Member{u.owner_label ? ` · ${u.owner_label}` : ""}
                           </span>
                         )}
                         {isSeller && u.spydeck_addon && (
-                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Spydeck</span>
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">Spydeck</span>
                         )}
                         {u.active === false && (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Deactivated</span>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">Deactivated</span>
                         )}
                       </div>
                       <div className="truncate text-xs text-muted-foreground">
@@ -1758,23 +1860,16 @@ function UsersPanel() {
                   </div>
 
                   {/* Joined — context, not a control, so it stays quiet. */}
-                  <span className="hidden truncate text-xs text-muted-foreground lg:block">{fmtDate(u.created_at)}</span>
+                  <span className="hidden truncate text-sm text-muted-foreground lg:block">{fmtDate(u.created_at)}</span>
 
-                  {/* Activity — sellers carry orders. Today's uploads vs limit + recent daily
-                      average (amber once at/over), then how long since the last order so a
-                      dormant account is obvious. Staff have no orders of their own. */}
+                  {/* Activity — sellers carry orders. Today's uploads over their daily limit
+                      (edit the limit inline; amber once at/over), then how long since the last
+                      order so a dormant account is obvious. Staff have no orders of their own. */}
                   <div className="hidden min-w-0 text-xs lg:block">
                     {isSeller ? (
                       <>
-                        <span
-                          className={"inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 tabular-nums " +
-                            (overLimit ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground")}
-                          title={`${u.orders_today ?? 0} uploaded today${u.order_limit != null ? ` · limit ${u.order_limit}` : " · no limit set"} · ~${perDay}/day recently · ${u.orders_total ?? 0} all-time`}
-                        >
-                          {u.order_limit != null ? `${u.orders_today ?? 0}/${u.order_limit}` : `${u.orders_today ?? 0}/—`}
-                          <span className="opacity-70">~{perDay}/d</span>
-                        </span>
-                        <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                        <LimitCell user={u} canEdit={isAdminCaller} defaultLimit={defaultLimit} saving={busy === u.id} onSave={(v) => saveOrderLimit(u, v)} />
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
                           {lastActive ? `last order ${lastActive}` : "no orders yet"}
                         </div>
                       </>
@@ -1788,14 +1883,14 @@ function UsersPanel() {
                       can't submit work. */}
                   {isSeller ? (
                     <span
-                      className={"hidden text-right text-xs tabular-nums sm:block " +
-                        ((u.balance ?? 0) <= 0 ? "font-medium text-amber-700" : "text-muted-foreground")}
+                      className={"hidden text-right text-sm tabular-nums sm:block " +
+                        ((u.balance ?? 0) <= 0 ? "font-medium text-primary" : "text-muted-foreground")}
                       title={(u.balance ?? 0) <= 0 ? "No funds — this account can't submit orders" : "Wallet balance"}
                     >
                       {usd2(u.balance ?? 0)}
                     </span>
                   ) : (
-                    <span className="hidden text-right text-muted-foreground/50 sm:block">—</span>
+                    <span className="hidden text-right text-sm text-muted-foreground/50 sm:block">—</span>
                   )}
 
                   {/* Access — role + plan + the manage menu, right-aligned under the header.
@@ -1807,7 +1902,7 @@ function UsersPanel() {
                     ) : (
                       <select
                         value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id}
-                        className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                        className="eg-select h-8 rounded-lg border border-border/60 bg-card px-2 text-sm capitalize transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                       >
                         {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
@@ -1815,7 +1910,7 @@ function UsersPanel() {
                     {u.role === "seller" && (isAdminCaller ? (
                       <select
                         value={u.plan ?? "starter"} onChange={(e) => changePlan(u, e.target.value)} disabled={busy === u.id}
-                        className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                        className="eg-select h-8 rounded-lg border border-border/60 bg-card px-2 text-sm capitalize transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                       >
                         {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
                       </select>
@@ -1825,7 +1920,7 @@ function UsersPanel() {
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         aria-label={`Manage ${u.email}`}
-                        className="eg-tap inline-flex size-8 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                        className="eg-tap inline-flex size-8 items-center justify-center rounded-lg border border-border/60 bg-card text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                       >
                         <DotsThree size={16} weight="bold" />
                       </DropdownMenuTrigger>
@@ -1836,11 +1931,6 @@ function UsersPanel() {
                         {u.role === "seller" && (
                           <DropdownMenuItem onClick={() => { setAdjFor(u); setAdjAmt(""); setAdjNote(""); setAdjErr(null) }}>
                             Adjust balance…
-                          </DropdownMenuItem>
-                        )}
-                        {u.role === "seller" && (
-                          <DropdownMenuItem onClick={() => changeOrderLimit(u)}>
-                            Daily order limit{u.order_limit != null ? ` · ${u.orders_today ?? 0}/${u.order_limit}` : ""}…
                           </DropdownMenuItem>
                         )}
                         {u.active === false ? (
