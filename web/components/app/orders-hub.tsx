@@ -11,7 +11,8 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, validateAddress, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
+import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, validateAddress, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
+import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -32,6 +33,65 @@ import { DesignCanvasDialog } from "@/components/app/design-canvas"
 
 const nowId = () => Date.now()
 const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
+
+// Per-order blank-stock chip for the warehouse, shown beside the readiness strip: is the
+// stock here (purple), short (amber → send to a PO), or untracked/unknown (grey)? Hovering
+// breaks it down per line and shows any PO a short blank is already on. Module-scope (not
+// defined inside the row render) to satisfy react-hooks/static-components.
+function StockChip({ order, items, catalog, stock, pos, canPO, sending, onSend }: {
+  order: OrderRow
+  items: OrderItem[]
+  catalog: CatalogProduct[]
+  stock: Record<string, number>
+  pos: PurchaseOrder[]
+  canPO: boolean
+  sending: boolean
+  onSend: (o: OrderRow) => void
+}) {
+  const { state, lines } = orderStock(items, catalog, stock)
+  // A PO that already lists this blank FOR THIS ORDER (so a re-look shows "on PO", not a
+  // prompt to send it again).
+  const poFor = (sku: string) =>
+    pos.find((p) => (p.items ?? []).some((it) => String(it.sku).toUpperCase() === sku && (it.sources ?? []).some((s) => s.order === order.id)))
+  const tone =
+    state === "in" ? "border-primary/30 bg-primary/10 text-primary"
+    : state === "out" ? "border-amber-300 bg-amber-100 text-amber-800"
+    : "border-border bg-muted text-muted-foreground"
+  const dot = state === "in" ? "bg-primary" : state === "out" ? "bg-amber-500" : "bg-muted-foreground/50"
+  const label = state === "in" ? "In stock" : state === "out" ? "Out of stock" : "Stock —"
+  const clickable = state === "out" && canPO
+  return (
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        disabled={!clickable || sending}
+        onClick={clickable ? () => onSend(order) : undefined}
+        className={"inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium " + tone + (clickable ? " cursor-pointer hover:brightness-95" : " cursor-default")}
+      >
+        <span className={"size-1.5 rounded-full " + dot} />
+        {sending ? "Sending…" : label}
+      </button>
+      {/* Hover breakdown — per line: on-hand/needed, or which PO it's already on. */}
+      <span className="pointer-events-none absolute right-0 top-full z-30 mt-1 hidden w-64 rounded-lg border border-border bg-popover p-2 text-left text-[11px] text-popover-foreground shadow-lg group-hover:block">
+        {lines.map((l, i) => {
+          const on = l.have != null && l.have < l.need ? poFor(l.sku) : null
+          return (
+            <span key={i} className="flex items-center justify-between gap-2 py-0.5">
+              <span className="min-w-0 truncate">{l.name}{l.sku ? ` · ${l.sku}` : ""}</span>
+              <span className="shrink-0 tabular-nums">
+                {l.have == null ? <span className="text-muted-foreground">not tracked</span>
+                  : l.have < l.need ? <span className="text-amber-600">{l.have}/{l.need}{on ? ` · PO ${on.num}` : ""}</span>
+                  : <span className="text-primary">{l.have}/{l.need}</span>}
+              </span>
+            </span>
+          )
+        })}
+        {state === "out" && canPO && <span className="mt-1 block border-t border-border pt-1 text-muted-foreground">Click to add short blanks to a draft PO.</span>}
+        {state === "out" && !canPO && <span className="mt-1 block border-t border-border pt-1 text-muted-foreground">Short on stock — warehouse can send to a PO.</span>}
+      </span>
+    </span>
+  )
+}
 
 // USPS mail classes offered for a direct label buy (Labels 3.0 values).
 const MAIL_CLASSES: { id: string; label: string }[] = [
@@ -135,6 +195,9 @@ export function OrdersHub() {
   // Artwork review. NB: this no longer implies "set any status" — stage changes are
   // gated per-role by stageOptionsFor/canSetStage, and the server enforces it.
   const canDesign = role === "operator" || isAdmin // send to designer
+  // Only warehouse/admin may write purchase orders (mirrors requireWarehouse on the server),
+  // so only they get the actionable amber "send to PO" — operators see the status read-only.
+  const canPO = isAdmin || role === "warehouse"
 
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [filter, setFilter] = useState("all")
@@ -157,6 +220,10 @@ export function OrdersHub() {
   const [threads, setThreads] = useState<Record<string, OrderThreadRow[]>>({})
   const [dfiles, setDfiles] = useState<Record<string, DesignFileRow[]>>({})
   const [stock, setStock] = useState<Record<string, number>>({})
+  // Draft/placed POs, so the stock chip's hover can show "already on PO #x" and the
+  // send-to-PO action can append to an existing draft rather than mint a new one each click.
+  const [pos, setPos] = useState<PurchaseOrder[]>([])
+  const [poBusy, setPoBusy] = useState<string | null>(null)  // order id being sent to a PO
   // Placed artwork per order, keyed by sku — what the row avatars composite onto the blank.
   const [designs, setDesigns] = useState<Record<string, Record<string, OrderDesign>>>({})
   /**
@@ -247,6 +314,68 @@ export function OrdersHub() {
       setStock(m)
     }).catch(() => {})
   }, [])
+  // POs, only for warehouse/admin (who can act on them). Used by the stock chip.
+  const loadPOs = useCallback(() => {
+    if (!canPO) return
+    getPurchaseOrders().then((p) => setPos(p ?? [])).catch(() => {})
+  }, [canPO])
+  useEffect(() => { loadPOs() }, [loadPOs])
+
+  // Send an order's SHORT blanks to a purchase order — appends to an existing draft for the
+  // supplier (or opens a new draft), tagging each line's `sources` with this order id so the
+  // PO stays traceable back to what drove it. Idempotent: a blank already on a PO for THIS
+  // order is skipped, so a second click never double-counts. Stays a DRAFT — placing an
+  // order with a supplier is a separate, deliberately-gated step, and no cost books until
+  // a PO is marked received.
+  const sendToPO = async (o: OrderRow) => {
+    const { shortLines } = orderStock(o.items ?? [], catalog, stock)
+    if (!shortLines.length || !canPO) return
+    setPoBusy(o.id); setNote(null)
+    try {
+      const skus = [...new Set(shortLines.map((l) => l.sku))]
+      const supMap = await resolveSuppliers(skus).then((r) => r.bySku).catch(() => ({} as Record<string, { supplier: string | null }>))
+      const bySupplier = new Map<string, typeof shortLines>()
+      for (const l of shortLines) {
+        const sup = supMap[l.sku]?.supplier || "Unassigned"
+        const arr = bySupplier.get(sup) ?? []; arr.push(l); bySupplier.set(sup, arr)
+      }
+      const fresh = await getPurchaseOrders().catch(() => pos)
+      const touched: string[] = []
+      let added = 0
+      for (const [supplier, ls] of bySupplier) {
+        let po = fresh.find((p) => p.status === "draft" && (p.supplier || "Unassigned") === supplier)
+        const isNew = !po
+        if (!po) po = { num: "PO-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).slice(2, 5).toUpperCase(), supplier, items: [], status: "draft" }
+        const nextItems = [...(po.items ?? [])]
+        for (const l of ls) {
+          const short = Math.max(1, l.need - (l.have ?? 0))
+          const existing = nextItems.find((it) => String(it.sku).toUpperCase() === l.sku)
+          if (existing) {
+            const srcs = existing.sources ?? []
+            if (srcs.some((s) => s.order === o.id)) continue   // already on this PO for this order → skip
+            srcs.push({ order: o.id, qty: short })
+            existing.sources = srcs
+            existing.qty = (Number(existing.qty) || 0) + short
+            existing.auto = true
+            added++
+          } else {
+            nextItems.push({ sku: l.sku, name: l.name, qty: short, auto: true, sources: [{ order: o.id, qty: short }] })
+            added++
+          }
+        }
+        const saved = { ...po, items: nextItems }
+        await savePurchaseOrder(saved)
+        touched.push(saved.num)
+        if (isNew) fresh.push(saved); else Object.assign(po, saved)
+      }
+      setPos(await getPurchaseOrders().catch(() => fresh))
+      setNote(added ? `Added ${added} short blank${added === 1 ? "" : "s"} to draft PO ${touched.join(", ")}.` : `Already on ${touched.join(", ")} — nothing new to add.`)
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Couldn't add to a purchase order.")
+    } finally {
+      setPoBusy(null)
+    }
+  }
   // Restore the saved warehouse "from" address.
   useEffect(() => {
     const id = setTimeout(() => {
@@ -866,7 +995,12 @@ export function OrdersHub() {
                     </div>
                   </div>
                 ),
-                ready: <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} compact />,
+                ready: (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} compact />
+                    <StockChip order={o} items={items} catalog={catalog} stock={stock} pos={pos} canPO={canPO} sending={poBusy === o.id} onSend={sendToPO} />
+                  </div>
+                ),
                 action: null, // rendered inline below, pinned last
               }
               return (
