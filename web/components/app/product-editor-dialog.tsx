@@ -13,6 +13,7 @@ import { swatchHex } from "@/lib/color-swatch"
 import { extractDominant, hexToRgb, rgbToOklab } from "@/lib/thread-match"
 import { normalizeMethods, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
+import { packagingHint } from "@/lib/dim-weight"
 
 // Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
 // surcharges cannot drift apart again.
@@ -131,6 +132,12 @@ export function ProductEditorDialog({
   const [productCost, setProductCost] = useState("")
   const [basePrice, setBasePrice] = useState("")
   const [shipping, setShipping] = useState("")
+  // Shipping physicals — weight (oz) + box (inches). Feed the label buy and the dim-weight
+  // check that warns when a box would be billed on size instead of weight.
+  const [weightOz, setWeightOz] = useState("")
+  const [boxL, setBoxL] = useState("")
+  const [boxW, setBoxW] = useState("")
+  const [boxH, setBoxH] = useState("")
   const [desc, setDesc] = useState("")
   const [sizes, setSizes] = useState<string[]>([])
   const [colors, setColors] = useState<string[]>([])
@@ -176,6 +183,10 @@ export function ProductEditorDialog({
       setProductCost(p?.productCost != null ? String(p.productCost) : "")
       setBasePrice(p?.basePrice != null ? String(p.basePrice) : p?.base_price != null ? String(p.base_price) : "")
       setShipping(p?.shippingFee != null ? String(p.shippingFee) : p?.shipping_fee != null ? String(p.shipping_fee) : "")
+      setWeightOz(p?.weightOz != null ? String(p.weightOz) : "")
+      setBoxL(p?.boxL != null ? String(p.boxL) : "")
+      setBoxW(p?.boxW != null ? String(p.boxW) : "")
+      setBoxH(p?.boxH != null ? String(p.boxH) : "")
       // Supplier feeds send HTML fragments (<p><strong>95% Cotton…</strong></p>), which
       // rendered as literal tags in this textarea. Flatten to one feature per line.
       setDesc(looksLikeHtml(p?.description) ? descriptionToText(p?.description) : (p?.description ?? ""))
@@ -324,6 +335,8 @@ export function ProductEditorDialog({
   const base = num(basePrice), pcost = num(productCost)
   const profit = !isNaN(base) && !isNaN(pcost) ? base - pcost : NaN
   const marginPct = !isNaN(profit) && base > 0 ? Math.round((profit / base) * 100) : NaN
+  // Dim-weight check for the packaging suggestion (÷166, USPS/Shippo). Deterministic math.
+  const pkg = packagingHint(weightOz, boxL, boxW, boxH)
 
   // Apply the bulk Base/Shipping to every size at once. In % mode the base is a markup over
   // each size's product cost (its own tier cost, else the product-level one); in $ mode it's
@@ -367,6 +380,10 @@ export function ProductEditorDialog({
       productCost: productCost.trim() === "" ? undefined : Number(productCost) || 0,
       basePrice: basePrice.trim() === "" ? undefined : Number(basePrice) || 0,
       shippingFee: shipping.trim() === "" ? undefined : Number(shipping) || 0,
+      weightOz: weightOz.trim() === "" ? undefined : Number(weightOz) || 0,
+      boxL: boxL.trim() === "" ? undefined : Number(boxL) || 0,
+      boxW: boxW.trim() === "" ? undefined : Number(boxW) || 0,
+      boxH: boxH.trim() === "" ? undefined : Number(boxH) || 0,
       sizePrices: strToTiers(tiers, sizes),
       description: desc.trim() || undefined,
       sizes,
@@ -638,6 +655,36 @@ export function ProductEditorDialog({
                   <p className="mt-2 text-xs text-muted-foreground">No sizes yet — add one above to price it.</p>
                 )}
               </div>
+          </div>
+
+          {/* Shipping physicals + dim-weight guard. Carriers bill the greater of actual and
+              dimensional weight (L×W×H÷166); keep the box under the ceiling so you're always
+              billed on weight and never reweighed up. */}
+          <div className="rounded-xl border border-border p-4">
+            <span className="text-sm font-medium">Weight &amp; dimensions</span>
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Weight (oz)</span><Input value={weightOz} onChange={(e) => setWeightOz(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="e.g. 12" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Length (in)</span><Input value={boxL} onChange={(e) => setBoxL(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="L" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Width (in)</span><Input value={boxW} onChange={(e) => setBoxW(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="W" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Height (in)</span><Input value={boxH} onChange={(e) => setBoxH(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="H" className="h-9" inputMode="decimal" /></label>
+            </div>
+            {pkg ? (
+              <div className={"mt-3 flex items-start gap-2 rounded-lg border p-2.5 text-xs " +
+                (pkg.billedOnSize ? "border-primary/40 bg-primary/5 text-foreground" : "border-emerald-300 bg-emerald-50 text-emerald-800")}>
+                <Question size={14} weight="bold" className="mt-0.5 shrink-0" />
+                {pkg.billedOnSize ? (
+                  <span>
+                    <span className="font-medium text-primary">Billed on size, not weight.</span> This box&apos;s dimensional weight is {pkg.dimLb!.toFixed(2)} lb vs {pkg.actualLb.toFixed(2)} lb actual — the carrier upcharges the difference. Keep the box under <span className="font-medium tabular-nums">{Math.round(pkg.maxVolumeIn3)} in³</span> (about {pkg.suggestedCube.toFixed(1)}″ each side) to be billed on the {pkg.actualLb.toFixed(2)} lb actual weight instead.
+                  </span>
+                ) : (
+                  <span>
+                    Billed on actual weight ({pkg.actualLb.toFixed(2)} lb) ✓{pkg.dimLb != null ? ` · dim weight ${pkg.dimLb.toFixed(2)} lb` : ""}. Stay under <span className="font-medium tabular-nums">{Math.round(pkg.maxVolumeIn3)} in³</span> (≈ {pkg.suggestedCube.toFixed(1)}″ cube) and it keeps winning — no reweigh upcharge.
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">Enter the weight to see the smallest box that avoids a dimensional-weight upcharge (USPS/Shippo, ÷166).</p>
+            )}
           </div>
 
           {/* ── Images ──────────────────────────────────────────────────────────────

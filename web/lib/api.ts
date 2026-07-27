@@ -458,6 +458,13 @@ export type CatalogProduct = {
   sizePrices?: { size: string; price: number; shipping: number | null; cost?: number | null }[]
   /** Product cost for the whole product, when sizes don't differ. Same role as tier.cost. */
   productCost?: number | string | null
+  /** Shipping physicals for label buying + the dim-weight check. Weight in ounces, box in
+   *  inches. Dimensional weight (L×W×H÷166 lb) is compared against actual weight so the
+   *  editor can flag a box that would be billed on size, not weight. */
+  weightOz?: number | string | null
+  boxL?: number | string | null
+  boxW?: number | string | null
+  boxH?: number | string | null
   // Print-method surcharge, e.g. { DTG: 3, EMB: 5 } — EMB stitches cost more than ink.
   methodPrices?: Record<string, number>
   // This product's own extra-item shipping, overriding the platform's ship_extra.
