@@ -1476,48 +1476,36 @@ function LimitCell({
     const t = raw.trim()
     onSave(t === "" ? null : Math.max(0, parseInt(t, 10) || 0))
   }
-  const label = limit != null ? (limit === 0 ? "∞" : String(limit)) : (defaultLimit > 0 ? String(defaultLimit) : "—")
+  // One value, in plain words: "40/day", "Unlimited", or "No limit" (falling back to the
+  // platform default, shown muted). Usage + recent average live in the tooltip rather than
+  // crowding the cell. Amber only when today has hit the limit.
+  const label = limit == null
+    ? (defaultLimit > 0 ? `${defaultLimit}/day` : "No limit")
+    : limit === 0 ? "Unlimited" : `${limit}/day`
   const inherited = limit == null
-  return (
-    <div className="text-sm">
-      <span
-        className={"inline-flex items-center gap-1 rounded-md px-2 py-0.5 tabular-nums " +
-          (over ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}
-        title={`${today} uploaded today · ~${perDay}/day recently · ${
-          limit == null ? `no personal limit (platform default ${defaultLimit || "none"})` : limit === 0 ? "unlimited" : `limit ${limit}`
-        }`}
-      >
-        <span>{today}</span>
-        <span className="opacity-50">/</span>
-        {editing ? (
-          <input
-            autoFocus
-            type="number"
-            min={0}
-            defaultValue={limit ?? ""}
-            onBlur={(e) => commit(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); commit((e.target as HTMLInputElement).value) }
-              else if (e.key === "Escape") setEditing(false)
-            }}
-            placeholder={defaultLimit ? String(defaultLimit) : "—"}
-            className="w-12 rounded border border-primary/50 bg-card px-1 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          />
-        ) : canEdit ? (
-          <button
-            onClick={() => setEditing(true)}
-            disabled={saving}
-            className={"rounded px-0.5 underline decoration-dotted underline-offset-2 hover:text-foreground " + (inherited ? "opacity-60" : "font-medium")}
-            title="Click to set this seller's daily limit"
-          >
-            {label}
-          </button>
-        ) : (
-          <span className={inherited ? "opacity-60" : ""}>{label}</span>
-        )}
-      </span>
-      <span className="ml-1 opacity-70">~{perDay}/d</span>
-    </div>
+  const title = `${today} uploaded today · ~${perDay}/day recently${inherited ? ` · using platform default ${defaultLimit || "none"}` : limit === 0 ? " · unlimited" : ""}`
+  const cls = over ? "font-medium text-primary" : inherited ? "text-muted-foreground" : "font-medium text-foreground"
+  if (editing) {
+    return (
+      <input
+        autoFocus type="number" min={0} defaultValue={limit ?? ""}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit((e.target as HTMLInputElement).value) }
+          else if (e.key === "Escape") setEditing(false)
+        }}
+        placeholder={defaultLimit ? String(defaultLimit) : "none"}
+        className="w-20 rounded-md border border-primary/50 bg-card px-1.5 py-0.5 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      />
+    )
+  }
+  return canEdit ? (
+    <button onClick={() => setEditing(true)} disabled={saving} title={`${title} · click to change`}
+      className={"text-sm tabular-nums underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground " + cls}>
+      {label}
+    </button>
+  ) : (
+    <span title={title} className={"text-sm tabular-nums " + cls}>{label}</span>
   )
 }
 
@@ -1813,7 +1801,13 @@ function UsersPanel() {
                 <span className="hidden lg:block">Joined</span>
                 <span className="hidden lg:block">Activity</span>
                 <span className="hidden text-right sm:block">Balance</span>
-                <span className="text-right">Access</span>
+                {/* Same 3-col sub-grid as the row's Access cell, so Role / Plan sit exactly
+                    over their selects. */}
+                <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-1.5">
+                  <span>Role</span>
+                  <span>Plan</span>
+                  <span className="w-8" />
+                </div>
               </div>
             )}
             {paged.pageItems.length === 0 ? (
@@ -1870,9 +1864,9 @@ function UsersPanel() {
                     {isSeller ? (
                       <>
                         <LimitCell user={u} canEdit={isAdminCaller} defaultLimit={defaultLimit} saving={busy === u.id} onSave={(v) => saveOrderLimit(u, v)} />
-                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {lastActive ? `last order ${lastActive}` : "no orders yet"}
-                        </div>
+                        {lastActive && (
+                          <div className="mt-0.5 truncate text-xs text-muted-foreground">last order {lastActive}</div>
+                        )}
                       </>
                     ) : (
                       <span className="text-muted-foreground/50">—</span>
@@ -1897,31 +1891,35 @@ function UsersPanel() {
                   {/* Access — role + plan + the manage menu, right-aligned under the header.
                       A FIXED-width track (see USER_ROW_GRID): a seller's extra Plan select
                       must not widen this cell and drag every other column out of true. */}
-                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-1.5">
+                    {/* Role — borderless, keeps the dropdown arrow (eg-select). */}
                     {!isAdminCaller ? (
-                      <span className="text-sm capitalize">{u.role}</span>
+                      <span className="truncate text-sm capitalize">{u.role}</span>
                     ) : (
                       <select
                         value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id}
-                        className="eg-select h-8 rounded-lg border border-border/60 bg-card px-2 text-sm capitalize transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                        className="eg-select h-8 rounded-md bg-transparent px-1 text-sm capitalize transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                       >
                         {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
                     )}
-                    {u.role === "seller" && (isAdminCaller ? (
+                    {/* Plan — sellers only; an empty cell keeps Role/Plan/menu aligned for staff. */}
+                    {u.role === "seller" ? (isAdminCaller ? (
                       <select
                         value={u.plan ?? "starter"} onChange={(e) => changePlan(u, e.target.value)} disabled={busy === u.id}
-                        className="eg-select h-8 rounded-lg border border-border/60 bg-card px-2 text-sm capitalize transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                        className="eg-select h-8 rounded-md bg-transparent px-1 text-sm capitalize transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                       >
                         {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
                       </select>
                     ) : (
-                      <span className="text-sm capitalize text-muted-foreground">{u.plan ?? "starter"}</span>
-                    ))}
+                      <span className="truncate text-sm capitalize text-muted-foreground">{u.plan ?? "starter"}</span>
+                    )) : (
+                      <span />
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         aria-label={`Manage ${u.email}`}
-                        className="eg-tap inline-flex size-8 items-center justify-center rounded-lg border border-border/60 bg-card text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                        className="eg-tap inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                       >
                         <DotsThree size={16} weight="bold" />
                       </DropdownMenuTrigger>
