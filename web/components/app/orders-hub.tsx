@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, ArrowUUpLeft } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -507,8 +507,19 @@ export function OrdersHub() {
   const setOrderStatus = async (o: OrderRow, to: string) => {
     setBusy(`ord:${o.id}`)
     try {
+      // A hold overwrites the stage it interrupts (factory_status is one field), so before
+      // holding, remember what it WAS — that's what "Resume" restores. Clear it again when
+      // leaving the hold. meta is merged (the server replaces the column wholesale), so this
+      // never clobbers source/note/etc.
+      const prev = normalizeStage(o.factory_status ?? orderStage(o.items ?? []))
+      let metaPatch: Record<string, unknown> | undefined
+      if (to === "on_hold" && prev && prev !== "on_hold") {
+        metaPatch = { ...(o.meta ?? {}), hold_from: prev }
+      } else if (prev === "on_hold" && to !== "on_hold" && o.meta && "hold_from" in o.meta) {
+        const m = { ...o.meta }; delete m.hold_from; metaPatch = m
+      }
       for (const it of o.items ?? []) if (it.sku || it.line_id) { patchItem(o.id, it.sku ?? "", to, it.line_id); await postItemStatus(o.id, it.sku ?? "", to, it.line_id) }
-      await updateOrder(o.id, { factoryStatus: to })
+      await updateOrder(o.id, metaPatch ? { factoryStatus: to, meta: metaPatch } : { factoryStatus: to })
       setActionErr(null)
     } catch (e) {
       setActionErr(e instanceof Error ? e.message : "Couldn't change that order's status.")
@@ -1137,12 +1148,34 @@ export function OrdersHub() {
                               one look identical; this names which it is, and points at the
                               ⋯ menu that resolves it. Muted, not primary — it is a state,
                               not something to click. */}
-                          {stopped && (
-                            <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-amber-700">
-                              <Warning size={13} weight="fill" />
-                              {normalizeStage(stage) === "on_hold" ? "On hold" : "Flagged"} — resolve in ⋯
-                            </span>
-                          )}
+                          {stopped && (() => {
+                            const norm = normalizeStage(stage)
+                            const stLabel = stageMeta(norm)?.label || "On hold"
+                            // On hold remembers the stage it interrupted (meta.hold_from), so
+                            // it offers a one-click "Back to <that stage>" — clear how to come
+                            // off hold. Without a stored prior (an old hold), fall back to ⋯.
+                            const holdFrom = norm === "on_hold" ? (o.meta?.hold_from as string | undefined) : undefined
+                            const backLabel = holdFrom != null ? (stageMeta(holdFrom)?.label || "Received") : null
+                            return (
+                              <span className="inline-flex shrink-0 items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                                  <Warning size={13} weight="fill" /> {stLabel}
+                                </span>
+                                {norm === "on_hold" && (backLabel != null ? (
+                                  <Button
+                                    size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs"
+                                    disabled={busy === `ord:${o.id}`}
+                                    onClick={() => setOrderStatus(o, holdFrom!)}
+                                    title={`Take this order off hold and return it to ${backLabel}`}
+                                  >
+                                    <ArrowUUpLeft size={12} weight="bold" /> Back to {backLabel}
+                                  </Button>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">resolve in ⋯</span>
+                                ))}
+                              </span>
+                            )
+                          })()}
                           {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}>{tl("ui", "Start order")}</Button>}
                           {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}>{tl("ui", "Create new label")}</Button>}
                           {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further.">{tl("ui", "Next stage")}</Button>}

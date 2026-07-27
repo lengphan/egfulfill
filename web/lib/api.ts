@@ -1036,7 +1036,7 @@ export function postItemStatus(id: string, sku: string, status: string, lineId?:
   })
 }
 
-export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string }) {
+export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; meta?: Record<string, unknown> }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(patch),
