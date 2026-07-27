@@ -285,26 +285,34 @@ async function runLettering(req, reply, { design }) {
   } catch (e) { reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' }; }
 }
 
-// ── Combined: bitmap art + lettering in ONE design — PROTOTYPE ─────────────────
-// Compose an auto-digitized bitmap AND lettering into a single design/preview + machine
-// file. This recipe shape (an <artwork> element beside <decorations><lettering>) is our
-// BEST READ of the EWA recipe model, NOT a confirmed spec — like the single-mode XML above
-// it is unverified against a live account. If EWA rejects it, the error + a body sample are
-// returned so the XML here can be corrected. When only ONE input is present we delegate to
-// the proven single-mode handlers rather than guessing.
-function buildCombinedXml({ filename, base64, text, alphabet, letterHeight, colorInt, designFile }) {
+// ── Combined: bitmap art + lettering in ONE design ─────────────────────────────
+// Per the Wilcom API guide the merge is a TWO-STEP: (1) auto-digitize the image to an .emb,
+// (2) call newDesign with a recipe whose <decorations> hold the .emb as a <design> decoration
+// ALONGSIDE the <lettering> decoration (both are valid decoration types; sequence = stitch
+// order). buildCombinedXml is step 2 — it embeds the already-digitized .emb via <files>.
+// Ref: apiguide.wilcom.com …/design-recipe-recipe-xml-data/decorations/ and …/design/.
+function buildCombinedXml({ embName, embBase64, text, alphabet, letterHeight, colorInt, designFile }) {
   const lh = Math.min(50, Math.max(5, Number(letterHeight) || 20));
   const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="preview.png"', 'dpi="120"'].filter(Boolean).join(' ');
   return '<xml><recipe>'
-    + `<artwork><bitmap file="${XML_ESC(filename)}"/><autodigitize_options/></artwork>`
-    + '<decorations><lettering>'
+    + '<decorations>'
+    + `<design file="${XML_ESC(embName)}" colorwaytype="current"/>`
+    + '<lettering>'
     + `<simple_lettering text="${XML_ESC(text)}" alphabet_name="${XML_ESC(alphabet)}" height="${lh.toFixed(1)}"/>`
     + `<thread color="${colorInt}"/>`
-    + '</lettering></decorations>'
+    + '</lettering>'
+    + '</decorations>'
     + `<output ${out}/>`
-    + `<files><file filename="${XML_ESC(filename)}" filecontents="${base64}"/></files>`
+    + `<files><file filename="${XML_ESC(embName)}" filecontents="${embBase64}"/></files>`
     + '</recipe></xml>';
 }
+
+// The auto-digitized .emb for an image doesn't change while the image is fixed, so cache it by
+// content hash: a live combined preview then re-runs only the FAST lettering step as you type,
+// not the heavy (up to 90s) auto-digitize on every keystroke. Small LRU-ish cap.
+const _embCache = new Map();
+function embCacheGet(hash) { const v = _embCache.get(hash); if (v) { _embCache.delete(hash); _embCache.set(hash, v); } return v; }
+function embCacheSet(hash, v) { _embCache.set(hash, v); if (_embCache.size > 24) _embCache.delete(_embCache.keys().next().value); }
 
 async function runCombine(req, reply, { design }) {
   if (!configured()) { reply.code(400); return { ok: false, error: 'Wilcom EWA is not configured — add the key in Settings › Integrations.' }; }
@@ -322,9 +330,27 @@ async function runCombine(req, reply, { design }) {
   const alphabet = String(b.alphabet || '').trim();
   if (!alphabet) { reply.code(400); return { ok: false, error: 'Pick an alphabet for the text.' }; }
   const stem = safeName(b.filename || text, 'design');
-  const filename = `${stem}.${img.ext}`;
-  const xml = buildCombinedXml({ filename, base64: img.base64, text, alphabet, letterHeight: b.height, colorInt: hexToColorInt(b.color), designFile: design ? `${stem}.emb` : null });
   try {
+    // STEP 1 — auto-digitize the image to an .emb (cached by image content hash, so live typing
+    // re-runs only the lettering step, not this heavy call).
+    const hash = crypto.createHash('sha256').update(img.base64).digest('hex').slice(0, 32);
+    let emb = embCacheGet(hash);
+    if (!emb) {
+      const artStem = safeName(b.filename || 'art', 'art');
+      const artXml = buildBitmapXml({ filename: `${artStem}.${img.ext}`, base64: img.base64, width: b.width, height: b.height, designFile: `${artStem}.emb` });
+      const artRes = await ewaCall('api/bitmapArtDesign', artXml);
+      if (!artRes.ok) {
+        const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(artRes.body || '');
+        reply.code(502);
+        return { ok: false, status: artRes.status, error: m ? m[1].trim() : 'EWA could not auto-digitize the image', sample: (artRes.body || '').slice(0, 400) };
+      }
+      const artEmb = parseFiles(artRes.body).find((f) => /\.emb$/i.test(f.filename));
+      if (!artEmb) { reply.code(502); return { ok: false, error: 'Auto-digitize returned no .emb to combine with the text.', sample: (artRes.body || '').slice(0, 400) }; }
+      emb = { filename: artEmb.filename, base64: artEmb.base64 };
+      embCacheSet(hash, emb);
+    }
+    // STEP 2 — one design: the .emb as a <design> decoration + the <lettering> decoration.
+    const xml = buildCombinedXml({ embName: emb.filename, embBase64: emb.base64, text, alphabet, letterHeight: b.height, colorInt: hexToColorInt(b.color), designFile: design ? `${stem}.emb` : null });
     const res = await ewaCall(design ? 'api/newDesign' : 'api/newDesignTrueview', xml);
     if (!res.ok) {
       const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
