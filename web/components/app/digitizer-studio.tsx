@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from "react"
 // NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
-import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, UploadSimple, X, ArrowRight, PaperPlaneTilt, Check } from "@phosphor-icons/react"
+import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, UploadSimple, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
   wilcomPreview, wilcomDigitize, getWilcomGenerations, createDesignCard,
-  getWilcomAlphabets, wilcomCombinePreview, wilcomCombine, ApiError,
-  type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration,
+  getWilcomAlphabets, wilcomCombinePreview, wilcomCombine,
+  type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration, type WilcomTransform,
 } from "@/lib/api"
 
 type Tab = "create" | "library" | "history"
@@ -379,6 +379,32 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
   )
 }
 
+const IDENTITY_TF: WilcomTransform = { x: 0, y: 0, scale: 1, angle: 0 }
+
+// One labelled slider for a transform value.
+function TfSlider({ label, value, min, max, step, unit, onChange }: { label: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }) {
+  return (
+    <label className="flex items-center gap-2 text-[11px]">
+      <span className="w-12 shrink-0 text-muted-foreground">{label}</span>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="min-w-0 flex-1 accent-[var(--primary)]" />
+      <span className="w-14 shrink-0 text-right tabular-nums text-muted-foreground">{value}{unit}</span>
+    </label>
+  )
+}
+
+// Move / resize / rotate a layer — maps to the decoration's <transform x y scale angle>.
+function TransformControls({ tf, onChange }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void }) {
+  return (
+    <div className="space-y-1.5 border-t border-border bg-muted/20 px-3 py-2">
+      <TfSlider label="Move X" value={tf.x} min={-80} max={80} step={1} unit=" mm" onChange={(v) => onChange({ ...tf, x: v })} />
+      <TfSlider label="Move Y" value={tf.y} min={-80} max={80} step={1} unit=" mm" onChange={(v) => onChange({ ...tf, y: v })} />
+      <TfSlider label="Size" value={tf.scale} min={0.2} max={3} step={0.05} unit="×" onChange={(v) => onChange({ ...tf, scale: v })} />
+      <TfSlider label="Rotate" value={tf.angle} min={-180} max={180} step={5} unit="°" onChange={(v) => onChange({ ...tf, angle: v })} />
+      <button type="button" onClick={() => onChange(IDENTITY_TF)} className="text-[11px] font-medium text-primary hover:underline">Reset</button>
+    </div>
+  )
+}
+
 // ── Create — ONE workspace: drop an image AND/OR type text, combined into a single live
 // embroidery preview + machine file via the EWA combine endpoint (prototype). ──────────
 function CreateTab() {
@@ -391,7 +417,11 @@ function CreateTab() {
   const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
   const [res, setRes] = useState<WilcomResult | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const [debug, setDebug] = useState<string | null>(null) // TEMP: EWA's raw response (success OR reject)
+  // Per-layer move / resize / rotate → the decoration's <transform>. Identity by default so a
+  // fresh combine renders exactly as before until you actually adjust something.
+  const [imgTf, setImgTf] = useState<WilcomTransform>(IDENTITY_TF)
+  const [txtTf, setTxtTf] = useState<WilcomTransform>(IDENTITY_TF)
+  const [openLayer, setOpenLayer] = useState<"image" | "text" | null>(null)
   // The dropped/chosen artwork to embroider alongside the text. dataUrl is downscaled under
   // EWA's 2 MB cap; thumb keeps the full-res original for the little in-panel preview.
   const [image, setImage] = useState<{ dataUrl: string; thumb: string; name: string } | null>(null)
@@ -422,20 +452,14 @@ function CreateTab() {
   const ready = !!image || (hasText && !!alphabet)
   const run = async (design: boolean) => {
     if (!ready) return
-    setStatus(design ? "generating" : "previewing"); setErr(null); setDebug(null)
+    setStatus(design ? "generating" : "previewing"); setErr(null)
     try {
-      const body = { image: image?.dataUrl, text: hasText ? text.trim() : undefined, alphabet, height, color, filename: image?.name, name: image?.name || (hasText ? text.trim() : undefined) }
+      const body = { image: image?.dataUrl, text: hasText ? text.trim() : undefined, alphabet, height, color, filename: image?.name, name: image?.name || (hasText ? text.trim() : undefined),
+        designTransform: image ? imgTf : undefined, letterTransform: hasText ? txtTf : undefined }
       const r = design ? await wilcomCombine(body) : await wilcomCombinePreview(body)
-      setDebug(r.sample ?? null) // capture EWA's raw response whether it succeeded or rejected
       if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null) }
       else setRes(r)
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Failed")
-      // A rejected combine comes back as a thrown ApiError (502); its body still carries the
-      // `sample` debug payload — pull it out so the debug box shows the real EWA response.
-      const body = e instanceof ApiError ? (e.body as { sample?: string } | undefined) : undefined
-      setDebug(body?.sample ?? null)
-    } finally { setStatus("idle") }
+    } catch (e) { setErr(e instanceof Error ? e.message : "Failed") } finally { setStatus("idle") }
   }
 
   // Live preview — auto-render as you type/tweak (debounced), no button press. Pauses while a
@@ -445,7 +469,7 @@ function CreateTab() {
     const id = setTimeout(() => { void run(false) }, 650)
     return () => clearTimeout(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image?.dataUrl, text, alphabet, height, color, ready])
+  }, [image?.dataUrl, text, alphabet, height, color, ready, imgTf, txtTf])
 
   const inputCls = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
   const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
@@ -533,26 +557,34 @@ function CreateTab() {
           ) : <p className="text-xs text-muted-foreground">No thread library set — add cones in Settings › Thread palette.</p>}
         </div>
 
-        {/* Layers — the elements in this design (the image and the text). Display for now;
-            multi-file + drag-to-reorder is the next step once the combine renders both. */}
+        {/* Layers — the elements in this design. Each opens a move / resize / rotate panel that
+            feeds the decoration's <transform>. Multi-file + reorder is the next step. */}
         {(image || hasText) && (
           <div>
             <span className={labelCls}>Layers</span>
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {image && (
-                <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
-                  <ImageSquare size={15} className="shrink-0 text-muted-foreground" />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={image.thumb} alt="" className="size-6 shrink-0 rounded border border-border object-contain" />
-                  <span className="min-w-0 flex-1 truncate">{image.name}</span>
-                  <button onClick={() => setImage(null)} title="Remove image layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
+                <div>
+                  <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
+                    <ImageSquare size={15} className="shrink-0 text-muted-foreground" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={image.thumb} alt="" className="size-6 shrink-0 rounded border border-border object-contain" />
+                    <span className="min-w-0 flex-1 truncate">{image.name}</span>
+                    <button onClick={() => setOpenLayer((o) => (o === "image" ? null : "image"))} title="Move / resize / rotate" className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === "image" ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
+                    <button onClick={() => { setImage(null); setImgTf(IDENTITY_TF) }} title="Remove image layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
+                  </div>
+                  {openLayer === "image" && <TransformControls tf={imgTf} onChange={setImgTf} />}
                 </div>
               )}
               {hasText && (
-                <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
-                  <PencilSimple size={15} className="shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate">“{text}”</span>
-                  <button onClick={() => setText("")} title="Remove text layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
+                <div>
+                  <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
+                    <PencilSimple size={15} className="shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate">“{text}”</span>
+                    <button onClick={() => setOpenLayer((o) => (o === "text" ? null : "text"))} title="Move / resize / rotate" className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === "text" ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
+                    <button onClick={() => { setText(""); setTxtTf(IDENTITY_TF) }} title="Remove text layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
+                  </div>
+                  {openLayer === "text" && <TransformControls tf={txtTf} onChange={setTxtTf} />}
                 </div>
               )}
             </div>
@@ -576,14 +608,6 @@ function CreateTab() {
           </div>
         )}
         {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
-        {/* TEMP debug — EWA's raw response for a combined design, so we can see why only one
-            decoration renders. Copy the whole thing and paste it back. Removed once fixed. */}
-        {debug && (
-          <details className="rounded-lg border border-border bg-muted/30" open>
-            <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground">EWA response (debug) — copy &amp; paste this back to me</summary>
-            <pre className="max-h-56 select-all overflow-auto whitespace-pre-wrap break-all px-3 pb-3 font-mono text-[10px] leading-snug text-muted-foreground">{debug}</pre>
-          </details>
-        )}
       </div>
 
       {/* RIGHT — the big preview, the hero of the tab; sticks while you scroll the controls. */}

@@ -1637,7 +1637,9 @@ export function wilcomLettering(body: { text: string; alphabet: string; height?:
 // omitted; the server delegates to the proven single-mode path when only one is present, and
 // attempts the combined recipe when both are. `sample` is the raw EWA body on a combine
 // failure, kept so the recipe can be iterated against a live account.
-export type WilcomComboBody = { image?: string; text?: string; alphabet?: string; height?: number; color?: string; filename?: string; name?: string; orderRef?: string }
+/** Move (x/y mm), resize (scale ×), rotate (angle°) for a decoration in the combined design. */
+export type WilcomTransform = { x: number; y: number; scale: number; angle: number }
+export type WilcomComboBody = { image?: string; text?: string; alphabet?: string; height?: number; color?: string; filename?: string; name?: string; orderRef?: string; designTransform?: WilcomTransform; letterTransform?: WilcomTransform }
 export function wilcomCombinePreview(body: WilcomComboBody) {
   return api<WilcomResult>(`/api/wilcom/combine-preview`, { method: "POST", body: JSON.stringify(body) })
 }

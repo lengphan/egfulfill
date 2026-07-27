@@ -176,7 +176,7 @@ async function runBitmap(req, reply, { design }) {
   try {
     const res = await ewaCall(design ? 'api/bitmapArtDesign' : 'api/bitmapArtTrueview', xml);
     if (!res.ok) {
-      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
+      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '') || /\bmessage="([^"]{1,300})"/i.exec(res.body || '');
       reply.code(502);
       return { ok: false, status: res.status, error: m ? m[1].trim() : 'EWA rejected the request', sample: (res.body || '').slice(0, 400) };
     }
@@ -251,7 +251,7 @@ async function runLettering(req, reply, { design }) {
     // returns a flat, non-TrueView bitmap); generate uses newDesign to emit the machine file.
     const res = await ewaCall(design ? 'api/newDesign' : 'api/newDesignTrueview', xml);
     if (!res.ok) {
-      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
+      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '') || /\bmessage="([^"]{1,300})"/i.exec(res.body || '');
       reply.code(502);
       return { ok: false, status: res.status, error: m ? m[1].trim() : 'EWA rejected the request', sample: (res.body || '').slice(0, 400) };
     }
@@ -291,13 +291,22 @@ async function runLettering(req, reply, { design }) {
 // ALONGSIDE the <lettering> decoration (both are valid decoration types; sequence = stitch
 // order). buildCombinedXml is step 2 — it embeds the already-digitized .emb via <files>.
 // Ref: apiguide.wilcom.com …/design-recipe-recipe-xml-data/decorations/ and …/design/.
-function buildCombinedXml({ embName, embBase64, text, alphabet, letterHeight, colorInt, designFile }) {
+// A decoration transform: move (x/y mm), resize (scale ×), rotate (angle°). Emitted only when
+// it differs from identity so a default combine keeps its exact current behaviour.
+function tfXml(tf) {
+  if (!tf) return '';
+  const x = Number(tf.x) || 0, y = Number(tf.y) || 0, scale = Number(tf.scale) || 1, angle = Number(tf.angle) || 0;
+  if (x === 0 && y === 0 && scale === 1 && angle === 0) return '';
+  return `<transform x="${x}" y="${y}" scale="${scale}" angle="${angle}"/>`;
+}
+function buildCombinedXml({ embName, embBase64, text, alphabet, letterHeight, colorInt, designFile, designTf, letterTf }) {
   const lh = Math.min(50, Math.max(5, Number(letterHeight) || 20));
   const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="preview.png"', 'dpi="120"'].filter(Boolean).join(' ');
   return '<xml><recipe>'
     + '<decorations>'
-    + `<design file="${XML_ESC(embName)}" colorwaytype="current"/>`
+    + `<design file="${XML_ESC(embName)}" colorwaytype="current">${tfXml(designTf)}</design>`
     + '<lettering>'
+    + tfXml(letterTf)
     + `<simple_lettering text="${XML_ESC(text)}" alphabet_name="${XML_ESC(alphabet)}" height="${lh.toFixed(1)}"/>`
     + `<thread color="${colorInt}"/>`
     + '</lettering>'
@@ -344,7 +353,7 @@ async function runCombine(req, reply, { design }) {
       const artXml = buildBitmapXml({ filename: `${artStem}.${img.ext}`, base64: img.base64, width: b.width, height: b.height, designFile: `${artStem}.emb` });
       const artRes = await ewaCall('api/bitmapArtDesign', artXml);
       if (!artRes.ok) {
-        const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(artRes.body || '');
+        const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(artRes.body || '') || /\bmessage="([^"]{1,300})"/i.exec(artRes.body || '');
         reply.code(502);
         return { ok: false, status: artRes.status, error: m ? m[1].trim() : 'EWA could not auto-digitize the image', sample: (artRes.body || '').replace(/filecontents="[^"]*"/gi, 'filecontents="[base64]"').slice(0, 2000) };
       }
@@ -354,10 +363,10 @@ async function runCombine(req, reply, { design }) {
       embCacheSet(hash, emb);
     }
     // STEP 2 — one design: the .emb as a <design> decoration + the <lettering> decoration.
-    const xml = buildCombinedXml({ embName: emb.filename, embBase64: emb.base64, text, alphabet, letterHeight: b.height, colorInt: hexToColorInt(b.color), designFile: design ? `${stem}.emb` : null });
+    const xml = buildCombinedXml({ embName: emb.filename, embBase64: emb.base64, text, alphabet, letterHeight: b.height, colorInt: hexToColorInt(b.color), designFile: design ? `${stem}.emb` : null, designTf: b.designTransform, letterTf: b.letterTransform });
     const res = await ewaCall(design ? 'api/newDesign' : 'api/newDesignTrueview', xml);
     if (!res.ok) {
-      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
+      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '') || /\bmessage="([^"]{1,300})"/i.exec(res.body || '');
       reply.code(502);
       // The sample is deliberately returned: the combine recipe is a prototype, so the raw
       // EWA response is what we iterate the XML against.
@@ -389,10 +398,6 @@ async function runCombine(req, reply, { design }) {
         out.id = gid; out.trueviewUrl = tvUrl; out.fileUrl = fileUrl;
       } catch (e) { req.log?.warn?.({ err: String(e) }, 'wilcom combine persist failed'); }
     }
-    // DEBUG (temporary): EWA's raw response, base64 stripped — so we can see WHY only one
-    // decoration renders (design_info num_objects, thread/colour list, any note). Remove once
-    // the combine is confirmed rendering both the design and the lettering.
-    out.sample = (res.body || '').replace(/filecontents="[^"]*"/gi, 'filecontents="[base64]"').slice(0, 2500);
     return out;
   } catch (e) { reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' }; }
 }
@@ -427,7 +432,7 @@ export function wilcomRoutes(app, requireStaff) {
       // EWA answers 200 on success; a non-200 (or an error XML) usually means a bad
       // appId/appKey. Try to pull a human-readable message out of the XML either way, but
       // always surface the status + a trimmed body so a wrong contract is diagnosable.
-      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
+      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '') || /\bmessage="([^"]{1,300})"/i.exec(res.body || '');
       return { ok: res.ok, status: res.status, message: m ? m[1].trim() : null, sample: (res.body || '').slice(0, 800) };
     } catch (e) {
       reply.code(502);
