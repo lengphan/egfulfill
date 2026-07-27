@@ -132,11 +132,10 @@ function EmailBrandingCard() {
 
   return (
     <>
-      {/* Compact trigger in the Broadcasts header — the swatch + logo show branding is
-          already set, so it's a one-time setup you open only to adjust, not a panel
-          that dominates the page. */}
+      {/* Compact trigger in the Broadcasts header — a one-time setup you open only to
+          adjust, not a panel that dominates the page. (The accent-colour chip was dropped
+          for a cleaner button; a set logo still shows that branding is configured.) */}
       <Button variant="outline" size="sm" className="gap-2" onClick={() => setOpen(true)}>
-        <span className="size-3.5 shrink-0 rounded-full border border-black/10" style={{ background: b.accent }} />
         {b.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={b.logoUrl} alt="" className="h-4 max-w-[4.5rem] object-contain" />

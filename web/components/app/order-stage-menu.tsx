@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { DotsThree, SkipForward, Truck, Flag } from "@phosphor-icons/react"
+import { DotsThree, SkipForward, Truck } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, canSetStage, stageDenialReason, canWalk } from "@/lib/factory-status"
 import { postItemStatus, updateOrder, type OrderRow } from "@/lib/api"
@@ -95,7 +95,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
               <DropdownMenuLabel>Flag / hold</DropdownMenuLabel>
               {exc.map((s) => (
                 <DropdownMenuItem key={s.id} disabled={!!s.deny} title={s.deny ?? undefined} onClick={() => onStage(s)}>
-                  <Flag size={13} weight="fill" /> {s.label}
+                  {s.label}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>

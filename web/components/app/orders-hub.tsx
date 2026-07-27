@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -1102,7 +1102,7 @@ export function OrdersHub() {
                                         title={s.deny ?? undefined}
                                         onClick={() => { if (!s.deny) setOrderStatus(o, s.id) }}
                                       >
-                                        <Flag size={13} weight="fill" /> {tl("stage", s.label)}
+                                        {tl("stage", s.label)}
                                       </DropdownMenuItem>
                                     ))}
                                   </DropdownMenuGroup>
