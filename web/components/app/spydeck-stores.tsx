@@ -37,8 +37,10 @@ const priceStr = (l: EtsyListing) =>
 const PAGE_SIZE = 5
 
 // Preview strips, cached by shop_id for this session so paging back — or a re-render — never
-// re-fetches. Protects both the burst and the daily Etsy budget.
-const stripCache = new Map<string, EtsyListing[]>()
+// re-fetches. It holds the FULL listings so the same cache serves BOTH the row's preview strip
+// AND "View catalog" — opening a shop you've already previewed costs zero extra Etsy calls.
+const listingsCache = new Map<string, EtsyListing[]>()
+const stripOf = (ls: EtsyListing[]) => ls.filter((l) => l.thumb || l.image).slice(0, 12)
 
 // One STORE per row: identity + stats + actions on the left, a strip of that shop's actual
 // product images on the right — so you can see what a competitor sells before clicking in.
@@ -47,15 +49,15 @@ const stripCache = new Map<string, EtsyListing[]>()
 function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: number; saved: boolean; onToggle: (s: SpyShop) => void; onOpen: (s: SpyShop) => void }) {
   // Read the cache at mount (the row remounts per shop — key={shop_id}), so a cached strip
   // shows with no fetch and no setState-in-effect.
-  const [previews, setPreviews] = useState<EtsyListing[] | null>(() => stripCache.get(s.shop_id) ?? null)
+  const [previews, setPreviews] = useState<EtsyListing[] | null>(() => { const c = listingsCache.get(s.shop_id); return c ? stripOf(c) : null })
   useEffect(() => {
-    if (stripCache.has(s.shop_id)) return // already shown by the initializer above
+    if (listingsCache.has(s.shop_id)) return // already shown by the initializer above
     let live = true
     // Space the calls out (~250ms per row) so a page of PAGE_SIZE rows trickles in rather than
     // firing at once — keeps us far below Etsy's 10/sec limit.
     const t = setTimeout(() => {
       getSpydeckShopListings(s.shop_id)
-        .then((r) => { const strip = (r.listings ?? []).filter((l) => l.thumb || l.image).slice(0, 12); stripCache.set(s.shop_id, strip); if (live) setPreviews(strip) })
+        .then((r) => { const full = r.listings ?? []; listingsCache.set(s.shop_id, full); if (live) setPreviews(stripOf(full)) })
         .catch(() => { if (live) setPreviews([]) })
     }, index * 250)
     return () => { live = false; clearTimeout(t) }
@@ -197,8 +199,13 @@ export function StoresTab(h: Handlers) {
   }
 
   const openShop = async (s: SpyShop) => {
-    setOpen(s); setCatalog(null); setCatLoading(true)
-    try { const r = await getSpydeckShopListings(s.shop_id); setCatalog(r.listings ?? []) }
+    setOpen(s)
+    // Reuse the row's cached listings — opening a shop whose strip already loaded costs no
+    // extra Etsy call.
+    const cached = listingsCache.get(s.shop_id)
+    if (cached) { setCatalog(cached); setCatLoading(false); return }
+    setCatalog(null); setCatLoading(true)
+    try { const r = await getSpydeckShopListings(s.shop_id); const full = r.listings ?? []; listingsCache.set(s.shop_id, full); setCatalog(full) }
     catch { setCatalog([]) }
     finally { setCatLoading(false) }
   }
