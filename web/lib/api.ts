@@ -8,7 +8,10 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? ""
 export class ApiError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
+    // The parsed error-response body, so callers can read fields beyond `error` (e.g. the
+    // digitizer's `sample` debug payload) that would otherwise be lost when we throw.
+    public body?: unknown
   ) {
     super(message)
     this.name = "ApiError"
@@ -25,15 +28,17 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
   if (!res.ok) {
     let message = res.statusText
+    let body: unknown
     try {
-      const body = (await res.json()) as { error?: unknown; message?: unknown }
-      const err = body?.error ?? body?.message
+      body = await res.json()
+      const b = body as { error?: unknown; message?: unknown }
+      const err = b?.error ?? b?.message
       // Coerce non-string error bodies so they never render as "[object Object]".
       if (err != null) message = typeof err === "string" ? err : JSON.stringify(err)
     } catch {
       /* non-JSON error body */
     }
-    throw new ApiError(res.status, message)
+    throw new ApiError(res.status, message, body)
   }
   return res.json() as Promise<T>
 }

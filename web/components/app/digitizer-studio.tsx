@@ -8,7 +8,7 @@ import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-mat
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
   wilcomPreview, wilcomDigitize, getWilcomGenerations, createDesignCard,
-  getWilcomAlphabets, wilcomCombinePreview, wilcomCombine,
+  getWilcomAlphabets, wilcomCombinePreview, wilcomCombine, ApiError,
   type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration,
 } from "@/lib/api"
 
@@ -429,7 +429,13 @@ function CreateTab() {
       setDebug(r.sample ?? null) // capture EWA's raw response whether it succeeded or rejected
       if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null) }
       else setRes(r)
-    } catch (e) { setErr(e instanceof Error ? e.message : "Failed") } finally { setStatus("idle") }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed")
+      // A rejected combine comes back as a thrown ApiError (502); its body still carries the
+      // `sample` debug payload — pull it out so the debug box shows the real EWA response.
+      const body = e instanceof ApiError ? (e.body as { sample?: string } | undefined) : undefined
+      setDebug(body?.sample ?? null)
+    } finally { setStatus("idle") }
   }
 
   // Live preview — auto-render as you type/tweak (debounced), no button press. Pauses while a
