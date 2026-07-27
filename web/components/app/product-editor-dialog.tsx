@@ -338,25 +338,25 @@ export function ProductEditorDialog({
   // Dim-weight check for the packaging suggestion (÷166, USPS/Shippo). Deterministic math.
   const pkg = packagingHint(weightOz, boxL, boxW, boxH)
 
-  // Apply the bulk Base/Shipping to every size at once. In % mode the base is a markup over
-  // each size's product cost (its own tier cost, else the product-level one); in $ mode it's
-  // the literal amount. A blank field is left alone, so you can bulk-set just one column.
+  // Apply the bulk Base/Shipping to every size at once. The base value is an UPCHARGE OVER
+  // the product cost, never a fixed price: in $ mode it ADDS dollars (cost $10 + $5 = base
+  // $15); in % mode it adds a percentage (cost $10 + 20% = base $12). Each size uses its own
+  // product cost, else the product-level one. Shipping is a flat fee. A blank field is left
+  // alone, so you can bulk-set just one column.
   const applyBulk = () => {
     const b = bulkBase.trim(), sh = bulkShip.trim()
     if (b === "" && sh === "") return
-    const pct = Number(b)
+    const amt = Number(b) || 0
     setTiers((prev) => {
       const nextT: Record<string, Tier> = { ...prev }
       for (const s of sizes) {
         const cur = nextT[s] ?? { price: "", shipping: "", cost: "" }
         let price = cur.price
         if (b !== "") {
-          if (bulkPct) {
-            const rowCost = num(cur.cost) || num(productCost)
-            price = !isNaN(rowCost) ? String(Math.round(rowCost * (1 + pct / 100) * 100) / 100) : cur.price
-          } else {
-            price = String(Number(b) || 0)
-          }
+          const rowCost = num(cur.cost)
+          const cost = !isNaN(rowCost) ? rowCost : (num(productCost) || 0)
+          const nextBase = bulkPct ? cost * (1 + amt / 100) : cost + amt
+          price = String(Math.round(nextBase * 100) / 100)
         }
         nextT[s] = { ...cur, price, shipping: sh !== "" ? String(Number(sh) || 0) : cur.shipping }
       }
@@ -529,12 +529,12 @@ export function ProductEditorDialog({
                     <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">Clear pricing</button>
                   )}
                 </div>
-                {/* Bulk-fill — set Base cost + Shipping for every size at once. $ = flat
-                    amount; % = markup over each size's product cost. Blank field = leave
-                    that column as-is. */}
+                {/* Bulk-fill every size at once. Base is an UPCHARGE over the product cost,
+                    never a fixed price: $ adds dollars (cost 10 + 5 = base 15), % adds a
+                    percentage. Shipping is a flat fee. A blank field is left as-is. */}
                 {sizes.length > 0 && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-2.5 py-2">
-                    <span className="text-xs font-medium text-muted-foreground">Set all sizes:</span>
+                    <span className="text-xs font-medium text-muted-foreground">Base = product cost +</span>
                     <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
                       {([[false, "$"], [true, "%"]] as const).map(([v, lbl]) => (
                         <button key={lbl} type="button" onClick={() => setBulkPct(v)}
@@ -544,9 +544,10 @@ export function ProductEditorDialog({
                       ))}
                     </div>
                     <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
-                      placeholder={bulkPct ? "base markup %" : "base cost $"} className="h-8 w-28 text-xs" inputMode="decimal" aria-label="Bulk base cost" />
+                      placeholder={bulkPct ? "upcharge %" : "upcharge $"} className="h-8 w-24 text-xs" inputMode="decimal" aria-label="Base upcharge over product cost" />
+                    <span className="text-xs text-muted-foreground">· shipping</span>
                     <Input value={bulkShip} onChange={(e) => setBulkShip(e.target.value.replace(/[^0-9.]/g, ""))}
-                      placeholder="shipping $" className="h-8 w-24 text-xs" inputMode="decimal" aria-label="Bulk shipping" />
+                      placeholder="$ flat" className="h-8 w-20 text-xs" inputMode="decimal" aria-label="Bulk shipping fee" />
                     <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim()}>Apply to all</Button>
                   </div>
                 )}
@@ -567,7 +568,11 @@ export function ProductEditorDialog({
                       <Input
                         value={t?.cost ?? ""}
                         onChange={(e) => patch("cost", e.target.value)}
-                        placeholder="supplier"
+                        /* Inherits the product-level supplier cost as the shown number when
+                           this size has none of its own — the same pattern Base cost and
+                           Shipping use. Only override here when a size actually costs more. */
+                        placeholder={productCost.trim() !== "" ? Number(productCost).toFixed(2) : "—"}
+                        title={productCost.trim() !== "" ? `Using the product-level supplier cost ${Number(productCost).toFixed(2)}` : "Enter the supplier cost for this size"}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Product cost for size ${s}`}
                       />
                       <Input
