@@ -11,7 +11,7 @@ import { ActivityFeed } from "@/components/app/activity-feed"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { AssignCardDialog } from "@/components/app/assign-card-dialog"
-import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
+import { PushToPartnerInline } from "@/components/app/push-to-partner-dialog"
 import { OrderHistory } from "@/components/app/order-history"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
@@ -302,8 +302,8 @@ export function DesignerBoard() {
     moveCard(card, col)
   }
 
-  // The card a drop (or the toolbar button) has proposed sending out. Null = window shut.
-  const [pushCard, setPushCard] = useState<DesignCard | null>(null)
+  // Whether the viewer may send to a design partner. The send form now lives INLINE inside
+  // the card window (see CardDialog), so there's no separate push dialog to open here.
   const showPartner = canOutsource()
 
   const openCard = (cards ?? []).find((c) => c.id === openId) ?? null
@@ -365,22 +365,6 @@ export function DesignerBoard() {
           {outsourced} card{outsourced === 1 ? "" : "s"} outsourced to a design partner — tracked on the order, not on this board.
         </p>
       )}
-
-      {/* One window serves the row menu, the toolbar button and the lane drop. A card
-          with an order sends that line; one without sends the artwork on its own. */}
-      <PushToPartnerDialog
-        open={!!pushCard}
-        onOpenChange={(v) => { if (!v) setPushCard(null) }}
-        cardId={pushCard ? String(pushCard.id) : undefined}
-        orderId={pushCard?.order_id ? String(pushCard.order_id) : undefined}
-        sku={pushCard?.sku ? String(pushCard.sku) : undefined}
-        itemName={pushCard?.title}
-        printType={pushCard?.type}
-        artworkUrl={pushCard?.thumb ? String(pushCard.thumb) : null}
-        // Carry the card's own notes into the push so it's one set of notes, one window.
-        initialDescription={pushCard ? String(((pushCard.specs && typeof pushCard.specs === "object" ? pushCard.specs : {}) as Record<string, unknown>).description ?? "") : undefined}
-        onPushed={() => { setPushCard(null); load() }}
-      />
 
       {/* Assigning writes the artwork into the order's designs server-side, so the order's
           design tag lights in the same action — see assign-card-dialog. */}
@@ -632,7 +616,7 @@ export function DesignerBoard() {
       )}
       {openCard && <CardDialog card={openCard} me={me} designFee={designFee} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => void removeCard(id)}
         onAssign={() => { setAssignCard(openCard); setOpenId(null) }}
-        onPush={() => { setPushCard(openCard); setOpenId(null) }} canPush={showPartner} lanes={lanes} />}
+        onPushed={() => { setOpenId(null); load() }} canPush={showPartner} lanes={lanes} />}
     </div>
   )
 }
@@ -773,7 +757,7 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
 }
 
 // Card detail — claim, move, set payout. Approving auto-credits the designer (via onMove).
-function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAssign, onPush, canPush, lanes }: { card: DesignCard; me: string; designFee: number; lanes: DesignLane[]; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void; onAssign: () => void; onPush: () => void; canPush: boolean }) {
+function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAssign, onPushed, canPush, lanes }: { card: DesignCard; me: string; designFee: number; lanes: DesignLane[]; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void; onAssign: () => void; onPushed: () => void; canPush: boolean }) {
   // Default the payout to the platform Design fee when the card hasn't set one.
   const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
   const [busy, setBusy] = useState(false)
@@ -802,6 +786,10 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
     if (next === String(cardSpecs.description ?? "")) return
     patch(card.id, { specs: { ...cardSpecs, description: next } })
   }
+
+  // The partner-send form is revealed INLINE in this same window (no second dialog). The
+  // card supplies the artwork, title and description; only the partner-specific fields show.
+  const [showPush, setShowPush] = useState(false)
 
   const move = (to: string, extra?: Partial<DesignCard>) => onMove(card, to, extra)
   // Only warehouse + admin set the design fee / credit; operators & designers can't.
@@ -919,7 +907,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             </Button>
           )}
           {canPush && !card.vendor && (
-            <Button size="sm" variant="outline" onClick={onPush}>
+            <Button size="sm" variant={showPush ? "secondary" : "outline"} onClick={() => setShowPush((v) => !v)}>
               <PaperPlaneTilt size={14} weight="bold" /> Send to Pink Design
             </Button>
           )}
@@ -940,6 +928,26 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
           />
         </div>
+
+        {/* Partner send, inline in THIS window — revealed by the "Send to Pink Design" button
+            above, no separate popup. The card supplies the artwork, title and notes; only the
+            partner-specific fields (product type, board, reference files) show here. On a
+            successful send the parent closes and reloads, and the card returns as a Pink card. */}
+        {showPush && canPush && !card.vendor && (
+          <div className="rounded-xl border border-border bg-muted/30 p-3">
+            <PushToPartnerInline
+              cardId={String(card.id)}
+              orderId={card.order_id ? String(card.order_id) : undefined}
+              sku={card.sku ? String(card.sku) : undefined}
+              itemName={card.title}
+              printType={card.type}
+              artworkUrl={card.thumb ? String(card.thumb) : null}
+              initialDescription={desc}
+              onPushed={() => onPushed()}
+              onCancel={() => setShowPush(false)}
+            />
+          </div>
+        )}
 
         {/* Their task ref (= our vendor_ref). Shown so it can be cross-referenced on Pink's
             board and pasted into their test-webhook form to verify the sync. select-all makes

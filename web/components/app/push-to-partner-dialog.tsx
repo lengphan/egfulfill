@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, PaperPlaneTilt, Trash, UploadSimple, Warning, CheckCircle } from "@phosphor-icons/react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getPinkStatus, pushToPink, uploadPinkAttachment } from "@/lib/api"
@@ -33,24 +33,10 @@ const readFile = (f: File) => new Promise<string>((res, rej) => {
   r.readAsDataURL(f)
 })
 
-/**
- * "Send to design partner" — the manual route out to Pink Design.
- *
- * Deliberately manual. Sellers usually upload print-ready artwork, so most jobs need no
- * outsourced design at all; sending automatically would open, and pay for, a task for
- * every one of them. This is the escape hatch for the files that genuinely need work.
- *
- * Shows the artwork that will be sent, what it maps to on their side, and anything extra
- * being attached — because once it's gone it's on someone else's board, and the moment to
- * notice you're sending the wrong file is before, not after.
- */
-export function PushToPartnerDialog({
-  open, onOpenChange, orderId, sku, cardId, itemName, qty, printType, artworkUrl, initialDescription, onPushed,
-}: {
-  open: boolean
-  onOpenChange: (v: boolean) => void
-  // All three optional: a send can be anchored to a line item, to an existing board card,
-  // or to nothing at all (speculative artwork with no order behind it yet).
+/** What a send needs to know, shared by the dialog and the inline (in-card) forms. All
+ *  optional: a send can be anchored to a line item, to an existing board card, or to
+ *  nothing at all (speculative artwork with no order behind it yet). */
+type PushProps = {
   orderId?: string
   sku?: string
   cardId?: string
@@ -62,7 +48,23 @@ export function PushToPartnerDialog({
   // the push rather than being retyped in a second window.
   initialDescription?: string | null
   onPushed?: (refId?: string) => void
-}) {
+}
+
+/**
+ * The Send-to-Pink-Design form BODY, without dialog chrome. Rendered two ways:
+ *  - full, inside the standalone dialog (PushToPartnerDialog) — shows artwork, title and
+ *    description because the dialog has no other context.
+ *  - `compact`, inline inside the card window (PushToPartnerInline) — the card already
+ *    shows the artwork and owns the title + description, so those are hidden here and the
+ *    card supplies them at send time. This is what keeps it ONE window.
+ *
+ * `active` gates the seeding effect: the dialog only seeds while open; the inline form is
+ * always active once mounted (mounted only when its section is opened).
+ */
+function PushToPartnerPanel({
+  orderId, sku, cardId, itemName, qty, printType, artworkUrl, initialDescription,
+  compact = false, active = true, onPushed, onCancel,
+}: PushProps & { compact?: boolean; active?: boolean; onCancel?: () => void }) {
   const [status, setStatus] = useState<{ configured: boolean; ok?: boolean; error?: string } | null>(null)
   const [productTypes, setProductTypes] = useState<Opt[]>([])
   const [boards, setBoards] = useState<Opt[]>([])
@@ -90,22 +92,27 @@ export function PushToPartnerDialog({
     }).catch(() => setStatus({ configured: false, error: "Couldn't reach the design partner." }))
   }, [])
 
+  // The auto-derived title/description, used verbatim in compact mode (where those fields
+  // aren't shown) and as the seed for the editable fields in full mode.
+  const defaultTitle = orderId ? `${itemName || sku || "Design"} · order ${orderId}` : (itemName || sku || "Design")
+  const defaultDesc = [
+    printType ? `Print method: ${printType}.` : null,
+    orderId ? `Order ${orderId}${sku ? `, SKU ${sku}` : ""}.` : "Not tied to an order.",
+  ].filter(Boolean).join(" ")
+
   useEffect(() => {
-    if (!open) return
+    if (!active) return
     const t = setTimeout(() => {
       load()
-      setTitle(orderId ? `${itemName || sku || "Design"} · order ${orderId}` : (itemName || sku || "Design"))
+      setTitle(defaultTitle)
       // Prefer the card's own notes when it has some; otherwise fall back to the auto summary.
       const seeded = (initialDescription ?? "").trim()
-      setDesc(seeded || [
-        printType ? `Print method: ${printType}.` : null,
-        orderId ? `Order ${orderId}${sku ? `, SKU ${sku}` : ""}.` : "Not tied to an order.",
-      ].filter(Boolean).join(" "))
+      setDesc(seeded || defaultDesc)
       setMsg(null)
       setExtras([])
     }, 0)
     return () => clearTimeout(t)
-  }, [open, load, itemName, sku, orderId, qty, printType, initialDescription])
+  }, [active, load, defaultTitle, defaultDesc, initialDescription])
 
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return
@@ -127,13 +134,17 @@ export function PushToPartnerDialog({
     sending.current = true
     setBusy(true); setMsg(null)
     try {
+      // In compact mode the title/description fields aren't shown, so send the card's own
+      // (via props) rather than the hidden local state.
+      const effTitle = (compact ? defaultTitle : title).trim()
+      const effDesc = (compact ? ((initialDescription ?? "").trim() || defaultDesc) : desc).trim()
       const r = await pushToPink({
         orderId, sku, cardId,
-        title: title.trim() || undefined,
+        title: effTitle || undefined,
         // The order's real quantity is still sent as context (server falls back to the line's
         // qty when absent); it just isn't an editable field, because a design is one job.
         qty: qty ?? undefined,
-        description: desc.trim() || undefined,
+        description: effDesc || undefined,
         productType: productType || undefined,
         boardId: board || undefined,
         extraImages: extras.map((e) => e.url),
@@ -143,35 +154,31 @@ export function PushToPartnerDialog({
       // sync won't work for it — show that plainly rather than a cheerful "sent".
       setMsg(r.warning ? { ok: false, text: r.warning } : { ok: true, text: `Sent — their task ref is ${r.refId}.` })
       onPushed?.(r.refId)
-      setTimeout(() => onOpenChange(false), 1200)
+      if (onCancel) setTimeout(() => onCancel(), 1200)
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't send this to the design partner." })
     } finally { sending.current = false; setBusy(false) }
   }
 
   const notReady = !!status && (!status.configured || status.ok === false)
+  const noArtwork = !artworkUrl && !extras.length
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Send to design partner</DialogTitle>
-          <DialogDescription>
-            Opens a task on Pink Design&apos;s board. They return finished files to this card.
-          </DialogDescription>
-        </DialogHeader>
-      <div className="max-h-[60vh] space-y-4 overflow-y-auto py-2">
-        {notReady && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
-            <span>{status?.error || "The design partner isn't connected — add PINKDESIGN_API_KEY in Settings › Integrations."}</span>
-          </div>
-        )}
+    <div className={compact ? "space-y-3" : "max-h-[60vh] space-y-4 overflow-y-auto py-2"}>
+      {notReady && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
+          <span>{status?.error || "The design partner isn't connected — add PINKDESIGN_API_KEY in Settings › Integrations."}</span>
+        </div>
+      )}
 
-        {/* What's actually going. The artwork leads on their side too, so it leads here. */}
+      {/* Full mode leads with the artwork + what it maps to. Compact mode drops it — the card
+          window already shows the design above this section. */}
+      {!compact && (
         <div className="flex gap-3">
           <div className="size-24 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
             {artworkUrl
+              // eslint-disable-next-line @next/next/no-img-element
               ? <img src={artworkUrl} alt="" className="size-full object-contain" />
               : <div className="flex size-full items-center justify-center px-2 text-center text-[11px] text-muted-foreground">No artwork on this line</div>}
           </div>
@@ -189,87 +196,119 @@ export function PushToPartnerDialog({
             )}
           </div>
         </div>
+      )}
 
-        <div className="space-y-3">
+      <div className="space-y-3">
+        {!compact && (
           <Field label="Title">
             <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} className="h-9" />
           </Field>
-          {/* No "Quantity" field: a design is made ONCE regardless of how many units get
-              printed, so a per-task quantity is meaningless to a design partner and only
-              confused people. The order's real qty is still sent in the payload (below) as
-              context, just not surfaced as an editable box. */}
-          <Field label="Product type">
-            {/* min-w-0 lets the select shrink so a long option label can't push the dialog
-                wider than its box. */}
-            <select value={productType} onChange={(e) => setProductType(e.target.value)} disabled={busy}
+        )}
+        {/* No "Quantity" field: a design is made ONCE regardless of how many units get
+            printed, so a per-task quantity is meaningless to a design partner. The order's
+            real qty is still sent in the payload as context, just not surfaced. */}
+        <Field label="Product type">
+          {/* min-w-0 lets the select shrink so a long option label can't push the box wider. */}
+          <select value={productType} onChange={(e) => setProductType(e.target.value)} disabled={busy}
+            className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
+            <option value="">— not set —</option>
+            {productTypes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </Field>
+        {boards.length > 1 && (
+          <Field label="Board">
+            <select value={board} onChange={(e) => setBoard(e.target.value)} disabled={busy}
               className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
-              <option value="">— not set —</option>
-              {productTypes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {boards.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </Field>
-          {boards.length > 1 && (
-            <Field label="Board">
-              <select value={board} onChange={(e) => setBoard(e.target.value)} disabled={busy}
-                className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
-                {boards.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </Field>
-          )}
+        )}
+        {!compact && (
           <Field label="Description">
             <textarea value={desc} onChange={(e) => setDesc(e.target.value)} disabled={busy} rows={3}
               className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
           </Field>
-        </div>
-
-        {/* Extra reference files. Not the artwork — notes FOR the designer. */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Reference files</span>
-            <label className={"inline-flex cursor-pointer items-center gap-1.5 text-xs " + (uploading ? "opacity-60" : "text-primary hover:underline")}>
-              {uploading ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} weight="bold" />}
-              Add files
-              <input type="file" multiple className="hidden" disabled={uploading || busy}
-                     onChange={(e) => { addFiles(e.target.files); e.target.value = "" }} />
-            </label>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Mockups, spec sheets, a marked-up screenshot — anything that tells their designer what you want.
-            Sent alongside the artwork; if there&apos;s no stored artwork, the first image here is sent as the design.
-          </p>
-          {extras.map((f, i) => (
-            <div key={f.url} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs">
-              <span className="min-w-0 flex-1 truncate">{f.name}</span>
-              <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} disabled={busy}
-                      className="text-muted-foreground hover:text-red-600" title="Remove">
-                <Trash size={13} />
-              </button>
-            </div>
-          ))}
-        </div>
-
-        {msg && (
-          <div className={"flex items-start gap-2 rounded-lg border px-3 py-2 text-sm " +
-            (msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-destructive/30 bg-destructive/10 text-destructive")}>
-            {msg.ok ? <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0" /> : <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />}
-            <span>{msg.text}</span>
-          </div>
         )}
       </div>
 
-      <DialogFooter>
-        <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-        <Button size="sm" onClick={send} disabled={busy || uploading || notReady || (!artworkUrl && !extras.length)}>
+      {/* Extra reference files. Not the artwork — notes FOR the designer. */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">Reference files</span>
+          <label className={"inline-flex cursor-pointer items-center gap-1.5 text-xs " + (uploading ? "opacity-60" : "text-primary hover:underline")}>
+            {uploading ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} weight="bold" />}
+            Add files
+            <input type="file" multiple className="hidden" disabled={uploading || busy}
+                   onChange={(e) => { addFiles(e.target.files); e.target.value = "" }} />
+          </label>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Mockups, spec sheets, a marked-up screenshot — anything that tells their designer what you want.
+          Sent alongside the artwork; if there&apos;s no stored artwork, the first image here is sent as the design.
+        </p>
+        {extras.map((f, i) => (
+          <div key={f.url} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs">
+            <span className="min-w-0 flex-1 truncate">{f.name}</span>
+            <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} disabled={busy}
+                    className="text-muted-foreground hover:text-red-600" title="Remove">
+              <Trash size={13} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {msg && (
+        <div className={"flex items-start gap-2 rounded-lg border px-3 py-2 text-sm " +
+          (msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-destructive/30 bg-destructive/10 text-destructive")}>
+          {msg.ok ? <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0" /> : <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />}
+          <span>{msg.text}</span>
+        </div>
+      )}
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        {onCancel && <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>Cancel</Button>}
+        <Button size="sm" onClick={send} disabled={busy || uploading || notReady || noArtwork}>
           {busy ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />}
-          Send to partner
+          Send to Pink Design
         </Button>
-      </DialogFooter>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * "Send to design partner" as a standalone dialog — the manual route out to Pink Design.
+ *
+ * Deliberately manual. Sellers usually upload print-ready artwork, so most jobs need no
+ * outsourced design at all; sending automatically would open, and pay for, a task for every
+ * one of them. This is the escape hatch for the files that genuinely need work.
+ */
+export function PushToPartnerDialog({
+  open, onOpenChange, ...props
+}: PushProps & { open: boolean; onOpenChange: (v: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Send to design partner</DialogTitle>
+          <DialogDescription>
+            Opens a task on Pink Design&apos;s board. They return finished files to this card.
+          </DialogDescription>
+        </DialogHeader>
+        <PushToPartnerPanel {...props} active={open} onCancel={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   )
 }
 
+/** The same send form, embedded inline in the card window (no popup). The card supplies the
+ *  artwork, title and description, so only the partner-specific fields show here. */
+export function PushToPartnerInline(props: PushProps & { onCancel?: () => void }) {
+  return <PushToPartnerPanel {...props} compact active />
+}
+
 /** A labelled form row. min-w-0 so a wide child (a select with long options) can shrink
- *  inside a grid cell instead of overflowing the dialog. */
+ *  inside a grid cell instead of overflowing. */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block min-w-0 space-y-1.5">
