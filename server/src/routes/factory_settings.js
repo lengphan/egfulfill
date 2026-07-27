@@ -305,6 +305,20 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff) {
     return readThreadPalette();
   });
 
+  // Just the DESIGN fees a seller is actually charged (standard / complex / check) — no
+  // cost or margin policy, so it's safe for any signed-in user, like the two reads above.
+  // The seller-side design canvas shows a fee estimate from these; the full settings read
+  // below stays staff-only.
+  app.get('/api/design_fees', { preHandler: requireAuth }, async () => {
+    await ensure();
+    const nums = await readAll();
+    return {
+      standard: Number(nums.design_fee_standard) || 0,
+      complex: Number(nums.design_fee_complex) || 0,
+      check: Number(nums.check_fee) || 0,
+    };
+  });
+
   app.get('/api/factory/settings', { preHandler: requireStaff }, async () => {
     await ensure();
     const [nums, shipFrom, types, threads] = await Promise.all([readAll(), readShipFrom(), readProductTypes(), readThreadPalette()]);

@@ -1369,6 +1369,12 @@ export function getProductTypes() {
 export function getFactorySettings() {
   return api<FactorySettings>(`/api/factory/settings`)
 }
+/** Seller-safe: just the design fees a seller is charged (no cost/margin policy). Powers the
+ *  fee estimate on the seller-side design canvas, where /api/factory/settings is off-limits. */
+export type DesignFees = { standard: number; complex: number; check: number }
+export function getDesignFees() {
+  return api<DesignFees>(`/api/design_fees`)
+}
 /** The numeric keys are addressed by name from the settings form, so the body stays
  *  loosely keyed — but the values are narrowed to what the route actually accepts. */
 export function setFactorySettings(body: Record<string, string | number | ShipFromAddress | ProductType[] | ThreadColor[] | undefined>) {

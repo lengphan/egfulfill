@@ -5,7 +5,7 @@ import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { uploadDesignFile, postOrderDesign, postOrderThreads, setDesignTier, getFactorySettings, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { uploadDesignFile, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -482,18 +482,16 @@ export function DesignCanvasDialog({
    *  shows a confident $0 next to a button that moves money. */
   const [fees, setFees] = useState<{ standard: number; complex: number; check: number } | null>(null)
   useEffect(() => {
-    if (!open || !isStaff) return
+    if (!open) return
+    // Seller-safe fees read (just the design/check fees, no margin policy), so BOTH the
+    // staff charge picker and the seller's fee estimate can show the real number.
     const t = setTimeout(() => {
-      getFactorySettings()
-        .then((f) => setFees({
-          standard: Number(f.design_fee_standard) || 0,
-          complex: Number(f.design_fee_complex) || 0,
-          check: Number(f.check_fee) || 0,
-        }))
+      getDesignFees()
+        .then((f) => setFees({ standard: f.standard || 0, complex: f.complex || 0, check: f.check || 0 }))
         .catch(() => setFees(null))
     }, 0)
     return () => clearTimeout(t)
-  }, [open, isStaff])
+  }, [open])
 
   /**
    * Does THIS LINE already have a machine file? The only honest input to the suggestion
@@ -506,7 +504,7 @@ export function DesignCanvasDialog({
    */
   const [hasFile, setHasFile] = useState(false)
   useEffect(() => {
-    if (!open || !isStaff) return
+    if (!open) return   // read for sellers too — it drives their "you uploaded your file" status
     const t = setTimeout(() => {
       getDesignFiles(orderId)
         .then((rows) => setHasFile((rows ?? []).some((f) =>
@@ -515,7 +513,7 @@ export function DesignCanvasDialog({
         .catch(() => setHasFile(false))
     }, 0)
     return () => clearTimeout(t)
-  }, [open, isStaff, orderId, item.sku])
+  }, [open, orderId, item.sku])
   const hasMachineFile = hasFile || !!attached
 
   const [tier, setTier] = useState<DesignTier | null>((item.design_tier as DesignTier | null) ?? null)
@@ -1086,6 +1084,30 @@ export function DesignCanvasDialog({
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* SELLER view of the same thing the staff picker above decides — a plain-language
+              estimate, never the fee controls (they're being charged; they don't set it):
+                • their own machine file  → no design fee, just the check fee
+                • artwork, few colours    → the standard fee, shown
+                • artwork, many colours   → complex, so the fee is quoted, not fixed yet
+              Only when there's something to say — an empty line shows nothing. */}
+          {!isStaff && (hasMachineFile || designUrl) && (
+            <div className="rounded-lg border border-border px-3 py-2.5 text-xs">
+              {hasMachineFile ? (
+                <span className="text-emerald-700">
+                  <span className="font-medium">You uploaded your file.</span> No design fee{fees?.check ? ` — just a ${usd(fees.check)} check fee` : " — just a check fee"}; we&apos;ll verify it and reach out if we need anything.
+                </span>
+              ) : threads.length >= 6 ? (
+                <span className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Design fee being calculated…</span> Your artwork is detailed ({threads.length} colours), so we&apos;ll confirm the quote before charging.
+                </span>
+              ) : (
+                <span className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Standard design fee{fees?.standard ? ` · ${usd(fees.standard)}` : ""}</span> — we&apos;ll make the print file from your artwork.
+                </span>
               )}
             </div>
           )}
