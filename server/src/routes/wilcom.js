@@ -286,6 +286,84 @@ async function runLettering(req, reply, { design }) {
   } catch (e) { reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' }; }
 }
 
+// ── Combined: bitmap art + lettering in ONE design — PROTOTYPE ─────────────────
+// Compose an auto-digitized bitmap AND lettering into a single design/preview + machine
+// file. This recipe shape (an <artwork> element beside <decorations><lettering>) is our
+// BEST READ of the EWA recipe model, NOT a confirmed spec — like the single-mode XML above
+// it is unverified against a live account. If EWA rejects it, the error + a body sample are
+// returned so the XML here can be corrected. When only ONE input is present we delegate to
+// the proven single-mode handlers rather than guessing.
+function buildCombinedXml({ filename, base64, text, alphabet, letterHeight, colorInt, designFile }) {
+  const lh = Math.min(50, Math.max(5, Number(letterHeight) || 20));
+  const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="preview.png"', 'dpi="120"'].filter(Boolean).join(' ');
+  return '<xml><recipe>'
+    + `<artwork><bitmap file="${XML_ESC(filename)}"/><autodigitize_options/></artwork>`
+    + '<decorations><lettering>'
+    + `<simple_lettering text="${XML_ESC(text)}" alphabet_name="${XML_ESC(alphabet)}" height="${lh.toFixed(1)}"/>`
+    + `<thread color="${colorInt}"/>`
+    + '</lettering></decorations>'
+    + `<output ${out}/>`
+    + `<files><file filename="${XML_ESC(filename)}" filecontents="${base64}"/></files>`
+    + '</recipe></xml>';
+}
+
+async function runCombine(req, reply, { design }) {
+  if (!configured()) { reply.code(400); return { ok: false, error: 'Wilcom EWA is not configured — add the key in Settings › Integrations.' }; }
+  const b = req.body || {};
+  const text = String(b.text || '').trim();
+  const hasImg = !!b.image;
+  // Only one input → use the PROVEN single-mode path, not the prototype recipe.
+  if (hasImg && !text) return runBitmap(req, reply, { design });
+  if (text && !hasImg) return runLettering(req, reply, { design });
+  if (!hasImg && !text) { reply.code(400); return { ok: false, error: 'Add an image, some text, or both.' }; }
+
+  const img = fromDataUrl(b.image);
+  if (!img) { reply.code(400); return { ok: false, error: 'Send an image data URL (PNG / JPG / WEBP).' }; }
+  if (tooBig(img.base64)) { reply.code(413); return { ok: false, error: 'Image is over 2 MB — downscale it first.' }; }
+  const alphabet = String(b.alphabet || '').trim();
+  if (!alphabet) { reply.code(400); return { ok: false, error: 'Pick an alphabet for the text.' }; }
+  const stem = safeName(b.filename || text, 'design');
+  const filename = `${stem}.${img.ext}`;
+  const xml = buildCombinedXml({ filename, base64: img.base64, text, alphabet, letterHeight: b.height, colorInt: hexToColorInt(b.color), designFile: design ? `${stem}.emb` : null });
+  try {
+    const res = await ewaCall(design ? 'api/newDesign' : 'api/newDesignTrueview', xml);
+    if (!res.ok) {
+      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
+      reply.code(502);
+      // The sample is deliberately returned: the combine recipe is a prototype, so the raw
+      // EWA response is what we iterate the XML against.
+      return { ok: false, status: res.status, error: m ? m[1].trim() : 'EWA rejected the combined design', sample: (res.body || '').slice(0, 400) };
+    }
+    const files = parseFiles(res.body);
+    const info = parseDesignInfo(res.body) || {};
+    const tv = files.find((f) => isPng(f.filename));
+    const machine = design ? files.find((f) => isMachine(f.filename)) : null;
+    const out = {
+      ok: true,
+      trueview: tv ? tv.base64 : null,
+      machineFile: machine ? { filename: machine.filename, base64: machine.base64 } : null,
+      stitches: info.stitches ?? null, colours: info.colours ?? null,
+      width: info.width ?? null, height: info.height ?? null,
+      threads: parseThreads(res.body),
+    };
+    if (design && storageEnabled()) {
+      try {
+        await ensureGen();
+        const gid = 'WG-' + crypto.randomBytes(8).toString('hex');
+        const ext = machine ? (machine.filename.split('.').pop() || 'emb').toLowerCase() : null;
+        const tvKey = tv ? `wilcom/${gid}-tv.png` : null;
+        const fileKey = machine ? `wilcom/${gid}-${stem}.${ext}` : null;
+        const tvUrl = tvKey ? await putObject(tvKey, Buffer.from(tv.base64, 'base64'), 'image/png') : null;
+        const fileUrl = fileKey ? await putObject(fileKey, Buffer.from(machine.base64, 'base64'), 'application/octet-stream') : null;
+        await q(`insert into wilcom_generations (id, by_user, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url, tv_key, file_key) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+          [gid, req.user?.sub || null, `${text} + ${stem}`, b.orderRef || null, 'maker', 'combined', out.stitches, out.colours, out.width, out.height, ext ? [ext.toUpperCase()] : [], tvUrl, fileUrl, tvKey, fileKey]);
+        out.id = gid; out.trueviewUrl = tvUrl; out.fileUrl = fileUrl;
+      } catch (e) { req.log?.warn?.({ err: String(e) }, 'wilcom combine persist failed'); }
+    }
+    return out;
+  } catch (e) { reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' }; }
+}
+
 // Alphabet list for the Maker dropdown — parsed from api/info's <alphabet name="…"> entries.
 async function ewaAlphabets() {
   const res = await ewaCall('api/info', '');
@@ -345,6 +423,10 @@ export function wilcomRoutes(app, requireStaff) {
   });
   app.post('/api/wilcom/lettering-preview', { preHandler: requireStaff }, (req, reply) => runLettering(req, reply, { design: false }));
   app.post('/api/wilcom/lettering', { preHandler: requireStaff }, (req, reply) => runLettering(req, reply, { design: true }));
+  // Create — combined image + lettering in one design (prototype). Delegates to the proven
+  // bitmap/lettering handlers when only one input is present; both → the combined recipe.
+  app.post('/api/wilcom/combine-preview', { preHandler: requireStaff }, (req, reply) => runCombine(req, reply, { design: false }));
+  app.post('/api/wilcom/combine', { preHandler: requireStaff }, (req, reply) => runCombine(req, reply, { design: true }));
 
   // TrueView preview of an already-uploaded machine file (.emb), for the board card that
   // otherwise shows a blank placeholder. Resolve the file by its own id or by order+sku,

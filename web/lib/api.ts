@@ -1615,6 +1615,17 @@ export function wilcomLetteringPreview(body: { text: string; alphabet: string; h
 export function wilcomLettering(body: { text: string; alphabet: string; height?: number; color?: string }) {
   return api<WilcomResult>(`/api/wilcom/lettering`, { method: "POST", body: JSON.stringify(body) })
 }
+// Create — image + lettering combined into ONE design (prototype). image and/or text may be
+// omitted; the server delegates to the proven single-mode path when only one is present, and
+// attempts the combined recipe when both are. `sample` is the raw EWA body on a combine
+// failure, kept so the recipe can be iterated against a live account.
+export type WilcomComboBody = { image?: string; text?: string; alphabet?: string; height?: number; color?: string; filename?: string; name?: string; orderRef?: string }
+export function wilcomCombinePreview(body: WilcomComboBody) {
+  return api<WilcomResult>(`/api/wilcom/combine-preview`, { method: "POST", body: JSON.stringify(body) })
+}
+export function wilcomCombine(body: WilcomComboBody) {
+  return api<WilcomResult>(`/api/wilcom/combine`, { method: "POST", body: JSON.stringify(body) })
+}
 export function deleteDesignLibrary(id: number | string) {
   return api<{ ok?: boolean }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }
