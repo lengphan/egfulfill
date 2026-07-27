@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple, Paperclip } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
@@ -572,8 +572,9 @@ export function DesignerBoard() {
                           <div className="mt-auto flex items-center justify-between gap-1.5 pt-1.5 text-xs text-muted-foreground">
                             <span className="shrink-0 font-mono">DSN-{c.id}</span>
                             {!isDesigner && (() => {
+                              // Always show a figure — including $0.00 — so the whole board can be
+                              // scanned for payout at a glance (a blank used to read as "unknown").
                               const payout = c.vendor ? partnerCost : (amt(c.payment) || designFee)
-                              if (payout <= 0) return null
                               const suffix = c.credited ? " · paid" : c.vendor ? " · partner" : ""
                               return (
                                 <span
@@ -790,6 +791,33 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
   // The partner-send form is revealed INLINE in this same window (no second dialog). The
   // card supplies the artwork, title and description; only the partner-specific fields show.
   const [showPush, setShowPush] = useState(false)
+  // Click the artwork to view it full size (a lightbox, not a new tab — a data-URL thumb
+  // can't be opened as a top-level navigation in Chrome).
+  const [zoom, setZoom] = useState(false)
+
+  // Reference files kept ON the card (mockups, spec sheets — custom designs often need
+  // several). Persisted in specs.reference_files, so they stay with the card, and reused as
+  // the attachments on a Pink Design push. Upload goes through the same object-storage
+  // endpoint the push uses, so each returns a real URL.
+  type RefFile = { url: string; name?: string }
+  const refFiles: RefFile[] = Array.isArray(cardSpecs.reference_files) ? (cardSpecs.reference_files as RefFile[]) : []
+  const [refBusy, setRefBusy] = useState(false)
+  const [refErr, setRefErr] = useState<string | null>(null)
+  const addRefFiles = async (files: FileList | null) => {
+    if (!files?.length) return
+    setRefBusy(true); setRefErr(null)
+    const added: RefFile[] = []
+    try {
+      for (const f of Array.from(files)) {
+        const data = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error("unreadable")); r.readAsDataURL(f) })
+        const r = await uploadPinkAttachment({ data, name: f.name })
+        if (r.url) added.push({ url: r.url, name: f.name })
+        else setRefErr(r.error || `Couldn't upload ${f.name}.`)
+      }
+      if (added.length) patch(card.id, { specs: { ...cardSpecs, reference_files: [...refFiles, ...added] } })
+    } catch (e) { setRefErr(e instanceof Error ? e.message : "Couldn't upload that file.") } finally { setRefBusy(false) }
+  }
+  const removeRefFile = (i: number) => patch(card.id, { specs: { ...cardSpecs, reference_files: refFiles.filter((_, j) => j !== i) } })
 
   const move = (to: string, extra?: Partial<DesignCard>) => onMove(card, to, extra)
   // Only warehouse + admin set the design fee / credit; operators & designers can't.
@@ -842,64 +870,93 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="pr-6 text-base leading-snug">
-            {editTitle ? (
-              <input
-                autoFocus
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onBlur={saveTitle}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); saveTitle() }
-                  else if (e.key === "Escape") { setTitleDraft(card.title || ""); setEditTitle(false) }
-                }}
-                placeholder="Card title"
-                className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-base font-semibold outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => { setTitleDraft(card.title || ""); setEditTitle(true) }}
-                title="Click to rename"
-                className="group -ml-1 inline-flex max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-accent"
-              >
-                <span className="line-clamp-2">{card.title || "Design card"}</span>
-                <PencilSimple size={13} weight="bold" className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-              </button>
-            )}
-          </DialogTitle>
+          {/* Title (wraps to two lines) on the left; the STATUS pill sits up here by the close
+              X so the card's state reads at a glance and the title has room to be long. */}
+          <div className="flex items-start justify-between gap-3 pr-7">
+            <DialogTitle className="min-w-0 flex-1 text-base leading-snug">
+              {editTitle ? (
+                <input
+                  autoFocus
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={saveTitle}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); saveTitle() }
+                    else if (e.key === "Escape") { setTitleDraft(card.title || ""); setEditTitle(false) }
+                  }}
+                  placeholder="Card title"
+                  className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-base font-semibold outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setTitleDraft(card.title || ""); setEditTitle(true) }}
+                  title="Click to rename"
+                  className="group -ml-1 inline-flex max-w-full items-start gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-accent"
+                >
+                  <span className="line-clamp-2">{card.title || "Design card"}</span>
+                  <PencilSimple size={13} weight="bold" className="mt-1 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                </button>
+              )}
+            </DialogTitle>
+            <span className="mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
+              <span className={"size-1.5 rounded-full " + laneMeta(col, lanes).accent} />
+              {laneMeta(col, lanes).label}
+            </span>
+          </div>
         </DialogHeader>
+
+        {/* Enlarged artwork on the LEFT (click to view full size) + description/notes on the
+            RIGHT — the notes area is the whole point of this window for a custom design. */}
         <div className="flex gap-4">
-          <div className="relative size-44 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+          <button
+            type="button"
+            onClick={() => { if (card.thumb) setZoom(true) }}
+            disabled={!card.thumb}
+            title={card.thumb ? "Click to view full size" : undefined}
+            className="group relative size-52 shrink-0 overflow-hidden rounded-xl border border-border bg-muted disabled:cursor-default"
+          >
             {card.thumb ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={String(card.thumb)} alt="" className="size-full object-contain" />
             ) : (
-              <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={34} weight="duotone" /></div>
+              <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={40} weight="duotone" /></div>
             )}
-          </div>
-          <div className="min-w-0 flex-1 space-y-1 text-sm">
-            <div className="flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{laneMeta(col, lanes).label}</span>
-              {card.is_emb && <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700"><Needle size={10} weight="bold" /> Embroidery</span>}
-              {card.priority && card.priority !== "normal" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(card.priority)}</span>}
-            </div>
-            <div className="text-muted-foreground">{card.product || card.type || "—"}</div>
-            {card.order_id
-              ? <div className="text-muted-foreground">Order <span className="font-mono text-foreground">{String(card.order_id)}</span></div>
-              // Saying it belongs to no order, rather than leaving a gap. An orderless card
-              // is a normal state here, not missing data — and it's the one state where
-              // "Assign to an order" is the obvious next move.
-              : <div className="text-muted-foreground">Not attached to an order yet</div>}
-            {card.customer && <div className="text-muted-foreground">{String(card.customer)}</div>}
-            {card.claimed_by && <div className="text-xs text-muted-foreground">Claimed by {String(card.claimed_by)}</div>}
+            {card.thumb && (
+              <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-background/80 py-1 text-[10px] font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                <MagnifyingGlassPlus size={11} weight="bold" /> Full size
+              </span>
+            )}
+          </button>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <label htmlFor={`card-desc-${card.id}`} className="mb-1 text-sm font-medium">Description / notes</label>
+            <textarea
+              id={`card-desc-${card.id}`}
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              onBlur={saveDesc}
+              placeholder="Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."
+              className="min-h-[9rem] w-full flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+            />
           </div>
         </div>
 
-        {/* THE THREE ROUTES OUT OF A CARD, in one row because they are alternatives, not a
-            sequence. Assign is offered only while the card has no order — reassigning is a
-            different and far more dangerous operation (one seller's artwork landing on
-            another's job), so it is deliberately not a click away. */}
+        {/* Compact meta line — method / priority / product, order state, customer, claimer.
+            Status moved up to the header, so it isn't repeated here. */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          {card.is_emb && <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700"><Needle size={10} weight="bold" /> Embroidery</span>}
+          {card.priority && card.priority !== "normal" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(card.priority)}</span>}
+          <span>{card.product || card.type || "No product / type set"}</span>
+          <span aria-hidden>·</span>
+          {card.order_id
+            ? <span>Order <span className="font-mono text-foreground">{String(card.order_id)}</span></span>
+            : <span>Not attached to an order yet</span>}
+          {card.customer && <><span aria-hidden>·</span><span>{String(card.customer)}</span></>}
+          {card.claimed_by && <><span aria-hidden>·</span><span>Claimed by {String(card.claimed_by)}</span></>}
+        </div>
+
+        {/* Routes out of the card — assign to an order, or send to the design partner (the
+            send form opens inline below). */}
         <div className="flex flex-wrap gap-2">
           {!card.order_id && (
             <Button size="sm" variant="outline" onClick={onAssign}>
@@ -913,20 +970,32 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           )}
         </div>
 
-        {/* Description / notes — the single place instructions for a customised design live
-            (placement, colours, personalisation). Saved to the card on blur, and pre-filled
-            into the partner push, so it's one set of notes in one window. */}
-        <div className="space-y-1.5">
-          <label htmlFor={`card-desc-${card.id}`} className="text-sm font-medium">Description / notes</label>
-          <textarea
-            id={`card-desc-${card.id}`}
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-            onBlur={saveDesc}
-            rows={4}
-            placeholder="Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."
-            className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-          />
+        {/* Reference files kept ON OUR card — mockups, spec sheets, the several refs a custom
+            design usually needs. Persisted (specs.reference_files) so they stay with the card,
+            and reused as the attachments when it's sent to Pink Design. */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Reference files{refFiles.length ? ` (${refFiles.length})` : ""}</span>
+            <label className={"inline-flex cursor-pointer items-center gap-1.5 text-xs " + (refBusy ? "opacity-60" : "text-primary hover:underline")}>
+              {refBusy ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} weight="bold" />}
+              Add files
+              <input type="file" multiple className="hidden" disabled={refBusy} onChange={(e) => { void addRefFiles(e.target.files); e.currentTarget.value = "" }} />
+            </label>
+          </div>
+          {refErr && <p className="text-xs text-destructive">{refErr}</p>}
+          {refFiles.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Mockups, spec sheets, marked-up screenshots — anything that tells the designer what you want. Kept on the card and sent with a Pink Design push.</p>
+          ) : (
+            <div className="space-y-1">
+              {refFiles.map((f, i) => (
+                <div key={f.url + i} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs">
+                  <Paperclip size={12} weight="bold" className="shrink-0 text-muted-foreground" />
+                  <a href={f.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate hover:underline">{f.name || f.url}</a>
+                  <button onClick={() => removeRefFile(i)} className="shrink-0 text-muted-foreground hover:text-red-600" title="Remove"><Trash size={13} /></button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Partner send, inline in THIS window — revealed by the "Send to Pink Design" button
@@ -943,6 +1012,8 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               printType={card.type}
               artworkUrl={card.thumb ? String(card.thumb) : null}
               initialDescription={desc}
+              // The card's own reference files ARE the attachments — no separate uploader here.
+              presetExtras={refFiles.map((f) => ({ url: f.url, name: f.name || "reference" }))}
               onPushed={() => onPushed()}
               onCancel={() => setShowPush(false)}
             />
@@ -1115,6 +1186,22 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           )}
           <button onClick={removeThis} className="ml-auto text-xs font-medium text-muted-foreground hover:text-red-600">Remove card</button>
         </div>
+
+        {/* Full-size artwork lightbox — fixed to the viewport (escapes the dialog's scroll
+            box), click anywhere to close. Works for a remote URL or a base64 data-URL thumb. */}
+        {zoom && card.thumb && (
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Close full-size view"
+            onClick={() => setZoom(false)}
+            onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") setZoom(false) }}
+            className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={String(card.thumb)} alt={card.title || "Design"} className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

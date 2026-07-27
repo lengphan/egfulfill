@@ -47,6 +47,9 @@ type PushProps = {
   // The card's own description/notes, pre-filled so the notes typed on the card carry into
   // the push rather than being retyped in a second window.
   initialDescription?: string | null
+  // Reference files already kept on the card — used as the attachments instead of a separate
+  // uploader here (inline/compact mode), so files live in one place.
+  presetExtras?: { url: string; name: string }[]
   onPushed?: (refId?: string) => void
 }
 
@@ -62,7 +65,7 @@ type PushProps = {
  * always active once mounted (mounted only when its section is opened).
  */
 function PushToPartnerPanel({
-  orderId, sku, cardId, itemName, qty, printType, artworkUrl, initialDescription,
+  orderId, sku, cardId, itemName, qty, printType, artworkUrl, initialDescription, presetExtras,
   compact = false, active = true, onPushed, onCancel,
 }: PushProps & { compact?: boolean; active?: boolean; onCancel?: () => void }) {
   const [status, setStatus] = useState<{ configured: boolean; ok?: boolean; error?: string } | null>(null)
@@ -79,6 +82,11 @@ function PushToPartnerPanel({
   const [uploading, setUploading] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const sending = useRef(false)
+  const didSeed = useRef(false)
+
+  // In compact (in-card) mode the card owns the reference files and passes them in live via
+  // presetExtras; in full mode they're uploaded here into local `extras`.
+  const effExtras = compact ? (presetExtras ?? []) : extras
 
   const load = useCallback(() => {
     getPinkStatus().then((s) => {
@@ -101,13 +109,19 @@ function PushToPartnerPanel({
   ].filter(Boolean).join(" ")
 
   useEffect(() => {
-    if (!active) return
+    if (!active) { didSeed.current = false; return }
+    if (didSeed.current) return
+    // Seed ONCE per activation, not on every prop change — otherwise typing in the card's
+    // description (which flows in as initialDescription) would reset the board / product-type
+    // picks on every keystroke. Compact mode reads the card's files live at send time, so
+    // there's nothing to seed for extras here.
+    didSeed.current = true
     const t = setTimeout(() => {
       load()
       setTitle(defaultTitle)
       // Prefer the card's own notes when it has some; otherwise fall back to the auto summary.
-      const seeded = (initialDescription ?? "").trim()
-      setDesc(seeded || defaultDesc)
+      const d = (initialDescription ?? "").trim()
+      setDesc(d || defaultDesc)
       setMsg(null)
       setExtras([])
     }, 0)
@@ -147,7 +161,7 @@ function PushToPartnerPanel({
         description: effDesc || undefined,
         productType: productType || undefined,
         boardId: board || undefined,
-        extraImages: extras.map((e) => e.url),
+        extraImages: effExtras.map((e) => e.url),
       })
       if (r.error) { setMsg({ ok: false, text: r.error }); return }
       // A warning means the task WAS created but we couldn't capture its reference, so status
@@ -161,7 +175,7 @@ function PushToPartnerPanel({
   }
 
   const notReady = !!status && (!status.configured || status.ok === false)
-  const noArtwork = !artworkUrl && !extras.length
+  const noArtwork = !artworkUrl && !effExtras.length
 
   return (
     <div className={compact ? "space-y-3" : "max-h-[60vh] space-y-4 overflow-y-auto py-2"}>
@@ -231,7 +245,9 @@ function PushToPartnerPanel({
         )}
       </div>
 
-      {/* Extra reference files. Not the artwork — notes FOR the designer. */}
+      {/* Extra reference files (full/dialog mode only). In compact/inline mode the card owns
+          the reference files and passes them in as presetExtras, so no uploader shows here. */}
+      {!compact && (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">Reference files</span>
@@ -256,6 +272,17 @@ function PushToPartnerPanel({
           </div>
         ))}
       </div>
+      )}
+
+      {/* In compact mode, a one-line reminder of what will be attached (the card lists/edits
+          them above), so it's clear the files are going even without the uploader here. */}
+      {compact && (
+        <p className="text-xs text-muted-foreground">
+          {effExtras.length
+            ? `${effExtras.length} reference file${effExtras.length === 1 ? "" : "s"} from the card will be attached.`
+            : "No reference files on the card yet — add them above; the artwork still sends."}
+        </p>
+      )}
 
       {msg && (
         <div className={"flex items-start gap-2 rounded-lg border px-3 py-2 text-sm " +
