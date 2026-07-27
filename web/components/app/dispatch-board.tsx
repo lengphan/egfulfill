@@ -650,7 +650,6 @@ export function DispatchBoard() {
                 labelled ones. Whether it has a label yet is shown by a per-row tag, not by
                 dimming the whole row (which read as "cancelled"). */}
             {queue.map((o) => {
-              const ready = !!o.tracking
               return (
                 <label
                   key={o.id}
@@ -668,11 +667,6 @@ export function DispatchBoard() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
                       <span className="truncate text-sm">{customerOf(o)}</span>
-                      {/* Not-yet-labelled is a state, not a cancellation — say so plainly
-                          rather than greying the whole row. */}
-                      {!ready && (
-                        <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Needs label</span>
-                      )}
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
