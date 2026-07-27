@@ -303,8 +303,12 @@ function buildCombinedXml({ embName, embBase64, text, alphabet, letterHeight, co
     + '</lettering>'
     + '</decorations>'
     + `<output ${out}/>`
+    + '</recipe>'
+    // <files> is a top-level child of <xml>, a SIBLING of <recipe> — NOT nested inside it
+    // (EWA resolves <design file> against xml/files; nesting it caused error 101 "Couldn't
+    // find the file … under files element"). Mirrors the bitmap recipe's placement.
     + `<files><file filename="${XML_ESC(embName)}" filecontents="${embBase64}"/></files>`
-    + '</recipe></xml>';
+    + '</xml>';
 }
 
 // The auto-digitized .emb for an image doesn't change while the image is fixed, so cache it by
