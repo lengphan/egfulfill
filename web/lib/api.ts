@@ -1468,6 +1468,10 @@ export type DesignCard = {
   credited?: boolean // designer paid once on approval — guards against double-credit
   priority?: string | null
   is_emb?: boolean
+  /** The linked machine file's id in design_file_data (an EMB card's .emb) — the reliable
+   *  key for a stitch-file preview, since the file's order_id can be null. */
+  design_id?: string | null
+  emb_file_name?: string | null
   /** The card's seller (store, else name/email), resolved server-side from the order —
    *  shown as the name tag, and the reason an EMB card needn't read "Seller file". */
   seller_name?: string | null

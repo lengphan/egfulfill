@@ -23,14 +23,15 @@ import { useConfirm } from "@/components/app/confirm-dialog"
  * site restores the old behaviour with nothing else touched, and the preview never blocks
  * the card render (it swaps in asynchronously if it arrives).
  */
-function EmbPreview({ orderId, sku, children }: { orderId?: string | null; sku?: string | null; children: ReactNode }) {
+function EmbPreview({ designId, orderId, sku, children }: { designId?: string | null; orderId?: string | null; sku?: string | null; children: ReactNode }) {
   const [png, setPng] = useState<string | null>(null)
   useEffect(() => {
-    if (!orderId) return
+    if (!designId && !orderId) return
     let live = true
-    getEmbPreview({ orderId, sku }).then((r) => { if (live && r.ok && r.png) setPng(r.png) }).catch(() => {})
+    // design_id is the reliable key (the file's order_id can be null); order+sku is a fallback.
+    getEmbPreview(designId ? { designId } : { orderId, sku }).then((r) => { if (live && r.ok && r.png) setPng(r.png) }).catch(() => {})
     return () => { live = false }
-  }, [orderId, sku])
+  }, [designId, orderId, sku])
   // eslint-disable-next-line @next/next/no-img-element
   if (png) return <img src={`data:image/png;base64,${png}`} alt="" className="size-full object-cover" />
   return <>{children}</>
@@ -519,7 +520,7 @@ export function DesignerBoard() {
                             <img src={String(c.thumb)} alt="" className="size-full object-cover" />
                           ) : c.is_emb ? (
                             // No thumbnail for a stitch file — try a Wilcom TrueView, else the placeholder.
-                            <EmbPreview orderId={c.order_id} sku={c.sku}>
+                            <EmbPreview designId={c.design_id} orderId={c.order_id} sku={c.sku}>
                               <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
                             </EmbPreview>
                           ) : (
@@ -589,8 +590,12 @@ export function DesignerBoard() {
                             <button
                               type="button"
                               onClick={() => { setEditNameId(c.id); setNameDraft(c.title || "") }}
-                              title="Click to rename"
-                              className="line-clamp-2 rounded text-left text-sm font-medium leading-tight transition-colors hover:bg-accent"
+                              // min-h reserves BOTH lines even for a one-line title, so a short
+                              // title no longer makes the whole card shorter than its neighbours —
+                              // everything below stays docked at the same place. line-clamp-2 caps
+                              // it at two lines; the full title is on hover and in the rename input.
+                              title={c.title || "Design"}
+                              className="line-clamp-2 min-h-[2.25rem] rounded text-left text-sm font-medium leading-tight transition-colors hover:bg-accent"
                             >
                               {cardLabel(c)}
                             </button>
@@ -969,7 +974,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               // eslint-disable-next-line @next/next/no-img-element
               <img src={String(card.thumb)} alt="" className="size-full object-contain" />
             ) : card.is_emb ? (
-              <EmbPreview orderId={card.order_id} sku={card.sku}>
+              <EmbPreview designId={card.design_id} orderId={card.order_id} sku={card.sku}>
                 <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={40} weight="duotone" /></div>
               </EmbPreview>
             ) : (
