@@ -471,14 +471,16 @@ export function DesignerBoard() {
                         onClick={() => setOpenId(c.id)}
                         className={"group overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow " + (c.vendor ? "cursor-pointer" : "cursor-grab active:cursor-grabbing")}
                       >
-                        {/* Fixed SQUARE preview so every tile is the same shape regardless of
-                            lane width — the design fills a consistent 1:1 frame. */}
-                        <div className="relative aspect-square w-full overflow-hidden bg-muted">
+                        {/* Trello-style cover: the design shows at its NATURAL aspect (capped
+                            at max-h-80) — a tall design stays tall, a wide one stays wide —
+                            instead of being squeezed into a uniform square. The card height
+                            follows the artwork, like a Trello card cover. */}
+                        <div className="relative w-full overflow-hidden bg-muted">
                           {c.thumb ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={String(c.thumb)} alt="" className="size-full object-cover" />
+                            <img src={String(c.thumb)} alt="" className="block max-h-80 w-full object-cover" />
                           ) : (
-                            <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
+                            <div className="flex h-32 w-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
                           )}
                           {c.is_emb && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
                           {/* Outsourced: whose queue this is actually in. Our designers do
@@ -510,11 +512,11 @@ export function DesignerBoard() {
                             <X size={11} weight="bold" />
                           </button>}
                         </div>
-                        {/* min-h so a sparse card (a fresh drop with only a title + id) is the
-                            same height as a full one (order #, method, files) — every tile in
-                            a lane matches, which is the "same size" the drop sets. */}
-                        <div className="min-h-[4.75rem] p-2.5">
-                          <div className="truncate text-sm font-medium leading-tight">{c.title || "Design"}</div>
+                        {/* Content-driven height (no forced min-h) so a card is as tall as what
+                            it holds — the Trello way. The title WRAPS up to two lines instead of
+                            truncating, so a real design name is readable on the card face. */}
+                        <div className="p-2.5">
+                          <div className="line-clamp-2 text-sm font-medium leading-tight">{c.title || "Design"}</div>
                           {/* The DESIGN ID and what it paid — the two facts you track a card
                               by. This line used to be product/type, or a bare "—" when a card
                               (a dropped design, say) had neither, which read as broken. The id
