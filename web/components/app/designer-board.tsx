@@ -75,6 +75,7 @@ export function DesignerBoard() {
   const canSeeHistory = canDeleteCard()
   const [query, setQuery] = useState("")
   const [designFee, setDesignFee] = useState(0) // platform default payout per design
+  const [partnerCost, setPartnerCost] = useState(0) // what an outsourced design partner costs per task
   const [delErr, setDelErr] = useState<string | null>(null)
   const me = getUser()?.name || "Designer"
 
@@ -99,7 +100,7 @@ export function DesignerBoard() {
   useEffect(() => {
     const id = setTimeout(() => {
       load()
-      getFactorySettings().then((s) => setDesignFee(Number(s.designer_payout) || 0)).catch(() => {})
+      getFactorySettings().then((s) => { setDesignFee(Number(s.designer_payout) || 0); setPartnerCost(Number(s.design_partner_cost) || 0) }).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
   }, [load])
@@ -490,7 +491,7 @@ export function DesignerBoard() {
                           {/* Outsourced: whose queue this is actually in. Our designers do
                               embroidery, so DTG/DTF is worked by a partner — showing it on
                               the tile stops anyone reaching for a job that isn't theirs. */}
-                          {c.vendor && <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{vendorLabel(c.vendor)}</span>}
+                          {c.vendor && <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-pink-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{vendorLabel(c.vendor)}</span>}
                           {/* Cancel the card without opening it. Hover-revealed so a full
                               column isn't a grid of delete buttons, and it confirms —
                               removal is not undoable and these sit under a drag handle.
@@ -516,41 +517,49 @@ export function DesignerBoard() {
                             <X size={11} weight="bold" />
                           </button>}
                         </div>
-                        {/* Fixed footer height so every card matches and the DSN id + price row
-                            lands in the same spot on each. Title wraps up to two lines (readable
-                            name), then the always-present DSN id + what it paid. */}
-                        <div className="min-h-[4.75rem] p-2.5">
+                        {/* Footer is a flex column: title + meta at the TOP, the DSN id and payout
+                            DOCKED to the bottom (mt-auto) so they line up across every card. Kept
+                            NEUTRAL — no green/amber tint on the bottom row. */}
+                        <div className="flex min-h-[4.75rem] flex-col p-2.5">
                           <div className="line-clamp-2 text-sm font-medium leading-tight">{c.title || "Design"}</div>
-                          {/* The DESIGN ID and what it paid — the two facts you track a card
-                              by. This line used to be product/type, or a bare "—" when a card
-                              (a dropped design, say) had neither, which read as broken. The id
-                              is always present, so the line always says something, which also
-                              keeps every tile the same height. Money: the amount CREDITED to
-                              the designer once approved; $0 while it's only claimed (work
-                              underway, nothing earned yet); nothing at all before anyone
-                              claims it. */}
-                          <div className="mt-0.5 flex items-center gap-1.5 text-xs">
-                            <span className="shrink-0 font-mono text-muted-foreground">DSN-{c.id}</span>
-                            {c.credited ? (
-                              <span className="shrink-0 font-semibold tabular-nums text-emerald-600">{money(amt(c.payment))} paid</span>
-                            ) : c.claimed_by ? (
-                              <span className="shrink-0 tabular-nums text-muted-foreground" title={`Claimed by ${c.claimed_by} — not credited yet`}>$0.00 · claimed</span>
-                            ) : null}
-                          </div>
-                          {/* The rest: order #, method, files. Money moved up to the id line,
-                              so it isn't shown twice. */}
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
-                            {c.order_id ? (
-                              <span className="rounded bg-muted px-1.5 py-0.5 font-mono">{String(c.order_id).slice(0, 12)}</span>
-                            ) : null}
-                            {(c.product || c.type) && (
-                              <span className="rounded bg-muted px-1.5 py-0.5">{c.product || c.type}</span>
-                            )}
-                            {(c.file_count ?? 0) > 0 && (
-                              <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5" title={`${c.file_count} design file${c.file_count === 1 ? "" : "s"}`}>
-                                <Paperclip size={9} weight="bold" />{c.file_count}
-                              </span>
-                            )}
+                          {/* Essential meta, only when present: order #, method/product, file count. */}
+                          {(c.order_id || c.product || c.type || (c.file_count ?? 0) > 0) && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                              {c.order_id ? (
+                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono">{String(c.order_id).slice(0, 12)}</span>
+                              ) : null}
+                              {(c.product || c.type) && (
+                                <span className="rounded bg-muted px-1.5 py-0.5">{c.product || c.type}</span>
+                              )}
+                              {(c.file_count ?? 0) > 0 && (
+                                <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5" title={`${c.file_count} design file${c.file_count === 1 ? "" : "s"}`}>
+                                  <Paperclip size={9} weight="bold" />{c.file_count}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {/* Docked to the bottom: DSN id (left) + what the design pays (right).
+                              The amount is FACTORY-ONLY — a designer never sees it (their earnings
+                              live in their wallet), on internal AND partner cards. Internal = the
+                              designer payout (the card's own, or the platform default); partner =
+                              what the outsourced task costs us. Neutral text, NO colour — " · paid"
+                              once actually credited, " · partner" for an outsourced card, else the
+                              plain rate. */}
+                          <div className="mt-auto flex items-center justify-between gap-1.5 pt-1.5 text-xs text-muted-foreground">
+                            <span className="shrink-0 font-mono">DSN-{c.id}</span>
+                            {!isDesigner && (() => {
+                              const payout = c.vendor ? partnerCost : (amt(c.payment) || designFee)
+                              if (payout <= 0) return null
+                              const suffix = c.credited ? " · paid" : c.vendor ? " · partner" : ""
+                              return (
+                                <span
+                                  className="shrink-0 font-medium tabular-nums text-foreground"
+                                  title={c.vendor ? "Outsourced — partner cost" : c.credited ? "Credited to the designer" : (c.claimed_by ? `Payout to ${c.claimed_by} on approval` : "Designer payout on approval")}
+                                >
+                                  {money(payout)}{suffix}
+                                </span>
+                              )
+                            })()}
                           </div>
                         </div>
                       </button>
@@ -613,7 +622,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
   // name, tinted like the board badge), a claimed card is with that designer, and anything
   // else is genuinely unclaimed — said plainly rather than a bare dash.
   { id: "claimed", label: "Assigned to", cell: (c) => c.vendor
-    ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{vendorLabel(c.vendor)}</span>
+    ? <span className="inline-flex items-center gap-1 rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">{vendorLabel(c.vendor)}</span>
     : c.claimed_by
       ? <span className="text-foreground">{String(c.claimed_by)}</span>
       : <span className="text-muted-foreground">Unclaimed</span> },
