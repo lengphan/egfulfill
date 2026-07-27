@@ -1597,12 +1597,25 @@ function UsersPanel() {
     return out
   }
 
-  const shown = users.filter((u) => {
+  // Everything the active toggle + search let through, BEFORE the role chips narrow it.
+  // The chip counts read off this set, so each chip shows exactly how many rows selecting
+  // it would reveal — and they react to a search the same way the list does.
+  const countBase = users.filter((u) => {
     if (!showInactive && u.active === false) return false
-    if (roleFilter === "staff" ? u.role === "seller" : roleFilter !== "all" && u.role !== roleFilter) return false
     if (!term) return true
     return [u.name, u.email, u.store_name, u.role].some((f) => String(f ?? "").toLowerCase().includes(term))
   })
+  // "Staff" is every non-seller, so operator + warehouse + designer + admin all fall under
+  // it — they are factory roles, not a seller's team, so this is a role tally, not a
+  // hierarchy. A bare role id counts that one role.
+  const roleCount = (id: string) =>
+    id === "all" ? countBase.length
+      : id === "staff" ? countBase.filter((u) => u.role !== "seller").length
+      : id === "seller" ? countBase.filter((u) => u.role === "seller").length
+      : countBase.filter((u) => u.role === id).length
+  const shown = countBase.filter((u) =>
+    roleFilter === "all" ? true : roleFilter === "staff" ? u.role !== "seller" : u.role === roleFilter
+  )
   const inactiveCount = users.filter((u) => u.active === false).length
   // "Busiest first" = trailing 14-day volume, descending — so after suggesting limits the
   // heavy hitters float to the top for a quick review. Sorted BEFORE grouping so a team's
@@ -1636,15 +1649,18 @@ function UsersPanel() {
             <Input value={qStr} onChange={(e) => setQStr(e.target.value)} placeholder="Search name, email or store…" className="h-9 pl-8" />
           </div>
           <div className="flex flex-wrap items-center gap-1">
-            {[["all", "All"], ["staff", "Staff"], ["seller", "Sellers"], ["operator", "Operator"], ["warehouse", "Warehouse"], ["designer", "Designer"], ["admin", "Admin"]].map(([id, label]) => (
+            {[["all", "All"], ["staff", "Staff"], ["seller", "Sellers"], ["operator", "Operator"], ["warehouse", "Warehouse"], ["designer", "Designer"], ["admin", "Admin"]].map(([id, label]) => {
+              const n = roleCount(id)
+              return (
               <button
                 key={id}
                 onClick={() => setRoleFilter(id)}
                 className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (roleFilter === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
               >
                 {label}
+                <span className={"ml-1 tabular-nums " + (roleFilter === id ? "opacity-80" : "opacity-50")}>{n}</span>
               </button>
-            ))}
+            )})}
           </div>
           {/* Sort: newest account first (default) vs busiest by recent volume — so after
               suggesting limits, the heavy hitters are at the top to review. */}
