@@ -31,20 +31,35 @@ const priceStr = (l: EtsyListing) =>
     : l.price != null ? `${l.currency === "USD" ? "$" : ""}${l.price}${l.currency && l.currency !== "USD" ? " " + l.currency : ""}`
       : ""
 
-const PAGE_SIZE = 10
+// Kept deliberately SMALL to stay well under Etsy's 10-requests/second ceiling: each row on a
+// page fires one listings call, so a page = PAGE_SIZE calls. 5 (staggered + cached below) is
+// comfortably safe; bump it only once the live behaviour is confirmed fine.
+const PAGE_SIZE = 5
+
+// Preview strips, cached by shop_id for this session so paging back — or a re-render — never
+// re-fetches. Protects both the burst and the daily Etsy budget.
+const stripCache = new Map<string, EtsyListing[]>()
 
 // One STORE per row: identity + stats + actions on the left, a strip of that shop's actual
 // product images on the right — so you can see what a competitor sells before clicking in.
-// Each row lazily fetches a dozen of its own listings for the preview strip.
-function ShopRow({ s, saved, onToggle, onOpen }: { s: SpyShop; saved: boolean; onToggle: (s: SpyShop) => void; onOpen: (s: SpyShop) => void }) {
-  const [previews, setPreviews] = useState<EtsyListing[] | null>(null)
+// Each row lazily fetches a dozen of its own listings, STAGGERED by its position so a page
+// never bursts all its calls in the same second.
+function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: number; saved: boolean; onToggle: (s: SpyShop) => void; onOpen: (s: SpyShop) => void }) {
+  // Read the cache at mount (the row remounts per shop — key={shop_id}), so a cached strip
+  // shows with no fetch and no setState-in-effect.
+  const [previews, setPreviews] = useState<EtsyListing[] | null>(() => stripCache.get(s.shop_id) ?? null)
   useEffect(() => {
+    if (stripCache.has(s.shop_id)) return // already shown by the initializer above
     let live = true
-    getSpydeckShopListings(s.shop_id)
-      .then((r) => { if (live) setPreviews((r.listings ?? []).filter((l) => l.thumb || l.image).slice(0, 12)) })
-      .catch(() => { if (live) setPreviews([]) })
-    return () => { live = false }
-  }, [s.shop_id])
+    // Space the calls out (~250ms per row) so a page of PAGE_SIZE rows trickles in rather than
+    // firing at once — keeps us far below Etsy's 10/sec limit.
+    const t = setTimeout(() => {
+      getSpydeckShopListings(s.shop_id)
+        .then((r) => { const strip = (r.listings ?? []).filter((l) => l.thumb || l.image).slice(0, 12); stripCache.set(s.shop_id, strip); if (live) setPreviews(strip) })
+        .catch(() => { if (live) setPreviews([]) })
+    }, index * 250)
+    return () => { live = false; clearTimeout(t) }
+  }, [s.shop_id, index])
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md lg:flex-row">
@@ -323,8 +338,8 @@ export function StoresTab(h: Handlers) {
             const rows = all.slice(cur * PAGE_SIZE, cur * PAGE_SIZE + PAGE_SIZE)
             return (
               <>
-                {rows.map((s) => (
-                  <ShopRow key={s.shop_id} s={s} saved={savedShopIds.has(s.shop_id)} onToggle={toggleSaveShop} onOpen={openShop} />
+                {rows.map((s, i) => (
+                  <ShopRow key={s.shop_id} s={s} index={i} saved={savedShopIds.has(s.shop_id)} onToggle={toggleSaveShop} onOpen={openShop} />
                 ))}
                 {pages > 1 && (
                   <div className="flex items-center justify-center gap-2 pt-2">
