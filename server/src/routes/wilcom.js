@@ -473,10 +473,21 @@ export function wilcomRoutes(app, requireStaff) {
       const m = /base64,([\s\S]+)$/.exec(String(row.data));
       base64 = (m ? m[1] : String(row.data)).replace(/\s+/g, '');
     } else if (row.url) {
+      // Objects are PRIVATE in TTL mode and the raw host URL isn't publicly fetchable, so a
+      // plain GET 403s. Read via the SIGNED getObject using the key design_files.js stored it
+      // under ('design-files/<designId><ext>'); fall back to a public fetch for CDN urls.
+      const ext = (String(row.file_name || '').match(/\.[a-z0-9]+$/i) || [''])[0] || '';
+      const key = 'design-files/' + encodeURIComponent(String(row.design_id)) + ext;
       try {
-        const rr = await fetch(String(row.url));
-        if (rr.ok) base64 = Buffer.from(await rr.arrayBuffer()).toString('base64');
-      } catch (e) { /* fall through to the no-bytes error */ }
+        const obj = await getObject(key);
+        if (obj && obj.body) base64 = Buffer.from(obj.body).toString('base64');
+      } catch (e) { /* try the url next */ }
+      if (!base64) {
+        try {
+          const rr = await fetch(String(row.url));
+          if (rr.ok) base64 = Buffer.from(await rr.arrayBuffer()).toString('base64');
+        } catch (e) { /* fall through to the no-bytes error */ }
+      }
     }
     if (!base64) { reply.code(404); return { ok: false, error: 'Machine file row found but its bytes are unreadable.', hasUrl: !!row.url }; }
     const filename = safeName(String(row.file_name || 'design').replace(/\.[^.]+$/, ''), 'design') + '.emb';
