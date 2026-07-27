@@ -137,6 +137,13 @@ export function stageDenialReason(role: string, current: string | null | undefin
     return `That would skip ${LINE.slice(ai + 1, ti).map(LABEL_OF).join(", ")}. Move it one stage at a time.`
   }
 
+  // A shipped order is done — the only change left is a Refund. Un-shipping would claim the
+  // buyer's tracking reversed (it can't), and it's too late to cancel. Applies to EVERY role;
+  // Refund itself is still admin-gated below (MONEY_STAGES).
+  if (at === "shipped" && to !== "shipped" && to !== "refunded") {
+    return "This order has shipped — the only change left is a refund."
+  }
+
   if (role === "admin") return null
   if (role === "warehouse") {
     return MONEY_STAGES.has(to) ? "Cancelling or refunding is an admin decision." : null

@@ -130,6 +130,13 @@ export function stageDenial(role, current, target) {
     return `That would skip ${missed.map((s) => STAGE_LABEL[s] || s).join(', ')}. Move it one stage at a time.`;
   }
 
+  // A shipped order is done — the only change left is a Refund (un-shipping can't reverse the
+  // buyer's tracking, and it's too late to cancel). Every role; Refund is admin-gated below.
+  // Mirrors stageDenialReason in web/lib/factory-status.ts.
+  if (at === 'shipped' && to !== 'shipped' && to !== 'refunded') {
+    return 'This order has shipped — the only change left is a refund.';
+  }
+
   if (role === 'admin') return null;
   if (role === 'warehouse') {
     return MONEY_STAGES.has(to) ? 'Cancelling or refunding is an admin decision.' : null;

@@ -1069,9 +1069,10 @@ export function OrdersHub() {
                     {/* One PRIMARY action for the current stage/role; everything rarer
                         (flag/status, labels, the non-primary of ship/advance) tucks into a
                         ⋯ menu so the row isn't a wall of buttons. */}
-                    {allShipped ? (
-                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> {tl("ui", "Shipped")}</span>
-                    ) : (() => {
+                    {/* Shipped orders keep the ⋯ menu (so admin can still Refund) — the old
+                        "✓ Shipped" badge REPLACED the whole action cluster, hiding it. The
+                        menu greys every stage except Refunded for a shipped order. */}
+                    {(() => {
                       /**
                        * EVERY stage is listed; the ones this role can't use from here are
                        * disabled and carry the reason.
@@ -1116,7 +1117,9 @@ export function OrdersHub() {
                        * forward is the honest one: resolve the stop, then ship.
                        */
                       const stopped = isException(stage)
-                      const canShip = canFulfill && shipOpen !== o.id && !stopped
+                      // A fully-shipped order offers no ship/advance — the only move is Refund,
+                      // via the stage list below. So no "Create new label" primary or menu item.
+                      const canShip = canFulfill && shipOpen !== o.id && !stopped && !allShipped
                       /**
                        * No next stage means no Next-stage button.
                        *
