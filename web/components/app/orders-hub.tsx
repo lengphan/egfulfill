@@ -56,7 +56,7 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
     state === "in" ? "bg-primary/10 text-primary hover:bg-primary/15"
     : state === "out" ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
     : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
-  const label = state === "in" ? "In stock" : state === "out" ? "No stock" : "Stock —"
+  const label = state === "in" ? "In stock" : state === "out" ? "No stock" : "Stock"
   const clickable = state === "out" && canPO
   const title = state === "in" ? "Blank stock is on hand for every line"
     : state === "out" ? (canPO ? "Short on blank stock — click to add to a draft purchase order. Open the order for the per-line breakdown." : "Short on blank stock — open the order for the per-line breakdown")
