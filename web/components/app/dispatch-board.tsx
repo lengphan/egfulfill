@@ -16,7 +16,6 @@ import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
 import { canSetStage, canWalk, stagePath, normalizeStage } from "@/lib/factory-status"
-import { ReadinessStrip } from "@/components/app/readiness-dots"
 
 /**
  * DISPATCH — everything that has finished production and is waiting to leave.
@@ -674,7 +673,21 @@ export function DispatchBoard() {
                       </span>
                       <span>{unitsOf(o)} unit{unitsOf(o) === 1 ? "" : "s"}</span>
                       {addrLine(o) && <span className="truncate">{addrLine(o)}</span>}
-                      <ReadinessStrip order={o} />
+                      {/* The label's OWN status here — not the production readiness pills, which
+                          belong on the make boards. "Sent to partner" is the byeastside hand-off
+                          (pushed but not scanned back yet), so it's visible whether a parcel is
+                          out for external scan or still waiting here. */}
+                      {(() => {
+                        const d = disposition(o)
+                        const sentOut = !o.label_scanned_at && !!o.dispatch_pdf_id
+                        const label = sentOut ? "Sent to partner" : d.label
+                        const dot = sentOut ? "bg-amber-500" : DISP_DOT[d.key]
+                        return (
+                          <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
+                            <span className={"size-1.5 rounded-full " + dot} /> {label}
+                          </span>
+                        )
+                      })()}
                     </div>
                   </div>
                   {o.tracking ? (
