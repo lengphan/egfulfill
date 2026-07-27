@@ -135,8 +135,9 @@ export function VariantStrip({
   size?: string | null
   method?: string | null
   blank?: string | null
-  /** The line item's own SKU — the identifier the floor and support both reference. Shown
-   *  as a leading mono chip so it reads as an id, not a variant word. */
+  /** The BLANK / inventory SKU stock is held against (resolveProduct(it)?.sku || it.blank),
+   *  NOT the marketplace listing SKU — the id the floor picks against and inventory tracks.
+   *  Shown as a leading mono chip so it reads as an id, not a variant word. */
   sku?: string | null
   className?: string
   /** Submitted order — variants are frozen (the server rejects changes once the cost is

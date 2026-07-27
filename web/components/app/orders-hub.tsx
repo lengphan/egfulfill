@@ -1485,7 +1485,7 @@ export function OrdersHub() {
                             ) : (
                               <>
                               <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                <VariantStrip sku={it.sku} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} />
+                                <VariantStrip sku={resolveProduct(it, catalog)?.sku || it.blank || undefined} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} />
                                 {it.qty ? <span className="text-[11px] text-muted-foreground">×{it.qty}</span> : null}
                               </div>
 
