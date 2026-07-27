@@ -160,6 +160,10 @@ export function getMyTopups() {
 export type AdminUser = {
   id: string; email: string; name?: string | null; role: string; store_name?: string | null
   active?: boolean; plan?: string; spydeck_addon?: boolean; created_at?: string
+  /** Cosmetic identity the person set on their own profile — same avatar as the topbar. */
+  avatar_emoji?: string | null; avatar_color?: string | null; username?: string | null
+  /** Lifetime order count and when the last order landed — the dormant-vs-active signal. */
+  orders_total?: number; last_order_at?: string | null
   /** Set when this account is a MEMBER of someone else's team. */
   owner_id?: string | null
   owner_label?: string | null

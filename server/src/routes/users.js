@@ -61,6 +61,9 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     // member belongs to whom — the one thing you need before changing anything.
     const r = await q(`
       select u.id, u.email, u.name, u.role, u.store_name, u.active, u.plan, u.spydeck_addon, u.created_at,
+             -- Cosmetic identity, so the directory shows the SAME avatar the person set on
+             -- their own profile (topbar/sidebar) rather than a bare initial.
+             u.avatar_emoji, u.avatar_color, u.username,
              u.order_limit,
              -- Orders this seller has created today — so the admin sees usage against the
              -- limit without opening each account.
@@ -68,6 +71,10 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
              -- Trailing 14-day volume — the "busiest first" sort key, and the same signal the
              -- limit suggester weights by, so the review lines up with what it distributed.
              (select count(*)::int from orders o3 where o3.seller_id = u.id and o3.created_at >= now() - interval '14 days') as orders_14d,
+             -- Lifetime orders + when the last one landed — answers "is this account active or
+             -- dormant?" at a glance, which is the first thing you check before editing one.
+             (select count(*)::int from orders o5 where o5.seller_id = u.id) as orders_total,
+             (select max(o4.created_at) from orders o4 where o4.seller_id = u.id) as last_order_at,
              tm.owner_id,
              coalesce(o.store_name, o.name, o.email) as owner_label,
              tm.permissions as team_permissions,

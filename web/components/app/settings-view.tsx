@@ -62,6 +62,24 @@ const fmtDate = (s?: string | null) => {
   const d = new Date(s)
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
+// Compact "how long ago" for the last-active column — a date alone makes you do the
+// subtraction; "3d ago" reads at a glance which accounts have gone quiet.
+const fmtAgo = (s?: string | null) => {
+  if (!s) return null
+  const t = new Date(s).getTime()
+  if (isNaN(t)) return null
+  const secs = Math.max(0, (Date.now() - t) / 1000)
+  if (secs < 60) return "just now"
+  const mins = secs / 60
+  if (mins < 60) return `${Math.floor(mins)}m ago`
+  const hrs = mins / 60
+  if (hrs < 24) return `${Math.floor(hrs)}h ago`
+  const days = hrs / 24
+  if (days < 30) return `${Math.floor(days)}d ago`
+  const months = days / 30
+  if (months < 12) return `${Math.floor(months)}mo ago`
+  return `${Math.floor(days / 365)}y ago`
+}
 
 // ─────────────────────────── Profile ───────────────────────────
 function ProfilePanel() {
@@ -1414,6 +1432,21 @@ function PlatformPanel() {
 const ROLES = ["seller", "operator", "warehouse", "designer", "admin"]
 // Plans are SERVER state now; this dropdown is the ONLY way to change one.
 const PLANS = ["starter", "pro", "enterprise"]
+// ONE grid template shared by the header and every data row, so columns line up no matter
+// which controls a role carries. Every track except the flexible Account column is a FIXED
+// width: each row is its own grid, so a variable track (e.g. sizing Access to its contents,
+// which a seller widens with a Plan select and staff don't) would let the column edges
+// drift row to row — exactly the misalignment this replaces. Tracks appear as the viewport
+// widens, and the row cells hidden at each breakpoint drop out of grid flow at the SAME
+// breakpoints, so the visible-cell count always equals the track count.
+//   base : Account · Access
+//   sm   : Account · Balance · Access
+//   lg   : Account · Joined · Activity · Balance · Access
+const USER_ROW_GRID =
+  "grid items-center gap-x-3 gap-y-1 px-5 " +
+  "grid-cols-[minmax(0,1fr)_11rem] " +
+  "sm:grid-cols-[minmax(0,1fr)_5.5rem_15rem] " +
+  "lg:grid-cols-[minmax(0,1fr)_6.5rem_10rem_5.5rem_17rem]"
 function UsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -1643,98 +1676,116 @@ function UsersPanel() {
           )}
         </div>
         {!loaded ? <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div> : (
-          /* Rows, not a table.
-             The table was carrying six columns — name, email, role, plan, joined, manage —
-             which left every cell cramped and made the team grouping lean on indentation
-             alone. Identity (avatar + name + email) is ONE thing, so it's one cell; role
-             and plan are both "what this account may do", so they sit together on the
-             right. A team reads as a bordered group with its leader at the top, which the
-             eye follows without needing the indent to do the work. */
+          /* An aligned grid, not free-flowing rows. Every row is the same USER_ROW_GRID,
+             so Joined / Activity / Balance / Access line up under their headers no matter
+             the role — a seller (plan + balance) and a staff account (neither) still share
+             identical column edges, which the old flex layout did not. Identity is one cell
+             (avatar + name + email + badges); a team member sits under its leader with a
+             left accent INSIDE that cell, so the indent never shifts the columns beside it. */
           <div className="divide-y divide-border">
-            {/* Header. The rows carry four aligned columns — joined, balance, access,
-                actions — and without labels a bare "$0.00" or a date is a number with no
-                claim attached. Hidden on small screens, where those columns collapse. */}
+            {/* Header — labels the columns the rows carry, so a bare "$0.00" or a date reads
+                as a claim, not a loose number. Same grid + same per-cell breakpoints as the
+                rows, so each label sits exactly above its values. */}
             {paged.pageItems.length > 0 && (
-              <div className="hidden items-center gap-3 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:flex">
-                <span className="size-9 shrink-0" />
-                <span className="min-w-0 flex-1">Account</span>
-                <span className="hidden w-24 shrink-0 lg:block">Joined</span>
-                <span className="w-20 shrink-0 text-right">Balance</span>
-                {/* Must match the row's Access cell exactly — see the note there. */}
-                <span className="w-[280px] shrink-0">Access</span>
+              <div className={USER_ROW_GRID + " py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"}>
+                <span className="min-w-0">Account</span>
+                <span className="hidden lg:block">Joined</span>
+                <span className="hidden lg:block">Activity</span>
+                <span className="hidden text-right sm:block">Balance</span>
+                <span className="text-right">Access</span>
               </div>
             )}
             {paged.pageItems.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground">{users.length ? "No users match that search." : "No users"}</div>
             ) : (
-              paged.pageItems.map(({ u, child }) => (
+              paged.pageItems.map(({ u, child }) => {
+                const isSeller = u.role === "seller"
+                const displayName = u.name || u.store_name || (u.username ? `@${u.username}` : "") || u.email || "—"
+                const perDay = Math.round((u.orders_14d ?? 0) / 14)
+                const overLimit = u.order_limit != null && (u.orders_today ?? 0) >= u.order_limit
+                const lastActive = fmtAgo(u.last_order_at)
+                return (
                 <div
                   key={u.id}
                   className={
-                    "flex flex-wrap items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40 " +
-                    (child ? "border-l-2 border-primary/25 bg-muted/20 pl-10" : "") +
-                    (u.active === false ? " opacity-55" : "")
+                    USER_ROW_GRID + " py-3 transition-colors hover:bg-accent/40 " +
+                    (child ? "bg-muted/20 " : "") +
+                    (u.active === false ? "opacity-55" : "")
                   }
                 >
-                  {/* Identity */}
-                  <span className={"grid shrink-0 place-items-center rounded-full bg-muted font-medium text-muted-foreground " + (child ? "size-7 text-xs" : "size-9 text-sm")}>
-                    {(u.name || u.email || "?").charAt(0).toUpperCase()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={child ? "truncate text-sm" : "truncate text-sm font-medium"}>{u.name || u.store_name || "—"}</span>
-                      {!child && (u.team_size ?? 0) > 0 && (
-                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Leads {u.team_size}</span>
-                      )}
-                      {child && (
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Member</span>
-                      )}
-                      {u.active === false && (
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Deactivated</span>
-                      )}
+                  {/* Account — avatar + identity + badges, all in the flexible column. */}
+                  <div className={"flex min-w-0 items-center gap-3 " + (child ? "border-l-2 border-primary/30 pl-3" : "")}>
+                    <UserAvatar user={{ name: displayName, avatar_emoji: u.avatar_emoji, avatar_color: u.avatar_color }} size={child ? 30 : 38} className={child ? "rounded-lg" : "rounded-xl"} />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className={child ? "truncate text-sm" : "truncate text-sm font-medium"}>{displayName}</span>
+                        {!child && (u.team_size ?? 0) > 0 && (
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Leads {u.team_size}</span>
+                        )}
+                        {child && (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            Member{u.owner_label ? ` · ${u.owner_label}` : ""}
+                          </span>
+                        )}
+                        {isSeller && u.spydeck_addon && (
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Spydeck</span>
+                        )}
+                        {u.active === false && (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Deactivated</span>
+                        )}
+                      </div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {u.email || (u.username ? `@${u.username}` : "—")}
+                        {u.store_name && u.store_name !== displayName && <span className="opacity-70"> · {u.store_name}</span>}
+                      </div>
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">{u.email}</div>
                   </div>
 
                   {/* Joined — context, not a control, so it stays quiet. */}
-                  <span className="hidden w-24 shrink-0 text-xs text-muted-foreground lg:block">{fmtDate(u.created_at)}</span>
+                  <span className="hidden truncate text-xs text-muted-foreground lg:block">{fmtDate(u.created_at)}</span>
 
-                  {/* Balance, for sellers only — staff share the factory wallet, so a
-                      per-account figure would be meaningless for them. Amber at zero or
-                      below: that's an account that can't submit work. */}
-                  {/* Peak-season usage — today's uploads vs limit + recent daily average, so
-                      after suggesting limits the busiest sellers can be reviewed at a glance.
-                      Amber once they're at/over. */}
-                  {u.role === "seller" && (
-                    <span
-                      className={"hidden shrink-0 items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] tabular-nums lg:inline-flex " +
-                        (u.order_limit != null && (u.orders_today ?? 0) >= u.order_limit ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground")}
-                      title={`${u.orders_today ?? 0} uploaded today${u.order_limit != null ? ` · limit ${u.order_limit}` : " · no limit set"} · ~${Math.round((u.orders_14d ?? 0) / 14)}/day recently`}
-                    >
-                      {u.order_limit != null ? `${u.orders_today ?? 0}/${u.order_limit}` : `${u.orders_today ?? 0}/—`}
-                      <span className="opacity-70">~{Math.round((u.orders_14d ?? 0) / 14)}/d</span>
-                    </span>
-                  )}
+                  {/* Activity — sellers carry orders. Today's uploads vs limit + recent daily
+                      average (amber once at/over), then how long since the last order so a
+                      dormant account is obvious. Staff have no orders of their own. */}
+                  <div className="hidden min-w-0 text-xs lg:block">
+                    {isSeller ? (
+                      <>
+                        <span
+                          className={"inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 tabular-nums " +
+                            (overLimit ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground")}
+                          title={`${u.orders_today ?? 0} uploaded today${u.order_limit != null ? ` · limit ${u.order_limit}` : " · no limit set"} · ~${perDay}/day recently · ${u.orders_total ?? 0} all-time`}
+                        >
+                          {u.order_limit != null ? `${u.orders_today ?? 0}/${u.order_limit}` : `${u.orders_today ?? 0}/—`}
+                          <span className="opacity-70">~{perDay}/d</span>
+                        </span>
+                        <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                          {lastActive ? `last order ${lastActive}` : "no orders yet"}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground/50">—</span>
+                    )}
+                  </div>
 
-                  {u.role === "seller" ? (
+                  {/* Balance — sellers only; staff share the factory wallet, so a per-account
+                      figure is meaningless for them. Amber at or below zero: that account
+                      can't submit work. */}
+                  {isSeller ? (
                     <span
-                      className={"hidden w-20 shrink-0 text-right text-xs tabular-nums sm:block " +
+                      className={"hidden text-right text-xs tabular-nums sm:block " +
                         ((u.balance ?? 0) <= 0 ? "font-medium text-amber-700" : "text-muted-foreground")}
                       title={(u.balance ?? 0) <= 0 ? "No funds — this account can't submit orders" : "Wallet balance"}
                     >
                       {usd2(u.balance ?? 0)}
                     </span>
                   ) : (
-                    <span className="hidden w-20 shrink-0 sm:block" />
+                    <span className="hidden text-right text-muted-foreground/50 sm:block">—</span>
                   )}
 
-                  {/* Access: what this account may do, in one place.
-                      FIXED width, matching the header. Without it the cell sized to its
-                      contents — and a seller carries an extra Plan select that staff
-                      don't — so staff rows were narrower here and their Joined/Balance
-                      columns sat further right than the sellers' below them. That's the
-                      "wallet balance pushing the date" misalignment. */}
-                  <div className="flex w-[280px] shrink-0 items-center gap-1.5">
+                  {/* Access — role + plan + the manage menu, right-aligned under the header.
+                      A FIXED-width track (see USER_ROW_GRID): a seller's extra Plan select
+                      must not widen this cell and drag every other column out of true. */}
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
                     {!isAdminCaller ? (
                       <span className="text-sm capitalize">{u.role}</span>
                     ) : (
@@ -1791,7 +1842,7 @@ function UsersPanel() {
                     </DropdownMenu>
                   </div>
                 </div>
-              ))
+              )})
             )}
           </div>
         )}
