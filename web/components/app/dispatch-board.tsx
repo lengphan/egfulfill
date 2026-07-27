@@ -63,17 +63,19 @@ function disposition(o: OrderRow): { key: DispKey; label: string } {
   if (fs === "working" || fs === "printed") return { key: "production", label: "In production" }
   return { key: "removed", label: "Off the board" }   // has a label but sits before the board
 }
-// A small status DOT, not a colour-filled pill — the disposition sits next to a calm mono
-// timeline, so the outcome is carried by a quiet coloured dot + neutral label rather than a
-// second loud badge. Green = done, violet = in production, amber = stuck, red = cancelled.
-const DISP_DOT: Record<DispKey, string> = {
-  scanned: "bg-emerald-500",
-  shipped: "bg-emerald-500",
-  awaiting: "bg-muted-foreground/40",
-  production: "bg-violet-500",
-  removed: "bg-amber-500",
-  cancelled: "bg-red-500",
+// Outcome as a solid tinted pill (no coloured dot). Green = done, violet = in production,
+// amber = stuck, red = cancelled, grey = waiting.
+const DISP_PILL: Record<DispKey, string> = {
+  scanned: "bg-emerald-100 text-emerald-700",
+  shipped: "bg-emerald-100 text-emerald-700",
+  awaiting: "bg-muted text-muted-foreground",
+  production: "bg-violet-100 text-violet-700",
+  removed: "bg-amber-100 text-amber-700",
+  cancelled: "bg-red-100 text-red-700",
 }
+// Shared column template for the history table — the header and every row use it so the
+// columns line up. Scrolls horizontally inside the card rather than cramming on narrow.
+const HIST_GRID = "grid items-center gap-3 px-5 grid-cols-[1rem_7rem_7rem_minmax(8rem,1fr)_9rem_11rem_2rem]"
 // The per-label timeline shows DISPATCH actions only — scans, hand-offs to byeastside,
 // pull-backs, label prints/voids, manifests. Order-level noise (order saved/updated, design
 // files, charges) belongs on the order page, not the scan floor.
@@ -567,42 +569,38 @@ export function DispatchBoard() {
               <div className="text-xs">Every label and what became of it — scanned, shipped, pulled off the board — shows here.</div>
             </div>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="overflow-x-auto">
+              <div className={HIST_GRID + " border-b border-border py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"}>
+                <span />
+                <span>Status</span>
+                <span>Order</span>
+                <span>Customer</span>
+                <span>Channel</span>
+                <span>When</span>
+                <span />
+              </div>
+              <div className="divide-y divide-border">
               {history.map((o) => {
                 const d = disposition(o)
                 const via = (o as { scanned_via?: string | null }).scanned_via
                 const when = o.label_scanned_at
-                  ? new Date(o.label_scanned_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+                  ? new Date(o.label_scanned_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
                   : ""
                 const open = expanded.has(o.id)
                 const events = auditByOrder[o.id]
                 return (
                   <div key={o.id}>
                     {/* Row toggles the action timeline. Click the label-link separately. */}
-                    <div onClick={() => toggleTimeline(o.id)} className="flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40">
+                    <div onClick={() => toggleTimeline(o.id)} className={HIST_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
-                      <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                        <span className={"size-1.5 rounded-full " + DISP_DOT[d.key]} />
-                        {d.label}
+                      <span className={"inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[11px] font-medium " + DISP_PILL[d.key]}>{d.label}</span>
+                      <span className="truncate font-mono text-sm font-semibold">{numOf(o)}</span>
+                      <span className="truncate text-sm">{customerOf(o)}</span>
+                      <span className="truncate text-xs text-muted-foreground">{platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}</span>
+                      <span className="truncate text-xs text-muted-foreground" title={when ? `Scanned${via ? ` · ${via === "byeastside" ? "byeastside" : "in-house"}` : ""}` : "Labelled"}>
+                        {when || (o.created_at ? new Date(o.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—")}
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
-                          <span className="truncate text-sm">{customerOf(o)}</span>
-                        </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
-                            {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
-                          </span>
-                          {when
-                            ? <span>Scanned {when}{via ? ` · ${via === "byeastside" ? "byeastside" : "in-house"}` : ""}</span>
-                            : <span>Labelled{o.created_at ? " " + new Date(o.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : ""}</span>}
-                        </div>
-                      </div>
-                      {o.tracking && (
-                        <span className="shrink-0 font-mono text-xs text-muted-foreground">{o.tracking}</span>
-                      )}
-                      {o.tracking_label_url && (
+                      {o.tracking_label_url ? (
                         <a
                           href={o.tracking_label_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
                           className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -610,7 +608,7 @@ export function DispatchBoard() {
                         >
                           <ArrowSquareOut size={13} weight="bold" />
                         </a>
-                      )}
+                      ) : <span />}
                     </div>
                     {/* Timestamped DISPATCH timeline — scans, hand-offs, pull-backs, labels.
                         Not the full order history (order edits, design files) — that's the
@@ -634,6 +632,7 @@ export function DispatchBoard() {
                   </div>
                 )
               })}
+              </div>
             </div>
           )
         ) : queue.length === 0 ? (
@@ -681,11 +680,9 @@ export function DispatchBoard() {
                         const d = disposition(o)
                         const sentOut = !o.label_scanned_at && !!o.dispatch_pdf_id
                         const label = sentOut ? "Sent to partner" : d.label
-                        const dot = sentOut ? "bg-amber-500" : DISP_DOT[d.key]
+                        const pill = sentOut ? "bg-amber-100 text-amber-700" : DISP_PILL[d.key]
                         return (
-                          <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
-                            <span className={"size-1.5 rounded-full " + dot} /> {label}
-                          </span>
+                          <span className={"inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[11px] font-medium " + pill}>{label}</span>
                         )
                       })()}
                     </div>
