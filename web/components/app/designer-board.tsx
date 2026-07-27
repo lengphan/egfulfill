@@ -68,6 +68,11 @@ export function DesignerBoard() {
   const [err, setErr] = useState<string | null>(null)
   const [assignCard, setAssignCard] = useState<DesignCard | null>(null)
   const [openId, setOpenId] = useState<string | number | null>(null)
+  // Inline card rename — a single click on the card's NAME edits it in place (Enter/blur
+  // saves, Esc cancels). Held at board level so only one name edits at a time, and so the
+  // card being edited can suspend its own drag (below) while you select text.
+  const [editNameId, setEditNameId] = useState<string | number | null>(null)
+  const [nameDraft, setNameDraft] = useState("")
   const [view, setView] = useState<"board" | "list" | "history">("board")
   // The History tab is warehouse+admin, matching who may delete — it's the record of
   // deletions and moves, so the people who make those calls are the ones who see it. An
@@ -461,26 +466,33 @@ export function DesignerBoard() {
                     <div className="py-6 text-center text-xs text-muted-foreground/60">Drop cards or artwork here</div>
                   ) : (
                     list.map((c) => (
-                      <button
+                      <div
                         key={String(c.id)}
                         // A vendor card is driven by the partner's board, so it can't be
                         // dragged through our lanes — the same gate the card dialog applies,
-                        // enforced on the tile so a drag can't route around it.
-                        draggable={!c.vendor}
+                        // enforced on the tile so a drag can't route around it. Renaming also
+                        // suspends drag so text selection in the name works.
+                        draggable={!c.vendor && editNameId !== c.id}
                         onDragStart={() => { if (!c.vendor) setDragId(c.id) }}
                         onDragEnd={() => setDragId(null)}
-                        onClick={() => setOpenId(c.id)}
                         // shrink-0 is load-bearing: the card area is a flex column, and without
                         // it flexbox COMPRESSES every card to fit the fixed-height lane instead
                         // of overflowing — so cards shrank as you added them and the column never
                         // scrolled. Pinned to their natural height, the lane scrolls as intended.
-                        className={"group shrink-0 overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow " + (c.vendor ? "cursor-pointer" : "cursor-grab active:cursor-grabbing")}
+                        // `relative` anchors the hover-revealed delete button, now a SIBLING of
+                        // the image (a button can't be nested inside the image button).
+                        className={"group relative shrink-0 overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow " + (c.vendor ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
                       >
-                        {/* FIXED-height cover (h-48) — every card is the same height, so the
-                            design ID + price row below always lands in the same place and stays
-                            clearly readable. object-cover fills the frame at any aspect; a fixed
-                            landscape frame, not the old square that cropped designs badly. */}
-                        <div className="relative h-48 w-full overflow-hidden bg-muted">
+                        {/* IMAGE = open full details on a single click. FIXED-height cover (h-48)
+                            so every card is the same height; object-cover fills the frame at any
+                            aspect. (The name below has its own click — to rename in place.) */}
+                        <button
+                          type="button"
+                          onClick={() => setOpenId(c.id)}
+                          title="Open card details"
+                          aria-label={`Open ${c.title || "card"} details`}
+                          className="relative block h-48 w-full cursor-pointer overflow-hidden bg-muted"
+                        >
                           {c.thumb ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={String(c.thumb)} alt="" className="size-full object-cover" />
@@ -503,36 +515,53 @@ export function DesignerBoard() {
                               <span className="truncate">{String(c.claimed_by)}</span>
                             </span>
                           ) : null}
-                          {/* Cancel the card without opening it. Hover-revealed so a full
-                              column isn't a grid of delete buttons, and it confirms —
-                              removal is not undoable and these sit under a drag handle.
-                              Warehouse/admin only, matching the server: showing a button
-                              that always 403s is worse than showing none. */}
-                          {canDeleteCard() && <button
-                            aria-label={`Cancel ${c.title || "card"}`}
-                            title="Cancel this card"
-                            onClick={async (e) => {
-                              e.stopPropagation()
-                              const ok = await confirm({
-                                title: c.vendor ? `Remove this ${vendorLabel(c.vendor)} card?` : "Cancel this card?",
-                                body: c.vendor
-                                  ? `This was sent to ${vendorLabel(c.vendor)}. Removing it here does NOT cancel it on their board — they have no cancel API, so they may still design and invoice it, and their finished file can no longer reach us. Cancel it on their board first, then remove this.`
-                                  : `"${c.title || "This card"}" will be removed from the board. The order itself isn't affected.`,
-                                confirmLabel: c.vendor ? "Remove anyway" : "Cancel card",
-                                cancelLabel: "Keep it",
-                              })
-                              if (ok) void removeCard(c.id)
-                            }}
-                            className="eg-tap absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
-                          >
-                            <X size={11} weight="bold" />
-                          </button>}
-                        </div>
+                        </button>
+                        {/* Cancel the card — hover-revealed, a SIBLING of the image button (a
+                            button can't nest inside another), positioned over the cover.
+                            Warehouse/admin only, matching the server. */}
+                        {canDeleteCard() && <button
+                          aria-label={`Cancel ${c.title || "card"}`}
+                          title="Cancel this card"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            const ok = await confirm({
+                              title: c.vendor ? `Remove this ${vendorLabel(c.vendor)} card?` : "Cancel this card?",
+                              body: c.vendor
+                                ? `This was sent to ${vendorLabel(c.vendor)}. Removing it here does NOT cancel it on their board — they have no cancel API, so they may still design and invoice it, and their finished file can no longer reach us. Cancel it on their board first, then remove this.`
+                                : `"${c.title || "This card"}" will be removed from the board. The order itself isn't affected.`,
+                              confirmLabel: c.vendor ? "Remove anyway" : "Cancel card",
+                              cancelLabel: "Keep it",
+                            })
+                            if (ok) void removeCard(c.id)
+                          }}
+                          className="eg-tap absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
+                        >
+                          <X size={11} weight="bold" />
+                        </button>}
                         {/* Footer is a flex column: title + meta at the TOP, the DSN id and payout
                             DOCKED to the bottom (mt-auto) so they line up across every card. Kept
                             NEUTRAL — no green/amber tint on the bottom row. */}
                         <div className="flex min-h-[4.75rem] flex-col p-2.5">
-                          <div className="line-clamp-2 text-sm font-medium leading-tight">{c.title || "Design"}</div>
+                          {/* NAME — a single click edits it in place. Enter/blur saves, Esc cancels. */}
+                          {editNameId === c.id ? (
+                            <input
+                              autoFocus
+                              value={nameDraft}
+                              onChange={(e) => setNameDraft(e.target.value)}
+                              onBlur={() => { const t = nameDraft.trim(); setEditNameId(null); if (t && t !== (c.title || "")) patch(c.id, { title: t }) }}
+                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur() } else if (e.key === "Escape") setEditNameId(null) }}
+                              className="w-full rounded border border-input bg-background px-1 py-0.5 text-sm font-medium leading-tight outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => { setEditNameId(c.id); setNameDraft(c.title || "") }}
+                              title="Click to rename"
+                              className="line-clamp-2 rounded text-left text-sm font-medium leading-tight transition-colors hover:bg-accent"
+                            >
+                              {c.title || "Design"}
+                            </button>
+                          )}
                           {/* Order ID + file number ALWAYS show so a card is readable at a glance —
                               a card with no order says "No order" rather than going blank, and the
                               file count shows even at 0. Method/product sits between them when set. */}
@@ -571,7 +600,7 @@ export function DesignerBoard() {
                             })()}
                           </div>
                         </div>
-                      </button>
+                      </div>
                     ))
                   )}
                 </div>
