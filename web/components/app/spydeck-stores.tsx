@@ -31,40 +31,73 @@ const priceStr = (l: EtsyListing) =>
     : l.price != null ? `${l.currency === "USD" ? "$" : ""}${l.price}${l.currency && l.currency !== "USD" ? " " + l.currency : ""}`
       : ""
 
-function ShopCard({ s, saved, onToggle, onOpen }: { s: SpyShop; saved: boolean; onToggle: (s: SpyShop) => void; onOpen: (s: SpyShop) => void }) {
+const PAGE_SIZE = 10
+
+// One STORE per row: identity + stats + actions on the left, a strip of that shop's actual
+// product images on the right — so you can see what a competitor sells before clicking in.
+// Each row lazily fetches a dozen of its own listings for the preview strip.
+function ShopRow({ s, saved, onToggle, onOpen }: { s: SpyShop; saved: boolean; onToggle: (s: SpyShop) => void; onOpen: (s: SpyShop) => void }) {
+  const [previews, setPreviews] = useState<EtsyListing[] | null>(null)
+  useEffect(() => {
+    let live = true
+    getSpydeckShopListings(s.shop_id)
+      .then((r) => { if (live) setPreviews((r.listings ?? []).filter((l) => l.thumb || l.image).slice(0, 12)) })
+      .catch(() => { if (live) setPreviews([]) })
+    return () => { live = false }
+  }, [s.shop_id])
+
   return (
-    <div className="flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
-      <div className="flex items-start gap-3">
-        <div className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-muted">
-          {s.icon
-            ? <Image src={s.icon} alt={s.shop_name || "shop"} fill unoptimized sizes="48px" className="object-cover" />
-            : <span className="flex size-full items-center justify-center text-muted-foreground"><Storefront size={20} weight="duotone" /></span>}
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md lg:flex-row">
+      {/* LEFT — identity, stats, actions (fixed column) */}
+      <div className="flex w-full shrink-0 flex-col gap-3 lg:w-60">
+        <div className="flex items-start gap-3">
+          <div className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-muted">
+            {s.icon
+              ? <Image src={s.icon} alt={s.shop_name || "shop"} fill unoptimized sizes="48px" className="object-cover" />
+              : <span className="flex size-full items-center justify-center text-muted-foreground"><Storefront size={20} weight="duotone" /></span>}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold">{s.shop_name || "—"}</div>
+            {s.title && <div className="line-clamp-1 text-xs text-muted-foreground">{s.title}</div>}
+          </div>
+          <button
+            type="button" onClick={() => onToggle(s)} aria-pressed={saved}
+            aria-label={saved ? "Unsave store" : "Save store"}
+            className={"flex size-8 shrink-0 items-center justify-center rounded-full transition-colors " + (saved ? "bg-rose-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent")}
+          >
+            <Heart size={15} weight={saved ? "fill" : "regular"} />
+          </button>
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{s.shop_name || "—"}</div>
-          {s.title && <div className="line-clamp-1 text-xs text-muted-foreground">{s.title}</div>}
+        <div className="grid grid-cols-3 gap-1.5 text-center">
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.listings)}</div><div className="text-[10px] text-muted-foreground">Products</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.sales)}</div><div className="text-[10px] text-muted-foreground">Sales</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="flex items-center justify-center gap-0.5 text-sm font-semibold tabular-nums">{s.rating != null ? <>{s.rating.toFixed(1)}<Star size={11} weight="fill" className="text-amber-500" /></> : "—"}</div><div className="text-[10px] text-muted-foreground">{fmtK(s.reviews)} reviews</div></div>
         </div>
-        <button
-          type="button" onClick={() => onToggle(s)} aria-pressed={saved}
-          aria-label={saved ? "Unsave store" : "Save store"}
-          className={"flex size-8 shrink-0 items-center justify-center rounded-full transition-colors " + (saved ? "bg-rose-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent")}
-        >
-          <Heart size={15} weight={saved ? "fill" : "regular"} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => onOpen(s)} className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary/10 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
+            <Package size={13} weight="bold" /> View catalog
+          </button>
+          {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent" title="Open on Etsy"><ArrowSquareOut size={15} /></a>}
+        </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-        <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.listings)}</div><div className="text-[10px] text-muted-foreground">Products</div></div>
-        <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.sales)}</div><div className="text-[10px] text-muted-foreground">Sales</div></div>
-        <div className="rounded-lg bg-muted/50 py-1.5"><div className="flex items-center justify-center gap-0.5 text-sm font-semibold tabular-nums">{s.rating != null ? <>{s.rating.toFixed(1)}<Star size={11} weight="fill" className="text-amber-500" /></> : "—"}</div><div className="text-[10px] text-muted-foreground">{fmtK(s.reviews)} reviews</div></div>
-      </div>
-
-      <div className="mt-3 flex items-center gap-2">
-        <button type="button" onClick={() => onOpen(s)} className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary/10 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
-          <Package size={13} weight="bold" /> View catalog
-        </button>
-        {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent" title="Open on Etsy"><ArrowSquareOut size={15} /></a>}
-      </div>
+      {/* RIGHT — the shop's product images, the whole point of the row. Click to open the
+          full catalog. Horizontally scrollable so a long strip never widens the page. */}
+      <button type="button" onClick={() => onOpen(s)} title={`Open ${s.shop_name || "shop"}'s catalog`} className="group min-w-0 flex-1 self-stretch overflow-hidden rounded-xl text-left">
+        {previews === null ? (
+          <div className="flex gap-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="aspect-square w-24 shrink-0 animate-pulse rounded-lg bg-muted" />)}</div>
+        ) : previews.length === 0 ? (
+          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">No product images to preview</div>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {previews.map((l) => (
+              <div key={String(l.listing_id)} className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
+                <Image src={l.thumb || l.image || ""} alt={l.title || ""} fill unoptimized sizes="96px" className="object-cover transition-transform duration-300 group-hover:scale-105" />
+              </div>
+            ))}
+          </div>
+        )}
+      </button>
     </div>
   )
 }
@@ -77,6 +110,7 @@ export function StoresTab(h: Handlers) {
   const [tab, setTab] = useState<"search" | "saved">("search")
   const [saved, setSaved] = useState<SpyShop[]>([])
   const [savedShopIds, setSavedShopIds] = useState<Set<string>>(new Set())
+  const [page, setPage] = useState(0) // store-list pagination (PAGE_SIZE per page)
   const [open, setOpen] = useState<SpyShop | null>(null)
   const [catalog, setCatalog] = useState<EtsyListing[] | null>(null)
   const [catLoading, setCatLoading] = useState(false)
@@ -95,7 +129,7 @@ export function StoresTab(h: Handlers) {
   const byCategory = useCallback(async (id: string) => {
     setCatId(id)
     if (!id) return
-    setLoading(true); setError(null); setTab("search"); setQuery("")
+    setLoading(true); setError(null); setTab("search"); setQuery(""); setPage(0)
     try {
       const r = await getSpydeckShopsByCategory(id)
       setShops(r.shops ?? [])
@@ -129,7 +163,7 @@ export function StoresTab(h: Handlers) {
   const run = useCallback(async () => {
     const q = query.trim()
     if (!q) return
-    setLoading(true); setError(null); setTab("search")
+    setLoading(true); setError(null); setTab("search"); setPage(0)
     try {
       const r = await searchSpydeckShops(q)
       setShops(r.shops ?? [])
@@ -262,7 +296,7 @@ export function StoresTab(h: Handlers) {
         )}
         <div className="flex items-center gap-1 rounded-full bg-muted p-1">
           {(["search", "saved"] as const).map((t) => (
-            <button key={t} type="button" onClick={() => setTab(t)}
+            <button key={t} type="button" onClick={() => { setTab(t); setPage(0) }}
               className={"rounded-full px-3 py-1 text-xs font-medium transition-colors " + (tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
               {t === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : "Results"}
             </button>
@@ -281,10 +315,27 @@ export function StoresTab(h: Handlers) {
       ) : list && list.length === 0 ? (
         <div className="py-16 text-center text-sm text-muted-foreground">{tab === "saved" ? "No saved stores yet — hit the heart on any store." : "No stores match that name."}</div>
       ) : (
-        <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {(list ?? []).map((s) => (
-            <ShopCard key={s.shop_id} s={s} saved={savedShopIds.has(s.shop_id)} onToggle={toggleSaveShop} onOpen={openShop} />
-          ))}
+        <div className="space-y-3 p-5">
+          {(() => {
+            const all = list ?? []
+            const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE))
+            const cur = Math.min(page, pages - 1) // guard: list may shrink below the current page
+            const rows = all.slice(cur * PAGE_SIZE, cur * PAGE_SIZE + PAGE_SIZE)
+            return (
+              <>
+                {rows.map((s) => (
+                  <ShopRow key={s.shop_id} s={s} saved={savedShopIds.has(s.shop_id)} onToggle={toggleSaveShop} onOpen={openShop} />
+                ))}
+                {pages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                    <button type="button" onClick={() => setPage(Math.max(0, cur - 1))} disabled={cur === 0} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">Prev</button>
+                    <span className="px-1 text-xs text-muted-foreground">Page {cur + 1} of {pages} · {all.length} stores</span>
+                    <button type="button" onClick={() => setPage(Math.min(pages - 1, cur + 1))} disabled={cur >= pages - 1} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">Next</button>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
     </div>
