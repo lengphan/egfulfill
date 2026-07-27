@@ -89,12 +89,24 @@ const lanePill = (accent?: string) => LANE_PILL[String(accent || "")] ?? "bg-mut
 const VENDOR_NAMES: Record<string, string> = { pinkdesign: "Pink Design" }
 const vendorLabel = (v?: string | null) => (v ? (VENDOR_NAMES[v] ?? v) : "")
 
+// An EMB-check card = the seller already supplied the stitch (.emb) file, so it only needs a
+// factory check, never digitising. The is_emb flag isn't always set (older cards, or a .emb
+// dropped in later), so also treat a card whose type/kind is "emb" as one — that's the file
+// kind, distinct from the "Embroidery" print METHOD that still needs cutting.
+type EmbLike = { is_emb?: boolean; type?: string | null; product?: string | null }
+const isEmbCard = (x: EmbLike): boolean => {
+  if (x.is_emb) return true
+  const t = String(x.type ?? "").trim().toLowerCase()
+  const p = String(x.product ?? "").trim().toLowerCase()
+  return t === "emb" || p === "emb"
+}
+
 // The card's display name. EMB cards arrive titled "Seller file · Ambar.emb"; the seller
 // now shows as its own tag, so strip that prefix and show just the file — the "who" is the
 // tag, the "what" is the title.
-const cardLabel = (c: { title?: string | null; is_emb?: boolean }): string => {
+const cardLabel = (c: { title?: string | null } & EmbLike): string => {
   const t = String(c.title ?? "").trim()
-  if (c.is_emb) return t.replace(/^seller file\s*[·:–-]?\s*/i, "").trim() || t || "Embroidery file"
+  if (isEmbCard(c)) return t.replace(/^seller file\s*[·:–-]?\s*/i, "").trim() || t || "Embroidery file"
   return t || "Design"
 }
 
@@ -243,7 +255,7 @@ export function DesignerBoard() {
     // Designers see neither outsourced (vendor) cards nor EMB-check cards: a seller-supplied
     // .emb is already digitised and only needs a factory check before stitching, so it never
     // enters the designer claim/payout flow — it's factory-internal until it's sent out.
-    () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor && !c.is_emb) : (cards ?? [])),
+    () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor && !isEmbCard(c)) : (cards ?? [])),
     [cards, isDesigner],
   )
   // Only meaningful on the designer portal, where partner cards are the ones being hidden;
@@ -516,7 +528,7 @@ export function DesignerBoard() {
                         // the image (a button can't be nested inside the image button).
                         // EMB-check cards get a distinct amber frame so the floor spots "already
                         // digitised — verify only", set apart from normal and pink vendor cards.
-                        className={"group relative shrink-0 overflow-hidden rounded-xl border text-left shadow-sm transition-shadow hover:shadow " + (c.is_emb ? "border-amber-400 bg-amber-50/60 " : "border-border bg-background ") + (c.vendor ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
+                        className={"group relative shrink-0 overflow-hidden rounded-xl border text-left shadow-sm transition-shadow hover:shadow " + (isEmbCard(c) ? "border-amber-400 bg-amber-50/60 " : "border-border bg-background ") + (c.vendor ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
                       >
                         {/* IMAGE = open full details on a single click. FIXED-height cover (h-48)
                             so every card is the same height; object-cover fills the frame at any
@@ -531,7 +543,7 @@ export function DesignerBoard() {
                           {c.thumb ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={String(c.thumb)} alt="" className="size-full object-cover" />
-                          ) : c.is_emb ? (
+                          ) : isEmbCard(c) ? (
                             // No thumbnail for a stitch file — try a Wilcom TrueView, else the placeholder.
                             <EmbPreview designId={c.design_id} orderId={c.order_id} sku={c.sku}>
                               <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
@@ -539,7 +551,7 @@ export function DesignerBoard() {
                           ) : (
                             <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
                           )}
-                          {c.is_emb && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
+                          {isEmbCard(c) && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
                           {/* Top-right tag = WHO owns this card's queue. A partner card shows the
                               partner (pink). Otherwise, if someone on OUR side has claimed it, their
                               NAME shows here — VIOLET when a designer claimed it (e.g. Abdul), SLATE
@@ -638,7 +650,7 @@ export function DesignerBoard() {
                             <span className="shrink-0 font-mono">DSN-{c.id}</span>
                             {/* EMB-check cards carry no payout (factory check, not designer
                                 work), so the footer figure is suppressed for them. */}
-                            {!isDesigner && !c.is_emb && (() => {
+                            {!isDesigner && !isEmbCard(c) && (() => {
                               // Always show a figure — including $0.00 — so the whole board can be
                               // scanned for payout at a glance (a blank used to read as "unknown").
                               const payout = c.vendor ? partnerCost : (amt(c.payment) || designFee)
@@ -703,13 +715,13 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
         )}
       </div>
       <span className="max-w-[220px] truncate font-medium">{cardLabel(c)}</span>
-      {c.is_emb && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
+      {isEmbCard(c) && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
     </div>
   ) },
   { id: "order", label: "Order", cell: (c) => <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">{c.order_id ? String(c.order_id) : "—"}</span> },
   { id: "customer", label: "Customer", cell: (c) => <span className="text-muted-foreground">{c.customer ? String(c.customer) : "—"}</span> },
   { id: "product", label: "Product", cell: (c) => <div className="max-w-[220px] truncate text-muted-foreground">{c.product || c.type || "—"}</div> },
-  { id: "method", label: "Method", cell: (c) => <span className="text-muted-foreground">{c.type ? String(c.type) : (c.is_emb ? "Embroidery" : "—")}</span> },
+  { id: "method", label: "Method", cell: (c) => <span className="text-muted-foreground">{c.type ? String(c.type) : (isEmbCard(c) ? "Embroidery" : "—")}</span> },
   // Who's actually working it: an OUTSOURCED card is with the partner (shown as their
   // name, tinted like the board badge), a claimed card is with that designer, and anything
   // else is genuinely unclaimed — said plainly rather than a bare dash.
@@ -1013,7 +1025,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             {card.thumb ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={String(card.thumb)} alt="" className="size-full object-contain" />
-            ) : card.is_emb ? (
+            ) : isEmbCard(card) ? (
               <EmbPreview designId={card.design_id} orderId={card.order_id} sku={card.sku}>
                 <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={40} weight="duotone" /></div>
               </EmbPreview>
@@ -1027,13 +1039,13 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             )}
           </button>
           <div className="flex min-w-0 flex-1 flex-col">
-            <label htmlFor={`card-desc-${card.id}`} className="mb-1 text-sm font-medium">{card.is_emb ? "Check notes" : "Description / notes"}</label>
+            <label htmlFor={`card-desc-${card.id}`} className="mb-1 text-sm font-medium">{isEmbCard(card) ? "Check notes" : "Description / notes"}</label>
             <textarea
               id={`card-desc-${card.id}`}
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               onBlur={saveDesc}
-              placeholder={card.is_emb
+              placeholder={isEmbCard(card)
                 ? "Notes for the factory check — thread colours, placement, anything to verify before stitching. Saved to the card."
                 : "Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."}
               className="min-h-[9rem] w-full flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
@@ -1044,7 +1056,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         {/* Compact meta line — method / priority / product, order state, customer, claimer.
             Status moved up to the header, so it isn't repeated here. */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-          {card.is_emb && <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700"><Needle size={10} weight="bold" /> Embroidery</span>}
+          {isEmbCard(card) && <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700"><Needle size={10} weight="bold" /> Embroidery</span>}
           {card.priority && card.priority !== "normal" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(card.priority)}</span>}
           <span>{card.product || card.type || "No product / type set"}</span>
           <span aria-hidden>·</span>
@@ -1065,7 +1077,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           )}
           {/* EMB-check cards are already digitised — Pink Design DIGITISES raw art, so it's
               not an option here. They only get a factory check before stitching. */}
-          {canPush && !card.vendor && !card.is_emb && (
+          {canPush && !card.vendor && !isEmbCard(card) && (
             <Button size="sm" variant={showPush ? "secondary" : "outline"} onClick={() => setShowPush((v) => !v)}>
               <PaperPlaneTilt size={14} weight="bold" /> Send to Pink Design
             </Button>
@@ -1077,7 +1089,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             and reused as the attachments when it's sent to Pink Design. Hidden on EMB-check
             cards: they never go to Pink Design, so there's nothing to attach — the actual
             .emb lives in the Files drop zone below. */}
-        {!card.is_emb && (
+        {!isEmbCard(card) && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Reference files{refFiles.length ? ` (${refFiles.length})` : ""}</span>
@@ -1201,7 +1213,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         {(() => {
           // No payout on a vendor card (invoiced) or an EMB-check card (a factory check, not
           // designer work — nobody is credited for it).
-          if (card.vendor || card.is_emb) return null
+          if (card.vendor || isEmbCard(card)) return null
           const claimedRole = String(card.claimed_role || "").toLowerCase()
           const wontPay = !!card.claimed_by && !!claimedRole && claimedRole !== "designer"
           if (wontPay) {
