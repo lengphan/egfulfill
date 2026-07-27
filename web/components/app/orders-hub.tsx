@@ -53,11 +53,13 @@ function StockChip({ order, items, catalog, stock, pos, canPO, sending, onSend }
   // prompt to send it again).
   const poFor = (sku: string) =>
     pos.find((p) => (p.items ?? []).some((it) => String(it.sku).toUpperCase() === sku && (it.sources ?? []).some((s) => s.order === order.id)))
+  // Same solid-tinted pill as the Label/Scan/Design chips beside it (readiness-dots.tsx):
+  // purple = ready/in-stock, amber = needs action/out, grey = unknown. The colour IS the
+  // status, and it recomputes every render — so picking a blank on a line flips it live.
   const tone =
-    state === "in" ? "border-primary/30 bg-primary/10 text-primary"
-    : state === "out" ? "border-amber-300 bg-amber-100 text-amber-800"
-    : "border-border bg-muted text-muted-foreground"
-  const dot = state === "in" ? "bg-primary" : state === "out" ? "bg-amber-500" : "bg-muted-foreground/50"
+    state === "in" ? "bg-primary/10 text-primary hover:bg-primary/15"
+    : state === "out" ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
+    : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
   const label = state === "in" ? "In stock" : state === "out" ? "Out of stock" : "Stock —"
   const clickable = state === "out" && canPO
   return (
@@ -66,9 +68,9 @@ function StockChip({ order, items, catalog, stock, pos, canPO, sending, onSend }
         type="button"
         disabled={!clickable || sending}
         onClick={clickable ? () => onSend(order) : undefined}
-        className={"inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium " + tone + (clickable ? " cursor-pointer hover:brightness-95" : " cursor-default")}
+        title={clickable ? "Send short blanks to a draft purchase order" : undefined}
+        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
       >
-        <span className={"size-1.5 rounded-full " + dot} />
         {sending ? "Sending…" : label}
       </button>
       {/* Hover breakdown — per line: on-hand/needed, or which PO it's already on. */}

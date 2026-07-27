@@ -115,10 +115,11 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // width it gets, so spending the table's flexible space on it starves everything that
   // WOULD have fitted whole.
   items:    { id: "items",    label: "Items",    grid: "minmax(0,1.2fr)" },
-  // Three solid coloured pills (Label · Scan · Design), tinted by progress. Fixed — the
-  // header cell can't size it — and just wide enough to hold them on one line in English or
-  // Vietnamese ("Thiết kế" is the widest); the surplus goes back to the flexible columns.
-  ready:    { id: "ready",    label: "Ready",    grid: "12.5rem" },
+  // Four solid coloured pills now — Label · Scan · Design + the Stock chip, all tinted by
+  // state. Fixed (the header cell can't size it) and wide enough to hold the four on ONE
+  // line incl. the widest label ("Out of stock"); the surplus is taken from the flexible
+  // Customer/Items columns, which is why the name sits a little tighter than before.
+  ready:    { id: "ready",    label: "Ready",    grid: "18rem" },
   action:   { id: "action",   label: "",         grid: "12rem" },  // header stays blank: buttons need no title
 }
 
