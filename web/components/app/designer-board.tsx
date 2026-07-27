@@ -71,6 +71,19 @@ const laneOf = (c: DesignCard, lanes: DesignLane[]) => {
 // last so a card in a lane we somehow don't know still shows *something* rather than blank.
 const laneMeta = (id: string, lanes: DesignLane[]) =>
   lanes.find((l) => l.id === id) ?? DEFAULT_LANES.find((l) => l.id === id) ?? { id, label: id, accent: "bg-muted-foreground", sort: 99, system: false }
+// A lane accent (a bg-*-500 swatch) → a solid tinted STATUS pill, no dot. Literal classes
+// so Tailwind keeps them; an unmapped custom accent falls back to neutral.
+const LANE_PILL: Record<string, string> = {
+  "bg-slate-400": "bg-slate-100 text-slate-700", "bg-slate-500": "bg-slate-100 text-slate-700",
+  "bg-violet-500": "bg-violet-100 text-violet-700", "bg-amber-500": "bg-amber-100 text-amber-700",
+  "bg-red-500": "bg-red-100 text-red-700", "bg-emerald-500": "bg-emerald-100 text-emerald-700",
+  "bg-blue-500": "bg-blue-100 text-blue-700", "bg-sky-500": "bg-sky-100 text-sky-700",
+  "bg-green-500": "bg-green-100 text-green-700", "bg-orange-500": "bg-orange-100 text-orange-700",
+  "bg-pink-500": "bg-pink-100 text-pink-700", "bg-indigo-500": "bg-indigo-100 text-indigo-700",
+  "bg-teal-500": "bg-teal-100 text-teal-700", "bg-rose-500": "bg-rose-100 text-rose-700",
+  "bg-cyan-500": "bg-cyan-100 text-cyan-700", "bg-lime-500": "bg-lime-100 text-lime-700",
+}
+const lanePill = (accent?: string) => LANE_PILL[String(accent || "")] ?? "bg-muted text-muted-foreground"
 // Partner keys are storage values ("pinkdesign"); the board shows a human name. Unknown
 // vendors fall back to the raw key rather than hiding that the card is outsourced.
 const VENDOR_NAMES: Record<string, string> = { pinkdesign: "Pink Design" }
@@ -709,7 +722,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
   { id: "files", label: "Files", cell: (c) => ((c.file_count ?? 0) > 0 ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Paperclip size={11} weight="bold" /> {c.file_count}</span> : <span className="text-muted-foreground">—</span>) },
   // The lane IS the status, so it's labelled "Status". (The old separate "Status" column only
   // said Credited/—, which the Payout column already implies — removed.)
-  { id: "lane", label: "Status", cell: (c) => { const col = laneMeta(laneOf(c, lanes), lanes); return <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs"><span className={"size-1.5 rounded-full " + col.accent} /> {col.label}</span> } },
+  { id: "lane", label: "Status", cell: (c) => { const col = laneMeta(laneOf(c, lanes), lanes); return <span className={"inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium " + lanePill(col.accent)}>{col.label}</span> } },
   { id: "payout", label: "Payout", align: "right", cell: (c) => <span className="font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</span> },
 ]
 const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "files", "lane", "payout"]
@@ -953,8 +966,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
                 </button>
               )}
             </DialogTitle>
-            <span className="mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
-              <span className={"size-1.5 rounded-full " + laneMeta(col, lanes).accent} />
+            <span className={"mt-0.5 inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-medium " + lanePill(laneMeta(col, lanes).accent)}>
               {laneMeta(col, lanes).label}
             </span>
           </div>
