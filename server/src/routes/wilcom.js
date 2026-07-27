@@ -354,37 +354,49 @@ export function wilcomRoutes(app, requireStaff) {
   app.post('/api/wilcom/design-preview', { preHandler: requireStaff }, async (req, reply) => {
     const b = req.body || {};
     let row = null;
+    const cols = `design_id, file_name, mime, data, url, content_hash`;
     if (b.designId) {
-      row = (await q(`select design_id, file_name, mime, data from design_file_data where design_id=$1`, [String(b.designId)])).rows[0];
+      row = (await q(`select ${cols} from design_file_data where design_id=$1`, [String(b.designId)])).rows[0];
     } else if (b.orderId) {
       // Prefer the sku's own .emb; but a "Seller file" card may carry a different (or null)
       // sku than the file was stored under, so fall back to ANY .emb on the order rather
       // than showing nothing. A preview of the order's stitch file still beats a blank tile.
       const embWhere = `(kind='emb' or lower(file_name) like '%.emb')`;
       if (b.sku != null && b.sku !== '') {
-        row = (await q(`select design_id, file_name, mime, data from design_file_data
+        row = (await q(`select ${cols} from design_file_data
                           where order_id=$1 and sku=$2 and ${embWhere} order by created_at desc limit 1`,
           [String(b.orderId), String(b.sku)])).rows[0];
       }
       if (!row) {
-        row = (await q(`select design_id, file_name, mime, data from design_file_data
+        row = (await q(`select ${cols} from design_file_data
                           where order_id=$1 and ${embWhere} order by created_at desc limit 1`,
           [String(b.orderId)])).rows[0];
       }
     }
-    if (!row || !row.data) { reply.code(404); return { ok: false, error: 'No machine file for that design.' }; }
+    if (!row) { reply.code(404); return { ok: false, error: 'No machine file for that design.' }; }
     // designTrueview reads Wilcom-native .emb; skip anything else rather than guessing.
     if (!/\.emb$/i.test(row.file_name || '') && !/emb/i.test(row.mime || '')) {
       return { ok: false, unavailable: true, reason: 'not-emb' };
     }
     await ensurePreviews();
-    const dataStr = String(row.data);
-    const hash = crypto.createHash('sha1').update(dataStr).digest('hex').slice(0, 16);
+    // Cache key from the file's stored content hash (no bytes needed to check the cache).
+    const hash = String(row.content_hash || ('id-' + row.design_id)).slice(0, 32);
     const cached = (await q(`select png, stitches, colours from wilcom_previews where design_id=$1 and hash=$2`, [row.design_id, hash])).rows[0];
     if (cached && cached.png) return { ok: true, png: cached.png, stitches: cached.stitches, colours: cached.colours, cached: true };
     if (!configured()) return { ok: false, unavailable: true, reason: 'not-configured' };
-    const m = /base64,([\s\S]+)$/.exec(dataStr);
-    const base64 = (m ? m[1] : dataStr).replace(/\s+/g, '');
+    // The bytes are EITHER inline (data) OR in object storage (url, public-read) — the big
+    // base64 is kept out of Postgres when storage is on, which is why data can be null.
+    let base64 = null;
+    if (row.data) {
+      const m = /base64,([\s\S]+)$/.exec(String(row.data));
+      base64 = (m ? m[1] : String(row.data)).replace(/\s+/g, '');
+    } else if (row.url) {
+      try {
+        const rr = await fetch(String(row.url));
+        if (rr.ok) base64 = Buffer.from(await rr.arrayBuffer()).toString('base64');
+      } catch (e) { /* fall through to the no-bytes error */ }
+    }
+    if (!base64) { reply.code(404); return { ok: false, error: 'Machine file row found but its bytes are unreadable.', hasUrl: !!row.url }; }
     const filename = safeName(String(row.file_name || 'design').replace(/\.[^.]+$/, ''), 'design') + '.emb';
     try {
       const res = await ewaCall('api/designTrueview', buildDesignTrueviewXml({ filename, base64 }));
