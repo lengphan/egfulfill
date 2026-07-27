@@ -269,9 +269,9 @@ export function designFilesRoutes(app, requireAuth) {
         [String(b.orderId), b.sku || null]).then((r) => r.rowCount).catch(() => 1);
       if (!dup) {
         await q(
-          `insert into design_cards (order_id, sku, title, col, type, payment, pay_status)
-           values ($1,$2,$3,'review',$4,0,'pending')`,
-          [String(b.orderId), b.sku || null,
+          `insert into design_cards (order_id, sku, design_id, title, col, type, payment, pay_status)
+           values ($1,$2,$3,$4,'review',$5,0,'pending')`,
+          [String(b.orderId), b.sku || null, b.designId || null,
            `Seller file · ${b.name || b.designId}`, 'emb']
         ).catch(() => {});
         notify({
