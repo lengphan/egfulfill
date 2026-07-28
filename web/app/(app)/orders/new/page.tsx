@@ -36,8 +36,12 @@ type Valid = { kind: "idle" } | { kind: "checking" } | { kind: "ok"; addr: Valid
 // colors/sizes are the OPTIONS the picked catalog product offers. Empty (a blank
 // item, or a product that defines no variants) → the field stays free text, so you
 // can still type anything; populated → it becomes a dropdown of real variants.
-type Line = { name: string; sku: string; img: string; qty: string; price: string; color: string; size: string; method: string; colors: string[]; sizes: string[]; methods: string[] }
-const emptyLine = (): Line => ({ name: "", sku: "", img: "", qty: "1", price: "", color: "", size: "", method: "", colors: [], sizes: [], methods: [] })
+// `blank` = the catalog product this line produces on. resolveProduct() keys on it FIRST
+// (name/sku/id), so persisting it is what makes the picked product survive to the order
+// detail even when the listing sku isn't a catalog VARIANT sku. Without it, only products
+// whose sku happens to be a variant sku resolved — the rest lost their blank on save.
+type Line = { name: string; sku: string; blank: string; img: string; qty: string; price: string; color: string; size: string; method: string; colors: string[]; sizes: string[]; methods: string[] }
+const emptyLine = (): Line => ({ name: "", sku: "", blank: "", img: "", qty: "1", price: "", color: "", size: "", method: "", colors: [], sizes: [], methods: [] })
 
 // Variant controls reuse the app's VariantField — the same swatched dropdown the order
 // table uses (colour chips, themed menu), instead of a bare native <select>. Method
@@ -120,6 +124,7 @@ export default function NewOrderPage() {
     const patch: Partial<Line> = {
       name: p.name,
       sku: p.sku,
+      blank: p.name,
       img: p.img,
       price: p.price ? String(p.price) : "",
       color: p.color,
@@ -163,6 +168,7 @@ export default function NewOrderPage() {
         .map((l) => ({
           name: l.name.trim(),
           sku: l.sku || undefined,
+          blank: l.blank.trim() || undefined,
           img: l.img || undefined,
           qty: Number(l.qty) || 1,
           unitPrice: Number(l.price) || 0,
@@ -311,7 +317,7 @@ export default function NewOrderPage() {
                   value={l.name}
                   onText={(v) => setLine(i, { name: v })}
                   onPick={(p) => setLine(i, {
-                    name: p.name, sku: p.sku, img: p.img,
+                    name: p.name, sku: p.sku, blank: p.name, img: p.img,
                     price: p.price ? String(p.price) : "",
                     color: p.color, size: p.sizes[0] ?? "", colors: p.colors, sizes: p.sizes,
                   })}
