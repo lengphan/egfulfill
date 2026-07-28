@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent } from "react"
 // NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
-import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, UploadSimple, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal } from "@phosphor-icons/react"
+import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
@@ -115,7 +115,6 @@ function BrowseTab() {
   const [q, setQ] = useState("")
   const [open, setOpen] = useState<ArtItem | null>(null)
   const [done, setDone] = useState<Set<string>>(new Set())
-  const [over, setOver] = useState(false)
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -126,32 +125,15 @@ function BrowseTab() {
     return () => clearTimeout(id)
   }, [])
 
-  const takeFile = async (file?: File) => {
-    if (!file || !file.type.startsWith("image/")) return
-    const dataUrl = await readFile(file)
-    setOpen({ key: `U${file.name}`, name: file.name.replace(/\.[^.]+$/, ""), source: "upload", thumb: dataUrl, getImage: () => toDataUrl(dataUrl) })
-  }
-
   const items: ArtItem[] = source === "order" ? (orders ?? []).map(orderItem) : (lib ?? []).map(libItem)
   const loading = source === "order" ? orders === null : lib === null
   const list = items.filter((i) => !q || `${i.name} ${i.ref ?? ""}`.toLowerCase().includes(q.toLowerCase()))
 
   return (
     <>
-      {/* Direct upload — lives in this tab, no separate nav. */}
-      <label
-        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-        onDragLeave={() => setOver(false)}
-        onDrop={(e) => { e.preventDefault(); setOver(false); void takeFile(e.dataTransfer.files?.[0]) }}
-        className={"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed py-6 text-center transition-colors " + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
-      >
-        <UploadSimple size={22} className="text-muted-foreground" />
-        <div className="text-sm font-medium">Drop an image to digitize</div>
-        <div className="text-xs text-muted-foreground">or click to choose — PNG / JPG, auto-downscaled to fit</div>
-        <input type="file" accept="image/*" className="sr-only" onChange={(e) => { void takeFile(e.target.files?.[0]); e.currentTarget.value = "" }} />
-      </label>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      {/* No upload drop-zone here — Library is for browsing existing artwork; new uploads
+          happen in the Create tab. */}
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex rounded-full border border-border p-0.5">
           {([{ id: "order", label: "Order artwork" }, { id: "library", label: "Library" }] as const).map((s) => (
             <button key={s.id} onClick={() => setSource(s.id)} className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (source === s.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{s.label}</button>
@@ -490,6 +472,32 @@ function CreateTab() {
     return () => clearTimeout(id)
   }, [])
 
+  // Persist the work-in-progress design so it survives switching tabs OR navigating away — the
+  // Create tab unmounts in both cases, which was wiping everything. sessionStorage (this
+  // browser session), restored once on mount, saved debounced on change.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      try {
+        const s = JSON.parse(sessionStorage.getItem("eg_digitizer_create") || "null")
+        if (!s) return
+        if (s.image) setImage(s.image)
+        if (typeof s.text === "string") setText(s.text)
+        if (s.alphabet) setAlphabet(s.alphabet)
+        if (typeof s.height === "number") setHeight(s.height)
+        if (s.color) setColor(s.color)
+        if (s.imgTf) setImgTf(s.imgTf)
+        if (s.txtTf) setTxtTf(s.txtTf)
+      } catch { /* ignore corrupt/absent */ }
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
+  useEffect(() => {
+    const id = setTimeout(() => {
+      try { sessionStorage.setItem("eg_digitizer_create", JSON.stringify({ image, text, alphabet, height, color, imgTf, txtTf })) } catch { /* quota/serialise */ }
+    }, 500)
+    return () => clearTimeout(id)
+  }, [image, text, alphabet, height, color, imgTf, txtTf])
+
   const busy = status !== "idle"
   const hasText = !!text.trim()
   // Ready when there's SOMETHING to stitch: an image, or text with an alphabet. (Lettering
@@ -497,16 +505,25 @@ function CreateTab() {
   const ready = !!image || (hasText && !!alphabet)
   // GENERATE — the real single .emb: EWA combines the layers with their transforms. Runs only
   // on the button, never live, so arranging on the canvas costs nothing.
-  const generate = async () => {
-    if (!ready) return
+  const generate = async (): Promise<WilcomResult | null> => {
+    if (!ready) return null
     setStatus("generating"); setErr(null)
     try {
       const body = { image: image?.dataUrl, text: hasText ? text.trim() : undefined, alphabet, height, color, filename: image?.name, name: image?.name || (hasText ? text.trim() : undefined),
         designTransform: image ? imgTf : undefined, letterTransform: hasText ? txtTf : undefined }
       const r = await wilcomCombine(body)
-      if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null) }
-      else setRes(r)
-    } catch (e) { setErr(e instanceof Error ? e.message : "Failed") } finally { setStatus("idle") }
+      if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null); return null }
+      setRes(r); return r
+    } catch (e) { setErr(e instanceof Error ? e.message : "Failed"); return null } finally { setStatus("idle") }
+  }
+  // Generate then download ONE format. The .emb is the MACHINE FILE (stitches only). The PNG
+  // is the rendered image. Each click regenerates so it always reflects the current arrangement.
+  const generateAnd = async (kind: "emb" | "png") => {
+    const r = await generate()
+    if (!r) return
+    const stem = (r.machineFile?.filename || (hasText ? text.trim() : image?.name) || "design").replace(/\.[^.]+$/, "")
+    if (kind === "emb" && r.machineFile) download(r.machineFile.filename, `data:application/octet-stream;base64,${r.machineFile.base64}`)
+    if (kind === "png" && r.trueview) download(`${stem}.png`, `data:image/png;base64,${r.trueview}`)
   }
 
   // Each layer previews on its OWN (a stitched TrueView), then you arrange it directly on the
@@ -675,21 +692,24 @@ function CreateTab() {
           <div><div className="text-base font-semibold">{ext ?? "—"}</div><div className="text-[11px] text-muted-foreground">file</div></div>
         </div>
 
-        <button onClick={generate} disabled={busy || !ready} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-          {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : <DownloadSimple size={14} weight="bold" />} Generate file
-        </button>
-        {res?.machineFile && (
-          <div className="flex gap-2">
-            <button onClick={() => download(res.machineFile!.filename, `data:application/octet-stream;base64,${res.machineFile!.base64}`)} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"><DownloadSimple size={14} weight="bold" /> {ext}</button>
-            <button onClick={() => { if (res.trueview) download(`${res.machineFile!.filename.replace(/\.[^.]+$/, "")}.png`, `data:image/png;base64,${res.trueview}`) }} disabled={!res.trueview} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"><DownloadSimple size={14} weight="bold" /> PNG</button>
-          </div>
-        )}
+        {/* Two explicit generate actions, side by side — grab whichever you need. Machine file
+            = the .emb (stitches only, for the embroidery machine); PNG = the rendered image. */}
+        <div className="flex gap-2">
+          <button onClick={() => void generateAnd("emb")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+            {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : <Needle size={14} weight="bold" />} Machine file
+          </button>
+          <button onClick={() => void generateAnd("png")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
+            <ImageSquare size={14} weight="bold" /> PNG
+          </button>
+        </div>
         {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
       </div>
 
       {/* RIGHT — the big preview, the hero of the tab; sticks while you scroll the controls. */}
       <div className="space-y-2 lg:sticky lg:top-4">
-        <div className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
+        {/* Clicking the empty canvas deselects — the layer boxes stopPropagation, so only a
+            background click reaches here, dropping the selection (hides the box border/handles). */}
+        <div onPointerDown={() => setOpenLayer(null)} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
           {!ready && (
             <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">Drop an image or type text — then arrange it here.</div>
           )}
@@ -727,6 +747,7 @@ function CreateTab() {
 function HistoryTab() {
   const [rows, setRows] = useState<WilcomGeneration[] | null>(null)
   const [q, setQ] = useState("")
+  const [zoom, setZoom] = useState<string | null>(null) // lightbox image src
   const load = useCallback(() => { getWilcomGenerations().then((r) => setRows(r.generations ?? [])).catch(() => setRows([])) }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
   const list = (rows ?? []).filter((g) => !q || `${g.name} ${g.order_ref} ${g.type}`.toLowerCase().includes(q.toLowerCase()))
@@ -757,18 +778,34 @@ function HistoryTab() {
             <tbody>
               {list.map((g) => (
                 <tr key={g.id} className="border-b border-border last:border-0 hover:bg-accent/50">
-                  <td className="px-4 py-2.5"><span className="relative flex size-10 items-center justify-center overflow-hidden rounded-md bg-muted"><Thumb src={g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? "")} className="absolute inset-0 size-full object-cover" /></span></td>
+                  <td className="px-4 py-2.5">
+                    <button type="button" onClick={() => setZoom(g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? ""))} title="Zoom in" className="relative flex size-10 items-center justify-center overflow-hidden rounded-md bg-muted transition-transform hover:scale-110">
+                      <Thumb src={g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? "")} className="absolute inset-0 size-full object-cover" />
+                    </button>
+                  </td>
                   <td className="px-4 py-2.5 font-medium">{g.name || "Untitled"}</td>
                   <td className="px-4 py-2.5 text-muted-foreground">{g.order_ref || (g.source === "maker" ? "Maker" : "—")}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{g.stitches != null ? g.stitches.toLocaleString() : "—"}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{g.colours ?? "—"}</td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{(g.formats ?? []).join(" · ") || "—"}</td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{fmtDate(g.created_at)}</td>
-                  <td className="px-4 py-2.5"><a href={`/api/wilcom/asset/${g.id}/file`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><DownloadSimple size={13} weight="bold" /> Download</a></td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <a href={`/api/wilcom/asset/${g.id}/file`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><DownloadSimple size={13} weight="bold" /> EMB</a>
+                      <a href={`/api/wilcom/asset/${g.id}/tv`} download className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><DownloadSimple size={13} weight="bold" /> PNG</a>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* Lightbox — click a design thumbnail to zoom; click anywhere / Esc to close. */}
+      {zoom && (
+        <div role="button" tabIndex={0} aria-label="Close full-size view" onClick={() => setZoom(null)} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") setZoom(null) }} className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoom} alt="" className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" />
         </div>
       )}
     </>
