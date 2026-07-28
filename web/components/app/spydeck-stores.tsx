@@ -40,7 +40,9 @@ const PAGE_SIZE = 5
 // re-fetches. It holds the FULL listings so the same cache serves BOTH the row's preview strip
 // AND "View catalog" — opening a shop you've already previewed costs zero extra Etsy calls.
 const listingsCache = new Map<string, EtsyListing[]>()
-const stripOf = (ls: EtsyListing[]) => ls.filter((l) => l.thumb || l.image).slice(0, 12)
+// Fewer, bigger previews that STRETCH to fill the row — a store's look reads better from 5
+// large thumbnails than a dozen tiny scrolling ones.
+const stripOf = (ls: EtsyListing[]) => ls.filter((l) => l.thumb || l.image).slice(0, 5)
 
 // One STORE per row: identity + stats + actions on the left, a strip of that shop's actual
 // product images on the right — so you can see what a competitor sells before clicking in.
@@ -92,7 +94,7 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => onOpen(s)} className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary/10 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
-            <Package size={13} weight="bold" /> View catalog
+            <Storefront size={13} weight="bold" /> Go To Store
           </button>
           {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent" title="Open on Etsy"><ArrowSquareOut size={15} /></a>}
         </div>
@@ -102,14 +104,14 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
           full catalog. Horizontally scrollable so a long strip never widens the page. */}
       <button type="button" onClick={() => onOpen(s)} title={`Open ${s.shop_name || "shop"}'s catalog`} className="group min-w-0 flex-1 self-stretch overflow-hidden rounded-xl text-left">
         {previews === null ? (
-          <div className="flex gap-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="aspect-square w-24 shrink-0 animate-pulse rounded-lg bg-muted" />)}</div>
+          <div className="flex gap-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="aspect-square flex-1 animate-pulse rounded-lg bg-muted" />)}</div>
         ) : previews.length === 0 ? (
           <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">No product images to preview</div>
         ) : (
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2">
             {previews.map((l) => (
-              <div key={String(l.listing_id)} className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
-                <Image src={l.thumb || l.image || ""} alt={l.title || ""} fill unoptimized sizes="96px" className="object-cover transition-transform duration-300 group-hover:scale-105" />
+              <div key={String(l.listing_id)} className="relative aspect-square min-w-0 flex-1 overflow-hidden rounded-lg bg-muted">
+                <Image src={l.thumb || l.image || ""} alt={l.title || ""} fill unoptimized sizes="180px" className="object-cover transition-transform duration-300 group-hover:scale-105" />
               </div>
             ))}
           </div>
