@@ -1100,6 +1100,8 @@ export type NewOrderItem = {
   color?: string
   size?: string
   printType?: string
+  /** Print-ready artwork URL for this line (persisted to order_items.design_src). */
+  designSrc?: string
 }
 // %-coords for placing artwork on a mockup: center x/y, width w, rotation r (degrees).
 export type DesignPos = { x: number; y: number; w: number; h?: number; r: number }
@@ -1733,6 +1735,8 @@ export function createOrder(order: {
   status?: string
   total?: number
   items?: NewOrderItem[]
+  store?: string
+  meta?: Record<string, unknown>
 }) {
   return api<{ ok?: boolean; id?: string; error?: string }>(`/api/orders`, {
     method: "POST",

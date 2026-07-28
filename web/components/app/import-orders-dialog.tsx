@@ -12,6 +12,7 @@ import {
   rowsToRecords,
   groupToOrders,
   CSV_TEMPLATE,
+  CSV_COLUMNS,
   type ImportRecord,
 } from "@/lib/order-import"
 import { createOrder, getOrders, getSheetsConfig, getSheetRows } from "@/lib/api"
@@ -141,9 +142,18 @@ export function ImportOrdersDialog({
           // imported line arrived reading "not set up for production yet" even when the
           // CSV named one.
           blank: it.blank || undefined,
+          // Artwork URL from the sheet — was parsed but never sent, so "Design File URL" did
+          // nothing. Persisted to the line's design_src.
+          designSrc: it.designUrl || undefined,
         }))
         const total = orderTotal(items.map((it) => ({ qty: it.qty ?? 1, unitPrice: it.unitPrice ?? 0, size: it.size })), []).total
         const hasAddress = !!(o.address.street || o.address.city)
+        // Shipping Service + Internal Notes were also parsed but dropped — keep them on the
+        // order's meta so they survive the import instead of vanishing.
+        const meta: Record<string, unknown> = {}
+        if (o.service) meta.shippingService = o.service
+        if (o.notes) meta.notes = o.notes
+        if (o.orderNumber) meta.sourceOrderNumber = o.orderNumber
         const r = await createOrder({
           id: nextOrderId(),
           seq: baseSeq + i,
@@ -151,8 +161,10 @@ export function ImportOrdersDialog({
           status: "new",
           customer: o.customer,
           address: hasAddress ? { ...o.address, ref: o.orderNumber } : undefined,
+          store: o.store || undefined,
           total,
           items,
+          meta: Object.keys(meta).length ? meta : undefined,
         })
         if (!r.error) imported++
       }
@@ -189,6 +201,37 @@ export function ImportOrdersDialog({
                 <DownloadSimple size={14} weight="bold" /> Template
               </Button>
             </div>
+
+            {/* Columns reference — REQUIRED are solid, OPTIONAL are highlighted amber so a filler
+                sees at a glance what they can skip. Hover any chip for what it does. */}
+            <details className="rounded-xl border border-border bg-muted/20">
+              <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
+                Columns — <span className="text-muted-foreground">what’s required vs optional</span>
+              </summary>
+              <div className="space-y-2 px-3 pb-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {CSV_COLUMNS.map((c) => (
+                    <span
+                      key={c.header}
+                      title={c.help}
+                      className={
+                        "inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs " +
+                        (c.required
+                          ? "border-border bg-foreground/5 font-medium text-foreground"
+                          : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300")
+                      }
+                    >
+                      {c.header}
+                      {c.required && <span className="text-destructive">*</span>}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  <span className="font-medium text-foreground">Bold + <span className="text-destructive">*</span></span> = required.
+                  <span className="ml-1 rounded bg-amber-50 px-1 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">Amber</span> = optional (safe to leave blank). Plus one of <b>Item SKU</b> or <b>Product Title</b>. Hover a chip for details.
+                </p>
+              </div>
+            </details>
 
             <Tabs defaultValue="file">
               <TabsList className={sheetsEnabled ? "grid w-full grid-cols-3" : "grid w-full grid-cols-2"}>

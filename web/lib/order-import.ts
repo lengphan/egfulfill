@@ -30,6 +30,35 @@ export const CSV_TEMPLATE = (() => {
 // Required columns — a row missing any of these is flagged invalid.
 export const REQUIRED_COLS = ["ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
 
+// Per-column reference for the import dialog: which headers are required vs optional, and what
+// each does. Drives the legend so a filler knows exactly what they can skip. `key` is the
+// canonical field (see COL_ALIASES); headers in the template are these in order.
+export type CsvColumn = { header: string; key: string; required: boolean; help: string }
+export const CSV_COLUMNS: CsvColumn[] = [
+  { header: "Order Number", key: "order_number", required: false, help: "Groups multiple item rows into one order. Auto-generated if left blank." },
+  { header: "Ship Name", key: "ship_name", required: true, help: "Recipient's full name." },
+  { header: "Ship Email", key: "ship_email", required: false, help: "Buyer email, kept for your records." },
+  { header: "Ship Address 1", key: "ship_address_1", required: true, help: "Street address." },
+  { header: "Ship Address 2", key: "ship_address_2", required: false, help: "Apt / suite / unit." },
+  { header: "Ship City", key: "ship_city", required: true, help: "Destination city." },
+  { header: "Ship State", key: "ship_state", required: true, help: "State / province." },
+  { header: "Ship Zip", key: "ship_zip", required: true, help: "Postal code." },
+  { header: "Store Name", key: "store_name", required: false, help: "Which shop the order came from." },
+  { header: "Product Title", key: "item_name", required: false, help: "Item name on the board. Either this or Item SKU is required." },
+  { header: "Image Link/ID", key: "hero_image", required: false, help: "URL of the listing photo shown on the card." },
+  { header: "Item SKU", key: "item_sku", required: false, help: "Your listing SKU. Either this or Product Title is required." },
+  { header: "Blank", key: "blank", required: false, help: "The catalog blank you produce on — needed to cost & barcode the line; without it it reads “not set up for production”." },
+  { header: "Template ID", key: "template_id", required: false, help: "A saved design template to apply (fills blank + artwork + placement + method)." },
+  { header: "Item Quantity", key: "item_quantity", required: false, help: "Defaults to 1 if blank." },
+  { header: "Print Type", key: "print_type", required: false, help: "DTG / DTF / EMB / … Defaults to DTG if blank." },
+  { header: "Item Color", key: "item_color", required: false, help: "Garment colour." },
+  { header: "Item Size", key: "item_size", required: false, help: "Garment size." },
+  { header: "Item Price", key: "item_price", required: false, help: "What the BUYER paid per unit (your sale price). Records only — it does NOT set the fulfilment charge, which comes from the blank's pricing at submit." },
+  { header: "Design File URL", key: "design_file_url", required: false, help: "Link to the print-ready artwork — attached to the line on import." },
+  { header: "Shipping Service", key: "shipping_service", required: false, help: "Requested method (e.g. Standard). Saved with the order." },
+  { header: "Internal Notes", key: "internal_notes", required: false, help: "Private note for your team. Saved with the order." },
+]
+
 // Header aliases → canonical key. Lets a generic marketplace export import as-is.
 const COL_ALIASES: Record<string, string[]> = {
   order_number: ["order", "order_id", "order_no", "order_number", "order_num"],
