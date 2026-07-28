@@ -471,12 +471,49 @@ export function DispatchBoard() {
     w.print()
   }
 
+  // One click for the two documents a packer needs TOGETHER — the shipping label(s) and the
+  // packing slip(s). Opens the labels (stamping them printed for warehouse/admin) then the
+  // slips; each sub-action already reports its own popup-blocker note.
+  const labelAndSlip = async () => {
+    if (!chosenWithLabel.length) { setErr("None of the selected orders have a stored label file to print."); return }
+    await openLabels()
+    printPackingSlips()
+  }
+
+  // Finish All — the batch is done: scanned, made, and out the door. Walks every item all the
+  // way to Shipped (one hop at a time so the skip guard passes), then sets the order Shipped,
+  // so the seller sees Fulfilled. The server ship guard STILL applies per order — anything not
+  // actually ready (a line unmade, no label) is skipped and reported, never force-shipped.
+  const finishAll = async () => {
+    if (!chosen.length) return
+    if (!window.confirm(`Finish ${chosen.length} order${chosen.length === 1 ? "" : "s"}? This marks ${chosen.length === 1 ? "it" : "them"} Shipped — Fulfilled to the seller — and closes ${chosen.length === 1 ? "it" : "them"} out.`)) return
+    setBusy(true); setErr(null)
+    const failed: string[] = []
+    const path = stagePath(STAGE, "shipped") ?? ["shipped"]
+    for (const o of chosen) {
+      try {
+        await markScannedInHouse(o.id).catch(() => {})
+        for (const stage of path) {
+          for (const it of o.items ?? []) {
+            if (it.sku || it.line_id) await postItemStatus(o.id, it.sku ?? "", stage, it.line_id)
+          }
+        }
+        await updateOrder(o.id, { factoryStatus: "shipped", status: "shipped" })
+      } catch { failed.push(numOf(o)) }
+    }
+    setBusy(false); setPicked(new Set())
+    if (failed.length) setErr(`Couldn't finish ${failed.length} order${failed.length === 1 ? "" : "s"}: ${failed.join(", ")} — every item must be made and labelled first.`)
+    load()
+  }
+
   // awaiting_scan → working is TWO steps in the pipeline ("printed" sits between), so it's a
   // skip, and stageDenial refuses a skip for EVERYONE — which greyed "Scanned here" out for
   // every role, always, however an order was selected. The scan doesn't teleport past
   // printed; it WALKS it (markScanned below), so the gate is "can this role walk there" —
   // true for warehouse/admin, still false for an operator whose zone ends at the scan.
   const canAdvance = canSetStage(role, STAGE, NEXT) || canWalk(role, STAGE, NEXT)
+  // Finishing walks all the way to Shipped, so the gate is "can this role walk there".
+  const canFinish = canWalk(role, STAGE, "shipped") || canSetStage(role, STAGE, "shipped")
   const [manifestOpen, setManifestOpen] = useState(false)
   // Mirrors the server's eligibility rules (lib/manifest-eligible.ts) so the button can
   // say why before the click rather than after.
@@ -558,6 +595,12 @@ export function DispatchBoard() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Label + slip in one click — the two documents that leave with the parcel. */}
+            <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={labelAndSlip}
+              title="Open the shipping label(s) and print the packing slip(s) together">
+              <Tag size={14} weight="bold" /> Label &amp; Slip
+            </Button>
+
             {/* PULL BACK / undo — grouped: take orders off the board, or cancel the batch at
                 the partner. Both are "walk it back", kept out of the primary row. */}
             <DropdownMenu>
@@ -583,8 +626,14 @@ export function DispatchBoard() {
               </Button>
             )}
             {canScanOut && (
-              <Button size="sm" disabled={!chosen.length || busy || !canAdvance} onClick={markScanned} title={canAdvance ? undefined : "Your role can't move orders past this stage"}>
+              <Button size="sm" variant="outline" disabled={!chosen.length || busy || !canAdvance} onClick={markScanned} title={canAdvance ? undefined : "Your role can't move orders past this stage"}>
                 {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Scanned here</>}
+              </Button>
+            )}
+            {canScanOut && (
+              <Button size="sm" disabled={!chosen.length || busy || !canFinish} onClick={finishAll}
+                title={canFinish ? "Mark the selected orders Shipped & Fulfilled" : "Your role can't ship orders out"}>
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : <><Truck size={14} weight="bold" /> Finish All</>}
               </Button>
             )}
           </div>
