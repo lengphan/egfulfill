@@ -51,7 +51,17 @@ export default function SignupPage() {
     }
     setLoading(true)
     try {
-      const r = await signupUser({ email: email.trim(), username: username.trim() || undefined, password, store_name: store.trim(), name: store.trim() })
+      // Display name comes from the USERNAME they chose (their exact identifier), not the
+      // store name — copying the store name in made e.g. a shop called "baby" show up as the
+      // person's name. Fall back to the store name, then the email local part, so the name is
+      // never blank when username is skipped.
+      const r = await signupUser({
+        email: email.trim(),
+        username: username.trim() || undefined,
+        password,
+        store_name: store.trim(),
+        name: username.trim() || store.trim() || email.trim().split("@")[0],
+      })
       if (r.error) throw new Error(r.error)
       if (r.token) {
         setSession(r.token, r.user ?? {})
