@@ -291,13 +291,20 @@ async function runLettering(req, reply, { design }) {
 // ALONGSIDE the <lettering> decoration (both are valid decoration types; sequence = stitch
 // order). buildCombinedXml is step 2 — it embeds the already-digitized .emb via <files>.
 // Ref: apiguide.wilcom.com …/design-recipe-recipe-xml-data/decorations/ and …/design/.
-// A decoration transform: move (x/y mm), resize (scale ×), rotate (angle°). Emitted only when
-// it differs from identity so a default combine keeps its exact current behaviour.
+// A decoration's transform. The EWA attribute names are EXACT (apiguide.wilcom.com …/transform/):
+//   dx / dy   millimetres from the location's TOP-LEFT corner (+x right, +y DOWN)
+//   rotation  degrees, positive = clockwise      scale  HARD-LIMITED to 0.8–1.2 (±20%)
+//   mirror    none | horizontal | vertical | both
+// (An earlier build emitted x/y/angle/scale — names EWA doesn't recognise — so every decoration
+// silently landed at the origin. That was the "everything stacked in the centre" bug.)
+// Always emitted for a multi-layer design: without dx/dy each decoration defaults to the same
+// top-left and they pile up.
 function tfXml(tf) {
   if (!tf) return '';
-  const x = Number(tf.x) || 0, y = Number(tf.y) || 0, scale = Number(tf.scale) || 1, angle = Number(tf.angle) || 0;
-  if (x === 0 && y === 0 && scale === 1 && angle === 0) return '';
-  return `<transform x="${x}" y="${y}" scale="${scale}" angle="${angle}"/>`;
+  const dx = Number(tf.dx) || 0, dy = Number(tf.dy) || 0, rotation = Number(tf.rotation) || 0;
+  let scale = Number(tf.scale); scale = Number.isFinite(scale) && scale > 0 ? Math.min(1.2, Math.max(0.8, scale)) : 1;
+  const mirror = ['horizontal', 'vertical', 'both'].includes(tf.mirror) ? tf.mirror : 'none';
+  return `<transform scale="${scale}" mirror="${mirror}" rotation="${rotation}" dx="${dx.toFixed(2)}" dy="${dy.toFixed(2)}"/>`;
 }
 function buildCombinedXml({ embName, embBase64, text, alphabet, letterHeight, colorInt, designFile, designTf, letterTf }) {
   const lh = Math.min(50, Math.max(5, Number(letterHeight) || 20));

@@ -371,6 +371,19 @@ const newLayerId = () => "L" + Math.random().toString(36).slice(2, 9)
 // bakes into the generated .emb. BOX_SPAN_MM maps the preview's span to millimetres — a
 // nominal hoop width; tune once checked against real output.
 const BOX_SPAN_MM = 120
+// EWA hard-limits a decoration's scale to ±20%. Clamp everywhere so the preview box can't show
+// a size the generated design can't reproduce (WYSIWYG).
+const clampScale = (s: number) => Math.min(1.2, Math.max(0.8, Number.isFinite(s) && s > 0 ? s : 1))
+// Convert the client box (mm, origin = canvas CENTRE, +y UP, positioned by the element's centre)
+// into EWA's transform (dx/dy mm from the location's TOP-LEFT, +y DOWN, from the element's
+// top-left). Needs the element's measured stitched size (mm) so the CENTRES line up.
+function toEwaTransform(tf: WilcomTransform, wmm: number, hmm: number) {
+  const scale = clampScale(tf.scale)
+  const w = (wmm || 0) * scale, h = (hmm || 0) * scale
+  const cx = BOX_SPAN_MM / 2 + tf.x   // element centre, mm from the left edge
+  const cy = BOX_SPAN_MM / 2 - tf.y   // element centre, mm from the top edge (+y flips to down)
+  return { dx: +(cx - w / 2).toFixed(2), dy: +(cy - h / 2).toFixed(2), rotation: tf.angle, scale, mirror: "none" as const }
+}
 type DragState = { mode: "move" | "resize" | "rotate"; sx: number; sy: number; start: WilcomTransform; cx: number; cy: number; d0: number; a0: number; rw: number; rh: number }
 function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode; selected: boolean; onSelect: () => void }) {
   const drag = useRef<DragState | null>(null)
@@ -399,7 +412,7 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect }: { tf: Wilco
       onChange({ ...d.start, x: Math.round(d.start.x + dx), y: Math.round(d.start.y - dy) })
     } else if (d.mode === "resize") {
       const dist = Math.hypot(e.clientX - d.cx, e.clientY - d.cy)
-      onChange({ ...d.start, scale: Math.max(0.2, Math.min(3, Math.round((dist / d.d0) * d.start.scale * 20) / 20)) })
+      onChange({ ...d.start, scale: clampScale(Math.round((dist / d.d0) * d.start.scale * 100) / 100) })
     } else {
       const a = Math.atan2(e.clientY - d.cy, e.clientX - d.cx)
       let deg = d.start.angle + ((a - d.a0) * 180) / Math.PI
@@ -415,7 +428,7 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect }: { tf: Wilco
       <div
         data-mode="move" onPointerDown={down} onPointerMove={move} onPointerUp={up}
         className={"pointer-events-auto absolute flex touch-none items-center justify-center rounded border-2 " + (selected ? "cursor-move border-primary/80" : "cursor-pointer border-transparent")}
-        style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${34 * tf.scale}%`, aspectRatio: "1", transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
+        style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${34 * clampScale(tf.scale)}%`, aspectRatio: "1", transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
       >
         {/* Full opacity — the ghost is the REAL stitched TrueView, so it must not look faded.
             Selection is shown by the border + handles, not by dimming the embroidery. */}
@@ -536,9 +549,13 @@ function CreateTab() {
     try {
       // Ordered layer payload — each image (auto-digitized server-side) and the text, with its
       // transform, in stitch order. Text content rides alongside for the text layer(s).
-      const payload = layers.map((l) => l.kind === "image"
-        ? { kind: "image" as const, image: l.dataUrl, name: l.name, transform: l.tf }
-        : { kind: "text" as const, transform: l.tf })
+      const payload = layers.map((l) => {
+        const r = resById[l.id]                       // this layer's own stitched preview (mm size)
+        const transform = toEwaTransform(l.tf, r?.width ?? 0, r?.height ?? 0)
+        return l.kind === "image"
+          ? { kind: "image" as const, image: l.dataUrl, name: l.name, transform }
+          : { kind: "text" as const, transform }
+      })
       const body = { layers: payload, text: hasText ? text.trim() : undefined, alphabet, height, color,
         name: imgLayers[0]?.name || (hasText ? text.trim() : undefined) }
       const r = await wilcomCombine(body)
