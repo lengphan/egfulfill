@@ -571,12 +571,12 @@ export function DesignCanvasDialog({
       })
       if (r?.error) throw new Error(r.error)
       setErr(null)
-      // Keep it SHORT. Sellers got a four-line paragraph that read as an error; they need a
-      // calm one-liner. Staff keep the one actionable nudge — add an image so the stitch
-      // file has somewhere to sit on the mockup — because that's their job, not the seller's.
+      // Keep it SHORT — just confirm the file. Staff keep the one actionable nudge (add an
+      // image so the stitch file has somewhere to sit on the mockup); the seller sees a plain
+      // success line, no fee explainer.
       setAttached(isStaff
-        ? `${f.name} filed as the machine file — check fee, not a design fee. Add an image too so it shows on the mockup.`
-        : `Machine file uploaded — ${f.name}. Just a check fee applies (not a design fee); we'll take it from here and reach out if we need anything.`)
+        ? `${f.name} filed as the machine file. Add an image too so it shows on the mockup.`
+        : `Machine file uploaded — ${f.name}.`)
     } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
   }, [orderId, item.line_id, item.sku, isStaff])
 
@@ -620,18 +620,24 @@ export function DesignCanvasDialog({
    *  where closing the window mid-flow would look like the action had finished.
    *  Returns whether it persisted, so a caller can stop rather than carry on regardless. */
   const save = async (close = true): Promise<boolean> => {
-    if (!designUrl || !item.sku) { setErr("Upload artwork first."); return false }
+    if (!designUrl) { setErr("Upload artwork first."); return false }
+    // Artwork attaches to a LINE, keyed line-first (server: coalesce('L:'||line_id,'S:'||sku)).
+    // A marketplace line arrives with its variant — and thus SKU — unset, but always carries a
+    // line_id. Requiring a SKU here mislabelled a present design as "no artwork" on exactly
+    // those lines; require a line identity instead.
+    if (!item.sku && !item.line_id) { setErr("This line needs a variant chosen before artwork can be saved."); return false }
     setSaving(true); setErr(null)
     try {
       // Fingerprint the artwork as it's saved, so the factory can later tell that this
       // design has already been digitised. Best-effort: a null phash costs us fuzzy
       // matching, never the save.
       const phash = await perceptualHash(designUrl).catch(() => null)
-      const r = await postOrderDesign(orderId, { sku: item.sku, line_id: item.line_id, data: designUrl, name: item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
+      const r = await postOrderDesign(orderId, { sku: item.sku ?? "", line_id: item.line_id, data: designUrl, name: item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
       if (r.error) throw new Error(r.error)
       // Persist the matched threads alongside the design so the factory loads the right
-      // cones. Best-effort — a design still saves even if the thread write hiccups.
-      if (isEmb && threads.length) await postOrderThreads(orderId, item.sku, threads).catch(() => {})
+      // cones. Best-effort — a design still saves even if the thread write hiccups. Keyed by
+      // sku, so skip when the line has none yet (it can be re-matched after variant setup).
+      if (isEmb && threads.length && item.sku) await postOrderThreads(orderId, item.sku, threads).catch(() => {})
       onSaved?.()
       if (close) onOpenChange(false)
       return true
@@ -1098,7 +1104,7 @@ export function DesignCanvasDialog({
             <div className="rounded-lg border border-border px-3 py-2.5 text-xs">
               {hasMachineFile ? (
                 <span className="text-emerald-700">
-                  <span className="font-medium">You uploaded your file.</span> No design fee{fees?.check ? ` — just a ${usd(fees.check)} check fee` : " — just a check fee"}; we&apos;ll verify it and reach out if we need anything.
+                  <span className="font-medium">You uploaded your file.</span> No design fee{fees?.check ? ` — just a ${usd(fees.check)} check fee.` : " — just a check fee."}
                 </span>
               ) : threads.length >= 6 ? (
                 <span className="text-muted-foreground">

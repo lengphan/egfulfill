@@ -1227,10 +1227,13 @@ export function ordersRoutes(app, requireAuth) {
   app.post('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const { sku, data, name, kind, pos } = req.body || {};
-    if (!sku || !data) return { error: 'sku and data required' };
     // Line identity, when the caller knows it. Falls back to sku-keying so older clients
     // and marketplace sync keep working — see the migration above.
     const lineId = (req.body || {}).line_id ? String((req.body || {}).line_id) : null;
+    // Artwork keys line-first (coalesce('L:'||line_id,'S:'||sku)), so a marketplace line whose
+    // SKU is still unset attaches by line_id. Require DATA + a line identity, not specifically
+    // a SKU — the old `!sku` check rejected exactly those lines with "sku and data required".
+    if (!data || (!sku && !lineId)) return { error: 'data and (sku or line id) required' };
     const posJson = (pos && typeof pos === 'object') ? JSON.stringify(pos) : null;
     // Exact hash is ours, never the client's — it decides whether an already-produced
     // machine file may be reused, so a forged one would attach the wrong deliverable.
