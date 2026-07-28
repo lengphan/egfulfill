@@ -593,7 +593,6 @@ export function SpyDeckView() {
       {view === "search" && (
         <SectionCard
           title={cloud.live ? "Keywords in these results" : "Trending keywords & niches"}
-          description={cloud.live ? "Aggregated from the current search — click any to dig in" : "Popular niches to explore — bigger = hotter. Click to research."}
         >
           <KeywordCloud words={cloud.words} onPick={(t) => run(t)} />
         </SectionCard>
@@ -601,7 +600,6 @@ export function SpyDeckView() {
 
       <SectionCard
         title="Product research"
-        description="Spy live Etsy listings and save the winners"
         actions={
           <div className="flex rounded-lg border border-border p-0.5">
             {(([

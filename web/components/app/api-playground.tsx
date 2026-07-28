@@ -201,7 +201,6 @@ export function ApiPlayground() {
         title={<span className="flex items-center gap-2">Your API key
           <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase " + (env === "live" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>{env}</span>
         </span>}
-        description="Calls authenticate with this key, sent as the X-API-Key header."
         actions={
           <div className="flex rounded-lg border border-border p-0.5">
             {(["test", "live"] as const).map((m) => (
