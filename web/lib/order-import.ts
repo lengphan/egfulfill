@@ -16,10 +16,6 @@ export const CSV_HEADERS = [
   "Shipping Service", "Internal Notes",
 ]
 
-// Headers only (no throwaway sample row) — the Columns legend in the dialog is the guide now.
-// Still used by "Make a copy in Google Sheets" to shape a fresh sheet with the right columns.
-export const CSV_TEMPLATE = CSV_HEADERS.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
-
 // Required columns — a row missing any of these is flagged invalid.
 export const REQUIRED_COLS = ["ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
 
@@ -50,6 +46,15 @@ export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Shipping Service", key: "shipping_service", required: false, help: "Requested method (e.g. Standard). Saved with the order." },
   { header: "Internal Notes", key: "internal_notes", required: false, help: "Private note for your team. Saved with the order." },
 ]
+
+// Template header row: optional columns are suffixed " (optional)" so a filler sees at a glance
+// what's skippable, right in the sheet (not just the in-app legend). canonHeader() strips the
+// suffix on import, so a filled-in template still maps correctly.
+export const TEMPLATE_HEADERS = CSV_COLUMNS.map((c) => (c.required ? c.header : `${c.header} (optional)`))
+
+// Headers only (no throwaway sample row) — the Columns legend in the dialog is the guide.
+// Used by the .xlsx download AND "Make a copy in Google Sheets".
+export const CSV_TEMPLATE = TEMPLATE_HEADERS.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
 
 // Header aliases → canonical key. Lets a generic marketplace export import as-is.
 const COL_ALIASES: Record<string, string[]> = {
@@ -121,7 +126,9 @@ export function parsePasted(text: string): string[][] {
 }
 
 function canonHeader(h: string): string {
-  const norm = String(h).toLowerCase().trim().replace(/#/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
+  // Drop a trailing "(optional)" marker from our own template headers before matching.
+  const cleaned = String(h).replace(/\(\s*optional\s*\)/gi, "").trim()
+  const norm = cleaned.toLowerCase().trim().replace(/#/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
   return ALIAS_LOOKUP[norm] || norm
 }
 

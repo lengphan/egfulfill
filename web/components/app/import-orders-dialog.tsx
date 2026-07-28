@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { UploadSimple, CheckCircle, WarningCircle, Table, CircleNotch } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CircleNotch } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -13,11 +13,23 @@ import {
   groupToOrders,
   CSV_TEMPLATE,
   CSV_COLUMNS,
+  TEMPLATE_HEADERS,
   type ImportRecord,
 } from "@/lib/order-import"
 import { createOrder, getOrders, getSheetsConfig, getSheetRows } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
+
+// Build + download the .xlsx template. Lazy-imports the (already-installed) xlsx lib so it
+// never weighs down the app's main bundle — only loads when someone clicks the button.
+async function downloadXlsxTemplate() {
+  const XLSX = await import("xlsx")
+  const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS])
+  ws["!cols"] = TEMPLATE_HEADERS.map((h) => ({ wch: Math.max(12, h.length + 2) }))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, "Orders")
+  XLSX.writeFile(wb, "EGFULFILL Order Import.xlsx")
+}
 
 export function ImportOrdersDialog({
   open,
@@ -64,12 +76,31 @@ export function ImportOrdersDialog({
 
   const takeFile = (file?: File | null) => {
     if (!file) return
-    if (!/\.csv$/i.test(file.name)) { setError("Please upload a .csv file (export or paste for .xlsx / Sheets)."); return }
+    const isXlsx = /\.xlsx?$/i.test(file.name)
+    if (!isXlsx && !/\.csv$/i.test(file.name)) { setError("Please upload a .csv or .xlsx file (or use Paste)."); return }
     // An empty or unreadable file used to do NOTHING — no preview, no error, no clue.
     // Silence is the worst outcome here: it's indistinguishable from the click not
     // registering, so people re-try the same broken file.
     if (!file.size) { setError(`"${file.name}" is empty — nothing to import.`); return }
     const reader = new FileReader()
+    if (isXlsx) {
+      // Read the first sheet into rows the same shape parseCSV produces. xlsx is lazy-imported.
+      reader.onload = async () => {
+        try {
+          const XLSX = await import("xlsx")
+          const wb = XLSX.read(reader.result, { type: "array" })
+          const ws = wb.Sheets[wb.SheetNames[0]]
+          if (!ws) { setError(`"${file.name}" has no sheets.`); return }
+          const rows = (XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" }) as unknown[][])
+            .map((r) => r.map((c) => (c == null ? "" : String(c).trim())))
+            .filter((r) => r.some((c) => c !== ""))
+          ingest(rows)
+        } catch { setError(`Couldn't read "${file.name}". Try re-saving it, or use Paste.`) }
+      }
+      reader.onerror = () => setError(`Couldn't read "${file.name}". Try re-saving it, or use Paste.`)
+      reader.readAsArrayBuffer(file)
+      return
+    }
     reader.onload = () => {
       const text = String(reader.result || "")
       if (!text.trim()) { setError(`"${file.name}" has no readable text.`); return }
@@ -185,7 +216,12 @@ export function ImportOrdersDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Upload a CSV, paste rows, or pull a Google Sheet. Common Shopify/Etsy column names are recognized automatically.</p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-muted-foreground">Upload a CSV/XLSX, paste rows, or pull a Google Sheet. Common Shopify/Etsy column names are recognized automatically.</p>
+              <Button variant="outline" size="sm" className="shrink-0" onClick={() => void downloadXlsxTemplate()}>
+                <DownloadSimple size={14} weight="bold" /> Template (.xlsx)
+              </Button>
+            </div>
 
             {/* Columns reference — REQUIRED are solid, OPTIONAL are highlighted amber so a filler
                 sees at a glance what they can skip. Hover any chip for what it does. */}
@@ -233,9 +269,9 @@ export function ImportOrdersDialog({
                   className={"flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed px-4 py-10 text-center transition-colors " + (dragOver ? "border-primary bg-primary/5" : "border-border hover:bg-accent")}
                 >
                   <UploadSimple size={24} className="text-muted-foreground" />
-                  <span className="text-sm font-medium">Drop a .csv or <span className="text-primary">browse</span></span>
+                  <span className="text-sm font-medium">Drop a .csv / .xlsx or <span className="text-primary">browse</span></span>
                   <span className="text-xs text-muted-foreground">Uses the egfulfill template format</span>
-                  <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => takeFile(e.target.files?.[0])} />
+                  <input type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => takeFile(e.target.files?.[0])} />
                 </label>
               </TabsContent>
 
