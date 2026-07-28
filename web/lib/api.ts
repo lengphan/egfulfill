@@ -1146,6 +1146,17 @@ export function designForLine(
 // shipping + ship_extra per additional unit. Priced by server/src/pricing.js — the SAME
 // quote the charge uses, so what the seller is shown is what they're billed.
 // `unpriced` lists items with no catalog match; those block submit (no cost = no price).
+export type OrderDesignFee = {
+  line_id: string | null
+  sku: string | null
+  name: string | null
+  tier: "supplied" | "standard" | "complex"
+  /** e.g. "Check Fee (File Provided)", "Design Fee (New)", "Design Fee (Complex)" */
+  label: string
+  /** null = quoted, under review ("To Be Determined") — shown, never hidden. */
+  amount: number | null
+  status: "charged" | "estimated" | "tbd"
+}
 export type OrderQuote = {
   lines: { id: string; sku: string; name: string; qty: number; size: string | null; unitCost: number; shipFee: number }[]
   unpriced: { sku: string; name: string }[]
@@ -1156,6 +1167,8 @@ export type OrderQuote = {
   total: number
   charged: number
   balance: number
+  /** Design/check fees per line — visible in the Summary; complex ones are TBD until accepted. */
+  designFees?: { items: OrderDesignFee[]; total: number }
 }
 export function getOrderQuote(id: string) {
   return api<OrderQuote>(`/api/orders/${encodeURIComponent(id)}/quote`)

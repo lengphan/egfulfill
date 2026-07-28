@@ -1111,7 +1111,8 @@ export function ordersRoutes(app, requireAuth) {
     }
     const quote = await quoteOrder(req.params.id);
     const paid = await chargedAmount(req.params.id);
-    return { ...quote, charged: paid > 0 ? paid : 0, balance: await balanceOf(row.seller_id) };
+    const designFees = await computeDesignFees(req.params.id).catch(() => ({ items: [], total: 0 }));
+    return { ...quote, designFees, charged: paid > 0 ? paid : 0, balance: await balanceOf(row.seller_id) };
   });
 
   // Per-item production status — the warehouse "Working" flag. Staff-only. Keyed
@@ -1362,6 +1363,47 @@ export function ordersRoutes(app, requireAuth) {
       [orderId, lineId || sku]).catch(() => {});
     audit(req, 'design.charged', { entityType: 'order', entityId: orderId, after: { tier, amount, line_id: lineId, sku } });
     return { charged: amount, tier };
+  }
+
+  /**
+   * Design/check fees per line, for the order Summary — so a fee is VISIBLE, never a surprise
+   * on the statement. Tier comes from the stored design_tier once staff has classified the
+   * line; before that it's INFERRED for a seller-facing estimate (own machine file → check
+   * fee; image → we digitise it, standard). Complex is quoted, so its amount is left null =
+   * "To Be Determined" until accepted, rather than hidden. Amounts mirror chargeDesign.
+   */
+  async function computeDesignFees(orderId) {
+    const fees = await readAll().catch(() => ({}));
+    const CHECK = Number(fees.check_fee) || 0;
+    const STD = Number(fees.design_fee_standard) || 0;
+    const CPX = Number(fees.design_fee_complex) || 0;
+    const rows = await q(
+      `select i.line_id, i.sku, i.name, i.design_tier, i.design_quote_status, i.design_charged_at,
+              exists(select 1 from design_file_data f
+                       where f.order_id = i.order_id and coalesce(f.sku,'') = coalesce(i.sku,'')) as has_machine,
+              exists(select 1 from order_designs d
+                       where d.order_id = i.order_id
+                         and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
+                         and (d.data is not null or d.storage_key is not null)) as has_image
+         from order_items i where i.order_id = $1`,
+      [orderId]).then((r) => r.rows).catch(() => []);
+    const items = []; let total = 0;
+    for (const r of rows) {
+      // Staff's classification wins; before that, infer from what the seller supplied.
+      const tier = r.design_tier || (r.has_machine ? 'supplied' : r.has_image ? 'standard' : null);
+      if (!tier) continue;
+      let label, amount;
+      if (tier === 'supplied') { label = 'Check Fee (File Provided)'; amount = CHECK; }
+      else if (tier === 'complex') {
+        label = 'Design Fee (Complex)';
+        // Fixed only once accepted or charged; otherwise under review → To Be Determined.
+        amount = (r.design_charged_at || r.design_quote_status === 'accepted') ? CPX : null;
+      } else { label = 'Design Fee (New)'; amount = STD; }
+      const status = r.design_charged_at ? 'charged' : (amount == null ? 'tbd' : 'estimated');
+      if (amount != null) total += amount;
+      items.push({ line_id: r.line_id || null, sku: r.sku || null, name: r.name || null, tier, label, amount, status });
+    }
+    return { items, total };
   }
 
   /**

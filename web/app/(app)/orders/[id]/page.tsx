@@ -237,6 +237,10 @@ export default function OrderDetailPage() {
   const timeline = (Array.isArray(order.timeline) ? order.timeline : []) as TimelineEntry[]
   const itemsTotal = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.qty) || 1), 0)
   const total = Number(order.total ?? 0) || 0
+  // Design/check fees shown in the Summary. Complex fees under review are `amount: null`
+  // ("To Be Determined") and are NOT added to the number, only listed.
+  const designFees = quote?.designFees
+  const dfTotal = designFees?.total ?? 0
 
   return (
     <div className="space-y-5">
@@ -519,11 +523,17 @@ export default function OrderDetailPage() {
                     </dt>
                     <dd className="tabular-nums">{usd(quote.shipping)}</dd>
                   </div>
+                  {designFees?.items?.map((f, i) => (
+                    <div key={i} className="flex justify-between">
+                      <dt className="text-muted-foreground">{f.label}{f.name ? <span className="opacity-70"> · {f.name}</span> : null}</dt>
+                      <dd className="tabular-nums">{f.amount == null ? <span className="italic text-muted-foreground">To Be Determined</span> : usd(f.amount)}</dd>
+                    </div>
+                  ))}
                   <div className="flex justify-between border-t border-border pt-2 font-semibold">
                     <dt>Total</dt>
-                    <dd className="tabular-nums">{usd(quote.total)}</dd>
+                    <dd className="tabular-nums">{usd(quote.total + dfTotal)}</dd>
                   </div>
-                  <p className="pt-1 text-xs text-muted-foreground">Charged when you submit to production. Design digitising, if we cut the file for you, is billed separately.</p>
+                  <p className="pt-1 text-xs text-muted-foreground">Charged when you submit to production. Design &amp; check fees are listed above; a design still under review shows “To Be Determined” until we confirm it.</p>
                 </>
               ) : (
                 <>
@@ -540,11 +550,17 @@ export default function OrderDetailPage() {
                       <dd className="tabular-nums">{usd(total - itemsTotal)}</dd>
                     </div>
                   )}
+                  {designFees?.items?.map((f, i) => (
+                    <div key={i} className="flex justify-between">
+                      <dt className="text-muted-foreground">{f.label}{f.name ? <span className="opacity-70"> · {f.name}</span> : null}</dt>
+                      <dd className="tabular-nums">{f.amount == null ? <span className="italic text-muted-foreground">To Be Determined</span> : usd(f.amount)}</dd>
+                    </div>
+                  ))}
                   <div className="flex justify-between border-t border-border pt-2 font-semibold">
                     <dt>Total</dt>
-                    <dd className="tabular-nums">{usd(total)}</dd>
+                    <dd className="tabular-nums">{usd(total + dfTotal)}</dd>
                   </div>
-                  <p className="pt-1 text-xs text-muted-foreground">Design digitising, if we cut the file for you, is billed separately.</p>
+                  <p className="pt-1 text-xs text-muted-foreground">Design &amp; check fees are listed above; a design still under review shows “To Be Determined” until we confirm it.</p>
                 </>
               )}
               {quote?.unpriced?.length ? (
