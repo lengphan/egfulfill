@@ -5,7 +5,7 @@ import { VariantField } from "@/components/app/variant-field"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, Plus, Trash, CheckCircle, WarningCircle, Package, Storefront, X } from "@phosphor-icons/react"
+import { ArrowLeft, Plus, Trash, CheckCircle, WarningCircle, CircleNotch, Package, Storefront, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -68,27 +68,29 @@ export default function NewOrderPage() {
     }
   }, [])
 
-  async function onValidate() {
+  // Live address validation — fires shortly after you stop typing/pasting, so there's no
+  // "Validate" button to remember. State is set only inside the deferred timeout (never
+  // synchronously in the effect body) to satisfy react-hooks/set-state-in-effect.
+  useEffect(() => {
     const p = parsed.addr
-    if (!p.street || !p.zip) {
-      setValid({ kind: "bad", msg: "Add a name, a street line, and a City, ST ZIP line." })
-      return
-    }
-    setValid({ kind: "checking" })
-    try {
-      const r = await validateAddress({
+    let alive = true
+    const t = setTimeout(() => {
+      if (!alive) return
+      if (!p.street || !p.zip) { setValid({ kind: "idle" }); return }
+      setValid({ kind: "checking" })
+      validateAddress({
         streetAddress: p.street,
         secondaryAddress: p.street2 || undefined,
         city: p.city,
         state: p.state,
         ZIPCode: zip5(p.zip),
       })
-      if (r.ok && r.address) setValid({ kind: "ok", addr: r.address })
-      else setValid({ kind: "bad", msg: friendlyValidationError(r.error) })
-    } catch (e) {
-      setValid({ kind: "bad", msg: friendlyValidationError(e instanceof Error ? e.message : "") })
-    }
-  }
+        .then((r) => { if (!alive) return; if (r.ok && r.address) setValid({ kind: "ok", addr: r.address }); else setValid({ kind: "bad", msg: friendlyValidationError(r.error) }) })
+        .catch((e) => { if (alive) setValid({ kind: "bad", msg: friendlyValidationError(e instanceof Error ? e.message : "") }) })
+    }, 600)
+    return () => { alive = false; clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsed.addr.street, parsed.addr.street2, parsed.addr.city, parsed.addr.state, parsed.addr.zip])
 
   // Canonical order total: Σ(unit × qty) + first-item/additional shipping.
   const pricing = useMemo(
@@ -214,39 +216,34 @@ export default function NewOrderPage() {
       <SectionCard title="Shipping">
         <div className="space-y-4 p-5">
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Name &amp; Address</span>
-              {valid.kind === "ok" && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
-                  <CheckCircle size={14} weight="fill" /> Validated
-                </span>
-              )}
-              {valid.kind === "bad" && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600" title={valid.msg}>
-                  <WarningCircle size={14} weight="fill" /> Not validated
-                </span>
-              )}
-            </div>
-            <textarea
-              value={block}
-              onChange={(e) => {
-                setBlock(e.target.value)
-                setValid({ kind: "idle" })
-              }}
-              rows={5}
-              placeholder={"e.g.\nJane Doe\n123 Main St\nSpringfield, IL 62704"}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-            />
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" variant="outline" size="sm" onClick={onValidate} disabled={valid.kind === "checking" || !parsed.addr.street}>
-                {valid.kind === "checking" ? "Checking…" : "Validate address"}
-              </Button>
-              {valid.kind === "ok" && (
-                <span className="truncate text-xs text-emerald-600">
-                  {[valid.addr.street, valid.addr.street2, valid.addr.city, valid.addr.state, `${valid.addr.zip}${valid.addr.zip4 ? "-" + valid.addr.zip4 : ""}`].filter(Boolean).join(", ")}
-                </span>
-              )}
-              {valid.kind === "bad" && <span className="truncate text-xs text-amber-600">{valid.msg}</span>}
+            <span className="text-sm font-medium">Name &amp; Address</span>
+            {/* One paste box, validated live. The status sits INSIDE the box, bottom-right —
+                extra bottom padding keeps the last address line clear of it. */}
+            <div className="relative">
+              <textarea
+                value={block}
+                onChange={(e) => setBlock(e.target.value)}
+                rows={5}
+                placeholder={"e.g.\nJane Doe\n123 Main St\nSpringfield, IL 62704"}
+                className="w-full rounded-md border border-input bg-transparent px-3 pb-8 pt-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
+              <div className="pointer-events-none absolute bottom-2 right-2.5">
+                {valid.kind === "checking" && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                    <CircleNotch size={12} className="animate-spin" /> Checking…
+                  </span>
+                )}
+                {valid.kind === "ok" && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600">
+                    <CheckCircle size={12} weight="fill" /> Validated
+                  </span>
+                )}
+                {valid.kind === "bad" && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-[11px] font-medium text-amber-600" title={valid.msg}>
+                    <WarningCircle size={12} weight="fill" /> Not validated
+                  </span>
+                )}
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">First line is the customer name, then the shipping address (street, then City, ST ZIP).</p>
           </div>

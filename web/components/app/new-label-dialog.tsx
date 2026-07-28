@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
-import { packagingHint } from "@/lib/dim-weight"
+import { PackagingHint } from "@/components/app/packaging-hint"
 import { createOrder, validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, type ShipAddress, type UspsLabelResult, type ShippingRate } from "@/lib/api"
 
 const BLANK: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
@@ -175,23 +175,27 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
         ) : (
           <>
             <div className="space-y-3 py-1">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
-                {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking address…</span>}
-                {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><CheckCircle size={12} weight="fill" /> Address validated</span>}
-                {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify — check it" : "Address not found"}</span>}
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+              {/* Live validation status sits INSIDE the box, bottom-right; extra bottom padding
+                  keeps the last address line clear of it. */}
+              <div className="relative">
+                <textarea
+                  value={pasteText}
+                  onChange={(e) => {
+                    setPasteText(e.target.value)
+                    const { name, addr } = parseBlock(e.target.value)
+                    setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
+                  }}
+                  rows={4}
+                  placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
+                  className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                />
+                <div className="pointer-events-none absolute bottom-2 right-2.5">
+                  {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-[11px] text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking…</span>}
+                  {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600"><CheckCircle size={12} weight="fill" /> Validated</span>}
+                  {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-[11px] font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
+                </div>
               </div>
-              <textarea
-                value={pasteText}
-                onChange={(e) => {
-                  setPasteText(e.target.value)
-                  const { name, addr } = parseBlock(e.target.value)
-                  setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
-                }}
-                rows={4}
-                placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-              />
               <p className="text-[10px] text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
 
               <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Parcel</div>
@@ -202,18 +206,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
                 <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => { setPkg({ ...pkg, width: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
                 <label className="flex w-14 flex-col gap-1"><span className="text-[11px] text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => { setPkg({ ...pkg, height: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
               </div>
-              {/* Dim-weight guard (÷166, USPS/Shippo) — warns before you buy if this box will
-                  be rated on size rather than weight, and how small to go to avoid it. */}
-              {(() => {
-                const h = packagingHint(weightOz, pkg.length, pkg.width, pkg.height)
-                if (!h || !h.billedOnSize) return null
-                return (
-                  <p className="flex items-start gap-1.5 text-[11px] text-primary">
-                    <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
-                    <span>Rated on size: dim weight {h.dimLb!.toFixed(2)} lb &gt; {h.actualLb.toFixed(2)} lb actual. A box under {Math.round(h.maxVolumeIn3)} in³ (≈{h.suggestedCube.toFixed(1)}″ cube) would rate on weight instead.</span>
-                  </p>
-                )
-              })()}
+              {/* Dim-weight packaging suggestion (÷166, USPS/Shippo) — always visible once
+                  there's a weight, so the box guidance is findable, not just a rare warning. */}
+              <PackagingHint weightOz={weightOz} length={pkg.length} width={pkg.width} height={pkg.height} />
 
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex cursor-pointer items-center gap-2 text-sm">

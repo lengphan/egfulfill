@@ -9,6 +9,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
+import { PackagingHint } from "@/components/app/packaging-hint"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, validateAddress, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
@@ -1280,23 +1281,26 @@ export function OrdersHub() {
                             warehouse address (Settings › Platform), so it isn't shown or edited
                             here. The address is validated live — see the badge by the header. */}
                         <div className="space-y-2">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
-                            {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking address…</span>}
-                            {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><CheckCircle size={12} weight="fill" /> Address validated</span>}
-                            {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify — check it" : "Address not found"}</span>}
+                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+                          {/* Live validation status sits INSIDE the box, bottom-right. */}
+                          <div className="relative">
+                            <textarea
+                              value={pasteText}
+                              onChange={(e) => {
+                                setPasteText(e.target.value)
+                                const { name, addr } = parseBlock(e.target.value)
+                                setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
+                              }}
+                              rows={4}
+                              placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
+                              className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                            />
+                            <div className="pointer-events-none absolute bottom-2 right-2.5">
+                              {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-[11px] text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking…</span>}
+                              {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600"><CheckCircle size={12} weight="fill" /> Validated</span>}
+                              {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-[11px] font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
+                            </div>
                           </div>
-                          <textarea
-                            value={pasteText}
-                            onChange={(e) => {
-                              setPasteText(e.target.value)
-                              const { name, addr } = parseBlock(e.target.value)
-                              setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
-                            }}
-                            rows={4}
-                            placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
-                            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-                          />
                           <p className="text-[10px] text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
                         </div>
                       </div>
@@ -1333,6 +1337,10 @@ export function OrdersHub() {
                           {busy === `label:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Printer size={14} weight="bold" /> Buy USPS label</>}
                         </Button>
                       </div>
+
+                      {/* Dim-weight packaging suggestion for this parcel (÷166) — the box guidance,
+                          shown right under the dimensions it reasons about. */}
+                      <PackagingHint weightOz={pkg.weightOz} length={pkg.length} width={pkg.width} height={pkg.height} />
 
                       {labelErr && <div className="flex items-center gap-1.5 text-sm text-destructive"><Warning size={14} weight="fill" /> {labelErr}</div>}
 
