@@ -396,7 +396,7 @@ export function SiteContentPanel() {
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={resetToDefaults}>Reset to defaults</Button>
-          <Button size="sm" onClick={save} disabled={saving}>
+          <Button size="sm" onClick={() => save()} disabled={saving}>
             {saving ? <CircleNotch size={14} className="animate-spin" /> : <FloppyDisk size={14} />}Save
           </Button>
         </div>
