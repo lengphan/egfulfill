@@ -373,10 +373,15 @@ export function sandboxRoutes(app, requireAuth) {
              values ($1,$2,'api',$3,$4,'new','',$5, now(), $6)`,
       [id, String(sellerId), JSON.stringify(customer), JSON.stringify(b.shipping_address || {}), total,
        JSON.stringify({ external_id: b.external_id || null, via: 'api' })]);
+    let li = 0;
     for (const l of priced) {
-      await q(`insert into order_items (order_id, sku, name, qty, color, size, unit_price, print_type)
-               values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [id, l.sku, l.product, l.quantity, l.color, l.size, l.unit_price, l.method]).catch(() => {});
+      // Mint a stable line_id so every API-sourced line is addressable (blank/variant picking,
+      // per-line status/design) and identical-SKU siblings never collide — same guarantee the
+      // Etsy/Shopify/TikTok importers give their lines.
+      const lineId = `API${(li++).toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
+      await q(`insert into order_items (order_id, sku, name, qty, color, size, unit_price, print_type, line_id)
+               values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [id, l.sku, l.product, l.quantity, l.color, l.size, l.unit_price, l.method, lineId]).catch(() => {});
     }
     // Confirm intake to the pusher's own endpoints. Sounds redundant — they just made
     // this call — but a partner fanning orders across several fulfillers uses it as the

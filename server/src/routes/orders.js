@@ -453,6 +453,15 @@ export function ordersRoutes(app, requireAuth) {
   // Stable per-line id (client-generated) so a line item's design/image/status keys
   // never collide between identical-SKU siblings. Preserved across replaceItems.
   q('alter table order_items add column if not exists line_id text').catch(() => {});
+  // ADDRESSABILITY BACKFILL. Item-setup / item-status / design all address a line by line_id
+  // OR sku; a line with NEITHER (a marketplace/manual line whose blank isn't picked yet, or a
+  // row that pre-dates line_id) is impossible to edit — "line_id or sku required" — and the
+  // blank can never be set. Mint a STABLE line_id from the immutable row id for every such
+  // orphan, once, so every order type (Etsy, Shopify, TikTok, manual, sandbox, old or new) is
+  // editable on every board. `BL` prefix can't collide with marketplace/`FFL-` ids. Idempotent.
+  q(`update order_items set line_id = 'BL' || id where (line_id is null or line_id = '') and (sku is null or sku = '')`)
+    .then((r) => { if (r && r.rowCount) console.log(`[order_items] minted line_id for ${r.rowCount} unaddressable line(s)`); })
+    .catch(() => {});
   /**
    * Which design charge this line attracts. One field, three mutually exclusive outcomes:
    *
@@ -638,6 +647,19 @@ export function ordersRoutes(app, requireAuth) {
   q('alter table orders add column if not exists est_delivery timestamptz').catch(() => {});
   q('alter table order_items add column if not exists ship_fee numeric').catch(() => {});
 
+  // Guarantee every returned line is ADDRESSABLE. Any line with neither line_id nor sku gets a
+  // stable line_id minted from its row id (same scheme as the load-time backfill) and PERSISTED,
+  // so the id the client receives is the one item-setup will match. Self-healing: covers any
+  // insert path that ever forgets to set a key, for every order type, without touching a board.
+  async function healOrphanLines(row) {
+    const items = row && Array.isArray(row.items) ? row.items : [];
+    const orphans = items.filter((it) => it && it.id != null && !it.line_id && (it.sku == null || it.sku === ''));
+    if (!orphans.length) return row;
+    await Promise.all(orphans.map((it) => q(`update order_items set line_id = 'BL' || id where id = $1 and line_id is null`, [it.id]).catch(() => {})));
+    for (const it of orphans) it.line_id = 'BL' + it.id;
+    return row;
+  }
+
   // List
   // ONE order. The detail page used to fetch every order and search it, so an order the
   // list happened to exclude read as "not found" even though it existed. Staff may read
@@ -664,7 +686,7 @@ export function ordersRoutes(app, requireAuth) {
         reply.code(404); return { error: 'Order not found' };
       }
     }
-    return row;
+    return healOrphanLines(row);
   });
 
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {
@@ -701,6 +723,7 @@ export function ordersRoutes(app, requireAuth) {
             -- '' / 'new', which the push filter excludes.
             or exists (select 1 from users u where u.id = o.seller_id and u.role <> 'seller')
          group by o.id order by o.created_at desc`);
+      await Promise.all(r.rows.map(healOrphanLines));
       return r.rows;
     }
     // Sellers only see their OWN orders, never the admin/factory-synced ones. A team member sees
@@ -721,6 +744,7 @@ export function ordersRoutes(app, requireAuth) {
        from orders o ${join} where o.seller_id=$1 and o.factory_order=false group by o.id order by o.created_at desc`,
       [sel.id]
     );
+    await Promise.all(r.rows.map(healOrphanLines));
     return r.rows;
   });
 
