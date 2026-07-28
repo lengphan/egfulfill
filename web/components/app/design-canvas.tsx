@@ -918,9 +918,9 @@ export function DesignCanvasDialog({
           </div>
         )}
         <div className="space-y-3">
-          {/* The artwork input the STAGE opens. No visible Upload button while the stage is
-              empty — the stage already is one, and two controls for one job is how the old
-              layout got noisy. It comes back as "Replace" once there's art to replace. */}
+          {/* The artwork input the STAGE opens. An explicit Upload image / Replace button is
+              always shown too: the empty stage alone wasn't discoverable, which left people
+              staring at a greyed-out Save with no obvious way to add the image. */}
           <input ref={uploadRef} type="file" accept="image/*" className="hidden"
             onChange={(e) => { readImageFile(e.target.files?.[0], (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr); e.target.value = "" }} />
           <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} className="hidden"
@@ -929,9 +929,7 @@ export function DesignCanvasDialog({
           {/* WORDS ONLY, one component, one size. A verb each, styled identically, so the
               row reads without decoding an icon. */}
           <div className="flex flex-wrap items-center gap-2">
-            {designUrl && (
-              <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>Replace</Button>
-            )}
+            <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>{designUrl ? "Replace" : "Upload image"}</Button>
             <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>Library</Button>
             {/* The seller's own-file route, now a BUTTON. Dropping one always worked, but
                 a drop is only discoverable if you already suspect it exists — which is why
@@ -1103,7 +1101,16 @@ export function DesignCanvasDialog({
             </div>
           )}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* Say WHY Save is disabled. A machine file without an image is the common case —
+                the stitch file is saved, but there's no picture to place on the mockup yet. */}
+            {!designUrl && (
+              <span className="mr-auto text-xs text-muted-foreground">
+                {hasMachineFile
+                  ? "Add an image so your file shows in the right spot on the product mockup."
+                  : "Add artwork above to save this design."}
+              </span>
+            )}
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={() => void save()} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
           </div>
