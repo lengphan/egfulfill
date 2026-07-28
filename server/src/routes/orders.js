@@ -862,15 +862,22 @@ export function ordersRoutes(app, requireAuth) {
     const imgBySku = {};
     for (const r of prev.rows) { if (r.sku != null && r.img && !(r.sku in imgBySku)) imgBySku[r.sku] = r.img; }
     await q('delete from order_items where order_id=$1', [orderId]);
+    let li = 0;
     for (const it of items) {
       const img = (it.img != null && it.img !== '') ? it.img : (imgBySku[it.sku] || null);
       const designPos = (it.designPos && typeof it.designPos === 'object') ? JSON.stringify(it.designPos) : null;
+      // Every line must be ADDRESSABLE — item-setup/status/design all key on line_id or sku.
+      // A manual line often starts with NO sku (blank not picked yet) and no line_id, which
+      // left it impossible to ever set the blank ("line_id or sku required"). Mint a stable
+      // line_id here when the client didn't send one and there's no sku to key on. The client
+      // reads it back and echoes it on later edits, so it stays stable.
+      const lineId = it.lineId || (it.sku ? null : `FFL-${Date.now().toString(36)}${(li++).toString(36)}${Math.random().toString(36).slice(2, 6)}`);
       await q(
         `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant, unit_price, design_src, img, blank, design_pos, line_id)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [orderId, it.sku || null, it.name || null, it.printType || it.tech || null, it.qty || 1,
          it.color || null, it.size || null, it.variant || null, it.unitPrice || 0, it.designSrc || null,
-         img, it.blank || null, designPos, it.lineId || null]
+         img, it.blank || null, designPos, lineId]
       );
     }
   }
