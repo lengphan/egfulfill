@@ -329,12 +329,6 @@ export function ProductEditorDialog({
   })()
   const bandFee = fees?.[bandKey]
 
-  // Live margin readout — our margin as the factory: what we charge the seller (Base cost)
-  // minus what the blank cost us (Product cost). Shipping is a pass-through fee, not part of
-  // the product margin, so it's shown as its own column rather than folded in here.
-  const base = num(basePrice), pcost = num(productCost)
-  const profit = !isNaN(base) && !isNaN(pcost) ? base - pcost : NaN
-  const marginPct = !isNaN(profit) && base > 0 ? Math.round((profit / base) * 100) : NaN
   // Dim-weight check for the packaging suggestion (÷166, USPS/Shippo). Deterministic math.
   const pkg = packagingHint(weightOz, boxL, boxW, boxH)
 
@@ -368,6 +362,13 @@ export function ProductEditorDialog({
     if (!name.trim()) { setErr("Give the product a name."); return }
     const colorImages: Record<string, string> = {}
     for (const c of colors) colorImages[c] = colorImgs[c] || ""
+    // Product-level cost/base/shipping default = the first size's tier (or the loaded value).
+    const firstTierNum = (k: keyof Tier, stateVal: string): number | undefined => {
+      const tv = (sizes.length ? tiers[sizes[0]]?.[k] : "")?.trim()
+      if (tv) return Number(tv) || 0
+      const sv = stateVal.trim()
+      return sv === "" ? undefined : Number(sv) || 0
+    }
     const next: CatalogProduct = {
       ...(product ?? {}),
       id: product?.id ?? genId(newIdSeed),
@@ -377,9 +378,12 @@ export function ProductEditorDialog({
       // undefined when blank so the server derives base = productCost + markup rather than
       // treating a blank as $0 (see server/pricing.js). `price` (any legacy retail figure)
       // is preserved untouched via the spread above — it's no longer edited here.
-      productCost: productCost.trim() === "" ? undefined : Number(productCost) || 0,
-      basePrice: basePrice.trim() === "" ? undefined : Number(basePrice) || 0,
-      shippingFee: shipping.trim() === "" ? undefined : Number(shipping) || 0,
+      // Product-level defaults now come from the FIRST size's tier (the summary row was removed;
+      // per-size pricing is the source). Falls back to the loaded value, else undefined so the
+      // server derives base = productCost + markup rather than treating a blank as $0.
+      productCost: firstTierNum("cost", productCost),
+      basePrice: firstTierNum("price", basePrice),
+      shippingFee: firstTierNum("shipping", shipping),
       weightOz: weightOz.trim() === "" ? undefined : Number(weightOz) || 0,
       boxL: boxL.trim() === "" ? undefined : Number(boxL) || 0,
       boxW: boxW.trim() === "" ? undefined : Number(boxW) || 0,
@@ -496,24 +500,10 @@ export function ProductEditorDialog({
             </div>
           </div>
 
-          {/* Pricing + live margin */}
+          {/* Sizes & pricing — the per-size cost / base / shipping below is the source of truth.
+              The product-level summary row + margin readout were removed as redundant; the
+              product-level defaults are derived from the first size's tier on save. */}
           <div className="rounded-xl border border-border p-4">
-            <div className="grid grid-cols-3 gap-3">
-              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Product cost ($)</span><Input value={productCost} onChange={(e) => setProductCost(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="from supplier" className="h-9" inputMode="decimal" /></label>
-              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Base cost ($)</span><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={pcost > 0 && markup ? `${(pcost + markup).toFixed(2)} (cost + markup)` : "18.00"} className="h-9" inputMode="decimal" /></label>
-              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Shipping fee ($)</span><Input value={shipping} onChange={(e) => setShipping(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={bandFee != null ? `default ${bandFee}` : "default"} className="h-9" inputMode="decimal" /></label>
-            </div>
-            <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
-              <span className="text-muted-foreground">Margin per unit <span className="opacity-70">(base − product cost)</span></span>
-              {isNaN(profit) ? (
-                <span className="text-muted-foreground">enter product + base cost</span>
-              ) : (
-                <span className={"font-semibold tabular-nums " + (profit >= 0 ? "text-emerald-600" : "text-destructive")}>
-                  ${profit.toFixed(2)}{!isNaN(marginPct) ? ` · ${marginPct}%` : ""}
-                </span>
-              )}
-            </div>
-            {shipping.trim() === "" && <p className="mt-1 text-xs text-muted-foreground">Leave shipping blank to use the platform default at fulfillment.</p>}
 
             {/* Per-size price tiers — the canonical sizePrices [{size, price, shipping}].
                 Keyed by SIZE, not colour: a 3XL costs more to buy and to ship, while Navy
@@ -522,7 +512,7 @@ export function ProductEditorDialog({
             {/* Always rendered — this table is now the size list itself, so gating it on
                 sizes.length meant deleting the last size removed the only way to add one
                 back. */}
-            <div className="mt-3 border-t border-border pt-3">
+            <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium">Sizes &amp; pricing</span>
                   {Object.keys(tiers).length > 0 && (
@@ -888,14 +878,14 @@ export function ProductEditorDialog({
               <span className="text-sm font-medium">Colors</span>
               {colors.length > 0 && <button onClick={() => setColors([])} className="text-xs font-medium text-primary hover:underline">Clear</button>}
             </div>
-            {/* Each colour can point at one of the gallery images. A colour with none
-                falls back to the product's main image, same as before. "Auto-match" fills
-                every blank in one click; ✓ = matched from the supplier map or filename,
-                ? = guessed from the photo's dominant colour (eyeball those). */}
+            {/* Photo-first matching: show each gallery PHOTO and tag it with its colour (no
+                image numbers). A colour with no photo falls back to the product's main image.
+                Auto-match fills the tags; ✓ = confident (supplier map / filename), ? = guessed
+                from the photo's dominant colour (eyeball those). One photo per colour. */}
             {colors.length > 0 && gallery.length > 0 && (
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Match each colour to its photo</span>
+                  <span className="text-xs text-muted-foreground">Tag each photo with its colour</span>
                   <button
                     type="button"
                     onClick={autoMatch}
@@ -903,38 +893,42 @@ export function ProductEditorDialog({
                     className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
                   >
                     {matching ? <CircleNotch size={12} weight="bold" className="animate-spin" /> : <MagicWand size={12} weight="fill" />}
-                    {matching ? "Matching…" : "Auto-match photos"}
+                    {matching ? "Matching…" : "Auto-match"}
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {colors.map((c) => (
-                    <div key={c} className="flex items-center gap-1.5 rounded-md bg-card px-1.5 py-1">
-                      <span className="max-w-[110px] truncate text-xs font-medium">{prettyColorName(c)}</span>
-                      <select
-                        value={colorImgs[c] ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          setColorImgs((m) => ({ ...m, [c]: v }))
-                          // A manual pick is authoritative — drop any auto-match ✓/? marker on it.
-                          setMatchConf((m) => { const n = { ...m }; delete n[c]; return n })
-                        }}
-                        className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-xs transition-colors hover:border-primary/40"
-                      >
-                        <option value="">Main image</option>
-                        {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
-                      </select>
-                      {colorImgs[c] && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={colorImgs[c]} alt="" className="size-6 rounded border border-border object-cover" />
-                      )}
-                      {matchConf[c] === "high" && (
-                        <Check size={13} weight="bold" className="text-emerald-600" aria-label="Confident match" />
-                      )}
-                      {matchConf[c] === "low" && (
-                        <Question size={13} weight="bold" className="text-amber-500" aria-label="Guessed from the photo colour — please verify" />
-                      )}
-                    </div>
-                  ))}
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                  {gallery.map((u) => {
+                    const assigned = colors.find((c) => colorImgs[c] === u)
+                    return (
+                      <div key={u} className="relative aspect-square overflow-hidden rounded-lg border border-border bg-card">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={u} alt="" className="size-full object-cover" />
+                        {assigned && matchConf[assigned] === "high" && <Check size={14} weight="bold" className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-emerald-600" aria-label="Confident match" />}
+                        {assigned && matchConf[assigned] === "low" && <Question size={14} weight="bold" className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-amber-500" aria-label="Guessed — verify" />}
+                        {/* Colour tag, overlaid on the photo. Picking a colour points it at THIS
+                            photo and clears that photo/colour off any other pairing. */}
+                        <select
+                          value={assigned ?? ""}
+                          onChange={(e) => {
+                            const c = e.target.value
+                            setColorImgs((m) => {
+                              const n = { ...m }
+                              for (const k of Object.keys(n)) if (n[k] === u) delete n[k] // this photo off any colour
+                              if (c) n[c] = u
+                              return n
+                            })
+                            if (assigned) setMatchConf((m) => { const n = { ...m }; delete n[assigned]; return n })
+                            if (c) setMatchConf((m) => { const n = { ...m }; delete n[c]; return n })
+                          }}
+                          className={"eg-select absolute inset-x-1 bottom-1 h-6 w-[calc(100%-0.5rem)] rounded-md border px-1 text-[11px] font-medium backdrop-blur transition-colors " + (assigned ? "border-primary/40 bg-primary/90 text-primary-foreground" : "border-border bg-card/90 text-muted-foreground")}
+                          aria-label="Tag this photo's colour"
+                        >
+                          <option value="">— colour —</option>
+                          {colors.map((c) => <option key={c} value={c}>{prettyColorName(c)}</option>)}
+                        </select>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
