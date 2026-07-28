@@ -27,7 +27,7 @@ export const isSubmittable = (o: { factory_status?: string | null }) =>
  * way the price is on screen before the button that takes the money.
  */
 export function SubmitOrderButton({
-  order, quote, onDone, size = "sm", label = "Submit to production", className,
+  order, quote, onDone, size = "sm", label = "Submit to production", className, incomplete = 0,
 }: {
   order: OrderRow
   /** Pass one if the caller already has it; otherwise it's fetched when the dialog opens. */
@@ -36,6 +36,10 @@ export function SubmitOrderButton({
   size?: "sm" | "default"
   label?: string
   className?: string
+  /** Lines still missing a blank / colour / size / method (orderNeedsSetup). > 0 blocks the
+   *  submit: an order with an unpicked variant can't be produced, so it must not be charged
+   *  and pushed to the floor. Callers with the catalog compute this; default 0 = no gate. */
+  incomplete?: number
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -80,10 +84,14 @@ export function SubmitOrderButton({
     } finally { setBusy(false) }
   }
 
-  // Only block on a quote we actually have. An un-fetched quote is not evidence of a
-  // problem, and disabling the button because a request hasn't returned would read as
-  // "this order can't be submitted".
-  const blocked = !!q?.unpriced?.length
+  // Block when a line still needs setup (no blank / unpicked variant — can't be made), or
+  // on a quote we actually have that has unpriceable lines. An un-fetched quote is not
+  // evidence of a problem, so it never blocks on its own.
+  const setupBlock = incomplete > 0
+  const blocked = setupBlock || !!q?.unpriced?.length
+  const blockMsg = setupBlock
+    ? `${incomplete} item${incomplete === 1 ? "" : "s"} still ${incomplete === 1 ? "needs" : "need"} a blank, colour, size & method — pick them before submitting.`
+    : "Some lines have no price yet — pick a blank on them first"
 
   return (
     <>
@@ -92,7 +100,7 @@ export function SubmitOrderButton({
         className={className}
         onClick={(e) => { e.stopPropagation(); openDialog() }}
         disabled={busy || blocked}
-        title={blocked ? "Some lines have no price yet — pick a blank on them first" : undefined}
+        title={blocked ? blockMsg : undefined}
       >
         <PaperPlaneTilt size={14} weight="bold" /> {label}
       </Button>
@@ -129,7 +137,11 @@ export function SubmitOrderButton({
             </div>
           ) : null}
 
-          {q?.unpriced?.length ? (
+          {setupBlock ? (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <Warning size={15} weight="fill" className="mt-0.5 shrink-0" /> {blockMsg} We can&apos;t make an order with an item that isn&apos;t fully specified.
+            </div>
+          ) : q?.unpriced?.length ? (
             <p className="text-sm text-destructive">
               {q.unpriced.length} line{q.unpriced.length === 1 ? "" : "s"} can&apos;t be priced yet — pick a blank on them first.
             </p>
@@ -148,7 +160,7 @@ export function SubmitOrderButton({
           <DialogFooter>
             {short && <Button variant="outline" onClick={() => router.push("/wallet")}>Top up wallet</Button>}
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Not yet</Button>
-            <Button onClick={submit} disabled={busy || loadingQuote || !!q?.unpriced?.length}>
+            <Button onClick={submit} disabled={busy || loadingQuote || blocked}>
               {busy ? "Submitting…" : q ? `Charge ${money(q.total)}` : "Submit"}
             </Button>
           </DialogFooter>

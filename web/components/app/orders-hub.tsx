@@ -16,7 +16,7 @@ import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCar
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { resolveProduct } from "@/lib/variant-resolve"
+import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, isFactoryColLocked, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
@@ -439,6 +439,7 @@ export function OrdersHub() {
   // shipping it; the parcel still has to be scanned and made.
   const buyLabel = async (o: OrderRow) => {
     setLabelErr(null)
+    if (orderNeedsSetup(o.items, catalog) > 0) { setLabelErr("Finish item setup (blank, colour, size, method) on every line before buying a label — we can't ship what isn't made."); return }
     if (!addrComplete(to)) { setLabelErr("Recipient needs a street, city, state and ZIP."); return }
     if (!addrComplete(from)) { setLabelErr("No warehouse 'From' address saved — set it in Settings › Platform, then try again."); return }
     setBusy(`label:${o.id}`)
@@ -1333,10 +1334,28 @@ export function OrdersHub() {
                             left, so flinging it to the far edge (x≈1655, 846px past the
                             last field at 1920) separated it from its own inputs. It reads
                             as the end of the form now, because it is. */}
-                        <Button size="sm" onClick={() => buyLabel(o)} disabled={busy === `label:${o.id}`}>
-                          {busy === `label:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Printer size={14} weight="bold" /> Buy USPS label</>}
-                        </Button>
+                        {(() => {
+                          // Can't ship what can't be made: block the label while any line still
+                          // needs its blank / colour / size / method picked.
+                          const unset = orderNeedsSetup(o.items, catalog)
+                          return (
+                            <Button size="sm" onClick={() => buyLabel(o)} disabled={busy === `label:${o.id}` || unset > 0}
+                              title={unset > 0 ? `${unset} item${unset === 1 ? "" : "s"} still ${unset === 1 ? "needs" : "need"} setup — pick every variant before buying a label.` : undefined}>
+                              {busy === `label:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Printer size={14} weight="bold" /> Buy USPS label</>}
+                            </Button>
+                          )
+                        })()}
                       </div>
+
+                      {(() => {
+                        const unset = orderNeedsSetup(o.items, catalog)
+                        return unset > 0 ? (
+                          <div className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                            <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
+                            <span>{unset} item{unset === 1 ? "" : "s"} still {unset === 1 ? "needs" : "need"} a blank, colour, size &amp; method — finish setup before shipping.</span>
+                          </div>
+                        ) : null
+                      })()}
 
                       {/* Dim-weight packaging suggestion for this parcel (÷166) — the box guidance,
                           shown right under the dimensions it reasons about. */}

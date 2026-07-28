@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
+import { orderNeedsSetup } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
 import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -416,7 +417,7 @@ export function OrdersList() {
                                   STATE, submit is an ACTION, and six of them read as six
                                   alarms rather than one thing to do. */}
                               <span className="ml-auto flex items-center gap-2">
-                                <SubmitOrderButton order={o} onDone={load} label="Submit to production" />
+                                <SubmitOrderButton order={o} onDone={load} label="Submit to production" incomplete={orderNeedsSetup(o.items, catalog)} />
                                 <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${encodeURIComponent(o.id)}`) }}>
                                   Open order <CaretRight size={12} weight="bold" />
                                 </Button>

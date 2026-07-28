@@ -127,3 +127,26 @@ export function sizesOf(p: CatalogProduct | null): string[] {
   for (const t of p.sizePrices ?? []) if (t?.size) out.add(String(t.size))
   return [...out]
 }
+
+const isSet = (v: unknown) => !!(v != null && String(v).trim())
+
+/**
+ * Is a line NOT yet production-ready? True when its blank can't be resolved at all, OR the
+ * resolved product OFFERS a colour / size / method the line hasn't picked. This is the one
+ * definition of "needs setup" — the submit and the label both gate on it, because an order
+ * with an unpicked variant literally can't be made. Marketplace lines arrive with everything
+ * unset, and a manual line can too, so both flow through here.
+ */
+export function itemNeedsSetup(item: OrderItem, catalog: CatalogProduct[]): boolean {
+  const p = resolveProduct(item, catalog)
+  if (!p) return !isSet(item.blank)   // nothing to produce on
+  if (colorsOf(p).length && !isSet(item.color)) return true
+  if (sizesOf(p).length && !isSet(item.size)) return true
+  if (methodsOf(p).length && !isSet(item.print_type)) return true
+  return false
+}
+
+/** How many of an order's lines still need setup (0 = ready). */
+export function orderNeedsSetup(items: OrderItem[] | undefined, catalog: CatalogProduct[]): number {
+  return (items ?? []).filter((it) => itemNeedsSetup(it, catalog)).length
+}
