@@ -114,11 +114,10 @@ export default function ProductDetailPage() {
         <ArrowLeft size={16} weight="bold" /> Products
       </Button>
 
-      {/* Image column is capped (not a full 50/50 split) so the mockup doesn't blow up to
-          ~half the viewport on wide screens. The whole grid is capped too: with only a
-          max-w on the page, the info column absorbed every extra pixel on a wide screen,
-          which stretched the cards and left the big empty right gutter. */}
-      <div className="grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:items-start">
+      {/* Fill the page container (eg-content, 1600px) like every other page — the old
+          max-w-6xl cap left a big empty right gutter. The image column is still capped so the
+          mockup doesn't blow up to half the viewport; the info column takes the rest. */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)] lg:items-start">
         {/* Gallery sticks while the (much taller) info column scrolls — otherwise the
             left column dead-ends under the thumbnails and leaves a tall empty well. */}
         <div className="space-y-3 lg:sticky lg:top-6">
