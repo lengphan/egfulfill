@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Plus, ArrowLineDown, DownloadSimple } from "@phosphor-icons/react"
 import { TopUpDialog } from "@/components/app/topup-dialog"
 import { PayoutDialog } from "@/components/app/payout-dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,6 +39,13 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
   const [busy, setBusy] = useState<string | null>(null)
   const load = useCallback(() => { if (canReview) getTopups("pending").then((r) => setTopups(r ?? [])).catch(() => setTopups([])) }, [canReview])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  // Kept in sync via the wallet-changed event so BOTH copies of this panel (top of page +
+  // above the ledger) reflect a review done in either one, with no stale duplicate.
+  useEffect(() => {
+    const h = () => load()
+    window.addEventListener("eg-wallet-changed", h)
+    return () => window.removeEventListener("eg-wallet-changed", h)
+  }, [load])
   const review = async (t: TopupRequest, action: "confirm" | "reject") => {
     // Close it out of the pending list immediately (optimistic), then record the decision.
     // On success refresh the wallet so the credit lands in the history right away; on
@@ -265,6 +273,8 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
   }, [view?.rows, rejected])
   const [topUpOpen, setTopUpOpen] = useState(false)
   const [payoutOpen, setPayoutOpen] = useState(false)
+  // The row a staff/seller clicked to inspect — full detail for an audit/check-up.
+  const [detail, setDetail] = useState<Row | null>(null)
   // Admin and warehouse share the FACTORY wallet, which is a pure internal ledger — there
   // is nothing to withdraw from it and no bank/card account to link, so those controls are
   // hidden for them. Sellers keep Withdraw, which now opens the payout flow.
@@ -382,6 +392,41 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
 
       <PayoutDialog open={payoutOpen} onOpenChange={setPayoutOpen} onDone={refresh} />
 
+      {/* Transaction detail — click any row for the full record (ref, type, note, balances). */}
+      <Dialog open={!!detail} onOpenChange={(o) => { if (!o) setDetail(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Transaction detail</DialogTitle></DialogHeader>
+          {detail && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <Badge className={detail.tone} variant="secondary">{detail.label}</Badge>
+                <span className={"text-lg font-semibold tabular-nums " + (detail.rejected ? "text-muted-foreground line-through" : detail.amount >= 0 ? "text-emerald-600" : "text-foreground")}>
+                  {usd(detail.amount, !detail.rejected)}
+                </span>
+              </div>
+              <dl className="divide-y divide-border rounded-lg border border-border text-sm">
+                {[
+                  ["Description", detail.desc],
+                  ["Date", detail.date],
+                  ["Reference", detail.ref || "—"],
+                  ["Method", detail.method],
+                  ["Balance before", Number.isFinite(detail.balance) ? usd(detail.balance - detail.amount) : "—"],
+                  ["Balance after", Number.isFinite(detail.balance) ? usd(detail.balance) : "—"],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-start justify-between gap-4 px-3 py-2">
+                    <dt className="shrink-0 text-muted-foreground">{k}</dt>
+                    <dd className="min-w-0 break-words text-right font-medium tabular-nums">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+              {detail.ref && /^(FF-|etsy-|shopify-|tiktok-)/i.test(detail.ref) && (
+                <a href={`/orders/${encodeURIComponent(detail.ref)}`} className="inline-flex text-sm font-medium text-primary hover:underline">Open order →</a>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (
           <Card key={k.label} className="gap-0 p-5">
@@ -400,6 +445,11 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
           </Card>
         ))}
       </div>
+
+      {/* Second copy of the pending-top-up notice — right above the ledger, where the credit
+          lands, so a reviewer working the transactions doesn't miss it. Stays in sync with the
+          top-of-page copy via the wallet-changed event. */}
+      <AdminTopups onReviewed={() => { refresh(); window.dispatchEvent(new CustomEvent("eg-wallet-changed")) }} />
 
       {(() => {
       const txCard = (
@@ -458,7 +508,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
               </TableRow>
             ) : (
               histRows.map((t) => (
-                <TableRow key={t.id}>
+                <TableRow key={t.id} onClick={() => setDetail(t)} className="cursor-pointer hover:bg-muted/40">
                   <TableCell className="text-muted-foreground">{t.date}</TableCell>
                   <TableCell className="font-medium">{t.desc}</TableCell>
                   <TableCell className="text-muted-foreground">{t.ref}</TableCell>

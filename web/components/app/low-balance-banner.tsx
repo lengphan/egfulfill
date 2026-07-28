@@ -30,6 +30,14 @@ export function LowBalanceBanner() {
     getWallet().then((r) => setW({ balance: r.balance, low: r.low, lowBelow: r.lowBelow })).catch(() => setW(null))
   }, [])
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+  // Re-read the moment the wallet changes (a top-up funded/approved) so a now-healthy balance
+  // drops this banner immediately instead of lingering until a reload. Same event the topbar
+  // and Add Funds already dispatch.
+  useEffect(() => {
+    const h = () => load()
+    window.addEventListener("eg-wallet-changed", h)
+    return () => window.removeEventListener("eg-wallet-changed", h)
+  }, [load])
 
   if (!w || !w.low) return null
   const negative = w.balance < 0
