@@ -305,7 +305,7 @@ export default function OrderDetailPage() {
           width, so a long unbroken order/SKU string holds the 1.6fr track open and pushes
           the whole grid past its container — the page then scrolls sideways. There was
           slack to absorb it at 1600px; at the reading width there isn't. */}
-      <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid gap-5 lg:grid-cols-[2.1fr_1fr]">
         {/* items + timeline */}
         <div className="min-w-0 space-y-5">
           <SectionCard title={`Items (${items.length})`}>

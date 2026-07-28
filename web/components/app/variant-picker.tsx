@@ -59,7 +59,7 @@ export function VariantPicker({
     <div className="mt-3">
       {/* Uneven tracks, but the SAME tracks on every line item — Blank holds full product
           names so it gets the room; Size holds "S"/"2XL" so it needs least. */}
-      <div className="grid grid-cols-2 gap-x-2 gap-y-2.5 sm:grid-cols-[1.6fr_1.1fr_1fr_1.1fr]">
+      <div className="grid grid-cols-2 gap-x-2 gap-y-2.5 sm:grid-cols-[1.4fr_1.1fr_1fr_1.1fr]">
         {/* Blank — the load-bearing pick; nothing else can price without it, so it's the
             only field that flags itself when empty. */}
         <VariantField
