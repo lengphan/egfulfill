@@ -108,7 +108,6 @@ export function DigitizerStudio() {
 
 // ── Browse: order artwork + library + direct upload ─────────────────────────────
 function BrowseTab() {
-  const [source, setSource] = useState<Source>("order")
   const [orders, setOrders] = useState<OrderUpload[] | null>(null)
   const [lib, setLib] = useState<LibraryDesign[] | null>(null)
   const [palette, setPalette] = useState<ThreadColor[]>([])
@@ -125,23 +124,18 @@ function BrowseTab() {
     return () => clearTimeout(id)
   }, [])
 
-  const items: ArtItem[] = source === "order" ? (orders ?? []).map(orderItem) : (lib ?? []).map(libItem)
-  const loading = source === "order" ? orders === null : lib === null
+  // Order artwork + design library shown TOGETHER (no source toggle).
+  const items: ArtItem[] = [...(orders ?? []).map(orderItem), ...(lib ?? []).map(libItem)]
+  const loading = orders === null || lib === null
   const list = items.filter((i) => !q || `${i.name} ${i.ref ?? ""}`.toLowerCase().includes(q.toLowerCase()))
 
   return (
     <>
-      {/* No upload drop-zone here — Library is for browsing existing artwork; new uploads
-          happen in the Create tab. */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex rounded-full border border-border p-0.5">
-          {([{ id: "order", label: "Order artwork" }, { id: "library", label: "Library" }] as const).map((s) => (
-            <button key={s.id} onClick={() => setSource(s.id)} className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (source === s.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{s.label}</button>
-          ))}
-        </div>
-        <div className="relative max-w-xs flex-1">
+      {/* Search only, top-right — order artwork and the design library live in one grid below. */}
+      <div className="flex justify-end">
+        <div className="relative w-full max-w-sm">
           <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search artwork…" className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
         </div>
       </div>
 
@@ -149,7 +143,7 @@ function BrowseTab() {
         {loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 10 }).map((_, i) => <div key={i} className="aspect-[3/4] animate-pulse rounded-xl bg-muted" />)}</div>
         ) : list.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border py-14 text-center text-sm text-muted-foreground">{q ? `Nothing matches “${q}”.` : source === "order" ? "No buyer artwork on your orders yet." : "No designs in your library yet."}</div>
+          <div className="rounded-2xl border border-dashed border-border py-14 text-center text-sm text-muted-foreground">{q ? `Nothing matches “${q}”.` : "No artwork yet — buyer uploads and your design library will appear here."}</div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {list.map((it) => (
@@ -696,7 +690,7 @@ function CreateTab() {
             = the .emb (stitches only, for the embroidery machine); PNG = the rendered image. */}
         <div className="flex gap-2">
           <button onClick={() => void generateAnd("emb")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-            {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : <Needle size={14} weight="bold" />} Machine file
+            {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : <Needle size={14} weight="bold" />} EMB
           </button>
           <button onClick={() => void generateAnd("png")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
             <ImageSquare size={14} weight="bold" /> PNG
