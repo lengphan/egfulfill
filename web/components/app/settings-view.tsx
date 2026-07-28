@@ -2174,7 +2174,7 @@ function ActivityPanel() {
                 key={c.key}
                 type="button"
                 aria-pressed={on}
-                onClick={() => setCats((prev) => (on ? prev.filter((k) => k !== c.key) : [...prev, c.key]))}
+                onClick={() => setCats(on ? [] : [c.key])}
                 className={
                   "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors " +
                   (on
