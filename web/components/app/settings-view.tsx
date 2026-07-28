@@ -2205,8 +2205,12 @@ function BackupsPanel() {
     listBackups()
       .then((s) => {
         setState(s); setLoaded(true)
-        setFreq((p) => p || String(s.config.frequencyDays))
-        setKeep((p) => p || String(s.config.keep))
+        // Guard: during the brief window where the new UI is live but the API hasn't been
+        // rebuilt yet, config/summary are absent — degrade instead of throwing.
+        if (s.config) {
+          setFreq((p) => p || String(s.config.frequencyDays))
+          setKeep((p) => p || String(s.config.keep))
+        }
       })
       .catch((e) => { setErr(e instanceof Error ? e.message : "Couldn't load backups"); setLoaded(true) })
   }, [])
