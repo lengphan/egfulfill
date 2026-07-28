@@ -61,6 +61,7 @@ import {
   runBackup,
   backupDownloadUrl,
   deleteBackup,
+  setBackupConfig,
   type DbBackup,
   type BackupsState,
 } from "@/lib/api"
@@ -2149,14 +2150,42 @@ function ActivityPanel() {
 }
 
 // ─────────────────────────── Backups (admin) ───────────────────────────
-// Database backups to R2 — on-demand + nightly, download, delete. The live database is
-// never touched here; these are point-in-time copies stored beside the artwork.
+// Database backups to R2 — on-demand + nightly, download, delete, with a summary strip and
+// an editable schedule. The live database is never touched here; these are point-in-time
+// copies stored beside the artwork.
 function fmtBytes(n: number): string {
   if (!n || n < 0) return "—"
   const u = ["B", "KB", "MB", "GB"]
   let i = 0, v = n
   while (v >= 1024 && i < u.length - 1) { v /= 1024; i++ }
   return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`
+}
+function fmtRel(iso: string | null): string {
+  if (!iso) return "Never"
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  if (m < 1) return "Just now"
+  if (m < 60) return `${m}m ago`
+  const h = Math.round(m / 60); if (h < 24) return `${h}h ago`
+  return `${Math.round(h / 24)}d ago`
+}
+function fmtNext(iso: string | null): string {
+  if (!iso) return "Soon"
+  const ms = new Date(iso).getTime() - Date.now()
+  if (ms <= 0) return "Due now"
+  const h = Math.round(ms / 3600000); if (h < 24) return `in ${h}h`
+  return `in ${Math.round(h / 24)}d`
+}
+function freqLabel(days: number): string {
+  return days === 1 ? "every day" : days === 7 ? "every week" : `every ${days} days`
+}
+function BackupStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-lg border bg-card px-3 py-2.5">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-lg font-semibold leading-tight tabular-nums">{value}</div>
+      {sub ? <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div> : null}
+    </div>
+  )
 }
 
 function BackupsPanel() {
@@ -2165,10 +2194,20 @@ function BackupsPanel() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [confirmDel, setConfirmDel] = useState<DbBackup | null>(null)
+  // Schedule form — seeded from the server on first load (functional guard below never
+  // clobbers an in-progress edit when the list re-polls).
+  const [freq, setFreq] = useState("")
+  const [keep, setKeep] = useState("")
+  const [savingCfg, setSavingCfg] = useState(false)
+  const [cfgMsg, setCfgMsg] = useState<string | null>(null)
 
   const load = useCallback(() => {
     listBackups()
-      .then((s) => { setState(s); setLoaded(true) })
+      .then((s) => {
+        setState(s); setLoaded(true)
+        setFreq((p) => p || String(s.config.frequencyDays))
+        setKeep((p) => p || String(s.config.keep))
+      })
       .catch((e) => { setErr(e instanceof Error ? e.message : "Couldn't load backups"); setLoaded(true) })
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
@@ -2196,6 +2235,14 @@ function BackupsPanel() {
     try { await deleteBackup(b.id); load() }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't delete that backup") }
   }
+  const saveConfig = async () => {
+    setSavingCfg(true); setCfgMsg(null)
+    try {
+      await setBackupConfig({ frequencyDays: Number(freq), keep: Number(keep) })
+      setCfgMsg("Saved"); load(); setTimeout(() => setCfgMsg(null), 2000)
+    } catch (e) { setCfgMsg(e instanceof Error ? e.message : "Couldn't save schedule") }
+    finally { setSavingCfg(false) }
+  }
 
   if (!loaded) return (
     <SectionCard title="Backups">
@@ -2205,6 +2252,8 @@ function BackupsPanel() {
 
   const ready = !!state?.storageConfigured && !!state?.pgDumpAvailable
   const rows = state?.backups || []
+  const sum = state?.summary
+  const cfg = state?.config
 
   return (
     <SectionCard title="Backups" description="Point-in-time copies of the database, stored in R2 alongside your artwork.">
@@ -2222,9 +2271,19 @@ function BackupsPanel() {
         </div>
       )}
 
+      {/* Summary strip — totals and cadence at a glance. */}
+      {sum && cfg && (
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <BackupStat label="Stored" value={fmtBytes(sum.totalBytes)} sub={`${sum.doneCount} backup${sum.doneCount === 1 ? "" : "s"}${sum.doneCount ? ` · avg ${fmtBytes(Math.round(sum.totalBytes / sum.doneCount))}` : ""}`} />
+          <BackupStat label="This week" value={String(sum.weekCount)} sub={`${sum.monthCount} in 30 days`} />
+          <BackupStat label="Last backup" value={fmtRel(sum.lastDone)} sub={sum.lastDone ? new Date(sum.lastDone).toLocaleDateString() : "—"} />
+          <BackupStat label="Next (auto)" value={fmtNext(sum.nextAuto)} sub={freqLabel(cfg.frequencyDays)} />
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-prose text-sm text-muted-foreground">
-          A backup runs automatically every night. The most recent {state?.keepAuto ?? 14} nightly backups are kept; manual ones stay until you remove them.
+          A backup runs automatically {freqLabel(cfg?.frequencyDays ?? 1)}. The most recent {cfg?.keep ?? 14} automatic backups are kept; manual ones stay until you remove them.
         </p>
         <Button onClick={startBackup} disabled={!ready || busy || anyRunning}>
           {busy || anyRunning ? <CircleNotch size={16} className="animate-spin" /> : <Database size={16} />}
@@ -2232,34 +2291,56 @@ function BackupsPanel() {
         </Button>
       </div>
 
+      {/* Editable schedule — saved to the DB, no redeploy. */}
+      <div className="mt-4 flex flex-wrap items-end gap-4 rounded-lg border bg-muted/20 p-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="bk-freq">Automatic frequency</label>
+          <select id="bk-freq" value={freq} onChange={(e) => setFreq(e.target.value)}
+            className="h-8 rounded-md border border-input bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+            <option value="1">Every day</option>
+            <option value="2">Every 2 days</option>
+            <option value="7">Every week</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="bk-keep">Keep last</label>
+          <Input id="bk-keep" type="number" min={1} max={90} value={keep} onChange={(e) => setKeep(e.target.value)} className="h-8 w-24" />
+        </div>
+        <Button variant="outline" size="sm" onClick={saveConfig} disabled={savingCfg || !freq || !keep}>
+          {savingCfg ? <CircleNotch size={14} className="animate-spin" /> : null}
+          Save schedule
+        </Button>
+        {cfgMsg && <span className="text-xs text-muted-foreground">{cfgMsg}</span>}
+      </div>
+
       {err && <p className="mt-3 text-sm text-destructive">{err}</p>}
 
       <div className="mt-4 overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-3 py-2 font-medium">When</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium">Size</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2" aria-label="Actions" />
+              <th className="px-4 py-3 font-medium">When</th>
+              <th className="px-4 py-3 font-medium">Type</th>
+              <th className="px-4 py-3 font-medium">Size</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3" aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">No backups yet. Run one now, or wait for tonight’s automatic backup.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No backups yet. Run one now, or wait for the next automatic backup.</td></tr>
             )}
             {rows.map((b) => (
               <tr key={b.id} className="border-b last:border-0">
-                <td className="px-3 py-2 tabular-nums">{new Date(b.created_at).toLocaleString()}</td>
-                <td className="px-3 py-2"><Badge variant={b.kind === "auto" ? "secondary" : "outline"}>{b.kind === "auto" ? "Nightly" : "Manual"}</Badge></td>
-                <td className="px-3 py-2 tabular-nums text-muted-foreground">{b.status === "done" ? fmtBytes(Number(b.size_bytes || 0)) : "—"}</td>
-                <td className="px-3 py-2">
+                <td className="px-4 py-3 tabular-nums">{new Date(b.created_at).toLocaleString()}</td>
+                <td className="px-4 py-3"><Badge variant={b.kind === "auto" ? "secondary" : "outline"}>{b.kind === "auto" ? "Automatic" : "Manual"}</Badge></td>
+                <td className="px-4 py-3 tabular-nums text-muted-foreground">{b.status === "done" ? fmtBytes(Number(b.size_bytes || 0)) : "—"}</td>
+                <td className="px-4 py-3">
                   {b.status === "done" && <span className="inline-flex items-center gap-1 text-green-600"><Check size={14} /> Done</span>}
                   {b.status === "running" && <span className="inline-flex items-center gap-1 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /> Running</span>}
                   {b.status === "failed" && <span className="inline-flex items-center gap-1 text-destructive" title={b.error || undefined}><Warning size={14} /> Failed</span>}
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
                     {b.status === "done" && (
                       <Button variant="ghost" size="sm" onClick={() => download(b)} title="Download">
@@ -2277,7 +2358,7 @@ function BackupsPanel() {
         </table>
       </div>
 
-      {state?.pgDumpVersion && <p className="mt-2 text-xs text-muted-foreground">{state.pgDumpVersion}</p>}
+      {state?.pgDumpVersion && <p className="mt-3 text-xs text-muted-foreground">{state.pgDumpVersion}</p>}
 
       <Dialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
         <DialogContent>

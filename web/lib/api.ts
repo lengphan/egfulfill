@@ -2814,16 +2814,31 @@ export type DbBackup = {
   created_at: string
   finished_at: string | null
 }
+export type BackupConfig = { frequencyDays: number; keep: number }
+export type BackupSummary = {
+  totalBytes: number
+  doneCount: number
+  weekCount: number
+  monthCount: number
+  lastDone: string | null
+  nextAuto: string | null
+}
 export type BackupsState = {
   backups: DbBackup[]
   storageConfigured: boolean
   pgDumpAvailable: boolean
   pgDumpVersion: string | null
   running: boolean
-  keepAuto: number
+  config: BackupConfig
+  summary: BackupSummary
 }
 export function listBackups() {
   return api<BackupsState>(`/api/backups`)
+}
+export function setBackupConfig(c: BackupConfig) {
+  return api<{ ok: boolean; config: BackupConfig }>(`/api/backups/config`, {
+    method: "PUT", body: JSON.stringify(c),
+  })
 }
 export function runBackup() {
   return api<{ ok: boolean; status: string }>(`/api/backups/run`, { method: "POST" })

@@ -22,9 +22,22 @@ import { storageEnabled, putObject, presignGet, deleteObject } from '../storage.
 import { audit } from '../audit.js';
 
 const PREFIX = 'backups/db';                     // R2 key prefix — sits beside artwork in the bucket
-const KEEP_AUTO = 14;                            // nightly backups to retain; older AUTO ones are pruned
-const AUTO_EVERY_MS = 60 * 60 * 1000;            // wake hourly to check whether a nightly is due
-const AUTO_MIN_GAP_MS = 23 * 60 * 60 * 1000;     // ...but only actually back up if the last success is this old
+const AUTO_EVERY_MS = 60 * 60 * 1000;            // wake hourly to check whether a scheduled backup is due
+const CONFIG_KEY = 'backup_config';              // row in `settings` — admin-editable frequency + retention
+const DEFAULTS = { frequencyDays: 1, keep: 14 }; // nightly, keep the last 14
+const SLACK_MS = 60 * 60 * 1000;                 // fire ~1h early so a 03:00 run doesn't drift later each day
+
+// Admin-editable schedule, read from the shared `settings` table at run time (no redeploy).
+async function getBackupConfig() {
+  try {
+    const r = await q('select value from settings where key=$1', [CONFIG_KEY]);
+    const v = r.rows[0] && r.rows[0].value;
+    const o = v && typeof v === 'object' ? v : {};
+    const frequencyDays = [1, 2, 7].includes(Number(o.frequencyDays)) ? Number(o.frequencyDays) : DEFAULTS.frequencyDays;
+    const keep = Number.isFinite(Number(o.keep)) ? Math.min(90, Math.max(1, Math.floor(Number(o.keep)))) : DEFAULTS.keep;
+    return { frequencyDays, keep };
+  } catch { return { ...DEFAULTS }; }
+}
 
 // ── table (created idempotently at route load, like the other settings tables) ──
 let _ready = null;
@@ -110,7 +123,7 @@ async function runBackup({ kind, actorEmail, req }) {
     await putObject(key, buf, 'application/octet-stream', 'private');   // private — never public-read
     await q(`update db_backups set status='done', size_bytes=$2, finished_at=now() where id=$1`, [row.id, buf.length]);
     if (req) audit(req, 'backup.created', { entityType: 'db_backup', entityId: String(row.id), after: { key, size: buf.length, kind } });
-    if (kind === 'auto') await pruneAuto();
+    if (kind === 'auto') await pruneAuto((await getBackupConfig()).keep);
     return { ...row, status: 'done', size_bytes: buf.length };
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
@@ -124,10 +137,10 @@ async function runBackup({ kind, actorEmail, req }) {
 
 // Keep the newest KEEP_AUTO nightly backups; delete the rest from R2 and the table. Manual
 // backups are never auto-pruned — a human made them on purpose.
-async function pruneAuto() {
+async function pruneAuto(keep) {
   const old = await q(
     `select id, r2_key from db_backups where kind='auto' and status='done' order by created_at desc offset $1`,
-    [KEEP_AUTO]);
+    [keep]);
   for (const r of old.rows) {
     if (r.r2_key) await deleteObject(r.r2_key).catch(() => {});
     await q('delete from db_backups where id=$1', [r.id]).catch(() => {});
@@ -139,9 +152,10 @@ async function maybeAutoBackup() {
   try {
     if (!storageEnabled() || !(await pgDumpVersion())) return;
     await ensureTable();
+    const cfg = await getBackupConfig();
     const last = await q(`select max(created_at) as t from db_backups where status='done'`);
     const t = last.rows[0] && last.rows[0].t ? new Date(last.rows[0].t).getTime() : 0;
-    if (Date.now() - t < AUTO_MIN_GAP_MS) return;
+    if (Date.now() - t < cfg.frequencyDays * 24 * 3600 * 1000 - SLACK_MS) return;
     await runBackup({ kind: 'auto', actorEmail: 'system' });
   } catch { /* recorded on the row; swallow so the timer survives to the next tick */ }
 }
@@ -165,14 +179,46 @@ export function backupRoutes(app, requireAdmin) {
     const r = await q(`select id, r2_key, size_bytes, kind, status, error, created_by, created_at, finished_at
                        from db_backups order by created_at desc limit 60`);
     const pg = await pgDumpVersion();
+    const cfg = await getBackupConfig();
+    // Roll-up for the summary strip: total stored, how many, cadence over the last week/month.
+    const st = await q(`select
+        count(*) filter (where status='done')                                              as done_count,
+        coalesce(sum(size_bytes) filter (where status='done'), 0)                           as total_bytes,
+        count(*) filter (where status='done' and created_at >= now() - interval '7 days')   as week_count,
+        count(*) filter (where status='done' and created_at >= now() - interval '30 days')  as month_count,
+        max(created_at) filter (where status='done')                                        as last_done
+      from db_backups`);
+    const s = st.rows[0] || {};
+    const lastDone = s.last_done ? new Date(s.last_done).getTime() : 0;
     return {
       backups: r.rows,
       storageConfigured: storageEnabled(),
       pgDumpAvailable: !!pg,
       pgDumpVersion: pg || null,
       running: _running,
-      keepAuto: KEEP_AUTO,
+      config: cfg,
+      summary: {
+        totalBytes: Number(s.total_bytes || 0),
+        doneCount: Number(s.done_count || 0),
+        weekCount: Number(s.week_count || 0),
+        monthCount: Number(s.month_count || 0),
+        lastDone: s.last_done || null,
+        nextAuto: lastDone ? new Date(lastDone + cfg.frequencyDays * 24 * 3600 * 1000).toISOString() : null,
+      },
     };
+  });
+
+  // Admin-editable schedule: how often the automatic backup fires, and how many to keep.
+  app.put('/api/backups/config', { preHandler: requireAdmin }, async (req) => {
+    await q('create table if not exists settings (key text primary key, value jsonb, updated_at timestamptz default now())').catch(() => {});
+    const b = req.body || {};
+    const frequencyDays = [1, 2, 7].includes(Number(b.frequencyDays)) ? Number(b.frequencyDays) : DEFAULTS.frequencyDays;
+    const keep = Number.isFinite(Number(b.keep)) ? Math.min(90, Math.max(1, Math.floor(Number(b.keep)))) : DEFAULTS.keep;
+    const clean = { frequencyDays, keep };
+    await q(`insert into settings (key, value, updated_at) values ($1, $2::jsonb, now())
+             on conflict (key) do update set value = excluded.value, updated_at = now()`, [CONFIG_KEY, JSON.stringify(clean)]);
+    audit(req, 'backup.config', { entityType: 'settings', entityId: CONFIG_KEY, after: clean });
+    return { ok: true, config: clean };
   });
 
   // Back up now. Fires and returns — the list endpoint reports progress via `status`, so a
