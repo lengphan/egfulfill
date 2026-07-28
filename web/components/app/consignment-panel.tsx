@@ -163,7 +163,6 @@ export function ConsignmentPanel() {
       {/* 1. Inbound — the declaration, so nothing arrives unannounced. */}
       <SectionCard
         title="Inbound shipments"
-        description="Stock sellers have told us they're sending"
         actions={<Button size="sm" onClick={() => setAsnOpen(true)}><Plus size={13} weight="bold" /> Announce shipment</Button>}
       >
         {shipments === null ? (

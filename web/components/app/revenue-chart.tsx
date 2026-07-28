@@ -54,7 +54,6 @@ export function RevenueChart({ data: dataProp }: { data?: Record<string, Revenue
   return (
     <SectionCard
       title="Revenue"
-      description="Gross revenue across your stores"
       actions={
         <>
           <label className="mr-1 flex items-center gap-2 text-sm text-muted-foreground">

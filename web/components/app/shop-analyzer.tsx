@@ -125,7 +125,7 @@ export function ShopAnalyzer() {
           )}
 
           {/* Fixable, countable problems — the concrete half of the advice. */}
-          <SectionCard title="Listing health" description="Counted across your active listings">
+          <SectionCard title="Listing health">
             <div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4">
               {[
                 { label: "Missing tags", n: s.issues.noTags, hint: "no tags at all" },

@@ -98,7 +98,7 @@ export function ReportsView() {
 
       {/* Same rule as the dashboard: an all-zero chart asserts zero revenue. */}
       {orders === null && loadErr ? (
-        <SectionCard title="Revenue" description="Gross revenue across your stores">
+        <SectionCard title="Revenue">
           <div className="px-5 py-10 text-center text-sm text-muted-foreground">
             No revenue data to chart — your orders couldn&apos;t be loaded.
           </div>
@@ -108,7 +108,7 @@ export function ReportsView() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <SectionCard title="Revenue by channel" description="Across your stores" bodyClassName="space-y-4 p-5">
+        <SectionCard title="Revenue by channel" bodyClassName="space-y-4 p-5">
           {orders === null && loadErr ? (
             // "No revenue yet" is a statement about the business. Only make it when the
             // orders were actually read.
@@ -130,7 +130,7 @@ export function ReportsView() {
           )}
         </SectionCard>
 
-        <SectionCard title="Top products" description="By revenue">
+        <SectionCard title="Top products">
           {orders === null && loadErr ? (
             <div className="p-5 text-sm text-muted-foreground">Couldn&apos;t load this.</div>
           ) : top.length === 0 ? (

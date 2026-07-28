@@ -7,7 +7,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Pagination } from "@/components/app/pagination"
 import { getNotifications, markNotificationsRead, type Notification } from "@/lib/api"
-import { getToken, getUser } from "@/lib/auth"
+import { getToken } from "@/lib/auth"
 
 const PER_PAGE = 25
 
@@ -48,7 +48,6 @@ const TYPE_LABEL: Record<string, string> = {
  */
 export function NotificationsView() {
   const router = useRouter()
-  const role = getUser()?.role || "seller"
   const [items, setItems] = useState<Notification[] | null>(null)
   const [total, setTotal] = useState(0)
   const [unread, setUnread] = useState(0)
@@ -90,7 +89,6 @@ export function NotificationsView() {
   return (
     <SectionCard
       title="Notifications"
-      description={`Everything sent to your ${role} account`}
       actions={
         <div className="flex items-center gap-2">
           <button

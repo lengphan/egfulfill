@@ -153,7 +153,7 @@ export function DashboardView() {
       {/* A chart of zeros is a claim about revenue. When the read failed we have no
           series to draw, so say that instead of rendering a flat line at the axis. */}
       {orders === null && loadErr ? (
-        <SectionCard title="Revenue" description="Gross revenue across your stores">
+        <SectionCard title="Revenue">
           <div className="px-5 py-10 text-center text-sm text-muted-foreground">
             No revenue data to chart — your orders couldn&apos;t be loaded.
           </div>
@@ -164,7 +164,6 @@ export function DashboardView() {
 
       <SectionCard
         title="Recent orders"
-        description="Latest activity across your stores"
         actions={
           <Button variant="outline" size="sm" onClick={() => router.push("/orders")}>
             View all

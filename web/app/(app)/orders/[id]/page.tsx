@@ -420,7 +420,7 @@ export default function OrderDetailPage() {
           {/* The RECORD, distinct from the conversation below it. */}
           <OrderHistory orderId={String(id)} />
 
-          <SectionCard title="Order activity" description="Messages & notes on this order">
+          <SectionCard title="Order activity">
             <div className="flex flex-col">
               <div className="max-h-72 min-h-[80px] flex-1 space-y-3 overflow-y-auto p-5">
                 {messages.length === 0 ? (
