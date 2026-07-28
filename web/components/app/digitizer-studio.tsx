@@ -430,10 +430,12 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect }: { tf: Wilco
     <div data-boxhost className="pointer-events-none absolute inset-0" style={{ zIndex: selected ? 20 : 10 }}>
       <div
         data-mode="move" onPointerDown={down} onPointerMove={move} onPointerUp={up}
-        className={"pointer-events-auto absolute flex touch-none items-center justify-center rounded border-2 " + (selected ? "cursor-move border-primary/80 bg-primary/5" : "cursor-pointer border-dashed border-primary/40 hover:border-primary/70")}
+        className={"pointer-events-auto absolute flex touch-none items-center justify-center rounded border-2 " + (selected ? "cursor-move border-primary/80" : "cursor-pointer border-dashed border-primary/40 hover:border-primary/70")}
         style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${34 * tf.scale}%`, aspectRatio: "1", transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
       >
-        <div className={"pointer-events-none flex max-h-full max-w-full items-center justify-center overflow-hidden " + (selected ? "opacity-70" : "opacity-40")}>{ghost}</div>
+        {/* Full opacity — the ghost is the REAL stitched TrueView, so it must not look faded.
+            Selection is shown by the border + handles, not by dimming the embroidery. */}
+        <div className="pointer-events-none flex max-h-full max-w-full items-center justify-center overflow-hidden">{ghost}</div>
         {selected && (
           <>
             <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />
