@@ -204,6 +204,28 @@ export function walletRoutes(app, requireAuth) {
     const led = await q(
       `select id, delta, type, ref, note, created_by, created_at
          from wallet_ledger where account=$1 order by created_at desc, id desc limit 200`, [account]);
+    // P&L summary over the FULL ledger (not the 200-row window) so the cards total everything,
+    // grouped by the real ledger `type` — revenue, deposits, refunds and each cost category are
+    // distinct facts, not "everything positive vs everything negative". This is the honest
+    // per-category total the sign-based row view can't give.
+    const sumRows = (await q(
+      `select type, coalesce(sum(delta),0)::float as total from wallet_ledger where account=$1 group by type`,
+      [account])).rows;
+    const byType = Object.fromEntries(sumRows.map((r) => [r.type, Number(r.total) || 0]));
+    const pos = (t) => Math.max(0, byType[t] || 0);
+    const absNeg = (t) => Math.abs(Math.min(0, byType[t] || 0));
+    const summary = {
+      revenue: pos('order-charge-in'),      // factory: what sellers paid in
+      paid: absNeg('order-charge-out'),     // seller: what they paid out
+      deposits: pos('topup'),               // top-ups (card / VietQR / transfer)
+      refundsIn: pos('order-refund-in'),    // seller: refunds received
+      refundsOut: absNeg('order-refund-out'), // factory: refunds paid back
+      payouts: absNeg('withdrawal'),        // withdrawals
+      productCost: absNeg('blanks-cost'),   // COGS — S&S/Otto POs
+      postage: absNeg('label-cost'),        // Shippo/USPS labels
+      design: absNeg('design-partner-cost'), // Pink Design
+      dispatch: absNeg('expedite-cost'),    // byeastside pick fee
+    };
     // Ship the warning threshold WITH the balance, so a client never has to decide for
     // itself what "low" means — two screens using different numbers is how one warns and
     // the other doesn't. House accounts are exempt: they may run negative by design.
@@ -215,7 +237,7 @@ export function walletRoutes(app, requireAuth) {
         lowBelow = Number.isFinite(n) && n > 0 ? n : null;
       } catch { lowBelow = null; }
     }
-    return { account, balance: bal, ledger: led.rows, lowBelow, low: lowBelow != null && bal < lowBelow };
+    return { account, balance: bal, ledger: led.rows, summary, lowBelow, low: lowBelow != null && bal < lowBelow };
   });
 
   // Append one ledger entry (idempotent by ref). Returns the new balance.

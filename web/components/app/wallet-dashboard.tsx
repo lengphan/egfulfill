@@ -15,10 +15,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SectionCard } from "@/components/app/section-card"
 import { CircleNotch, CheckCircle, XCircle, Warning } from "@phosphor-icons/react"
-import { getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type TopupRequest, type PayoutRequest } from "@/lib/api"
+import { getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type WalletSummary, type TopupRequest, type PayoutRequest } from "@/lib/api"
+import { BillingView } from "@/components/app/billing-view"
 import { getToken, getUser } from "@/lib/auth"
 
 const usd2 = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -119,7 +120,26 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
   )
 }
 
-type TxType = "Deposit" | "Charge" | "Refund" | "Payout" | "Rejected"
+// A ledger row's display category, from its REAL `type` (not just its sign) — so a factory
+// cost reads "Postage" / "Product cost" and revenue reads "Revenue", instead of everything
+// negative being "Charge" and everything positive "Deposit".
+function txMeta(type: string, delta: number): { label: string; tone: string } {
+  const t = String(type || "").toLowerCase()
+  const EM = "bg-emerald-100 text-emerald-700", MUT = "bg-muted text-muted-foreground", AM = "bg-amber-100 text-amber-800"
+  if (t === "order-charge-in") return { label: "Revenue", tone: EM }
+  if (t === "order-charge-out" || t === "charge") return { label: "Order charge", tone: MUT }
+  if (t === "topup") return { label: "Deposit", tone: EM }
+  if (t.startsWith("order-refund")) return { label: "Refund", tone: EM }
+  if (t === "blanks-cost") return { label: "Product cost", tone: AM }
+  if (t === "label-cost") return { label: "Postage", tone: AM }
+  if (t === "design-partner-cost") return { label: "Design", tone: AM }
+  if (t === "expedite-cost") return { label: "Dispatch fee", tone: AM }
+  if (t === "withdrawal") return { label: "Payout", tone: MUT }
+  if (t === "manual-income") return { label: "Income", tone: EM }
+  if (t === "manual-expense") return { label: "Expense", tone: AM }
+  if (t === "adjust") return { label: "Adjustment", tone: MUT }
+  return { label: delta >= 0 ? "Credit" : "Debit", tone: MUT }
+}
 type Row = {
   id: string
   /** Sort key for merging non-ledger entries (rejected top-ups) into the history. */
@@ -128,7 +148,9 @@ type Row = {
   desc: string
   ref: string
   method: string
-  type: TxType
+  label: string
+  tone: string
+  rejected?: boolean
   amount: number
   balance: number
 }
@@ -138,19 +160,13 @@ type View = {
   deposited: number
   ordersCharged: number
   avgCharge: number
+  summary?: WalletSummary
   rows: Row[]
 }
 
 const usd = (n: number, signed = false) =>
   `${signed ? (n < 0 ? "−" : "+") : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-
-const typeTone: Record<TxType, string> = {
-  Deposit: "bg-emerald-100 text-emerald-700",
-  Refund: "bg-emerald-100 text-emerald-700",
-  Charge: "bg-muted text-muted-foreground",
-  Rejected: "bg-red-100 text-red-700",
-  Payout: "bg-muted text-muted-foreground",
-}
+const pct = (num: number, den: number) => (den > 0 ? `${Math.round((num / den) * 100)}%` : "—")
 
 // Demo fallback — shown when there's no session / API (keeps the page populated in standalone dev).
 const DEMO: View = {
@@ -160,15 +176,15 @@ const DEMO: View = {
   ordersCharged: 47,
   avgCharge: 133.7,
   rows: [
-    { id: "1", date: "Apr 12", desc: "Bank transfer", ref: "ACH ·2231", method: "ACH", type: "Deposit", amount: 500, balance: 12480 },
-    { id: "2", date: "Apr 11", desc: "Hoodie · black", ref: "Order #4142", method: "Wallet", type: "Charge", amount: -63.75, balance: 11980 },
-    { id: "3", date: "Apr 11", desc: "Tee · 2-pack", ref: "Order #4140", method: "Wallet", type: "Charge", amount: -27, balance: 12043.75 },
-    { id: "4", date: "Apr 10", desc: "Reprint credit", ref: "Order #4088", method: "Wallet", type: "Refund", amount: 12, balance: 12070.75 },
-    { id: "5", date: "Apr 09", desc: "Card ·4417", ref: "Visa", method: "Card", type: "Deposit", amount: 250, balance: 12090.25 },
+    { id: "1", date: "Apr 12", desc: "Bank transfer", ref: "ACH ·2231", method: "ACH", ...txMeta("topup", 500), amount: 500, balance: 12480 },
+    { id: "2", date: "Apr 11", desc: "Hoodie · black", ref: "Order #4142", method: "Wallet", ...txMeta("order-charge-out", -63.75), amount: -63.75, balance: 11980 },
+    { id: "3", date: "Apr 11", desc: "Tee · 2-pack", ref: "Order #4140", method: "Wallet", ...txMeta("order-charge-out", -27), amount: -27, balance: 12043.75 },
+    { id: "4", date: "Apr 10", desc: "Reprint credit", ref: "Order #4088", method: "Wallet", ...txMeta("order-refund-in", 12), amount: 12, balance: 12070.75 },
+    { id: "5", date: "Apr 09", desc: "Card ·4417", ref: "Visa", method: "Card", ...txMeta("topup", 250), amount: 250, balance: 12090.25 },
   ],
 }
 
-function mapLedger(balance: number, ledger: LedgerRow[]): View {
+function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary): View {
   let run = balance
   let charges = 0
   let deposited = 0
@@ -179,28 +195,28 @@ function mapLedger(balance: number, ledger: LedgerRow[]): View {
     run -= delta
     if (delta < 0) charges += Math.abs(delta)
     if (delta > 0) deposited += delta
-    if (l.type === "charge") ordersCharged += 1
-    const type: TxType =
-      delta > 0 ? (l.type === "refund" ? "Refund" : "Deposit") : l.type === "withdrawal" ? "Payout" : "Charge"
+    if (String(l.type).toLowerCase().startsWith("order-charge")) ordersCharged += 1
+    const meta = txMeta(l.type, delta)
     return {
       id: String(l.id),
       at: new Date(l.created_at).getTime(),
       date: new Date(l.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }),
-      desc: l.note || l.type,
+      desc: l.note || meta.label,
       ref: l.ref || "",
-      method: l.type === "charge" ? "Wallet" : "—",
-      type,
+      method: String(l.type).toLowerCase().startsWith("order-charge") ? "Wallet" : "—",
+      label: meta.label,
+      tone: meta.tone,
       amount: delta,
       balance: balanceAfter,
     }
   })
-  return { balance, charges, deposited, ordersCharged, avgCharge: ordersCharged ? charges / ordersCharged : 0, rows }
+  return { balance, charges, deposited, ordersCharged, avgCharge: ordersCharged ? charges / ordersCharged : 0, summary, rows }
 }
 
 // (A ZERO fallback View used to live here and was rendered whenever getWallet() threw.
 //  It is deliberately gone: a zeroed wallet and an unreadable one must not look alike.)
 
-export function WalletDashboard() {
+export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: boolean } = {}) {
   const [view, setView] = useState<View | null>(null)
   // Distinguishes "couldn't read the wallet" from "this wallet is empty". Without it the
   // catch below fell back to ZERO, which renders "Available balance $0.00" under a green
@@ -235,7 +251,9 @@ export function WalletDashboard() {
       desc: `Top-up declined${r.method ? ` · ${r.method}` : ""}`,
       ref: r.ref || "",
       method: r.method || "—",
-      type: "Rejected" as TxType,
+      label: "Declined",
+      tone: "bg-red-100 text-red-700",
+      rejected: true,
       amount: Number(r.amount_usd) || 0,
       balance: NaN,          // no movement — rendered as "—" rather than a made-up figure
       at: new Date(r.created_at).getTime(),
@@ -258,7 +276,7 @@ export function WalletDashboard() {
     const signedIn = !!getToken()
     if (!signedIn) { setView(DEMO); return }
     getWallet()
-      .then((w) => { setView(mapLedger(w.balance, w.ledger)); setLoadErr(null) })
+      .then((w) => { setView(mapLedger(w.balance, w.ledger, w.summary)); setLoadErr(null) })
       // Keep any balance already on screen (a failed REFRESH shouldn't blank a good
       // reading) but never invent one where we have none — that was the $0.00 lie.
       .catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server."))
@@ -309,12 +327,26 @@ export function WalletDashboard() {
     )
   }
 
-  const kpis = [
-    { label: "Available balance", value: usd(view.balance), sub: "Ready for fulfillment", tone: "pos" as const },
-    { label: "Fulfillment charges", value: usd(view.charges), sub: "this period", tone: "mut" as const },
-    { label: "Total deposited", value: usd(view.deposited), sub: "this period", tone: "mut" as const },
-    { label: "Orders charged", value: String(view.ordersCharged), sub: `${usd(view.avgCharge)} avg charge`, tone: "mut" as const },
-  ]
+  // Factory (admin/warehouse) reads its wallet as a P&L; a seller reads what they've paid,
+  // deposited and been refunded. All totals come from the FULL-ledger summary (uncapped),
+  // never the 200-row window. COGS (blanks) only books when a supplier PO is received, so it
+  // reads low until purchasing goes live — labelled so it's "what's booked", not "what's owed".
+  const s = view.summary
+  const fees = s ? s.postage + s.design + s.dispatch : 0
+  const profit = s ? s.revenue - s.productCost - fees - s.refundsOut : 0
+  const kpis = isFactoryWallet && s
+    ? [
+        { label: "Revenue", value: usd(s.revenue), sub: "order charges received", tone: "pos" as const },
+        { label: "Product cost", value: usd(s.productCost), sub: "blanks booked (COGS)", tone: "mut" as const },
+        { label: "Fees & partner", value: usd(fees), sub: "postage · design · dispatch", tone: "mut" as const },
+        { label: "Profit", value: usd(profit), sub: `${pct(profit, s.revenue)} margin`, tone: (profit >= 0 ? "pos" : "neg") as "pos" | "neg" },
+      ]
+    : [
+        { label: "Available balance", value: usd(view.balance), sub: "Ready for fulfillment", tone: "pos" as const },
+        { label: "Total paid", value: usd(s?.paid ?? view.charges), sub: "fulfillment charges", tone: "mut" as const },
+        { label: "Deposited", value: usd(s?.deposits ?? view.deposited), sub: "top-ups", tone: "mut" as const },
+        { label: "Refunds", value: usd(s?.refundsIn ?? 0), sub: "returned to you", tone: "mut" as const },
+      ]
 
   return (
     <div className="space-y-4">
@@ -357,7 +389,7 @@ export function WalletDashboard() {
             <div
               className={
                 "mt-1.5 text-[12.5px] font-medium " +
-                (k.tone === "pos" ? "text-emerald-600" : "text-muted-foreground")
+                (k.tone === "pos" ? "text-emerald-600" : k.tone === "neg" ? "text-red-600" : "text-muted-foreground")
               }
             >
               {k.sub}
@@ -366,24 +398,17 @@ export function WalletDashboard() {
         ))}
       </div>
 
+      {(() => {
+      const txCard = (
       <Card className="gap-0 overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
-            <div className="text-[15px] font-bold">Transaction History</div>
-            <div className="text-[13px] text-muted-foreground">Deposits and fulfillment charges</div>
+            <div className="text-[15px] font-bold">Transaction history</div>
+            <div className="text-[13px] text-muted-foreground">Every money move on this account — balance before &amp; after each one</div>
           </div>
-          <div className="flex items-center gap-2">
-            <Tabs defaultValue="all">
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="deposits">Deposits</TabsTrigger>
-                <TabsTrigger value="charges">Charges</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <Button variant="outline" size="sm">
-              <DownloadSimple size={14} /> Export CSV
-            </Button>
-          </div>
+          <Button variant="outline" size="sm">
+            <DownloadSimple size={14} /> Export CSV
+          </Button>
         </div>
         {pending.length > 0 && (
           <div className="border-b border-border bg-muted/30 px-4 py-3">
@@ -439,21 +464,21 @@ export function WalletDashboard() {
                   <TableCell className="text-muted-foreground">{t.ref}</TableCell>
                   <TableCell className="text-muted-foreground">{t.method}</TableCell>
                   <TableCell>
-                    <Badge className={typeTone[t.type]} variant="secondary">
-                      {t.type}
+                    <Badge className={t.tone} variant="secondary">
+                      {t.label}
                     </Badge>
                   </TableCell>
                   <TableCell
                     className={
                       "text-right font-semibold tabular-nums " +
-                      (t.type === "Rejected"
+                      (t.rejected
                         ? "text-muted-foreground line-through"
                         : t.amount >= 0 ? "text-emerald-600" : "text-foreground")
                     }
                   >
                     {/* No +/- on a declined attempt: the sign says which way money moved,
                         and it did not move. Struck-through, unsigned, no balance. */}
-                    {usd(t.amount, t.type !== "Rejected")}
+                    {usd(t.amount, !t.rejected)}
                   </TableCell>
                   {/* Balance before this entry = balance after − the amount it moved. Both
                       dashes for a declined attempt, which never moved money. */}
@@ -469,6 +494,20 @@ export function WalletDashboard() {
           </TableBody>
         </Table>
       </Card>
+      )
+      // Partner history (vendor costs) is FACTORY-ONLY — a seller never sees it. When shown,
+      // the transaction table and the partner view sit under one pair of tabs, cards on top.
+      return partnerHistory && isFactoryWallet ? (
+        <Tabs defaultValue="transactions" className="space-y-3">
+          <TabsList>
+            <TabsTrigger value="transactions">Transaction history</TabsTrigger>
+            <TabsTrigger value="partners">Partner history</TabsTrigger>
+          </TabsList>
+          <TabsContent value="transactions">{txCard}</TabsContent>
+          <TabsContent value="partners"><BillingView /></TabsContent>
+        </Tabs>
+      ) : txCard
+      })()}
     </div>
   )
 }
