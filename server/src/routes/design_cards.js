@@ -8,7 +8,7 @@ import { audit } from '../audit.js';
 import { notify } from './notifications.js';
 import { bookDesignCost } from './pinkdesign.js';
 import { storageEnabled, fromDataUrl, designUrlTtlDays, presignGet, publicUrl } from '../storage.js';
-import { putObject } from '../storage.js';
+import { putObject, getObject } from '../storage.js';
 import { hashOf } from '../fingerprint.js';
 
 export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
@@ -132,6 +132,17 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
 
   const artUrlOf = (row) => {
     if (!row || !row.art_key) return null;
+    // Serve the artwork SAME-ORIGIN through this API (see the /art/:hash route below), the way
+    // /api/wilcom/asset and the supplier img proxy already do — never a raw storage/CDN URL. A
+    // missing CDN DNS record (cdn.egful.store was never created), a private bucket, or an object
+    // the browser can't reach then can't blank the board: the server reads the bytes with its own
+    // signed access and re-serves them. Keyed by the artwork's content hash (unguessable), so an
+    // <img> — which can't send an auth header — still loads it. Falls back to a presigned/public
+    // URL only when there's no hash to serve by (older rows predating the hash column).
+    if (row.art_hash) {
+      const ext = (String(row.art_key).match(/\.[a-z0-9]+$/i) || [''])[0] || '';
+      return `/api/design_cards/art/${row.art_hash}${ext}`;
+    }
     return designUrlTtlDays() > 0 ? presignGet(row.art_key) : publicUrl(row.art_key);
   };
   const extFromMime = (mime) => {
@@ -322,6 +333,38 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       [req.user.sub]
     );
     return r.rows;
+  });
+
+  /**
+   * Same-origin re-serve of a card's artwork — the source `artUrlOf` points every board thumbnail
+   * at. UNAUTHENTICATED BY DESIGN, exactly like /api/wilcom/asset/:id/:kind and the supplier image
+   * proxy: an <img> can't carry a Bearer header, and the path key is the artwork's SHA-256 content
+   * hash — unguessable, so it can't be walked the way a sequential card id could. The bytes are
+   * read with the server's own signed storage access (getObject), so this works whether the object
+   * is public, private, or behind a CDN alias whose DNS was never set up — the exact failure that
+   * was blanking the board. Best-effort: any miss is a 404 and the card keeps its placeholder.
+   */
+  app.get('/api/design_cards/art/:hash', async (req, reply) => {
+    const hash = String(req.params.hash || '').replace(/\.[a-z0-9]+$/i, '').toLowerCase();
+    if (!/^[0-9a-f]{16,64}$/.test(hash)) { reply.code(404); return { error: 'not found' }; }
+    const row = (await q('select art_key, art_data from design_cards where art_hash=$1 limit 1', [hash])).rows[0];
+    if (!row) { reply.code(404); return { error: 'not found' }; }
+    reply.header('Cache-Control', 'public, max-age=86400');
+    const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', svg: 'image/svg+xml', pdf: 'application/pdf' };
+    // Storage was OFF at upload → the bytes live inline in a data URL; decode and serve them.
+    if (!row.art_key && row.art_data) {
+      const m = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(String(row.art_data));
+      if (m) {
+        reply.header('Content-Type', m[1] || 'application/octet-stream');
+        return reply.send(Buffer.from(m[3], m[2] ? 'base64' : 'utf8'));
+      }
+    }
+    if (!row.art_key) { reply.code(404); return { error: 'not found' }; }
+    const obj = await getObject(row.art_key).catch(() => null);
+    if (!obj || !obj.body) { reply.code(404); return { error: 'not found' }; }
+    const ext = (String(row.art_key).match(/\.([a-z0-9]+)$/i) || [null, ''])[1].toLowerCase();
+    reply.header('Content-Type', obj.contentType || MIME[ext] || 'application/octet-stream');
+    return reply.send(obj.body);
   });
 
   /**
