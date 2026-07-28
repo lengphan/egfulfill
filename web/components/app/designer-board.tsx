@@ -679,8 +679,12 @@ export function DesignerBoard() {
                             {/* EMB-check cards carry no payout (factory check, not designer
                                 work), so the footer figure is suppressed for them. */}
                             {!isDesigner && !isEmbCard(c) && (() => {
-                              // Always show a figure — including $0.00 — so the whole board can be
-                              // scanned for payout at a glance (a blank used to read as "unknown").
+                              // Only show a figure once the card has a DESTINATION — sent to a partner
+                              // (partner cost), claimed by a designer, or given an explicit payout. Until
+                              // then the number is just the platform-default guess, which reads as more
+                              // settled than it is, so the price stays blank (only correct once routed).
+                              const determined = !!c.vendor || amt(c.payment) > 0 || !!c.claimed_by
+                              if (!determined) return null
                               const payout = c.vendor ? partnerCost : (amt(c.payment) || designFee)
                               const suffix = c.credited ? " · paid" : c.vendor ? " · partner" : ""
                               return (
