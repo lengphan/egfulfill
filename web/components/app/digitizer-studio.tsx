@@ -462,6 +462,7 @@ function CreateTab() {
   const [layers, setLayers] = useState<Layer[]>([])
   const [openLayer, setOpenLayer] = useState<string | null>(null) // active layer id
   const [over, setOver] = useState(false)
+  const [compare, setCompare] = useState(true) // show the generated result beside the arrangement
   const addImages = async (files: Iterable<File> | null | undefined) => {
     for (const f of Array.from(files ?? []).filter((x) => x.type.startsWith("image/"))) {
       const thumb = await readFile(f)
@@ -741,35 +742,57 @@ function CreateTab() {
 
       {/* RIGHT — the big preview, the hero of the tab; sticks while you scroll the controls. */}
       <div className="space-y-2 lg:sticky lg:top-4">
-        {/* Clicking the empty canvas deselects — the layer boxes stopPropagation, so only a
-            background click reaches here, dropping the selection (hides the box border/handles). */}
-        <div onPointerDown={() => setOpenLayer(null)} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
-          {!ready && (
-            <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">Drop an image or type text — then arrange it here.</div>
+        {/* After a generate, the stitched result can sit BESIDE the arrangement so you can eyeball
+            whether the merged .emb matches how you laid the layers out. Toggle to reclaim width. */}
+        {res?.trueview && (
+          <div className="flex items-center justify-end">
+            <button onClick={() => setCompare((c) => !c)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent">
+              <Eye size={13} />{compare ? "Hide stitched result" : "Compare with stitched result"}
+            </button>
+          </div>
+        )}
+        <div className={"grid gap-2 " + (res?.trueview && compare ? "xl:grid-cols-2" : "grid-cols-1")}>
+          <div className="space-y-1">
+            {/* Clicking the empty canvas deselects — the layer boxes stopPropagation, so only a
+                background click reaches here, dropping the selection (hides border/handles). */}
+            <div onPointerDown={() => setOpenLayer(null)} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
+              {!ready && (
+                <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">Drop an image or type text — then arrange it here.</div>
+              )}
+              {ready && err && (
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-30 m-2 flex items-start gap-2 rounded-lg bg-amber-50/95 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/70 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{err}</span></div>
+              )}
+              {/* Layers arranged DIRECTLY — each shows its own stitched TrueView (or a placeholder
+                  while it renders) and you drag / resize / rotate it in place. This IS the design;
+                  Generate merges the layers into one .emb. No divergent combined render underneath. */}
+              {/* Array order = stack order: later layers render last (on top), matching the panel. */}
+              {layers.map((l) => (
+                <LayerBoxEditor key={l.id} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
+                  isImg(l)
+                    ? (resById[l.id]?.trueview
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={`data:image/png;base64,${resById[l.id]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
+                        // eslint-disable-next-line @next/next/no-img-element
+                        : <img src={l.thumb} alt="" className="max-h-full max-w-full object-contain opacity-60" />)
+                    : (resById["text"]?.trueview
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={`data:image/png;base64,${resById["text"]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
+                        : <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>)
+                } />
+              ))}
+            </div>
+            <div className="text-center text-[11px] text-muted-foreground">Your arrangement — drag to position. Generate merges the layers into one file.</div>
+          </div>
+          {res?.trueview && compare && (
+            <div className="space-y-1">
+              <div className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`data:image/png;base64,${res.trueview}`} alt="Generated stitched output" className="max-h-full max-w-full object-contain p-3" />
+              </div>
+              <div className="text-center text-[11px] text-muted-foreground">Stitched result — what EWA actually generated{shownStitches ? ` · ${shownStitches.toLocaleString()} stitches` : ""}. Regenerate after moving layers.</div>
+            </div>
           )}
-          {ready && err && (
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-30 m-2 flex items-start gap-2 rounded-lg bg-amber-50/95 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/70 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{err}</span></div>
-          )}
-          {/* Layers arranged DIRECTLY — each shows its own stitched TrueView (or a placeholder
-              while it renders) and you drag / resize / rotate it in place. This IS the design;
-              Generate merges the layers into one .emb. No divergent combined render underneath. */}
-          {/* Array order = stack order: later layers render last (on top), matching the panel. */}
-          {layers.map((l) => (
-            <LayerBoxEditor key={l.id} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
-              isImg(l)
-                ? (resById[l.id]?.trueview
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={`data:image/png;base64,${resById[l.id]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
-                    // eslint-disable-next-line @next/next/no-img-element
-                    : <img src={l.thumb} alt="" className="max-h-full max-w-full object-contain opacity-60" />)
-                : (resById["text"]?.trueview
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={`data:image/png;base64,${resById["text"]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
-                    : <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>)
-            } />
-          ))}
         </div>
-        <div className="text-center text-[11px] text-muted-foreground">Arrange the layers here — each shows its stitched look. Generate merges them into one file.</div>
       </div>
     </div>
   )
