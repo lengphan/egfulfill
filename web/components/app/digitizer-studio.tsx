@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent } from "react"
 // NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
-import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal } from "@phosphor-icons/react"
+import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
@@ -357,6 +357,14 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
 
 const IDENTITY_TF: WilcomTransform = { x: 0, y: 0, scale: 1, angle: 0 }
 
+// A layer on the Create canvas. Order in the list = stitch order (later = stitched on top).
+// Text is a single layer (id "text"); every other layer is an image. Each carries its own
+// transform (move/resize/rotate).
+type ImgLayer = { id: string; kind: "image"; dataUrl: string; thumb: string; name: string; tf: WilcomTransform }
+type Layer = ImgLayer | { id: "text"; kind: "text"; tf: WilcomTransform }
+const isImg = (l: Layer): l is ImgLayer => l.kind === "image"
+const newLayerId = () => "L" + Math.random().toString(36).slice(2, 9)
+
 // Direct-manipulation box over the preview: drag the body to MOVE, the corner nub to RESIZE,
 // the top nub to ROTATE — instant client-side feedback (a ghost of the element). EWA's live
 // preview ignores the transform, so the box + ghost is what you position against; the value
@@ -434,25 +442,45 @@ function CreateTab() {
   const [palette, setPalette] = useState<ThreadColor[]>([])
   const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
   const [res, setRes] = useState<WilcomResult | null>(null)   // the GENERATED combined .emb (download + readout)
-  const [imgRes, setImgRes] = useState<WilcomResult | null>(null) // the image's OWN stitched preview
-  const [txtRes, setTxtRes] = useState<WilcomResult | null>(null) // the text's OWN stitched preview
+  const [resById, setResById] = useState<Record<string, WilcomResult>>({}) // each layer's OWN stitched preview
   const [err, setErr] = useState<string | null>(null)
-  // Per-layer move / resize / rotate → the decoration's <transform>. Identity by default so a
-  // fresh combine renders exactly as before until you actually adjust something.
-  const [imgTf, setImgTf] = useState<WilcomTransform>(IDENTITY_TF)
-  const [txtTf, setTxtTf] = useState<WilcomTransform>(IDENTITY_TF)
-  const [openLayer, setOpenLayer] = useState<"image" | "text" | null>(null)
-  // The dropped/chosen artwork to embroider alongside the text. dataUrl is downscaled under
-  // EWA's 2 MB cap; thumb keeps the full-res original for the little in-panel preview.
-  const [image, setImage] = useState<{ dataUrl: string; thumb: string; name: string } | null>(null)
+  // LAYERS — ordered (list order = stitch order; a later layer stitches on top). Text is one
+  // layer (id "text"); the rest are images. Each carries its own move/resize/rotate transform.
+  const [layers, setLayers] = useState<Layer[]>([])
+  const [openLayer, setOpenLayer] = useState<string | null>(null) // active layer id
   const [over, setOver] = useState(false)
-  const takeImage = async (file?: File) => {
-    if (!file || !file.type.startsWith("image/")) return
-    const thumb = await readFile(file)
-    try { const dataUrl = await toDataUrl(thumb); setImage({ dataUrl, thumb, name: file.name.replace(/\.[^.]+$/, "") }) }
-    catch { setImage({ dataUrl: thumb, thumb, name: file.name.replace(/\.[^.]+$/, "") }) }
-    setOpenLayer("image") // ready to drag straight away
+  const addImages = async (files: Iterable<File> | null | undefined) => {
+    for (const f of Array.from(files ?? []).filter((x) => x.type.startsWith("image/"))) {
+      const thumb = await readFile(f)
+      let dataUrl = thumb; try { dataUrl = await toDataUrl(thumb) } catch { /* keep raw on downscale failure */ }
+      const layer: ImgLayer = { id: newLayerId(), kind: "image", dataUrl, thumb, name: f.name.replace(/\.[^.]+$/, ""), tf: IDENTITY_TF }
+      setLayers((prev) => [...prev, layer])
+      setOpenLayer(layer.id)
+      // Preview this image on its own (once — an image doesn't change after it's dropped).
+      wilcomPreview({ image: dataUrl, filename: layer.name }).then((r) => { if (r.ok) setResById((m) => ({ ...m, [layer.id]: r })) }).catch(() => {})
+    }
   }
+  const setLayerTf = (id: string, tf: WilcomTransform) => setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, tf } : l)))
+  const moveLayer = (id: string, dir: -1 | 1) => setLayers((prev) => {
+    const i = prev.findIndex((l) => l.id === id); if (i < 0) return prev
+    const j = i + dir; if (j < 0 || j >= prev.length) return prev
+    const n = [...prev]; const [m] = n.splice(i, 1); n.splice(j, 0, m); return n
+  })
+  const removeLayer = (id: string) => {
+    setLayers((prev) => prev.filter((l) => l.id !== id))
+    setResById((m) => { const n = { ...m }; delete n[id]; return n })
+    setOpenLayer((o) => (o === id ? null : o))
+    if (id === "text") setText("")
+  }
+  // Keep exactly one text layer while there's text; drop it when the text is cleared.
+  const ensureTextLayer = (present: boolean) => setLayers((prev) => {
+    const has = prev.some((l) => l.id === "text")
+    if (present && !has) return [...prev, { id: "text" as const, kind: "text" as const, tf: IDENTITY_TF }]
+    if (!present && has) return prev.filter((l) => l.id !== "text")
+    return prev
+  })
+  const onTextChange = (v: string) => { setText(v); ensureTextLayer(!!v.trim()) }
+  const imgLayers = layers.filter(isImg)
   // Colour-change mode — the palette grid is tucked away until "Change colour", so the
   // controls stay short until you want to recolour.
   const [showPalette, setShowPalette] = useState(false)
@@ -474,37 +502,45 @@ function CreateTab() {
       try {
         const s = JSON.parse(sessionStorage.getItem("eg_digitizer_create") || "null")
         if (!s) return
-        if (s.image) setImage(s.image)
+        if (Array.isArray(s.layers)) {
+          setLayers(s.layers)
+          // Previews aren't persisted — re-fetch each restored image layer's own preview.
+          for (const l of s.layers) if (l?.kind === "image" && l.dataUrl) {
+            wilcomPreview({ image: l.dataUrl, filename: l.name }).then((r) => { if (r.ok) setResById((m) => ({ ...m, [l.id]: r })) }).catch(() => {})
+          }
+        }
         if (typeof s.text === "string") setText(s.text)
         if (s.alphabet) setAlphabet(s.alphabet)
         if (typeof s.height === "number") setHeight(s.height)
         if (s.color) setColor(s.color)
-        if (s.imgTf) setImgTf(s.imgTf)
-        if (s.txtTf) setTxtTf(s.txtTf)
       } catch { /* ignore corrupt/absent */ }
     }, 0)
     return () => clearTimeout(id)
   }, [])
   useEffect(() => {
     const id = setTimeout(() => {
-      try { sessionStorage.setItem("eg_digitizer_create", JSON.stringify({ image, text, alphabet, height, color, imgTf, txtTf })) } catch { /* quota/serialise */ }
+      try { sessionStorage.setItem("eg_digitizer_create", JSON.stringify({ layers, text, alphabet, height, color })) } catch { /* quota/serialise */ }
     }, 500)
     return () => clearTimeout(id)
-  }, [image, text, alphabet, height, color, imgTf, txtTf])
+  }, [layers, text, alphabet, height, color])
 
   const busy = status !== "idle"
   const hasText = !!text.trim()
-  // Ready when there's SOMETHING to stitch: an image, or text with an alphabet. (Lettering
-  // needs an alphabet; an image on its own doesn't.)
-  const ready = !!image || (hasText && !!alphabet)
+  // Ready when there's SOMETHING to stitch: an image layer, or text with an alphabet.
+  const ready = imgLayers.length > 0 || (hasText && !!alphabet)
   // GENERATE — the real single .emb: EWA combines the layers with their transforms. Runs only
   // on the button, never live, so arranging on the canvas costs nothing.
   const generate = async (): Promise<WilcomResult | null> => {
     if (!ready) return null
     setStatus("generating"); setErr(null)
     try {
-      const body = { image: image?.dataUrl, text: hasText ? text.trim() : undefined, alphabet, height, color, filename: image?.name, name: image?.name || (hasText ? text.trim() : undefined),
-        designTransform: image ? imgTf : undefined, letterTransform: hasText ? txtTf : undefined }
+      // Ordered layer payload — each image (auto-digitized server-side) and the text, with its
+      // transform, in stitch order. Text content rides alongside for the text layer(s).
+      const payload = layers.map((l) => l.kind === "image"
+        ? { kind: "image" as const, image: l.dataUrl, name: l.name, transform: l.tf }
+        : { kind: "text" as const, transform: l.tf })
+      const body = { layers: payload, text: hasText ? text.trim() : undefined, alphabet, height, color,
+        name: imgLayers[0]?.name || (hasText ? text.trim() : undefined) }
       const r = await wilcomCombine(body)
       if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null); return null }
       setRes(r); return r
@@ -515,33 +551,21 @@ function CreateTab() {
   const generateAnd = async (kind: "emb" | "png") => {
     const r = await generate()
     if (!r) return
-    const stem = (r.machineFile?.filename || (hasText ? text.trim() : image?.name) || "design").replace(/\.[^.]+$/, "")
+    const stem = (r.machineFile?.filename || (hasText ? text.trim() : imgLayers[0]?.name) || "design").replace(/\.[^.]+$/, "")
     if (kind === "emb" && r.machineFile) download(r.machineFile.filename, `data:application/octet-stream;base64,${r.machineFile.base64}`)
     if (kind === "png" && r.trueview) download(`${stem}.png`, `data:image/png;base64,${r.trueview}`)
   }
 
-  // Each layer previews on its OWN (a stitched TrueView), then you arrange it directly on the
-  // canvas — so what you drag IS the rendered element, not a proxy floating over a separate
-  // combined render (that was the "two separate" problem). The image preview fetches once per
-  // image; the text preview re-fetches as the text/font/size/colour changes. Neither re-fires
-  // on move/resize/rotate — that's client-side.
-  useEffect(() => {
-    let live = true
-    // setState happens inside the timeout (deferred), never synchronously in the effect body.
-    const id = setTimeout(() => {
-      if (!live) return
-      if (!image) { setImgRes(null); return }
-      void wilcomPreview({ image: image.dataUrl, filename: image.name }).then((r) => { if (live && r.ok) setImgRes(r) }).catch(() => {})
-    }, image ? 300 : 0)
-    return () => { live = false; clearTimeout(id) }
-  }, [image])
+  // Each layer previews on its OWN (a stitched TrueView) and you arrange THAT directly on the
+  // canvas. Image layers are previewed on drop (see addImages); the TEXT layer re-fetches here
+  // as the text/font/size/colour changes. Neither re-fires on move/resize — that's client-side.
   useEffect(() => {
     const active = hasText && !!alphabet
     let live = true
     const id = setTimeout(() => {
       if (!live) return
-      if (!active) { setTxtRes(null); return }
-      void wilcomLetteringPreview({ text: text.trim(), alphabet, height, color }).then((r) => { if (live && r.ok) setTxtRes(r) }).catch(() => {})
+      if (!active) { setResById((m) => { if (!m["text"]) return m; const n = { ...m }; delete n["text"]; return n }); return }
+      void wilcomLetteringPreview({ text: text.trim(), alphabet, height, color }).then((r) => { if (live && r.ok) setResById((m) => ({ ...m, text: r })) }).catch(() => {})
     }, active ? 550 : 0)
     return () => { live = false; clearTimeout(id) }
   }, [text, alphabet, height, color, hasText])
@@ -551,7 +575,7 @@ function CreateTab() {
   const ext = res?.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : null
   // Live stitch estimate while arranging = sum of the layers' own previews (the generated
   // combine gives the exact figure once you Generate).
-  const shownStitches = res?.stitches ?? (((imgRes?.stitches ?? 0) + (txtRes?.stitches ?? 0)) || null)
+  const shownStitches = res?.stitches ?? (Object.values(resById).reduce((s, r) => s + (r.stitches ?? 0), 0) || null)
   // The cone currently selected, so the colour control can name it rather than show a bare hex.
   const selCone = palette.find((c) => c.hex.toLowerCase() === color.toLowerCase())
   const cones = pQuery ? palette.filter((c) => `${c.name} ${c.code}`.toLowerCase().includes(pQuery.toLowerCase())) : palette
@@ -560,34 +584,34 @@ function CreateTab() {
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(340px,400px)_1fr]">
       {/* LEFT — image, text, colour, sequence, readout, actions */}
       <div className="space-y-4">
-        {/* Drop / choose the artwork to embroider. Optional — text can stitch on its own,
-            an image can stitch on its own, or both combine into one preview. */}
+        {/* Images — drop several. Each becomes its own layer you arrange + reorder below. */}
         <div>
-          <label className={labelCls}>Image</label>
-          {image ? (
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image.thumb} alt="" className="size-12 shrink-0 rounded-md border border-border object-contain" />
-              <span className="min-w-0 flex-1 truncate text-sm">{image.name}</span>
-              <button onClick={() => setImage(null)} title="Remove image" className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={14} /></button>
-            </div>
-          ) : (
+          <label className={labelCls}>Images</label>
+          <div className="space-y-1.5">
+            {imgLayers.map((im) => (
+              <div key={im.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={im.thumb} alt="" className="size-10 shrink-0 rounded-md border border-border object-contain" />
+                <span className="min-w-0 flex-1 truncate text-sm">{im.name}</span>
+                <button onClick={() => removeLayer(im.id)} title="Remove image" className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={14} /></button>
+              </div>
+            ))}
             <label
               onDragOver={(e) => { e.preventDefault(); setOver(true) }}
               onDragLeave={() => setOver(false)}
-              onDrop={(e) => { e.preventDefault(); setOver(false); void takeImage(e.dataTransfer.files?.[0]) }}
-              className={"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-5 text-center transition-colors " + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
+              onDrop={(e) => { e.preventDefault(); setOver(false); void addImages(e.dataTransfer.files) }}
+              className={"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-4 text-center transition-colors " + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
             >
-              <ImageSquare size={20} className="text-muted-foreground" />
-              <span className="text-xs font-medium">Drop an image to embroider</span>
+              <ImageSquare size={18} className="text-muted-foreground" />
+              <span className="text-xs font-medium">{imgLayers.length ? "Add another image" : "Drop an image to embroider"}</span>
               <span className="text-[11px] text-muted-foreground">or click to choose — optional</span>
-              <input type="file" accept="image/*" className="sr-only" onChange={(e) => { void takeImage(e.target.files?.[0]); e.currentTarget.value = "" }} />
+              <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void addImages(e.target.files); e.currentTarget.value = "" }} />
             </label>
-          )}
+          </div>
         </div>
         <div>
-          <label className={labelCls}>Text {image ? "(stitched with the image)" : "(optional)"}</label>
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type to add lettering…" className={inputCls} />
+          <label className={labelCls}>Text {imgLayers.length ? "(stitched with the images)" : "(optional)"}</label>
+          <input value={text} onChange={(e) => onTextChange(e.target.value)} placeholder="Type to add lettering…" className={inputCls} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -635,46 +659,45 @@ function CreateTab() {
           ) : <p className="text-xs text-muted-foreground">No thread library set — add cones in Settings › Thread palette.</p>}
         </div>
 
-        {/* Layers — the elements in this design. Each opens a move / resize / rotate panel that
-            feeds the decoration's <transform>. Multi-file + reorder is the next step. */}
-        {(image || hasText) && (
+        {/* Layers — the elements in this design, TOP of the list = stitched on top. Each opens a
+            move / resize / rotate panel feeding its <transform>; the carets reorder the stack. */}
+        {layers.length > 0 && (
           <div>
-            <span className={labelCls}>Layers</span>
+            <span className={labelCls}>Layers <span className="font-normal opacity-60">· top of the list stitches on top</span></span>
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-              {image && (
-                <div>
-                  <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
-                    <ImageSquare size={15} className="shrink-0 text-muted-foreground" />
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image.thumb} alt="" className="size-6 shrink-0 rounded border border-border object-contain" />
-                    <span className="min-w-0 flex-1 truncate">{image.name}</span>
-                    <button onClick={() => setOpenLayer((o) => (o === "image" ? null : "image"))} title="Move / resize / rotate" className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === "image" ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
-                    <button onClick={() => { setImage(null); setImgTf(IDENTITY_TF) }} title="Remove image layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
-                  </div>
-                  {openLayer === "image" && (
-                    <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-[11px] text-muted-foreground">
-                      <span className="min-w-0 truncate">Drag the box on the preview — corner to resize, top nub to rotate</span>
-                      <button type="button" onClick={() => setImgTf(IDENTITY_TF)} className="shrink-0 font-medium text-primary hover:underline">Reset</button>
+              {/* Reversed so the on-top (last-stitched) layer sits at the top of the list. */}
+              {layers.slice().reverse().map((l) => {
+                const ai = layers.findIndex((x) => x.id === l.id)
+                return (
+                  <div key={l.id}>
+                    <div className="flex items-center gap-2 px-3 py-2 text-sm">
+                      {isImg(l) ? (
+                        <>
+                          <ImageSquare size={15} className="shrink-0 text-muted-foreground" />
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={l.thumb} alt="" className="size-6 shrink-0 rounded border border-border object-contain" />
+                          <span className="min-w-0 flex-1 truncate">{l.name}</span>
+                        </>
+                      ) : (
+                        <>
+                          <PencilSimple size={15} className="shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 truncate">“{text}”</span>
+                        </>
+                      )}
+                      <button onClick={() => moveLayer(l.id, 1)} disabled={ai === layers.length - 1} title="Bring forward" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent disabled:opacity-30"><CaretUp size={13} weight="bold" /></button>
+                      <button onClick={() => moveLayer(l.id, -1)} disabled={ai === 0} title="Send back" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent disabled:opacity-30"><CaretDown size={13} weight="bold" /></button>
+                      <button onClick={() => setOpenLayer((o) => (o === l.id ? null : l.id))} title="Move / resize / rotate" className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === l.id ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
+                      <button onClick={() => removeLayer(l.id)} title="Remove layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
                     </div>
-                  )}
-                </div>
-              )}
-              {hasText && (
-                <div>
-                  <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
-                    <PencilSimple size={15} className="shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate">“{text}”</span>
-                    <button onClick={() => setOpenLayer((o) => (o === "text" ? null : "text"))} title="Move / resize / rotate" className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === "text" ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
-                    <button onClick={() => { setText(""); setTxtTf(IDENTITY_TF) }} title="Remove text layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
+                    {openLayer === l.id && (
+                      <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-[11px] text-muted-foreground">
+                        <span className="min-w-0 truncate">Drag the box on the preview — corner to resize, top nub to rotate</span>
+                        <button type="button" onClick={() => setLayerTf(l.id, IDENTITY_TF)} className="shrink-0 font-medium text-primary hover:underline">Reset</button>
+                      </div>
+                    )}
                   </div>
-                  {openLayer === "text" && (
-                    <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-[11px] text-muted-foreground">
-                      <span className="min-w-0 truncate">Drag the box on the preview — corner to resize, top nub to rotate</span>
-                      <button type="button" onClick={() => setTxtTf(IDENTITY_TF)} className="shrink-0 font-medium text-primary hover:underline">Reset</button>
-                    </div>
-                  )}
-                </div>
-              )}
+                )
+              })}
             </div>
           </div>
         )}
@@ -713,23 +736,21 @@ function CreateTab() {
           {/* Layers arranged DIRECTLY — each shows its own stitched TrueView (or a placeholder
               while it renders) and you drag / resize / rotate it in place. This IS the design;
               Generate merges the layers into one .emb. No divergent combined render underneath. */}
-          {image && (
-            <LayerBoxEditor tf={imgTf} onChange={setImgTf} selected={openLayer === "image"} onSelect={() => setOpenLayer("image")} ghost={
-              imgRes?.trueview
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={`data:image/png;base64,${imgRes.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
-                // eslint-disable-next-line @next/next/no-img-element
-                : <img src={image.thumb} alt="" className="max-h-full max-w-full object-contain opacity-60" />
+          {/* Array order = stack order: later layers render last (on top), matching the panel. */}
+          {layers.map((l) => (
+            <LayerBoxEditor key={l.id} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
+              isImg(l)
+                ? (resById[l.id]?.trueview
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={`data:image/png;base64,${resById[l.id]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
+                    // eslint-disable-next-line @next/next/no-img-element
+                    : <img src={l.thumb} alt="" className="max-h-full max-w-full object-contain opacity-60" />)
+                : (resById["text"]?.trueview
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={`data:image/png;base64,${resById["text"]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
+                    : <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>)
             } />
-          )}
-          {hasText && (
-            <LayerBoxEditor tf={txtTf} onChange={setTxtTf} selected={openLayer === "text"} onSelect={() => setOpenLayer("text")} ghost={
-              txtRes?.trueview
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={`data:image/png;base64,${txtRes.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
-                : <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>
-            } />
-          )}
+          ))}
         </div>
         <div className="text-center text-[11px] text-muted-foreground">Arrange the layers here — each shows its stitched look. Generate merges them into one file.</div>
       </div>

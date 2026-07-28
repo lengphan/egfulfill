@@ -1651,7 +1651,12 @@ export function wilcomLettering(body: { text: string; alphabet: string; height?:
 // failure, kept so the recipe can be iterated against a live account.
 /** Move (x/y mm), resize (scale ×), rotate (angle°) for a decoration in the combined design. */
 export type WilcomTransform = { x: number; y: number; scale: number; angle: number }
-export type WilcomComboBody = { image?: string; text?: string; alphabet?: string; height?: number; color?: string; filename?: string; name?: string; orderRef?: string; designTransform?: WilcomTransform; letterTransform?: WilcomTransform }
+// One entry per element in the design, in stitch order (later = on top). An image layer
+// carries its base64 to auto-digitize server-side; the text layer's content rides in `text`.
+export type WilcomComboLayer =
+  | { kind: "image"; image: string; name?: string; transform?: WilcomTransform }
+  | { kind: "text"; transform?: WilcomTransform }
+export type WilcomComboBody = { layers?: WilcomComboLayer[]; image?: string; text?: string; alphabet?: string; height?: number; color?: string; filename?: string; name?: string; orderRef?: string; designTransform?: WilcomTransform; letterTransform?: WilcomTransform }
 export function wilcomCombinePreview(body: WilcomComboBody) {
   return api<WilcomResult>(`/api/wilcom/combine-preview`, { method: "POST", body: JSON.stringify(body) })
 }

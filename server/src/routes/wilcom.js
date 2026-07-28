@@ -320,6 +320,28 @@ function buildCombinedXml({ embName, embBase64, text, alphabet, letterHeight, co
     + '</xml>';
 }
 
+// Multi-layer generalisation of the recipe above: an ORDERED list of decorations (each an
+// already-digitized .emb `design` or a `lettering`) plus the <files> they reference. Decoration
+// order == stitch order (later stitches on top), so the caller emits them in layer order.
+function decoXml(d) {
+  if (d.type === 'design') return `<design file="${XML_ESC(d.embName)}" colorwaytype="current">${tfXml(d.transform)}</design>`;
+  const lh = Math.min(50, Math.max(5, Number(d.height) || 20));
+  return '<lettering>' + tfXml(d.transform)
+    + `<simple_lettering text="${XML_ESC(d.text)}" alphabet_name="${XML_ESC(d.alphabet)}" height="${lh.toFixed(1)}"/>`
+    + `<thread color="${d.colorInt}"/></lettering>`;
+}
+function buildMultiXml({ decorations, files, designFile }) {
+  const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="preview.png"', 'dpi="120"'].filter(Boolean).join(' ');
+  return '<xml><recipe><decorations>'
+    + decorations.map(decoXml).join('')
+    + '</decorations>'
+    + `<output ${out}/>`
+    + '</recipe>'
+    // <files> is a SIBLING of <recipe> (nesting caused error 101) — one <file> per distinct emb.
+    + `<files>${files.map((f) => `<file filename="${XML_ESC(f.filename)}" filecontents="${f.base64}"/>`).join('')}</files>`
+    + '</xml>';
+}
+
 // The auto-digitized .emb for an image doesn't change while the image is fixed, so cache it by
 // content hash: a live combined preview then re-runs only the FAST lettering step as you type,
 // not the heavy (up to 90s) auto-digitize on every keystroke. Small LRU-ish cap.
@@ -327,9 +349,110 @@ const _embCache = new Map();
 function embCacheGet(hash) { const v = _embCache.get(hash); if (v) { _embCache.delete(hash); _embCache.set(hash, v); } return v; }
 function embCacheSet(hash, v) { _embCache.set(hash, v); if (_embCache.size > 24) _embCache.delete(_embCache.keys().next().value); }
 
+// Auto-digitize one image → { filename, base64 } .emb, cached by content hash. Returns a
+// { error, status, sample } object instead on failure so the caller can bubble it up verbatim.
+async function digitizeToEmb(image, nameHint, i) {
+  const img = fromDataUrl(image);
+  if (!img) return { error: 'Send image data URLs (PNG / JPG / WEBP).', status: 400 };
+  if (tooBig(img.base64)) return { error: `Image "${nameHint || i + 1}" is over 2 MB — downscale it first.`, status: 413 };
+  const hash = crypto.createHash('sha256').update(img.base64).digest('hex').slice(0, 32);
+  const cached = embCacheGet(hash);
+  if (cached) return { emb: cached };
+  const artStem = safeName(nameHint || `art${i}`, `art${i}`);
+  const artXml = buildBitmapXml({ filename: `${artStem}.${img.ext}`, base64: img.base64, designFile: `${artStem}.emb` });
+  const artRes = await ewaCall('api/bitmapArtDesign', artXml);
+  if (!artRes.ok) {
+    const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(artRes.body || '') || /\bmessage="([^"]{1,300})"/i.exec(artRes.body || '');
+    return { error: m ? m[1].trim() : 'EWA could not auto-digitize the image', status: 502, sample: (artRes.body || '').replace(/filecontents="[^"]*"/gi, 'filecontents="[base64]"').slice(0, 2000) };
+  }
+  const artEmb = parseFiles(artRes.body).find((f) => /\.emb$/i.test(f.filename));
+  if (!artEmb) return { error: 'Auto-digitize returned no .emb to combine with the text.', status: 502, sample: (artRes.body || '').slice(0, 400) };
+  const emb = { filename: artEmb.filename, base64: artEmb.base64 };
+  embCacheSet(hash, emb);
+  return { emb };
+}
+
+// Shared tail for the combine paths: read the newDesign response, shape the output, persist
+// (design mode + storage on). `res` is the raw ewaCall result.
+async function finalizeDesign(req, reply, { design, res, stem, nameLabel, orderRef }) {
+  if (!res.ok) {
+    const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '') || /\bmessage="([^"]{1,300})"/i.exec(res.body || '');
+    reply.code(502);
+    return { ok: false, status: res.status, error: m ? m[1].trim() : 'EWA rejected the combined design', sample: (res.body || '').replace(/filecontents="[^"]*"/gi, 'filecontents="[base64]"').slice(0, 2000) };
+  }
+  const files = parseFiles(res.body);
+  const info = parseDesignInfo(res.body) || {};
+  const tv = files.find((f) => isPng(f.filename));
+  const machine = design ? files.find((f) => isMachine(f.filename)) : null;
+  const out = {
+    ok: true,
+    trueview: tv ? tv.base64 : null,
+    machineFile: machine ? { filename: machine.filename, base64: machine.base64 } : null,
+    stitches: info.stitches ?? null, colours: info.colours ?? null,
+    width: info.width ?? null, height: info.height ?? null,
+    threads: parseThreads(res.body),
+  };
+  if (design && storageEnabled()) {
+    try {
+      await ensureGen();
+      const gid = 'WG-' + crypto.randomBytes(8).toString('hex');
+      const ext = machine ? (machine.filename.split('.').pop() || 'emb').toLowerCase() : null;
+      const tvKey = tv ? `wilcom/${gid}-tv.png` : null;
+      const fileKey = machine ? `wilcom/${gid}-${stem}.${ext}` : null;
+      const tvUrl = tvKey ? await putObject(tvKey, Buffer.from(tv.base64, 'base64'), 'image/png') : null;
+      const fileUrl = fileKey ? await putObject(fileKey, Buffer.from(machine.base64, 'base64'), 'application/octet-stream') : null;
+      await q(`insert into wilcom_generations (id, by_user, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url, tv_key, file_key) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+        [gid, req.user?.sub || null, nameLabel, orderRef || null, 'maker', 'combined', out.stitches, out.colours, out.width, out.height, ext ? [ext.toUpperCase()] : [], tvUrl, fileUrl, tvKey, fileKey]);
+      out.id = gid; out.trueviewUrl = tvUrl; out.fileUrl = fileUrl;
+    } catch (e) { req.log?.warn?.({ err: String(e) }, 'wilcom combine persist failed'); }
+  }
+  return out;
+}
+
+// Multi-layer combine — N image layers (each auto-digitized) plus an optional text layer, in
+// the caller's order. Degenerate cases fall back to the proven single-mode handlers.
+async function runCombineLayers(req, reply, { design }) {
+  const b = req.body || {};
+  const inLayers = (b.layers || []).filter((l) => l && (l.kind === 'image' || l.kind === 'text'));
+  const imgs = inLayers.filter((l) => l.kind === 'image' && l.image);
+  const text = String(b.text || '').trim();
+  const hasText = inLayers.some((l) => l.kind === 'text') && !!text;
+  if (imgs.length === 0 && hasText) { req.body = { ...b, alphabet: b.alphabet }; return runLettering(req, reply, { design }); }
+  if (imgs.length === 1 && !hasText) { req.body = { ...b, image: imgs[0].image, filename: imgs[0].name }; return runBitmap(req, reply, { design }); }
+  if (imgs.length === 0 && !hasText) { reply.code(400); return { ok: false, error: 'Add an image, some text, or both.' }; }
+  const alphabet = String(b.alphabet || '').trim();
+  if (hasText && !alphabet) { reply.code(400); return { ok: false, error: 'Pick an alphabet for the text.' }; }
+  try {
+    // Auto-digitize every image; give each a UNIQUE <files> name so a repeated image can't collide.
+    const files = [];
+    const embName = new Map();
+    let i = 0;
+    for (const l of imgs) {
+      const r = await digitizeToEmb(l.image, l.name, i);
+      if (r.error) { reply.code(r.status || 502); return { ok: false, status: r.status, error: r.error, sample: r.sample }; }
+      const name = `layer-${i}.emb`;
+      files.push({ filename: name, base64: r.emb.base64 });
+      embName.set(l, name);
+      i++;
+    }
+    const colorInt = hexToColorInt(b.color);
+    const decorations = inLayers.map((l) => embName.has(l)
+      ? { type: 'design', embName: embName.get(l), transform: l.transform }
+      : (l.kind === 'text' && hasText ? { type: 'lettering', text, alphabet, height: b.height, colorInt, transform: l.transform } : null)
+    ).filter(Boolean);
+    const stem = safeName(b.name || text || 'design', 'design');
+    const xml = buildMultiXml({ decorations, files, designFile: design ? `${stem}.emb` : null });
+    const res = await ewaCall(design ? 'api/newDesign' : 'api/newDesignTrueview', xml);
+    const label = [text, ...imgs.map((l) => l.name).filter(Boolean)].filter(Boolean).join(' + ') || stem;
+    return finalizeDesign(req, reply, { design, res, stem, nameLabel: label, orderRef: b.orderRef });
+  } catch (e) { reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' }; }
+}
+
 async function runCombine(req, reply, { design }) {
   if (!configured()) { reply.code(400); return { ok: false, error: 'Wilcom EWA is not configured — add the key in Settings › Integrations.' }; }
   const b = req.body || {};
+  // New ordered multi-layer payload takes precedence over the legacy single-image fields.
+  if (Array.isArray(b.layers) && b.layers.length) return runCombineLayers(req, reply, { design });
   const text = String(b.text || '').trim();
   const hasImg = !!b.image;
   // Only one input → use the PROVEN single-mode path, not the prototype recipe.
@@ -365,40 +488,7 @@ async function runCombine(req, reply, { design }) {
     // STEP 2 — one design: the .emb as a <design> decoration + the <lettering> decoration.
     const xml = buildCombinedXml({ embName: emb.filename, embBase64: emb.base64, text, alphabet, letterHeight: b.height, colorInt: hexToColorInt(b.color), designFile: design ? `${stem}.emb` : null, designTf: b.designTransform, letterTf: b.letterTransform });
     const res = await ewaCall(design ? 'api/newDesign' : 'api/newDesignTrueview', xml);
-    if (!res.ok) {
-      const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '') || /\bmessage="([^"]{1,300})"/i.exec(res.body || '');
-      reply.code(502);
-      // The sample is deliberately returned: the combine recipe is a prototype, so the raw
-      // EWA response is what we iterate the XML against.
-      return { ok: false, status: res.status, error: m ? m[1].trim() : 'EWA rejected the combined design', sample: (res.body || '').replace(/filecontents="[^"]*"/gi, 'filecontents="[base64]"').slice(0, 2000) };
-    }
-    const files = parseFiles(res.body);
-    const info = parseDesignInfo(res.body) || {};
-    const tv = files.find((f) => isPng(f.filename));
-    const machine = design ? files.find((f) => isMachine(f.filename)) : null;
-    const out = {
-      ok: true,
-      trueview: tv ? tv.base64 : null,
-      machineFile: machine ? { filename: machine.filename, base64: machine.base64 } : null,
-      stitches: info.stitches ?? null, colours: info.colours ?? null,
-      width: info.width ?? null, height: info.height ?? null,
-      threads: parseThreads(res.body),
-    };
-    if (design && storageEnabled()) {
-      try {
-        await ensureGen();
-        const gid = 'WG-' + crypto.randomBytes(8).toString('hex');
-        const ext = machine ? (machine.filename.split('.').pop() || 'emb').toLowerCase() : null;
-        const tvKey = tv ? `wilcom/${gid}-tv.png` : null;
-        const fileKey = machine ? `wilcom/${gid}-${stem}.${ext}` : null;
-        const tvUrl = tvKey ? await putObject(tvKey, Buffer.from(tv.base64, 'base64'), 'image/png') : null;
-        const fileUrl = fileKey ? await putObject(fileKey, Buffer.from(machine.base64, 'base64'), 'application/octet-stream') : null;
-        await q(`insert into wilcom_generations (id, by_user, name, order_ref, source, type, stitches, colours, width, height, formats, trueview_url, file_url, tv_key, file_key) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-          [gid, req.user?.sub || null, `${text} + ${stem}`, b.orderRef || null, 'maker', 'combined', out.stitches, out.colours, out.width, out.height, ext ? [ext.toUpperCase()] : [], tvUrl, fileUrl, tvKey, fileKey]);
-        out.id = gid; out.trueviewUrl = tvUrl; out.fileUrl = fileUrl;
-      } catch (e) { req.log?.warn?.({ err: String(e) }, 'wilcom combine persist failed'); }
-    }
-    return out;
+    return finalizeDesign(req, reply, { design, res, stem, nameLabel: `${text} + ${stem}`, orderRef: b.orderRef });
   } catch (e) { reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' }; }
 }
 
