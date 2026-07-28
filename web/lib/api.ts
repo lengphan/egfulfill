@@ -55,10 +55,25 @@ export type LedgerRow = {
   created_at: string
 }
 
+/** P&L totals over the FULL ledger (not the 200-row window), grouped by ledger type.
+ *  Factory reads revenue/costs/profit from this; a seller reads paid/deposits/refunds. */
+export type WalletSummary = {
+  revenue: number      // factory: order charges received
+  paid: number         // seller: order charges paid
+  deposits: number     // top-ups
+  refundsIn: number    // seller: refunds received
+  refundsOut: number   // factory: refunds paid back
+  payouts: number      // withdrawals
+  productCost: number  // COGS (blanks POs)
+  postage: number      // labels
+  design: number       // Pink Design
+  dispatch: number     // byeastside pick fee
+}
 export type WalletResponse = {
   account: string
   balance: number
   ledger: LedgerRow[]
+  summary?: WalletSummary
   /** The threshold the SERVER considers low, and whether this balance is under it.
    *  Sent with the balance so no client decides for itself what "low" means — two
    *  screens using different numbers is how one warns and the other stays quiet.
@@ -2783,4 +2798,39 @@ export function setEmailBranding(b: EmailBranding) {
   return api<{ ok?: boolean; branding?: EmailBranding; error?: string }>(`/api/email-branding`, {
     method: "PUT", body: JSON.stringify(b),
   })
+}
+
+// ─────────────────────────── Backups (admin) ───────────────────────────
+// Admin-only Postgres backups to R2 — on-demand + nightly. See server/src/routes/backup.js.
+// size_bytes arrives as a string when non-null (node-pg returns bigint as text).
+export type DbBackup = {
+  id: number
+  r2_key: string | null
+  size_bytes: string | number | null
+  kind: "manual" | "auto"
+  status: "running" | "done" | "failed"
+  error: string | null
+  created_by: string | null
+  created_at: string
+  finished_at: string | null
+}
+export type BackupsState = {
+  backups: DbBackup[]
+  storageConfigured: boolean
+  pgDumpAvailable: boolean
+  pgDumpVersion: string | null
+  running: boolean
+  keepAuto: number
+}
+export function listBackups() {
+  return api<BackupsState>(`/api/backups`)
+}
+export function runBackup() {
+  return api<{ ok: boolean; status: string }>(`/api/backups/run`, { method: "POST" })
+}
+export function backupDownloadUrl(id: number) {
+  return api<{ url: string }>(`/api/backups/${id}/download`)
+}
+export function deleteBackup(id: number) {
+  return api<{ ok: boolean }>(`/api/backups/${id}`, { method: "DELETE" })
 }

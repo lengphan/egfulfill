@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight, X } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight, X, DownloadSimple, Database } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -57,6 +57,12 @@ import {
   type FactorySettings,
   type AdminUser,
   type AuditRow,
+  listBackups,
+  runBackup,
+  backupDownloadUrl,
+  deleteBackup,
+  type DbBackup,
+  type BackupsState,
 } from "@/lib/api"
 
 const fmtDate = (s?: string | null) => {
@@ -2142,6 +2148,155 @@ function ActivityPanel() {
   )
 }
 
+// ─────────────────────────── Backups (admin) ───────────────────────────
+// Database backups to R2 — on-demand + nightly, download, delete. The live database is
+// never touched here; these are point-in-time copies stored beside the artwork.
+function fmtBytes(n: number): string {
+  if (!n || n < 0) return "—"
+  const u = ["B", "KB", "MB", "GB"]
+  let i = 0, v = n
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++ }
+  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`
+}
+
+function BackupsPanel() {
+  const [state, setState] = useState<BackupsState | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [confirmDel, setConfirmDel] = useState<DbBackup | null>(null)
+
+  const load = useCallback(() => {
+    listBackups()
+      .then((s) => { setState(s); setLoaded(true) })
+      .catch((e) => { setErr(e instanceof Error ? e.message : "Couldn't load backups"); setLoaded(true) })
+  }, [])
+  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+
+  // Poll while a backup is in flight so its row flips to Done / Failed on its own.
+  const anyRunning = !!state?.running || (state?.backups || []).some((b) => b.status === "running")
+  useEffect(() => {
+    if (!anyRunning) return
+    const id = setInterval(load, 4000)
+    return () => clearInterval(id)
+  }, [anyRunning, load])
+
+  const startBackup = async () => {
+    setErr(null); setBusy(true)
+    try { await runBackup(); setTimeout(load, 400) }
+    catch (e) { setErr(e instanceof Error ? e.message : "Couldn't start the backup") }
+    finally { setBusy(false) }
+  }
+  const download = async (b: DbBackup) => {
+    try { const { url } = await backupDownloadUrl(b.id); window.open(url, "_blank", "noopener") }
+    catch (e) { setErr(e instanceof Error ? e.message : "Couldn't get a download link") }
+  }
+  const doDelete = async (b: DbBackup) => {
+    setConfirmDel(null)
+    try { await deleteBackup(b.id); load() }
+    catch (e) { setErr(e instanceof Error ? e.message : "Couldn't delete that backup") }
+  }
+
+  if (!loaded) return (
+    <SectionCard title="Backups">
+      <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+    </SectionCard>
+  )
+
+  const ready = !!state?.storageConfigured && !!state?.pgDumpAvailable
+  const rows = state?.backups || []
+
+  return (
+    <SectionCard title="Backups" description="Point-in-time copies of the database, stored in R2 alongside your artwork.">
+      {/* Prerequisite warnings — name what's missing and how to fix it, rather than a dead button. */}
+      {!state?.storageConfigured && (
+        <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm">
+          <Warning size={18} className="mt-0.5 shrink-0 text-amber-600" />
+          <span>Object storage (R2) isn’t configured, so there’s nowhere to keep a backup. Set the <code>SPACES_*</code> keys first.</span>
+        </div>
+      )}
+      {state?.storageConfigured && !state?.pgDumpAvailable && (
+        <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm">
+          <Warning size={18} className="mt-0.5 shrink-0 text-amber-600" />
+          <span><code>pg_dump</code> isn’t in the running server image yet. Rebuild it on the server (<code>docker compose up -d --build</code>), then reload.</span>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-prose text-sm text-muted-foreground">
+          A backup runs automatically every night. The most recent {state?.keepAuto ?? 14} nightly backups are kept; manual ones stay until you remove them.
+        </p>
+        <Button onClick={startBackup} disabled={!ready || busy || anyRunning}>
+          {busy || anyRunning ? <CircleNotch size={16} className="animate-spin" /> : <Database size={16} />}
+          {anyRunning ? "Backing up…" : "Back up now"}
+        </Button>
+      </div>
+
+      {err && <p className="mt-3 text-sm text-destructive">{err}</p>}
+
+      <div className="mt-4 overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 font-medium">When</th>
+              <th className="px-3 py-2 font-medium">Type</th>
+              <th className="px-3 py-2 font-medium">Size</th>
+              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2" aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">No backups yet. Run one now, or wait for tonight’s automatic backup.</td></tr>
+            )}
+            {rows.map((b) => (
+              <tr key={b.id} className="border-b last:border-0">
+                <td className="px-3 py-2 tabular-nums">{new Date(b.created_at).toLocaleString()}</td>
+                <td className="px-3 py-2"><Badge variant={b.kind === "auto" ? "secondary" : "outline"}>{b.kind === "auto" ? "Nightly" : "Manual"}</Badge></td>
+                <td className="px-3 py-2 tabular-nums text-muted-foreground">{b.status === "done" ? fmtBytes(Number(b.size_bytes || 0)) : "—"}</td>
+                <td className="px-3 py-2">
+                  {b.status === "done" && <span className="inline-flex items-center gap-1 text-green-600"><Check size={14} /> Done</span>}
+                  {b.status === "running" && <span className="inline-flex items-center gap-1 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /> Running</span>}
+                  {b.status === "failed" && <span className="inline-flex items-center gap-1 text-destructive" title={b.error || undefined}><Warning size={14} /> Failed</span>}
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-1">
+                    {b.status === "done" && (
+                      <Button variant="ghost" size="sm" onClick={() => download(b)} title="Download">
+                        <DownloadSimple size={16} />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => setConfirmDel(b)} title="Delete">
+                      <Trash size={16} />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {state?.pgDumpVersion && <p className="mt-2 text-xs text-muted-foreground">{state.pgDumpVersion}</p>}
+
+      <Dialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this backup?</DialogTitle>
+            <DialogDescription>
+              The dump file is removed from R2 for good. This does not touch your live database — only this saved copy.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDel(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => confirmDel && doDelete(confirmDel)}>Delete backup</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </SectionCard>
+  )
+}
+
 export function SettingsView() {
   // Integrations is a platform/admin concern (Stripe secret, supplier creds, AI key,
   // etc.) — ADMIN only. Operator/warehouse/designer + sellers never see it.
@@ -2206,6 +2361,9 @@ export function SettingsView() {
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
         {isAdmin && <TabsTrigger value="site">Site content</TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
+        {/* Backups — admin-only. Restoring a lost database is the least reversible thing on
+            the platform, so who can trigger/delete a backup matches who can touch money. */}
+        {isAdmin && <TabsTrigger value="backups">Backups</TabsTrigger>}
         {/* Permissions — admin-only, HIDE-only nav visibility per role. */}
         {isAdmin && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         {/* Team is a SELLER's own staff (and their permissions). Factory roles are managed
@@ -2255,6 +2413,11 @@ export function SettingsView() {
       {isAdmin && (
         <TabsContent value="activity">
           <ActivityPanel />
+        </TabsContent>
+      )}
+      {isAdmin && (
+        <TabsContent value="backups">
+          <BackupsPanel />
         </TabsContent>
       )}
       {isAdmin && (

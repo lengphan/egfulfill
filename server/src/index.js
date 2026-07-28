@@ -56,6 +56,7 @@ import { startSupplierPoll } from './supplier-poll.js';
 import { manifestRoutes } from './routes/manifests.js';
 import { manualSupplierRoutes } from './routes/manual_suppliers.js';
 import { pinkDesignRoutes } from './routes/pinkdesign.js';
+import { backupRoutes } from './routes/backup.js';
 import { addClient } from './events.js';
 import { storageEnabled, putObject, deleteObject, presignGet, publicUrl, designUrlTtlDays } from './storage.js';
 
@@ -384,6 +385,7 @@ startSupplierPoll({
   ssOrderStatus,
 });
 pinkDesignRoutes(app, requireAuth, requireStaff);      // Pink Design: outsourced DTG/DTF artwork
+backupRoutes(app, requireAdmin);                       // admin-only Postgres backups → R2 (on-demand + nightly), download + prune
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })
