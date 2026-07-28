@@ -285,7 +285,53 @@ async function syncAllTiktok(opts = {}) {
   return { ok: true, synced };
 }
 
+/**
+ * Push tracking to TikTok Shop — "Mark Package As Shipped", for a SELLER-fulfilled order we
+ * shipped on our own label. Wired exactly to the v202309 spec:
+ *   1. GET /order/202309/orders?ids=<id>            → delivery_option_id + line-item ids
+ *   2. GET /logistics/202309/delivery_options/{id}/shipping_providers → match our carrier → id
+ *   3. POST /fulfillment/202309/orders/{id}/packages { order_line_item_ids, tracking_number,
+ *                                                      shipping_provider_id }
+ * Marks the order shipped on TikTok (buyer sees tracking). Bound to the order's OWNER shop,
+ * no fallback. Throws on any problem. Needs the app's `seller.fulfillment.basic` scope.
+ */
+export async function tiktokPushTracking(order, tracking, carrier) {
+  const m = String((order && order.id) || '').match(/^tiktok-(.+)$/i);
+  if (!m) throw new Error('Not a TikTok order');
+  const orderId = m[1];
+  const conns = (await q(`select * from platform_connections where platform='tiktok'`)).rows;
+  const conn = conns.find((c) => order && String(c.connected_by) === String(order.seller_id))
+    || conns.find((c) => order && c.shop_name && c.shop_name === order.store)
+    || null;
+  if (!conn) throw new Error("Couldn't tell which connected TikTok shop this order belongs to");
+  const cipher = await getShopCipher(conn);
+
+  // 1) order detail → delivery_option_id + the line-item ids to mark shipped
+  const od = await ttSignedRequest(conn, 'GET', '/order/202309/orders', { query: { shop_cipher: cipher, ids: orderId } });
+  const to = (od.orders || [])[0];
+  if (!to) throw new Error('TikTok order not found');
+  const deliveryOptionId = to.delivery_option_id;
+  const lineItemIds = (to.line_items || []).map((li) => li.id).filter(Boolean);
+
+  // 2) shipping providers for that delivery option → the id matching our carrier (usually USPS)
+  if (!deliveryOptionId) throw new Error('Order has no delivery_option_id — cannot resolve a shipping provider');
+  const sp = await ttSignedRequest(conn, 'GET', `/logistics/202309/delivery_options/${encodeURIComponent(deliveryOptionId)}/shipping_providers`, { query: { shop_cipher: cipher } });
+  const providers = sp.shipping_providers || [];
+  const want = String(carrier || 'USPS').toUpperCase();
+  const hit = providers.find((p) => String(p.name || '').toUpperCase() === want)
+    || providers.find((p) => String(p.name || '').toUpperCase().includes(want))
+    || (providers.length === 1 ? providers[0] : null);
+  if (!hit || !hit.id) throw new Error(`No TikTok shipping provider matched "${carrier || 'USPS'}" for this order`);
+
+  // 3) mark the package shipped with our tracking
+  const body = { tracking_number: tracking, shipping_provider_id: hit.id };
+  if (lineItemIds.length) body.order_line_item_ids = lineItemIds;
+  const res = await ttSignedRequest(conn, 'POST', `/fulfillment/202309/orders/${encodeURIComponent(orderId)}/packages`, { query: { shop_cipher: cipher }, body });
+  return { ok: true, channel: 'tiktok', packageId: (res && res.package_id) || null, warning: (res && res.warning && res.warning.message) || null };
+}
+
 export function tiktokRoutes(app, requireAuth, requireStaff) {
+  // Reuse the platform_connections table (created by etsy.js). Create it here too so
   // Reuse the platform_connections table (created by etsy.js). Create it here too so
   // TikTok works even on a DB that never loaded the Etsy route first (idempotent).
   q(`create table if not exists platform_connections (

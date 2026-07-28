@@ -411,10 +411,10 @@ async function pushMarketplaceTracking(order, tracking, carrier) {
       const { shopifyPushTracking } = await import('./shopify.js');
       return await shopifyPushTracking(order, tracking, carrier);
     }
-    // TikTok's ship flow (create/find a package → ship it with tracking + a looked-up
-    // shipping_provider_id) lives behind Partner Center login and isn't publicly documented,
-    // so it's deliberately NOT wired rather than guessed. The routing lands it here for when
-    // the spec is confirmed. Until then a TikTok order is a no-op (never a wrong API call).
+    if (channel === 'tiktok') {
+      const { tiktokPushTracking } = await import('./tiktok.js');
+      return await tiktokPushTracking(order, tracking, carrier);
+    }
     return { channel, skipped: 'not-wired' };
   } catch (e) {
     return { channel, error: (e && e.message) || 'push failed' };
