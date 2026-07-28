@@ -534,7 +534,7 @@ export function ProductEditorDialog({
                       ))}
                     </div>
                     <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
-                      placeholder={bulkPct ? "upcharge %" : "upcharge $"} className="h-8 w-24 text-xs" inputMode="decimal" aria-label="Base upcharge over product cost" />
+                      placeholder={bulkPct ? "upcharge %" : "upcharge $"} className="h-8 w-32 text-xs" inputMode="decimal" aria-label="Base upcharge over product cost" />
                     <span className="text-xs text-muted-foreground">· shipping</span>
                     <Input value={bulkShip} onChange={(e) => setBulkShip(e.target.value.replace(/[^0-9.]/g, ""))}
                       placeholder="$ flat" className="h-8 w-20 text-xs" inputMode="decimal" aria-label="Bulk shipping fee" />
