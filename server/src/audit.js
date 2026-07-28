@@ -73,8 +73,22 @@ export function auditRoutes(app, requireAdmin, requireAuth) {
     if (f.action)     { where.push(`action=$${n++}`); vals.push(f.action); }
     if (f.actor)      { where.push(`actor ilike $${n++}`); vals.push('%' + f.actor + '%'); }
     if (f.since)      { where.push(`ts >= $${n++}`); vals.push(f.since); }
+    // Category filter: comma-separated action PREFIXES (order., design, label. …) — matches
+    // ANY, so the Activity page can fold ~40 raw action types into a handful of toggles.
+    if (f.cats) {
+      const prefixes = String(f.cats).split(',').map((s) => s.trim()).filter(Boolean).slice(0, 40);
+      if (prefixes.length) {
+        const ors = prefixes.map((p) => { const i = n++; vals.push(p + '%'); return `action like $${i}`; });
+        where.push('(' + ors.join(' or ') + ')');
+      }
+    }
+    // Free-text across the human-visible fields (actor, note, id, action).
+    if (f.q) {
+      const i = n++; vals.push('%' + String(f.q).trim() + '%');
+      where.push(`(action ilike $${i} or actor ilike $${i} or coalesce(actor_name,'') ilike $${i} or coalesce(note,'') ilike $${i} or coalesce(entity_id,'') ilike $${i})`);
+    }
     const lim = Math.min(parseInt(f.limit, 10) || 200, 1000);
-    const sql = `select id, ts, actor, actor_role, action, entity_type, entity_id, before, after, note
+    const sql = `select id, ts, actor, actor_name, actor_role, action, entity_type, entity_id, before, after, note
                  from audit_log ${where.length ? 'where ' + where.join(' and ') : ''}
                  order by ts desc, id desc limit ${lim}`;
     const r = await q(sql, vals);

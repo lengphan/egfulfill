@@ -57,6 +57,23 @@ const REGISTRY: Record<string, { label: string; verb: string; icon: ActionMeta["
   "design.lane":         { label: "Moved",    verb: "moved",         icon: ArrowRight },
 }
 
+// Coarse buckets for the Activity page's filter toggles. Each bucket is a set of action
+// PREFIXES (matched with `like prefix%` server-side), so the ~40 raw action types fold into
+// a handful of human categories without listing every one. Kept here, beside the per-action
+// wording, so the vocabulary lives in one place.
+export type ActionCategory = { key: string; label: string; prefixes: string[] }
+export const ACTION_CATEGORIES: ActionCategory[] = [
+  { key: "orders",     label: "Orders",      prefixes: ["order.", "item."] },
+  { key: "fulfilment", label: "Fulfilment",  prefixes: ["label.", "dispatch.", "manifest", "consignment."] },
+  { key: "design",     label: "Design",      prefixes: ["design"] },
+  { key: "money",      label: "Money",       prefixes: ["wallet.", "billing.", "topup"] },
+  { key: "users",      label: "Users & team", prefixes: ["user.", "seller.", "team"] },
+  { key: "catalog",    label: "Catalog",     prefixes: ["catalog"] },
+  { key: "email",      label: "Email",       prefixes: ["broadcast.", "email_branding"] },
+  { key: "suppliers",  label: "Suppliers",   prefixes: ["purchase", "manual_supplier", "ss.", "otto"] },
+  { key: "system",     label: "System",      prefixes: ["backup.", "capacity.", "factory", "nav"] },
+]
+
 export function actionMeta(action: string): ActionMeta {
   const exact = REGISTRY[action]
   if (exact) return exact

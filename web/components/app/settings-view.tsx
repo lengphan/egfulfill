@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ActivityFeed } from "@/components/app/activity-feed"
+import { ACTION_CATEGORIES } from "@/components/app/activity-meta"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
@@ -2130,18 +2131,94 @@ function UsersPanel() {
 }
 
 // ─────────────────────────── Activity (admin) ───────────────────────────
+const ACTIVITY_RANGES = [
+  { key: "all", label: "All time", days: 0 },
+  { key: "1", label: "Last 24 hours", days: 1 },
+  { key: "7", label: "Last 7 days", days: 7 },
+  { key: "30", label: "Last 30 days", days: 30 },
+]
+
 function ActivityPanel() {
   const [audit, setAudit] = useState<AuditRow[] | null>(null)
-  useEffect(() => { const id = setTimeout(() => { getAudit({ limit: 200 }).then((r) => setAudit(r ?? [])).catch(() => setAudit([])) }, 0); return () => clearTimeout(id) }, [])
-  // Same feed as everywhere else (activity-feed) — a global log rather than one entity's, so
-  // the subject is WHICH entity the action touched ("order 4099", "design_card 13").
+  const [cats, setCats] = useState<string[]>([])   // selected category keys; empty = all
+  const [query, setQuery] = useState("")
+  const [range, setRange] = useState("all")
+
+  // Refetch (debounced) whenever a filter changes — the server does the filtering, so a rare
+  // action still turns up beyond the most recent page. setState sits inside the timer/promise,
+  // never synchronously in the effect.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setAudit(null)
+      const prefixes = ACTION_CATEGORIES.filter((c) => cats.includes(c.key)).flatMap((c) => c.prefixes)
+      const r = ACTIVITY_RANGES.find((x) => x.key === range)
+      const since = r && r.days ? new Date(Date.now() - r.days * 86_400_000).toISOString() : undefined
+      getAudit({ limit: 300, cats: prefixes, q: query.trim() || undefined, since })
+        .then((rows) => setAudit(rows ?? []))
+        .catch(() => setAudit([]))
+    }, 250)
+    return () => clearTimeout(id)
+  }, [cats, query, range])
+
+  const filtered = cats.length > 0 || query.trim() !== "" || range !== "all"
+
   return (
     <SectionCard title="Activity log" description="Audited actions across the platform">
-      <div className="p-3">
+      {/* Filter bar: category toggles + free-text + time range. */}
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {ACTION_CATEGORIES.map((c) => {
+            const on = cats.includes(c.key)
+            return (
+              <button
+                key={c.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setCats((prev) => (on ? prev.filter((k) => k !== c.key) : [...prev, c.key]))}
+                className={
+                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors " +
+                  (on
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-input bg-card text-muted-foreground hover:text-foreground")
+                }
+              >
+                {c.label}
+              </button>
+            )
+          })}
+          {cats.length > 0 && (
+            <button type="button" onClick={() => setCats([])} className="ml-0.5 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search actor, note, id…" className="h-8 w-60 pl-8" />
+          </div>
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            className="h-8 rounded-md border border-input bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          >
+            {ACTIVITY_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+          {audit && (
+            <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+              {audit.length}{audit.length === 300 ? "+" : ""} event{audit.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Same feed as everywhere else (activity-feed) — a global log rather than one entity's,
+          so the subject is WHICH entity the action touched ("order 4099", "design_card 13"). */}
+      <div className="mt-3">
         <ActivityFeed
           rows={audit}
           variant="card"
-          empty="No activity recorded yet."
+          empty={filtered ? "No activity matches these filters." : "No activity recorded yet."}
           subject={(a) => (a.entity_type ? <span className="text-muted-foreground">{a.entity_type} {a.entity_id ?? ""}</span> : null)}
         />
       </div>

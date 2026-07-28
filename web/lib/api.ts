@@ -276,10 +276,13 @@ export type AuditRow = { id: number | string; ts: string; actor?: string | null;
 export function getOrderHistory(entityId: string) {
   return api<AuditRow[]>(`/api/audit/entity?entityId=${encodeURIComponent(entityId)}`)
 }
-export function getAudit(params?: { limit?: number; action?: string }) {
+export function getAudit(params?: { limit?: number; action?: string; cats?: string[]; q?: string; since?: string }) {
   const p = new URLSearchParams()
   if (params?.limit) p.set("limit", String(params.limit))
   if (params?.action) p.set("action", params.action)
+  if (params?.cats && params.cats.length) p.set("cats", params.cats.join(","))
+  if (params?.q) p.set("q", params.q)
+  if (params?.since) p.set("since", params.since)
   const qs = p.toString()
   return api<AuditRow[]>(`/api/audit${qs ? `?${qs}` : ""}`)
 }
