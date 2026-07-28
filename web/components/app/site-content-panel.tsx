@@ -133,17 +133,31 @@ export function SiteContentPanel() {
   const edit = (fn: (c: SiteContent) => void) =>
     setContent((prev) => { if (!prev) return prev; const next = structuredClone(prev); fn(next); return next })
 
-  const save = async () => {
-    if (!content) return
+  // `override` lets an action persist the exact content it just produced (e.g. Remove banner)
+  // instead of the async `content` state, which wouldn't have updated yet on the same click.
+  const save = async (override?: SiteContent) => {
+    const payload = override ?? content
+    if (!payload) return
     setSaving(true); setErr(null); setSaved(false)
     try {
-      const r = await setSiteContent(content)
+      const r = await setSiteContent(payload)
       if (r.error) throw new Error(r.error)
       setSaved(true); setTimeout(() => setSaved(false), 2500)
       load()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save — admin only.")
     } finally { setSaving(false) }
+  }
+
+  // Remove the banner AND persist it right away — "Remove" that only clears the form and
+  // silently comes back on refresh isn't a removal. Saves the current content minus the image,
+  // exactly as pressing Save after Remove would.
+  const removeBanner = () => {
+    if (!content) return
+    const next = structuredClone(content)
+    next.hero.image = ""
+    setLocalPreview(null); setImgBroken(false); setContent(next)
+    void save(next)
   }
 
   const onPickImage = async (file: File | undefined) => {
@@ -234,7 +248,7 @@ export function SiteContentPanel() {
                   <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                     {uploading ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} />}Replace
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => { setLocalPreview(null); setImgBroken(false); edit((x) => { x.hero.image = "" }) }} disabled={uploading}><Trash size={13} />Remove</Button>
+                  <Button variant="ghost" size="sm" onClick={removeBanner} disabled={uploading || saving}><Trash size={13} />Remove</Button>
                 </div>
               </div>
             ) : (
