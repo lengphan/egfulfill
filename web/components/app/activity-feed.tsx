@@ -5,6 +5,22 @@ import { CircleNotch } from "@phosphor-icons/react"
 import { actionMeta, actorName } from "@/components/app/activity-meta"
 import type { AuditRow } from "@/lib/api"
 
+// The money an audited action moved, when it recorded one — a charge/refund/payout carries
+// it in `after` (fields vary by action: amount, total, charged…). Surfaced as a small chip so
+// "how much was charged" is answerable straight from the log. Null when the action isn't money.
+const MONEY_FIELDS = ["amount", "amount_usd", "total", "charged", "refunded", "delta", "paid"]
+function moneyOf(r: AuditRow): number | null {
+  const a = r.after
+  if (!a) return null
+  for (const f of MONEY_FIELDS) {
+    const v = a[f]
+    const n = typeof v === "number" ? v : (typeof v === "string" && v.trim() !== "" && !isNaN(Number(v)) ? Number(v) : null)
+    if (n != null && n !== 0) return n
+  }
+  return null
+}
+const fmtMoney = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
 /**
  * The one activity feed, used everywhere audit_log is shown — order page, dispatch board,
  * readiness popover, designer board. Each row reads as a quiet sentence:
@@ -77,6 +93,7 @@ export function ActivityFeed({
                   <span className="text-muted-foreground">{m.verb}</span>
                   {subj != null && <> {subj}</>}
                   {note && r.note ? <span className="text-muted-foreground"> · {r.note}</span> : null}
+                  {(() => { const amt = moneyOf(r); return amt != null ? <span className="font-semibold text-foreground"> · {fmtMoney(amt)}</span> : null })()}
                   <span className="text-muted-foreground/70"> · {when}</span>
                 </span>
               </div>
@@ -93,6 +110,7 @@ export function ActivityFeed({
               {subj != null && <> {subj}</>}
               {note && r.note ? <span className="text-muted-foreground"> · {r.note}</span> : null}
             </div>
+            {(() => { const amt = moneyOf(r); return amt != null ? <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold tabular-nums">{fmtMoney(amt)}</span> : null })()}
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">{when}</span>
           </div>
         )
