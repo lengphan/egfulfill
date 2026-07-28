@@ -47,6 +47,7 @@ import {
   type ThreadColor,
   ALL_SIDES,
   setFactorySettings,
+  getPinkStatus,
   getUsers,
   updateUserAdmin,
   createUserAdmin,
@@ -882,6 +883,10 @@ function PlatformPanel() {
   const [expediteFee, setExpediteFee] = useState("")
   const [expediteCost, setExpediteCost] = useState("")
   const [designPartnerCost, setDesignPartnerCost] = useState("")
+  // Default Pink Design product type: the value applied to every push, plus the options to
+  // choose it from (pulled live from Pink so a renamed type never goes stale).
+  const [pinkProductType, setPinkProductType] = useState("")
+  const [pinkTypeOptions, setPinkTypeOptions] = useState<{ value: string; label: string }[]>([])
   const [orderLimitDefault, setOrderLimitDefault] = useState("")
   const [capacityNotice, setCapacityNotice] = useState("")
   const [capacityMode, setCapacityMode] = useState(false)
@@ -939,6 +944,7 @@ function PlatformPanel() {
       setExpediteFee(r.expedite_fee != null ? String(r.expedite_fee) : "")
       setExpediteCost(r.expedite_cost != null ? String(r.expedite_cost) : "")
       setDesignPartnerCost(r.design_partner_cost != null ? String(r.design_partner_cost) : "")
+      setPinkProductType(r.pink_product_type != null ? String(r.pink_product_type) : "")
       setOrderLimitDefault(r.order_limit_default != null ? String(r.order_limit_default) : "")
       setCapacityNotice(r.capacity_notice != null ? String(r.capacity_notice) : "")
       setCapacityMode(!!Number(r.capacity_mode || 0))
@@ -966,6 +972,25 @@ function PlatformPanel() {
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
 
+  // Pink Design product types — for the default-type picker. Pulled live so a renamed type on
+  // Pink's side never leaves a stale hardcoded option. Best-effort: no options if Pink is off.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      getPinkStatus().then((s) => {
+        const raw = s.productTypes
+        const arr = Array.isArray(raw) ? raw
+          : (raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown[] }).data)) ? (raw as { data: unknown[] }).data : []
+        setPinkTypeOptions(arr.map((x) => {
+          if (typeof x === "string") return { value: x, label: x }
+          const o = (x ?? {}) as Record<string, unknown>
+          const value = String(o.id ?? o.key ?? o.value ?? o.code ?? o.name ?? "")
+          return { value, label: String(o.name ?? o.title ?? o.label ?? value) }
+        }).filter((o) => o.value))
+      }).catch(() => {})
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
+
   const save = async () => {
     setSaving(true); setErr(null); setSaved(false)
     try {
@@ -979,6 +1004,7 @@ function PlatformPanel() {
         expedite_fee: expediteFee === "" ? undefined : Number(expediteFee),
         expedite_cost: expediteCost === "" ? undefined : Number(expediteCost),
         design_partner_cost: designPartnerCost === "" ? undefined : Number(designPartnerCost),
+        pink_product_type: pinkProductType,
         order_limit_default: orderLimitDefault === "" ? undefined : Number(orderLimitDefault),
         capacity_notice: capacityNotice,
         capacity_mode: capacityMode ? 1 : 0,
@@ -1166,6 +1192,28 @@ function PlatformPanel() {
             hint="Per outsourced task. Booked when the card is approved."
             value={designPartnerCost} onChange={setDesignPartnerCost}
           />
+        </div>
+
+        {/* Default product type sent to Pink on every push — set once so the card's send form
+            doesn't ask for it. Options come live from Pink; empty = pick per card. */}
+        <div className="mt-4">
+          <label className="mb-1 block text-sm font-medium">Default product type for Pink Design</label>
+          <p className="mb-1.5 text-xs text-muted-foreground">
+            Applied to every design sent to Pink, so the card&apos;s send form won&apos;t ask for it.
+            Choose <strong>No default</strong> to pick per card instead.
+          </p>
+          <select value={pinkProductType} onChange={(e) => setPinkProductType(e.target.value)}
+            className="h-9 w-full max-w-sm min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
+            <option value="">— No default (pick per card) —</option>
+            {pinkTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {/* Keep a saved value selectable even if Pink's list didn't load or dropped it. */}
+            {pinkProductType && !pinkTypeOptions.some((o) => o.value === pinkProductType) && (
+              <option value={pinkProductType}>{pinkProductType}</option>
+            )}
+          </select>
+          {!pinkTypeOptions.length && (
+            <p className="mt-1 text-xs text-muted-foreground">Connect Pink Design to load its product types.</p>
+          )}
         </div>
       </Fold>
 

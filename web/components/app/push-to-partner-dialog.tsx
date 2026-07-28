@@ -75,6 +75,9 @@ function PushToPartnerPanel({
   const [title, setTitle] = useState("")
   const [desc, setDesc] = useState("")
   const [productType, setProductType] = useState("")
+  // When a default type is set in Settings, pre-select it and HIDE the picker — a single-type
+  // shop shouldn't re-pick it every push. Empty string = no default, so the picker still shows.
+  const [defaultType, setDefaultType] = useState("")
   const [board, setBoard] = useState("")
   const [extras, setExtras] = useState<{ url: string; name: string }[]>([])
 
@@ -92,6 +95,10 @@ function PushToPartnerPanel({
     getPinkStatus().then((s) => {
       setStatus(s)
       setProductTypes(toOptions(s.productTypes))
+      // Default product type from Settings — pre-select it; the picker is then hidden below.
+      const dt = String(s.productTypeDefault || "")
+      setDefaultType(dt)
+      if (dt) setProductType(dt)
       const b = toOptions(s.boards)
       setBoards(b)
       // One board is not a choice — pick it rather than making someone confirm it.
@@ -221,14 +228,18 @@ function PushToPartnerPanel({
         {/* No "Quantity" field: a design is made ONCE regardless of how many units get
             printed, so a per-task quantity is meaningless to a design partner. The order's
             real qty is still sent in the payload as context, just not surfaced. */}
-        <Field label="Product type">
-          {/* min-w-0 lets the select shrink so a long option label can't push the box wider. */}
-          <select value={productType} onChange={(e) => setProductType(e.target.value)} disabled={busy}
-            className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
-            <option value="">— not set —</option>
-            {productTypes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </Field>
+        {/* Product type picker — hidden once a default is set in Settings › Integrations, since
+            a single-type shop shouldn't re-pick it every send (the default is applied server-side). */}
+        {!defaultType && (
+          <Field label="Product type">
+            {/* min-w-0 lets the select shrink so a long option label can't push the box wider. */}
+            <select value={productType} onChange={(e) => setProductType(e.target.value)} disabled={busy}
+              className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
+              <option value="">— not set —</option>
+              {productTypes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
+        )}
         {boards.length > 1 && (
           <Field label="Board">
             <select value={board} onChange={(e) => setBoard(e.target.value)} disabled={busy}

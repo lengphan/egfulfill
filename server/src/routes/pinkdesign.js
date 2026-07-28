@@ -206,6 +206,12 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   const method = item?.print_type || card?.type || null;
   const where = useOrder ? ` · order ${useOrder}` : '';
 
+  // Product type: an explicit pick wins; otherwise fall back to the default set once in
+  // Settings › Integrations (pink_product_type) so it needn't be chosen on every push. Read
+  // at call time — a value saved in the UI applies to the next send without a redeploy.
+  let useProductType = productType || null;
+  if (!useProductType) { try { useProductType = (String((await readSettings()).pink_product_type || '').trim()) || null; } catch { /* default absent */ } }
+
   const payload = {
     title: String(wantTitle || '').trim() || `${subject}${where}`,
     qty: Math.max(1, parseInt(wantQty, 10) || Number(item?.qty) || 1),
@@ -215,7 +221,7 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
       useOrder ? `Order ${useOrder}${useSku ? `, SKU ${useSku}` : ''}.` : 'Not tied to an order.',
     ].filter(Boolean).join(' '),
     images: [imageUrl, ...extras],
-    ...(productType ? { product_type: productType } : {}),
+    ...(useProductType ? { product_type: useProductType } : {}),
     ...(designType ? { design_type: designType } : {}),
   };
   const r = await pink('/create_task', { method: 'POST', body: JSON.stringify(payload) });
@@ -299,6 +305,10 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
         raw: typeof boards.data === 'string' ? boards.data.slice(0, 200) : boards.data,
       };
     }
+    // The default product type set in Settings — the push form pre-selects it and hides its
+    // own picker when one is set, so a single-type shop never re-picks it.
+    let productTypeDefault = null;
+    try { productTypeDefault = (String((await readSettings()).pink_product_type || '').trim()) || null; } catch { /* default absent */ }
     return {
       configured: true,
       ok: boards.ok,
@@ -306,6 +316,7 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       boardId: boardId() || null,
       boards: boards.ok ? boards.data : null,
       productTypes: types.ok ? types.data : null,
+      productTypeDefault,
       error: boards.ok ? undefined : `board_list failed (${boards.status})`,
     };
   });

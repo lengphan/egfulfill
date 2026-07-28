@@ -68,7 +68,10 @@ const TEXT_KEYS = ['ss_shipping_method', 'otto_payment_method', 'otto_shipping_m
                    'enabled_carriers',
                    // Editable delay notice shown to a seller ONLY once they've crossed their
                    // order limit — e.g. "orders submitted now may ship later than usual".
-                   'capacity_notice'];
+                   'capacity_notice',
+                   // Default Pink Design product type: most shops send one type, so it's set
+                   // once here and applied to every push — the picker needn't appear per card.
+                   'pink_product_type'];
 
 // Defaults applied when a key has never been set. Exported so the pricing path and the
 // product editor agree on the starting numbers instead of each hardcoding its own.

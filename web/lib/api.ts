@@ -1359,6 +1359,8 @@ export type FactorySettings = {
   ship_from_complete?: boolean
   /** Carriers the rate picker offers (comma-separated substrings, e.g. "usps,ups"). Empty = all. */
   enabled_carriers?: string
+  /** Default Pink Design product type, applied to every push so the picker needn't appear per card. */
+  pink_product_type?: string
   product_types?: ProductType[]
   /** The factory's own cone stock. Empty = fall back to the built-in starter palette. */
   thread_palette?: ThreadColor[]
@@ -2351,7 +2353,7 @@ export function refundOrder(
 // a paid task for every one of them. These power the "Send to design partner" window.
 export type PinkStatus = {
   configured: boolean; ok?: boolean; base?: string; boardId?: string | null
-  boards?: unknown; productTypes?: unknown; error?: string
+  boards?: unknown; productTypes?: unknown; productTypeDefault?: string | null; error?: string
 }
 export function getPinkStatus() {
   return api<PinkStatus>(`/api/pinkdesign/status`)
