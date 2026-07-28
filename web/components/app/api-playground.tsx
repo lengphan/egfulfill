@@ -1,14 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Play, Key, Copy, Check, CircleNotch, Warning, Lightning, BookOpen, CaretRight, Eye, EyeSlash } from "@phosphor-icons/react"
+import { Play, Key, Copy, Check, CircleNotch, Warning, BookOpen, CaretRight, Eye, EyeSlash } from "@phosphor-icons/react"
 import { tabsListVariants, tabsTriggerVariants } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { WebhooksPanel } from "@/components/app/webhooks-panel"
-import { createApiKey } from "@/lib/api"
 import { API_ENDPOINTS, type ApiEndpoint } from "@/lib/api-endpoints"
 
 const KEY_STORE = "eg_playground_key" // convenience only — sessionStorage, never the JWT
@@ -51,7 +50,7 @@ function DevTabs({ tab, onTab }: { tab: DevTab; onTab: (t: DevTab) => void }) {
   // No icons — see the note in design-lab-tabs.tsx. Two words each; a mark in front of
   // them is decoration competing with the label.
   const items: { id: DevTab; label: string }[] = [
-    { id: "api", label: "API playground" },
+    { id: "api", label: "API Explorer" },
     { id: "webhooks", label: "Webhooks" },
   ]
   return (
@@ -78,7 +77,6 @@ export function ApiPlayground() {
   // Keys render masked. Revealing is deliberate and per-view, never remembered — a key
   // left legible is a key that ends up in a screen share or a screenshot.
   const [revealed, setRevealed] = useState(false)
-  const [freshRevealed, setFreshRevealed] = useState(false)
   const apiKey = keys[env]
   // ?endpoint=<id> preselects one, so "Try it" in the public docs lands on the call you
   // were reading instead of the top of the list. Read once at mount rather than through
@@ -93,9 +91,6 @@ export function ApiPlayground() {
   const [param, setParam] = useState(selected.param?.placeholder ?? "")
   const [sending, setSending] = useState(false)
   const [res, setRes] = useState<{ status: number; ok: boolean; text: string } | null>(null)
-  const [keyErr, setKeyErr] = useState<string | null>(null)
-  const [genLoading, setGenLoading] = useState(false)
-  const [freshKey, setFreshKey] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   // Restore previously pasted/generated keys per environment (session-scoped).
@@ -124,19 +119,6 @@ export function ApiPlayground() {
     [selected, param]
   )
 
-  const generateKey = async () => {
-    setGenLoading(true); setKeyErr(null)
-    try {
-      const r = await createApiKey(env === "live" ? "Live playground key" : "Playground key", env)
-      setFreshKey(r.key)
-      setCopied(false)
-      rememberKey(r.key)
-    } catch (e) {
-      setKeyErr(e instanceof Error ? e.message : "Couldn't generate a key. Are you signed in?")
-    } finally {
-      setGenLoading(false)
-    }
-  }
 
   const send = async () => {
     setSending(true); setRes(null)
@@ -179,7 +161,7 @@ export function ApiPlayground() {
         <div className="border-t border-border">
           <div className="grid gap-4 p-5 sm:grid-cols-3">
             {[
-              { n: "1", h: "Get a key", b: "Generate a test key (egk_test_…) below or in Settings → API keys. Send it on every request as the X-API-Key header." },
+              { n: "1", h: "Get a key", b: "Generate a key (egk_test_…) in Settings → API keys, then paste it below. Send it on every request as the X-API-Key header." },
               { n: "2", h: "Build in the sandbox", b: "Every call hits /api/test/* — it validates auth and returns realistic responses but creates NO real orders, labels, or charges. Try the endpoints below." },
               { n: "3", h: "Go live", b: "Once your integration works, live access (a production key + real order endpoints) is enabled per-account — reach out and we'll turn it on." },
             ].map((s) => (
@@ -199,12 +181,12 @@ export function ApiPlayground() {
       {/* Key bar */}
       <SectionCard
         title={<span className="flex items-center gap-2">Your API key
-          <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase " + (env === "live" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>{env}</span>
+          <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase " + (env === "live" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>{env === "live" ? "Live" : "Sandbox"}</span>
         </span>}
         actions={
           <div className="flex rounded-lg border border-border p-0.5">
             {(["test", "live"] as const).map((m) => (
-              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-red-500 text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m}</button>
+              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-red-500 text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m === "live" ? "Live" : "Sandbox"}</button>
             ))}
           </div>
         }
@@ -225,7 +207,7 @@ export function ApiPlayground() {
                 value={revealed || !apiKey ? apiKey : maskKey(apiKey)}
                 onChange={(e) => rememberKey(e.target.value)}
                 readOnly={!!apiKey && !revealed}
-                placeholder={env === "live" ? "Paste an egk_live_… key, or generate one" : "Paste an egk_test_… key, or generate one"}
+                placeholder={env === "live" ? "Paste your egk_live_… key from Settings → API keys" : "Paste your egk_test_… key from Settings → API keys"}
                 className="pl-9 pr-20 font-mono text-xs"
               />
               {apiKey && (
@@ -253,34 +235,13 @@ export function ApiPlayground() {
                 </span>
               )}
             </div>
-            {/* disabled while in flight so a double-click can't mint two keys — every
-                press creates a real, permanent credential. */}
-            <Button variant="outline" onClick={generateKey} disabled={genLoading}>
-              {genLoading ? <CircleNotch size={15} className="animate-spin" /> : <Lightning size={15} weight="bold" />} Generate {env}
-            </Button>
+            {/* Keys are created & managed in ONE place — Settings → API keys — so the
+                Explorer stays a pure try-it surface (no second generator to drift from it). */}
+            <a href="/settings?tab=keys" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-input bg-card px-3 text-sm font-medium transition-colors hover:bg-accent">
+              <Key size={14} weight="bold" /> Manage keys
+            </a>
           </div>
-          {keyErr && <div className="flex items-center gap-1.5 text-sm text-destructive"><Warning size={14} weight="fill" /> {keyErr}</div>}
-          {freshKey && (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-              <code className="min-w-0 flex-1 truncate font-mono text-xs text-emerald-800">
-                {freshRevealed ? freshKey : maskKey(freshKey)}
-              </code>
-              <span className="shrink-0 text-[11px] font-medium text-emerald-700">Copy now — shown once</span>
-              <Button size="sm" variant="outline" onClick={() => setFreshRevealed((v) => !v)}
-                aria-label={freshRevealed ? "Hide key" : "Reveal key"}>
-                {freshRevealed ? <EyeSlash size={13} weight="bold" /> : <Eye size={13} weight="bold" />}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => { try { await navigator.clipboard.writeText(freshKey); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {} }}
-                aria-label="Copy key"
-              >
-                {copied ? <Check size={13} weight="bold" /> : <Copy size={13} weight="bold" />}
-              </Button>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">Keys are managed in <span className="font-medium text-foreground">Settings → API keys</span>. {env === "live" ? "A live key makes calls create real records." : "A test key hits the sandbox — no real orders, labels or charges."}</p>
+          <p className="text-xs text-muted-foreground">Keys are created &amp; managed in <a href="/settings?tab=keys" className="font-medium text-foreground underline underline-offset-2">Settings → API keys</a> — generate one there and paste it above. {env === "live" ? "A live key makes calls create real records." : "A sandbox key hits /api/test/* — no real orders, labels or charges."}</p>
         </div>
       </SectionCard>
 
