@@ -11,7 +11,7 @@ import { aiComplete } from './support_ai.js';
 import { sendMail, mailConfigured } from '../mailer.js';
 import { supportReplyEmail } from '../emails.js';
 import { audit } from '../audit.js';
-import { quoteOrder, freezeQuote } from '../pricing.js';
+import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll } from './factory_settings.js';
 import { orderCharges, refundOrder } from './order_refunds.js';
@@ -888,10 +888,16 @@ export function ordersRoutes(app, requireAuth) {
     const imgBySku = {};
     for (const r of prev.rows) { if (r.sku != null && r.img && !(r.sku in imgBySku)) imgBySku[r.sku] = r.img; }
     await q('delete from order_items where order_id=$1', [orderId]);
+    // Auto-resolve a missing blank from the SKU (imports often carry a SKU but no Blank
+    // column) so lines come in production-ready instead of "not set up". Built once per save;
+    // only fills a blank that's empty, never overrides one that was chosen.
+    const needsBlank = items.some((it) => it.sku && !(it.blank != null && String(it.blank).trim()));
+    const catIdx = needsBlank ? await catalogIndex().catch(() => null) : null;
     let li = 0;
     for (const it of items) {
       const img = (it.img != null && it.img !== '') ? it.img : (imgBySku[it.sku] || null);
       const designPos = (it.designPos && typeof it.designPos === 'object') ? JSON.stringify(it.designPos) : null;
+      const blank = (it.blank != null && String(it.blank).trim()) ? it.blank : (catIdx ? resolveBlankName(catIdx, it) : null) || null;
       // Every line must be ADDRESSABLE — item-setup/status/design all key on line_id or sku.
       // A manual line often starts with NO sku (blank not picked yet) and no line_id, which
       // left it impossible to ever set the blank ("line_id or sku required"). Mint a stable
@@ -903,7 +909,7 @@ export function ordersRoutes(app, requireAuth) {
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [orderId, it.sku || null, it.name || null, it.printType || it.tech || null, it.qty || 1,
          it.color || null, it.size || null, it.variant || null, it.unitPrice || 0, it.designSrc || null,
-         img, it.blank || null, designPos, lineId]
+         img, blank, designPos, lineId]
       );
     }
   }

@@ -91,6 +91,18 @@ function matchProduct(idx, item) {
   return null;
 }
 
+// Resolve the BLANK NAME a line should carry, from its SKU, when it doesn't already have a
+// blank. Returns the catalog product's name (what the client's resolveProduct/VariantPicker
+// key on), or null if there's nothing to fill or nothing matched. Used so an imported line
+// with a SKU but no Blank column comes in production-ready instead of "not set up".
+export function resolveBlankName(idx, item) {
+  if (item.blank != null && String(item.blank).trim()) return null;   // already set — don't override
+  if (!item.sku) return null;
+  const row = matchProduct(idx, item);
+  const name = row && row.data && row.data.name;
+  return name ? String(name) : null;
+}
+
 // The canonical price tier for a size. Shape comes from npmCollectPriceTiers in
 // eg-products.js: sizePrices is an ARRAY of {size, price, shipping} — NOT a keyed map.
 // `shipping` may be null, meaning "no per-size override, use the product's fee".
