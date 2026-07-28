@@ -838,7 +838,7 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
 function FeeGroup({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
   return (
     <section className="mt-5 first:mt-0">
-      <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{title}</h4>
+      <h4 className="text-[13px] font-semibold uppercase tracking-widest text-primary">{title}</h4>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
       <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">{children}</div>
     </section>

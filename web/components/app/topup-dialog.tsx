@@ -61,6 +61,20 @@ function useSeedAmount(cfg: TopupConfig | null, amount: string, setAmount: (v: s
   }, [cfg])
 }
 
+// The line under every amount field: a quiet hint until the seller types an amount below the
+// admin-set minimum, then an amber warning. Everything is driven by `minUsd` — nothing here
+// is hardcoded, so it tracks whatever the admin sets.
+function MinHint({ amount, minUsd }: { amount: string; minUsd: number }) {
+  const n = Number(amount)
+  if (n > 0 && n < minUsd)
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600">
+        <Warning size={11} weight="fill" /> {usd0(n)} is below the {usd0(minUsd)} minimum — enter at least {usd0(minUsd)}.
+      </span>
+    )
+  return <span className="text-[11px] text-muted-foreground">Minimum top-up {usd0(minUsd)}.</span>
+}
+
 function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
   const [amount, setAmount] = useState("")   // USD
   const [showBulk, setShowBulk] = useState(false)
@@ -229,7 +243,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Amount (USD)</span>
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
-        <span className="text-[11px] text-muted-foreground">Minimum top-up {usd0(minUsd)}.</span>
+        <MinHint amount={amount} minUsd={minUsd} />
       </label>
       {/* Left: the rate ($1 = …). Right: the VND the QR will actually charge. */}
       <div className={"flex items-center justify-between rounded-lg border px-3 py-2 text-sm " + (discounted ? "border-primary/40 bg-primary/5" : "border-border bg-muted/40")}>
@@ -304,7 +318,7 @@ function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: 
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Amount (USD)</span>
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
-        <span className="text-[11px] text-muted-foreground">Minimum top-up {usd0(minUsd)}.</span>
+        <MinHint amount={amount} minUsd={minUsd} />
       </label>
       {error && <div className="text-sm text-destructive">{error}</div>}
       <Button className="w-full" onClick={proceed} disabled={Number(amount) < minUsd}>Continue to card</Button>
@@ -403,7 +417,7 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Amount (USD)</span>
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
-        <span className="text-[11px] text-muted-foreground">Minimum top-up {usd0(minUsd)}.</span>
+        <MinHint amount={amount} minUsd={minUsd} />
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Reference / transaction note (optional)</span>
