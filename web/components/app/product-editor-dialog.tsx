@@ -705,15 +705,23 @@ export function ProductEditorDialog({
               if (files.length) { e.preventDefault(); addImageFiles(files) }
             }}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-medium">Images</span>
-              <span className="text-xs text-muted-foreground">
-                {gallery.length ? `${gallery.length} held · drag to reorder` : "Drag images in, paste, or browse"}
-              </span>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">Photo</span>
+              <div className="flex items-center gap-2">
+                {colors.length > 0 && gallery.length > 0 && (
+                  <button type="button" onClick={autoMatch} disabled={matching} className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60">
+                    {matching ? <CircleNotch size={12} weight="bold" className="animate-spin" /> : <MagicWand size={12} weight="fill" />}
+                    {matching ? "Matching…" : "Auto-match colours"}
+                  </button>
+                )}
+                <span className="text-xs text-muted-foreground">{gallery.length ? `${gallery.length} photos · drag to reorder` : "Drag in, paste, or add"}</span>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2.5">
-              {gallery.map((u, i) => (
+              {gallery.map((u, i) => {
+                const assigned = colors.find((c) => colorImgs[c] === u)
+                return (
                 <div
                   key={u}
                   className="group relative"
@@ -735,22 +743,33 @@ export function ProductEditorDialog({
                     setDragIdx(null)
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setImg(u)}
-                    title={u === img ? "Main image" : "Make this the main image"}
-                    className={
-                      "relative block size-28 overflow-hidden rounded-lg border-2 transition-colors " +
-                      (u === img ? "border-primary" : "border-border hover:border-primary/50") +
-                      (dragIdx === i ? " opacity-40" : "")
-                    }
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={u} alt="" className="size-full object-cover" draggable={false} />
-                    {u === img && (
-                      <span className="absolute inset-x-0 bottom-0 bg-primary py-0.5 text-center text-xs font-semibold text-primary-foreground">Main</span>
+                  <div className={"relative size-28 overflow-hidden rounded-lg border-2 transition-colors " + (u === img ? "border-primary" : "border-border") + (dragIdx === i ? " opacity-40" : "")}>
+                    {/* Click the photo to make it the MAIN image (first = hero). */}
+                    <button type="button" onClick={() => setImg(u)} title={u === img ? "Main image" : "Make this the main image"} className="block size-full">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={u} alt="" className="size-full object-cover" draggable={false} />
+                    </button>
+                    {u === img && <span className="pointer-events-none absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow">Main</span>}
+                    {assigned && matchConf[assigned] === "high" && <Check size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-emerald-600" aria-label="Confident match" />}
+                    {assigned && matchConf[assigned] === "low" && <Question size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-amber-500" aria-label="Guessed — verify" />}
+                    {/* Colour tag overlaid on the photo. */}
+                    {colors.length > 0 && (
+                      <select
+                        value={assigned ?? ""}
+                        onChange={(e) => {
+                          const c = e.target.value
+                          setColorImgs((m) => { const n = { ...m }; for (const k of Object.keys(n)) if (n[k] === u) delete n[k]; if (c) n[c] = u; return n })
+                          if (assigned) setMatchConf((m) => { const n = { ...m }; delete n[assigned]; return n })
+                          if (c) setMatchConf((m) => { const n = { ...m }; delete n[c]; return n })
+                        }}
+                        className={"eg-select absolute inset-x-1 bottom-1 h-6 w-[calc(100%-0.5rem)] rounded-md border px-1 text-[11px] font-medium backdrop-blur transition-colors " + (assigned ? "border-primary/40 bg-primary/90 text-primary-foreground" : "border-border bg-card/90 text-muted-foreground")}
+                        aria-label="Tag this photo's colour"
+                      >
+                        <option value="">— colour —</option>
+                        {colors.map((c) => <option key={c} value={c}>{prettyColorName(c)}</option>)}
+                      </select>
                     )}
-                  </button>
+                  </div>
                   <button
                     type="button"
                     aria-label="Remove image"
@@ -762,12 +781,13 @@ export function ProductEditorDialog({
                       setColorImgs((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
                       setSideMockups((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
                     }}
-                    className="absolute -right-1.5 -top-1.5 hidden size-6 place-items-center rounded-full bg-foreground/75 text-background group-hover:grid"
+                    className="absolute -right-1.5 -top-1.5 z-10 hidden size-6 place-items-center rounded-full bg-foreground/75 text-background group-hover:grid"
                   >
                     <X size={12} weight="bold" />
                   </button>
                 </div>
-              ))}
+                )
+              })}
 
               <label className="grid size-28 cursor-pointer place-items-center gap-1 rounded-lg border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent">
                 <span className="flex flex-col items-center gap-1">
@@ -782,7 +802,7 @@ export function ProductEditorDialog({
             </div>
 
             <p className="mt-3 text-xs text-muted-foreground">
-              The first image is the main one — click any tile to promote it, or drag to reorder.
+              The first image is the main one — click any tile to promote it, drag to reorder, and tag each with its colour.
             </p>
           </div>
 
@@ -878,60 +898,8 @@ export function ProductEditorDialog({
               <span className="text-sm font-medium">Colors</span>
               {colors.length > 0 && <button onClick={() => setColors([])} className="text-xs font-medium text-primary hover:underline">Clear</button>}
             </div>
-            {/* Photo-first matching: show each gallery PHOTO and tag it with its colour (no
-                image numbers). A colour with no photo falls back to the product's main image.
-                Auto-match fills the tags; ✓ = confident (supplier map / filename), ? = guessed
-                from the photo's dominant colour (eyeball those). One photo per colour. */}
-            {colors.length > 0 && gallery.length > 0 && (
-              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Tag each photo with its colour</span>
-                  <button
-                    type="button"
-                    onClick={autoMatch}
-                    disabled={matching}
-                    className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
-                  >
-                    {matching ? <CircleNotch size={12} weight="bold" className="animate-spin" /> : <MagicWand size={12} weight="fill" />}
-                    {matching ? "Matching…" : "Auto-match"}
-                  </button>
-                </div>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                  {gallery.map((u) => {
-                    const assigned = colors.find((c) => colorImgs[c] === u)
-                    return (
-                      <div key={u} className="relative aspect-square overflow-hidden rounded-lg border border-border bg-card">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={u} alt="" className="size-full object-cover" />
-                        {assigned && matchConf[assigned] === "high" && <Check size={14} weight="bold" className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-emerald-600" aria-label="Confident match" />}
-                        {assigned && matchConf[assigned] === "low" && <Question size={14} weight="bold" className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-amber-500" aria-label="Guessed — verify" />}
-                        {/* Colour tag, overlaid on the photo. Picking a colour points it at THIS
-                            photo and clears that photo/colour off any other pairing. */}
-                        <select
-                          value={assigned ?? ""}
-                          onChange={(e) => {
-                            const c = e.target.value
-                            setColorImgs((m) => {
-                              const n = { ...m }
-                              for (const k of Object.keys(n)) if (n[k] === u) delete n[k] // this photo off any colour
-                              if (c) n[c] = u
-                              return n
-                            })
-                            if (assigned) setMatchConf((m) => { const n = { ...m }; delete n[assigned]; return n })
-                            if (c) setMatchConf((m) => { const n = { ...m }; delete n[c]; return n })
-                          }}
-                          className={"eg-select absolute inset-x-1 bottom-1 h-6 w-[calc(100%-0.5rem)] rounded-md border px-1 text-[11px] font-medium backdrop-blur transition-colors " + (assigned ? "border-primary/40 bg-primary/90 text-primary-foreground" : "border-border bg-card/90 text-muted-foreground")}
-                          aria-label="Tag this photo's colour"
-                        >
-                          <option value="">— colour —</option>
-                          {colors.map((c) => <option key={c} value={c}>{prettyColorName(c)}</option>)}
-                        </select>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Photo↔colour tagging now lives on the tiles in the Photo section above; this
+                section just manages WHICH colours exist. */}
             {colors.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {colors.map((c) => (
