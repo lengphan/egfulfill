@@ -371,21 +371,21 @@ const newLayerId = () => "L" + Math.random().toString(36).slice(2, 9)
 // bakes into the generated .emb. BOX_SPAN_MM maps the preview's span to millimetres — a
 // nominal hoop width; tune once checked against real output.
 const BOX_SPAN_MM = 120
-// EWA hard-limits a decoration's scale to ±20%. Clamp everywhere so the preview box can't show
-// a size the generated design can't reproduce (WYSIWYG).
-const clampScale = (s: number) => Math.min(1.2, Math.max(0.8, Number.isFinite(s) && s > 0 ? s : 1))
-// Convert the client box (mm, origin = canvas CENTRE, +y UP, positioned by the element's centre)
-// into EWA's transform (dx/dy mm from the location's TOP-LEFT, +y DOWN, from the element's
-// top-left). Needs the element's measured stitched size (mm) so the CENTRES line up.
-function toEwaTransform(tf: WilcomTransform, wmm: number, hmm: number) {
-  const scale = clampScale(tf.scale)
-  const w = (wmm || 0) * scale, h = (hmm || 0) * scale
+const NOMINAL_MM = 45 // fallback footprint for a layer whose stitched preview hasn't loaded yet
+// Image layers resize by RE-DIGITIZING at a target size (baked into the .emb), not via the
+// decoration transform — whose scale EWA hard-caps at ±20%. So the box scale can range freely.
+const clampScale = (s: number) => Math.min(4, Math.max(0.25, Number.isFinite(s) && s > 0 ? s : 1))
+// Convert the client box into EWA's transform. Size is already baked into each element (image →
+// digitize width, text → letter height), so transform scale stays 1 and we only need dx/dy:
+// EWA measures mm from the location's TOP-LEFT (+y down) from the element's top-left, while the
+// canvas is centre-origin / +y-up, so convert using the element's EFFECTIVE stitched size (mm).
+function toEwaTransform(tf: WilcomTransform, effWmm: number, effHmm: number) {
   const cx = BOX_SPAN_MM / 2 + tf.x   // element centre, mm from the left edge
   const cy = BOX_SPAN_MM / 2 - tf.y   // element centre, mm from the top edge (+y flips to down)
-  return { dx: +(cx - w / 2).toFixed(2), dy: +(cy - h / 2).toFixed(2), rotation: tf.angle, scale, mirror: "none" as const }
+  return { dx: +(cx - effWmm / 2).toFixed(2), dy: +(cy - effHmm / 2).toFixed(2), rotation: tf.angle, scale: 1, mirror: "none" as const }
 }
 type DragState = { mode: "move" | "resize" | "rotate"; sx: number; sy: number; start: WilcomTransform; cx: number; cy: number; d0: number; a0: number; rw: number; rh: number }
-function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode; selected: boolean; onSelect: () => void }) {
+function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, resizable, z }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode; selected: boolean; onSelect: () => void; wmm: number; hmm: number; resizable: boolean; z: number }) {
   const drag = useRef<DragState | null>(null)
 
   // Single handlers, no ref-in-render: the host rect is read off the DOM via closest() at
@@ -423,19 +423,22 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect }: { tf: Wilco
   const up = (e: RPointerEvent<HTMLElement>) => { drag.current = null; try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* ignore */ } }
 
   const nub = "pointer-events-auto absolute size-4 touch-none rounded-full border-2 border-primary bg-background shadow"
+  // z-index follows STACK ORDER ONLY (never selection) so the reorder carets visibly change which
+  // layer sits on top even while it's selected. Selection is shown by the border + handles alone.
   return (
-    <div data-boxhost className="pointer-events-none absolute inset-0" style={{ zIndex: selected ? 20 : 10 }}>
+    <div data-boxhost className="pointer-events-none absolute inset-0" style={{ zIndex: z }}>
       <div
         data-mode="move" onPointerDown={down} onPointerMove={move} onPointerUp={up}
         className={"pointer-events-auto absolute flex touch-none items-center justify-center rounded border-2 " + (selected ? "cursor-move border-primary/80" : "cursor-pointer border-transparent")}
-        style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${34 * clampScale(tf.scale)}%`, aspectRatio: "1", transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
+        style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${(wmm / BOX_SPAN_MM) * 100}%`, height: `${(hmm / BOX_SPAN_MM) * 100}%`, transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
       >
         {/* Full opacity — the ghost is the REAL stitched TrueView, so it must not look faded.
             Selection is shown by the border + handles, not by dimming the embroidery. */}
-        <div className="pointer-events-none flex max-h-full max-w-full items-center justify-center overflow-hidden">{ghost}</div>
+        <div className="pointer-events-none flex size-full items-center justify-center overflow-hidden">{ghost}</div>
         {selected && (
           <>
-            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />
+            {/* Resize (corner) only for images — text sizes via the Height field, not a free drag. */}
+            {resizable && <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />}
             <div title="Drag to rotate" data-mode="rotate" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-7 left-1/2 -translate-x-1/2 cursor-grab"} />
           </>
         )}
@@ -551,11 +554,18 @@ function CreateTab() {
       // Ordered layer payload — each image (auto-digitized server-side) and the text, with its
       // transform, in stitch order. Text content rides alongside for the text layer(s).
       const payload = layers.map((l) => {
-        const r = resById[l.id]                       // this layer's own stitched preview (mm size)
-        const transform = toEwaTransform(l.tf, r?.width ?? 0, r?.height ?? 0)
-        return l.kind === "image"
-          ? { kind: "image" as const, image: l.dataUrl, name: l.name, transform }
-          : { kind: "text" as const, transform }
+        const r = resById[l.id]                          // this layer's own stitched preview (mm size)
+        if (l.kind === "image") {
+          const s = l.tf.scale || 1
+          const natW = r?.width ?? 0, natH = r?.height ?? 0
+          const effW = (natW || NOMINAL_MM) * s, effH = (natH || NOMINAL_MM) * s
+          // Size baked by RE-DIGITIZING at this width (past EWA's ±20% transform cap); position via dx/dy.
+          const targetWidthMm = natW ? +(natW * s).toFixed(1) : undefined
+          return { kind: "image" as const, image: l.dataUrl, name: l.name, targetWidthMm, transform: toEwaTransform(l.tf, effW, effH) }
+        }
+        // Text: size is the letter Height; effective footprint = its preview (rendered at that height).
+        const effW = r?.width || NOMINAL_MM, effH = r?.height || NOMINAL_MM
+        return { kind: "text" as const, transform: toEwaTransform(l.tf, effW, effH) }
       })
       const body = { layers: payload, text: hasText ? text.trim() : undefined, alphabet, height, color,
         name: imgLayers[0]?.name || (hasText ? text.trim() : undefined) }
@@ -765,9 +775,16 @@ function CreateTab() {
               {/* Layers arranged DIRECTLY — each shows its own stitched TrueView (or a placeholder
                   while it renders) and you drag / resize / rotate it in place. This IS the design;
                   Generate merges the layers into one .emb. No divergent combined render underneath. */}
-              {/* Array order = stack order: later layers render last (on top), matching the panel. */}
-              {layers.map((l) => (
-                <LayerBoxEditor key={l.id} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
+              {/* Array order = stack order: later layers render last (on top), matching the panel.
+                  Each box is sized in REAL mm (its stitched preview × the image scale), so the box
+                  IS the true footprint and resizing an image scales it for real. */}
+              {layers.map((l, i) => {
+                const r = resById[l.id] || resById[isImg(l) ? l.id : "text"]
+                const s = isImg(l) ? (l.tf.scale || 1) : 1  // text sizes via Height, not box scale
+                const effW = (r?.width || NOMINAL_MM) * s
+                const effH = (r?.height || NOMINAL_MM) * s
+                return (
+                <LayerBoxEditor key={l.id} z={i + 1} wmm={effW} hmm={effH} resizable={isImg(l)} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
                   isImg(l)
                     ? (resById[l.id]?.trueview
                         // eslint-disable-next-line @next/next/no-img-element
@@ -779,7 +796,8 @@ function CreateTab() {
                         ? <img src={`data:image/png;base64,${resById["text"]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
                         : <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>)
                 } />
-              ))}
+                )
+              })}
             </div>
             <div className="text-center text-[11px] text-muted-foreground">Your arrangement — drag to position. Generate merges the layers into one file.</div>
           </div>

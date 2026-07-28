@@ -1659,7 +1659,7 @@ export type WilcomEwaTransform = { dx: number; dy: number; rotation: number; sca
 // One entry per element in the design, in stitch order (later = on top). An image layer
 // carries its base64 to auto-digitize server-side; the text layer's content rides in `text`.
 export type WilcomComboLayer =
-  | { kind: "image"; image: string; name?: string; transform?: WilcomEwaTransform }
+  | { kind: "image"; image: string; name?: string; targetWidthMm?: number; transform?: WilcomEwaTransform }
   | { kind: "text"; transform?: WilcomEwaTransform }
 export type WilcomComboBody = { layers?: WilcomComboLayer[]; image?: string; text?: string; alphabet?: string; height?: number; color?: string; filename?: string; name?: string; orderRef?: string; designTransform?: WilcomTransform; letterTransform?: WilcomTransform }
 export function wilcomCombinePreview(body: WilcomComboBody) {

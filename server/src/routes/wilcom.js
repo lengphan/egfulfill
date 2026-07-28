@@ -360,15 +360,19 @@ function embCacheSet(hash, v) { _embCache.set(hash, v); if (_embCache.size > 24)
 
 // Auto-digitize one image → { filename, base64 } .emb, cached by content hash. Returns a
 // { error, status, sample } object instead on failure so the caller can bubble it up verbatim.
-async function digitizeToEmb(image, nameHint, i) {
+// `targetWidthMm` (optional) re-digitizes the art at that embroidered width — this is how a
+// layer resizes BEYOND the decoration transform's hard ±20% cap. Size is baked into the .emb,
+// so the cache key includes it (a different size is a different .emb).
+async function digitizeToEmb(image, nameHint, i, targetWidthMm) {
   const img = fromDataUrl(image);
   if (!img) return { error: 'Send image data URLs (PNG / JPG / WEBP).', status: 400 };
   if (tooBig(img.base64)) return { error: `Image "${nameHint || i + 1}" is over 2 MB — downscale it first.`, status: 413 };
-  const hash = crypto.createHash('sha256').update(img.base64).digest('hex').slice(0, 32);
+  const w = Number(targetWidthMm) > 0 ? Math.round(Number(targetWidthMm)) : 0;
+  const hash = crypto.createHash('sha256').update(img.base64 + '|w' + w).digest('hex').slice(0, 32);
   const cached = embCacheGet(hash);
   if (cached) return { emb: cached };
   const artStem = safeName(nameHint || `art${i}`, `art${i}`);
-  const artXml = buildBitmapXml({ filename: `${artStem}.${img.ext}`, base64: img.base64, designFile: `${artStem}.emb` });
+  const artXml = buildBitmapXml({ filename: `${artStem}.${img.ext}`, base64: img.base64, width: w || undefined, designFile: `${artStem}.emb` });
   const artRes = await ewaCall('api/bitmapArtDesign', artXml);
   if (!artRes.ok) {
     const m = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(artRes.body || '') || /\bmessage="([^"]{1,300})"/i.exec(artRes.body || '');
@@ -437,7 +441,7 @@ async function runCombineLayers(req, reply, { design }) {
     const embName = new Map();
     let i = 0;
     for (const l of imgs) {
-      const r = await digitizeToEmb(l.image, l.name, i);
+      const r = await digitizeToEmb(l.image, l.name, i, l.targetWidthMm);
       if (r.error) { reply.code(r.status || 502); return { ok: false, status: r.status, error: r.error, sample: r.sample }; }
       const name = `layer-${i}.emb`;
       files.push({ filename: name, base64: r.emb.base64 });
