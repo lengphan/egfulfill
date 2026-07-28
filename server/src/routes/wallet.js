@@ -280,7 +280,12 @@ export function walletRoutes(app, requireAuth) {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const qy = req.query || {};
     const where = [], args = [];
+    // This is the PARTNER-COSTS ledger (what we owe vendors), NOT the account transaction
+    // ledger — so it only ever lists rows that map to a partner. Without this, "All partners"
+    // returned every row on the account, so top-ups and order charges (which are transactions,
+    // not partner costs) leaked in. A specific partner filter already implies partner-not-null.
     if (qy.partner) { args.push(String(qy.partner)); where.push(`${PARTNER_SQL} = $${args.length}`); }
+    else { where.push(`${PARTNER_SQL} is not null`); }
     if (qy.account) { args.push(String(qy.account)); where.push(`account = $${args.length}`); }
     if (qy.type) { args.push(String(qy.type)); where.push(`type = $${args.length}`); }
     // Dates are inclusive of the whole end day — a statement "to the 31st" that silently

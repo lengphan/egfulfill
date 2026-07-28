@@ -8,7 +8,6 @@ import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truc
 import { SectionCard } from "@/components/app/section-card"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
-import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ColumnsMenu } from "@/components/app/columns-menu"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,7 +24,7 @@ import { ItemAvatar } from "@/components/app/item-avatar"
 import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken } from "@/lib/auth"
-import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
+import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
@@ -172,18 +171,6 @@ export function OrdersList() {
     return () => { live = false; clearTimeout(id) }
   }, [])
 
-  const stats = useMemo(() => {
-    const list = orders ?? []
-    const byGroup = (g: string) => list.filter((o) => sellerStatus(o).group === g).length
-    return {
-      draft: byGroup("draft"),
-      pending: byGroup("pending"),
-      prod: byGroup("production"),
-      shipped: byGroup("shipped"),
-      attention: byGroup("attention"),
-    }
-  }, [orders])
-
   const filtered = useMemo(() => {
     return (orders ?? []).filter((o) => {
       if (!matchesFilter(o, filter)) return false
@@ -208,14 +195,6 @@ export function OrdersList() {
           </span>
         </div>
       )}
-      <StatGrid>
-        <StatCard label="Draft" value={String(stats.draft)} sub="not submitted yet" />
-        <StatCard label="Pending" value={String(stats.pending)} sub="awaiting factory" />
-        <StatCard label="In process" value={String(stats.prod)} sub="being made" />
-        <StatCard label="Fulfilled" value={String(stats.shipped)} sub="shipped" tone="pos" />
-        <StatCard label="Needs attention" value={String(stats.attention)} sub="action needed" tone={stats.attention ? "neg" : undefined} />
-      </StatGrid>
-
       <SectionCard
         title="Orders"
         actions={
