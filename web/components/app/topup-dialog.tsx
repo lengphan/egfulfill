@@ -409,20 +409,20 @@ export function TopUpDialog({ open, onOpenChange, onFunded }: { open: boolean; o
         <DialogHeader>
           <DialogTitle>Add funds</DialogTitle>
         </DialogHeader>
-        <Tabs defaultValue="vietqr">
+        <Tabs defaultValue="transfer">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="vietqr">VietQR</TabsTrigger>
-            <TabsTrigger value="card">Card</TabsTrigger>
             <TabsTrigger value="transfer">Transfer</TabsTrigger>
+            <TabsTrigger value="vietqr">QR Code</TabsTrigger>
+            <TabsTrigger value="card">Card</TabsTrigger>
           </TabsList>
+          <TabsContent value="transfer" className="mt-4">
+            <TransferTopUp onFunded={onFunded} onClose={close} />
+          </TabsContent>
           <TabsContent value="vietqr" className="mt-4">
             <VietqrTopUp onFunded={onFunded} onClose={close} />
           </TabsContent>
           <TabsContent value="card" className="mt-4">
             <CardTopUp onFunded={onFunded} onClose={close} />
-          </TabsContent>
-          <TabsContent value="transfer" className="mt-4">
-            <TransferTopUp onFunded={onFunded} onClose={close} />
           </TabsContent>
         </Tabs>
       </DialogContent>
