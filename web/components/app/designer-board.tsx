@@ -161,6 +161,9 @@ export function DesignerBoard() {
   // by the server's set (which may add/rename/remove). canManageLanes matches card
   // deletion — a lane holds work, so re-homing or removing it is the same custody call.
   const [lanes, setLanes] = useState<DesignLane[]>(DEFAULT_LANES)
+  // A just-added column: its title input auto-focuses and selects so you type the real name
+  // straight over the placeholder, no dialog. Cleared once that input has taken focus.
+  const [newLaneId, setNewLaneId] = useState<string | null>(null)
   const canManageLanes = canDeleteCard()
   const loadLanes = useCallback(() => {
     getDesignLanes().then((r) => { if (Array.isArray(r) && r.length) setLanes(r) }).catch(() => {})
@@ -182,6 +185,21 @@ export function DesignerBoard() {
     }, 0)
     return () => clearTimeout(id)
   }, [load])
+
+  // The payout rates (designer payout + Pink partner cost) are edited elsewhere — Settings ›
+  // Platform › Partner rates — but the board otherwise reads them only once at mount, so a
+  // change didn't show on the cards until a hard reload. Re-pull them whenever the board
+  // regains focus, so editing the rate in another tab and coming back updates the vendor-card
+  // payouts live. (In-house cards keep showing the designer payout — that split is by design.)
+  useEffect(() => {
+    const refresh = () => {
+      if (typeof document !== "undefined" && document.hidden) return
+      getFactorySettings().then((s) => { setDesignFee(Number(s.designer_payout) || 0); setPartnerCost(Number(s.design_partner_cost) || 0) }).catch(() => {})
+    }
+    window.addEventListener("focus", refresh)
+    document.addEventListener("visibilitychange", refresh)
+    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh) }
+  }, [])
 
   // persist() is gone: its only remaining callers were the two delete paths, and
   // "POST the whole board minus one card" is exactly what made a card undeletable.
@@ -212,11 +230,13 @@ export function DesignerBoard() {
   }, [load])
 
   // ── Lane management (warehouse+admin) ──
+  // Add a column with NO prompt: create it with a placeholder name, then the board focuses
+  // and selects its title input (see newLaneId below) so the name is typed in place. Delete
+  // still confirms via removeLane — adding is cheap and reversible, deleting re-homes cards.
   const addLane = useCallback(async () => {
-    const label = window.prompt("Name the new lane")?.trim()
-    if (!label) return
-    const r = await createDesignLane({ label })
+    const r = await createDesignLane({ label: "New column" })
     if (r?.error) { setDelErr(r.error); return }
+    if (r?.id) setNewLaneId(String(r.id))
     loadLanes()
   }, [loadLanes])
 
@@ -497,6 +517,7 @@ export function DesignerBoard() {
                       saves. A system lane renames too; only its DELETION is blocked. */}
                   {canManageLanes ? (
                     <input
+                      ref={(el) => { if (el && col.id === newLaneId) { el.focus(); el.select(); setTimeout(() => setNewLaneId(null), 0) } }}
                       defaultValue={col.label}
                       onClick={(e) => e.stopPropagation()}
                       onBlur={(e) => void renameLane(col, e.target.value)}
@@ -686,10 +707,10 @@ export function DesignerBoard() {
             <button
               onClick={() => void addLane()}
               className="flex h-[calc(100vh-14rem)] min-h-[22rem] w-11 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-              title="Add a lane"
+              title="Add a column"
             >
               <Plus size={18} weight="bold" />
-              <span className="[writing-mode:vertical-rl] text-xs font-medium">Add lane</span>
+              <span className="[writing-mode:vertical-rl] text-xs font-medium">Add Column</span>
             </button>
           )}
         </div>
