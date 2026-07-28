@@ -12,20 +12,13 @@ export const CSV_HEADERS = [
   "Store Name",
   "Product Title", "Image Link/ID", "Item SKU", "Blank", "Template ID",
   "Item Quantity", "Print Type",
-  "Item Color", "Item Size", "Item Price", "Design File URL",
+  "Item Color", "Item Size", "Item Price",
   "Shipping Service", "Internal Notes",
 ]
 
-// A ready-to-fill template with one clearly-labelled sample row (skipped on import).
-export const CSV_TEMPLATE = (() => {
-  const esc = (r: string[]) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
-  const sample = [
-    "1001", "Ava Brodeur — delete this row", "ava@example.com",
-    "43 Calumet Rd", "", "Fairhaven", "MA", "02719",
-    "My Store", "Classic Tee", "", "TEE-CL", "TEE-CL", "", "1", "DTG", "Black", "M", "18.00", "", "Standard", "",
-  ]
-  return [esc(CSV_HEADERS), esc(sample)].join("\n")
-})()
+// Headers only (no throwaway sample row) — the Columns legend in the dialog is the guide now.
+// Still used by "Make a copy in Google Sheets" to shape a fresh sheet with the right columns.
+export const CSV_TEMPLATE = CSV_HEADERS.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
 
 // Required columns — a row missing any of these is flagged invalid.
 export const REQUIRED_COLS = ["ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
@@ -54,7 +47,6 @@ export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Item Color", key: "item_color", required: false, help: "Garment colour." },
   { header: "Item Size", key: "item_size", required: false, help: "Garment size." },
   { header: "Item Price", key: "item_price", required: false, help: "What the BUYER paid per unit (your sale price). Records only — it does NOT set the fulfilment charge, which comes from the blank's pricing at submit." },
-  { header: "Design File URL", key: "design_file_url", required: false, help: "Link to the print-ready artwork — attached to the line on import." },
   { header: "Shipping Service", key: "shipping_service", required: false, help: "Requested method (e.g. Standard). Saved with the order." },
   { header: "Internal Notes", key: "internal_notes", required: false, help: "Private note for your team. Saved with the order." },
 ]

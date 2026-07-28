@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CircleNotch } from "@phosphor-icons/react"
+import { UploadSimple, CheckCircle, WarningCircle, Table, CircleNotch } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -18,16 +18,6 @@ import {
 import { createOrder, getOrders, getSheetsConfig, getSheetRows } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
-
-function downloadTemplate() {
-  const blob = new Blob([CSV_TEMPLATE], { type: "text/csv;charset=utf-8" })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = "EGFULFILL – Order Import Template.csv"
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 export function ImportOrdersDialog({
   open,
@@ -195,12 +185,7 @@ export function ImportOrdersDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm text-muted-foreground">Upload a CSV, paste rows, or pull a Google Sheet. Common Shopify/Etsy column names are recognized automatically.</p>
-              <Button variant="outline" size="sm" className="shrink-0" onClick={downloadTemplate}>
-                <DownloadSimple size={14} weight="bold" /> Template
-              </Button>
-            </div>
+            <p className="text-sm text-muted-foreground">Upload a CSV, paste rows, or pull a Google Sheet. Common Shopify/Etsy column names are recognized automatically.</p>
 
             {/* Columns reference — REQUIRED are solid, OPTIONAL are highlighted amber so a filler
                 sees at a glance what they can skip. Hover any chip for what it does. */}
