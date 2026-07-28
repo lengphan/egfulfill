@@ -155,7 +155,7 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {SMALL_USD_PRESETS.map((v) => (
-          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
+          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
         ))}
       </div>
 
@@ -181,7 +181,7 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
                     className={"relative flex flex-col gap-2 overflow-hidden rounded-xl border p-4 text-left transition-colors " + (active ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}
                   >
                     {best && <span className="absolute right-0 top-0 rounded-bl-lg bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground">Best rate</span>}
-                    <span className="text-lg font-bold tabular-nums">{usd(t.usd)}</span>
+                    <span className="text-lg font-semibold tabular-nums">{usd(t.usd)}</span>
                     <span className="w-fit rounded-lg bg-muted px-2.5 py-1.5 text-xs tabular-nums text-muted-foreground">$1 = <span className="font-semibold text-foreground">{vnd(t.rate)}</span></span>
                     {saveVnd > 0 && <span className="w-fit rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">save {vnd(saveVnd)}</span>}
                   </button>
@@ -261,7 +261,7 @@ function CardTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () =>
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {SMALL_USD_PRESETS.map((v) => (
-          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
+          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
         ))}
       </div>
       <label className="flex flex-col gap-1.5">
@@ -348,12 +348,12 @@ function TransferTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: (
       <div className="space-y-2">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {SMALL_USD_PRESETS.map((v) => (
-            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
+            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {BULK_USD_PRESETS.map((v) => (
-            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-bold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
+            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd(v)}</button>
           ))}
         </div>
       </div>
