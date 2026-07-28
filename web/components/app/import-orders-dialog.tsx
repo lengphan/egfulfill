@@ -269,8 +269,8 @@ export function ImportOrdersDialog({
                   className={"flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed px-4 py-10 text-center transition-colors " + (dragOver ? "border-primary bg-primary/5" : "border-border hover:bg-accent")}
                 >
                   <UploadSimple size={24} className="text-muted-foreground" />
-                  <span className="text-sm font-medium">Drop a .csv / .xlsx or <span className="text-primary">browse</span></span>
-                  <span className="text-xs text-muted-foreground">Uses the egfulfill template format</span>
+                  <span className="text-sm font-medium">Drop a .csv, .xlsx or .xls — or <span className="text-primary">browse</span></span>
+                  <span className="text-xs text-muted-foreground">All three work here · uses the egfulfill template format</span>
                   <input type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => takeFile(e.target.files?.[0])} />
                 </label>
               </TabsContent>
