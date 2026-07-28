@@ -28,6 +28,7 @@ export type VisSurface = { key: string; label: string; group: string; roles: Vis
 const TAB_SURFACES: VisSurface[] = [
   { key: "/spydeck#trending", label: "SpyDeck · Trending feed", group: "Tabs", roles: ["seller", "operator", "warehouse", "admin"] },
   { key: "/spydeck#account", label: "SpyDeck · Shop analyzer", group: "Tabs", roles: ["seller", "operator", "warehouse", "admin"] },
+  { key: "/spydeck#stores", label: "SpyDeck · Stores", group: "Tabs", roles: ["seller", "operator", "warehouse", "admin"] },
 ]
 
 // Default-hidden surfaces per role, applied until an admin saves an explicit choice for that

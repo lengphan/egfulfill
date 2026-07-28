@@ -367,6 +367,7 @@ export function SpyDeckView() {
   // Resolved after mount, since role is read from localStorage.
   const [showTrending, setShowTrending] = useState(true)
   const [showAccount, setShowAccount] = useState(true)
+  const [showStores, setShowStores] = useState(true)
   useEffect(() => {
     let alive = true
     const t = setTimeout(() => {
@@ -378,9 +379,11 @@ export function SpyDeckView() {
         if (!alive) return
         const trend = !isSurfaceHidden(r, "/spydeck#trending")
         const acct = !isSurfaceHidden(r, "/spydeck#account")
+        const store = !isSurfaceHidden(r, "/spydeck#stores")
         setShowTrending(trend)
         setShowAccount(acct)
-        setView((v) => ((v === "trending" && !trend) || (v === "account" && !acct) ? "search" : v))
+        setShowStores(store)
+        setView((v) => ((v === "trending" && !trend) || (v === "account" && !acct) || (v === "stores" && !store) ? "search" : v))
       })
     }, 0)
     return () => { alive = false; clearTimeout(t) }
@@ -604,7 +607,8 @@ export function SpyDeckView() {
           <div className="flex rounded-lg border border-border p-0.5">
             {(([
               ...(showTrending ? (["trending"] as const) : []),
-              "search", "saved", "uploaded", "stores",
+              "search", "saved", "uploaded",
+              ...(showStores ? (["stores"] as const) : []),
               ...(showAccount ? (["account"] as const) : []),
             ]) as Array<"trending" | "search" | "saved" | "uploaded" | "account" | "stores">).map((v) => (
               <button
