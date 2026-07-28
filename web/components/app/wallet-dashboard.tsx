@@ -275,7 +275,10 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
     // Demo numbers are ONLY for the signed-out standalone preview — never a real account.
     const signedIn = !!getToken()
     if (!signedIn) { setView(DEMO); return }
-    getWallet()
+    // Admin/warehouse read the shared FACTORY account (where all revenue + costs are booked)
+    // — NOT their own personal id, which is empty. Loading the wrong account is why the P&L
+    // cards read $0 while the partner breakdown (no account filter) showed real costs.
+    getWallet(isFactoryWallet ? "factory" : undefined)
       .then((w) => { setView(mapLedger(w.balance, w.ledger, w.summary)); setLoadErr(null) })
       // Keep any balance already on screen (a failed REFRESH shouldn't blank a good
       // reading) but never invent one where we have none — that was the $0.00 lie.
@@ -292,7 +295,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
         setRejected(all.filter((r) => r.status === "rejected"))
       })
       .catch(() => setPending([]))
-  }, [])
+  }, [isFactoryWallet])
   useEffect(() => {
     const id = setTimeout(refresh, 0)
     return () => clearTimeout(id)
@@ -402,10 +405,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       const txCard = (
       <Card className="gap-0 overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div>
-            <div className="text-[15px] font-bold">Transaction history</div>
-            <div className="text-[13px] text-muted-foreground">Every money move on this account — balance before &amp; after each one</div>
-          </div>
+          <div className="text-[15px] font-bold">Transaction history</div>
           <Button variant="outline" size="sm">
             <DownloadSimple size={14} /> Export CSV
           </Button>
