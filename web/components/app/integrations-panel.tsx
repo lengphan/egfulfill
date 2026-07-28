@@ -206,12 +206,15 @@ const INTEGRATIONS: Integration[] = [
       return { level: "off" }
     },
   },
-  // Status via config only — a live EWA round-trip runs behind the Digitizer's "Test
-  // connection" button, not on every Settings load. `key` must match the server's
-  // SECRET_DEFS `integration` value so the WILCOM_APP_ID/KEY edit fields attach here.
+  // Status via config ONLY — a live EWA round-trip runs behind the Digitizer's "Test
+  // connection" button, not on every Settings load. The /test call hits EWA's `api/info`,
+  // which is flaky/unreliable and was FALSE-reporting Error on a key that digitizes fine,
+  // so the status row reflects "key present" and leaves the live check to the on-demand
+  // Test button. `key` must match the server's SECRET_DEFS `integration` value so the
+  // WILCOM_APP_ID/KEY edit fields attach here.
   {
     key: "wilcom", name: "Wilcom EWA", blurb: "Embroidery digitizing engine", group: "Embroidery",
-    check: configThenTest("/api/wilcom/config", "/api/wilcom/test", "configured"),
+    check: configOnly("/api/wilcom/config", "configured"),
   },
 ]
 
