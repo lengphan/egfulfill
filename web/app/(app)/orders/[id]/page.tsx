@@ -15,6 +15,7 @@ import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { OrderHistory } from "@/components/app/order-history"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
+import { ApproveOrderButton } from "@/components/app/approve-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
 import { SellerDesignFiles } from "@/components/app/design-files-panel"
 import { Button } from "@/components/ui/button"
@@ -273,6 +274,7 @@ export default function OrderDetailPage() {
             )}
             <CancelOrderButton order={order} onDone={reload} />
             <SubmitOrderButton order={order} quote={quote} onDone={reload} incomplete={orderNeedsSetup(order.items, catalog)} />
+            {isStaff && <ApproveOrderButton order={order} catalog={catalog} onDone={reloadAll} onError={setActionErr} />}
             {isStaff && (
               <OrderStageMenu
                 order={order}
