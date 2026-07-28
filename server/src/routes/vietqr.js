@@ -235,10 +235,58 @@ export function vietqrRoutes(app, requireAuth) {
     const stored = await readTiers();
     return stored === null ? defaultTiers(rate) : stored;
   }
+
+  // ── Top-up presets + minimum (ALL methods, not just VietQR) ──────────────────
+  // The quick-amount buttons and the minimum a seller may top up. Admin-adjustable so the
+  // business can change the floor (currently $200) or the suggested amounts without a deploy.
+  // Defaults match what the Add Funds dialog shipped with.
+  const DEFAULT_MIN_USD = 200;
+  const DEFAULT_SMALL = [50, 100, 200, 500, 1000];
+  const DEFAULT_BULK = [2000, 5000, 10000, 20000];
+  const cleanList = (raw) => Array.from(new Set(
+    (Array.isArray(raw) ? raw : []).map((x) => Math.round(Number(x) || 0)).filter((x) => x > 0)
+  )).sort((a, c) => a - c);
+  // null = never configured (→ caller uses defaults); [] = explicitly cleared.
+  async function readNumList(key) {
+    try {
+      const r = await q('select value from settings where key=$1', [key]);
+      if (!r.rows[0]) return null;
+      let raw = r.rows[0].value;
+      if (typeof raw === 'string') raw = JSON.parse(raw);
+      if (!Array.isArray(raw)) return null;
+      return cleanList(raw);
+    } catch { return null; }
+  }
+  async function readMinUsd() {
+    try {
+      const r = await q("select value from settings where key='vqr_min_usd'");
+      if (!r.rows[0]) return null;
+      const v = Math.round(Number(r.rows[0].value));
+      return Number.isFinite(v) && v >= 0 ? v : null;
+    } catch { return null; }
+  }
+  async function topupConfig(rate) {
+    const [small, bulk, min] = await Promise.all([
+      readNumList('vqr_small_presets'), readNumList('vqr_bulk_presets'), readMinUsd(),
+    ]);
+    return {
+      tiers: await effectiveTiers(rate),
+      minUsd: min == null ? DEFAULT_MIN_USD : min,
+      smallPresets: small && small.length ? small : DEFAULT_SMALL,
+      bulkPresets: bulk && bulk.length ? bulk : DEFAULT_BULK,
+    };
+  }
+  // Shared floor check — client gates too, but the server is the boundary a direct call hits.
+  async function enforceMinUsd(usd) {
+    const min = (await readMinUsd());
+    const floor = min == null ? DEFAULT_MIN_USD : min;
+    return (Number(usd) || 0) >= floor ? null : floor;
+  }
+
   app.get('/api/vietqr/rate', { preHandler: requireAuth }, async () => {
     const r = await q("select value from settings where key='vqr_rate'");
     const rate = r.rows[0] && Number(r.rows[0].value) > 0 ? Number(r.rows[0].value) : 25400;
-    return { rate, tiers: await effectiveTiers(rate) };
+    return { rate, ...(await topupConfig(rate)) };
   });
   app.put('/api/vietqr/rate', { preHandler: requireAuth }, async (req, reply) => {
     if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only — only an admin can set the exchange rate' }; }
@@ -251,7 +299,17 @@ export function vietqrRoutes(app, requireAuth) {
         .filter((t) => t.usd > 0 && t.rate > 0).sort((a, c) => a.usd - c.usd);
       await q("insert into settings (key,value,updated_at) values ('vqr_tiers',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(clean)]);
     }
-    return { ok: true, rate, tiers: await effectiveTiers(rate) };
+    if (b.minUsd !== undefined) {
+      const m = Math.max(0, Math.round(Number(b.minUsd) || 0));
+      await q("insert into settings (key,value,updated_at) values ('vqr_min_usd',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [String(m)]);
+    }
+    if (Array.isArray(b.smallPresets)) {
+      await q("insert into settings (key,value,updated_at) values ('vqr_small_presets',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(cleanList(b.smallPresets))]);
+    }
+    if (Array.isArray(b.bulkPresets)) {
+      await q("insert into settings (key,value,updated_at) values ('vqr_bulk_presets',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(cleanList(b.bulkPresets))]);
+    }
+    return { ok: true, rate, ...(await topupConfig(rate)) };
   });
 
   // ── Mint a VA-backed payment QR (production-reliable callbacks) ──────────────
@@ -265,6 +323,15 @@ export function vietqrRoutes(app, requireAuth) {
     const body = req.body || {};
     const amount = Math.round(Number(body.amount) || 0);
     if (!amount || amount < 1000) { reply.code(400); return { error: 'Invalid amount (VND)' }; }
+    // Enforce the top-up minimum (USD) before asking VietQR for a QR. Below-min amounts
+    // always price at the base rate, so base-rate USD is exact for this check.
+    try {
+      let baseRate = 25400;
+      const rr = await q("select value from settings where key='vqr_rate'");
+      const n = rr.rows[0] ? Number(rr.rows[0].value) : 0; if (n > 0) baseRate = n;
+      const floor = await enforceMinUsd(amount / baseRate);
+      if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
+    } catch { /* settings unreadable — don't block */ }
     // Human-readable reference WE control: EG + zero-padded sequential number
     // (e.g. EG000007). Alphanumeric so it survives the bank memo; this is the key
     // that links the seller's wallet, the admin ledger, and the bank transfer.

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StripeCardForm } from "@/components/app/stripe-card-form"
-import { createVietqrPayment, vietqrStatus, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment, type VqrTier } from "@/lib/api"
+import { createVietqrPayment, vietqrStatus, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment, type TopupConfig } from "@/lib/api"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -38,10 +38,31 @@ const SMALL_USD_PRESETS = [50, 100, 200, 500, 1000]
 // Bulk top-up suggestion amounts — the "top up more" tiers. Shared so VietQR (with a rate)
 // and Transfer (plain USD, no rate) suggest the same big amounts. $20k is the top.
 const BULK_USD_PRESETS = [2000, 5000, 10000, 20000]
-function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () => void }) {
-  const [amount, setAmount] = useState("50")   // USD
-  const [rate, setRate] = useState(0)          // base VND per $1, admin-set
-  const [tiers, setTiers] = useState<VqrTier[]>([])   // volume discounts (ascending by usd)
+
+// Derive the amount options + minimum a tab should show from the shared config (falling back
+// to the shipped defaults while it loads). Small presets below the minimum are dropped — a
+// button you can't submit is only confusing.
+function amountOptions(cfg: TopupConfig | null) {
+  const minUsd = cfg?.minUsd ?? 200
+  return {
+    minUsd,
+    small: (cfg?.smallPresets ?? SMALL_USD_PRESETS).filter((v) => v >= minUsd),
+    bulk: (cfg?.bulkPresets ?? BULK_USD_PRESETS).filter((v) => v >= minUsd),
+  }
+}
+// Seed the amount box to the minimum once the config lands — but only if the seller hasn't
+// typed yet (deferred to avoid a synchronous setState in render).
+function useSeedAmount(cfg: TopupConfig | null, amount: string, setAmount: (v: string) => void) {
+  useEffect(() => {
+    if (!cfg) return
+    const id = setTimeout(() => { if (amount === "") setAmount(String(cfg.minUsd)) }, 0)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg])
+}
+
+function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
+  const [amount, setAmount] = useState("")   // USD
   const [showBulk, setShowBulk] = useState(false)
   const [phase, setPhase] = useState<"amount" | "qr" | "paid" | "error">("amount")
   const [payment, setPayment] = useState<VietqrPayment | null>(null)
@@ -49,7 +70,12 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => { getVietqrRate().then((r) => { setRate(Number(r.rate) || 0); setTiers(r.tiers || []) }).catch(() => {}) }, [])
+  const rate = cfg?.rate ?? 0          // base VND per $1, admin-set
+  const tiers = cfg?.tiers ?? []       // volume discounts (ascending by usd)
+  // The QR tab's bulk cards come from the rate `tiers` (they carry a discounted rate), so it
+  // only needs the small presets + the minimum here.
+  const { minUsd, small: smallPresets } = amountOptions(cfg)
+  useSeedAmount(cfg, amount, setAmount)
 
   const stopPoll = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -71,6 +97,7 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
 
   const start = async () => {
     if (usdAmt <= 0) { setError("Enter a USD amount."); return }
+    if (usdAmt < minUsd) { setError(`Minimum top-up is ${usd0(minUsd)}.`); return }
     if (!rate) { setError("Exchange rate isn't available right now — try again in a moment."); return }
     if (vndAmt < 1000) { setError("That's below the minimum top-up."); return }
     setError(null); setPhase("qr")
@@ -157,7 +184,7 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-        {SMALL_USD_PRESETS.map((v) => (
+        {smallPresets.map((v) => (
           <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
         ))}
       </div>
@@ -201,7 +228,8 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
 
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Amount (USD)</span>
-        <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="50" />
+        <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
+        <span className="text-[11px] text-muted-foreground">Minimum top-up {usd0(minUsd)}.</span>
       </label>
       {/* Left: the rate ($1 = …). Right: the VND the QR will actually charge. */}
       <div className={"flex items-center justify-between rounded-lg border px-3 py-2 text-sm " + (discounted ? "border-primary/40 bg-primary/5" : "border-border bg-muted/40")}>
@@ -218,7 +246,7 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
         )}
       </div>
       {error && <div className="text-sm text-destructive">{error}</div>}
-      <Button className="w-full" onClick={start} disabled={!rate || usdAmt <= 0}>Generate QR Code</Button>
+      <Button className="w-full" onClick={start} disabled={!rate || usdAmt < minUsd}>Generate QR Code</Button>
       <p className="text-center text-xs text-muted-foreground">Pay the VND amount with any VN banking app. Your USD balance updates automatically once paid.</p>
     </div>
   )
@@ -242,10 +270,16 @@ function Detail({ label, value, mono, missing }: { label: string; value?: string
 }
 
 // ───────────────────────────── Card (Stripe) ─────────────────────────────
-function CardTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () => void }) {
-  const [amount, setAmount] = useState("50")
+function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
+  const [amount, setAmount] = useState("")
   const [phase, setPhase] = useState<"amount" | "pay" | "paid">("amount")
   const [error, setError] = useState<string | null>(null)
+  const { minUsd, small: smallPresets } = amountOptions(cfg)
+  useSeedAmount(cfg, amount, setAmount)
+  const proceed = () => {
+    if (Number(amount) < minUsd) { setError(`Minimum top-up is ${usd0(minUsd)}.`); return }
+    setError(null); setPhase("pay")
+  }
 
   if (phase === "paid") return <Success title="Payment received" sub="Your card top-up has been credited." onDone={onClose} />
   if (phase === "pay")
@@ -263,15 +297,17 @@ function CardTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () =>
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-        {SMALL_USD_PRESETS.map((v) => (
+        {smallPresets.map((v) => (
           <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
         ))}
       </div>
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Amount (USD)</span>
-        <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="50" />
+        <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
+        <span className="text-[11px] text-muted-foreground">Minimum top-up {usd0(minUsd)}.</span>
       </label>
-      <Button className="w-full" onClick={() => Number(amount) > 0 && setPhase("pay")} disabled={!(Number(amount) > 0)}>Continue to card</Button>
+      {error && <div className="text-sm text-destructive">{error}</div>}
+      <Button className="w-full" onClick={proceed} disabled={Number(amount) < minUsd}>Continue to card</Button>
       <p className="text-center text-xs text-muted-foreground">Secured by Stripe. Balance updates on success.</p>
     </div>
   )
@@ -279,13 +315,15 @@ function CardTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () =>
 
 // ───────────────────────────── Transfer (manual) ─────────────────────────────
 const PROVIDERS = [
-  { key: "PayPal", to: "admin@embroiderygoods.com", hint: "Send to this PayPal, attach your receipt, then submit — we credit your wallet once it lands." },
   { key: "PingPong", to: "helennguyen958@gmail.com", hint: "Send to this PingPong account, attach your receipt, then submit." },
   { key: "LianLian", to: "phanmylinh0410@gmail.com", hint: "Send to this LianLian account, attach your receipt, then submit." },
+  { key: "PayPal", to: "admin@embroiderygoods.com", hint: "Send to this PayPal, attach your receipt, then submit — we credit your wallet once it lands." },
 ]
-function TransferTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () => void }) {
+function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
   const [provider, setProvider] = useState(PROVIDERS[0])
-  const [amount, setAmount] = useState("50")
+  const [amount, setAmount] = useState("")
+  const { minUsd, small: smallPresets, bulk: bulkPresets } = amountOptions(cfg)
+  useSeedAmount(cfg, amount, setAmount)
   const [ref, setRef] = useState("")
   const [proof, setProof] = useState<{ name: string; dataUrl: string } | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -306,6 +344,7 @@ function TransferTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: (
   const submit = async () => {
     const amt = Number(amount) || 0
     if (amt <= 0) { setError("Enter an amount."); return }
+    if (amt < minUsd) { setError(`Minimum top-up is ${usd0(minUsd)}.`); return }
     setSaving(true); setError(null)
     try {
       const r = await createTopupRequest({ amount: amt, method: provider.key, ref: ref.trim() || undefined, attachment: proof?.dataUrl })
@@ -350,12 +389,12 @@ function TransferTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: (
           is USD → our USD wallet, so there's no exchange rate or "save" here. */}
       <div className="space-y-2">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-          {SMALL_USD_PRESETS.map((v) => (
+          {smallPresets.map((v) => (
             <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {BULK_USD_PRESETS.map((v) => (
+          {bulkPresets.map((v) => (
             <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
           ))}
         </div>
@@ -363,7 +402,8 @@ function TransferTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: (
 
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Amount (USD)</span>
-        <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="50" />
+        <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
+        <span className="text-[11px] text-muted-foreground">Minimum top-up {usd0(minUsd)}.</span>
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Reference / transaction note (optional)</span>
@@ -406,6 +446,16 @@ function TransferTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: (
 // ───────────────────────────── Dialog ─────────────────────────────
 export function TopUpDialog({ open, onOpenChange, onFunded }: { open: boolean; onOpenChange: (v: boolean) => void; onFunded: () => void }) {
   const close = () => onOpenChange(false)
+  // One config fetch for the whole dialog — the admin-set minimum, quick-amount presets, and
+  // (for the QR tab) the exchange rate + volume tiers. Shared so every method enforces the
+  // same minimum and shows the same presets. Deferred so opening the dialog doesn't setState
+  // synchronously; re-fetched each open so an admin's change shows without a reload.
+  const [cfg, setCfg] = useState<TopupConfig | null>(null)
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(() => { getVietqrRate().then(setCfg).catch(() => {}) }, 0)
+    return () => clearTimeout(t)
+  }, [open])
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
@@ -419,13 +469,13 @@ export function TopUpDialog({ open, onOpenChange, onFunded }: { open: boolean; o
             <TabsTrigger value="card">Card</TabsTrigger>
           </TabsList>
           <TabsContent value="transfer" className="mt-4">
-            <TransferTopUp onFunded={onFunded} onClose={close} />
+            <TransferTopUp onFunded={onFunded} onClose={close} cfg={cfg} />
           </TabsContent>
           <TabsContent value="vietqr" className="mt-4">
-            <VietqrTopUp onFunded={onFunded} onClose={close} />
+            <VietqrTopUp onFunded={onFunded} onClose={close} cfg={cfg} />
           </TabsContent>
           <TabsContent value="card" className="mt-4">
-            <CardTopUp onFunded={onFunded} onClose={close} />
+            <CardTopUp onFunded={onFunded} onClose={close} cfg={cfg} />
           </TabsContent>
         </Tabs>
       </DialogContent>

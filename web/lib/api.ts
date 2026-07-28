@@ -115,11 +115,18 @@ export function createVietqrPayment(amount: number, amountUsd?: number) {
 // The shared USD→VND exchange rate + volume tiers (a better VND/$1 the more you add).
 // GET is any signed-in user; PUT is admin-only.
 export type VqrTier = { usd: number; rate: number }
+// The full top-up config the Add Funds dialog runs on: the VietQR rate + volume tiers, the
+// admin-set minimum (USD, applies to EVERY method), and the quick-amount presets.
+export type TopupConfig = { rate: number; tiers: VqrTier[]; minUsd: number; smallPresets: number[]; bulkPresets: number[] }
 export function getVietqrRate() {
-  return api<{ rate: number; tiers: VqrTier[] }>(`/api/vietqr/rate`)
+  return api<TopupConfig>(`/api/vietqr/rate`)
 }
-export function setVietqrRate(rate: number, tiers?: VqrTier[]) {
-  return api<{ ok?: boolean; rate?: number; tiers?: VqrTier[]; error?: string }>(`/api/vietqr/rate`, { method: "PUT", body: JSON.stringify({ rate, tiers }) })
+export function setVietqrRate(
+  rate: number,
+  tiers?: VqrTier[],
+  extra?: { minUsd?: number; smallPresets?: number[]; bulkPresets?: number[] },
+) {
+  return api<Partial<TopupConfig> & { ok?: boolean; error?: string }>(`/api/vietqr/rate`, { method: "PUT", body: JSON.stringify({ rate, tiers, ...extra }) })
 }
 export function vietqrStatus(ref: string) {
   return api<{ paid: boolean; transaction?: unknown }>(`/api/vietqr/status?ref=${encodeURIComponent(ref)}`)

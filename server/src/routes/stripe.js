@@ -67,6 +67,18 @@ async function customerFor(user) {
 }
 
 export function stripeRoutes(app, requireAuth) {
+  // The admin-set top-up minimum (default $200), read from the shared settings key that
+  // vietqr.js writes. Returns the floor when `amt` is below it, else null. Client gates too,
+  // but a direct call to the charge endpoints must hit the same boundary.
+  async function belowMin(amt) {
+    try {
+      const mr = await q("select value from settings where key='vqr_min_usd'");
+      const floor = mr.rows[0] != null && mr.rows[0].value != null && mr.rows[0].value !== ''
+        ? Math.max(0, Math.round(Number(mr.rows[0].value) || 0)) : 200;
+      return (Number(amt) || 0) < floor ? floor : null;
+    } catch { return null; }
+  }
+
   // Publishable key is public — the frontend needs it to mount the Payment Element.
   app.get('/api/stripe/config', { preHandler: requireAuth }, async () => ({ publishableKey: pkKey(), enabled: !!(skKey() && pkKey()) }));
 
@@ -86,6 +98,7 @@ export function stripeRoutes(app, requireAuth) {
     try {
       const amt = Number((req.body || {}).amount) || 0;
       if (amt <= 0) { reply.code(400); return { error: 'Invalid amount' }; }
+      const floor = await belowMin(amt); if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
       const pi = await stripe('/payment_intents', {
         amount: String(Math.round(amt * 100)),
         currency: 'usd',
@@ -154,6 +167,7 @@ export function stripeRoutes(app, requireAuth) {
       const amt = Number((req.body || {}).amount) || 0;
       const pmId = (req.body || {}).paymentMethodId;
       if (amt <= 0) { reply.code(400); return { error: 'Invalid amount' }; }
+      const floor = await belowMin(amt); if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
       if (!pmId) { reply.code(400); return { error: 'paymentMethodId required' }; }
       const customer = await customerFor(req.user);
       const pi = await stripe('/payment_intents', {

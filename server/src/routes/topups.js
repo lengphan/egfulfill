@@ -27,8 +27,17 @@ export function topupsRoutes(app, requireAuth) {
   q(`alter table topup_requests add column if not exists attachment text`).catch(() => {});
 
   // Seller creates a pending top-up (after they've transferred via VietQR).
-  app.post('/api/topups', { preHandler: requireAuth }, async (req) => {
+  app.post('/api/topups', { preHandler: requireAuth }, async (req, reply) => {
     const b = req.body || {};
+    const amount = Number(b.amount) || 0;
+    // Enforce the admin-set top-up minimum (default $200) — same settings key vietqr.js writes.
+    // Client gates too, but this is the boundary a direct API call hits.
+    try {
+      const mr = await q("select value from settings where key='vqr_min_usd'");
+      const floor = mr.rows[0] != null && mr.rows[0].value !== '' && mr.rows[0].value != null
+        ? Math.max(0, Math.round(Number(mr.rows[0].value) || 0)) : 200;
+      if (amount < floor) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
+    } catch { /* settings unreadable — don't block a legitimate transfer */ }
     const r = await q(
       `insert into topup_requests (seller_id, seller_email, seller_name, amount_usd, vnd, ref, note, method, attachment, status)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') returning *`,

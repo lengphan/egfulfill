@@ -896,6 +896,11 @@ function PlatformPanel() {
   const [vqrRate, setVqrRate] = useState("")
   // Volume tiers: top up ≥ $usd, get the better $1 = rate₫. Held as strings for editing.
   const [vqrTiers, setVqrTiers] = useState<{ usd: string; rate: string }[]>([])
+  // Top-up minimum (USD, applies to EVERY method) + the quick-amount presets. Presets held
+  // as comma-separated strings for easy editing; parsed to number[] on save.
+  const [vqrMin, setVqrMin] = useState("")
+  const [vqrSmall, setVqrSmall] = useState("")
+  const [vqrBulk, setVqrBulk] = useState("")
   const isAdminUser = (getUser()?.role || "") === "admin"
   const setTier = (i: number, k: "usd" | "rate", v: string) => setVqrTiers((ts) => ts.map((t, j) => (j === i ? { ...t, [k]: v.replace(/[^0-9]/g, "") } : t)))
   const addTier = () => setVqrTiers((ts) => [...ts, { usd: "", rate: "" }])
@@ -946,6 +951,9 @@ function PlatformPanel() {
       getVietqrRate().then((v) => {
         setVqrRate(v.rate ? String(v.rate) : "")
         setVqrTiers((v.tiers || []).map((t) => ({ usd: String(t.usd), rate: String(t.rate) })))
+        setVqrMin(v.minUsd != null ? String(v.minUsd) : "")
+        setVqrSmall((v.smallPresets || []).join(", "))
+        setVqrBulk((v.bulkPresets || []).join(", "))
       }).catch(() => {})
       setTypes(r.product_types ?? [])
       setThreads(r.thread_palette ?? [])
@@ -985,12 +993,17 @@ function PlatformPanel() {
         thread_palette: threads,
       })
       if (r.error) throw new Error(r.error)
-      // The VietQR rate + volume tiers live on their own admin-only endpoint.
+      // The VietQR rate + volume tiers + top-up min/presets live on their own admin-only endpoint.
       if (isAdminUser && vqrRate !== "" && Number(vqrRate) > 0) {
         const cleanTiers = vqrTiers
           .map((t) => ({ usd: Number(t.usd) || 0, rate: Number(t.rate) || 0 }))
           .filter((t) => t.usd > 0 && t.rate > 0)
-        const rr = await setVietqrRate(Number(vqrRate), cleanTiers)
+        const parseList = (s: string) => s.split(/[,\s]+/).map((x) => Math.round(Number(x))).filter((x) => x > 0)
+        const rr = await setVietqrRate(Number(vqrRate), cleanTiers, {
+          minUsd: vqrMin === "" ? undefined : Math.max(0, Math.round(Number(vqrMin) || 0)),
+          smallPresets: vqrSmall.trim() ? parseList(vqrSmall) : undefined,
+          bulkPresets: vqrBulk.trim() ? parseList(vqrBulk) : undefined,
+        })
         if (rr.error) throw new Error(rr.error)
       }
       // Push the new stock into the matcher so open boards stop matching against the
@@ -1095,6 +1108,24 @@ function PlatformPanel() {
               ))}
               <button type="button" onClick={addTier} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Plus size={13} weight="bold" /> Add tier</button>
             </div>
+          </FeeGroup>
+        )}
+        {isAdminUser && (
+          <FeeGroup
+            title="Top-up amounts"
+            hint="Applies to EVERY method (Transfer, QR, Card). The minimum a seller may add, and the quick-amount buttons shown in Add Funds."
+          >
+            <MoneyField label="Minimum top-up" hint="Smallest amount a seller can add, any method. Currently $200." value={vqrMin} onChange={setVqrMin} />
+            <label className="flex flex-col gap-1">
+              <span className="text-[13px] font-medium">Quick amounts</span>
+              <Input value={vqrSmall} onChange={(e) => setVqrSmall(e.target.value.replace(/[^0-9,\s]/g, ""))} inputMode="numeric" placeholder="50, 100, 200, 500, 1000" className="h-9" />
+              <span className="text-[11px] text-muted-foreground">Comma-separated. Amounts below the minimum are hidden automatically.</span>
+            </label>
+            <label className="flex flex-col gap-1 sm:col-span-2">
+              <span className="text-[13px] font-medium">Bulk amounts</span>
+              <Input value={vqrBulk} onChange={(e) => setVqrBulk(e.target.value.replace(/[^0-9,\s]/g, ""))} inputMode="numeric" placeholder="2000, 5000, 10000, 20000" className="h-9" />
+              <span className="text-[11px] text-muted-foreground">The larger &ldquo;top up more&rdquo; suggestions. Comma-separated.</span>
+            </label>
           </FeeGroup>
         )}
         <FeeGroup
