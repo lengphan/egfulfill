@@ -18,6 +18,7 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { storageEnabled, putObject, getObject } from '../storage.js';
+import { recordUsage } from '../usage.js';
 
 const EWA_BASE = 'https://public.ewa.wilcomapps.com/';
 const appId = () => (process.env.WILCOM_APP_ID || '').trim();
@@ -40,6 +41,7 @@ async function ewaCall(method, xml) {
     body: body.toString(),
   });
   const text = await r.text().catch(() => '');
+  recordUsage('wilcom', { endpoint: String(method).replace(/^\/+/, ''), ok: r.ok });
   return { status: r.status, ok: r.ok, body: text };
 }
 

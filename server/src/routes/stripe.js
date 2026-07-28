@@ -6,6 +6,7 @@
 // Credentials are read at CALL time: Settings › Integrations writes them to the DB and
 // into process.env live, but a boot-time `const` would pin the old value until a redeploy.
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 
 const skKey = () => (process.env.STRIPE_SECRET_KEY || '').trim();
 const pkKey = () => (process.env.STRIPE_PUBLISHABLE_KEY || '').trim();
@@ -16,6 +17,7 @@ async function stripe(path, body, method) {
   if (body) { opts.headers['Content-Type'] = 'application/x-www-form-urlencoded'; opts.body = new URLSearchParams(body).toString(); }
   const r = await fetch('https://api.stripe.com/v1' + path, opts);
   const d = await r.json().catch(() => ({}));
+  recordUsage('stripe', { endpoint: path, ok: r.ok });
   if (!r.ok) throw new Error((d.error && d.error.message) || ('HTTP ' + r.status));
   return d;
 }

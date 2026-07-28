@@ -10,6 +10,7 @@
 //   OTTOCAP_CLIENT_SECRET, OTTOCAP_API_BASE (sandbox default), OTTOCAP_ORDER_LIVE (gate).
 
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 
 const OC_USER = (process.env.OTTOCAP_USERNAME || '').trim();
 const OC_PASS = (process.env.OTTOCAP_PASSWORD || '').trim();
@@ -46,6 +47,7 @@ async function ocFetch(path, opts) {
     headers: Object.assign({ Authorization: 'Bearer ' + tok, Accept: 'application/json' }, (opts && opts.headers) || {})
   }));
   const text = await r.text(); let data; try { data = JSON.parse(text); } catch (e) { data = text; }
+  recordUsage('ottocap', { endpoint: path, ok: r.ok });
   return { ok: r.ok, status: r.status, data };
 }
 const ocGet = (path) => ocFetch(path, { method: 'GET' });

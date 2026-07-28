@@ -2,6 +2,7 @@
 // Etsy v3 uses PKCE with the keystring as client_id; NO client secret is needed
 // for the token exchange. Access tokens last ~1h and are refreshed automatically.
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 import { usdRates } from '../fx.js';
@@ -100,6 +101,7 @@ async function etsyGet(conn, path) {
     headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' }
   });
   const data = await res.json().catch(() => ({}));
+  recordUsage('etsy', { endpoint: path, ok: res.ok });
   if (!res.ok) throw new Error((data.error || ('Etsy API ' + res.status)) + ' @ ' + path);
   return data;
 }
@@ -111,6 +113,7 @@ async function etsyFetch(conn, path, opts = {}) {
   await rateLimit();
   const res = await fetch(API + path, { method: opts.method || 'GET', headers: Object.assign({ 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' }, opts.headers || {}), body: opts.body });
   const data = await res.json().catch(() => ({}));
+  recordUsage('etsy', { endpoint: path, ok: res.ok });
   if (!res.ok) throw new Error(((data && (data.error || data.message)) || ('Etsy API ' + res.status)) + ' @ ' + path);
   return data;
 }

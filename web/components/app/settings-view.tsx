@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
+import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { SiteContentPanel } from "@/components/app/site-content-panel"
 import { SupplierOrderingSettings } from "@/components/app/supplier-ordering-settings"
@@ -2152,6 +2153,8 @@ export function SettingsView() {
         {/* Supplier ordering defaults. Warehouse/admin, matching who may spend — these
             decide how a purchase order pays and ships. */}
         {canPlatform && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
+        {/* Integration usage/spend — a cost concern, so warehouse/admin like Platform. */}
+        {canPlatform && <TabsTrigger value="usage">Usage</TabsTrigger>}
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
         {isAdmin && <TabsTrigger value="site">Site content</TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
@@ -2194,6 +2197,11 @@ export function SettingsView() {
       {canPlatform && (
         <TabsContent value="users">
           <UsersPanel />
+        </TabsContent>
+      )}
+      {canPlatform && (
+        <TabsContent value="usage">
+          <UsagePanel isAdmin={isAdmin} />
         </TabsContent>
       )}
       {isAdmin && (

@@ -37,6 +37,7 @@ import { sandboxRoutes, authKey, keyAllows } from './routes/sandbox.js';
 import { webhookRoutes } from './webhooks.js';
 import { adminSecretsRoutes } from './routes/admin_secrets.js';
 import { wilcomRoutes } from './routes/wilcom.js';
+import { usageRoutes } from './routes/usage.js';
 import { auditRoutes } from './audit.js';
 import { supportAiRoutes } from './routes/support_ai.js';
 import { factorySettingsRoutes } from './routes/factory_settings.js';
@@ -352,6 +353,7 @@ sandboxRoutes(app, requireAuth);                       // seller API keys (/api/
 webhookRoutes(app, requireAuth, authKey, keyAllows);              // outbound webhooks (/api/webhooks) — what makes the public API push instead of poll-only; JWT *or* X-API-Key, since registering one is a partner action
 adminSecretsRoutes(app, requireStaff);                 // READ-ONLY masked last-4 of integration credentials (staff) — powers Settings › Integrations last-4 display; no plaintext/write
 wilcomRoutes(app, requireStaff);                       // Wilcom EWA: config check + live connectivity/auth test (reads WILCOM_APP_ID/KEY at call time)
+usageRoutes(app, requireStaff, requireAdmin);          // integration usage/spend dashboard (staff read) + per-platform cost/threshold config (admin)
 auditRoutes(app, requireAdmin, requireAuth);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
 factorySettingsRoutes(app, requireAuth, requireStaff); // platform factory settings — design fee, default shipping, emb file price (warehouse/admin)

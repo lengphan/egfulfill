@@ -12,6 +12,7 @@
 //   POST /api/shipping/label  {rateToken} | {to,from,parcel} → buy (specific or cheapest)
 //   GET  /api/shipping/track?provider=&carrier=&tracking=  → status
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 import { readShipFrom } from './factory_settings.js';
 
 // Read at CALL time, not import time. Saving a credential in Settings › Integrations
@@ -79,6 +80,7 @@ async function epBuy(shipmentId, rateId) {
   const d = await r.json().catch(() => ({}));
   if (!r.ok || !d.tracking_code) throw new Error((d.error && (d.error.message || JSON.stringify(d.error))) || ('EasyPost buy HTTP ' + r.status));
   const sr = d.selected_rate || {};
+  recordUsage('easypost', { endpoint: 'buy', ok: true }); // $ tracked in wallet_ledger (label-cost); count volume only
   return {
     provider: 'easypost', carrier: sr.carrier || '', service: sr.service || '',
     cost: Number(sr.rate) || null, tracking: d.tracking_code,
@@ -136,6 +138,7 @@ async function shBuy(rateObjectId, sel) {
   }
   const rate = (d.rate && typeof d.rate === 'object') ? d.rate : null;   // usually a string id
   sel = sel || {};
+  recordUsage('shippo', { endpoint: 'buy', ok: true }); // $ tracked in wallet_ledger (label-cost); count volume only
   return {
     provider: 'shippo',
     carrier: (rate && rate.provider) || sel.carrier || '',

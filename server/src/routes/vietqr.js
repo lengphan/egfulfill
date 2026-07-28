@@ -14,6 +14,7 @@
 // VietQR portal's "Username/Password khách hàng cung cấp" fields).
 import jwt from 'jsonwebtoken';
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 import { isStaff } from '../auth.js';
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
@@ -358,6 +359,7 @@ export function vietqrRoutes(app, requireAuth) {
         body: JSON.stringify({ bankCode, bankAccount: account, userBankName: name, content: note, amount, orderId, qrType: 0, transType: 'C' })
       });
       const gd = await gr.json().catch(() => ({}));
+      recordUsage('vietqr', { endpoint: 'qr/generate', ok: gr.ok });
       if (!gr.ok) { reply.code(502); return { error: 'VietQR generate failed: ' + JSON.stringify(gd).slice(0, 300) }; }
       // ONLY record a pending top-up when there is a scannable code to pay. A missing QR
       // means the seller can't pay, so a pending row would just be an orphan the admin
@@ -423,6 +425,7 @@ export function vietqrRoutes(app, requireAuth) {
         body: JSON.stringify({ bankCode, bankAccount: account, userBankName: name, content, amount, orderId, qrType: 0, transType: 'C' })
       });
       const gd = await gr.json().catch(() => ({}));
+      recordUsage('vietqr', { endpoint: 'qr/generate', ok: gr.ok });
       if (!gr.ok) { out.step2_generate = 'FAILED: ' + JSON.stringify(gd).slice(0, 300); return out; }
       genContent = gd.content || content;
       out.step2_generate = { ok: true, content: genContent, vaAccount: gd.vaAccount, transactionRefId: gd.transactionRefId };

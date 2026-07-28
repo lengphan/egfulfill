@@ -6,6 +6,7 @@
 // and we exchange the code at auth.tiktok-shops.com (app_key + app_secret required, NO signature).
 import crypto from 'node:crypto';
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 
 const APP_KEY    = process.env.TIKTOK_APP_KEY || '';
 const APP_SECRET = process.env.TIKTOK_APP_SECRET || '';
@@ -125,6 +126,7 @@ async function ttSignedRequest(conn, method, path, opts = {}) {
     body: method === 'GET' || !bodyStr ? undefined : bodyStr,
   });
   const data = await res.json().catch(() => ({}));
+  recordUsage('tiktok', { endpoint: path, ok: res.ok && data && data.code === 0 });
   // TikTok wraps everything as { code, message, data, request_id }; code===0 = ok.
   if (!res.ok || (data && data.code !== 0)) {
     throw new Error(((data && data.message) || ('TikTok API ' + res.status)) + ' @ ' + path);

@@ -13,6 +13,7 @@
 //   USPS_CRID=...   USPS_MID=...   USPS_ACCOUNT_NUMBER=...   (EPS account)
 //   USPS_ACCOUNT_TYPE=EPS
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 import { recordCost } from '../costs.js';
 import { readShipFrom } from './factory_settings.js';
 import { shippingEnabled, aggregatorBuyCheapest, aggregatorBuyRate, aggregatorVerifyAddress } from './shipping.js';
@@ -462,6 +463,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) 
       });
       const ct = res.headers.get('content-type') || '';
       const ab = Buffer.from(await res.arrayBuffer());
+      recordUsage('usps', { endpoint: 'label', ok: res.ok }); // $ tracked in wallet_ledger (label-cost); count volume only
       if (!res.ok) { reply.code(400); return { error: 'USPS label failed: ' + ab.toString('utf8').slice(0, 500) }; }
       // Labels 3.0 returns multipart/form-data: a JSON "labelMetadata" part (trackingNumber, postage)
       // + a "labelImage" part whose body is ALREADY base64 text (its header says application/pdf).

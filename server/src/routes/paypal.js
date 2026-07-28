@@ -6,6 +6,7 @@
 // Credentials are read at CALL time: Settings › Integrations writes them to the DB and
 // into process.env live, but a boot-time `const` would pin the old value until a redeploy.
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 
 const cidKey = () => (process.env.PAYPAL_CLIENT_ID || '').trim();
 const secKey = () => (process.env.PAYPAL_SECRET || '').trim();
@@ -80,6 +81,7 @@ export function paypalRoutes(app, requireAuth) {
         body: JSON.stringify(order)
       });
       const d = await r.json().catch(() => ({}));
+      recordUsage('paypal', { endpoint: 'create-order', ok: r.ok });
       if (!r.ok || !d.id) { reply.code(400); return { error: 'PayPal create failed: ' + JSON.stringify(d).slice(0, 300) }; }
       const approve = (d.links || []).find(l => l.rel === 'approve' || l.rel === 'payer-action');
       return { id: d.id, approveUrl: approve ? approve.href : null };
@@ -100,6 +102,7 @@ export function paypalRoutes(app, requireAuth) {
       const cap = d && d.purchase_units && d.purchase_units[0] && d.purchase_units[0].payments
         && d.purchase_units[0].payments.captures && d.purchase_units[0].payments.captures[0];
       const ok = r.ok && d.status === 'COMPLETED' && cap && cap.status === 'COMPLETED';
+      recordUsage('paypal', { endpoint: 'capture-order', ok: r.ok });
       if (!ok) { reply.code(400); return { error: 'Capture not completed: ' + JSON.stringify(d).slice(0, 300) }; }
       const amount = Number(cap.amount && cap.amount.value) || 0;
       // Real money in → record it like any top-up so the factory (admin+warehouse) is

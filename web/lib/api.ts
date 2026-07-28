@@ -1670,6 +1670,20 @@ export function deleteDesignLibrary(id: number | string) {
   return api<{ ok?: boolean }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }
 
+// ── Integration usage / spend meter ─────────────────────────────────────────────
+// Per-platform API call volume + estimated $ (from an admin per-call rate), plus the REAL
+// ledgered costs already in wallet_ledger (postage, blanks, …). Read-only dashboard: monthly
+// $ thresholds only alert, never throttle.
+export type UsagePlatform = { key: string; label: string; calls: number; errors: number; estDollars: number; estMonthlyDollars: number; costPerCallCents: number; monthlyLimitDollars: number; pct: number | null; over: boolean }
+export type UsageLedgerCat = { type: string; label: string; dollars: number; count: number }
+export type UsageSummary = { days: number; platforms: UsagePlatform[]; ledgered: UsageLedgerCat[]; totals: { calls: number; estDollars: number; ledgeredDollars: number; alerts: string[] } }
+export function getUsageSummary(days = 30) {
+  return api<UsageSummary>(`/api/usage/summary?days=${days}`)
+}
+export function setUsageConfig(body: { platform: string; costPerCallCents?: number; monthlyLimitCents?: number }) {
+  return api<{ ok: boolean; config: { costPerCallCents?: number; monthlyLimitCents?: number } }>(`/api/usage/config`, { method: "POST", body: JSON.stringify(body) })
+}
+
 // ── Design maker: the seller's reusable Images library ──────────────────────────
 // Two sources, both scoped server-side to the caller. "Your uploads" are stored (R2 +
 // a row); "order uploads" are buyer art referenced by URL off the seller's own orders.

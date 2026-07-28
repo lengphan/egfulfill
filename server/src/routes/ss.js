@@ -12,6 +12,7 @@
 // IMPORTANT: the full S&S product feed is enormous (100k+ SKUs), so /sync is
 // BOUNDED — it requires a brand or a set of styleIds; it never pulls everything.
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 
 const SS_ACCOUNT = (process.env.SS_ACCOUNT_NUMBER || '').trim();
 const SS_KEY     = (process.env.SS_API_KEY || '').trim();
@@ -143,8 +144,10 @@ async function ssGet(path, timeoutMs, skipLimit) {
     const r = await fetch(SS_BASE + path, { headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' }, signal: ctrl.signal });
     const txt = await r.text();
     let data; try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = txt; }
+    recordUsage('ss', { endpoint: path, ok: r.ok });
     return { ok: r.ok, status: r.status, data };
   } catch (e) {
+    recordUsage('ss', { endpoint: path, ok: false });
     return { ok: false, status: 0, data: null, error: e && e.message };   // timeout/network → caller falls back
   } finally { clearTimeout(timer); if (!skipLimit) _ssRelease(); }
 }

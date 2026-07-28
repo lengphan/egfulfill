@@ -5,6 +5,7 @@
 // seller connects their OWN store. Only *.myshopify.com is allowed (SSRF guard).
 import crypto from 'node:crypto';
 import { q } from '../db.js';
+import { recordUsage } from '../usage.js';
 
 const API_KEY     = process.env.SHOPIFY_API_KEY || '';
 const API_SECRET  = process.env.SHOPIFY_API_SECRET || '';
@@ -149,6 +150,7 @@ async function syncShopifyConnection(conn) {
     if (sinceIso) url += `&created_at_min=${encodeURIComponent(sinceIso)}`;
   }
   const r = await fetch(url, { headers: { 'X-Shopify-Access-Token': conn.access_token } });
+  recordUsage('shopify', { endpoint: 'GET /orders', ok: r.ok });
   if (!r.ok) throw new Error(`Shopify orders fetch failed (${r.status})`);
   const data = await r.json().catch(() => ({}));
   for (const order of (data.orders || [])) {
