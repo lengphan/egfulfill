@@ -926,13 +926,8 @@ export function DesignCanvasDialog({
           <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void attachMachineFile(f); e.target.value = "" }} />
 
-          {/* WORDS ONLY, one component, one size.
-              This row was four controls in three different treatments — three Buttons with
-              icons plus a hand-rolled <a> that only LOOKED like one — so the icons carried
-              no meaning the label didn't already have and the odd one out read as a
-              different kind of thing. A verb each, styled identically, is legible without
-              decoding a glyph. Download is a real Button that triggers the save, rather
-              than an anchor dressed as a button. */}
+          {/* WORDS ONLY, one component, one size. A verb each, styled identically, so the
+              row reads without decoding an icon. */}
           <div className="flex flex-wrap items-center gap-2">
             {designUrl && (
               <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>Replace</Button>
@@ -942,21 +937,11 @@ export function DesignCanvasDialog({
                 a drop is only discoverable if you already suspect it exists — which is why
                 the seller who had cut their own .pes had nowhere to go. */}
             <Button variant="outline" size="sm" onClick={() => machineRef.current?.click()}>Machine file</Button>
-            {designUrl && (
-              // A filename is the point: without one a signed storage URL just opens in a
-              // tab and a data-URL saves as "download", neither usable later.
-              <Button variant="outline" size="sm" onClick={() => {
-                const a = document.createElement("a")
-                a.href = designUrl
-                a.download = `${orderId}-${item.sku ?? "artwork"}`
-                a.click()
-              }}>Download</Button>
-            )}
             {/* Ten shirts, one file. Only when there IS another line, so a single-line
                 order doesn't carry a control that would do nothing. */}
             {designUrl && !!siblings?.length && (
               <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}>
-                {applying ? "Applying…" : "Use on every line"}
+                {applying ? "Applying…" : "Apply all items"}
               </Button>
             )}
           </div>
