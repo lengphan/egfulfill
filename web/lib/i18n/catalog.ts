@@ -95,7 +95,9 @@ const vi: Dict = {
   // untouched. AI-drafted, pending review.
   "stage.New": "Mới",
   "stage.Received": "Đã nhận",
+  "stage.Draft": "Nháp",
   "stage.Submitted": "Đã gửi",
+  "stage.Pending": "Chờ duyệt",
   "stage.Awaiting scan": "Chờ quét",
   "stage.Printed": "Đã in",
   "stage.Working": "Đang làm",

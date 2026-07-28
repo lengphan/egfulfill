@@ -53,16 +53,18 @@ function notifyOrderEvent(orderId, event, extra) {
 // Mirrors normalizeStage in web/lib/factory-status.ts — keep the two in sync. The
 // client filters the dropdown so operators aren't shown options that would 403;
 // THIS is what actually enforces it.
-const PIPELINE = ['in_review', 'awaiting_scan', 'printed', 'working', 'shipped'];
+// 'printed' (the label-paperwork step) was removed: in practice the scan walked straight
+// through it, so it never earned its own place on the line. Legacy 'printed' rows fold to
+// awaiting_scan (label made, not yet scanned) via normalizeStage below.
+const PIPELINE = ['in_review', 'awaiting_scan', 'working', 'shipped'];
 // Flagged + Backorder were retired; normalizeStage collapses any legacy value onto on_hold.
 const EXCEPTIONS = ['on_hold', 'cancelled', 'refunded'];
 function normalizeStage(s) {
   const v = String(s || '').toLowerCase().trim();
   if (['new', 'draft', 'none', 'pending'].includes(v)) return '';
   if (PIPELINE.includes(v) || EXCEPTIONS.includes(v)) return v;
-  if (['approved', 'ready_print', 'in_queue', 'queued', 'prescan'].includes(v)) return 'awaiting_scan';
-  if (['scanned', 'label', 'labelled', 'labeled'].includes(v)) return 'printed';
-  if (['printing', 'qc', 'production', 'in_production', 'in-prod', 'prepress',
+  if (['approved', 'ready_print', 'in_queue', 'queued', 'prescan', 'printed', 'label', 'labelled', 'labeled'].includes(v)) return 'awaiting_scan';
+  if (['scanned', 'printing', 'qc', 'production', 'in_production', 'in-prod', 'prepress',
        'packing', 'packed', 'ready', 'finished'].includes(v)) return 'working';
   if (['fulfilled', 'delivered', 'in_transit'].includes(v)) return 'shipped';
   // Flagged + Backorder were retired — collapse them and their aliases onto on_hold, the one
@@ -93,8 +95,8 @@ const posOf = (s) => LINE.indexOf(normalizeStage(s));
 // Human names, so a refusal can say which stages would be skipped rather than printing
 // the internal ids at someone.
 const STAGE_LABEL = {
-  '': 'Received', in_review: 'Submitted', awaiting_scan: 'Awaiting scan',
-  printed: 'Printed', working: 'Working', shipped: 'Shipped',
+  '': 'Draft', in_review: 'Pending', awaiting_scan: 'Awaiting scan',
+  working: 'Working', shipped: 'Shipped',
 };
 
 /**

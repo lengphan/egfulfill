@@ -51,7 +51,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
       const deny = stageDenialReason(role, stage, s.id)
       return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id) }
     })
-  const prod = withReason([{ id: "", label: "Received", tone: "new" as const }, ...FACTORY_STAGES])
+  const prod = withReason([{ id: "", label: "Draft", tone: "new" as const }, ...FACTORY_STAGES])
   const exc = withReason(EXCEPTION_STAGES)
 
   const onStage = (s: { id: string; label: string; deny: string | null; walk: boolean }) => {

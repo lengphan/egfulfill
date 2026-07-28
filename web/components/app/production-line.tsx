@@ -3,8 +3,8 @@
 import { FACTORY_STAGES, orderStage, type FactoryTone } from "@/lib/factory-status"
 import { type OrderRow } from "@/lib/api"
 
-// The six linear stages, Received first — the same vocabulary the boards show as badges.
-const LINE = [{ id: "", label: "Received", tone: "new" as FactoryTone }, ...FACTORY_STAGES]
+// The linear stages, Draft first — the same vocabulary the boards show as badges.
+const LINE = [{ id: "", label: "Draft", tone: "new" as FactoryTone }, ...FACTORY_STAGES]
 
 // Fill colours for the flow bar: the SAME hues as the stage badges (TONE_CLASS), one step
 // stronger so a thin bar still reads, and given a dark-mode step so it isn't a pale smear

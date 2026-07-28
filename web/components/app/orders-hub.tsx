@@ -153,14 +153,13 @@ const openLabel = (r: UspsLabelResult) => {
 }
 
 // Filters derive from the canonical pipeline so they always match the status model.
-// NB: id "" and the first pipeline stage (in_review) are DIFFERENT states that both used
-// to read "New" — a duplicate tab. "" = arrived but nobody has started it (where
-// factory-synced orders land); in_review = submitted into the queue, the first
-// production step. Labelled "Received" vs "New" so they're distinguishable. "Received"
-// matches ALL_STATUSES's own label for "" ("New (received)").
+// NB: id "" and the first pipeline stage (in_review) are DIFFERENT states. "" = Draft:
+// arrived/created but nobody has started it (where factory-synced orders land, unpaid);
+// in_review = Pending: the seller submitted + paid, awaiting factory approval. Labelled
+// "Draft" vs "Pending" so they're distinguishable — matches ALL_STATUSES's label for "".
 const FILTERS: { label: string; id: string }[] = [
   { label: "All", id: "all" },
-  { label: "Received", id: "" },
+  { label: "Draft", id: "" },
   ...FACTORY_STAGES.map((s) => ({ label: s.label, id: s.id })),
   { label: "Issues", id: "issues" },
 ]
@@ -1095,7 +1094,7 @@ export function OrdersHub() {
                           // so an operator can't reach Shipped by calling it a catch-up.
                           return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id) }
                         })
-                      const prod = withReason([{ id: "", label: "Received", tone: "new" as const }, ...FACTORY_STAGES])
+                      const prod = withReason([{ id: "", label: "Draft", tone: "new" as const }, ...FACTORY_STAGES])
                       const exc = withReason(EXCEPTION_STAGES)
                       /**
                        * A STOPPED order has no obvious next move — that is what stopping it
@@ -1166,7 +1165,7 @@ export function OrdersHub() {
                             // it offers a one-click "Back to <that stage>" — clear how to come
                             // off hold. Without a stored prior (an old hold), fall back to ⋯.
                             const holdFrom = norm === "on_hold" ? (o.meta?.hold_from as string | undefined) : undefined
-                            const backLabel = holdFrom != null ? (stageMeta(holdFrom)?.label || "Received") : null
+                            const backLabel = holdFrom != null ? (stageMeta(holdFrom)?.label || "Draft") : null
                             return (
                               <span className="inline-flex shrink-0 items-center gap-1.5">
                                 <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
@@ -1830,7 +1829,7 @@ export function OrdersHub() {
             return (
               <div className="space-y-3 text-sm">
                 <p className="text-muted-foreground">
-                  {numOf(catchUp.order)} is at <span className="font-medium text-foreground">{stageMeta(normalizeStage(from))?.label ?? "Received"}</span>.
+                  {numOf(catchUp.order)} is at <span className="font-medium text-foreground">{stageMeta(normalizeStage(from))?.label ?? "Draft"}</span>.
                   {" "}This records <span className="font-medium text-foreground">{path.length} stages</span>, in order:
                 </p>
                 <ol className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">

@@ -15,14 +15,14 @@ export type FactoryStage = { id: string; label: string; tone: FactoryTone }
 // The linear production flow (in order) — the warehouse scan flow.
 // The pipeline every submitted order follows.
 //
-// NB on ids vs labels: the submitted-but-untouched stage is LABELLED "New" but its id
-// stays `in_review`. The id `new` already means "not started / draft" in
-// normalizeStage — reusing it would make a seller's unsubmitted draft and a submitted
-// order indistinguishable in the DB. Labels are what people read; ids are data.
+// NB on ids vs labels: the seller-submitted stage is LABELLED "Pending" but its id stays
+// `in_review` — the id `new` already means "not started / Draft" in normalizeStage, and
+// reusing it would make a seller's unsubmitted Draft and a submitted order indistinguishable
+// in the DB. Labels are what people read; ids are data. ('printed' was removed — the scan
+// walked straight through it; legacy 'printed' rows fold to awaiting_scan.)
 export const FACTORY_STAGES: FactoryStage[] = [
-  { id: "in_review", label: "Submitted", tone: "review" },  // seller pushed it + paid; cancellable by them
-  { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" }, // label bought; waiting on the scan
-  { id: "printed", label: "Printed", tone: "qc" },          // label printed (pre-scan paperwork)
+  { id: "in_review", label: "Pending", tone: "review" },    // seller submitted + paid; awaiting factory approval; cancellable by them
+  { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" }, // approved; label made; waiting on the scan
   { id: "working", label: "Working", tone: "prod" },        // scanned + combined with the design; being made
   { id: "shipped", label: "Shipped", tone: "shipped" },
 ]
@@ -36,26 +36,21 @@ export const EXCEPTION_STAGES: FactoryStage[] = [
 ]
 const EXCEPTIONS = new Set(EXCEPTION_STAGES.map((s) => s.id))
 
-// Everything a staff member can set (new = received / cleared).
-// "" and in_review are DIFFERENT states that both used to read "New": "" is an order
-// that arrived and nobody has started (a marketplace sync lands here, unpaid); in_review
-// is one the seller has submitted AND been charged for. Confusing them is how a paid
-// order gets treated as untouched — so they're named for what they are.
-export const ALL_STATUSES: FactoryStage[] = [{ id: "", label: "Received", tone: "new" }, ...FACTORY_STAGES, ...EXCEPTION_STAGES]
+// Everything a staff member can set. "" and in_review are DIFFERENT states: "" is a Draft —
+// arrived/created and nobody has started (a marketplace sync or a factory's own order lands
+// here, unpaid); in_review is "Pending" — the seller has submitted AND been charged, awaiting
+// factory approval. Confusing them is how a paid order gets treated as untouched.
+export const ALL_STATUSES: FactoryStage[] = [{ id: "", label: "Draft", tone: "new" }, ...FACTORY_STAGES, ...EXCEPTION_STAGES]
 
 // Collapse the many raw factory_status values onto a canonical id. "" = not started.
 export function normalizeStage(s?: string | null): string {
   const v = String(s || "").toLowerCase().trim()
   if (v === "new" || v === "draft" || v === "none" || v === "pending") return ""
   if (ORDER.includes(v) || EXCEPTIONS.has(v)) return v
-  if (["approved", "ready_print", "in_queue", "queued", "prescan"].includes(v)) return "awaiting_scan"
-  // Retired ids still living in the DB. Without these they'd fall through to "" and
-  // every in-flight order would read as not-started.
-  //   scanned  -> printed  (the label step)
-  //   printing -> working  (the make step)
-  //   packing/packed/... -> working (packing was removed earlier)
-  if (["scanned", "label", "labelled", "labeled"].includes(v)) return "printed"
-  if (["printing", "qc", "production", "in_production", "in-prod", "prepress",
+  // 'printed' was removed (label made, pre-scan) → folds to awaiting_scan, alongside the
+  // other label/queue aliases. Retired make-step ids fold to working.
+  if (["approved", "ready_print", "in_queue", "queued", "prescan", "printed", "label", "labelled", "labeled"].includes(v)) return "awaiting_scan"
+  if (["scanned", "printing", "qc", "production", "in_production", "in-prod", "prepress",
        "packing", "packed", "ready", "finished"].includes(v)) return "working"
   if (["fulfilled", "delivered", "in_transit"].includes(v)) return "shipped"
   // Flagged + Backorder were retired — collapse them and their aliases onto On hold, the one
@@ -116,7 +111,7 @@ const MONEY_STAGES = new Set(["cancelled", "refunded"])
 // never counts as a skip. MIRRORS `LINE`/`skipsPipeline` in server/src/routes/orders.js.
 const LINE = ["", ...FACTORY_STAGES.map((s) => s.id)]
 const posOf = (s: string | null | undefined) => LINE.indexOf(normalizeStage(s))
-const LABEL_OF = (id: string) => (id === "" ? "Received" : FACTORY_STAGES.find((s) => s.id === id)?.label ?? id)
+const LABEL_OF = (id: string) => (id === "" ? "Draft" : FACTORY_STAGES.find((s) => s.id === id)?.label ?? id)
 
 /**
  * WHY a move is refused, or null if it's allowed.

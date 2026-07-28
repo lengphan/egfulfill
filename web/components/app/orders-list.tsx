@@ -176,7 +176,8 @@ export function OrdersList() {
     const list = orders ?? []
     const byGroup = (g: string) => list.filter((o) => sellerStatus(o).group === g).length
     return {
-      received: byGroup("received"),
+      draft: byGroup("draft"),
+      pending: byGroup("pending"),
       prod: byGroup("production"),
       shipped: byGroup("shipped"),
       attention: byGroup("attention"),
@@ -208,9 +209,10 @@ export function OrdersList() {
         </div>
       )}
       <StatGrid>
-        <StatCard label="Pending" value={String(stats.received)} sub="not submitted yet" />
-        <StatCard label="In production" value={String(stats.prod)} sub="being fulfilled" />
-        <StatCard label="Shipped" value={String(stats.shipped)} sub="fulfilled" tone="pos" />
+        <StatCard label="Draft" value={String(stats.draft)} sub="not submitted yet" />
+        <StatCard label="Pending" value={String(stats.pending)} sub="awaiting factory" />
+        <StatCard label="In process" value={String(stats.prod)} sub="being made" />
+        <StatCard label="Fulfilled" value={String(stats.shipped)} sub="shipped" tone="pos" />
         <StatCard label="Needs attention" value={String(stats.attention)} sub="action needed" tone={stats.attention ? "neg" : undefined} />
       </StatGrid>
 

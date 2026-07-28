@@ -5,60 +5,58 @@
 // reinvent granular seller stages here. The granular factory stages belong to the
 // factory boards, not the seller surfaces.
 export type SellerStatusInfo = { label: string; tone: string; group: SellerGroup }
-export type SellerGroup = "received" | "production" | "shipped" | "attention" | "closed"
+export type SellerGroup = "draft" | "pending" | "production" | "shipped" | "attention" | "closed"
 
-// Design-token tones matching the canonical SELLER_STATUS colours
-// (#6b7280 grey, #6366f1 indigo→violet, #16a34a green, #dc2626 red).
+// Design-token tones (grey neutral, violet accent, indigo wait, green ship, amber hold, red alert).
 const TONE = {
   neutral: "bg-muted text-muted-foreground",
+  wait: "bg-indigo-100 text-indigo-700",
   prod: "bg-violet-100 text-violet-700",
   shipped: "bg-emerald-100 text-emerald-700",
+  hold: "bg-amber-100 text-amber-800",
   alert: "bg-red-100 text-red-700",
 }
 
 const P = (label: string, tone: string, group: SellerGroup): SellerStatusInfo => ({ label, tone, group })
 
-// Keys mirror SELLER_STATUS (+ its legacy aliases) exactly.
+// The seller-facing lifecycle: Draft -> Pending -> In Process -> Fulfilled (+ On Hold /
+// Cancelled / Refunded). Mirrors factory ids; keys cover every raw value the backend emits.
 const MAP: Record<string, SellerStatusInfo> = {
-  // "Pending" = not sent to the factory yet. Same label whatever the origin (synced
-  // or manual): the seller's next action is identical either way — submit it.
-  // Deliberately NOT "New": the factory's first stage (in_review) is labelled New, and
-  // one word meaning "not submitted" to a seller but "submitted, ours now" to the floor
-  // would bite the moment the two talk about the same order.
-  new: P("Pending", TONE.neutral, "received"),
-  draft: P("Pending", TONE.neutral, "received"),
-  // Submitted = "In Production" to the seller. Every internal stage (in_review /
-  // awaiting_scan / printed / working) collapses to this one label — the factory's
-  // steps are not the seller's business. NB: still cancellable at in_review, so the
-  // Cancel button can appear alongside this label; that's driven by factory_status,
-  // not by what the badge says.
-  in_review: P("In Production", TONE.prod, "production"),
-  awaiting_scan: P("In Production", TONE.prod, "production"),
-  printed: P("In Production", TONE.prod, "production"),
-  working: P("In Production", TONE.prod, "production"),
-  scanned: P("In Production", TONE.prod, "production"),   // retired id; legacy rows
-  printing: P("In Production", TONE.prod, "production"),  // retired id; legacy rows
-  packing: P("In Production", TONE.prod, "production"),   // retired stage; legacy rows still carry it
-  shipped: P("Shipped", TONE.shipped, "shipped"),
+  // Draft = created/synced, NOT submitted. The seller's next action is to submit it. Same
+  // label whatever the origin (synced or manual).
+  new: P("Draft", TONE.neutral, "draft"),
+  draft: P("Draft", TONE.neutral, "draft"),
+  // Pending = submitted + charged, awaiting the factory to approve it. STILL cancellable
+  // (full refund) — the Cancel button appears alongside this, driven by factory_status.
+  in_review: P("Pending", TONE.wait, "pending"),
+  // In Process = the factory approved it and is making it. Every internal make-stage
+  // (awaiting_scan / working, + legacy) collapses to this one label — the factory's steps
+  // are not the seller's business.
+  awaiting_scan: P("In Process", TONE.prod, "production"),
+  printed: P("In Process", TONE.prod, "production"),     // retired id; legacy rows
+  working: P("In Process", TONE.prod, "production"),
+  scanned: P("In Process", TONE.prod, "production"),     // retired id; legacy rows
+  printing: P("In Process", TONE.prod, "production"),    // retired id; legacy rows
+  packing: P("In Process", TONE.prod, "production"),     // retired stage; legacy rows still carry it
+  shipped: P("Fulfilled", TONE.shipped, "shipped"),
   flagged: P("Action Needed", TONE.alert, "attention"),
   cancelled: P("Cancelled", TONE.neutral, "closed"),
   refunded: P("Refunded", TONE.neutral, "closed"),
-  // legacy aliases (verbatim from SELLER_STATUS)
-  prescan: P("In Production", TONE.prod, "production"),
-  ready_print: P("In Production", TONE.prod, "production"),
-  in_queue: P("In Production", TONE.prod, "production"),
-  production: P("In Production", TONE.prod, "production"),
-  qc: P("In Production", TONE.prod, "production"),
-  packed: P("In Production", TONE.prod, "production"),
-  // extra raw values the backend can emit, mapped to the same seller intent
-  queued: P("In Production", TONE.prod, "production"),
-  delivered: P("Shipped", TONE.shipped, "shipped"),
-  fulfilled: P("Shipped", TONE.shipped, "shipped"),
-  on_hold: P("Action Needed", TONE.alert, "attention"),
+  // legacy aliases
+  prescan: P("In Process", TONE.prod, "production"),
+  ready_print: P("In Process", TONE.prod, "production"),
+  in_queue: P("In Process", TONE.prod, "production"),
+  production: P("In Process", TONE.prod, "production"),
+  qc: P("In Process", TONE.prod, "production"),
+  packed: P("In Process", TONE.prod, "production"),
+  queued: P("In Process", TONE.prod, "production"),
+  delivered: P("Fulfilled", TONE.shipped, "shipped"),
+  fulfilled: P("Fulfilled", TONE.shipped, "shipped"),
+  on_hold: P("On Hold", TONE.hold, "attention"),
   unfunded: P("Action Needed", TONE.alert, "attention"),
 }
-// Unknown/missing → the old app's effective default was "In Production".
-const FALLBACK = P("In Production", TONE.prod, "production")
+// Unknown/missing non-empty status → treat as mid-pipeline (In Process), the old default.
+const FALLBACK = P("In Process", TONE.prod, "production")
 
 export function sellerStatus(o: { factory_status?: string | null; status?: string | null }): SellerStatusInfo {
   const raw = String(o?.factory_status || o?.status || "new").toLowerCase()
@@ -66,15 +64,16 @@ export function sellerStatus(o: { factory_status?: string | null; status?: strin
 }
 
 // Seller-facing filter tabs (grouped, not the granular factory stages).
-export const SELLER_FILTERS = ["All", "Pending", "In Production", "Shipped", "Needs attention"] as const
+export const SELLER_FILTERS = ["All", "Draft", "Pending", "In Process", "Fulfilled", "Needs attention"] as const
 export type SellerFilter = (typeof SELLER_FILTERS)[number]
 
 export function matchesFilter(o: { factory_status?: string | null; status?: string | null }, f: SellerFilter): boolean {
   if (f === "All") return true
   const g = sellerStatus(o).group
-  if (f === "Pending") return g === "received"   // group id kept for compatibility
-  if (f === "In Production") return g === "production"
-  if (f === "Shipped") return g === "shipped"
+  if (f === "Draft") return g === "draft"
+  if (f === "Pending") return g === "pending"
+  if (f === "In Process") return g === "production"
+  if (f === "Fulfilled") return g === "shipped"
   if (f === "Needs attention") return g === "attention"
   return true
 }

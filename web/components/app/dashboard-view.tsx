@@ -27,7 +27,7 @@ const DAY = 864e5
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: (Number(n) || 0) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 
 // "Open" = not yet shipped or closed (canonical seller groups).
-const OPEN_GROUPS = new Set(["received", "production", "attention"])
+const OPEN_GROUPS = new Set(["draft", "pending", "production", "attention"])
 
 const itemsLabel = (o: OrderRow) => {
   const items = o.items ?? []

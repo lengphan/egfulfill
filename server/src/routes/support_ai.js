@@ -159,15 +159,19 @@ async function aiConfig() {
   return { key, model, fromEnv };
 }
 
-// Seller-friendly status label from the factory status (mirrors the front-end SELLER_STATUS).
+// Seller-friendly status label from the factory status (mirrors the front-end SELLER_STATUS:
+// Draft -> Pending -> In Process -> Fulfilled, plus On Hold / Cancelled / Refunded).
 function sellerStatus(o) {
   const s = String(o.factory_status || o.status || 'new').toLowerCase();
-  if (['shipped', 'fulfilled', 'delivered'].includes(s)) return 'Shipped';
-  if (['packed', 'label', 'labelled', 'ready'].includes(s)) return 'Packed';
-  if (['queued', 'printing', 'production', 'in_production', 'prepress', 'qc', 'printed'].includes(s)) return 'In production';
-  if (['cancelled', 'canceled', 'refunded'].includes(s)) return 'Cancelled';
-  if (['hold', 'issue', 'attention', 'exception'].includes(s)) return 'Needs attention';
-  return 'Received';
+  if (['shipped', 'fulfilled', 'delivered'].includes(s)) return 'Fulfilled';
+  if (s === 'in_review') return 'Pending';   // submitted, awaiting factory approval
+  if (['awaiting_scan', 'working', 'printed', 'scanned', 'label', 'labelled', 'labeled', 'packed',
+       'ready', 'queued', 'printing', 'production', 'in_production', 'prepress', 'qc',
+       'ready_print', 'in_queue', 'prescan'].includes(s)) return 'In Process';
+  if (['cancelled', 'canceled'].includes(s)) return 'Cancelled';
+  if (s === 'refunded') return 'Refunded';
+  if (['on_hold', 'hold', 'issue', 'attention', 'exception', 'flagged', 'unfunded'].includes(s)) return 'On Hold';
+  return 'Draft';   // new / draft / '' — created, not submitted
 }
 
 const SYSTEM = `You are the EGFULFILL support assistant. EGFULFILL is a print-on-demand fulfillment platform for online sellers (Etsy/Shopify/etc.). You help sellers with orders, fulfillment status, shipping, billing/wallet top-ups (VietQR, card, or manual transfer), store connections, plans (Starter/Pro/Enterprise + SpyDeck research add-on), and the developer API sandbox.
