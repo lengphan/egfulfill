@@ -503,11 +503,15 @@ export function DesignerBoard() {
                 onDragOver={(e) => { e.preventDefault(); setOverCol(col.id) }}
                 onDragLeave={() => setOverCol((c) => (c === col.id ? null : c))}
                 onDrop={(e) => {
-                  // A file drop and a card drag both land here. Files win when present —
-                  // dragId can be stale from an earlier drag that never cleared.
+                  // A card being dragged (dragId set) always MOVES. It must NOT fall through to
+                  // the file path: a card carries its image in dataTransfer.files, so treating
+                  // that as a "file drop" created a duplicate card instead of moving it. Only a
+                  // genuine OS file drop (no card in flight) becomes a new card. dragId is cleared
+                  // on dragend, so it can't be stale here.
+                  if (dragId != null) { e.preventDefault(); drop(col.id); return }
                   const files = Array.from(e.dataTransfer?.files ?? [])
                   if (files.length) { e.preventDefault(); setOverCol(null); void dropFiles(files, col.id); return }
-                  drop(col.id)
+                  setOverCol(null)
                 }}
                 className={"flex h-[calc(100vh-14rem)] min-h-[22rem] min-w-0 flex-col rounded-2xl border bg-card transition-colors " + (overCol === col.id ? "border-primary bg-primary/5" : "border-border")}
               >
