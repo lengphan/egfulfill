@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent } from "react"
 // NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
-import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown } from "@phosphor-icons/react"
+import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown, DotsSixVertical, TShirt } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
@@ -372,6 +372,15 @@ const newLayerId = () => "L" + Math.random().toString(36).slice(2, 9)
 // nominal hoop width; tune once checked against real output.
 const BOX_SPAN_MM = 120
 const NOMINAL_MM = 45 // fallback footprint for a layer whose stitched preview hasn't loaded yet
+// Garment presets — the preview backdrop, so you can judge the stitching on the real blank colour.
+const GARMENTS: { name: string; color: string }[] = [
+  { name: "White", color: "#ffffff" }, { name: "Natural", color: "#f3efe6" },
+  { name: "Sport Grey", color: "#b6b6b6" }, { name: "Charcoal", color: "#3f3f46" },
+  { name: "Black", color: "#141414" }, { name: "Navy", color: "#1f2a44" },
+  { name: "Royal", color: "#1d4ed8" }, { name: "Red", color: "#9b2226" },
+  { name: "Forest", color: "#1e3a2f" }, { name: "Maroon", color: "#5b1a25" },
+  { name: "Sand", color: "#d8c9a3" }, { name: "Pink", color: "#f4c2d0" },
+]
 // Image layers resize by RE-DIGITIZING at a target size (baked into the .emb), not via the
 // decoration transform — whose scale EWA hard-caps at ±20%. So the box scale can range freely.
 const clampScale = (s: number) => Math.min(4, Math.max(0.25, Number.isFinite(s) && s > 0 ? s : 1))
@@ -385,7 +394,7 @@ function toEwaTransform(tf: WilcomTransform, effWmm: number, effHmm: number) {
   return { dx: +(cx - effWmm / 2).toFixed(2), dy: +(cy - effHmm / 2).toFixed(2), rotation: tf.angle, scale: 1, mirror: "none" as const }
 }
 type DragState = { mode: "move" | "resize" | "rotate"; sx: number; sy: number; start: WilcomTransform; cx: number; cy: number; d0: number; a0: number; rw: number; rh: number }
-function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, resizable, z }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode; selected: boolean; onSelect: () => void; wmm: number; hmm: number; resizable: boolean; z: number }) {
+function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, z }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode; selected: boolean; onSelect: () => void; wmm: number; hmm: number; z: number }) {
   const drag = useRef<DragState | null>(null)
 
   // Single handlers, no ref-in-render: the host rect is read off the DOM via closest() at
@@ -437,9 +446,13 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, res
         <div className="pointer-events-none flex size-full items-center justify-center overflow-hidden">{ghost}</div>
         {selected && (
           <>
-            {/* Resize (corner) only for images — text sizes via the Height field, not a free drag. */}
-            {resizable && <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />}
-            <div title="Drag to rotate" data-mode="rotate" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-7 left-1/2 -translate-x-1/2 cursor-grab"} />
+            {/* All four corners resize (scale from the centre); the top nub rotates. Works for
+                images (re-digitize width) and text (letter height) alike. */}
+            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-2 -left-2 cursor-nwse-resize"} />
+            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-2 -right-2 cursor-nesw-resize"} />
+            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -left-2 cursor-nesw-resize"} />
+            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />
+            <div title="Drag to rotate" data-mode="rotate" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-8 left-1/2 -translate-x-1/2 cursor-grab"} />
           </>
         )}
       </div>
@@ -466,6 +479,15 @@ function CreateTab() {
   const [openLayer, setOpenLayer] = useState<string | null>(null) // active layer id
   const [over, setOver] = useState(false)
   const [compare, setCompare] = useState(true) // show the generated result beside the arrangement
+  const [dragId, setDragId] = useState<string | null>(null) // layer card being drag-reordered
+  const [garment, setGarment] = useState("#f4f4f5") // preview backdrop (garment colour) — cosmetic
+  // Drop `dragId` onto `targetId`: dragId takes the target's slot in the stack.
+  const reorderTo = (dragId: string, targetId: string) => setLayers((prev) => {
+    if (dragId === targetId) return prev
+    const from = prev.findIndex((l) => l.id === dragId), to = prev.findIndex((l) => l.id === targetId)
+    if (from < 0 || to < 0) return prev
+    const n = [...prev]; const [m] = n.splice(from, 1); n.splice(to, 0, m); return n
+  })
   const addImages = async (files: Iterable<File> | null | undefined) => {
     for (const f of Array.from(files ?? []).filter((x) => x.type.startsWith("image/"))) {
       const thumb = await readFile(f)
@@ -530,16 +552,17 @@ function CreateTab() {
         if (s.alphabet) setAlphabet(s.alphabet)
         if (typeof s.height === "number") setHeight(s.height)
         if (s.color) setColor(s.color)
+        if (s.garment) setGarment(s.garment)
       } catch { /* ignore corrupt/absent */ }
     }, 0)
     return () => clearTimeout(id)
   }, [])
   useEffect(() => {
     const id = setTimeout(() => {
-      try { sessionStorage.setItem("eg_digitizer_create", JSON.stringify({ layers, text, alphabet, height, color })) } catch { /* quota/serialise */ }
+      try { sessionStorage.setItem("eg_digitizer_create", JSON.stringify({ layers, text, alphabet, height, color, garment })) } catch { /* quota/serialise */ }
     }, 500)
     return () => clearTimeout(id)
-  }, [layers, text, alphabet, height, color])
+  }, [layers, text, alphabet, height, color, garment])
 
   const busy = status !== "idle"
   const hasText = !!text.trim()
@@ -563,11 +586,15 @@ function CreateTab() {
           const targetWidthMm = natW ? +(natW * s).toFixed(1) : undefined
           return { kind: "image" as const, image: l.dataUrl, name: l.name, targetWidthMm, transform: toEwaTransform(l.tf, effW, effH) }
         }
-        // Text: size is the letter Height; effective footprint = its preview (rendered at that height).
-        const effW = r?.width || NOMINAL_MM, effH = r?.height || NOMINAL_MM
+        // Text: resizing scales the LETTER HEIGHT (baked below); footprint scales with it too.
+        const s = l.tf.scale || 1
+        const effW = (r?.width || NOMINAL_MM) * s, effH = (r?.height || NOMINAL_MM) * s
         return { kind: "text" as const, transform: toEwaTransform(l.tf, effW, effH) }
       })
-      const body = { layers: payload, text: hasText ? text.trim() : undefined, alphabet, height, color,
+      // The text box's scale multiplies the letter height (clamped to EWA's 5–50mm range).
+      const txtScale = layers.find((l) => l.id === "text")?.tf.scale || 1
+      const effHeight = Math.min(50, Math.max(5, Math.round(height * txtScale)))
+      const body = { layers: payload, text: hasText ? text.trim() : undefined, alphabet, height: effHeight, color,
         name: imgLayers[0]?.name || (hasText ? text.trim() : undefined) }
       const r = await wilcomCombine(body)
       if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null); return null }
@@ -697,8 +724,17 @@ function CreateTab() {
               {layers.slice().reverse().map((l) => {
                 const ai = layers.findIndex((x) => x.id === l.id)
                 return (
-                  <div key={l.id}>
+                  <div
+                    key={l.id}
+                    draggable
+                    onDragStart={() => setDragId(l.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => { if (dragId) reorderTo(dragId, l.id); setDragId(null) }}
+                    onDragEnd={() => setDragId(null)}
+                    className={"transition-colors " + (dragId === l.id ? "opacity-40" : dragId ? "hover:bg-primary/5" : "")}
+                  >
                     <div className="flex items-center gap-2 px-3 py-2 text-sm">
+                      <DotsSixVertical size={15} weight="bold" className="shrink-0 cursor-grab text-muted-foreground/50" />
                       {isImg(l) ? (
                         <>
                           <ImageSquare size={15} className="shrink-0 text-muted-foreground" />
@@ -752,20 +788,31 @@ function CreateTab() {
 
       {/* RIGHT — the big preview, the hero of the tab; sticks while you scroll the controls. */}
       <div className="space-y-2 lg:sticky lg:top-4">
-        {/* After a generate, the stitched result can sit BESIDE the arrangement so you can eyeball
-            whether the merged .emb matches how you laid the layers out. Toggle to reclaim width. */}
-        {res?.trueview && (
-          <div className="flex items-center justify-end">
+        {/* Garment colour — the preview backdrop, so you can judge the stitching on the blank you'll
+            actually embroider. Cosmetic (doesn't touch the .emb). */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"><TShirt size={14} /> Garment</span>
+            {GARMENTS.map((g) => (
+              <button key={g.color} title={g.name} onClick={() => setGarment(g.color)}
+                className={"size-5 rounded-full transition-transform hover:scale-110 " + (garment.toLowerCase() === g.color.toLowerCase() ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : "border border-black/15")}
+                style={{ background: g.color }} />
+            ))}
+            <label className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-[10px] text-muted-foreground" title="Custom colour">
+              +<input type="color" value={garment} onChange={(e) => setGarment(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
+            </label>
+          </div>
+          {res?.trueview && (
             <button onClick={() => setCompare((c) => !c)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent">
               <Eye size={13} />{compare ? "Hide stitched result" : "Compare with stitched result"}
             </button>
-          </div>
-        )}
+          )}
+        </div>
         <div className={"grid gap-2 " + (res?.trueview && compare ? "xl:grid-cols-2" : "grid-cols-1")}>
           <div className="space-y-1">
             {/* Clicking the empty canvas deselects — the layer boxes stopPropagation, so only a
                 background click reaches here, dropping the selection (hides border/handles). */}
-            <div onPointerDown={() => setOpenLayer(null)} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
+            <div onPointerDown={() => setOpenLayer(null)} style={{ background: garment }} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border lg:min-h-[600px]">
               {!ready && (
                 <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">Drop an image or type text — then arrange it here.</div>
               )}
@@ -779,12 +826,12 @@ function CreateTab() {
                   Each box is sized in REAL mm (its stitched preview × the image scale), so the box
                   IS the true footprint and resizing an image scales it for real. */}
               {layers.map((l, i) => {
-                const r = resById[l.id] || resById[isImg(l) ? l.id : "text"]
-                const s = isImg(l) ? (l.tf.scale || 1) : 1  // text sizes via Height, not box scale
+                const r = resById[l.id]
+                const s = l.tf.scale || 1  // scale sizes BOTH: image → digitize width, text → letter height
                 const effW = (r?.width || NOMINAL_MM) * s
                 const effH = (r?.height || NOMINAL_MM) * s
                 return (
-                <LayerBoxEditor key={l.id} z={i + 1} wmm={effW} hmm={effH} resizable={isImg(l)} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
+                <LayerBoxEditor key={l.id} z={i + 1} wmm={effW} hmm={effH} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
                   isImg(l)
                     ? (resById[l.id]?.trueview
                         // eslint-disable-next-line @next/next/no-img-element
@@ -803,7 +850,7 @@ function CreateTab() {
           </div>
           {res?.trueview && compare && (
             <div className="space-y-1">
-              <div className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted lg:min-h-[600px]">
+              <div style={{ background: garment }} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border lg:min-h-[600px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`data:image/png;base64,${res.trueview}`} alt="Generated stitched output" className="max-h-full max-w-full object-contain p-3" />
               </div>
