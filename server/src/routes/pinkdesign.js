@@ -139,7 +139,7 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
   let imageUrl = null;
 
   if (cardId) {
-    card = (await q('select id, order_id, sku, title, type, thumb, vendor, art_key, art_data from design_cards where id=$1::bigint limit 1',
+    card = (await q('select id, order_id, sku, title, type, thumb, vendor, art_key, art_data, art_hash from design_cards where id=$1::bigint limit 1',
       [String(cardId)])).rows[0] || null;
     if (!card) return { error: 'Card not found', status: 404 };
     if (card.vendor) return { error: `This card is already with ${card.vendor}.`, status: 400 };
@@ -162,15 +162,22 @@ export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
     if (design && design.storage_key) imageUrl = urlFor(design.storage_key);
   }
 
-  // An explicit image beats everything — it's what someone just picked. Then a card's own
-  // thumb, but ONLY when it's a real URL: a base64 thumb has no address to give them.
+  // The card's OWN artwork as a public, ABSOLUTE URL Pink can fetch — served by the same-origin
+  // art route (see /api/design_cards/art/:hash). Keyed by the artwork's content hash, so it works
+  // whether the image is a stored object (art_key) OR inline base64 (art_data), needing no public
+  // bucket or CDN. This is the single image the card shows and is often the ONLY one, so it must
+  // be sendable even with no separate reference attachment — and even when the card's own thumb is
+  // a data: URL or a relative /api path, neither of which Pink can fetch.
+  const publicApiOrigin = (process.env.PUBLIC_API_ORIGIN || 'https://egful.store').replace(/\/+$/, '');
+  const cardArtUrl = card && card.art_hash ? `${publicApiOrigin}/api/design_cards/art/${card.art_hash}` : null;
+
+  // An explicit image beats everything — it's what someone just picked. Then the card's own
+  // artwork, then a legacy http thumb. A base64/relative value is never a sendable address.
   if (directImage && /^https?:\/\//i.test(String(directImage))) imageUrl = String(directImage);
+  else if (!imageUrl && cardArtUrl) imageUrl = cardArtUrl;
   else if (!imageUrl && card && /^https?:\/\//i.test(String(card.thumb || ''))) imageUrl = String(card.thumb);
-  // A MANUAL card's OWN dropped artwork lives in object storage under art_key (thumb is null
-  // for it), so resolve THAT to a URL. Without this, a reference attachment wrongly became
-  // the artwork and the design the user actually dropped never went out — the exact "my
-  // image got replaced by an attachment" bug.
-  if (!imageUrl && card && card.art_key) imageUrl = urlFor(card.art_key);
+  // Last-ditch fallback for legacy rows that have a stored object but no content hash.
+  else if (!imageUrl && card && card.art_key) imageUrl = urlFor(card.art_key);
 
   // Reference material beyond the artwork itself — a mockup, a spec sheet, a marked-up
   // screenshot of what's wrong. URLs only, same constraint as the artwork, and the
