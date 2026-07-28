@@ -2163,7 +2163,7 @@ function ActivityPanel() {
   const filtered = cats.length > 0 || query.trim() !== "" || range !== "all"
 
   return (
-    <SectionCard title="Activity log" description="Audited actions across the platform">
+    <SectionCard title="Activity log" description="Audited actions across the platform" bodyClassName="p-5">
       {/* Filter bar: category toggles + free-text + time range. */}
       <div className="space-y-2.5">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -2337,7 +2337,7 @@ function BackupsPanel() {
   const cfg = state?.config
 
   return (
-    <SectionCard title="Backups" description="Point-in-time copies of the database, stored in R2 alongside your artwork.">
+    <SectionCard title="Backups" description="Point-in-time copies of the database, stored in R2 alongside your artwork." bodyClassName="p-5">
       {/* Prerequisite warnings — name what's missing and how to fix it, rather than a dead button. */}
       {!state?.storageConfigured && (
         <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm">

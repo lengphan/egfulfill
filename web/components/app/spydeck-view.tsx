@@ -874,8 +874,8 @@ function SpyDeckLocked() {
             </li>
           ))}
         </ul>
-        <Link href="/settings" className={cn(buttonVariants(), "mt-6 w-full sm:w-auto")}>
-          Upgrade or add SpyDeck
+        <Link href="/settings?tab=plan" className={cn(buttonVariants(), "mt-6 w-full sm:w-auto")}>
+          See plans
         </Link>
       </div>
     </div>
