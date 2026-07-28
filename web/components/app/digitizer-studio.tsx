@@ -412,7 +412,7 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect }: { tf: Wilco
     <div data-boxhost className="pointer-events-none absolute inset-0" style={{ zIndex: selected ? 20 : 10 }}>
       <div
         data-mode="move" onPointerDown={down} onPointerMove={move} onPointerUp={up}
-        className={"pointer-events-auto absolute flex touch-none items-center justify-center rounded border-2 " + (selected ? "cursor-move border-primary/80" : "cursor-pointer border-dashed border-primary/40 hover:border-primary/70")}
+        className={"pointer-events-auto absolute flex touch-none items-center justify-center rounded border-2 " + (selected ? "cursor-move border-primary/80" : "cursor-pointer border-transparent")}
         style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${34 * tf.scale}%`, aspectRatio: "1", transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
       >
         {/* Full opacity — the ghost is the REAL stitched TrueView, so it must not look faded.
