@@ -5,6 +5,7 @@ import { DotsThree, SkipForward, Truck } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, canSetStage, stageDenialReason, canWalk } from "@/lib/factory-status"
 import { postItemStatus, updateOrder, type OrderRow } from "@/lib/api"
+import { useConfirm } from "@/components/app/confirm-dialog"
 
 /**
  * The per-order factory ⋯ menu — the SAME stage/permission surface the boards row carries,
@@ -26,6 +27,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   onError?: (msg: string) => void
 }) {
   const [busy, setBusy] = useState(false)
+  const confirm = useConfirm()
   const items = order.items ?? []
   const stage = orderStage(items)
   const stopped = isException(stage)
@@ -54,9 +56,9 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   const prod = withReason([{ id: "", label: "Draft", tone: "new" as const }, ...FACTORY_STAGES])
   const exc = withReason(EXCEPTION_STAGES)
 
-  const onStage = (s: { id: string; label: string; deny: string | null; walk: boolean }) => {
+  const onStage = async (s: { id: string; label: string; deny: string | null; walk: boolean }) => {
     if (s.walk) {
-      if (window.confirm(`This records every stage up to “${s.label}”. Continue?`)) setOrderStatus(s.id)
+      if (await confirm({ title: "Record every stage?", body: `This records every stage up to “${s.label}”.`, confirmLabel: "Record", destructive: false })) setOrderStatus(s.id)
       return
     }
     if (!s.deny) setOrderStatus(s.id)

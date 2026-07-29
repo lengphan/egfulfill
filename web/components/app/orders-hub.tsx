@@ -11,6 +11,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { PackagingHint } from "@/components/app/packaging-hint"
 import { Button } from "@/components/ui/button"
+import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, validateAddress, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
 import { orderStock } from "@/lib/stock-status"
@@ -183,6 +184,7 @@ export function OrdersHub() {
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [filter, setFilter] = useState("all")
   const [busy, setBusy] = useState<string | null>(null)
+  const confirm = useConfirm()
   const [sent, setSent] = useState<Set<string>>(new Set())
   const [shipOpen, setShipOpen] = useState<string | null>(null)
   // EXPANDED order ids — the inverse of what this used to track. Rows now start closed:
@@ -452,7 +454,7 @@ export function OrdersHub() {
       // may still be pending approval), never a hard block.
       try {
         const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
-        if (v && !v.ok && v.error && !window.confirm(`Address check couldn't confirm this is deliverable:\n\n${v.error}\n\nBuy the label anyway?`)) return
+        if (v && !v.ok && v.error && !(await confirm({ title: "Address couldn't be verified", body: `${v.error} — buy the label anyway?`, confirmLabel: "Buy anyway" }))) return
       } catch { /* validation unavailable — proceed with the buy */ }
       const r = await buyUspsLabel({ to, from, orderId: o.id, ...pkg })
       if (!r.ok) { setLabelErr(r.error || "USPS couldn't create the label."); return }

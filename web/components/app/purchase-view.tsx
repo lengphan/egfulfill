@@ -5,7 +5,7 @@ import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneT
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
-import { usePrompt } from "@/components/app/confirm-dialog"
+import { useConfirm, usePrompt } from "@/components/app/confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -150,6 +150,7 @@ function ottoQty(r: unknown): number | null {
 // `embedded` hides the mobile hero when this sits inside the Purchasing tab shell.
 export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
   const prompt = usePrompt()
+  const confirm = useConfirm()
   const [inv, setInv] = useState<InventoryItem[] | null>(null)
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -521,11 +522,11 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
     // and refuses to touch our record if they decline. Someone read that, believed the
     // order was still live, and phoned a supplier who had already cancelled it.
     const isSsPo = /s&s|activewear/i.test(po.supplier || "")
-    if (wasPlaced && sent && !window.confirm(
+    if (wasPlaced && sent && !(await confirm(
       isSsPo
-        ? `Cancel ${po.num} with S&S?`
-        : `Cancel ${po.num}?\n\n${po.supplier || "This supplier"} has no cancel API — you'll need to contact them directly to stop the actual order.`
-    )) return
+        ? { title: `Cancel ${po.num} with S&S?`, confirmLabel: "Cancel order" }
+        : { title: `Cancel ${po.num}?`, body: `${po.supplier || "This supplier"} has no cancel API — you'll need to contact them directly to stop the actual order.`, confirmLabel: "Cancel order" }
+    ))) return
     setBusy(po.num); setMsg(null)
     try {
       // Ask the SUPPLIER first, where we can. Marking our record cancelled while their
@@ -564,21 +565,22 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
         if (numToCancel) {
           const c = await cancelSsOrder(numToCancel).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
           if ("error" in c && c.error) {
-            if (!window.confirm(
-              `S&S wouldn't cancel ${numToCancel} via their API:\n${c.error}\n\n` +
-              `If you've ALREADY cancelled it with S&S directly, click OK to mark it cancelled here.\n\n` +
-              `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
-            )) { setMsg({ ok: false, text: `S&S wouldn't cancel ${numToCancel}: ${c.error}` }); return }
+            if (!(await confirm({
+              title: `S&S wouldn't cancel ${numToCancel}`,
+              body: `${c.error}. If you've already cancelled it with S&S directly, mark it cancelled here — but only if S&S has actually stopped it, or the blanks will still ship.`,
+              confirmLabel: "Mark cancelled",
+            }))) { setMsg({ ok: false, text: `S&S wouldn't cancel ${numToCancel}: ${c.error}` }); return }
             manualCancel = true
           } else {
             reconciled = (c as { reconciled?: boolean }).reconciled === true
             supplierCancelled = true
           }
         } else {
-          if (!window.confirm(
-            `Mark ${po.num} cancelled here without an order number?\n\n` +
-            `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
-          )) { setMsg({ ok: false, text: `${po.num} left as-is. Cancel it in the S&S portal, then use Cancel again to clear it here.` }); return }
+          if (!(await confirm({
+            title: `Mark ${po.num} cancelled without an order number?`,
+            body: `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`,
+            confirmLabel: "Mark cancelled",
+          }))) { setMsg({ ok: false, text: `${po.num} left as-is. Cancel it in the S&S portal, then use Cancel again to clear it here.` }); return }
           manualCancel = true
         }
       } else if (sent && isSs && orderNo) {
@@ -587,11 +589,11 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
           // S&S declined via the API (almost always past their 10-minute window). Don't
           // dead-end: show their reason and let the operator attest they cancelled it in
           // the portal — otherwise a genuinely-cancelled order can never be cleared.
-          if (!window.confirm(
-            `S&S wouldn't cancel ${orderNo} via their API:\n${c.error}\n\n` +
-            `If you've ALREADY cancelled it with S&S directly, click OK to mark it cancelled here.\n\n` +
-            `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`
-          )) { setMsg({ ok: false, text: `S&S wouldn't cancel ${orderNo}: ${c.error}` }); return }
+          if (!(await confirm({
+            title: `S&S wouldn't cancel ${orderNo}`,
+            body: `${c.error}. If you've already cancelled it with S&S directly, mark it cancelled here — but only if S&S has actually stopped it, or the blanks will still ship.`,
+            confirmLabel: "Mark cancelled",
+          }))) { setMsg({ ok: false, text: `S&S wouldn't cancel ${orderNo}: ${c.error}` }); return }
           manualCancel = true
         } else {
           // Reconciled = the API cancel was too late, but S&S already had it cancelled, so

@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
+import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow, type AuditRow, type ShipAddress } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
@@ -98,6 +99,7 @@ export function DispatchBoard() {
   const [labelFor, setLabelFor] = useState<OrderRow | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
+  const confirm = useConfirm()
   const [err, setErr] = useState<string | null>(null)
   const [q, setQ] = useState("")
   // Two views of the same board: what's waiting to go out, and what already went. The
@@ -486,7 +488,7 @@ export function DispatchBoard() {
   // actually ready (a line unmade, no label) is skipped and reported, never force-shipped.
   const finishAll = async () => {
     if (!chosen.length) return
-    if (!window.confirm(`Finish ${chosen.length} order${chosen.length === 1 ? "" : "s"}? This marks ${chosen.length === 1 ? "it" : "them"} Shipped — Fulfilled to the seller — and closes ${chosen.length === 1 ? "it" : "them"} out.`)) return
+    if (!(await confirm({ title: `Finish ${chosen.length} order${chosen.length === 1 ? "" : "s"}?`, body: `This marks ${chosen.length === 1 ? "it" : "them"} Shipped — Fulfilled to the seller — and closes ${chosen.length === 1 ? "it" : "them"} out.`, confirmLabel: "Finish", destructive: false }))) return
     setBusy(true); setErr(null)
     const failed: string[] = []
     const path = stagePath(STAGE, "shipped") ?? ["shipped"]

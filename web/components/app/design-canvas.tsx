@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { uploadDesignFile, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
@@ -355,6 +356,7 @@ export function DesignCanvasDialog({
   const [designUrl, setDesignUrl] = useState(initialDesign ?? "")
   const [pos, setPos] = useState<Pos>(initialPos ? { x: initialPos.x, y: initialPos.y, w: initialPos.w, r: initialPos.r } : DEFAULT_POS)
   const [saving, setSaving] = useState(false)
+  const confirm = useConfirm()
   // Resolve the REAL blank mockup from the catalog (per the chosen colour + its side
   // faces), not the raw order-line thumbnail. Falls back to item.img when the product
   // can't be resolved (e.g. an unmatched marketplace SKU).
@@ -594,10 +596,12 @@ export function DesignCanvasDialog({
     const others = siblings ?? []
     if (!designUrl || !others.length) return
     const willReplace = others.filter((it) => !!designs?.[(it.line_id ?? it.sku) as string]?.data).length
-    const ok = window.confirm(
-      `Use this artwork on all ${others.length} other line${others.length === 1 ? "" : "s"}?` +
-      (willReplace ? `\n\n${willReplace} of them already ${willReplace === 1 ? "has artwork and it" : "have artwork and they"} will be replaced.` : "")
-    )
+    const ok = await confirm({
+      title: `Use this artwork on all ${others.length} other line${others.length === 1 ? "" : "s"}?`,
+      body: willReplace ? `${willReplace} of them already ${willReplace === 1 ? "has artwork and it" : "have artwork and they"} will be replaced.` : undefined,
+      confirmLabel: "Apply to all",
+      destructive: false,
+    })
     if (!ok) return
     setApplying(true); setErr(null)
     const failed: string[] = []
@@ -614,7 +618,7 @@ export function DesignCanvasDialog({
     if (failed.length) setErr(`Couldn't apply to: ${failed.join(", ")}`)
     const done = others.length - failed.length
     if (done > 0) { setAttached(`Applied to ${done} other line${done === 1 ? "" : "s"}.`); onSaved?.() }
-  }, [designUrl, siblings, designs, orderId, item.name, pos, onSaved])
+  }, [designUrl, siblings, designs, orderId, item.name, pos, onSaved, confirm])
 
   /** `close` is false when saving as a STEP in something else (sending to a designer),
    *  where closing the window mid-flow would look like the action had finished.

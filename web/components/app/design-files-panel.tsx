@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, type DesignFileRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
+import { useConfirm } from "@/components/app/confirm-dialog"
 
 // A file id that's stable per (order, sku, filename) so re-dropping the same file
 // REPLACES it rather than piling up duplicates on the card.
@@ -40,6 +41,7 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
   const [err, setErr] = useState<string | null>(null)
   const [role, setRole] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
+  const confirm = useConfirm()
 
   const canPrice = role === "admin" || role === "warehouse"
 
@@ -100,7 +102,7 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
   // Remove a file. Drops it from the order and reverts the Design tag (the server records
   // it in the tag history and broadcasts, so the readiness pill flips back on its own).
   const remove = async (f: DesignFileRow) => {
-    if (typeof window !== "undefined" && !window.confirm(`Remove ${f.name}? This can't be undone.`)) return
+    if (!(await confirm({ title: `Remove ${f.name}?`, body: "This can't be undone.", confirmLabel: "Remove" }))) return
     setBusy(f.designId); setErr(null)
     try {
       const r = await deleteDesignFile(f.designId)
@@ -205,6 +207,7 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
   const [sent, setSent] = useState<string | null>(null)
   const [role, setRole] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
+  const confirm = useConfirm()
   // Only staff may remove a file — this card is also shown to sellers, who must never be
   // able to delete a factory working file.
   const canRemove = !!role && role !== "seller"
@@ -215,7 +218,7 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
   useEffect(() => { const id = setTimeout(() => { setRole(getUser()?.role || ""); load() }, 0); return () => clearTimeout(id) }, [load])
 
   const remove = async (f: DesignFileRow) => {
-    if (typeof window !== "undefined" && !window.confirm(`Remove ${f.name}? This can't be undone.`)) return
+    if (!(await confirm({ title: `Remove ${f.name}?`, body: "This can't be undone.", confirmLabel: "Remove" }))) return
     setBusy(f.designId); setErr(null)
     try {
       const r = await deleteDesignFile(f.designId)

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { getShipments, refreshTracking, voidLabel, type ShipmentRow } from "@/lib/api"
 import { onLive } from "@/lib/live"
 import { getUser } from "@/lib/auth"
+import { useConfirm } from "@/components/app/confirm-dialog"
 
 /**
  * Every parcel that has a tracking number, searchable, with its label.
@@ -103,8 +104,9 @@ export function ShipmentsView() {
   const [newLabelOpen, setNewLabelOpen] = useState(false)
   const [rateCheckOpen, setRateCheckOpen] = useState(false)
   const canVoid = role === "warehouse" || role === "admin"
+  const confirm = useConfirm()
   const doVoid = async (s: ShipmentRow) => {
-    if (!window.confirm(`Void the label for ${s.num}? This refunds the postage with the carrier and credits it back.`)) return
+    if (!(await confirm({ title: `Void the label for ${s.num}?`, body: "This refunds the postage with the carrier and credits it back.", confirmLabel: "Void label" }))) return
     setVoiding(s.id)
     try {
       const r = await voidLabel(s.id)

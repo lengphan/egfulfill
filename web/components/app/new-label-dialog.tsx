@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { CircleNotch, ArrowSquareOut, CheckCircle, Warning, Truck } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
 import { PackagingHint } from "@/components/app/packaging-hint"
@@ -29,6 +30,7 @@ const FROM_STORE = "eg_ship_from"
 export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void; order?: { id: string; num?: string; to?: ShipAddress } }) {
   const [pasteText, setPasteText] = useState("")
   const [to, setTo] = useState<ShipAddress>({ ...BLANK })
+  const confirm = useConfirm()
   const [from, setFrom] = useState<ShipAddress>({ ...BLANK })
   const [pkg, setPkg] = useState({ lb: 0, oz: 6, length: 10, width: 8, height: 1 })
   const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0)
@@ -140,7 +142,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
       setFactorySettings({ ship_from: from }).catch(() => {})
       try {
         const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
-        if (v && !v.ok && v.error && !window.confirm(`Address check couldn't confirm this is deliverable:\n\n${v.error}\n\nBuy the label anyway?`)) return
+        if (v && !v.ok && v.error && !(await confirm({ title: "Address couldn't be verified", body: `${v.error} — buy the label anyway?`, confirmLabel: "Buy anyway" }))) return
       } catch { /* validation unavailable — proceed */ }
       const r = await buyUspsLabel({ to, from, orderId, weightOz, length: pkg.length, width: pkg.width, height: pkg.height, signature: svc.signature, insurance: svc.insurance || undefined, rateToken: picked.token, rate: { amount: picked.amount, carrier: picked.carrier, service: picked.service } })
       if (!r.ok) { setErr(r.error || "Couldn't buy the label."); return }

@@ -328,15 +328,19 @@ export function DesignerBoard() {
   // "approved" credits the designer ONCE (idempotent by DSN-<id> + the card's `credited`
   // flag), so re-dragging never double-pays; the payout follows the claimer.
   const moveCard = useCallback((card: DesignCard, to: string, extra?: Partial<DesignCard>) => {
-    // Claim-on-start: a DESIGNER moving a card out of Incoming claims it, so a working-lane
-    // card is never unassigned. ONLY designers claim (and only a claimer can be credited) —
-    // staff (operator / warehouse / admin) organise the board without a payout, so their
-    // moves just change the lane. Partner cards can't be claimed and aren't draggable.
+    // Ownership tag. Moving a card into a working lane tags it to whoever moved it (ANY
+    // role) if it's still unclaimed; moving it back to Incoming/New RELEASES it; deleting
+    // the card removes it too. Partner (Pink) cards are never tagged — the partner owns
+    // them. This is only a WHO-HAS-IT tag: credit is separate and stays designer-only (the
+    // server refuses to pay a non-designer claimer).
+    const fallback = lanes[0]?.id ?? "incoming"
     const u = getUser()
-    const claim = u?.role === "designer" && u.name && to !== (lanes[0]?.id ?? "incoming") && !card.claimed_by && !card.vendor
-      ? { claimed_by: u.name, claimed_role: "designer" }
-      : null
-    patch(card.id, { col: to, ...(claim || {}), ...extra })
+    let own: Partial<DesignCard> | null = null
+    if (!card.vendor && u?.name) {
+      if (to === fallback) { if (card.claimed_by) own = { claimed_by: null, claimed_role: null } }
+      else if (!card.claimed_by) { own = { claimed_by: u.name, claimed_role: u.role ?? null } }
+    }
+    patch(card.id, { col: to, ...(own || {}), ...extra })
     // Credit on approval — use the card's payout, or the platform Design fee as the default.
     const amount = amt(card.payment) || designFee
     if (to === "approved" && !card.credited && amount > 0) {
@@ -917,6 +921,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const prompt = usePrompt()
+  const confirm = useConfirm()
   const col = laneOf(card, lanes)
 
   // Click-to-rename the card. Saves only on a real change, so opening and closing the editor
@@ -1018,10 +1023,12 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
   // lives on — they don't offer a cancel API, so it may still be designed AND invoiced, and
   // we've dropped the vendor_ref their finished-work webhook needs (so the file would land
   // as an unknown ref and be ignored). Say all of that before letting it go.
-  const removeThis = () => {
-    if (card.vendor && typeof window !== "undefined" && !window.confirm(
-      `This card was sent to ${vendorLabel(card.vendor)}. Removing it here does NOT cancel it on their board — they have no cancel API, so they may still design and invoice it, and their finished file can no longer reach us. Cancel it on ${vendorLabel(card.vendor)}'s board first.\n\nRemove from our board anyway?`
-    )) return
+  const removeThis = async () => {
+    if (card.vendor && !(await confirm({
+      title: `Remove this ${vendorLabel(card.vendor)} card?`,
+      body: `Removing it here does NOT cancel it on ${vendorLabel(card.vendor)}'s board — they have no cancel API, so they may still design and invoice it, and their finished file can no longer reach us. Cancel it on their board first.`,
+      confirmLabel: "Remove anyway",
+    }))) return
     remove(card.id)
   }
 

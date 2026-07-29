@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getSiteContentAdmin, setSiteContent, uploadHeroImage } from "@/lib/api"
 import { DEFAULT_SITE_CONTENT, type SiteContent } from "@/lib/site-content"
+import { useConfirm } from "@/components/app/confirm-dialog"
 
 // Module-scope so they're stable across renders (react-hooks/static-components forbids
 // defining components inside render).
@@ -186,7 +187,8 @@ export function SiteContentPanel() {
     }
   }
 
-  const resetToDefaults = () => { if (confirm("Reset every field to the shipped default copy? This only fills the editor — nothing saves until you press Save.")) setContent(structuredClone(DEFAULT_SITE_CONTENT)) }
+  const confirm = useConfirm()
+  const resetToDefaults = async () => { if (await confirm({ title: "Reset to default copy?", body: "This only fills the editor — nothing saves until you press Save.", confirmLabel: "Reset", destructive: false })) setContent(structuredClone(DEFAULT_SITE_CONTENT)) }
 
   if (!content) {
     return <SectionCard title="Site content"><div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div></SectionCard>
