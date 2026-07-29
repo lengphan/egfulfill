@@ -635,6 +635,50 @@ export function getOttoInventory(sku: string) {
   return api<unknown>(`/api/otto/inventory?sku=${encodeURIComponent(sku)}`)
 }
 
+// ─────────────────── SanMar (SOAP supplier) ───────────────────
+// Read services are live once SanMar has whitelisted the server's IP; ordering is a
+// server-side dry run until SANMAR_ORDER_LIVE=1 (and the PO format is wired).
+export type SanmarProduct = {
+  style: string; title: string; brand: string; description?: string; status?: string
+  color?: string; catalogColor?: string; size?: string; sizeIndex?: string; availableSizes?: string
+  keywords?: string; inventoryKey?: string; uniqueKey?: string; caseSize?: number | null; pieceWeight?: number | null
+  image: string | null; colorProductImage?: string | null; colorSquareImage?: string | null
+  colorSwatchImage?: string | null; thumbnailImage?: string | null; brandLogoImage?: string | null; specSheet?: string | null
+  piecePrice?: number | null; dozenPrice?: number | null; casePrice?: number | null; salePrice?: number | null; priceText?: string
+  favorited?: boolean
+}
+export type SanmarWarehouseQty = { no: number; city: string; state: string; qty: number }
+export type SanmarPriceRow = { style: string; color?: string; size?: string; inventoryKey?: string; sizeIndex?: string; piecePrice: number | null; dozenPrice: number | null; casePrice: number | null; salePrice: number | null; myPrice: number | null }
+export function getSanmarStatus() {
+  return api<{ configured?: boolean; stage?: boolean; base?: string }>(`/api/sanmar/status`)
+}
+export function getSanmarProducts(p: { style?: string; brand?: string; category?: string }) {
+  const s = new URLSearchParams()
+  if (p.style) s.set("style", p.style)
+  if (p.brand) s.set("brand", p.brand)
+  if (p.category) s.set("category", p.category)
+  return api<{ total: number; items: SanmarProduct[]; error?: string }>(`/api/sanmar/products?${s.toString()}`)
+}
+export function getSanmarInventory(p: { style: string; color: string; size: string }) {
+  const s = new URLSearchParams({ style: p.style, color: p.color, size: p.size })
+  return api<{ style: string; color: string; size: string; total: number; warehouses: SanmarWarehouseQty[]; error?: string }>(`/api/sanmar/inventory?${s.toString()}`)
+}
+export function getSanmarPricing(p: { style: string; color?: string; size?: string }) {
+  const s = new URLSearchParams({ style: p.style })
+  if (p.color) s.set("color", p.color)
+  if (p.size) s.set("size", p.size)
+  return api<{ style: string; items: SanmarPriceRow[]; message?: string; error?: string }>(`/api/sanmar/pricing?${s.toString()}`)
+}
+export function getSanmarFavorites() {
+  return api<{ favorites: { style: string; name: string | null; image: string | null; price: number | null }[] }>(`/api/sanmar/favorites`)
+}
+export function toggleSanmarFavorite(p: { style: string; name?: string; image?: string | null; price?: number | null }, on: boolean) {
+  return api<{ ok?: boolean; favorited?: boolean; error?: string }>(`/api/sanmar/favorites`, { method: "POST", body: JSON.stringify({ ...p, on }) })
+}
+export function sanmarOrder(lines: { style: string; color?: string; size?: string; qty: number }[], extra?: { poNumber?: string; orderRef?: string }) {
+  return api<{ ok?: boolean; dryRun?: boolean; note?: string; payload?: unknown; error?: string }>(`/api/sanmar/order`, { method: "POST", body: JSON.stringify({ lines, ...extra }) })
+}
+
 // ── Inventory (staff) — whole-array upsert: send the full list, missing SKUs are dropped ──
 export type InventoryItem = { sku: string; name?: string | null; variant?: string | null; in_stock?: number; reserved?: number; reorder_at?: number; category?: string | null; supplier?: string | null; updated_at?: string }
 export function getInventory() {
