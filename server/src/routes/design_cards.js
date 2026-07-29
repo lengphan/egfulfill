@@ -383,6 +383,10 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
    * to a real designer — better a pooled credit than a silently dropped one.
    */
   app.post('/api/design_cards/:id/credit', { preHandler: requireStaff }, async (req, reply) => {
+    // Releasing the designer's payout is an ADMIN act — the same gate as moving a card into
+    // Approved. Soft-return (not 403) so the board's optimistic call from a non-admin just
+    // does nothing, matching the other "credited:false" outcomes below.
+    if (!req.user || req.user.role !== 'admin') { return { ok: true, credited: false, reason: 'admin-only' }; }
     const amount = Math.max(0, Number((req.body || {}).amount) || 0);
     if (!amount) { reply.code(400); return { error: 'amount required' }; }
     const card = await q('select id, title, claimed_by, credited, vendor from design_cards where id=$1::bigint', [String(req.params.id)])
@@ -434,6 +438,11 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     // send vendor:null and claim it anyway. Factory roles are untouched: operator,
     // warehouse and admin can still move, delete, and attach files to these cards.
     const isDesigner = (req.user && req.user.role) === 'designer';
+    // Only an ADMIN may move a card INTO Approved. That lane releases the designer's payout
+    // and tells the floor the design is final, so a stray drag by a designer/operator/warehouse
+    // must not trigger it. Enforced the same way as the vendor lock below — by preserving the
+    // stored lane, not rejecting the whole save — so other edits in the batch are untouched.
+    const isAdmin = (req.user && req.user.role) === 'admin';
     // Named apart from the `ids` used by the prune below: that one is the set to KEEP,
     // this one is the set to read lanes from. Same shape, opposite purpose.
     const priorIds = rows.map((c) => c.id).filter((v) => v != null).map(String);
@@ -463,6 +472,15 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
         c.col = lock.col;                 // can't drag it through the lanes
         c.vendor = lock.vendor;           // can't un-outsource it to unlock the above
         c.vendor_ref = lock.vendor_ref;
+      }
+      // Admin-only Approved gate: a non-admin can't land a card in Approved. Revert to the
+      // stored lane (or 'incoming' for a brand-new card), so the payout it would release
+      // never fires from a mistaken drag. Un-approving is NOT gated here — that's a UI confirm.
+      if (!isAdmin) {
+        const prev = before.get(String(c.id));
+        if (String(c.col || '').toLowerCase() === 'approved' && String((prev && prev.col) || '').toLowerCase() !== 'approved') {
+          c.col = (prev && prev.col) || 'incoming';
+        }
       }
       await q(
         `insert into design_cards

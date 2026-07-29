@@ -329,11 +329,26 @@ export function DesignerBoard() {
   // unclaimed) — an in-progress card that was nobody's job was the bug here. Entering
   // "approved" credits the designer ONCE (idempotent by DSN-<id> + the card's `credited`
   // flag), so re-dragging never double-pays; the payout follows the claimer.
-  const moveCard = useCallback((card: DesignCard, to: string, extra?: Partial<DesignCard>) => {
+  const moveCard = useCallback(async (card: DesignCard, to: string, extra?: Partial<DesignCard>) => {
     // A drop onto the card's OWN lane is a reposition, which the board doesn't support — do
     // NOTHING rather than re-run the claim/credit side effects. This is what stops dragging a
     // card onto another card in the same column from ever touching either card's owner.
     if (laneOf(card, lanes) === to && !extra) return
+    const role = getUser()?.role
+    const fromApproved = laneOf(card, lanes) === "approved"
+    // Admin-only into Approved — that lane releases the designer's payout, so a stray drag by
+    // a designer/operator/warehouse shouldn't reach it. The server enforces this too (reverts
+    // the lane + refuses the credit); this just explains it instead of a silent snap-back.
+    if (to === "approved" && role !== "admin") {
+      await confirm({ title: "Only an admin can approve", body: "Moving a card to Approved releases the designer's payout, so it's limited to admins. Ask an admin to approve it.", confirmLabel: "OK" })
+      return
+    }
+    // Confirm pulling a card back OUT of Approved — it reopens signed-off work. (The payout was
+    // already made and is idempotent, so it won't be paid twice.)
+    if (fromApproved && to !== "approved") {
+      const ok = await confirm({ title: "Move out of Approved?", body: "This reopens a card that was already signed off. The designer's payout has already been made and won't be paid again.", confirmLabel: "Move it", cancelLabel: "Keep approved" })
+      if (!ok) return
+    }
     // Ownership tag. Moving a card into a working lane tags it to whoever moved it (ANY
     // role) if it's still unclaimed; moving it back to Incoming/New RELEASES it; deleting
     // the card removes it too. Partner (Pink) cards are never tagged — the partner owns
@@ -360,7 +375,7 @@ export function DesignerBoard() {
         })
         .catch(() => {})
     }
-  }, [patch, designFee, lanes])
+  }, [patch, designFee, lanes, confirm])
 
   /**
    * A FILE dropped on a lane becomes a new card there.
