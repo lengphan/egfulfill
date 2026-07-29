@@ -310,6 +310,8 @@ export function DesignerBoard() {
   const grouped = useMemo(() => {
     const g: Record<string, DesignCard[]> = Object.fromEntries(lanes.map((l) => [l.id, []]))
     for (const c of filtered) (g[laneOf(c, lanes)] ??= []).push(c)
+    // Newest first in every lane, so a freshly pushed card lands at the FRONT of its column.
+    for (const k of Object.keys(g)) g[k].sort((a, b) => Number(b.id) - Number(a.id))
     return g
   }, [filtered, lanes])
 
@@ -328,6 +330,10 @@ export function DesignerBoard() {
   // "approved" credits the designer ONCE (idempotent by DSN-<id> + the card's `credited`
   // flag), so re-dragging never double-pays; the payout follows the claimer.
   const moveCard = useCallback((card: DesignCard, to: string, extra?: Partial<DesignCard>) => {
+    // A drop onto the card's OWN lane is a reposition, which the board doesn't support — do
+    // NOTHING rather than re-run the claim/credit side effects. This is what stops dragging a
+    // card onto another card in the same column from ever touching either card's owner.
+    if (laneOf(card, lanes) === to && !extra) return
     // Ownership tag. Moving a card into a working lane tags it to whoever moved it (ANY
     // role) if it's still unclaimed; moving it back to Incoming/New RELEASES it; deleting
     // the card removes it too. Partner (Pink) cards are never tagged — the partner owns
