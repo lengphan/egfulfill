@@ -18,6 +18,7 @@ import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { ApproveOrderButton } from "@/components/app/approve-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
 import { SellerDesignFiles } from "@/components/app/design-files-panel"
+import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -438,7 +439,10 @@ export default function OrderDetailPage() {
                     return (
                       <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
                         <div className={"max-w-[80%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                          {m.text}
+                          {/* AI briefs/replies arrive as markdown (**bold**, lists). Render it —
+                              keyed off content — so a brief bolds instead of showing literal **;
+                              a plain human message stays verbatim with its line breaks. */}
+                          {m.text ? (hasMarkdown(m.text) ? <Markdown>{m.text}</Markdown> : <span className="whitespace-pre-wrap">{m.text}</span>) : null}
                         </div>
                         <span className="mt-0.5 text-[10px] text-muted-foreground">
                           {m.by ? `${m.by} · ` : m.role && m.role !== "seller" ? `${m.role} · ` : ""}

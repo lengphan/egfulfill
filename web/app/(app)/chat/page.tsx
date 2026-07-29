@@ -6,16 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
-import { Markdown } from "@/components/app/markdown"
+import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
 
 const nowMs = () => Date.now()
-// Render as markdown only when the text actually carries the syntax our Markdown
-// renderer supports (**bold**, `code`, #headings, - / 1. lists). This keys off the
-// CONTENT, not who's viewing — so an AI reply bolds on the seller's screen and the
-// factory's alike, while a plain human message stays verbatim (literal * and line breaks).
-const hasMarkdown = (t?: string) =>
-  !!t && /\*\*[^*\n]+\*\*|`[^`\n]+`|^\s{0,3}#{1,4}\s|^\s*[-*]\s|^\s*\d+[.)]\s/m.test(t)
 const fmtTime = (ts?: number) => {
   if (!ts) return ""
   const d = new Date(ts)
@@ -231,9 +225,12 @@ export default function ChatPage() {
   // server gates access and SEARCHES BY NUMBER, so typing "@14" finds even an old order past
   // the recent window. Debounced so a query hits the server once, not per keystroke.
   useEffect(() => {
-    if (!activeId || (activeId.indexOf("support-") !== 0 && activeId !== STAFF_CHANNEL)) { setOrders([]); return }
+    const noMentions = !activeId || (activeId.indexOf("support-") !== 0 && activeId !== STAFF_CHANNEL)
     const query = mention?.query?.trim() ?? ""
+    // Defer every setState into the timeout so none runs synchronously in the effect body
+    // (repo lint rule react-hooks/set-state-in-effect).
     const id = setTimeout(() => {
+      if (noMentions || !activeId) { setOrders([]); return }
       getOrderMentions(activeId, query || undefined).then((r) => setOrders(r.orders ?? [])).catch(() => setOrders([]))
     }, query ? 200 : 0)
     return () => clearTimeout(id)

@@ -97,3 +97,12 @@ export function Markdown({ children, className = "" }: { children: string; class
     </div>
   )
 }
+
+/**
+ * Cheap "does this look like markdown" test. Keys off the CONTENT, not who's viewing —
+ * so an AI reply (**bold**, `code`, headings, lists) renders formatted for everyone,
+ * while a plain human message stays verbatim (literal * and line breaks preserved).
+ */
+export function hasMarkdown(t?: string): boolean {
+  return !!t && /\*\*[^*\n]+\*\*|`[^`\n]+`|^\s{0,3}#{1,4}\s|^\s*[-*]\s|^\s*\d+[.)]\s/m.test(t)
+}
