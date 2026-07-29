@@ -14,6 +14,7 @@ import { tiktokRoutes } from './routes/tiktok.js';
 import { shopifyRoutes } from './routes/shopify.js';
 import { ssRoutes } from './routes/ss.js';
 import { ottoCapRoutes } from './routes/ottocap.js';
+import { sanmarRoutes } from './routes/sanmar.js';
 import { usersRoutes } from './routes/users.js';
 import { uspsRoutes } from './routes/usps.js';
 import { templatesRoutes } from './routes/templates.js';
@@ -331,6 +332,7 @@ tiktokRoutes(app, requireAuth, requireStaff);   // TikTok Shop OAuth connect (se
 shopifyRoutes(app, requireAuth, requireStaff);  // Shopify per-store OAuth connect (seller + admin connect their own store)
 ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);  // S&S Activewear catalog + inventory sync (factory blanks → New In tab)
 ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);  // Otto Cap headwear supplier (auth + inventory + sandbox PO placement)
+sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);  // SanMar apparel supplier (SOAP: product/inventory/pricing live; ordering gated)
 usersRoutes(app, requireAdmin, requireAuth);   // admin user management + staff-readable GET /api/sellers (seller-adjust panel)
 uspsRoutes(app, requireAuth, requireStaff);
 templatesRoutes(app, requireAuth);
