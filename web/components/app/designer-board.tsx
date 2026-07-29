@@ -13,7 +13,7 @@ import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { AssignCardDialog } from "@/components/app/assign-card-dialog"
 import { PushToPartnerInline } from "@/components/app/push-to-partner-dialog"
 import { OrderHistory } from "@/components/app/order-history"
-import { useConfirm } from "@/components/app/confirm-dialog"
+import { useConfirm, usePrompt } from "@/components/app/confirm-dialog"
 
 /**
  * Renders a Wilcom TrueView PNG for an EMB card's raw .emb, falling back to `children` (the
@@ -916,6 +916,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
   const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const prompt = usePrompt()
   const col = laneOf(card, lanes)
 
   // Click-to-rename the card. Saves only on a real change, so opening and closing the editor
@@ -995,8 +996,13 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
   // vendor card that's ours to take. It goes through THEIR API (a note + a status flip on
   // their board), not a local lane move, so their board and ours stay in step.
   const requestFix = async () => {
-    const message = (typeof window !== "undefined"
-      ? window.prompt(`What needs changing? This note is sent to ${vendorLabel(card.vendor)}.`) : "")?.trim()
+    const message = (await prompt({
+      title: "What needs changing?",
+      body: `This note is sent to ${vendorLabel(card.vendor)}.`,
+      placeholder: "e.g. move the logo up, match Pantone 185…",
+      multiline: true,
+      confirmLabel: `Send to ${vendorLabel(card.vendor)}`,
+    }))?.trim()
     if (!message) return
     setBusy(true); setErr(null)
     try {

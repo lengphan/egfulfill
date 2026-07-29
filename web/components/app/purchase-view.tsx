@@ -5,6 +5,7 @@ import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneT
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { usePrompt } from "@/components/app/confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -148,6 +149,7 @@ function ottoQty(r: unknown): number | null {
 
 // `embedded` hides the mobile hero when this sits inside the Purchasing tab shell.
 export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
+  const prompt = usePrompt()
   const [inv, setInv] = useState<InventoryItem[] | null>(null)
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -548,9 +550,14 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
         const looked = await getSsOrder(ref).catch(() => null)
         let numToCancel: string | null = (looked?.orders?.find((o) => o.orderNumber)?.orderNumber) || null
         if (!numToCancel) {
-          const entered = window.prompt(
-            `${po.num}: no S&S order number saved, and we couldn't find one by PO number.\n\n` +
-            `Paste the S&S order number (portal / confirmation email) to cancel it via their API — or leave blank if you've already cancelled it with S&S directly.`, "")
+          const entered = await prompt({
+            title: `Cancel ${po.num} with S&S`,
+            body: `No S&S order number is saved and we couldn't find one by PO number. Paste it (from the portal or confirmation email) to cancel via their API — or leave blank if you've already cancelled it with S&S directly.`,
+            placeholder: "S&S order number",
+            required: false,
+            confirmLabel: "Cancel order",
+            cancelLabel: "Back",
+          })
           if (entered === null) { setMsg({ ok: false, text: `${po.num} left as-is.` }); return }
           numToCancel = entered.trim() || null
         }
@@ -896,7 +903,13 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
    * was expected, and a booked figure that was never received is worse than none.
    */
   const confirmCredit = async (po: PurchaseOrder, r: PoReturn) => {
-    const typed = window.prompt(`How much did ${po.supplier || "the supplier"} actually credit?`, String(r.credit || ""))
+    const typed = await prompt({
+      title: "How much was credited?",
+      body: `The amount ${po.supplier || "the supplier"} actually credited back.`,
+      defaultValue: String(r.credit || ""),
+      placeholder: "0.00",
+      confirmLabel: "Record credit",
+    })
     if (typed == null) return
     const amount = Number(typed)
     if (!isFinite(amount) || amount <= 0) { setMsg({ ok: false, text: "A credit needs an amount greater than zero." }); return }
