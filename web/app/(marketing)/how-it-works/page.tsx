@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import Link from "next/link"
 import {
   PlugsConnected,
@@ -14,26 +15,50 @@ const steps = [
     n: "01",
     icon: PlugsConnected,
     title: "Connect your stores",
-    body: "OAuth into Etsy, Shopify, TikTok Shop or WooCommerce in about two minutes. Your existing orders import immediately and new ones stream into a single queue from then on.",
-    detail: ["No CSV exports", "Multi-store from one login", "Existing orders backfilled"],
+    body: "Sign in to Etsy, Shopify, TikTok Shop or WooCommerce in about two minutes. Existing orders import right away, and new ones stream into one queue from then on.",
+    detail: ["No CSV exports", "Every store, one login", "Existing orders backfilled"],
   },
   {
     n: "02",
     icon: PenNib,
     title: "Upload your designs",
-    body: "Add artwork to your library and map it to products once. The mini designer handles placement, sizing, and print-ready files — including embroidery thread matching — so every order prints correctly.",
-    detail: ["Reusable design library", "Auto print-file generation", "Placement handled for you"],
+    body: "Add artwork once and map it to a product. The mini designer sets placement and size, generates the print files, and matches embroidery thread — so every order comes out right.",
+    detail: ["Reusable design library", "Print files made for you", "Placement handled"],
   },
   {
     n: "03",
     icon: RocketLaunch,
-    title: "We fulfill, hands-off",
-    body: "Orders print on a vetted network with QC at every stage, ship on the cheapest available label, and push tracking back to the marketplace. You just watch orders go out.",
-    detail: ["QC at intake, print & pack", "Cheapest-label shipping", "Tracking pushed back automatically"],
+    title: "We make and ship it",
+    body: "You submit an order; we accept it, produce it on a vetted network, buy the cheapest label, and push tracking back to your shop. You watch orders go out.",
+    detail: ["Reviewed before production", "Cheapest-label shipping", "Tracking pushed back"],
   },
 ]
 
-const pipeline = ["Order synced", "Design mapped", "Printed", "QC passed", "Packed", "Shipped"]
+// The REAL seller-facing status flow (mirrors sellerStatus in lib/order-status.ts) — same
+// labels and colours a seller sees on their orders, so this previews the actual product
+// instead of inventing a pipeline.
+const journey = [
+  {
+    label: "Draft",
+    tone: "bg-muted text-muted-foreground",
+    body: "Lands in your queue the moment it syncs. Edit it, add items — nothing is charged yet.",
+  },
+  {
+    label: "Pending",
+    tone: "bg-indigo-100 text-indigo-700",
+    body: "You submit it and we accept it into production. Still cancellable, for a full refund.",
+  },
+  {
+    label: "In process",
+    tone: "bg-violet-100 text-violet-700",
+    body: "Being made — printed or stitched, scanned, checked, packed. Nothing for you to do.",
+  },
+  {
+    label: "Fulfilled",
+    tone: "bg-emerald-100 text-emerald-700",
+    body: "Out the door on the cheapest label, with tracking pushed back to your shop.",
+  },
+]
 
 export default function HowItWorksPage() {
   return (
@@ -41,11 +66,11 @@ export default function HowItWorksPage() {
       <Reveal className="max-w-2xl">
         <div className="text-sm font-semibold uppercase tracking-wide text-primary">How it works</div>
         <h1 className="mt-3 font-display text-5xl font-semibold tracking-tight text-balance sm:text-6xl">
-          Live in three steps.
+          From your store to <span className="italic text-primary">their door</span>.
         </h1>
         <p className="mt-5 text-lg text-muted-foreground text-pretty">
-          Connect once, map your art once, and let the platform run the rest — print, pack, ship, and
-          track — on autopilot.
+          Connect a shop, map your art once, and every order runs itself — reviewed, made, shipped,
+          and tracked. Your job is to watch them go out.
         </p>
       </Reveal>
 
@@ -80,25 +105,41 @@ export default function HowItWorksPage() {
         ))}
       </div>
 
-      {/* pipeline strip */}
-      <Reveal className="mt-16">
+      {/* The order journey — the real four statuses a seller watches, in the app's own colours. */}
+      <Reveal className="mt-20">
         <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           The journey of one order
         </div>
-        <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-3">
-          {pipeline.map((p, i) => (
-            <div key={p} className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium">
-                <span className="size-1.5 rounded-full bg-primary" />
-                {p}
-              </span>
-              {i < pipeline.length - 1 && <ArrowRight size={14} weight="bold" className="text-muted-foreground/50" />}
-            </div>
+        <h2 className="mt-3 max-w-xl font-display text-3xl font-semibold tracking-tight text-balance">
+          Four calm stages on your side.
+        </h2>
+
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-0">
+          {journey.map((j, i) => (
+            <Fragment key={j.label}>
+              <Card className="flex-1 p-5">
+                <span className={"inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold " + j.tone}>
+                  {j.label}
+                </span>
+                <p className="mt-3 text-sm text-muted-foreground text-pretty">{j.body}</p>
+              </Card>
+              {i < journey.length - 1 && (
+                <div className="hidden shrink-0 items-center px-3 sm:flex" aria-hidden>
+                  <ArrowRight size={16} weight="bold" className="text-muted-foreground/40" />
+                </div>
+              )}
+            </Fragment>
           ))}
         </div>
+
+        <p className="mt-6 max-w-2xl text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">Four stages, all you have to know.</span>{" "}
+          Behind &ldquo;In process&rdquo; we approve it, buy the label, scan it in, make it, check it and
+          pack it — none of which lands on you.
+        </p>
       </Reveal>
 
-      <Reveal className="mt-16 flex flex-col items-center gap-5 rounded-3xl border border-border bg-muted/40 px-6 py-14 text-center">
+      <Reveal className="mt-20 flex flex-col items-center gap-5 rounded-3xl border border-border bg-muted/40 px-6 py-14 text-center">
         <h2 className="max-w-xl font-display text-3xl font-semibold tracking-tight">
           Ready to send your first hands-off order?
         </h2>
