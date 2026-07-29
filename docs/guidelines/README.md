@@ -1,23 +1,27 @@
-# EGFULFILL — Page Guidelines / Hướng dẫn sử dụng theo trang
+# EGFULFILL — How-to Guides
 
-User guidelines for every page, organised by role. Each file is bilingual: **English first, then Tiếng Việt.**
+Step-by-step guidance for using each page, organised by role. **English and Vietnamese are separate** — pick your language folder.
 
-Hướng dẫn cho từng trang, sắp xếp theo vai trò. Mỗi tệp có **hai ngôn ngữ: Tiếng Anh trước, Tiếng Việt sau.**
+Hướng dẫn từng bước cho mỗi trang, theo vai trò. **Tiếng Anh và Tiếng Việt để riêng** — chọn thư mục ngôn ngữ của bạn.
 
-| Role / Vai trò | File | Who / Dành cho |
+| Role | English | Tiếng Việt |
 |---|---|---|
-| **Seller** / Người bán | [seller.md](seller.md) | Shop owners + their team members |
-| **Operator** / Nhân viên vận hành | [operator.md](operator.md) | Factory floor — production up to the scan |
-| **Warehouse** / Kho | [warehouse.md](warehouse.md) | Custody + spend (labels, POs, finance) |
-| **Designer** / Thiết kế | [designer.md](designer.md) | Artwork + digitizing board only |
-| **Admin** / Quản trị | [admin.md](admin.md) | Full access to every board and tool |
+| Seller / Người bán | [en/seller.md](en/seller.md) | [vi/seller.md](vi/seller.md) |
+| Operator / Nhân viên vận hành | [en/operator.md](en/operator.md) | [vi/operator.md](vi/operator.md) |
+| Warehouse / Kho | [en/warehouse.md](en/warehouse.md) | [vi/warehouse.md](vi/warehouse.md) |
+| Designer / Thiết kế | [en/designer.md](en/designer.md) | [vi/designer.md](vi/designer.md) |
+| Admin / Quản trị | [en/admin.md](en/admin.md) | [vi/admin.md](vi/admin.md) |
 
-## Roles at a glance / Tổng quan vai trò
+## Screenshots
 
-- **Seller** manages their own shop: orders, products, stores, wallet. Never touches the factory floor.
-- **Operator / Nhân viên vận hành**: works production. Their zone **ends at the scan** — no money reverts, no Finance.
-- **Warehouse / Kho**: everything an operator does **plus** custody + money (labels, purchase orders, Finance).
-- **Designer / Thiết kế**: the design board and their own earnings **only**. Never sees which seller a job belongs to.
-- **Admin / Quản trị**: everything.
+The guides reference images in [`images/`](images/). To fill them with real screenshots of **your** app, run the capture script once per account:
 
-> Note / Lưu ý: what each person actually sees also depends on **Settings → Permissions** (per-role page visibility) and, for seller team members, the surfaces their owner shared in **Settings → Team**.
+```bash
+# get your login token: DevTools → Application → Local Storage → eg_token
+EG_TOKEN=<your-seller-token> EG_ROLE=seller node docs/guidelines/capture-screenshots.mjs
+EG_TOKEN=<your-admin-token>  EG_ROLE=admin  node docs/guidelines/capture-screenshots.mjs
+```
+
+Set `BASE_URL=https://app.egful.store` to capture the live app instead of localhost. A few pop-up screens (the Import dialog, the Pick-a-blank picker, the Top-up modal) aren't standalone pages — capture those by hand and save them as `images/import-dialog.png`, `images/variant-picker.png`, `images/wallet-topup.png`.
+
+> These docs live under `docs/` which Caddy keeps private (`@hidden`), so they are never served on the web.
