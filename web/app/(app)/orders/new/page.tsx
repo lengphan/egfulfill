@@ -310,7 +310,7 @@ export default function NewOrderPage() {
                   production and the stock barcode — so it gets the flexible column and
                   everything else is sized to its content. Method was as wide as Product
                   while holding one short word. */}
-              <div className="grid flex-1 grid-cols-[minmax(0,1fr)_60px_80px_auto] items-end gap-2.5 sm:grid-cols-[minmax(220px,1.6fr)_64px_84px_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto]">
+              <div className="grid flex-1 grid-cols-[minmax(0,1fr)_60px_80px_auto] items-end gap-2.5 sm:grid-cols-[minmax(170px,1.3fr)_60px_78px_minmax(94px,1fr)_minmax(58px,0.6fr)_minmax(104px,1fr)_auto]">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Product</span>
                 <ProductCombobox
