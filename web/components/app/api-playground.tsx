@@ -25,8 +25,10 @@ function maskKey(k: string): string {
   const m = v.match(/^(egk_(?:test|live)_)(.*)$/)
   const prefix = m ? m[1] : v.slice(0, 4)
   const body = m ? m[2] : v.slice(4)
+  // prefix + first 4 + eight dots + last 4 — the SAME shape Settings › API keys renders from
+  // its stored prefix + last4, so the two can be compared at a glance.
   if (body.length <= 8) return prefix + "•".repeat(Math.max(0, body.length))
-  return prefix + body.slice(0, 3) + "•".repeat(Math.min(12, body.length - 7)) + body.slice(-4)
+  return prefix + body.slice(0, 4) + "••••••••" + body.slice(-4)
 }
 
 const methodTone: Record<string, string> = {

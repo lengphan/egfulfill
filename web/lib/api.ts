@@ -2098,6 +2098,8 @@ export type ApiKey = {
   id: number | string
   label: string | null
   prefix: string
+  /** Last 4 chars of the key (null for keys created before this was stored). */
+  last4?: string | null
   mode: string
   created_at: string
   last_used_at: string | null
@@ -2109,7 +2111,7 @@ export function getApiKeys() {
 }
 
 export function createApiKey(label: string, mode: "test" | "live" = "test") {
-  return api<{ id: number | string; key: string; prefix: string; label: string; mode: string; created_at: string }>(
+  return api<{ id: number | string; key: string; prefix: string; last4?: string | null; label: string; mode: string; created_at: string }>(
     `/api/keys`,
     { method: "POST", body: JSON.stringify({ label, mode }) }
   )

@@ -43,6 +43,10 @@ function ensure() {
      // because silently narrowing a key a partner is already using would break their
      // integration at deploy time with no warning. New keys are granted explicitly.
      .then(() => q(`alter table api_keys add column if not exists scopes text[] not null default '{}'`))
+     // Last 4 chars of the key, for a prefix••••last4 display. Added after keys existed, so
+     // pre-existing rows have null last4 (the full key is gone) and show prefix-only — new keys
+     // get the matched format going forward.
+     .then(() => q(`alter table api_keys add column if not exists last4 text`))
      .catch((e) => { _ready = null; throw e; });
   return _ready;
 }
@@ -103,7 +107,7 @@ export function sandboxRoutes(app, requireAuth) {
   app.get('/api/keys', { preHandler: requireAuth }, async (req) => {
     await ensure();
     const r = await q(
-      `select id, label, prefix, mode, scopes, created_at, last_used_at, revoked_at
+      `select id, label, prefix, last4, mode, scopes, created_at, last_used_at, revoked_at
          from api_keys where seller_id=$1 order by created_at desc`, [String(req.user.sub)]);
     return { keys: r.rows, all_scopes: API_SCOPES };
   });
@@ -123,12 +127,15 @@ export function sandboxRoutes(app, requireAuth) {
       reply.code(400);
       return { error: 'No recognised scopes.', supported: API_SCOPES };
     }
+    // Store the LAST 4 (like Stripe) so the key can be shown as prefix••••last4 everywhere —
+    // the full key is still hashed and never stored, so this leaks nothing an attacker can use.
+    const last4  = full.slice(-4);
     const r = await q(
-      `insert into api_keys(seller_id, label, prefix, key_hash, mode, scopes)
-       values($1,$2,$3,$4,$5,$6) returning id, created_at`,
-      [String(req.user.sub), label, prefix, hashKey(full), mode, scopes]);
+      `insert into api_keys(seller_id, label, prefix, key_hash, mode, scopes, last4)
+       values($1,$2,$3,$4,$5,$6,$7) returning id, created_at`,
+      [String(req.user.sub), label, prefix, hashKey(full), mode, scopes, last4]);
     // The full key is returned ONCE here and never again — the UI must tell the user to copy it.
-    return { id: r.rows[0].id, key: full, prefix, label, mode, scopes, created_at: r.rows[0].created_at };
+    return { id: r.rows[0].id, key: full, prefix, last4, label, mode, scopes, created_at: r.rows[0].created_at };
   });
 
   app.delete('/api/keys/:id', { preHandler: requireAuth }, async (req) => {

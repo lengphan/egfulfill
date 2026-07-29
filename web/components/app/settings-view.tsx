@@ -429,7 +429,9 @@ function ApiKeysPanel() {
                   {k.revoked_at && <span className="text-[11px] font-medium text-red-600">revoked</span>}
                 </div>
                 <div className="mt-0.5 font-mono text-xs text-muted-foreground">
-                  {k.prefix} · created {fmtDate(k.created_at)} · last used {fmtDate(k.last_used_at)}
+                  {/* prefix••••last4 — the SAME shape the API Explorer shows, so a key can be
+                      matched by its first + last chars. Older keys (no stored last4) show prefix-only. */}
+                  {k.last4 ? `${k.prefix.replace(/…$/, "")}••••••••${k.last4}` : k.prefix} · created {fmtDate(k.created_at)} · last used {fmtDate(k.last_used_at)}
                 </div>
               </div>
               {!k.revoked_at && (
