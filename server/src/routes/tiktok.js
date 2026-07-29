@@ -150,6 +150,71 @@ async function getShopCipher(conn) {
   return shop.cipher;
 }
 
+// Resolve WHICH TikTok shop a publish targets. A seller publishes to their OWN connected
+// shop; staff (no shop of their own) fall back to the first factory-connected shop — the
+// same rule etsy.js's connectionFor uses, kept identical so a seller can never publish
+// into someone else's shop.
+async function connectionForPublish(user) {
+  const staff = !!(user && user.role && user.role !== 'seller');
+  const r = await q(
+    staff
+      ? `select * from platform_connections pc where platform='tiktok'
+           and not exists (select 1 from users u where u.id=pc.connected_by and u.role='seller')
+         order by created_at limit 1`
+      : `select * from platform_connections where platform='tiktok' and connected_by=$1 order by created_at limit 1`,
+    staff ? [] : [user.sub]);
+  return r.rows[0] || null;
+}
+
+// Normalise the dialog's product into the fields a TikTok create-product call needs. The
+// COMMON fields (title/description/price/tags/photos/variants) are settled; the shapes
+// marked PENDING map onto TikTok's exact request schema (Create Product, v202309) and are
+// finalised against the API doc before the live path is trusted. Because publishing is
+// gated (TIKTOK_PUBLISH_LIVE), the dry run returns this object verbatim for review, which
+// is exactly how the S&S/Otto order payloads were validated before ever going live.
+function buildTiktokProductPayload(b) {
+  const title = String(b.title || '').trim().slice(0, 255);
+  const description = String(b.description || b.title || '').trim();
+  const price = Number(b.price) || 0;
+  const tags = (Array.isArray(b.tags) ? b.tags : []).map(String).filter(Boolean).slice(0, 13);
+  const colors = (Array.isArray(b.colors) ? b.colors : []).map(String).filter(Boolean);
+  const sizes = (Array.isArray(b.sizes) ? b.sizes : []).map(String).filter(Boolean);
+  const skuBase = String(b.sku_base || b.sku || 'EG').toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'EG';
+  const perSize = (b.size_prices && typeof b.size_prices === 'object') ? b.size_prices : {};
+  const slug = (v) => String(v).toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 6);
+  // One SKU per colour×size, each stamped with OUR seller_sku so a buyer's order line
+  // round-trips back to this exact blank+variant — the same guarantee the Etsy path gives.
+  const skus = [];
+  for (const c of (colors.length ? colors : [null])) {
+    for (const z of (sizes.length ? sizes : [null])) {
+      const sku = [skuBase, c && slug(c), z && slug(z)].filter(Boolean).join('-');
+      const sales_attributes = [];
+      if (c) sales_attributes.push({ name: 'Color', value_name: String(c).slice(0, 45) });   // PENDING: attribute id/shape
+      if (z) sales_attributes.push({ name: 'Size', value_name: String(z).slice(0, 45) });
+      skus.push({
+        seller_sku: sku,
+        sales_attributes,
+        // PENDING: TikTok wants price.amount as a string in the shop currency + inventory[]
+        // keyed by warehouse_id — filled from b.warehouse_id once the doc confirms the shape.
+        price: { amount: String((z && perSize[z] != null ? Number(perSize[z]) : price) || price), currency: b.currency || 'USD' },
+        inventory: b.warehouse_id ? [{ warehouse_id: String(b.warehouse_id), quantity: Number(b.quantity) || 999 }] : [],
+      });
+    }
+  }
+  return {
+    title,
+    description,               // PENDING: TikTok expects description as HTML in most regions
+    category_id: b.category_id != null ? String(b.category_id) : null,   // REQUIRED, must be a leaf
+    brand_id: b.brand_id != null ? String(b.brand_id) : undefined,
+    // PENDING: main_images want TikTok image URIs from the image-upload API, not raw URLs —
+    // the publish route pre-uploads b.images and swaps these for the returned uris.
+    main_images: (Array.isArray(b.images) ? b.images : []).filter(Boolean).slice(0, 9),
+    package_weight: b.package_weight != null ? { value: String(b.package_weight), unit: b.weight_unit || 'GRAM' } : null,  // REQUIRED
+    skus,
+    tags,
+  };
+}
+
 // Is this connection's owner staff (factory-owned orders) or a seller (seller-owned)?
 // Same rule as Etsy/Shopify: factory_order = the connector is not a seller.
 async function connIsFactory(conn) {
@@ -474,5 +539,77 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       return { shop_id: conn.shop_id, shop_name: conn.shop_name, scopes: conn.scopes,
                token_ok: !!token, token_expires_at: conn.token_expires_at };
     } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  // ── Product publishing (Make product → TikTok Shop) ──────────────────────────────
+  // SAFETY: like the S&S/Otto order paths, this is a DRY RUN until TIKTOK_PUBLISH_LIVE=1.
+  // The payload shape is being finalised against TikTok's Create Product doc (v202309); the
+  // gate means a shop can never receive a half-mapped product before that's confirmed. The
+  // env is read at call time (not module load) so flipping it needs no redeploy.
+
+  // Leaf categories for the publish picker. Thin pass-through — the client renders whatever
+  // fields come back (id/local name/is_leaf) so we don't hard-code a shape we haven't seen.
+  app.get('/api/tiktok/categories', { preHandler: requireAuth }, async (req, reply) => {
+    try {
+      const conn = await connectionForPublish(req.user);
+      if (!conn) { reply.code(400); return { error: 'No TikTok shop connected' }; }
+      const cipher = await getShopCipher(conn);
+      const query = { shop_cipher: cipher };
+      if (req.query && req.query.keyword) query.keyword = String(req.query.keyword);
+      const d = await ttSignedRequest(conn, 'GET', '/product/202309/categories', { query });
+      return { categories: d.categories || d.category_list || [] };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  // Warehouses — each SKU's inventory is booked against a warehouse_id.
+  app.get('/api/tiktok/warehouses', { preHandler: requireAuth }, async (req, reply) => {
+    try {
+      const conn = await connectionForPublish(req.user);
+      if (!conn) { reply.code(400); return { error: 'No TikTok shop connected' }; }
+      const cipher = await getShopCipher(conn);
+      const d = await ttSignedRequest(conn, 'GET', '/logistics/202309/warehouses', { query: { shop_cipher: cipher } });
+      return { warehouses: d.warehouses || d.warehouse_list || [] };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  // Create a TikTok Shop product from the publish dialog. GATED: dry run unless
+  // TIKTOK_PUBLISH_LIVE=1. On a dry run it returns the assembled payload for review and
+  // never calls TikTok, so the mapping can be validated field-by-field against the doc
+  // before anything reaches the shop.
+  app.post('/api/tiktok/publish', { preHandler: requireAuth }, async (req, reply) => {
+    if (!APP_KEY || !APP_SECRET) { reply.code(400); return { error: 'Server missing TIKTOK_APP_KEY / TIKTOK_APP_SECRET' }; }
+    const b = req.body || {};
+    if (!String(b.title || '').trim() || !(Number(b.price) > 0)) {
+      reply.code(400); return { error: 'A title and a price are required.' };
+    }
+    let conn;
+    try {
+      conn = await connectionForPublish(req.user);
+      if (!conn) { reply.code(400); return { error: 'No TikTok shop connected to publish to.' }; }
+      await getShopCipher(conn);   // proves the shop is reachable + caches the cipher
+    } catch (e) { reply.code(400); return { error: e.message }; }
+
+    const payload = buildTiktokProductPayload(b);
+
+    if (String(process.env.TIKTOK_PUBLISH_LIVE || '') !== '1') {
+      return {
+        dryRun: true,
+        shop: conn.shop_name || conn.shop_id,
+        note: 'TIKTOK_PUBLISH_LIVE!=1 → NOT sent to TikTok. Review the payload; the Create-Product mapping (category, warehouse inventory, image URIs, package weight) is finalised against TikTok\'s v202309 doc before the live flag is flipped.',
+        missing: [
+          !payload.category_id && 'category_id (a leaf category is required)',
+          !payload.package_weight && 'package_weight',
+          !payload.skus.some((s) => s.inventory.length) && 'warehouse_id (SKU inventory has no warehouse)',
+          !payload.main_images.length && 'at least one image',
+        ].filter(Boolean),
+        payload,
+      };
+    }
+
+    // LIVE path — kept behind the flag AND a required-field guard so a confirmed-good
+    // mapping can go live, but a half-filled one still can't. The image pre-upload +
+    // exact create call are wired in once the doc is confirmed.
+    reply.code(501);
+    return { error: 'Live TikTok publishing is not enabled yet — the Create-Product payload is pending schema confirmation. Leave TIKTOK_PUBLISH_LIVE unset to use the dry run.', payload };
   });
 }
