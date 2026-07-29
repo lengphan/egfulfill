@@ -9,7 +9,7 @@ import { ProductCombobox } from "@/components/app/product-combobox"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
-import { getSpecQuote, publishEtsy, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote } from "@/lib/api"
+import { getSpecQuote, publishEtsy, publishTiktok, getTiktokCategories, getTiktokWarehouses, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse } from "@/lib/api"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -138,11 +138,29 @@ export function PublishProductDialog({
   // costs more can be charged more, which is the whole reason cost varies by size.
   const [sizeRetail, setSizeRetail] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<{ ok: boolean; text: string; url?: string } | null>(null)
+  const [result, setResult] = useState<{ ok: boolean; text: string; url?: string; note?: string } | null>(null)
   // One-time acknowledgement that competitor-sourced photos are about to go on the shop.
   const [ipConfirmed, setIpConfirmed] = useState(false)
+  // Which marketplace this draft goes to. Etsy takes photos + tags + variants directly;
+  // TikTok additionally needs a LEAF category, a warehouse (per-SKU inventory) and a
+  // package weight, so those fields appear only when TikTok is the target.
+  const [channel, setChannel] = useState<"etsy" | "tiktok">("etsy")
+  const [ttCatQuery, setTtCatQuery] = useState("")
+  const [ttCategories, setTtCategories] = useState<TiktokCategory[]>([])
+  const [ttCategory, setTtCategory] = useState<TiktokCategory | null>(null)
+  const [ttWarehouses, setTtWarehouses] = useState<TiktokWarehouse[]>([])
+  const [ttWarehouse, setTtWarehouse] = useState("")
+  const [ttWeight, setTtWeight] = useState("")
+  const [ttWeightUnit, setTtWeightUnit] = useState("POUND")
+  const [ttLoadErr, setTtLoadErr] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
   const seeded = useRef(false)
+  // A SpyDeck listing's competitor photos aren't in the grid payload — they arrive from an
+  // async listing-detail fetch AFTER this dialog opens, so the once-seed above ran with none
+  // (or just the cover). This tracks whether the user has hand-edited the photos; until they
+  // have, we keep syncing them from the prefill as the detail fills in, so the competitor
+  // images actually attach instead of silently never showing up.
+  const imgTouched = useRef(false)
 
   // Seed once per open, from whichever source supplied the prefill.
   useEffect(() => {
@@ -162,6 +180,17 @@ export function PublishProductDialog({
       getSpydeckTrending().then((r) => setSuggested((r.keywords ?? []).slice(0, 12))).catch(() => {})
       getCatalogProducts().then((rows) => { catalogRef.current = rows ?? [] }).catch(() => {})
     }, 0)
+    return () => clearTimeout(id)
+  }, [open, prefill])
+
+  // Re-sync photos from the prefill as the async listing-detail fetch fills them in — until
+  // the user edits them. Without this, competitor photos loaded after open never attach.
+  useEffect(() => {
+    if (!open) { imgTouched.current = false; return }
+    if (imgTouched.current) return
+    const imgs = (prefill?.images ?? []).filter(Boolean).slice(0, MAX_IMAGES)
+    if (!imgs.length) return
+    const id = setTimeout(() => { if (!imgTouched.current) setImages(imgs) }, 0)
     return () => clearTimeout(id)
   }, [open, prefill])
 
@@ -261,19 +290,20 @@ export function PublishProductDialog({
   }
   const removeTag = (t: string) => setTags((p) => p.filter((x) => x !== t))
   const addImages = (files: FileList | null) => {
+    imgTouched.current = true
     for (const f of Array.from(files ?? []).slice(0, MAX_IMAGES)) {
       readImageFile(f, (url) => setImages((p) => (p.length >= MAX_IMAGES ? p : [...p, url])), (m) => setResult({ ok: false, text: m }))
     }
   }
-  const makePrimary = (i: number) => setImages((p) => [p[i], ...p.filter((_, x) => x !== i)])
-  const removeImage = (i: number) => setImages((p) => p.filter((_, x) => x !== i))
+  const makePrimary = (i: number) => { imgTouched.current = true; setImages((p) => [p[i], ...p.filter((_, x) => x !== i)]) }
+  const removeImage = (i: number) => { imgTouched.current = true; setImages((p) => p.filter((_, x) => x !== i)) }
 
   // Remote (http) images are the source's OWN photos — a SpyDeck competitor's Etsy-CDN
   // shots. Locally-added photos are data: URLs, which are yours. Publishing someone
   // else's photos to your shop is an Etsy IP-policy risk, so we make it a deliberate,
   // acknowledged choice rather than something that just happens.
   const borrowedPhotos = useMemo(() => images.filter((u) => /^https?:\/\//i.test(u)), [images])
-  const removeBorrowedPhotos = () => { setImages((p) => p.filter((u) => !/^https?:\/\//i.test(u))); setIpConfirmed(false) }
+  const removeBorrowedPhotos = () => { imgTouched.current = true; setImages((p) => p.filter((u) => !/^https?:\/\//i.test(u))); setIpConfirmed(false) }
 
   const publish = async () => {
     if (!title.trim() || !priceReady) {
@@ -438,7 +468,17 @@ export function PublishProductDialog({
                 <ProductCombobox
                   value={blankText}
                   onText={setBlankText}
-                  onPick={(p) => { setBlankText(p.name); setBlank(catalogRef.current.find((x) => String(x.sku ?? "") === p.sku) ?? null) }}
+                  onPick={(p) => {
+                    setBlankText(p.name)
+                    // Resolve the picked blank to its full catalog row. catalogRef may not have
+                    // loaded yet (it's fetched async on open) — if so, fetch now so the pick
+                    // still sticks instead of silently resolving to null ("blank didn't persist").
+                    // Match by sku, then fall back to name so a sku-shape mismatch can't drop it.
+                    const pick = (rows: CatalogProduct[]) =>
+                      setBlank(rows.find((x) => String(x.sku ?? "") === p.sku) ?? rows.find((x) => String(x.name ?? "") === p.name) ?? null)
+                    if (catalogRef.current.length) pick(catalogRef.current)
+                    else getCatalogProducts().then((rows) => { catalogRef.current = rows ?? []; pick(catalogRef.current) }).catch(() => {})
+                  }}
                   placeholder="Pick the blank to print on"
                 />
                 <p className="text-xs text-muted-foreground">
