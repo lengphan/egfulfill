@@ -118,6 +118,35 @@ async function etsyFetch(conn, path, opts = {}) {
   return data;
 }
 
+// A publishable image source → its raw bytes, ready to POST to Etsy. Two shapes reach
+// the publish route: a `data:` URL (a photo the seller uploaded locally) and a remote
+// image URL (a SpyDeck listing's Etsy-CDN photo). The upload loop used to `continue` on
+// anything that wasn't a data: URL, so a product made from a competitor — whose photos
+// are ALL etsystatic.com URLs — published with NO images at all. Remote fetches are
+// allowlisted to Etsy's own CDN so this can never be turned into an SSRF against an
+// internal host. Returns null for a source we won't or can't fetch (caller skips it).
+const REMOTE_IMAGE_HOST_OK = (host) => /(^|\.)etsystatic\.com$/i.test(host);
+async function imageBytesFrom(src) {
+  const s = String(src || '');
+  const m = /^data:(image\/[a-z.+-]+);base64,(.+)$/i.exec(s);
+  if (m) {
+    const mime = m[1];
+    return { buf: Buffer.from(m[2], 'base64'), mime, ext: (mime.split('/')[1] || 'png').replace('jpeg', 'jpg') };
+  }
+  if (/^https?:\/\//i.test(s)) {
+    let host;
+    try { host = new URL(s).hostname; } catch { return null; }
+    if (!REMOTE_IMAGE_HOST_OK(host)) return null;   // never fetch an arbitrary host
+    const r = await fetch(s);
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    const mime = r.headers.get('content-type') || 'image/jpeg';
+    const ext = ((mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace(/[^a-z0-9]/gi, '')) || 'jpg';
+    return { buf, mime, ext };
+  }
+  return null;
+}
+
 // Resolve the listing image URL. Prefers the EXACT image the buyer saw
 // (transaction.listing_image_id); falls back to the listing's first image.
 // Cached per listing[:image] for the sync run.
@@ -1472,17 +1501,19 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
          b.printType || b.method || null, b.color || null, b.size || null]
       ).catch(() => {});
 
-      // Upload the design image(s).
+      // Upload the photo(s). Sources are data: URLs (local uploads) OR remote Etsy-CDN
+      // URLs (a SpyDeck listing's photos) — imageBytesFrom() handles both, so a product
+      // made from a competitor no longer publishes with no images. Order is preserved, so
+      // images[0] stays the listing's primary photo.
       const imgs = (Array.isArray(b.images) && b.images.length) ? b.images : (b.image ? [b.image] : []);
       let uploaded = 0;
-      for (const dataUrl of imgs) {
+      for (const src of imgs) {
         try {
-          const m = /^data:(image\/[a-z.+-]+);base64,(.+)$/i.exec(String(dataUrl));
-          if (!m) continue;
-          const buf = Buffer.from(m[2], 'base64');
-          const ext = (m[1].split('/')[1] || 'png').replace('jpeg', 'jpg');
+          const img = await imageBytesFrom(src);
+          if (!img) continue;
           const fd = new FormData();
-          fd.append('image', new Blob([buf], { type: m[1] }), 'design.' + ext);
+          fd.append('image', new Blob([img.buf], { type: img.mime }), 'photo.' + img.ext);
+          fd.append('rank', String(uploaded + 1));   // keep the seller's chosen order
           await etsyFetch(conn, `/shops/${conn.shop_id}/listings/${listingId}/images`, { method: 'POST', body: fd });
           uploaded++;
         } catch (e) { /* keep going; the draft still exists without the image */ }

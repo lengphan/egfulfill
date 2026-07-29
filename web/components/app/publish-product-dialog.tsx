@@ -105,7 +105,9 @@ export function PublishProductDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
   prefill: PublishPrefill | null
-  onPublished?: (url?: string) => void
+  /** `primaryImage` is the photo that became the listing's cover, so the caller can show
+   *  what was actually published instead of the source it copied from. */
+  onPublished?: (url?: string, primaryImage?: string) => void
   title?: string
 }) {
   // The dialog resolves a picked blank itself rather than asking each caller for a
@@ -137,6 +139,8 @@ export function PublishProductDialog({
   const [sizeRetail, setSizeRetail] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string; url?: string } | null>(null)
+  // One-time acknowledgement that competitor-sourced photos are about to go on the shop.
+  const [ipConfirmed, setIpConfirmed] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const seeded = useRef(false)
 
@@ -154,6 +158,7 @@ export function PublishProductDialog({
       setBlank(prefill?.blank ?? null)
       setBlankText(prefill?.blank?.name ?? "")
       setResult(null)
+      setIpConfirmed(false)
       getSpydeckTrending().then((r) => setSuggested((r.keywords ?? []).slice(0, 12))).catch(() => {})
       getCatalogProducts().then((rows) => { catalogRef.current = rows ?? [] }).catch(() => {})
     }, 0)
@@ -263,6 +268,13 @@ export function PublishProductDialog({
   const makePrimary = (i: number) => setImages((p) => [p[i], ...p.filter((_, x) => x !== i)])
   const removeImage = (i: number) => setImages((p) => p.filter((_, x) => x !== i))
 
+  // Remote (http) images are the source's OWN photos — a SpyDeck competitor's Etsy-CDN
+  // shots. Locally-added photos are data: URLs, which are yours. Publishing someone
+  // else's photos to your shop is an Etsy IP-policy risk, so we make it a deliberate,
+  // acknowledged choice rather than something that just happens.
+  const borrowedPhotos = useMemo(() => images.filter((u) => /^https?:\/\//i.test(u)), [images])
+  const removeBorrowedPhotos = () => { setImages((p) => p.filter((u) => !/^https?:\/\//i.test(u))); setIpConfirmed(false) }
+
   const publish = async () => {
     if (!title.trim() || !priceReady) {
       // Say WHICH is missing, and — when it's the price — name the two ways to supply it,
@@ -276,6 +288,10 @@ export function PublishProductDialog({
       setResult({ ok: false, text: msg })
       return
     }
+    // Gate on the FIRST attempt when the listing carries the competitor's own photos:
+    // surface the IP warning and make the seller choose. The warning panel renders while
+    // `!ipConfirmed`, so this returns and waits rather than silently attaching.
+    if (borrowedPhotos.length > 0 && !ipConfirmed) { setResult(null); return }
     setBusy(true); setResult(null)
     try {
       const r = await publishEtsy({
@@ -336,7 +352,7 @@ export function PublishProductDialog({
             : "Published as a draft listing",
         url: r.url,
       })
-      onPublished?.(r.url)
+      onPublished?.(r.url, images[0])
     } catch (e) {
       setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })
     } finally { setBusy(false) }
@@ -573,9 +589,43 @@ export function PublishProductDialog({
 
               {result && !result.ok && <p className="text-sm text-destructive">{result.text}</p>}
 
+              {/* IP warning — only for the competitor's OWN photos, and only until the
+                  seller acknowledges it. Publishing someone else's images to your shop can
+                  get a listing pulled and, repeated, put the shop at risk. */}
+              {borrowedPhotos.length > 0 && !ipConfirmed && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                  <p className="font-semibold">
+                    {borrowedPhotos.length} of these photos {borrowedPhotos.length === 1 ? "is the competitor's" : "are the competitor's"} own image{borrowedPhotos.length === 1 ? "" : "s"}.
+                  </p>
+                  <p className="mt-1 text-amber-800">
+                    Publishing them to your Etsy shop may breach Etsy&apos;s intellectual-property
+                    policy and put the shop at risk. Swap in your own artwork, or attach them anyway.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      onClick={removeBorrowedPhotos}
+                      className="rounded-md border border-amber-400 bg-white px-2.5 py-1 font-medium text-amber-900 transition-colors hover:bg-amber-100"
+                    >
+                      Remove their photos
+                    </button>
+                    <button
+                      onClick={() => setIpConfirmed(true)}
+                      className="rounded-md bg-amber-600 px-2.5 py-1 font-medium text-white transition-colors hover:bg-amber-700"
+                    >
+                      Attach anyway
+                    </button>
+                  </div>
+                </div>
+              )}
+              {borrowedPhotos.length > 0 && ipConfirmed && (
+                <p className="text-xs text-amber-700">
+                  Attaching {borrowedPhotos.length} competitor photo{borrowedPhotos.length === 1 ? "" : "s"} — replace {borrowedPhotos.length === 1 ? "it" : "them"} with your own before this draft goes live.
+                </p>
+              )}
+
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                <Button onClick={publish} disabled={busy}>
+                <Button onClick={publish} disabled={busy || (borrowedPhotos.length > 0 && !ipConfirmed)}>
                   {busy ? <CircleNotch size={15} className="animate-spin" /> : <><Storefront size={14} weight="bold" /> Publish draft</>}
                 </Button>
               </div>

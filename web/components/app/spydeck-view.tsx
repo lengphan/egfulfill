@@ -337,6 +337,14 @@ export function SpyDeckView() {
     setUploaded((prev) => (prev.some((x) => String(x.listing_id) === k) ? prev : [{ ...l, our_url: our?.url }, ...prev]))
     recordSpydeckUpload(l, our).catch(() => {})
   }
+  // Record what was actually PUBLISHED, not the source it was copied from: the seller can
+  // reorder photos or swap in their own, so the uploaded card must show the cover image
+  // the draft went out with. `image`/`thumb` both point at it so the card (thumb||image)
+  // renders the published cover rather than a stale competitor shot.
+  const onPublishedFrom = (source: EtsyListing, url?: string, primaryImage?: string) => {
+    const merged = primaryImage ? { ...source, image: primaryImage, thumb: primaryImage } : source
+    onPublished(merged, { url })
+  }
   // `keywords` still comes back from the trending endpoint; it's just not rendered
   // here any more (the Search tab's keyword cloud covers it).
   const [trending, setTrending] = useState<{ products: EtsyListing[]; keywords: string[] } | null>(null)
@@ -840,7 +848,7 @@ export function SpyDeckView() {
           tags: makeListing.tags ?? [],
           images: ((makeDetail?.images?.length ? makeDetail.images : makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []) as string[]).filter(Boolean),
         } : null}
-        onPublished={(url) => { if (makeListing) onPublished(makeListing, { url }) }}
+        onPublished={(url, img) => { if (makeListing) onPublishedFrom(makeListing, url, img) }}
         title="Make product"
       />
     </div>
