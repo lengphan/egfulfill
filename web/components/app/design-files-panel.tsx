@@ -19,6 +19,25 @@ const idFor = (orderId: string, sku: string | undefined, name: string) =>
 const MACHINE_RE = /\.(emb|pes|dst|exp|jef|vp3|xxx|hus)$/i
 const MACHINE_ACCEPT = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
 
+// Sort newest-first and flag the LATEST machine file for each line. After a design goes to
+// the board and comes back from the "Fix" lane, the corrected file is just the most recent
+// .emb/.pes for that item — so this is how "the newest official fixed file" is made obvious.
+// Only flagged when a line has MORE THAN ONE machine file (i.e. a revision actually happened),
+// so a single-file order doesn't get a redundant badge.
+type OrderedFile = DesignFileRow & { isLatest: boolean }
+function orderFiles(files: DesignFileRow[]): OrderedFile[] {
+  const sorted = [...files].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
+  const isMachine = (f: DesignFileRow) => f.kind === "emb" || f.kind === "pes"
+  const count: Record<string, number> = {}
+  for (const f of sorted) if (isMachine(f)) { const k = f.sku || "__order"; count[k] = (count[k] || 0) + 1 }
+  const seen: Record<string, boolean> = {}
+  return sorted.map((f) => {
+    let isLatest = false
+    if (isMachine(f)) { const k = f.sku || "__order"; if (!seen[k]) { seen[k] = true; isLatest = count[k] > 1 } }
+    return { ...f, isLatest }
+  })
+}
+
 const KIND_META: Record<string, { label: string; hint: string; cls: string; icon: React.ReactNode }> = {
   pes: { label: "PES", hint: "seller deliverable · paid", cls: "bg-violet-100 text-violet-700", icon: <FileArrowDown size={12} weight="fill" /> },
   emb: { label: "EMB", hint: "factory working file", cls: "bg-amber-100 text-amber-700", icon: <FileZip size={12} weight="fill" /> },
@@ -140,14 +159,17 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
         <div className="py-2 text-center text-[11px] text-muted-foreground">No files yet.</div>
       ) : (
         <div className="divide-y divide-border rounded-xl border border-border">
-          {files.map((f) => {
+          {orderFiles(files).map((f) => {
             const k = KIND_META[f.kind || "other"] ?? KIND_META.other
             return (
               <div key={f.designId} className="flex items-center gap-2 p-2">
                 <span className={"flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold " + k.cls}>{k.icon} {k.label}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-medium">{f.name}</div>
-                  <div className="truncate text-[10px] text-muted-foreground">{f.sku ? `${f.sku} · ` : ""}{k.hint}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-xs font-medium">{f.name}</span>
+                    {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+                  </div>
+                  <div className="truncate text-[10px] text-muted-foreground">{f.sku ? `Item ${f.sku} · ` : "Whole order · "}{k.hint}</div>
                 </div>
 
                 {/* Only .pes is sold, so only .pes gets a price — and only admin/warehouse
@@ -230,19 +252,20 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
   }
 
   /**
-   * Send us a machine file. Refused BY NAME if it isn't one — this panel sits under a
-   * heading about machine files, so an image dropped here is a mistake worth naming rather
-   * than storing as a mockup the seller will never see again.
+   * Send us a machine file OR a design image. Machine files get checked before production;
+   * images are stored as artwork on the order. Anything that's neither is named, not stored.
    */
   const send = async (list: FileList | File[]) => {
     const arr = Array.from(list)
     if (!arr.length) return
     setErr(null); setSent(null)
-    const wrong = arr.filter((f) => !MACHINE_RE.test(f.name))
-    const ok = arr.filter((f) => MACHINE_RE.test(f.name))
+    const isImg = (f: File) => /^image\//i.test(f.type) || /\.(png|jpe?g|webp|gif|bmp|heic|avif)$/i.test(f.name)
+    const ok = arr.filter((f) => MACHINE_RE.test(f.name) || isImg(f))
+    const wrong = arr.filter((f) => !MACHINE_RE.test(f.name) && !isImg(f))
     if (wrong.length) {
-      setErr(`${wrong.map((f) => f.name).join(", ")} — not a machine file. Artwork goes on the item itself, through Customize.`)
+      setErr(`${wrong.map((f) => f.name).join(", ")} — not a machine file or an image, so there's nothing to do with it here.`)
     }
+    let anyImg = false, anyMachine = false
     for (const f of ok) {
       // 50MB: the body limit is 60MB and base64 inflates by about a third, so a bigger
       // file returns a server error that says nothing useful.
@@ -257,13 +280,15 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
         })
         const r = await uploadDesignFile({ designId: idFor(orderId, undefined, f.name), orderId, name: f.name, mime: f.type || undefined, data })
         if (r?.error) throw new Error(r.error)
-        // Says what happens NEXT. The file landing is not the outcome the seller cares
-        // about — being checked before production is.
-        setSent(`${f.name} sent. We'll check it before production and come back to you if anything's wrong.`)
+        if (isImg(f)) anyImg = true; else anyMachine = true
       } catch (e) {
         setErr(e instanceof Error ? e.message : `Could not send ${f.name}`)
       } finally { setBusy(null) }
     }
+    const parts: string[] = []
+    if (anyMachine) parts.push("machine file — we'll check it before production and come back to you if anything's wrong")
+    if (anyImg) parts.push("design image — added to this order")
+    if (parts.length) setSent(`Sent your ${parts.join("; and your ")}.`)
     load()
   }
 
@@ -279,9 +304,9 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
       }
     >
       {busy ? <CircleNotch size={18} className="animate-spin text-muted-foreground" /> : <UploadSimple size={18} weight="bold" className="text-muted-foreground" />}
-      <span className="text-xs font-medium">{busy ? `Sending ${busy}…` : "Already have a machine file? Drop it here"}</span>
-      <span className="text-[10px] text-muted-foreground">.pes · .dst · .emb · .exp · .jef — we check it, and charge the check fee instead of digitising</span>
-      <input ref={inputRef} type="file" multiple accept={MACHINE_ACCEPT} className="hidden"
+      <span className="text-xs font-medium">{busy ? `Sending ${busy}…` : "Have a machine file or a design image? Drop it here"}</span>
+      <span className="text-[10px] text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>
+      <input ref={inputRef} type="file" multiple accept={MACHINE_ACCEPT + ",image/*"} className="hidden"
         onChange={(e) => { if (e.target.files) void send(e.target.files); e.target.value = "" }} />
     </div>
   )
@@ -322,7 +347,7 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
     return (
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">
-          No machine files on this order yet. They appear here once we&apos;ve cut them — or send us your own.
+          No files on this order yet. Machine files appear here once we&apos;ve cut them — or send us your own machine file or a design image.
         </p>
         {dropZone}
         {notices}
@@ -333,16 +358,24 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
   return (
     <div className="space-y-2">
       {notices}
-      {files.map((f) => (
+      {orderFiles(files).map((f) => (
         <div key={f.designId} className="flex items-center gap-3 rounded-xl border border-border p-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700"><Sparkle size={14} weight="fill" /></span>
+          <span className={"flex size-8 shrink-0 items-center justify-center rounded-lg " + (f.kind === "image" ? "bg-sky-100 text-sky-700" : "bg-violet-100 text-violet-700")}>
+            {f.kind === "image" ? <ImageIcon size={14} weight="fill" /> : <Sparkle size={14} weight="fill" />}
+          </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{f.name}</div>
-            <div className="text-xs text-muted-foreground">{f.paid ? "Purchased" : f.price ? `$${f.price} — pays from your wallet` : "Free"}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-sm font-medium">{f.name}</span>
+              {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {f.sku ? `Item ${f.sku} · ` : ""}
+              {f.kind === "image" ? "Design image" : f.paid ? "Purchased" : f.price ? `$${f.price} — pays from your wallet` : "Free"}
+            </div>
           </div>
-          <Button size="sm" variant={f.paid ? "outline" : "default"} disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
+          <Button size="sm" variant={f.paid || !f.price ? "outline" : "default"} disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
             {busy === f.designId ? <CircleNotch size={13} className="animate-spin" />
-              : f.paid ? <><FileArrowDown size={13} weight="bold" /> Download</>
+              : (f.paid || !f.price) ? <><FileArrowDown size={13} weight="bold" /> Download</>
               : <>Buy ${f.price} &amp; download</>}
           </Button>
           {canRemove && (

@@ -506,14 +506,21 @@ export function DesignCanvasDialog({
    * in so a file filed moments ago in this window counts without a refetch.
    */
   const [hasFile, setHasFile] = useState(false)
+  // The NEWEST machine file for this line, by name — so slot ② can show which fixed file is
+  // current after a revision, instead of a bare "added".
+  const [latestMachine, setLatestMachine] = useState<string | null>(null)
   useEffect(() => {
     if (!open) return   // read for sellers too — it drives their "you uploaded your file" status
     const t = setTimeout(() => {
       getDesignFiles(orderId)
-        .then((rows) => setHasFile((rows ?? []).some((f) =>
-          (f.kind === "emb" || f.kind === "pes") &&
-          (!f.sku || !item.sku || f.sku === item.sku))))
-        .catch(() => setHasFile(false))
+        .then((rows) => {
+          const mine = (rows ?? []).filter((f) =>
+            (f.kind === "emb" || f.kind === "pes") && (!f.sku || !item.sku || f.sku === item.sku))
+          setHasFile(mine.length > 0)
+          const newest = mine.slice().sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0]
+          setLatestMachine(newest?.name ?? null)
+        })
+        .catch(() => { setHasFile(false); setLatestMachine(null) })
     }, 0)
     return () => clearTimeout(t)
   }, [open, orderId, item.sku])
@@ -960,7 +967,7 @@ export function DesignCanvasDialog({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">Machine file</div>
-                  <div className="text-[11px] text-muted-foreground">{hasMachineFile ? "Added — the stitch file" : "The stitch file — .emb / .pes / .dst …"}</div>
+                  <div className="truncate text-[11px] text-muted-foreground" title={latestMachine || undefined}>{hasMachineFile ? (latestMachine ? `Latest: ${latestMachine}` : "Added — the stitch file") : "The stitch file — .emb / .pes / .dst …"}</div>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
