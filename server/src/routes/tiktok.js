@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
+import { imageBytesFrom } from '../images.js';
 
 const APP_KEY    = process.env.TIKTOK_APP_KEY || '';
 const APP_SECRET = process.env.TIKTOK_APP_SECRET || '';
@@ -134,6 +135,31 @@ async function ttSignedRequest(conn, method, path, opts = {}) {
   return (data && data.data) || {};
 }
 
+// Upload one product image to TikTok and return its URI (the token main_images/sku_img
+// reference — you can't send a raw URL to Create Product, only a URI from here). This is a
+// MULTIPART call, so unlike ttSignedRequest the body is NOT part of the signature — TikTok
+// signs query params only for multipart/form-data — and we must NOT set content-type by
+// hand (fetch adds the multipart boundary). use_case=MAIN_IMAGE unless a variant swatch.
+async function ttUploadImage(conn, img, useCase = 'MAIN_IMAGE') {
+  const token = await validToken(conn);
+  const path = '/product/202309/images/upload';
+  const query = { app_key: APP_KEY, timestamp: String(Math.floor(Date.now() / 1000)) };
+  query.sign = signRequest(path, query, '');   // '' → body excluded from the signature
+  const fd = new FormData();
+  fd.append('data', new Blob([img.buf], { type: img.mime }), 'photo.' + img.ext);
+  fd.append('use_case', useCase);
+  await rateLimit();
+  const res = await fetch(`${API_HOST}${path}?${new URLSearchParams(query).toString()}`, {
+    method: 'POST', headers: { 'x-tts-access-token': token }, body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  recordUsage('tiktok', { endpoint: path, ok: res.ok && data && data.code === 0 });
+  if (!res.ok || (data && data.code !== 0)) {
+    throw new Error(((data && data.message) || ('TikTok API ' + res.status)) + ' @ ' + path);
+  }
+  return (data && data.data && data.data.uri) || null;
+}
+
 // The order endpoints all need the shop CIPHER (an opaque per-shop token), which the
 // authorization endpoint returns. Cache it on the connection so we fetch it once per shop.
 // Keep shop_id as the stored open_id (it's the unique key + what disconnect targets) — only
@@ -166,53 +192,102 @@ async function connectionForPublish(user) {
   return r.rows[0] || null;
 }
 
-// Normalise the dialog's product into the fields a TikTok create-product call needs. The
-// COMMON fields (title/description/price/tags/photos/variants) are settled; the shapes
-// marked PENDING map onto TikTok's exact request schema (Create Product, v202309) and are
-// finalised against the API doc before the live path is trusted. Because publishing is
-// gated (TIKTOK_PUBLISH_LIVE), the dry run returns this object verbatim for review, which
-// is exactly how the S&S/Otto order payloads were validated before ever going live.
-function buildTiktokProductPayload(b) {
-  const title = String(b.title || '').trim().slice(0, 255);
-  const description = String(b.description || b.title || '').trim();
+// TikTok is strict about title/description text: no HTML entities (&nbsp; etc.), no
+// control chars, not all-symbols, no run of >9 identical chars (errors 12052931/932).
+// A competitor's Etsy title/description arrives as plain-ish text, so strip the risky bits
+// rather than trust it — an over-clean title beats a rejected listing.
+function ttCleanText(s, max) {
+  return String(s || '')
+    .replace(/&[a-z]+;|&#\d+;/gi, ' ')            // kill any HTML entities
+    .replace(/[\x00-\x1f\x7f]/g, ' ')       // control chars
+    .replace(/(.)\1{9,}/g, '$1$1$1')              // clamp >9 repeats
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+// Description must be HTML (Create Product). We DON'T pass entities (TikTok rejects them),
+// so build plain <p>/<br> paragraphs from the cleaned text. Empty falls back to the title.
+function ttDescriptionHtml(text, fallback) {
+  const clean = String(text || '')
+    .replace(/&[a-z]+;|&#\d+;/gi, ' ')
+    .replace(/[\x00-\x1f\x7f]/g, ' ')
+    .replace(/<[^>]*>/g, ' ')                     // drop whole source HTML tags, not just <>
+    .replace(/[<>]/g, ' ')                        // and any stray angle brackets
+    .replace(/&/g, ' and ');                      // no bare ampersands → no entities
+  const paras = clean.split(/\n{2,}/).map((p) => p.replace(/\n/g, '<br>').trim()).filter(Boolean);
+  const html = paras.length ? paras.map((p) => `<p>${p}</p>`).join('') : `<p>${ttCleanText(fallback, 2000)}</p>`;
+  return html.slice(0, 10000);
+}
+
+// Normalise the dialog's product into a TikTok Create Product body (v202309). `imageUris`
+// are the URIs returned by the image-upload API — main_images/sku_img reference those, NOT
+// raw URLs. The COMMON fields (title/description/price/tags/variants) mirror the Etsy path;
+// the REQUIRED TikTok-only fields (leaf category_id, per-SKU warehouse inventory, package
+// weight, category_version) come from the dialog's extra fields. Because publishing is
+// gated (TIKTOK_PUBLISH_LIVE), the dry run returns this object for review — the same way the
+// S&S/Otto order payloads were validated before ever going live.
+function buildTiktokProductPayload(b, imageUris) {
+  const title = ttCleanText(b.title, 255);
   const price = Number(b.price) || 0;
-  const tags = (Array.isArray(b.tags) ? b.tags : []).map(String).filter(Boolean).slice(0, 13);
+  const currency = b.currency || 'USD';
+  // Etsy tags → TikTok search terms (ST words): max 15, ≤250 chars total, not buyer-facing.
+  const searchTerms = [];
+  let stLen = 0;
+  for (const t of (Array.isArray(b.tags) ? b.tags : [])) {
+    const term = ttCleanText(t, 40);
+    if (!term || searchTerms.length >= 15 || stLen + term.length > 250) continue;
+    searchTerms.push(term); stLen += term.length;
+  }
   const colors = (Array.isArray(b.colors) ? b.colors : []).map(String).filter(Boolean);
   const sizes = (Array.isArray(b.sizes) ? b.sizes : []).map(String).filter(Boolean);
   const skuBase = String(b.sku_base || b.sku || 'EG').toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'EG';
   const perSize = (b.size_prices && typeof b.size_prices === 'object') ? b.size_prices : {};
+  const warehouseId = b.warehouse_id != null ? String(b.warehouse_id) : null;
+  const qty = Math.min(99999, Math.max(1, Number(b.quantity) || 999));
   const slug = (v) => String(v).toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 6);
+  const multiVariant = (colors.length ? colors.length : 1) * (sizes.length ? sizes.length : 1) > 1;
   // One SKU per colour×size, each stamped with OUR seller_sku so a buyer's order line
   // round-trips back to this exact blank+variant — the same guarantee the Etsy path gives.
+  // sales_attributes is omitted for a single-SKU product (TikTok requires it only when >1).
   const skus = [];
   for (const c of (colors.length ? colors : [null])) {
     for (const z of (sizes.length ? sizes : [null])) {
       const sku = [skuBase, c && slug(c), z && slug(z)].filter(Boolean).join('-');
-      const sales_attributes = [];
-      if (c) sales_attributes.push({ name: 'Color', value_name: String(c).slice(0, 45) });   // PENDING: attribute id/shape
-      if (z) sales_attributes.push({ name: 'Size', value_name: String(z).slice(0, 45) });
-      skus.push({
-        seller_sku: sku,
-        sales_attributes,
-        // PENDING: TikTok wants price.amount as a string in the shop currency + inventory[]
-        // keyed by warehouse_id — filled from b.warehouse_id once the doc confirms the shape.
-        price: { amount: String((z && perSize[z] != null ? Number(perSize[z]) : price) || price), currency: b.currency || 'USD' },
-        inventory: b.warehouse_id ? [{ warehouse_id: String(b.warehouse_id), quantity: Number(b.quantity) || 999 }] : [],
-      });
+      const amount = (z && perSize[z] != null ? Number(perSize[z]) : price) || price;
+      const sku_obj = {
+        seller_sku: sku.slice(0, 50),
+        inventory: warehouseId ? [{ warehouse_id: warehouseId, quantity: qty }] : [],
+        price: { amount: String(amount), currency },
+      };
+      if (multiVariant) {
+        sku_obj.sales_attributes = [];
+        if (c) sku_obj.sales_attributes.push({ name: 'Color', value_name: String(c).slice(0, 50) });
+        if (z) sku_obj.sales_attributes.push({ name: 'Size', value_name: String(z).slice(0, 50) });
+      }
+      skus.push(sku_obj);
     }
   }
-  return {
+  // US + SEA shops MUST use the v2 (7-level) category tree; everywhere else v1.
+  const categoryVersion = (RESOLVED_REGION === 'us') ? 'v2' : (b.category_version || 'v1');
+  const payload = {
+    // AS_DRAFT, not LISTING — mirror the Etsy "make a draft you review before it goes live"
+    // flow; the seller lists it from Seller Center once the artwork is their own.
+    save_mode: b.save_mode === 'LISTING' ? 'LISTING' : 'AS_DRAFT',
     title,
-    description,               // PENDING: TikTok expects description as HTML in most regions
-    category_id: b.category_id != null ? String(b.category_id) : null,   // REQUIRED, must be a leaf
-    brand_id: b.brand_id != null ? String(b.brand_id) : undefined,
-    // PENDING: main_images want TikTok image URIs from the image-upload API, not raw URLs —
-    // the publish route pre-uploads b.images and swaps these for the returned uris.
-    main_images: (Array.isArray(b.images) ? b.images : []).filter(Boolean).slice(0, 9),
-    package_weight: b.package_weight != null ? { value: String(b.package_weight), unit: b.weight_unit || 'GRAM' } : null,  // REQUIRED
+    description: ttDescriptionHtml(b.description, b.title),
+    category_id: b.category_id != null ? String(b.category_id) : null,   // REQUIRED — leaf
+    category_version: categoryVersion,
+    main_images: (Array.isArray(imageUris) ? imageUris : []).filter(Boolean).slice(0, 9).map((uri) => ({ uri })),
     skus,
-    tags,
+    package_weight: (b.package_weight != null && String(b.package_weight) !== '')
+      ? { value: String(b.package_weight), unit: b.weight_unit || (RESOLVED_REGION === 'us' ? 'POUND' : 'KILOGRAM') }
+      : null,   // REQUIRED for physical products
+    // A new key per request so a retry can't create a duplicate product.
+    idempotency_key: crypto.randomUUID(),
   };
+  if (b.brand_id) payload.brand_id = String(b.brand_id);
+  if (searchTerms.length) payload.search_terms = searchTerms;
+  return payload;
 }
 
 // Is this connection's owner staff (factory-owned orders) or a seller (seller-owned)?
@@ -574,8 +649,8 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
 
   // Create a TikTok Shop product from the publish dialog. GATED: dry run unless
   // TIKTOK_PUBLISH_LIVE=1. On a dry run it returns the assembled payload for review and
-  // never calls TikTok, so the mapping can be validated field-by-field against the doc
-  // before anything reaches the shop.
+  // never calls TikTok (not even the image upload), so the mapping can be validated
+  // field-by-field before anything reaches the shop — the S&S/Otto safety pattern.
   app.post('/api/tiktok/publish', { preHandler: requireAuth }, async (req, reply) => {
     if (!APP_KEY || !APP_SECRET) { reply.code(400); return { error: 'Server missing TIKTOK_APP_KEY / TIKTOK_APP_SECRET' }; }
     const b = req.body || {};
@@ -589,27 +664,73 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       await getShopCipher(conn);   // proves the shop is reachable + caches the cipher
     } catch (e) { reply.code(400); return { error: e.message }; }
 
-    const payload = buildTiktokProductPayload(b);
+    const live = String(process.env.TIKTOK_PUBLISH_LIVE || '') === '1';
+    const srcImages = (Array.isArray(b.images) ? b.images : []).filter(Boolean).slice(0, 9);
 
-    if (String(process.env.TIKTOK_PUBLISH_LIVE || '') !== '1') {
+    if (!live) {
+      // Preview only — build with the SOURCE image URLs in the uri slots so the reviewer
+      // sees which photos would be pre-uploaded, without actually uploading anything.
+      const preview = buildTiktokProductPayload(b, srcImages);
       return {
         dryRun: true,
         shop: conn.shop_name || conn.shop_id,
-        note: 'TIKTOK_PUBLISH_LIVE!=1 → NOT sent to TikTok. Review the payload; the Create-Product mapping (category, warehouse inventory, image URIs, package weight) is finalised against TikTok\'s v202309 doc before the live flag is flipped.',
+        note: 'TIKTOK_PUBLISH_LIVE!=1 → NOT sent to TikTok. Review the payload; set TIKTOK_PUBLISH_LIVE=1 (once validated against a real shop) to actually create the product.',
+        wouldUploadImages: srcImages.length,
         missing: [
-          !payload.category_id && 'category_id (a leaf category is required)',
-          !payload.package_weight && 'package_weight',
-          !payload.skus.some((s) => s.inventory.length) && 'warehouse_id (SKU inventory has no warehouse)',
-          !payload.main_images.length && 'at least one image',
+          !preview.category_id && 'category_id (a leaf category is required)',
+          !preview.package_weight && 'package_weight',
+          !preview.skus.some((s) => s.inventory.length) && 'warehouse_id (SKU inventory has no warehouse)',
+          !srcImages.length && 'at least one image',
         ].filter(Boolean),
-        payload,
+        payload: preview,
       };
     }
 
-    // LIVE path — kept behind the flag AND a required-field guard so a confirmed-good
-    // mapping can go live, but a half-filled one still can't. The image pre-upload +
-    // exact create call are wired in once the doc is confirmed.
-    reply.code(501);
-    return { error: 'Live TikTok publishing is not enabled yet — the Create-Product payload is pending schema confirmation. Leave TIKTOK_PUBLISH_LIVE unset to use the dry run.', payload };
+    // LIVE — a clean required-field guard first, so a half-filled product gives a readable
+    // error instead of a raw TikTok code (the shop would reject it anyway).
+    const problems = [
+      !b.category_id && 'a leaf category',
+      !b.warehouse_id && 'a warehouse',
+      (b.package_weight == null || String(b.package_weight) === '') && 'a package weight',
+      !srcImages.length && 'at least one image',
+    ].filter(Boolean);
+    if (problems.length) { reply.code(400); return { error: 'TikTok needs ' + problems.join(', ') + '.' }; }
+
+    try {
+      // 1) Pre-upload each photo → a TikTok image URI (raw URLs aren't accepted on create).
+      const uris = [];
+      for (const src of srcImages) {
+        const bytes = await imageBytesFrom(src);
+        if (!bytes) continue;
+        const uri = await ttUploadImage(conn, bytes, 'MAIN_IMAGE');
+        if (uri) uris.push(uri);
+      }
+      if (!uris.length) { reply.code(400); return { error: 'None of the images could be uploaded to TikTok.' }; }
+
+      // 2) Create the product.
+      const payload = buildTiktokProductPayload(b, uris);
+      const d = await ttSignedRequest(conn, 'POST', '/product/202309/products', {
+        query: { shop_cipher: conn.shop_cipher }, body: payload,
+      });
+      const productId = d.product_id || null;
+
+      // 3) Remember what it was built from, so the order it eventually produces arrives
+      //    ready to make — best-effort, mirrors the Etsy publish path.
+      if (productId) {
+        q(`insert into published_listings
+             (listing_id, platform, seller_id, blank_sku, design_id, design_data, design_pos, print_type, color, size)
+           values ($1,'tiktok',$2,$3,$4,$5,$6,$7,$8,$9)
+           on conflict (listing_id) do update set
+             blank_sku=excluded.blank_sku, print_type=excluded.print_type,
+             color=excluded.color, size=excluded.size`,
+          [String(productId), req.user.sub || null, b.blank || b.sku || null, b.designId || null,
+           b.designUrl || b.design || null, b.designPos ? JSON.stringify(b.designPos) : null,
+           b.printType || b.method || null,
+           (Array.isArray(b.colors) && b.colors.length === 1) ? b.colors[0] : null,
+           (Array.isArray(b.sizes) && b.sizes.length === 1) ? b.sizes[0] : null]
+        ).catch(() => {});
+      }
+      return { ok: true, product_id: productId, skus: d.skus || [], warnings: d.warnings || [] };
+    } catch (e) { reply.code(400); return { error: e.message }; }
   });
 }

@@ -8,6 +8,7 @@ import { audit } from '../audit.js';
 import { usdRates } from '../fx.js';
 import { requireSpydeck } from '../entitlements.js';
 import { fetchSheetRows } from './sheets.js';
+import { imageBytesFrom } from '../images.js';
 
 const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
 const SHARED_SECRET = (process.env.ETSY_SHARED_SECRET || '').trim();
@@ -116,35 +117,6 @@ async function etsyFetch(conn, path, opts = {}) {
   recordUsage('etsy', { endpoint: path, ok: res.ok });
   if (!res.ok) throw new Error(((data && (data.error || data.message)) || ('Etsy API ' + res.status)) + ' @ ' + path);
   return data;
-}
-
-// A publishable image source → its raw bytes, ready to POST to Etsy. Two shapes reach
-// the publish route: a `data:` URL (a photo the seller uploaded locally) and a remote
-// image URL (a SpyDeck listing's Etsy-CDN photo). The upload loop used to `continue` on
-// anything that wasn't a data: URL, so a product made from a competitor — whose photos
-// are ALL etsystatic.com URLs — published with NO images at all. Remote fetches are
-// allowlisted to Etsy's own CDN so this can never be turned into an SSRF against an
-// internal host. Returns null for a source we won't or can't fetch (caller skips it).
-const REMOTE_IMAGE_HOST_OK = (host) => /(^|\.)etsystatic\.com$/i.test(host);
-async function imageBytesFrom(src) {
-  const s = String(src || '');
-  const m = /^data:(image\/[a-z.+-]+);base64,(.+)$/i.exec(s);
-  if (m) {
-    const mime = m[1];
-    return { buf: Buffer.from(m[2], 'base64'), mime, ext: (mime.split('/')[1] || 'png').replace('jpeg', 'jpg') };
-  }
-  if (/^https?:\/\//i.test(s)) {
-    let host;
-    try { host = new URL(s).hostname; } catch { return null; }
-    if (!REMOTE_IMAGE_HOST_OK(host)) return null;   // never fetch an arbitrary host
-    const r = await fetch(s);
-    if (!r.ok) return null;
-    const buf = Buffer.from(await r.arrayBuffer());
-    const mime = r.headers.get('content-type') || 'image/jpeg';
-    const ext = ((mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace(/[^a-z0-9]/gi, '')) || 'jpg';
-    return { buf, mime, ext };
-  }
-  return null;
 }
 
 // Resolve the listing image URL. Prefers the EXACT image the buyer saw
