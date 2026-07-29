@@ -323,10 +323,20 @@ export function DesignerBoard() {
     return { total: list.length, active, approved, credited }
   }, [boardCards, lanes])
 
-  // Move a card; entering "approved" credits the designer ONCE (idempotent by DSN-<id> +
-  // the card's `credited` flag), so re-dragging it never double-pays.
+  // Move a card. Moving it OUT of Incoming claims it for whoever moved it (if still
+  // unclaimed) — an in-progress card that was nobody's job was the bug here. Entering
+  // "approved" credits the designer ONCE (idempotent by DSN-<id> + the card's `credited`
+  // flag), so re-dragging never double-pays; the payout follows the claimer.
   const moveCard = useCallback((card: DesignCard, to: string, extra?: Partial<DesignCard>) => {
-    patch(card.id, { col: to, ...extra })
+    // Claim-on-start: a DESIGNER moving a card out of Incoming claims it, so a working-lane
+    // card is never unassigned. ONLY designers claim (and only a claimer can be credited) —
+    // staff (operator / warehouse / admin) organise the board without a payout, so their
+    // moves just change the lane. Partner cards can't be claimed and aren't draggable.
+    const u = getUser()
+    const claim = u?.role === "designer" && u.name && to !== (lanes[0]?.id ?? "incoming") && !card.claimed_by && !card.vendor
+      ? { claimed_by: u.name, claimed_role: "designer" }
+      : null
+    patch(card.id, { col: to, ...(claim || {}), ...extra })
     // Credit on approval — use the card's payout, or the platform Design fee as the default.
     const amount = amt(card.payment) || designFee
     if (to === "approved" && !card.credited && amount > 0) {
@@ -340,7 +350,7 @@ export function DesignerBoard() {
         })
         .catch(() => {})
     }
-  }, [patch, designFee])
+  }, [patch, designFee, lanes])
 
   /**
    * A FILE dropped on a lane becomes a new card there.
