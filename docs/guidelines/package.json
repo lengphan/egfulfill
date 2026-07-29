@@ -1,0 +1,12 @@
+{
+  "name": "eg-guideline-screenshots",
+  "private": true,
+  "type": "module",
+  "description": "One-off tool: capture app screenshots for the guidelines. Run on a machine with a desktop browser (your Mac), not the headless server.",
+  "scripts": {
+    "capture": "node capture-screenshots.mjs"
+  },
+  "dependencies": {
+    "puppeteer": "^23.11.1"
+  }
+}

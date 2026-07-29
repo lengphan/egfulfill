@@ -4,13 +4,14 @@
 // visits each page in a real browser, signed in AS YOU, and saves the screenshot under that
 // key — so you get real screenshots without taking them one by one.
 //
-// ── Run it ──────────────────────────────────────────────────────────────────────
-//   1. Sign in to the app in your normal browser (localhost or app.egful.store).
+// ── Run it (on your Mac, NOT the server) ──────────────────────────────────────────
+//   The server is headless and has no Chrome — run this locally, against the LIVE app.
+//   1. Sign in to app.egful.store in your normal browser.
 //   2. DevTools → Application → Local Storage → copy the value of `eg_token`.
-//   3. From the repo root:
-//        cd web && npm run dev            # if capturing against localhost (skip for the live app)
-//        # then, in another terminal:
-//        node docs/guidelines/capture-screenshots.mjs
+//   3. In a terminal on your Mac, from the repo:
+//        cd docs/guidelines
+//        npm install                      # one-time: pulls puppeteer + a bundled Chrome
+//        EG_TOKEN=<token> EG_ROLE=admin BASE_URL=https://app.egful.store npm run capture
 //
 //   Environment variables (all optional except EG_TOKEN):
 //     EG_TOKEN   your real login token (REQUIRED — pages are empty without it)
@@ -28,7 +29,16 @@
 import { mkdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import puppeteer from "puppeteer"
+
+// Puppeteer is a one-off tool dependency, not part of the app. Load it dynamically so a missing
+// install gives a plain instruction instead of a stack trace.
+let puppeteer
+try {
+  puppeteer = (await import("puppeteer")).default
+} catch {
+  console.error(`\nPuppeteer isn't installed here.\n\nRun this on a machine with a normal desktop browser (your Mac — NOT the headless\nserver, which lacks the Chrome libraries):\n\n  cd docs/guidelines\n  npm install\n  EG_TOKEN=<your-token> EG_ROLE=admin BASE_URL=https://app.egful.store npm run capture\n`)
+  process.exit(1)
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const IMAGES = join(HERE, "images")
@@ -73,7 +83,7 @@ const SHOTS = [
 const wanted = SHOTS.filter((s) => !s.roles.length || s.roles.includes(ROLE))
 if (!wanted.length) { console.log(`No shots for role "${ROLE}".`); process.exit(0) }
 
-const browser = await puppeteer.launch({ headless: "new", defaultViewport: { width: 1440, height: 900 } })
+const browser = await puppeteer.launch({ headless: true, defaultViewport: { width: 1440, height: 900 } })
 const page = await browser.newPage()
 // Seed auth into localStorage BEFORE any app script runs, on every navigation.
 await page.evaluateOnNewDocument((token, user) => {
