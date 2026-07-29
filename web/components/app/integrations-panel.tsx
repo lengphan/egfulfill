@@ -196,6 +196,18 @@ const INTEGRATIONS: Integration[] = [
       return { level: "error", detail: String(r.body.error ?? "auth failed") }
     },
   },
+  {
+    // SanMar authenticates with a customer number + web username + password (no API key),
+    // and only answers whitelisted IPs — so "configured" here means the creds are set, not
+    // that SanMar has whitelisted us yet.
+    key: "sanmar", name: "SanMar", blurb: "Apparel blanks + orders", group: "Suppliers",
+    check: async () => {
+      const r = await raw("/api/sanmar/status")
+      if (r.status === 401 || r.status === 403) return { level: "restricted" }
+      if (!r.ok) return { level: "error", detail: `HTTP ${r.status || "—"}` }
+      return r.body.configured ? { level: "configured", detail: r.body.stage ? "stage" : "live" } : { level: "off" }
+    },
+  },
   // Other
   {
     key: "sheets", name: "Google Sheets", blurb: "Order import", group: "Other",
