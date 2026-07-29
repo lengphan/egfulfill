@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown } from "@phosphor-icons/react"
+import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check } from "@phosphor-icons/react"
+import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -930,23 +931,49 @@ export function DesignCanvasDialog({
           <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void attachMachineFile(f); e.target.value = "" }} />
 
-          {/* WORDS ONLY, one component, one size. A verb each, styled identically, so the
-              row reads without decoding an icon. */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>{designUrl ? "Replace" : "Upload image"}</Button>
-            <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>Library</Button>
-            {/* The seller's own-file route, now a BUTTON. Dropping one always worked, but
-                a drop is only discoverable if you already suspect it exists — which is why
-                the seller who had cut their own .pes had nowhere to go. */}
-            <Button variant="outline" size="sm" onClick={() => machineRef.current?.click()}>Machine file</Button>
-            {/* Ten shirts, one file. Only when there IS another line, so a single-line
-                order doesn't carry a control that would do nothing. */}
-            {designUrl && !!siblings?.length && (
-              <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}>
-                {applying ? "Applying…" : "Apply all items"}
-              </Button>
-            )}
+          {/* TWO things make a print-ready line, and people kept giving only one. So show
+              them as two numbered slots — the image (what shows on the mockup) and the
+              machine file (the stitch file) — each with its own state, so it reads as a
+              two-item checklist instead of a row of same-looking buttons. */}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {/* 1 — Design image */}
+            <div className={cn("rounded-lg border p-2.5", designUrl ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20" : "border-dashed border-border bg-muted/20")}>
+              <div className="flex items-start gap-2">
+                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold", designUrl ? "bg-emerald-600 text-white" : "border border-border bg-background text-muted-foreground")}>
+                  {designUrl ? <Check size={12} weight="bold" /> : "1"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium">Design image</div>
+                  <div className="text-[11px] text-muted-foreground">{designUrl ? "Added — shows on the mockup" : "The artwork we print / embroider"}</div>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>{designUrl ? "Replace" : "Upload image"}</Button>
+                <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>Library</Button>
+              </div>
+            </div>
+            {/* 2 — Machine file (the seller's own-file route, now discoverable) */}
+            <div className={cn("rounded-lg border p-2.5", hasMachineFile ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20" : "border-dashed border-border bg-muted/20")}>
+              <div className="flex items-start gap-2">
+                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold", hasMachineFile ? "bg-emerald-600 text-white" : "border border-border bg-background text-muted-foreground")}>
+                  {hasMachineFile ? <Check size={12} weight="bold" /> : "2"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium">Machine file</div>
+                  <div className="text-[11px] text-muted-foreground">{hasMachineFile ? "Added — the stitch file" : "The stitch file — .emb / .pes / .dst …"}</div>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Button variant="outline" size="sm" onClick={() => machineRef.current?.click()}>{hasMachineFile ? "Replace file" : "Attach file"}</Button>
+              </div>
+            </div>
           </div>
+          {/* Ten shirts, one file — only when there IS another line to apply to. */}
+          {designUrl && !!siblings?.length && (
+            <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}>
+              {applying ? "Applying…" : "Apply image to all items"}
+            </Button>
+          )}
           {err && <div className="text-sm text-destructive">{err}</div>}
           {/* A machine file was filed. Green, not red, and it says what it did AND what it
               deliberately didn't — the canvas is unchanged, which without a word reads as
