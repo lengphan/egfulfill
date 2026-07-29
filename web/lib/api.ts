@@ -1853,6 +1853,33 @@ export function getEtsyConnections() {
   return api<EtsyConnection[]>(`/api/etsy/connections`)
 }
 
+// ─────────────────── Publish to TikTok Shop ───────────────────
+// TikTok's Create Product needs a few fields Etsy doesn't: a LEAF category, a warehouse for
+// per-SKU inventory, and a package weight. The publish route is DRY-RUN until the server's
+// TIKTOK_PUBLISH_LIVE flag is set — a dry run returns the assembled `payload` for review.
+export type TiktokCategory = { id: string; local_name?: string; is_leaf?: boolean; parent_id?: string; permission_statuses?: string[] }
+export type TiktokWarehouse = { id: string; name?: string; type?: string; sub_type?: string }
+export function getTiktokCategories(keyword?: string) {
+  const qs = keyword ? `?keyword=${encodeURIComponent(keyword)}` : ""
+  return api<{ categories?: TiktokCategory[]; error?: string }>(`/api/tiktok/categories${qs}`)
+}
+export function getTiktokWarehouses() {
+  return api<{ warehouses?: TiktokWarehouse[]; error?: string }>(`/api/tiktok/warehouses`)
+}
+export function publishTiktok(body: {
+  title: string; description?: string; price: number; quantity?: number
+  images?: string[]; tags?: string[]
+  colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>
+  category_id: string; warehouse_id: string; package_weight: string | number; weight_unit?: string
+  brand_id?: string; currency?: string; save_mode?: "AS_DRAFT" | "LISTING"
+  blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; method?: string
+}) {
+  return api<{
+    ok?: boolean; product_id?: string | null; skus?: unknown[]; warnings?: { message?: string }[]
+    dryRun?: boolean; note?: string; missing?: string[]; wouldUploadImages?: number; payload?: unknown; error?: string
+  }>(`/api/tiktok/publish`, { method: "POST", body: JSON.stringify(body) })
+}
+
 export function getEtsyConfig() {
   return api<EtsyConfig>(`/api/etsy/config`)
 }

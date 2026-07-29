@@ -194,6 +194,26 @@ export function PublishProductDialog({
     return () => clearTimeout(id)
   }, [open, prefill])
 
+  // Load TikTok's leaf categories + warehouses the first time the seller switches channels.
+  // The category tree is large, so we fetch it once and filter locally as they type.
+  useEffect(() => {
+    if (channel !== "tiktok") return
+    if (!ttCategories.length) {
+      getTiktokCategories()
+        .then((r) => { if (r.error) setTtLoadErr(r.error); else { setTtLoadErr(""); setTtCategories((r.categories ?? []).filter((c) => c.is_leaf !== false)) } })
+        .catch((e) => setTtLoadErr(e instanceof Error ? e.message : "Couldn't load TikTok categories"))
+    }
+    if (!ttWarehouses.length) {
+      getTiktokWarehouses()
+        .then((r) => {
+          const ws = r.warehouses ?? []
+          setTtWarehouses(ws)
+          setTtWarehouse((w) => w || (ws[0] ? String(ws[0].id) : ""))
+        })
+        .catch(() => {})
+    }
+  }, [channel, ttCategories.length, ttWarehouses.length])
+
   // Variant options follow the chosen blank — the same resolvers the order pickers use,
   // so a listing offers exactly what the factory can actually make.
   const sizeOpts = useMemo(() => sizesOf(blank), [blank])
@@ -305,6 +325,57 @@ export function PublishProductDialog({
   const borrowedPhotos = useMemo(() => images.filter((u) => /^https?:\/\//i.test(u)), [images])
   const removeBorrowedPhotos = () => { imgTouched.current = true; setImages((p) => p.filter((u) => !/^https?:\/\//i.test(u))); setIpConfirmed(false) }
 
+  // Leaf categories that match what the seller typed. Capped so a 5,000-node tree can't
+  // render at once; the search box is how you reach the rest.
+  const ttCatMatches = useMemo(() => {
+    const qy = ttCatQuery.trim().toLowerCase()
+    return ttCategories
+      .filter((c) => !qy || (c.local_name ?? "").toLowerCase().includes(qy))
+      .slice(0, 40)
+  }, [ttCategories, ttCatQuery])
+
+  // Publish to TikTok Shop. Shares the common fields with the Etsy path but adds the three
+  // TikTok-only requirements. The server is DRY-RUN until its TIKTOK_PUBLISH_LIVE flag is
+  // set, so a dry run comes back with the assembled payload rather than a live product.
+  const publishToTiktok = async () => {
+    if (!ttCategory) { setResult({ ok: false, text: "Pick a TikTok category (it must be a leaf)." }); return }
+    if (!ttWarehouse) { setResult({ ok: false, text: "Pick a warehouse for stock." }); return }
+    if (!(Number(ttWeight) > 0)) { setResult({ ok: false, text: "Enter a package weight." }); return }
+    setBusy(true); setResult(null)
+    try {
+      const r = await publishTiktok({
+        title: title.trim(), description: desc.trim() || title.trim(),
+        price: basePrice, quantity: Number(qty) || 999,
+        images, tags,
+        colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
+        sku_base: blank?.sku ?? undefined,
+        size_prices: Object.fromEntries(sizeRows.filter((r) => r.price > 0).map((r) => [r.size, r.price])),
+        category_id: ttCategory.id, warehouse_id: ttWarehouse,
+        package_weight: ttWeight, weight_unit: ttWeightUnit,
+        blank: blank?.sku ?? undefined, printType: method || undefined,
+        designId: prefill?.designId, designUrl: prefill?.designUrl, designPos: prefill?.designPos,
+      })
+      if (r.error) throw new Error(r.error)
+      if (r.dryRun) {
+        // Honest about the mode: nothing was sent. Show what's still missing, if anything.
+        setResult({
+          ok: true,
+          text: "Validated for TikTok — but publishing is in dry-run mode, so nothing was sent to the shop.",
+          note: r.missing?.length ? `Still needed before it can list: ${r.missing.join(", ")}.` : "Ask an admin to enable live TikTok publishing to send it.",
+        })
+        return
+      }
+      setResult({
+        ok: true,
+        text: r.product_id ? `Created a draft product on TikTok (#${r.product_id}).` : "Created a draft product on TikTok.",
+        note: r.warnings?.length ? r.warnings.map((w) => w.message).filter(Boolean).join(" ") : undefined,
+      })
+      onPublished?.(undefined, images[0])
+    } catch (e) {
+      setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })
+    } finally { setBusy(false) }
+  }
+
   const publish = async () => {
     if (!title.trim() || !priceReady) {
       // Say WHICH is missing, and — when it's the price — name the two ways to supply it,
@@ -322,6 +393,7 @@ export function PublishProductDialog({
     // surface the IP warning and make the seller choose. The warning panel renders while
     // `!ipConfirmed`, so this returns and waits rather than silently attaching.
     if (borrowedPhotos.length > 0 && !ipConfirmed) { setResult(null); return }
+    if (channel === "tiktok") { publishToTiktok(); return }
     setBusy(true); setResult(null)
     try {
       const r = await publishEtsy({
@@ -396,6 +468,7 @@ export function PublishProductDialog({
         {result?.ok ? (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
             <div className="font-semibold text-emerald-600">{result.text}</div>
+            {result.note && <p className="max-w-sm text-sm text-muted-foreground">{result.note}</p>}
             {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">View the listing →</a>}
             <Button onClick={() => onOpenChange(false)}>Done</Button>
           </div>
@@ -403,6 +476,25 @@ export function PublishProductDialog({
           <div className="grid max-h-[72vh] gap-5 overflow-y-auto pr-1 md:grid-cols-[1.1fr_1fr]">
             {/* LEFT — what the listing looks like */}
             <div className="space-y-4">
+              {/* Where this draft goes. TikTok reveals its extra required fields on the right. */}
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Publish to</div>
+                <div className="inline-flex rounded-lg border border-border p-0.5">
+                  {(["etsy", "tiktok"] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => { setChannel(c); setResult(null) }}
+                      className={
+                        "rounded-md px-3 py-1 text-xs font-semibold capitalize transition-colors " +
+                        (channel === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
+                      }
+                    >
+                      {c === "tiktok" ? "TikTok Shop" : "Etsy"}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <div className="text-sm font-medium">Photos <span className="text-muted-foreground">({images.length}/{MAX_IMAGES})</span></div>
                 <div className="grid grid-cols-4 gap-2">
@@ -485,6 +577,58 @@ export function PublishProductDialog({
                   Sets what we produce, and the cost behind your margin.
                 </p>
               </div>
+
+              {/* TikTok Shop needs these three; Etsy doesn't. Shown only for the TikTok channel. */}
+              {channel === "tiktok" && (
+                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">TikTok Shop requirements</div>
+                  {ttLoadErr && <p className="text-xs text-destructive">{ttLoadErr}</p>}
+
+                  {/* Leaf category — required. Search then pick from the tree. */}
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium">Category {ttCategory && <span className="text-muted-foreground">· {ttCategory.local_name}</span>}</div>
+                    <Input value={ttCatQuery} onChange={(e) => setTtCatQuery(e.target.value)} placeholder={ttCategories.length ? "Search categories…" : "Loading categories…"} className="h-8 text-xs" />
+                    {ttCatQuery.trim() && (
+                      <div className="max-h-36 overflow-y-auto rounded-md border border-border">
+                        {ttCatMatches.length === 0 ? (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">No leaf category matches.</div>
+                        ) : ttCatMatches.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => { setTtCategory(c); setTtCatQuery("") }}
+                            className={"flex w-full items-center justify-between px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted " + (ttCategory?.id === c.id ? "bg-primary/10 text-primary" : "")}
+                          >
+                            <span className="truncate">{c.local_name || c.id}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Warehouse — per-SKU inventory is booked against it. */}
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium">Warehouse</span>
+                    <select value={ttWarehouse} onChange={(e) => setTtWarehouse(e.target.value)} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                      {!ttWarehouses.length && <option value="">No warehouse found</option>}
+                      {ttWarehouses.map((w) => <option key={w.id} value={w.id}>{w.name || w.id}</option>)}
+                    </select>
+                  </label>
+
+                  {/* Package weight — required for physical products. */}
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium">Package weight</span>
+                    <div className="flex gap-1.5">
+                      <Input value={ttWeight} onChange={(e) => setTtWeight(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.5" inputMode="decimal" className="h-8 flex-1 text-xs" />
+                      <select value={ttWeightUnit} onChange={(e) => setTtWeightUnit(e.target.value)} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs">
+                        <option value="POUND">lb</option>
+                        <option value="KILOGRAM">kg</option>
+                      </select>
+                    </div>
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">Creates a <span className="font-medium text-foreground">draft</span> product on your TikTok Shop for you to review, then list.</p>
+                </div>
+              )}
 
               {/* No "size priced" picker any more — the table below prices every size, so
                   choosing one to represent the rest was the thing hiding the others. */}
@@ -638,8 +782,9 @@ export function PublishProductDialog({
                     {borrowedPhotos.length} of these photos {borrowedPhotos.length === 1 ? "is the competitor's" : "are the competitor's"} own image{borrowedPhotos.length === 1 ? "" : "s"}.
                   </p>
                   <p className="mt-1 text-amber-800">
-                    Publishing them to your Etsy shop may breach Etsy&apos;s intellectual-property
-                    policy and put the shop at risk. Swap in your own artwork, or attach them anyway.
+                    Publishing them to your {channel === "tiktok" ? "TikTok" : "Etsy"} shop may breach the
+                    marketplace&apos;s intellectual-property policy and put the shop at risk. Swap in your
+                    own artwork, or attach them anyway.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button
@@ -670,7 +815,9 @@ export function PublishProductDialog({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Creates a DRAFT in your connected Etsy shop, reusing an existing listing&apos;s category &amp; shipping profile.
+                {channel === "tiktok"
+                  ? "Creates a DRAFT product on your connected TikTok Shop for you to review, then list."
+                  : "Creates a DRAFT in your connected Etsy shop, reusing an existing listing’s category & shipping profile."}
               </p>
             </div>
           </div>
