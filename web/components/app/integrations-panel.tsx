@@ -83,6 +83,9 @@ type Integration = {
   blurb: string
   group: string
   check: () => Promise<Result>
+  // Optional on-demand live call (e.g. a supplier whose status is config-only because the
+  // real call is slow or gated behind an IP whitelist). Renders a "Test connection" button.
+  test?: { path: string; okMsg: (b: Record<string, unknown>) => string }
 }
 
 const configOnly = (path: string, field = "configured"): (() => Promise<Result>) => async () => {
@@ -207,6 +210,9 @@ const INTEGRATIONS: Integration[] = [
       if (!r.ok) return { level: "error", detail: `HTTP ${r.status || "—"}` }
       return r.body.configured ? { level: "configured", detail: r.body.stage ? "stage" : "live" } : { level: "off" }
     },
+    // Status is config-only (creds present) because a real SanMar call needs their IP
+    // whitelist — the Test button makes the actual call so you can confirm that step.
+    test: { path: "/api/sanmar/test", okMsg: (b) => `Reached SanMar — priced ${b.priced_variants ?? 0} variant(s) for ${b.style ?? "PC61"}.` },
   },
   // Other
   {
@@ -238,6 +244,18 @@ export function IntegrationsPanel() {
   )
   const [secrets, setSecrets] = useState<Record<string, SecretMeta[]>>({})
   const [checking, setChecking] = useState(false)
+  // Per-row on-demand test (only rows with a `test` config use it).
+  const [tests, setTests] = useState<Record<string, { running?: boolean; result?: { ok: boolean; msg: string } }>>({})
+  const runTest = useCallback(async (i: Integration) => {
+    if (!i.test) return
+    setTests((p) => ({ ...p, [i.key]: { running: true } }))
+    const r = await raw(i.test.path)
+    const ok = r.ok && r.body.ok === true
+    const msg = ok
+      ? i.test.okMsg(r.body)
+      : String(r.body.error ?? (r.status ? `HTTP ${r.status}` : "Couldn't reach it — if this is a timeout, the server IP isn't whitelisted yet."))
+    setTests((p) => ({ ...p, [i.key]: { result: { ok, msg } } }))
+  }, [])
   // A light copy of the AI config, just for the collapsed Claude row's summary (model +
   // whether a key is set). The editable card below fetches its own.
   const [aiCfg, setAiCfg] = useState<AiConfig | null>(null)
@@ -346,17 +364,34 @@ export function IntegrationsPanel() {
                 <div className="space-y-2 border-t border-border bg-muted/20 px-5 py-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[13px] text-muted-foreground">{i.blurb}</span>
-                    <button
-                      onClick={() => recheckOne(i)}
-                      disabled={res.level === "checking"}
-                      title={`Refresh ${i.name}`}
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
-                    >
-                      <ArrowsClockwise size={12} weight="bold" className={res.level === "checking" ? "animate-spin" : ""} /> Recheck
-                    </button>
+                    <span className="flex items-center gap-3">
+                      {i.test && (
+                        <button
+                          onClick={() => runTest(i)}
+                          disabled={tests[i.key]?.running}
+                          title={`Make a live ${i.name} call`}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:underline disabled:opacity-50"
+                        >
+                          {tests[i.key]?.running ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />} Test connection
+                        </button>
+                      )}
+                      <button
+                        onClick={() => recheckOne(i)}
+                        disabled={res.level === "checking"}
+                        title={`Refresh ${i.name}`}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
+                      >
+                        <ArrowsClockwise size={12} weight="bold" className={res.level === "checking" ? "animate-spin" : ""} /> Recheck
+                      </button>
+                    </span>
                   </div>
                   {res.detail && (
                     <div className="break-all font-mono text-[12px] text-muted-foreground">{res.detail}</div>
+                  )}
+                  {tests[i.key]?.result && (
+                    <div className={"break-words text-[12px] " + (tests[i.key]!.result!.ok ? "text-emerald-600" : "text-destructive")}>
+                      {tests[i.key]!.result!.ok ? "✓ " : "✗ "}{tests[i.key]!.result!.msg}
+                    </div>
                   )}
                   {(secrets[i.key] ?? []).length > 0 && (
                     <div className="space-y-1.5 border-t border-border pt-2">
