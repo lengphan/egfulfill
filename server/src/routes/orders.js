@@ -1172,15 +1172,16 @@ export function ordersRoutes(app, requireAuth) {
     // endpoint being down must never fail the floor's status write.
     notifyOrderEvent(req.params.id, normalizeStage(status) === 'shipped' ? 'order.shipped' : 'order.status_changed',
       { line: { sku, line_id: lineId || null }, status: normalizeStage(status) || null });
-    // Entering the design stage hands the line to a designer — so do it automatically,
-    // and report what was HELD BACK. Silence would be wrong here: "nothing happened"
-    // and "we already have that file" look identical from the board.
+    // Reaching the scan stage tops the blanks back up: anything now projected below its
+    // reorder point is appended to that supplier's DRAFT purchase order (draft only —
+    // placing an order stays a human click on the Purchase board).
+    //
+    // Designs are DELIBERATELY not auto-carded here. A design reaches the board only when a
+    // human sends it (Send to designer / Send to Pink), so a status change — or a label —
+    // never floods the board. `design` stays null to keep the response shape stable for
+    // existing callers. (autoPushDesigns is now dormant.)
     let design = null, replenish = null;
     if (normalizeStage(status) === 'awaiting_scan') {
-      design = await autoPushDesigns(req.params.id, lineId, sku).catch(() => null);
-      // Same gate tops the blanks back up: anything now projected below its reorder
-      // point is appended to that supplier's DRAFT purchase order. Draft only —
-      // placing an order with a supplier stays a human click on the Purchase board.
       replenish = await autoReplenish(req.params.id).catch(() => null);
     }
     egBroadcast({ type: 'item-status' });   // no id/sku — see the note above

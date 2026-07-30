@@ -289,10 +289,12 @@ export function DesignerBoard() {
   // the viewer's role — not the card — decides whether outsourced work is visible.
   const isDesigner = getUser()?.role === "designer"
   const boardCards = useMemo(
-    // Designers see neither outsourced (vendor) cards nor EMB-check cards: a seller-supplied
-    // .emb is already digitised and only needs a factory check before stitching, so it never
-    // enters the designer claim/payout flow — it's factory-internal until it's sent out.
-    () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor && !isEmbCard(c)) : (cards ?? [])),
+    // Designers see design WORK, not files-to-check. A card that already carries a stitch
+    // file (design_id — a seller's supplied .emb, or a factory check) is a verification job,
+    // not digitising, so it stays factory-internal. An EMB *image* (no file yet) IS design
+    // work, so once a human deliberately sends it to the board a designer sees it and can
+    // digitise it. Vendor (Pink) cards are partner-driven and never a designer's to claim.
+    () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor && !c.design_id) : (cards ?? [])),
     [cards, isDesigner],
   )
   // Only meaningful on the designer portal, where partner cards are the ones being hidden;
