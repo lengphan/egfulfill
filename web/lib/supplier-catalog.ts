@@ -1,4 +1,4 @@
-import { getSsStyle, getOttoStyle, colorNames, type CatalogProduct } from "@/lib/api"
+import { getSsStyle, getOttoStyle, getSanmarCatalogStyle, colorNames, type CatalogProduct } from "@/lib/api"
 
 // Otto's Product Data stores images as Google Drive links, which don't render in an <img>
 // (Drive blocks hotlinking). Rewrite to Drive's embeddable thumbnail URL.
@@ -13,6 +13,7 @@ export const driveMap = (m?: Record<string, string>): Record<string, string> =>
 
 type SsFb = { title?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null }
 type OttoFb = { name?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null }
+type SanmarFb = { name?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null }
 
 // Build a catalog product from a supplier style (fetches its full detail on demand). One
 // place, reused by every "Add to catalog" button so the shape never drifts.
@@ -42,6 +43,21 @@ export async function ottoCatalogProduct(style: string, fb: OttoFb): Promise<Cat
     sizes: d?.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (fb.colors ?? [])[0],
     img: driveImg(d?.image ?? fb.image) || undefined, sku: d?.skus?.[0] || style,
     description: d?.description ?? undefined, supplier: "Otto Cap",
+  }
+}
+// SanMar resolves entirely from the imported catalog (no live SOAP call) — its detail
+// endpoint already returns per-colour images and every variant. SanMar is apparel like S&S,
+// so it defaults to DTG. Its price is our wholesale cost → Product cost (see the S&S note).
+export async function sanmarCatalogProduct(style: string, fb: SanmarFb): Promise<CatalogProduct> {
+  const d = await getSanmarCatalogStyle(style).catch(() => null)
+  const colorImages = d && !d.error ? { ...d.colorImages } : {}
+  if (Object.keys(colorImages).length === 0) for (const c of fb.colors ?? []) colorImages[c] = fb.image ?? ""
+  return {
+    id: "SANMAR-" + style, name: d?.name || fb.name || style, type: "Apparel", method: "DTG", status: "Active",
+    productCost: Number(d?.price ?? fb.price) || undefined,
+    sizes: d?.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (fb.colors ?? [])[0],
+    img: (d?.image ?? fb.image) || undefined, sku: style,
+    description: d?.description ?? undefined, supplier: "SanMar",
   }
 }
 

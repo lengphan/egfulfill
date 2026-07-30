@@ -232,6 +232,98 @@ function proxyImages(p) {
   };
 }
 
+// ── Bulk catalog (SDL / EPDD flat file) ──────────────────────────────────────
+// SanMar's browsable catalog does NOT come from the Web Service — getProductInfoByBrand/
+// ByCategory are async FTP drops, and the style call needs a style you already know. The
+// whole, searchable catalog is the SDL/EPDD comma-delimited file SanMar regenerates nightly
+// on their FTP. We ingest that file into `sanmar_products` (same idea as otto_products) and
+// serve browse/search from our DB. The file has a HEADER ROW, so we map by column NAME, not
+// a fixed position — resilient to SanMar reordering or adding columns.
+
+// Quote-aware CSV: handles "" escaped quotes and commas/newlines inside quoted fields.
+function parseCsvRows(text) {
+  const rows = []; let row = []; let field = ''; let inQ = false;
+  const s = String(text || '').replace(/^﻿/, ''); // strip BOM
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQ) {
+      if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && s[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); if (row.length > 1 || row[0] !== '') rows.push(row); }
+  return rows;
+}
+
+// Column name → our field. Header is normalised to lowercase alphanumerics ("STYLE#" →
+// "style", "PRODUCT_TITLE" → "producttitle"); first candidate that appears in the header wins.
+const SANMAR_CSV_FIELDS = {
+  uniqueKey:    ['uniquekey'],
+  style:        ['style', 'stylenumber', 'stylenum'],
+  title:        ['producttitle', 'title'],
+  description:  ['productdescription', 'description'],
+  brand:        ['brandname', 'brand', 'mill', 'millname'],
+  category:     ['categoryname', 'category'],
+  color:        ['colorname', 'color'],
+  catalogColor: ['catalogcolor', 'mainframecolor', 'sanmarmainframecolor'],
+  size:         ['size'],
+  sizeIndex:    ['sizeindex'],
+  inventoryKey: ['inventorykey'],
+  status:       ['productstatus', 'status'],
+  keywords:     ['keywords'],
+  piecePrice:   ['pieceprice', 'myprice'],
+  casePrice:    ['caseprice'],
+  msrp:         ['msrp', 'piecepricemsrp'],
+  qty:          ['qty', 'quantity', 'totalqty', 'inventory', 'totalinventory'],
+  image:        ['productimage', 'frontmodelimageurl', 'frontmodelimage', 'colorproductimage'],
+  swatch:       ['colorswatchimageurl', 'colorswatchimage', 'colorsquareimage', 'swatchimage'],
+  thumbnail:    ['thumbnailimage', 'thumbnailimageurl'],
+};
+const normHeader = (h) => String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// Parse a SanMar SDL/EPDD CSV into normalized variant rows. Returns [] if there's no
+// recognisable header (so a wrong file can't silently write junk).
+function parseSanmarCsv(text) {
+  const rows = parseCsvRows(text);
+  if (rows.length < 2) return [];
+  const header = rows[0].map(normHeader);
+  const idx = {};
+  for (const [field, cands] of Object.entries(SANMAR_CSV_FIELDS)) {
+    for (const cand of cands) { const i = header.indexOf(cand); if (i >= 0) { idx[field] = i; break; } }
+  }
+  // Need at least a style column to be a real product file.
+  if (idx.style == null && idx.uniqueKey == null) return [];
+  const num = (v) => { const n = parseFloat(String(v).replace(/[$,]/g, '')); return isFinite(n) ? n : null; };
+  const cell = (r, f) => (idx[f] != null ? String(r[idx[f]] ?? '').trim() : '');
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const style = cell(r, 'style');
+    let uniqueKey = cell(r, 'uniqueKey');
+    const color = cell(r, 'color') || cell(r, 'catalogColor');
+    const size = cell(r, 'size');
+    if (!uniqueKey) uniqueKey = [style, color, size].filter(Boolean).join('_');
+    if (!uniqueKey || (!style && !cell(r, 'title'))) continue;
+    out.push({
+      uniqueKey, style, title: cell(r, 'title'), description: cell(r, 'description'),
+      brand: cell(r, 'brand'), category: cell(r, 'category'),
+      color, catalogColor: cell(r, 'catalogColor'), size, sizeIndex: cell(r, 'sizeIndex'),
+      inventoryKey: cell(r, 'inventoryKey'), status: cell(r, 'status'), keywords: cell(r, 'keywords'),
+      piecePrice: num(cell(r, 'piecePrice')), casePrice: num(cell(r, 'casePrice')), msrp: num(cell(r, 'msrp')),
+      qty: idx.qty != null ? (parseInt(cell(r, 'qty').replace(/[^0-9-]/g, ''), 10) || 0) : null,
+      image: cell(r, 'image') || null, swatch: cell(r, 'swatch') || null, thumbnail: cell(r, 'thumbnail') || null,
+    });
+  }
+  return out;
+}
+
 export const sanmarEnabled = () => sanmarConfigured();
 
 export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
@@ -239,6 +331,20 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
   q(`create table if not exists sanmar_favorites (
        style text primary key, name text, image text, price numeric,
        created_by uuid, created_at timestamptz default now())`).catch(() => {});
+
+  // Bulk catalog — one row per style/color/size variant, ingested from the SDL/EPDD file.
+  // This is what makes SanMar browsable/keyword-searchable in the supplier catalog, the same
+  // way otto_products backs the Otto browse. Reference data only: spends nothing, touches no
+  // inventory. Placing an actual PO stays gated + warehouse/admin.
+  q(`create table if not exists sanmar_products (
+       unique_key text primary key,
+       style text, title text, description text,
+       brand text, category text,
+       color text, catalog_color text, size text, size_index text, inventory_key text,
+       status text, keywords text,
+       piece_price numeric(12,2), case_price numeric(12,2), msrp numeric(12,2), qty int,
+       image text, swatch text, thumbnail text,
+       data jsonb, synced_at timestamptz default now())`).catch(() => {});
 
   app.get('/api/sanmar/status', { preHandler: requireStaff }, async () => ({
     configured: sanmarConfigured(), stage: isStage(), base: cfg().base,
@@ -404,5 +510,128 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
       // soapCall already threw on errorOccurred=true; a clean response is "PO Submission successful".
       return { ok: true, stage: isStage(), poNumber: o.poNumber, message: tag(xml, 'message') || 'PO Submission successful' };
     } catch (e) { reply.code(502); return { error: String(e && e.message || e) }; }
+  });
+
+  // ── Bulk catalog import + browse ───────────────────────────────────────────
+  // Import the SDL/EPDD catalog into sanmar_products. Accepts EITHER the raw CSV text
+  // ({ csv }) — parsed server-side by the documented column names — OR pre-parsed rows
+  // ({ products: [...] }), mirroring /api/otto/import. Whole-batch upsert by unique_key;
+  // send the file in chunks if it exceeds the 60MB body limit. Staff-gated, like Otto:
+  // it's supplier REFERENCE data, spends nothing, and adds nothing sellable on its own.
+  app.post('/api/sanmar/import', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    let rows = Array.isArray(b.products) ? b.products
+      : (typeof b.csv === 'string' ? parseSanmarCsv(b.csv) : []);
+    if (!rows.length) {
+      reply.code(400);
+      return { error: 'No products found. Send { csv } (the SDL/EPDD file text, with its header row) or { products: [...] }.' };
+    }
+    let n = 0;
+    for (const r of rows) {
+      const uniqueKey = String(r.uniqueKey || r.unique_key || '').trim();
+      if (!uniqueKey) continue;
+      await q(
+        `insert into sanmar_products
+           (unique_key, style, title, description, brand, category, color, catalog_color, size,
+            size_index, inventory_key, status, keywords, piece_price, case_price, msrp, qty,
+            image, swatch, thumbnail, data, synced_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21, now())
+         on conflict (unique_key) do update set
+           style=excluded.style, title=excluded.title, description=excluded.description,
+           brand=excluded.brand, category=excluded.category, color=excluded.color,
+           catalog_color=excluded.catalog_color, size=excluded.size, size_index=excluded.size_index,
+           inventory_key=excluded.inventory_key, status=excluded.status, keywords=excluded.keywords,
+           piece_price=excluded.piece_price, case_price=excluded.case_price, msrp=excluded.msrp,
+           qty=excluded.qty, image=excluded.image, swatch=excluded.swatch, thumbnail=excluded.thumbnail,
+           data=excluded.data, synced_at=now()`,
+        [uniqueKey, r.style || null, r.title || null, r.description || null, r.brand || null,
+         r.category || null, r.color || null, r.catalogColor || r.catalog_color || null, r.size || null,
+         r.sizeIndex || r.size_index || null, r.inventoryKey || r.inventory_key || null, r.status || null,
+         r.keywords || null,
+         (r.piecePrice != null && isFinite(Number(r.piecePrice))) ? Number(r.piecePrice) : null,
+         (r.casePrice != null && isFinite(Number(r.casePrice))) ? Number(r.casePrice) : null,
+         (r.msrp != null && isFinite(Number(r.msrp))) ? Number(r.msrp) : null,
+         (r.qty != null && isFinite(Number(r.qty))) ? Math.trunc(Number(r.qty)) : null,
+         r.image || null, r.swatch || null, r.thumbnail || null, JSON.stringify(r.data || {})]
+      ).catch(() => {});
+      n++;
+    }
+    const c = await q('select count(*)::int as n from sanmar_products').catch(() => ({ rows: [{ n: 0 }] }));
+    return { ok: true, imported: n, total: c.rows[0]?.n || 0 };
+  });
+
+  // Catalog status — count + last import time (drives the "import the catalog" empty state).
+  app.get('/api/sanmar/catalog/status', { preHandler: requireStaff }, async () => {
+    try { const r = await q('select count(*)::int as n, max(synced_at) as last from sanmar_products'); return { count: r.rows[0]?.n || 0, last: r.rows[0]?.last || null }; }
+    catch { return { count: 0, last: null }; }
+  });
+
+  // Browse the imported catalog, one card per style — the SanMar equivalent of
+  // /api/otto/products, so it interleaves in the supplier browse the same way.
+  app.get('/api/sanmar/catalog', { preHandler: requireStaff }, async (req, reply) => {
+    const search = String(req.query?.search || req.query?.q || '').trim().toLowerCase();
+    const limit = Math.min(120, Math.max(1, parseInt(req.query?.limit, 10) || 60));
+    const offset = Math.max(0, parseInt(req.query?.offset, 10) || 0);
+    const where = search
+      ? `where lower(coalesce(style,'') || ' ' || coalesce(title,'') || ' ' || coalesce(brand,'') || ' ' || coalesce(category,'') || ' ' || coalesce(color,'') || ' ' || coalesce(keywords,'')) like $1`
+      : '';
+    const params = search ? ['%' + search + '%'] : [];
+    try {
+      const total = await q(`select count(*)::int as n from (select coalesce(style, unique_key) g from sanmar_products ${where} group by coalesce(style, unique_key)) t`, params);
+      const r = await q(
+        `select coalesce(style, unique_key) as style, min(brand) as brand, min(title) as name,
+                min(description) as description, min(category) as category,
+                min(piece_price) as price, max(piece_price) as price_max,
+                (array_agg(coalesce(image, thumbnail, swatch)) filter (where coalesce(image, thumbnail, swatch) is not null))[1] as image,
+                array_agg(distinct color) filter (where color is not null) as colors,
+                array_agg(distinct size) filter (where size is not null) as sizes,
+                coalesce(sum(qty), 0) as qty
+           from sanmar_products ${where}
+          group by coalesce(style, unique_key)
+          order by style
+          limit ${limit} offset ${offset}`, params);
+      let favs = new Set();
+      try { const fr = await q('select style from sanmar_favorites'); favs = new Set(fr.rows.map((x) => String(x.style))); } catch { /* no favorites table yet */ }
+      const items = r.rows.map((row) => ({ ...row, image: sanmarImg(row.image), favorited: favs.has(String(row.style)) }));
+      return { total: total.rows[0]?.n || 0, items };
+    } catch (e) { reply.code(500); return { error: String((e && e.message) || e), total: 0, items: [] }; }
+  });
+
+  // One style's full detail from the imported catalog — every colour, size and variant key.
+  // Mirrors /api/otto/style/:style so the "Add to catalog" + quick-order paths treat SanMar
+  // exactly like Otto (no live SOAP call needed; all data is the ingested flat file).
+  app.get('/api/sanmar/catalog/:style', { preHandler: requireStaff }, async (req, reply) => {
+    const style = String(req.params?.style || '').trim();
+    if (!style) { reply.code(400); return { error: 'style required' }; }
+    try {
+      const r = await q(
+        `select unique_key, style, title, description, brand, category, color, catalog_color,
+                size, size_index, inventory_key, piece_price, image, swatch, thumbnail
+           from sanmar_products where style=$1 order by color, size`, [style]);
+      if (!r.rows.length) { reply.code(404); return { error: 'Not in the imported catalog.' }; }
+      const rows = r.rows;
+      const colorImages = {};
+      for (const v of rows) {
+        const c = v.color || v.catalog_color;
+        if (c && !colorImages[c]) colorImages[c] = sanmarImg(v.image || v.thumbnail || v.swatch);
+      }
+      const uniq = (arr) => Array.from(new Set(arr.filter(Boolean)));
+      const variants = rows.map((v) => ({
+        color: v.color || v.catalog_color || null, size: v.size || null,
+        // SanMar's canonical variant handle is the inventory key; fall back to unique_key.
+        sku: v.inventory_key || v.unique_key, inventoryKey: v.inventory_key || null, sizeIndex: v.size_index || null,
+        price: v.piece_price != null ? Number(v.piece_price) : null, image: sanmarImg(v.image || v.thumbnail),
+      }));
+      const first = rows[0];
+      return {
+        style, name: first.title || style, brand: first.brand || 'SanMar', category: first.category || null,
+        description: first.description || null,
+        price: first.piece_price != null ? Number(first.piece_price) : null,
+        image: sanmarImg(first.image || first.thumbnail || first.swatch),
+        colors: uniq(rows.map((v) => v.color || v.catalog_color)),
+        sizes: uniq(rows.map((v) => v.size)),
+        colorImages, variants, skus: variants.map((v) => v.sku),
+      };
+    } catch (e) { reply.code(500); return { error: String((e && e.message) || e) }; }
   });
 }

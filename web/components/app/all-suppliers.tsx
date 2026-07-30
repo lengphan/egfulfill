@@ -15,11 +15,12 @@ import { parseCSV } from "@/lib/order-import"
 import {
   getSsStylesAll, getSsStyleImgs, getSsStyle, toggleSsFavorite, ssWarm, ssSync,
   getOttoProducts, getOttoStyle, getSsStyleSkus, getCatalogFilters, toggleOttoFavorite, importOttoProducts,
+  getSanmarCatalog, getSanmarCatalogStyle, toggleSanmarFavorite, importSanmarCatalog,
   getCatalogProducts, saveCatalogProducts, colorNames,
-  type SsStyle, type OttoStyle, type OttoImportRow, type CatalogProduct,
+  type SsStyle, type OttoStyle, type OttoImportRow, type SanmarCatalogStyle, type CatalogProduct,
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
-import { driveImg, prettyColor, driveMap, ssCatalogProduct, ottoCatalogProduct } from "@/lib/supplier-catalog"
+import { driveImg, prettyColor, driveMap, ssCatalogProduct, ottoCatalogProduct, sanmarCatalogProduct } from "@/lib/supplier-catalog"
 
 const PAGE = 30
 
@@ -53,14 +54,16 @@ function mapOttoRows(rows: string[][]): OttoImportRow[] {
 type Item =
   | { supplier: "ss"; id: string; ss: SsStyle }
   | { supplier: "otto"; id: string; otto: OttoStyle }
+  | { supplier: "sanmar"; id: string; sanmar: SanmarCatalogStyle }
 
-// One feed across BOTH suppliers — no tab-switching. Each card is badged S&S / Otto and
-// shows its brand. S&S streams from the full live catalog; Otto from the imported set.
+// One feed across ALL suppliers — no tab-switching. Each card is badged S&S / Otto / SanMar
+// and shows its brand. S&S streams from the full live catalog; Otto and SanMar from their
+// imported sets (SanMar's is the SDL/EPDD flat file, ingested into sanmar_products).
 export function AllSuppliers() {
   const isAdmin = getUser()?.role === "admin"
   const [search, setSearch] = useState("")
   const [debounced, setDebounced] = useState("")
-  const [sup, setSup] = useState<"" | "ss" | "otto">("")
+  const [sup, setSup] = useState<"" | "ss" | "otto" | "sanmar">("")
   const [brand, setBrand] = useState("")
   const [cat, setCat] = useState("")
   const [minP, setMinP] = useState("")
@@ -68,8 +71,10 @@ export function AllSuppliers() {
   const [items, setItems] = useState<Item[] | null>(null)
   const [ssOff, setSsOff] = useState(0)
   const [ottoOff, setOttoOff] = useState(0)
+  const [sanmarOff, setSanmarOff] = useState(0)
   const [ssTotal, setSsTotal] = useState(0)
   const [ottoTotal, setOttoTotal] = useState(0)
+  const [sanmarTotal, setSanmarTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [allFilters, setAllFilters] = useState<{ brands: string[]; categories: string[]; priceMin: number | null; priceMax: number | null } | null>(null)
@@ -90,15 +95,17 @@ export function AllSuppliers() {
   const [refreshing, setRefreshing] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const sanmarFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { const id = setTimeout(() => setDebounced(search.trim().toLowerCase()), 350); return () => clearTimeout(id) }, [search])
 
-  const fetchPage = useCallback(async (q: string, sOff: number, oOff: number): Promise<Item[]> => {
-    const [ss, otto] = await Promise.all([
+  const fetchPage = useCallback(async (q: string, sOff: number, oOff: number, saOff: number): Promise<Item[]> => {
+    const [ss, otto, sanmar] = await Promise.all([
       getSsStylesAll({ search: q, limit: PAGE, offset: sOff }).catch(() => ({ total: 0, styles: [] as SsStyle[] })),
       getOttoProducts({ search: q, limit: PAGE, offset: oOff }).catch(() => ({ total: 0, items: [] as OttoStyle[] })),
+      getSanmarCatalog({ search: q, limit: PAGE, offset: saOff }).catch(() => ({ total: 0, items: [] as SanmarCatalogStyle[] })),
     ])
-    setSsTotal(ss.total ?? 0); setOttoTotal(otto.total ?? 0)
+    setSsTotal(ss.total ?? 0); setOttoTotal(otto.total ?? 0); setSanmarTotal(sanmar.total ?? 0)
     const ssStyles = ss.styles ?? []
     // Resolve S&S thumbnails + colors + PRICE for this page (batched, cached). Resolve when
     // the image, the colors, OR the price is missing — the price comes from the same call.
@@ -116,39 +123,44 @@ export function AllSuppliers() {
     }
     const ssItems: Item[] = ssStyles.map((s) => ({ supplier: "ss", id: s.styleID, ss: s }))
     const ottoItems: Item[] = (otto.items ?? []).map((o) => ({ supplier: "otto", id: o.style, otto: o }))
-    // Interleave so both suppliers show from the top.
+    const sanmarItems: Item[] = (sanmar.items ?? []).map((s) => ({ supplier: "sanmar", id: s.style, sanmar: s }))
+    // Interleave so every supplier shows from the top.
     const merged: Item[] = []
-    const n = Math.max(ssItems.length, ottoItems.length)
-    for (let i = 0; i < n; i++) { if (ssItems[i]) merged.push(ssItems[i]); if (ottoItems[i]) merged.push(ottoItems[i]) }
+    const n = Math.max(ssItems.length, ottoItems.length, sanmarItems.length)
+    for (let i = 0; i < n; i++) { if (ssItems[i]) merged.push(ssItems[i]); if (ottoItems[i]) merged.push(ottoItems[i]); if (sanmarItems[i]) merged.push(sanmarItems[i]) }
     return merged
   }, [])
 
   const reload = useCallback((q: string) => {
     if (!getToken()) { setItems([]); return }
-    setLoading(true); setSsOff(0); setOttoOff(0)
-    fetchPage(q, 0, 0).then((m) => setItems(m)).catch(() => setItems([])).finally(() => setLoading(false))
+    setLoading(true); setSsOff(0); setOttoOff(0); setSanmarOff(0)
+    fetchPage(q, 0, 0, 0).then((m) => setItems(m)).catch(() => setItems([])).finally(() => setLoading(false))
   }, [fetchPage])
 
   useEffect(() => { const id = setTimeout(() => reload(debounced), 0); return () => clearTimeout(id) }, [debounced, reload])
 
   const loadMore = async () => {
     setLoading(true)
-    const sOff = ssOff + PAGE, oOff = ottoOff + PAGE
-    setSsOff(sOff); setOttoOff(oOff)
-    try { const m = await fetchPage(debounced, sOff, oOff); setItems((prev) => [...(prev ?? []), ...m]) } finally { setLoading(false) }
+    const sOff = ssOff + PAGE, oOff = ottoOff + PAGE, saOff = sanmarOff + PAGE
+    setSsOff(sOff); setOttoOff(oOff); setSanmarOff(saOff)
+    try { const m = await fetchPage(debounced, sOff, oOff, saOff); setItems((prev) => [...(prev ?? []), ...m]) } finally { setLoading(false) }
   }
 
-  const cardData = (it: Item) => it.supplier === "ss"
-    // Favourites arrive WITH their sizes joined from the synced skus, so prefer those over
-    // the lazily-fetched detail — the favourites tab was showing em-dashes because it was
-    // waiting on a detail call that only fires when you open a card.
-    // S&S: assert one-size ONLY once its sizes are actually resolved (favourite-joined, or
-    // a detail call has returned) and came back empty — before that, empty means unloaded,
-    // so oneSize stays undefined and the card shows "—".
-    ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, sizes: (it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`]) ?? [], sizesCount: it.ss.sizes?.length ?? undefined, oneSize: ((it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`])?.length === 0) && (it.ss.sizes !== undefined || detailSizes[`ss:${it.ss.styleID}`] !== undefined), favorited: it.ss.favorited }
+  const cardData = (it: Item) => {
+    // S&S: favourites arrive WITH their sizes joined from the synced skus, so prefer those
+    // over the lazily-fetched detail — the favourites tab was showing em-dashes because it
+    // was waiting on a detail call that only fires when you open a card. Assert one-size
+    // ONLY once sizes are actually resolved (favourite-joined, or a detail call returned)
+    // and came back empty — before that, empty means unloaded, so oneSize stays undefined
+    // and the card shows "—".
+    if (it.supplier === "ss") return { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, sizes: (it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`]) ?? [], sizesCount: it.ss.sizes?.length ?? undefined, oneSize: ((it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`])?.length === 0) && (it.ss.sizes !== undefined || detailSizes[`ss:${it.ss.styleID}`] !== undefined), favorited: it.ss.favorited }
     // Otto: the list returns every size, so an empty set is a real fact — the product has
     // no size dimension, i.e. one size / OSFM.
-    : { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizes: it.otto.sizes ?? [], sizesCount: it.otto.sizes?.length ?? 0, oneSize: (it.otto.sizes?.length ?? 0) === 0, favorited: it.otto.favorited }
+    if (it.supplier === "otto") return { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizes: it.otto.sizes ?? [], sizesCount: it.otto.sizes?.length ?? 0, oneSize: (it.otto.sizes?.length ?? 0) === 0, favorited: it.otto.favorited }
+    // SanMar: the imported catalog aggregates every colour and size per style, so — like
+    // Otto — an empty size set is a real fact. Image is already proxied by the API.
+    return { id: it.sanmar.style, title: it.sanmar.name || it.sanmar.style, brand: it.sanmar.brand || "SanMar", subtitle: it.sanmar.category || undefined, image: it.sanmar.image, price: it.sanmar.price, priceMax: it.sanmar.price_max, colors: it.sanmar.colors, sizes: it.sanmar.sizes ?? [], sizesCount: it.sanmar.sizes?.length ?? 0, oneSize: (it.sanmar.sizes?.length ?? 0) === 0, favorited: it.sanmar.favorited }
+  }
 
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
 
@@ -202,6 +214,19 @@ export function AllSuppliers() {
     } catch (e) { return { sizes: [], error: e instanceof Error ? e.message : "Couldn't reach Otto Cap." } }
   }
 
+  const loadSanmarVariants = async (style: string) => {
+    try {
+      const d = await getSanmarCatalogStyle(style)
+      if (d?.error) return { sizes: [], error: d.error }
+      const sizes = (d.variants ?? []).map((v) => ({
+        size: [v.color, v.size].filter(Boolean).join(" / ") || v.sku,
+        // SanMar's orderable handle is the inventory key (carried as `sku` by the detail API).
+        sku: v.sku, price: v.price ?? null, image: v.image ?? null,
+      }))
+      return { sizes, error: sizes.length ? null : "This SanMar style has no variants in the imported catalog." }
+    } catch (e) { return { sizes: [], error: e instanceof Error ? e.message : "Couldn't load the SanMar catalog." } }
+  }
+
   const quickOrderFor = (it: Item): QuickOrderProduct => {
     const d = cardData(it)
     // S&S sizes are only loaded once a card has been expanded; Otto ships them with the
@@ -213,7 +238,7 @@ export function AllSuppliers() {
     return {
       style: String(d.id),
       name: d.title || String(d.id),
-      supplier: it.supplier === "ss" ? "S&S Activewear" : "Otto Cap",
+      supplier: it.supplier === "ss" ? "S&S Activewear" : it.supplier === "otto" ? "Otto Cap" : "SanMar",
       image: d.image ?? null,
       sizes,
       defaultPrice: typeof d.price === "number" ? d.price : Number(d.price) || null,
@@ -227,7 +252,9 @@ export function AllSuppliers() {
     try {
       const product = it.supplier === "ss"
         ? await ssCatalogProduct(it.id, { title: it.ss.title, price: it.ss.price, image: it.ss.image, colors: colorNames(it.ss.colors) })
-        : await ottoCatalogProduct(it.id, { name: it.otto.name, price: it.otto.price, image: it.otto.image, colors: it.otto.colors })
+        : it.supplier === "otto"
+          ? await ottoCatalogProduct(it.id, { name: it.otto.name, price: it.otto.price, image: it.otto.image, colors: it.otto.colors })
+          : await sanmarCatalogProduct(it.id, { name: it.sanmar.name, price: it.sanmar.price, image: it.sanmar.image, colors: it.sanmar.colors ?? [] })
       setPreview(product); setPreviewKey(keyOf(it))
     } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't load that product.") } finally { setAddingId(null) }
   }
@@ -248,16 +275,20 @@ export function AllSuppliers() {
 
   const favorite = (it: Item, on: boolean) => {
     if (it.supplier === "ss") toggleSsFavorite(it.ss, on).catch(() => {})
-    else toggleOttoFavorite({ style: it.otto.style, name: it.otto.name, image: it.otto.image, price: it.otto.price }, on).catch(() => {})
+    else if (it.supplier === "otto") toggleOttoFavorite({ style: it.otto.style, name: it.otto.name, image: it.otto.image, price: it.otto.price }, on).catch(() => {})
+    else toggleSanmarFavorite({ style: it.sanmar.style, name: it.sanmar.name ?? undefined, image: it.sanmar.image, price: typeof it.sanmar.price === "number" ? it.sanmar.price : Number(it.sanmar.price) || null }, on).catch(() => {})
   }
 
-  const loadColors = (it: Item) => it.supplier === "ss"
-    ? () => getSsStyle(it.id).then((d) => {
-        if (!d || d.error) return {}
-        if (d.sizes?.length) setDetailSizes((p) => ({ ...p, [`ss:${it.id}`]: d.sizes! }))
-        return d.colorImages ?? {}
-      })
-    : () => getOttoStyle(it.id).then((d) => (d && !d.error ? driveMap(d.colorImages) : {}))
+  const loadColors = (it: Item): (() => Promise<Record<string, string>>) => {
+    if (it.supplier === "ss") return () => getSsStyle(it.id).then((d) => {
+      if (!d || d.error) return {}
+      if (d.sizes?.length) setDetailSizes((p) => ({ ...p, [`ss:${it.id}`]: d.sizes! }))
+      return d.colorImages ?? {}
+    })
+    if (it.supplier === "otto") return () => getOttoStyle(it.id).then((d) => (d && !d.error ? driveMap(d.colorImages) : {}))
+    // SanMar colour images come straight from the imported detail (already proxied).
+    return () => getSanmarCatalogStyle(it.id).then((d) => (d && !d.error ? d.colorImages ?? {} : {}))
+  }
 
   const onImport = async (file?: File) => {
     if (!file) return
@@ -276,10 +307,24 @@ export function AllSuppliers() {
     } catch (e) { setMsg(e instanceof Error ? e.message : "Import failed.") } finally { setImporting(false); if (fileRef.current) fileRef.current.value = "" }
   }
 
+  // SanMar's SDL/EPDD file is a comma-delimited CSV with a header row. Send the raw text —
+  // the server parses it by column name. (Big files may exceed the 60MB body limit; the
+  // basic SDL is well under, but a full EPDD with inventory can be split if it errors.)
+  const onImportSanmar = async (file?: File) => {
+    if (!file) return
+    setImporting(true); setMsg(null)
+    try {
+      const text = await file.text()
+      const r = await importSanmarCatalog(text)
+      if (r.error) throw new Error(r.error)
+      setMsg(`Imported ${r.imported ?? 0} SanMar rows — ${(r.total ?? 0).toLocaleString()} in the catalog.`); reload(debounced)
+    } catch (e) { setMsg(e instanceof Error ? e.message : "SanMar import failed.") } finally { setImporting(false); if (sanmarFileRef.current) sanmarFileRef.current.value = "" }
+  }
+
   // Filters (supplier / brand / category / price) — applied to what's loaded, like SpyDeck.
-  const brandOf = (it: Item) => (it.supplier === "ss" ? it.ss.brand || "" : it.otto.brand || "Otto Cap")
-  const catOf = (it: Item) => (it.supplier === "ss" ? it.ss.category || "" : it.otto.category || "")
-  const priceOf = (it: Item) => Number(it.supplier === "ss" ? it.ss.price : it.otto.price) || 0
+  const brandOf = (it: Item) => (it.supplier === "ss" ? it.ss.brand || "" : it.supplier === "otto" ? it.otto.brand || "Otto Cap" : it.sanmar.brand || "SanMar")
+  const catOf = (it: Item) => (it.supplier === "ss" ? it.ss.category || "" : it.supplier === "otto" ? it.otto.category || "" : it.sanmar.category || "")
+  const priceOf = (it: Item) => Number(it.supplier === "ss" ? it.ss.price : it.supplier === "otto" ? it.otto.price : it.sanmar.price) || 0
   const pool = (items ?? []).filter((it) => !sup || it.supplier === sup)
   // Filter options come from the WHOLE catalogue, not the loaded page. Deriving them from
   // `pool` meant a brand two pages deep was never offered — and the fewer results a search
@@ -305,7 +350,7 @@ export function AllSuppliers() {
   const anyFilter = !!(sup || brand || cat || minP || maxP)
   const clearFilters = () => { setSup(""); setBrand(""); setCat(""); setMinP(""); setMaxP("") }
 
-  const total = ssTotal + ottoTotal
+  const total = ssTotal + ottoTotal + sanmarTotal
   const canLoadMore = (items?.length ?? 0) < total
 
   return (
@@ -323,6 +368,10 @@ export function AllSuppliers() {
             <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
               {importing ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />} Import Otto
             </Button>
+            <input ref={sanmarFileRef} type="file" accept=".csv,.txt,text/csv" className="hidden" onChange={(e) => onImportSanmar(e.target.files?.[0])} />
+            <Button size="sm" variant="outline" onClick={() => sanmarFileRef.current?.click()} disabled={importing}>
+              {importing ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />} Import SanMar
+            </Button>
             <Button size="sm" variant="outline" onClick={() => { setRefreshing(true); ssWarm().catch(() => {}).finally(() => setRefreshing(false)) }} disabled={refreshing}>
               <ArrowsClockwise size={14} weight="bold" className={refreshing ? "animate-spin" : ""} /> Refresh
             </Button>
@@ -338,10 +387,11 @@ export function AllSuppliers() {
       {/* Filters — brand / category / price, applied to what's loaded */}
       {items !== null && items.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 text-sm">
-          <select value={sup} onChange={(e) => { setSup(e.target.value as "" | "ss" | "otto"); setBrand(""); setCat("") }} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+          <select value={sup} onChange={(e) => { setSup(e.target.value as "" | "ss" | "otto" | "sanmar"); setBrand(""); setCat("") }} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
             <option value="">All suppliers</option>
             <option value="ss">S&amp;S Activewear</option>
             <option value="otto">Otto Cap</option>
+            <option value="sanmar">SanMar</option>
           </select>
           <select value={brand} onChange={(e) => setBrand(e.target.value)} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
             <option value="">All brands</option>
@@ -376,7 +426,7 @@ export function AllSuppliers() {
                 <SupplierProductCard
                   key={keyOf(it)}
                   data={cardData(it)}
-                  supplierLabel={it.supplier === "ss" ? "S&S" : "Otto"}
+                  supplierLabel={it.supplier === "ss" ? "S&S" : it.supplier === "otto" ? "Otto" : "SanMar"}
                   added={added.has(keyOf(it))}
                   adding={addingId === keyOf(it)}
                   onAdd={() => addToCatalog(it)}
@@ -389,7 +439,9 @@ export function AllSuppliers() {
                     // one showed "this product lists no sizes" for a product that has 40.
                     const r = it.supplier === "otto"
                       ? await loadOttoVariants(it.id)
-                      : await loadSsVariants(it.id)
+                      : it.supplier === "sanmar"
+                        ? await loadSanmarVariants(it.id)
+                        : await loadSsVariants(it.id)
                     setQuickOrder(r.sizes.length ? { ...base, sizes: r.sizes } : { ...base, loadError: r.error ?? undefined })
                   }}
                   onFavorite={(on) => favorite(it, on)}

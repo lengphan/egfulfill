@@ -689,6 +689,31 @@ export function sanmarOrder(lines: SanmarOrderLine[], shipTo: SanmarShipTo, extr
     `/api/sanmar/order`, { method: "POST", body: JSON.stringify({ lines, shipTo, ...extra }) })
 }
 
+// ── SanMar bulk catalog (imported SDL/EPDD file) — browsable/searchable like Otto ──
+// One card per style; same field vocabulary as OttoStyle so the supplier feed renders it
+// with the shared SupplierProductCard.
+export type SanmarCatalogStyle = { style: string; brand?: string | null; name: string | null; description?: string | null; category?: string | null; price: number | string | null; price_max?: number | string | null; image: string | null; colors: string[] | null; sizes: string[] | null; qty?: number | null; favorited?: boolean }
+export type SanmarCatalogVariant = { color: string | null; size: string | null; sku: string; inventoryKey: string | null; sizeIndex: string | null; price: number | null; image: string | null }
+export type SanmarCatalogDetail = { style: string; name: string | null; brand?: string | null; category?: string | null; description?: string | null; price: number | null; image: string | null; colors: string[]; sizes: string[]; colorImages: Record<string, string>; variants: SanmarCatalogVariant[]; skus: string[]; error?: string }
+export function getSanmarCatalog(p: { search?: string; limit?: number; offset?: number }) {
+  const s = new URLSearchParams()
+  if (p.search) s.set("search", p.search)
+  if (p.limit != null) s.set("limit", String(p.limit))
+  if (p.offset != null) s.set("offset", String(p.offset))
+  return api<{ total: number; items: SanmarCatalogStyle[]; error?: string }>(`/api/sanmar/catalog?${s.toString()}`)
+}
+export function getSanmarCatalogStyle(style: string) {
+  return api<SanmarCatalogDetail>(`/api/sanmar/catalog/${encodeURIComponent(style)}`)
+}
+export function getSanmarCatalogStatus() {
+  return api<{ count: number; last: string | null }>(`/api/sanmar/catalog/status`)
+}
+// Import the SDL/EPDD file. Send its raw text ({ csv }) — the server parses it by column name.
+export function importSanmarCatalog(csv: string) {
+  return api<{ ok?: boolean; imported?: number; total?: number; error?: string }>(
+    `/api/sanmar/import`, { method: "POST", body: JSON.stringify({ csv }) })
+}
+
 // ── Inventory (staff) — whole-array upsert: send the full list, missing SKUs are dropped ──
 export type InventoryItem = { sku: string; name?: string | null; variant?: string | null; in_stock?: number; reserved?: number; reorder_at?: number; category?: string | null; supplier?: string | null; updated_at?: string }
 export function getInventory() {
