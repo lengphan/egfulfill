@@ -5,7 +5,7 @@ import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
+import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, Paperclip } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, type OrderDesignStatus } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
@@ -17,7 +17,7 @@ import { OrderHistory } from "@/components/app/order-history"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { ApproveOrderButton } from "@/components/app/approve-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
-import { SellerDesignFiles } from "@/components/app/design-files-panel"
+import { SellerDesignFiles, DesignFilesPanel } from "@/components/app/design-files-panel"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -90,6 +90,9 @@ export default function OrderDetailPage() {
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
   const [customize, setCustomize] = useState<OrderItem | null>(null)
+  // Which line's per-item file uploader is expanded (staff only). One at a time keeps the
+  // row list calm; the file lands on that line, no board card and no design push.
+  const [attachFor, setAttachFor] = useState<string | null>(null)
   // Design-partner state per line. Read separately from the order so a failure costs the
   // chip, not the page — and it 403s for sellers, which is exactly the intended result:
   // null means "no partner UI here", not "broken".
@@ -366,28 +369,38 @@ export default function OrderDetailPage() {
                         )}
 
                         {it.sku && (
-                          <div className="mt-3 flex items-center justify-end gap-2">
-                            {/* Partner chip + the tucked-away send action. Staff only —
-                                it renders nothing when design-status can't be read, which
-                                is what a seller gets. */}
-                            {designStatus && (
-                              <ItemDesignActions
-                                orderId={id}
-                                sku={String(it.sku)}
-                                itemName={it.name}
-                                qty={qty}
-                                printType={it.print_type}
-                                artworkUrl={artwork}
-                                state={designStatus.bySku[String(it.sku)]}
-                                onChanged={loadDesignStatus}
-                              />
+                          <>
+                            <div className="mt-3 flex items-center justify-end gap-2">
+                              {/* Factory attaches its OWN file (an .emb it cut, a print file)
+                                  straight onto THIS line — a silent attach: no board card, no
+                                  design push, it just lands in this line's files below. */}
+                              {isStaff && (
+                                <Button variant="outline" size="sm" onClick={() => setAttachFor((s) => (s === String(it.sku) ? null : String(it.sku)))}>
+                                  <Paperclip size={14} weight="bold" /> {attachFor === String(it.sku) ? "Hide files" : "Attach file"}
+                                </Button>
+                              )}
+                              {/* Partner chip + the tucked-away send action. Staff only —
+                                  it renders nothing when design-status can't be read, which
+                                  is what a seller gets. */}
+                              {designStatus && (
+                                <ItemDesignActions
+                                  orderId={id}
+                                  sku={String(it.sku)}
+                                  itemName={it.name}
+                                  qty={qty}
+                                  printType={it.print_type}
+                                  artworkUrl={artwork}
+                                  state={designStatus.bySku[String(it.sku)]}
+                                  onChanged={loadDesignStatus}
+                                />
+                              )}
+                            </div>
+                            {isStaff && attachFor === String(it.sku) && (
+                              <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+                                <DesignFilesPanel orderId={String(id)} sku={String(it.sku)} compact />
+                              </div>
                             )}
-                            {/* The Customize button is gone: the item's own image opens the
-                                same designer (onEdit above), so this was a second door to
-                                one room sitting in a row that is already busy. The image is
-                                the more discoverable of the two — it's the thing people
-                                click when they want to change the artwork. */}
-                          </div>
+                          </>
                         )}
                       </div>
                     </div>

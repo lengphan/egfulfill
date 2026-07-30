@@ -63,6 +63,9 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
   const confirm = useConfirm()
 
   const canPrice = role === "admin" || role === "warehouse"
+  // When mounted for a specific line, show only THAT line's files (uploads already target
+  // the sku). Order-level mounts (no sku) show everything, unchanged.
+  const shown = sku ? (files ?? []).filter((f) => (f.sku || "") === sku) : (files ?? [])
 
   const load = useCallback(() => {
     getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
@@ -155,11 +158,11 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
 
       {files === null ? (
         <div className="flex justify-center py-3 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /></div>
-      ) : files.length === 0 ? (
+      ) : shown.length === 0 ? (
         <div className="py-2 text-center text-[11px] text-muted-foreground">No files yet.</div>
       ) : (
         <div className="divide-y divide-border rounded-xl border border-border">
-          {orderFiles(files).map((f) => {
+          {orderFiles(shown).map((f) => {
             const k = KIND_META[f.kind || "other"] ?? KIND_META.other
             return (
               <div key={f.designId} className="flex items-center gap-2 p-2">
