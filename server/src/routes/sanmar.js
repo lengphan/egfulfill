@@ -1,20 +1,24 @@
-// SanMar connector — apparel/blanks supplier (SanMar Web Services, SOAP/XML v16.10).
+// SanMar connector — apparel/blanks supplier (SanMar Web Services, SOAP/XML v24.5).
 // -----------------------------------------------------------------------------
 // Unlike S&S and Otto (REST/JSON), SanMar is SOAP: we hand-build the request envelope
 // and pull fields out of the XML response with a small tag extractor (no XML dependency —
 // the responses are flat element trees). Product / Inventory / Pricing are read-only and
-// LIVE once activated; order placement is DRY-RUN until SANMAR_ORDER_LIVE='1' AND the PO
-// payload is finalised against SanMar's separate Purchase Order Submission Guide (this
-// integration guide doesn't specify it). All routes are STAFF-gated.
+// LIVE once the account is onboarded. Ordering (submitPO) is DRY-RUN until
+// SANMAR_ORDER_LIVE='1'; getPreSubmitInfo is a safe inventory pre-check (no order placed).
+// All routes are STAFF-gated.
 //
-// ACTIVATION (real-world, not code): SanMar requires the calling server's external static
-// IP to be whitelisted and a signed integration agreement on file. Until then every call
-// times out — that's their gate, not a bug. Our VPS apex A-record IP is what to give them.
+// ACTIVATION (real-world, not code): SanMar does NOT whitelist IPs (that restriction was
+// removed in 2018). The gate is: email sanmarintegrations@sanmar.com + Customer Number →
+// sign the Integration Agreement → SanMar enables FTP/Web-Services access → then your
+// sanmar.com username + password authenticate the production APIs. PURCHASE-ORDER
+// integration is a SEPARATE, later onboarding: SanMar first sets up a TEST environment
+// with its OWN credentials (point SANMAR_API_BASE at test-ws.sanmar.com to use them),
+// requires a multi-line test PO, then configures production ordering.
 //
 // Env (also settable in Settings → integration secrets): SANMAR_CUSTOMER_NUMBER,
-//   SANMAR_USERNAME, SANMAR_PASSWORD, SANMAR_API_BASE (prod default; stage-ws for testing),
-//   SANMAR_ORDER_LIVE (order gate). Read at CALL TIME so UI-saved keys apply without a
-//   restart, matching the _LIVE gate pattern used by the other suppliers.
+//   SANMAR_USERNAME, SANMAR_PASSWORD, SANMAR_API_BASE (prod default; test-ws for the PO
+//   test environment), SANMAR_ORDER_LIVE (order gate). Read at CALL TIME so UI-saved keys
+//   apply without a restart, matching the _LIVE gate pattern used by the other suppliers.
 
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
@@ -30,22 +34,28 @@ function cfg() {
   };
 }
 function sanmarConfigured() { const c = cfg(); return !!(c.cust && c.user && c.pass); }
-const isStage = () => /stage-ws/i.test(cfg().base);
+// The non-production host is now test-ws.sanmar.com ("Edev"/"stage" were renamed "Test").
+const isStage = () => /(test|stage)-ws\.sanmar/i.test(cfg().base);
 
 // SOAP endpoints (the WSDL URL without ?wsdl) + the operation namespace each one uses.
-// ProductInfo/Pricing live under impl.*; Inventory lives under webservice.* (positional args).
+// ProductInfo/Pricing live under impl.*; Inventory + PO live under webservice.* (the PO
+// service is SanMarPOServicePort — a separate WSDL from the read services).
 const SVC = {
   product:   { path: '/SanMarWebService/SanMarProductInfoServicePort', ns: 'http://impl.webservice.integration.sanmar.com/' },
   pricing:   { path: '/SanMarWebService/SanMarPricingServicePort',     ns: 'http://impl.webservice.integration.sanmar.com/' },
   inventory: { path: '/SanMarWebService/SanMarWebServicePort',         ns: 'http://webservice.integration.sanmar.com/' },
+  po:        { path: '/SanMarWebService/SanMarPOServicePort',          ns: 'http://webservice.integration.sanmar.com/' },
 };
-// The list response is a flat quantity per warehouse, in THIS fixed order (no whse number
-// is returned — see guide p.22). #12 is Arizona (virtual whses 8-11 roll into it).
+// For a style+color+size query the inventory response is a flat quantity per warehouse in
+// THIS fixed order (no whse number is returned — guide v24.5 p.52). #12 is Arizona (virtual
+// whses 8-11 roll into it); #31 (Richmond VA) was added July 2024 and, when present, is the
+// last value — a shorter list just means the trailing warehouses returned nothing.
 const WHSE_ORDER = [
   { no: 1, city: 'Seattle', state: 'WA' }, { no: 2, city: 'Cincinnati', state: 'OH' },
   { no: 3, city: 'Dallas', state: 'TX' }, { no: 4, city: 'Reno', state: 'NV' },
   { no: 5, city: 'Robbinsville', state: 'NJ' }, { no: 6, city: 'Jacksonville', state: 'FL' },
   { no: 7, city: 'Minneapolis', state: 'MN' }, { no: 12, city: 'Phoenix', state: 'AZ' },
+  { no: 31, city: 'Richmond', state: 'VA' },
 ];
 
 // ── Tiny XML helpers ─────────────────────────────────────────────────────────
@@ -70,7 +80,9 @@ function tagAll(xml, name) {
 const numOr = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
 
 // ── SOAP transport ───────────────────────────────────────────────────────────
-async function soapCall(service, bodyInner) {
+// opts.tolerateError: don't throw on errorOccurred=true (getPreSubmitInfo reports an
+// out-of-stock line THAT way — a valid answer, not a transport failure).
+async function soapCall(service, bodyInner, opts = {}) {
   if (!sanmarConfigured()) throw new Error('SanMar not configured (SANMAR_CUSTOMER_NUMBER / SANMAR_USERNAME / SANMAR_PASSWORD).');
   const svc = SVC[service];
   const url = cfg().base + svc.path;
@@ -83,9 +95,11 @@ async function soapCall(service, bodyInner) {
     r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: '' }, body: envelope });
     text = await r.text();
   } catch (e) {
-    // A network timeout here is almost always the IP-whitelist gate, not our code.
+    // A timeout here usually means the account isn't onboarded yet (agreement not signed),
+    // or our own outbound firewall is blocking port 8080 — NOT an IP whitelist (SanMar
+    // dropped IP restrictions in 2018).
     recordUsage('sanmar', { endpoint: service, ok: false });
-    throw new Error(`Couldn't reach SanMar (${String(e && e.message || e)}). If this is a timeout, confirm this server's IP is whitelisted with SanMar.`);
+    throw new Error(`Couldn't reach SanMar (${String(e && e.message || e)}). If this is a timeout, confirm the account is onboarded and that outbound port 8080 is open.`);
   }
   recordUsage('sanmar', { endpoint: service, ok: r.ok });
   if (!r.ok) throw new Error(`SanMar ${service} HTTP ${r.status}: ${String(text).slice(0, 300)}`);
@@ -94,7 +108,7 @@ async function soapCall(service, bodyInner) {
   // The guide spells the flag BOTH ways in different responses ("errorOccured" in product,
   // "errorOccurred" in pricing) — check both so a real error is never read as success.
   const err = (tag(text, 'errorOccurred') || tag(text, 'errorOccured') || '').toLowerCase();
-  if (err === 'true') throw new Error(tag(text, 'message') || 'SanMar returned an error.');
+  if (err === 'true' && !opts.tolerateError) throw new Error(tag(text, 'message') || 'SanMar returned an error.');
   return text;
 }
 
@@ -104,6 +118,62 @@ const authBlock = () => {
     `<sanMarUserName>${xmlEsc(c.user)}</sanMarUserName>` +
     `<sanMarUserPassword>${xmlEsc(c.pass)}</sanMarUserPassword>`;
 };
+
+// Normalise the order body into { poNumber, ship{...}, lines[] } used by both the dry-run
+// echo and the live submitPO/getPreSubmitInfo calls. Each line prefers inventoryKey+sizeIndex
+// (least error-prone per the guide); otherwise style + color + size, where COLOR MUST be the
+// SANMAR_MAINFRAME_COLOR (catalog colour), not the display name. NO commas in any field —
+// SanMar's flat-file layer is comma-delimited and a stray comma corrupts the order.
+function normalizeOrder(b) {
+  const noComma = (v) => String(v == null ? '' : v).replace(/,/g, ' ').trim();
+  const s = b.shipTo || {};
+  const ship = {
+    company: noComma(s.company || s.name), attention: noComma(s.attention || b.attention),
+    address1: noComma(s.address1 || s.street), address2: noComma(s.address2 || s.street2),
+    city: noComma(s.city), state: noComma(s.state), zip: noComma(s.zip || s.postalCode),
+    email: noComma(s.email), method: noComma(s.method || s.shipMethod) || 'UPS',
+    residence: /^y/i.test(String(s.residence || '')) ? 'Y' : 'N',
+  };
+  const lines = (Array.isArray(b.lines) ? b.lines : []).map((l) => ({
+    inventoryKey: noComma(l.inventoryKey), sizeIndex: noComma(l.sizeIndex),
+    style: noComma(l.style), color: noComma(l.color), size: noComma(l.size),
+    qty: Math.max(1, Number(l.qty) || 1),
+  })).filter((l) => l.style || l.inventoryKey);
+  return { poNumber: noComma(b.poNumber || ('EG-' + (b.orderRef || 'PO'))).slice(0, 28), ship, lines };
+}
+// Build the shared <arg0> for submitPO / getPreSubmitInfo from a normalized order.
+function poArg0(o) {
+  const details = o.lines.map((l) =>
+    `<webServicePoDetailList>` +
+    `<inventoryKey>${xmlEsc(l.inventoryKey)}</inventoryKey>` +
+    `<sizeIndex>${xmlEsc(l.sizeIndex)}</sizeIndex>` +
+    `<style>${xmlEsc(l.style)}</style>` +
+    `<color>${xmlEsc(l.color)}</color>` +
+    `<size>${xmlEsc(l.size)}</size>` +
+    `<quantity>${xmlEsc(l.qty)}</quantity>` +
+    `<whseNo></whseNo>` +
+    `</webServicePoDetailList>`).join('');
+  return `<arg0>` +
+    `<attention>${xmlEsc(o.ship.attention)}</attention>` +
+    `<notes></notes>` +
+    `<poNum>${xmlEsc(o.poNumber)}</poNum>` +
+    `<residence>${xmlEsc(o.ship.residence)}</residence>` +
+    `<department></department>` +
+    `<shipTo>${xmlEsc(o.ship.company)}</shipTo>` +
+    `<shipAddress1>${xmlEsc(o.ship.address1)}</shipAddress1>` +
+    `<shipAddress2>${xmlEsc(o.ship.address2)}</shipAddress2>` +
+    `<shipCity>${xmlEsc(o.ship.city)}</shipCity>` +
+    `<shipState>${xmlEsc(o.ship.state)}</shipState>` +
+    `<shipZip>${xmlEsc(o.ship.zip)}</shipZip>` +
+    `<shipMethod>${xmlEsc(o.ship.method)}</shipMethod>` +
+    `<shipEmail>${xmlEsc(o.ship.email)}</shipEmail>` +
+    details +
+    `</arg0>`;
+}
+// The four ship fields SanMar rejects a PO without.
+function missingShip(o) {
+  return ['address1', 'city', 'state', 'zip'].filter((k) => !o.ship[k]);
+}
 
 // ── Response → normalized shapes ─────────────────────────────────────────────
 // One flattened product-variant row from a product-info response. Fields mirror the
@@ -174,8 +244,9 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
     configured: sanmarConfigured(), stage: isStage(), base: cfg().base,
   }));
 
-  // Connectivity test — one signed call (pricing for a known style) proves auth + that the
-  // IP is whitelisted, before trusting a browse. Mirrors the Otto/Wilcom "verify one call".
+  // Connectivity test — one signed call (pricing for a known style) proves the credentials
+  // authenticate and the account is onboarded, before trusting a browse. Mirrors the
+  // Otto/Wilcom "verify one call".
   app.get('/api/sanmar/test', { preHandler: requireStaff }, async (req, reply) => {
     if (!sanmarConfigured()) { reply.code(400); return { error: 'SanMar not configured.' }; }
     try {
@@ -203,28 +274,25 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
     } catch (e) { reply.code(502); return { error: String(e && e.message || e) }; }
   });
 
-  // Product search — by style (+ optional color/size), or by brand, or by category.
-  // Returns normalized rows badged the same way as the other suppliers' cards.
+  // Product search by STYLE (+ optional colour/size) — the only product-info call that still
+  // returns rows inline (guide v24.5). getProductInfoByBrand / getProductInfoByCategory are
+  // now ASYNCHRONOUS: they drop a CSV on SanMar's FTP server and return only an ack, so we
+  // don't offer them as an inline browse — a caller wanting a whole brand/category should
+  // pull the SDL/EPDD bulk file over FTP instead.
   app.get('/api/sanmar/products', { preHandler: requireStaff }, async (req, reply) => {
     if (!sanmarConfigured()) { reply.code(400); return { error: 'SanMar not configured.' }; }
     const qy = req.query || {};
+    if (qy.brand || qy.category) {
+      reply.code(400);
+      return { error: 'SanMar returns brand/category catalogs as an async FTP file, not inline. Search by style here, or pull the SDL/EPDD bulk file over FTP for a whole brand or category.' };
+    }
+    if (!qy.style) { reply.code(400); return { error: 'Provide a style (colour and size optional).' }; }
     try {
-      let xml;
-      if (qy.style) {
-        const parts = [`<style>${xmlEsc(String(qy.style))}</style>`];
-        if (qy.color) parts.push(`<color>${xmlEsc(String(qy.color))}</color>`);
-        if (qy.size) parts.push(`<size>${xmlEsc(String(qy.size))}</size>`);
-        xml = await soapCall('product',
-          `<m:getProductInfoByStyleColorSize><arg0>${parts.join('')}</arg0><arg1>${authBlock()}</arg1></m:getProductInfoByStyleColorSize>`);
-      } else if (qy.brand) {
-        xml = await soapCall('product',
-          `<m:getProductInfoByBrand><arg0><brandName>${xmlEsc(String(qy.brand))}</brandName></arg0><arg1>${authBlock()}</arg1></m:getProductInfoByBrand>`);
-      } else if (qy.category) {
-        xml = await soapCall('product',
-          `<m:getProductInfoByCategory><arg0><category>${xmlEsc(String(qy.category))}</category></arg0><arg1>${authBlock()}</arg1></m:getProductInfoByCategory>`);
-      } else {
-        reply.code(400); return { error: 'Provide a style, brand or category.' };
-      }
+      const parts = [`<style>${xmlEsc(String(qy.style))}</style>`];
+      if (qy.color) parts.push(`<color>${xmlEsc(String(qy.color))}</color>`);
+      if (qy.size) parts.push(`<size>${xmlEsc(String(qy.size))}</size>`);
+      const xml = await soapCall('product',
+        `<m:getProductInfoByStyleColorSize><arg0>${parts.join('')}</arg0><arg1>${authBlock()}</arg1></m:getProductInfoByStyleColorSize>`);
       let favs = new Set();
       try { const fr = await q('select style from sanmar_favorites'); favs = new Set(fr.rows.map((x) => String(x.style))); } catch { /* table may not exist yet */ }
       const items = mapProducts(xml).map(proxyImages).map((p) => ({ ...p, favorited: favs.has(String(p.style)) }));
@@ -290,23 +358,51 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
     return { ok: true, favorited: true };
   });
 
-  // Place a purchase order. SAFETY: dry-run unless SANMAR_ORDER_LIVE='1'. Even live, the
-  // real PO envelope is NOT sent yet — its format lives in SanMar's separate Purchase Order
-  // Submission Guide, which this integration guide doesn't specify. So we assemble and
-  // return the normalized lines for review; wiring the live SOAP PO waits on that guide.
+  // Inventory pre-check (getPreSubmitInfo) — confirms the closest warehouse can fill each
+  // line WITHOUT placing an order, so it's safe to run live (no SANMAR_ORDER_LIVE gate). Use
+  // it before submitPO. Still needs the account onboarded for PO integration.
+  app.post('/api/sanmar/presubmit', { preHandler: requireStaff }, async (req, reply) => {
+    if (!sanmarConfigured()) { reply.code(400); return { error: 'SanMar not configured.' }; }
+    const o = normalizeOrder(req.body || {});
+    if (!o.lines.length) { reply.code(400); return { error: 'At least one line (style + qty, or inventoryKey) is required.' }; }
+    const miss = missingShip(o);
+    if (miss.length) { reply.code(400); return { error: 'Ship-to needs: ' + miss.join(', ') + '.' }; }
+    try {
+      const xml = await soapCall('po', `<m:getPreSubmitInfo>${poArg0(o)}<arg1>${authBlock()}</arg1></m:getPreSubmitInfo>`, { tolerateError: true });
+      // Each detail carries its own availability message + the whse that would fill it.
+      const lines = tagAll(xml, 'webServicePoDetailList').map((d) => ({
+        style: tag(d, 'style'), color: tag(d, 'color'), size: tag(d, 'size'),
+        inventoryKey: tag(d, 'inventoryKey'), quantity: numOr(tag(d, 'quantity')),
+        whseNo: tag(d, 'whseNo') || null, available: /confirmed and available/i.test(tag(d, 'message')),
+        message: tag(d, 'message'),
+      }));
+      return { ok: true, allAvailable: lines.length > 0 && lines.every((l) => l.available), message: tag(xml, 'message'), lines };
+    } catch (e) { reply.code(502); return { error: String(e && e.message || e) }; }
+  });
+
+  // Place a purchase order (submitPO). SAFETY: dry-run unless SANMAR_ORDER_LIVE='1' — even
+  // with a confirmed-good payload it isn't sent until the flag is set, the same posture as
+  // the S&S/Otto order paths. Payment (NET terms or a card on file) and the shipping option
+  // are account config at SanMar, NOT part of this call.
   app.post('/api/sanmar/order', { preHandler: requireStaff }, async (req, reply) => {
     if (!sanmarConfigured()) { reply.code(400); return { error: 'SanMar not configured.' }; }
-    const b = req.body || {};
-    const lines = (Array.isArray(b.lines) ? b.lines : [])
-      .map((l) => ({ style: String(l.style || '').trim(), color: String(l.color || '').trim(), size: String(l.size || '').trim(), qty: Math.max(1, Number(l.qty) || 1) }))
-      .filter((l) => l.style);
-    if (!lines.length) { reply.code(400); return { error: 'At least one line (style + qty) is required.' }; }
-    const payload = { customerNo: cfg().cust, poNumber: b.poNumber || ('EG-' + (b.orderRef || 'PO')), lines };
+    const o = normalizeOrder(req.body || {});
+    if (!o.lines.length) { reply.code(400); return { error: 'At least one line (style + qty, or inventoryKey) is required.' }; }
 
     if (String(process.env.SANMAR_ORDER_LIVE || '') !== '1') {
-      return { dryRun: true, stage: isStage(), note: 'SANMAR_ORDER_LIVE!=1 → NOT sent to SanMar. Review the lines; the live PO submission is wired once the SanMar Purchase Order Submission Guide payload is confirmed.', payload };
+      return {
+        dryRun: true, stage: isStage(),
+        note: 'SANMAR_ORDER_LIVE!=1 → NOT sent to SanMar. Review the payload; set SANMAR_ORDER_LIVE=1 (after PO onboarding + a passing test PO) to place it for real.',
+        missing: missingShip(o),
+        payload: o,
+      };
     }
-    reply.code(501);
-    return { error: 'Live SanMar ordering is not wired yet — the PO envelope format comes from SanMar\'s Purchase Order Submission Guide (not in the integration guide). Leave SANMAR_ORDER_LIVE unset to use the dry run.', payload };
+    const miss = missingShip(o);
+    if (miss.length) { reply.code(400); return { error: 'SanMar needs a ship-to ' + miss.join(', ') + ' to place the order.' }; }
+    try {
+      const xml = await soapCall('po', `<m:submitPO>${poArg0(o)}<arg1>${authBlock()}</arg1></m:submitPO>`);
+      // soapCall already threw on errorOccurred=true; a clean response is "PO Submission successful".
+      return { ok: true, stage: isStage(), poNumber: o.poNumber, message: tag(xml, 'message') || 'PO Submission successful' };
+    } catch (e) { reply.code(502); return { error: String(e && e.message || e) }; }
   });
 }

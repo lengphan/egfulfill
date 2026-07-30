@@ -675,8 +675,18 @@ export function getSanmarFavorites() {
 export function toggleSanmarFavorite(p: { style: string; name?: string; image?: string | null; price?: number | null }, on: boolean) {
   return api<{ ok?: boolean; favorited?: boolean; error?: string }>(`/api/sanmar/favorites`, { method: "POST", body: JSON.stringify({ ...p, on }) })
 }
-export function sanmarOrder(lines: { style: string; color?: string; size?: string; qty: number }[], extra?: { poNumber?: string; orderRef?: string }) {
-  return api<{ ok?: boolean; dryRun?: boolean; note?: string; payload?: unknown; error?: string }>(`/api/sanmar/order`, { method: "POST", body: JSON.stringify({ lines, ...extra }) })
+// A SanMar PO line: prefer inventoryKey+sizeIndex; else style + mainframe color + size.
+export type SanmarOrderLine = { style?: string; color?: string; size?: string; inventoryKey?: string; sizeIndex?: string; qty: number }
+export type SanmarShipTo = { company?: string; attention?: string; address1?: string; address2?: string; city?: string; state?: string; zip?: string; email?: string; method?: string; residence?: string }
+// Inventory pre-check — safe, never places an order.
+export function sanmarPresubmit(lines: SanmarOrderLine[], shipTo: SanmarShipTo, extra?: { poNumber?: string; orderRef?: string }) {
+  return api<{ ok?: boolean; allAvailable?: boolean; message?: string; lines?: { style: string; color?: string; size?: string; whseNo?: string | null; available: boolean; message?: string }[]; error?: string }>(
+    `/api/sanmar/presubmit`, { method: "POST", body: JSON.stringify({ lines, shipTo, ...extra }) })
+}
+// Place a PO. Dry-run on the server until SANMAR_ORDER_LIVE=1.
+export function sanmarOrder(lines: SanmarOrderLine[], shipTo: SanmarShipTo, extra?: { poNumber?: string; orderRef?: string }) {
+  return api<{ ok?: boolean; dryRun?: boolean; stage?: boolean; note?: string; missing?: string[]; poNumber?: string; message?: string; payload?: unknown; error?: string }>(
+    `/api/sanmar/order`, { method: "POST", body: JSON.stringify({ lines, shipTo, ...extra }) })
 }
 
 // ── Inventory (staff) — whole-array upsert: send the full list, missing SKUs are dropped ──
