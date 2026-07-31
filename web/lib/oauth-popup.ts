@@ -28,8 +28,35 @@ export type OAuthMessage = { source: "eg-oauth"; ok: boolean; shop?: string; mes
 // right exchange INSTEAD of guessing from the returned params — TikTok's US Seller Center
 // returns `code` while the global page returns `auth_code`, so param-name detection
 // misrouted US TikTok connects into the Etsy branch ("Lost the security key"). Same-origin,
-// so the popup (or a redirect) shares it with the opener. Cleared once the callback reads it.
+// so the popup (or a redirect) shares it with the opener.
+//
+// The marker is READ WITHOUT CONSUMING and only cleared once a connection completes. It used
+// to be deleted the moment the callback read it, which meant anything that ran the callback
+// twice — a reload, a re-mounted effect, reopening the window — lost the routing on the
+// second pass and produced the same misleading "Lost the security key" card.
 export const OAUTH_PROVIDER_KEY = "eg_oauth_provider"
-export function markOAuthProvider(p: "etsy" | "shopify" | "tiktok"): void {
-  try { localStorage.setItem(OAUTH_PROVIDER_KEY, p) } catch { /* ignore */ }
+export type OAuthProvider = "etsy" | "shopify" | "tiktok"
+export type OAuthMarker = { provider: OAuthProvider; state?: string; at?: number }
+
+/** Stash which provider (and the `state` we sent it) started this connect. */
+export function markOAuthProvider(p: OAuthProvider, state?: string): void {
+  try {
+    localStorage.setItem(OAUTH_PROVIDER_KEY, JSON.stringify({ provider: p, state, at: Date.now() } satisfies OAuthMarker))
+  } catch { /* ignore */ }
+}
+
+/** Read the marker without clearing it. Tolerates the older bare-string format so a connect
+ *  already in flight when this ships still routes correctly. */
+export function peekOAuthProvider(): OAuthMarker | null {
+  try {
+    const raw = localStorage.getItem(OAUTH_PROVIDER_KEY)
+    if (!raw) return null
+    if (raw[0] !== "{") return { provider: raw as OAuthProvider }
+    const m = JSON.parse(raw) as OAuthMarker
+    return m && m.provider ? m : null
+  } catch { return null }
+}
+
+export function clearOAuthProvider(): void {
+  try { localStorage.removeItem(OAUTH_PROVIDER_KEY) } catch { /* ignore */ }
 }

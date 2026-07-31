@@ -13,8 +13,8 @@ function randStr(): string {
 /** Open TikTok's authorize page (popup; redirect fallback if blocked). */
 export function startTikTokConnect(cfg: TiktokConfig): Window | null {
   if (!cfg.configured || !cfg.service_id) throw new Error("TikTok isn't configured yet — add the app keys in Settings › Integrations.")
-  markOAuthProvider("tiktok")
   const state = randStr()
+  markOAuthProvider("tiktok", state)
   const url = `${cfg.authorize_url}?service_id=${encodeURIComponent(cfg.service_id)}&state=${encodeURIComponent(state)}`
   const p = openOAuthPopup(url)
   if (!p) window.location.href = url

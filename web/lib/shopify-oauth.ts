@@ -26,8 +26,8 @@ export function normalizeShop(input: string): string | null {
 export function startShopifyConnect(cfg: ShopifyConfig, shopInput: string): Window | null {
   const shop = normalizeShop(shopInput)
   if (!shop) throw new Error("Enter your store as mystore.myshopify.com")
-  markOAuthProvider("shopify")
   const state = randStr()
+  markOAuthProvider("shopify", state)
   const redirect = window.location.origin + "/oauth-callback"
   localStorage.setItem(SHOPIFY_OAUTH_KEY, JSON.stringify({ shop, state, redirect } satisfies ShopifyOAuth))
   const url =

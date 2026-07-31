@@ -7,7 +7,9 @@ import { exchangeEtsy, exchangeShopify, exchangeTiktok } from "@/lib/api"
 import { readPkce, clearPkce } from "@/lib/etsy-oauth"
 import { getToken } from "@/lib/auth"
 import { clearShopifyOAuth } from "@/lib/shopify-oauth"
-import { OAUTH_PROVIDER_KEY } from "@/lib/oauth-popup"
+import { peekOAuthProvider, clearOAuthProvider } from "@/lib/oauth-popup"
+
+const BACKFILL_KEY = "eg_connect_backfill_days"
 
 type State =
   | { kind: "working" }
@@ -21,6 +23,10 @@ export default function OAuthCallbackPage() {
     // finish/fail either close the popup (posting the result to the opener) or, when this
     // isn't a popup, fall back to the full-page redirect the flow used before.
     const finish = (shop: string) => {
+      // Only a completed connection clears the connect-time scratch (provider marker +
+      // backfill choice). Clearing it on read is what broke re-runs of this callback.
+      clearOAuthProvider()
+      try { localStorage.removeItem(BACKFILL_KEY) } catch { /* ignore */ }
       setState({ kind: "ok", shop })
       if (window.opener && window.opener !== window) {
         try { window.opener.postMessage({ source: "eg-oauth", ok: true, shop }, window.location.origin) } catch { /* ignore */ }
@@ -37,33 +43,20 @@ export default function OAuthCallbackPage() {
     }
     // The "how far back to import" scope the user picked in the pre-connect modal on Stores.
     // It's stashed in localStorage (same-origin, so this popup shares it with the opener) and
-    // read here so the exchange can persist it on the connection. Cleared once consumed.
-    const takeBackfillDays = (): number | undefined => {
+    // read here so the exchange can persist it on the connection. Cleared by finish().
+    const readBackfillDays = (): number | undefined => {
       try {
-        const raw = localStorage.getItem("eg_connect_backfill_days")
-        localStorage.removeItem("eg_connect_backfill_days")
+        const raw = localStorage.getItem(BACKFILL_KEY)
         if (raw == null || raw === "") return undefined
         const n = Math.floor(Number(raw))
         return Number.isFinite(n) ? Math.max(0, Math.min(365, n)) : undefined
       } catch { return undefined }
     }
 
-    // Which provider started this connect, stashed at connect time. Authoritative over
-    // param-name guessing: TikTok's US Seller Center returns `code`, the global page returns
-    // `auth_code`, so shape-detection alone misrouted US TikTok into the Etsy branch.
-    const takeProvider = (): string | null => {
-      try {
-        const p = localStorage.getItem(OAUTH_PROVIDER_KEY)
-        localStorage.removeItem(OAUTH_PROVIDER_KEY)
-        return p
-      } catch { return null }
-    }
-
     // All state updates live inside this async runner (not the effect body) so
     // they're deferred, not synchronous mount renders.
     const run = async () => {
-      const backfill_days = takeBackfillDays()
-      const provider = takeProvider()
+      const backfill_days = readBackfillDays()
       const params = new URLSearchParams(window.location.search)
       // TikTok Shop returns `auth_code`; Etsy and Shopify return `code`. Reading only
       // `code` is why TikTok never worked here — the guard below fired before any
@@ -73,6 +66,15 @@ export default function OAuthCallbackPage() {
       const code = params.get("code") ?? authCode
       const returnedState = params.get("state")
       const oauthErr = params.get("error")
+
+      // Which provider started this connect, stashed at connect time. Authoritative over
+      // param-name guessing: TikTok's US Seller Center returns `code`, the global page returns
+      // `auth_code`, so shape-detection alone misrouted US TikTok into the Etsy branch.
+      // A marker whose `state` doesn't match what came back belongs to a different (abandoned)
+      // flow, so it's ignored rather than trusted.
+      const marker = peekOAuthProvider()
+      const staleMarker = !!(marker?.state && returnedState && marker.state !== returnedState)
+      const provider = staleMarker ? null : (marker?.provider ?? null)
 
       if (oauthErr) {
         fail(params.get("error_description") || oauthErr)
@@ -100,11 +102,23 @@ export default function OAuthCallbackPage() {
         return
       }
 
+      // Etsy is the ONLY provider here that needs local state to finish: without the PKCE
+      // verifier stashed at connect time its exchange can never succeed. So the verifier —
+      // not the param shape — is what makes a redirect Etsy's. With an explicit marker we
+      // stay lenient about `state` (the verifier still binds the code); with no marker, a
+      // verifier left over from an abandoned connect is only Etsy's if the state matches.
+      const pkce = readPkce()
+      const etsyPossible = !!pkce?.verifier &&
+        (provider === "etsy" || !returnedState || !pkce.state || pkce.state === returnedState)
+
       // TIKTOK SHOP. Routed by the provider marker set at connect time — NOT by param name:
       // the US Seller Center returns `code`, the global page returns `auth_code`, so we pass
       // whichever is present. (authCode kept as a fallback for a marker-less redirect.) The
-      // sign-in guard is repeated here because attaching a shop to an account needs a session.
-      if (provider === "tiktok" || authCode) {
+      // last clause is the safety net: no marker AND no verifier means Etsy is impossible, so
+      // TikTok is the only thing this redirect can be — try it rather than dying on a "Lost
+      // the security key" that names the wrong provider. The sign-in guard is repeated here
+      // because attaching a shop to an account needs a session.
+      if (provider === "tiktok" || authCode || (!provider && !etsyPossible)) {
         if (!getToken()) {
           setState({
             kind: "error",
@@ -133,9 +147,8 @@ export default function OAuthCallbackPage() {
         return
       }
 
-      const pkce = readPkce()
       if (!pkce?.verifier) {
-        fail("Lost the security key. Start the connection again from Stores — don't reload this window.")
+        fail("Lost the security key for this Etsy connection. Start it again from Stores — don't reload this window.")
         return
       }
       if (pkce.state && returnedState && pkce.state !== returnedState) {

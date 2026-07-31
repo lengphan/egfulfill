@@ -34,7 +34,7 @@ export async function startEtsyConnect(cfg: EtsyConfig): Promise<Window | null> 
   const state = randStr().slice(0, 24)
   const redirect = window.location.origin + "/oauth-callback"
   const ch = await challenge(verifier)
-  markOAuthProvider("etsy")
+  markOAuthProvider("etsy", state)
   localStorage.setItem(ETSY_PKCE_KEY, JSON.stringify({ verifier, state, redirect } satisfies Pkce))
   const url =
     "https://www.etsy.com/oauth/connect?response_type=code" +
