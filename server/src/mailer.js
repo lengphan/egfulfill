@@ -15,7 +15,10 @@ function parseFrom(s) {
 async function sendViaBrevoApi(opts) {
   const key = process.env.BREVO_API_KEY;
   if (!key) return null;                          // not configured → let the next transport try
-  const from = parseFrom(process.env.SMTP_FROM || process.env.MAIL_FROM);
+  // A caller may override the sender — bulk mail sends from the marketing subdomain so a
+  // campaign that trips a spam filter can't drag down the domain password resets depend on.
+  // Falls back to the transactional default when not given.
+  const from = parseFrom(opts.from || process.env.SMTP_FROM || process.env.MAIL_FROM);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 12000);
   try {
@@ -91,7 +94,7 @@ export async function sendMail(opts) {
       return false;
     }
     await m.sendMail(Object.assign(
-      { from: process.env.SMTP_FROM || ('EGFULFILL <no-reply@' + process.env.SMTP_HOST + '>') }, opts));
+      { from: opts.from || process.env.SMTP_FROM || ('EGFULFILL <no-reply@' + process.env.SMTP_HOST + '>') }, opts));
     return true;
   } catch (e) {
     _lastError = (_lastError ? _lastError + ' | ' : '') + 'smtp: ' + (e && e.message ? e.message : String(e));

@@ -419,6 +419,13 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
         const unsubUrl = `${publicOrigin()}/api/broadcasts/unsubscribe?t=${unsubToken(r.id)}`;
         const sent = await sendMail({
           to: r.email,
+          // Sent from the MARKETING subdomain (mail.egful.store, authenticated separately),
+          // not the transactional domain. This is the whole reason that subdomain exists: a
+          // campaign that lands in spam damages the reputation of whatever domain sent it,
+          // and password resets must not be that domain. Falls back to the default only if
+          // MAIL_FROM_BULK is unset, so a missing env var degrades to working-but-shared
+          // rather than not sending.
+          from: process.env.MAIL_FROM_BULK || undefined,
           subject: bc.subject,
           html: renderHtml(bc.body, r.name, unsubUrl, brand),
           text: renderText(bc.body, r.name, unsubUrl),
