@@ -566,6 +566,10 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       );
       return { ok: true, shop_id: shopId, shop_name: shopName, scopes };
     } catch (e) {
+      // The client only sees e.message, which hides WHERE it came from (TikTok's token
+      // endpoint vs the DB insert). Log the full error so a "no schema found"-type message
+      // is traceable to its real source in `docker compose logs api`.
+      app.log.error({ err: e, phase: 'tiktok/exchange', detail: e && e.message }, 'tiktok exchange failed');
       reply.code(400); return { error: e.message };
     }
   });
