@@ -50,10 +50,17 @@ export const decodeEntities = (s: string | null | undefined) =>
  */
 const SOURCE_PREFIX = /^(etsy|shopify|amazon|ebay|tiktok|woo|walmart)-/i
 export const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : String(o.id).replace(SOURCE_PREFIX, ""))
-/** The platform an order came from, title-cased — "Etsy", "Shopify", or "Manual". */
+// Marketplaces capitalise their own names, and title-casing the raw source got two of them
+// wrong on every row and in every filter — "Tiktok" and "Ebay" are not how those brands are
+// written. Anything unlisted still falls back to title case, so a new source needs no entry.
+const PLATFORM_NAMES: Record<string, string> = {
+  etsy: "Etsy", shopify: "Shopify", tiktok: "TikTok", amazon: "Amazon",
+  ebay: "eBay", woo: "WooCommerce", walmart: "Walmart", manual: "Manual",
+}
+/** The platform an order came from, as the platform writes it — "Etsy", "TikTok", "Manual". */
 export const platformOf = (o: OrderRow) => {
   const raw = String(o.source || (String(o.id).match(SOURCE_PREFIX)?.[1] ?? "") || "manual").toLowerCase()
-  return raw.charAt(0).toUpperCase() + raw.slice(1)
+  return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
 }
 export const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
 export const customerOf = (o: OrderRow) => o.customer?.name || "—"

@@ -22,6 +22,8 @@ import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, isFactoryColLocked, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
+import { OrderFilterBar, emptyOrdersMessage } from "@/components/app/order-filter-bar"
+import { filterOrders, EMPTY_ORDER_QUERY, type OrderQuery } from "@/lib/order-filter"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
@@ -183,6 +185,10 @@ export function OrdersHub() {
 
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [filter, setFilter] = useState("all")
+  // Search + platform/shop/print/date narrowing, applied AFTER the stage pill. Separate
+  // state because the two answer different questions ("whose turn is it" vs "which orders"),
+  // and clearing one must not silently clear the other.
+  const [query, setQuery] = useState<OrderQuery>(EMPTY_ORDER_QUERY)
   const [busy, setBusy] = useState<string | null>(null)
   const confirm = useConfirm()
   const [sent, setSent] = useState<Set<string>>(new Set())
@@ -610,10 +616,14 @@ export function OrdersHub() {
 
   const filtered = useMemo(() => {
     const list = orders ?? []
-    if (filter === "all") return list
-    if (filter === "issues") return list.filter((o) => isException(orderStage(o.items ?? [])))
-    return list.filter((o) => orderStage(o.items ?? []) === filter)
-  }, [orders, filter])
+    const byStage =
+      filter === "all" ? list
+      : filter === "issues" ? list.filter((o) => isException(orderStage(o.items ?? [])))
+      : list.filter((o) => orderStage(o.items ?? []) === filter)
+    // Stage first, then the search/facet query — so the pill counts keep meaning "at this
+    // stage", and a search never has to re-answer a question the pill already answered.
+    return filterOrders(byStage, query)
+  }, [orders, filter, query])
 
   const paged = usePaged(filtered, 25)
 
@@ -849,12 +859,21 @@ export function OrdersHub() {
           </div>
         }
       >
-        <div className="flex flex-wrap gap-1.5 border-b border-border px-5 py-3">
-          {FILTERS.map((f) => (
-            <button key={f.id} onClick={() => setFilter(f.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (filter === f.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-              {tl("stage", f.label)}
-            </button>
-          ))}
+        {/* Two rows, deliberately: the stage pills answer "whose turn is it", the bar below
+            answers "which orders". Stacking them keeps each readable at narrow widths, where
+            one combined row wraps into an unreadable jumble of pills and dropdowns. */}
+        <div className="space-y-3 border-b border-border px-5 py-3">
+          <div className="flex flex-wrap gap-1.5">
+            {FILTERS.map((f) => (
+              <button key={f.id} onClick={() => setFilter(f.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (filter === f.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                {tl("stage", f.label)}
+              </button>
+            ))}
+          </div>
+          {/* Only once there's something to search. A search box over an empty board is a
+              control that cannot do anything, and it makes "no orders yet" look like a
+              failed query. */}
+          {!!orders?.length && <OrderFilterBar orders={orders} query={query} onChange={setQuery} />}
         </div>
 
         {orders === null ? (
@@ -863,7 +882,10 @@ export function OrdersHub() {
           <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
             <Package size={24} weight="duotone" />
             <div className="font-medium text-foreground">{tl("ui", "Nothing here")}</div>
-            <div className="text-sm">{(orders.length ?? 0) === 0 ? tl("ui", "No orders are in production yet.") : tl("ui", "No orders match this filter.")}</div>
+            {/* Names what's actually narrowing the list — "no matches for OLVERA-TEES ·
+                last 7 days" is recoverable, "Nothing here" over a filter you forgot you set
+                is not. */}
+            <div className="text-sm">{tl("ui", emptyOrdersMessage(orders.length, filter !== "all", query))}</div>
           </div>
         ) : (
           <>
