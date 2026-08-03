@@ -13,7 +13,19 @@ const APP_KEY    = process.env.TIKTOK_APP_KEY || '';
 const APP_SECRET = process.env.TIKTOK_APP_SECRET || '';
 const SERVICE_ID = process.env.TIKTOK_SERVICE_ID || '';
 // Auth host is stable across regions; the token exchange is always auth.tiktok-shops.com.
-const AUTH_HOST     = (process.env.TIKTOK_AUTH_HOST || 'https://auth.tiktok-shops.com').replace(/\/+$/, '');
+// The Open API host does NOT serve /api/v2/token/* — it answers those with a gateway error
+// ("no schema found", now worded "Invalid path…"), which reads like a broken app rather than a
+// misconfigured host. So an override pointing there is refused rather than obeyed.
+const AUTH_HOST_DEFAULT = 'https://auth.tiktok-shops.com';
+const AUTH_HOST = (() => {
+  const raw = (process.env.TIKTOK_AUTH_HOST || '').replace(/\/+$/, '');
+  if (!raw) return AUTH_HOST_DEFAULT;
+  if (/open-api\.tiktokglobalshop\.com/i.test(raw)) {
+    console.warn(`[tiktok] ignoring TIKTOK_AUTH_HOST=${raw} — the Open API host does not serve the token endpoints; using ${AUTH_HOST_DEFAULT}`);
+    return AUTH_HOST_DEFAULT;
+  }
+  return raw;
+})();
 // The AUTHORIZE page is the ONE region-split URL. TikTok Shop US runs a SEPARATE account
 // system (services.us.tiktokshop.com); everywhere else uses the global Partner Center page
 // (services.tiktokshop.com). A US seller sent to the global page gets "we couldn't find an
@@ -48,14 +60,25 @@ function clampDays(v) {
 // TikTok wraps every response as { code, message, data, request_id }; code===0 = ok.
 async function ttTokenRequest(path, extraParams) {
   const params = new URLSearchParams({ app_key: APP_KEY, app_secret: APP_SECRET, ...extraParams });
-  // TikTok documents token/get + token/refresh as POST with all params in the query string
-  // (no JSON body). Sending GET has worked but is fragile if TikTok tightens method validation.
-  const res = await fetch(`${AUTH_HOST}${path}?${params.toString()}`, { method: 'POST' });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || (body && body.code !== 0)) {
-    throw new Error((body && body.message) || ('TikTok token error ' + res.status));
+  // GET, NOT POST. auth.tiktok-shops.com registers these two routes on GET only; a POST to the
+  // exact same URL falls through to a plain-text `404 page not found` (verified live), which
+  // isn't JSON — so the parse failed, the message came out empty, and every connect died on a
+  // bare status code. This was switched to POST on the theory that TikTok "documents" it that
+  // way; it does not, and it took the token REFRESH down with it, so live shops stopped syncing
+  // once their access token aged out. Don't change the method without re-probing both routes.
+  const res = await fetch(`${AUTH_HOST}${path}?${params.toString()}`, { method: 'GET' });
+  const text = await res.text();
+  let body = null;
+  try { body = JSON.parse(text); } catch { /* not JSON — see below */ }
+  // A non-JSON body means we never reached the API at all (wrong host, wrong method, a proxy
+  // in the way). Say that, with a snippet, instead of throwing away the only evidence.
+  if (!body) {
+    throw new Error(`TikTok token endpoint returned non-JSON (HTTP ${res.status}) from ${AUTH_HOST}${path}: ${text.slice(0, 120)}`);
   }
-  return (body && body.data) || {};
+  if (!res.ok || body.code !== 0) {
+    throw new Error(body.message || ('TikTok token error ' + res.status));
+  }
+  return body.data || {};
 }
 
 // access_token_expire_in is an ABSOLUTE unix-seconds timestamp in TikTok's response,
@@ -610,14 +633,18 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
   });
 
   // Diagnostic (staff): confirm the stored token still works + show granted scopes.
+  // The hosts come back either way — when connect itself is failing there IS no connection to
+  // inspect, and "which host are we actually calling" is the first thing you need to know.
+  // Hosts are configuration, not secrets; keys and tokens are never echoed.
   app.get('/api/tiktok/debug', { preHandler: requireStaff }, async (req, reply) => {
+    const hosts = { auth_host: AUTH_HOST, api_host: API_HOST, authorize_url: AUTHORIZE_URL, region: RESOLVED_REGION };
     try {
       const conn = (await q(`select * from platform_connections where platform='tiktok' order by created_at limit 1`)).rows[0];
-      if (!conn) { reply.code(400); return { error: 'No TikTok shop connected' }; }
+      if (!conn) { reply.code(400); return { error: 'No TikTok shop connected', ...hosts }; }
       const token = await validToken(conn);
       return { shop_id: conn.shop_id, shop_name: conn.shop_name, scopes: conn.scopes,
-               token_ok: !!token, token_expires_at: conn.token_expires_at };
-    } catch (e) { reply.code(400); return { error: e.message }; }
+               token_ok: !!token, token_expires_at: conn.token_expires_at, ...hosts };
+    } catch (e) { reply.code(400); return { error: e.message, ...hosts }; }
   });
 
   // ── Product publishing (Make product → TikTok Shop) ──────────────────────────────
