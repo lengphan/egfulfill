@@ -425,7 +425,7 @@ function makeStyleAggregator() {
         s = { style: key, title: '', description: '', brand: '', category: '',
               priceMin: null, priceMax: null, msrp: null,
               image: null, swatch: null, thumbnail: null,
-              colors: new Set(), sizes: new Set(), variants: [] };
+              colors: new Set(), sizes: new Set(), statuses: new Set(), variants: [] };
         byStyle.set(key, s);
       }
       s.title = best(s.title, v.title); s.description = best(s.description, v.description);
@@ -439,6 +439,7 @@ function makeStyleAggregator() {
       if (v.msrp != null && s.msrp == null) s.msrp = v.msrp;
       if (v.color) s.colors.add(v.color);
       if (v.size) s.sizes.add(v.size);
+      if (v.status) s.statuses.add(v.status);
       s.variants.push({
         c: v.color || null, s: v.size || null, i: v.sizeIndex || null,
         k: v.inventoryKey || null, u: v.uniqueKey, p: v.piecePrice,
@@ -452,6 +453,11 @@ function makeStyleAggregator() {
         image: s.image, swatch: s.swatch, thumbnail: s.thumbnail,
         colors: [...s.colors].sort(),
         sizes: [...s.sizes].sort(bySize),
+        // A style counts as discontinued only when EVERY variant is. A style whose 2XL was
+        // dropped but whose S-XL still sell is very much orderable, and hiding it would be
+        // wrong. 833 of the 4,081 styles are discontinued outright.
+        discontinued: s.statuses.size > 0 && [...s.statuses].every((x) => /discontinu/i.test(x)),
+        status: [...s.statuses].sort().join(', ') || null,
         variantCount: s.variants.length,
         // Variants in the same order the UI lists them: colour, then the size ladder.
         variants: s.variants.sort((a, b) =>
@@ -536,9 +542,11 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
        title text, description text, brand text, category text,
        price_min numeric(12,2), price_max numeric(12,2), msrp numeric(12,2),
        image text, swatch text, thumbnail text,
-       colors text[], sizes text[],
+       colors text[], sizes text[], status text, discontinued boolean default false,
        variant_count integer, variants jsonb,
        synced_at timestamptz default now())`).catch(() => {});
+  q(`alter table sanmar_styles add column if not exists status text`).catch(() => {});
+  q(`alter table sanmar_styles add column if not exists discontinued boolean default false`).catch(() => {});
   q(`create index if not exists sanmar_styles_search
        on sanmar_styles using gin (to_tsvector('simple',
          coalesce(style,'') || ' ' || coalesce(title,'') || ' ' ||
@@ -712,14 +720,14 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
 
   // ── Bulk catalog import + browse ───────────────────────────────────────────
   // One STYLE row of the upsert, as a parameter array.
-  const STYLE_COLS = 14;
+  const STYLE_COLS = 16;
   const styleParams = (s) => [
     s.style, s.title || null, s.description || null, s.brand || null, s.category || null,
     s.priceMin != null ? Number(s.priceMin) : null,
     s.priceMax != null ? Number(s.priceMax) : null,
     s.msrp != null ? Number(s.msrp) : null,
     s.image || null, s.swatch || null, s.thumbnail || null,
-    s.colors || [], s.sizes || [],
+    s.colors || [], s.sizes || [], s.status || null, !!s.discontinued,
     JSON.stringify(s.variants || []),
   ];
 
@@ -730,7 +738,8 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
   async function upsertSanmarStyles(styles) {
     const SQL_HEAD = `insert into sanmar_styles
            (style, title, description, brand, category, price_min, price_max, msrp,
-            image, swatch, thumbnail, colors, sizes, variants, variant_count, synced_at)
+            image, swatch, thumbnail, colors, sizes, status, discontinued,
+            variants, variant_count, synced_at)
          values `;
     const SQL_TAIL = `
          on conflict (style) do update set
@@ -738,6 +747,7 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
            category=excluded.category, price_min=excluded.price_min, price_max=excluded.price_max,
            msrp=excluded.msrp, image=excluded.image, swatch=excluded.swatch,
            thumbnail=excluded.thumbnail, colors=excluded.colors, sizes=excluded.sizes,
+           status=excluded.status, discontinued=excluded.discontinued,
            variants=excluded.variants, variant_count=excluded.variant_count, synced_at=now()`;
     const BATCH = 200;
     // Postgres rejects a statement that hits the same conflict target twice, so collapse any
@@ -851,17 +861,20 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
       ? `where lower(coalesce(style,'') || ' ' || coalesce(title,'') || ' ' || coalesce(brand,'') || ' ' || coalesce(category,'') || ' ' || coalesce(color,'') || ' ' || coalesce(keywords,'')) like $1`
       : '';
     const params = search ? ['%' + search + '%'] : [];
-    // One row per style already — no GROUP BY. That is the whole point of sanmar_styles:
-    // the old query read 161k variant rows and collapsed them to ~4k cards on every request.
-    const filter = search
-      ? `where lower(coalesce(style,'') || ' ' || coalesce(title,'') || ' ' || coalesce(brand,'') || ' ' || coalesce(category,'') || ' ' || array_to_string(coalesce(colors,'{}'), ' ')) like $1`
-      : '';
+    // 833 of the 4,081 styles are discontinued outright — a fifth of the catalog you cannot
+    // order. Hidden by default so the blank picker only offers buyable product; ?discontinued=1
+    // brings them back for looking up an old order.
+    const showGone = /^(1|true|yes)$/i.test(String(req.query?.discontinued || ''));
+    const clauses = [];
+    if (search) clauses.push(`lower(coalesce(style,'') || ' ' || coalesce(title,'') || ' ' || coalesce(brand,'') || ' ' || coalesce(category,'') || ' ' || array_to_string(coalesce(colors,'{}'), ' ')) like $1`);
+    if (!showGone) clauses.push(`coalesce(discontinued,false) = false`);
+    const filter = clauses.length ? 'where ' + clauses.join(' and ') : '';
     try {
       const total = await q(`select count(*)::int as n from sanmar_styles ${filter}`, params);
       const r = await q(
         `select style, brand, title as name, description, category,
                 price_min as price, price_max, image, colors, sizes,
-                variant_count, 0 as qty
+                status, discontinued, variant_count, 0 as qty
            from sanmar_styles ${filter}
           order by style
           limit ${limit} offset ${offset}`, params);
