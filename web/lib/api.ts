@@ -2190,6 +2190,13 @@ export function disconnectTiktok(shopId: string) {
 export function syncTiktok() {
   return api<{ ok?: boolean; imported?: number; synced?: unknown[]; error?: string }>(`/api/tiktok/sync`, { method: "POST" })
 }
+/** The label TIKTOK generated for a platform-shipped order (not one we bought).
+ *  UNVERIFIED against a live order — no TikTok order has synced yet, so the response shape
+ *  is what the docs describe, not what we've seen. Errors are surfaced, never swallowed. */
+export function getTiktokLabel(orderId: string) {
+  return api<{ ok?: boolean; shipping_type?: string | null; documents?: { package_id: string; url: string }[]; error?: string }>(
+    `/api/tiktok/orders/${encodeURIComponent(orderId)}/label`)
+}
 
 export function exchangeEtsy(body: { code: string; code_verifier: string; redirect_uri: string; backfill_days?: number }) {
   return api<{ shop_name?: string; error?: string }>(`/api/etsy/exchange`, {

@@ -361,19 +361,38 @@ async function importTiktokOrder(conn, order, isFactory) {
   const track = order.tracking_number
     || (order.packages || []).map((p) => p.tracking_number).filter(Boolean)[0] || null;
   const total = num((order.payment || {}).total_amount);
+  // WHO produces the label, and the packages to ask for it by.
+  //
+  // TikTok orders split two ways and the boards could not tell them apart: with TIKTOK
+  // shipping the platform generates the label (it exists, but only inside Seller Center);
+  // with SELLER shipping we buy our own and push the tracking back. Recording the type is
+  // the prerequisite for showing a TikTok-made label at all — without it every order looks
+  // like one we still owe a label for. Field name varies by response version, so read the
+  // documented one and fall back rather than storing null on a shape we haven't seen.
+  const shipType = String(order.shipping_type || order.delivery_type || '').toUpperCase() || null;
+  const packageIds = (order.packages || []).map((p) => p && p.id).filter(Boolean).map(String);
   // buyer_message → order Notes; seller_note kept too. Set on INSERT only (out of the
   // conflict update) so a seller's later edits survive a re-sync, same as the other importers.
-  const meta = { source: 'tiktok', tiktok_status: st, note: order.buyer_message || order.seller_note || '' };
+  const meta = {
+    source: 'tiktok', tiktok_status: st, note: order.buyer_message || order.seller_note || '',
+    tiktok_shipping_type: shipType, tiktok_package_ids: packageIds,
+  };
+  // The sync-OWNED half of meta is merged on re-sync; the rest (a seller's note) is not
+  // touched. Packages appear AFTER the order does, so insert-only would mean an order that
+  // gained a label never learned its package id — but a blanket meta=excluded.meta would
+  // wipe whatever a human wrote, which is the one thing sync must never do (CLAUDE.md §2.6).
+  const syncMeta = { tiktok_status: st, tiktok_shipping_type: shipType, tiktok_package_ids: packageIds };
   await q(
     `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order, meta)
      values ($1,$2,$3,'tiktok',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), $11, $12)
      on conflict (id) do update set total=excluded.total,
        customer=excluded.customer, address=excluded.address,
        tracking=coalesce(excluded.tracking, orders.tracking),
+       meta = coalesce(orders.meta, '{}'::jsonb) || $13::jsonb,
        created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
     [id, conn.connected_by, conn.shop_name || conn.shop_id,
      { name: custName, email: order.buyer_email || null }, address,
-     status, status, total, track, createdIso, !!isFactory, meta]
+     status, status, total, track, createdIso, !!isFactory, meta, JSON.stringify(syncMeta)]
   );
   // Items only on first import — a re-sync must not wipe factory picks. TikTok returns ONE
   // line_item per unit (no quantity field), and CLAUDE.md's line-identity rule wants each
@@ -630,6 +649,84 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       const shops = (d.shops || []).map((s) => ({ id: String(s.id || ''), name: s.name || null, region: s.region || null, has_cipher: !!s.cipher }));
       return { ok: true, signed_call_ok: true, shops };
     } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  /**
+   * The TikTok-GENERATED shipping label for a platform-shipped order.
+   *
+   * UNVERIFIED against a live order. The path is real — probed unauthenticated, it answers
+   * 36009004 "invalid credentials" where an unregistered path answers 36009009 "Invalid
+   * path" — and the shop holds seller.fulfillment.package.write. But no TikTok order has
+   * ever synced here, so the RESPONSE SHAPE has never been seen. Everything below reads
+   * defensively and the raw response is logged, so the first real order tells us what to
+   * fix instead of failing blind. Do not describe this as working until that has happened.
+   *
+   *   order id → packages[].id (from meta, else re-read the order) → GET
+   *   /fulfillment/202309/packages/{id}/shipping_documents → { doc_url }
+   *
+   * Returns the URL rather than proxying the bytes: it's a short-lived signed TikTok link,
+   * and streaming a PDF through here would put a 60MB body limit in front of a document we
+   * don't need to touch.
+   */
+  app.get('/api/tiktok/orders/:id/label', { preHandler: requireAuth }, async (req, reply) => {
+    const raw = String(req.params.id || '');
+    const orderId = raw.replace(/^tiktok-/i, '');
+    if (!orderId) { reply.code(400); return { error: 'Not a TikTok order' }; }
+    try {
+      const row = (await q('select * from orders where id=$1', ['tiktok-' + orderId])).rows[0];
+      if (!row) { reply.code(404); return { error: 'Order not found' }; }
+      // A seller may only read their OWN order's label; staff read any. Same shape as the
+      // rest of this file — the connection is resolved from the order's owner, never a
+      // "first shop we find" fallback that could hand one seller another's document.
+      const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+      if (!staff && String(row.seller_id) !== String(req.user.sub)) { reply.code(404); return { error: 'Order not found' }; }
+
+      const conns = (await q(`select * from platform_connections where platform='tiktok'`)).rows;
+      const conn = conns.find((c) => String(c.connected_by) === String(row.seller_id))
+        || conns.find((c) => c.shop_name && c.shop_name === row.store)
+        || null;
+      if (!conn) { reply.code(400); return { error: "Couldn't tell which connected TikTok shop this order belongs to" }; }
+      const cipher = await getShopCipher(conn);
+
+      // Package ids: prefer what the sync recorded, but re-read the order when meta predates
+      // this feature or the package was created after the last sync.
+      const meta = row.meta || {};
+      let packageIds = Array.isArray(meta.tiktok_package_ids) ? meta.tiktok_package_ids.filter(Boolean) : [];
+      let shipType = meta.tiktok_shipping_type || null;
+      if (!packageIds.length) {
+        const od = await ttSignedRequest(conn, 'GET', '/order/202309/orders', { query: { shop_cipher: cipher, ids: orderId } });
+        const to = (od.orders || [])[0];
+        if (!to) { reply.code(404); return { error: 'TikTok no longer has this order' }; }
+        packageIds = (to.packages || []).map((p) => p && p.id).filter(Boolean).map(String);
+        shipType = String(to.shipping_type || to.delivery_type || '').toUpperCase() || shipType;
+      }
+      if (!packageIds.length) {
+        reply.code(400);
+        return { error: 'This order has no package on TikTok yet, so there is no label to fetch.', shipping_type: shipType };
+      }
+
+      const size = String(req.query?.size || process.env.TIKTOK_LABEL_SIZE || 'A6').toUpperCase();
+      const docs = [];
+      for (const pid of packageIds) {
+        const d = await ttSignedRequest(conn, 'GET', `/fulfillment/202309/packages/${encodeURIComponent(pid)}/shipping_documents`, {
+          query: { shop_cipher: cipher, document_type: 'SHIPPING_LABEL', document_size: size },
+        });
+        // Shape unconfirmed — take the documented key, then anything URL-shaped, rather than
+        // returning null on a field name that turns out to differ by a word.
+        const url = d.doc_url || d.url || (Array.isArray(d.documents) ? (d.documents[0] || {}).doc_url : null) || null;
+        app.log.info({ phase: 'tiktok/label', packageId: pid, keys: Object.keys(d || {}), got_url: !!url }, 'tiktok shipping document');
+        docs.push({ package_id: pid, url, raw_keys: Object.keys(d || {}) });
+      }
+      const found = docs.filter((x) => x.url);
+      if (!found.length) {
+        reply.code(502);
+        return { error: 'TikTok returned no document URL for this package — the response shape differs from what we expected.', documents: docs };
+      }
+      return { ok: true, shipping_type: shipType, documents: found };
+    } catch (e) {
+      app.log.error({ err: e, phase: 'tiktok/label', order: orderId }, 'tiktok label fetch failed');
+      reply.code(400); return { error: e.message };
+    }
   });
 
   // Diagnostic (staff): confirm the stored token still works + show granted scopes.

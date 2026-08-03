@@ -23,6 +23,7 @@ import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, isFactoryColLocke
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
 import { OrderFilterBar, emptyOrdersMessage } from "@/components/app/order-filter-bar"
+import { getTiktokLabel } from "@/lib/api"
 import { filterOrders, EMPTY_ORDER_QUERY, type OrderQuery } from "@/lib/order-filter"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
@@ -189,6 +190,9 @@ export function OrdersHub() {
   // state because the two answer different questions ("whose turn is it" vs "which orders"),
   // and clearing one must not silently clear the other.
   const [query, setQuery] = useState<OrderQuery>(EMPTY_ORDER_QUERY)
+  // Fetching the TikTok-made label for a platform-shipped order. Per-order id so the row
+  // that was clicked is the one that shows as busy.
+  const [ttLabel, setTtLabel] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const confirm = useConfirm()
   const [sent, setSent] = useState<Set<string>>(new Set())
@@ -600,6 +604,28 @@ export function OrdersHub() {
       // went wrong until they opened the board and found it empty.
       setActionErr(`Couldn't send that line to a designer: ${e instanceof Error ? e.message : "unknown error"}`)
     } finally { setBusy(null) }
+  }
+
+  /**
+   * Open the label TIKTOK generated for a platform-shipped order.
+   *
+   * Distinct from "Reopen label", which reopens a label WE bought. This one exists only in
+   * TikTok's system, so it's a fetch, not a stored file. UNVERIFIED — no TikTok order has
+   * synced yet, so the failure path matters more than the success path here: every error is
+   * surfaced verbatim rather than collapsed to "couldn't fetch", because the first real
+   * order is what tells us whether the response shape matches.
+   */
+  const openTiktokLabel = async (o: OrderRow) => {
+    setTtLabel(o.id); setActionErr(null)
+    try {
+      const d = await getTiktokLabel(o.id)
+      if (d.error) throw new Error(d.error)
+      const url = d.documents?.[0]?.url
+      if (!url) throw new Error("TikTok returned no document URL for this order.")
+      window.open(url, "_blank", "noopener")
+    } catch (e) {
+      setActionErr(`Couldn't fetch the TikTok label: ${e instanceof Error ? e.message : "unknown error"}`)
+    } finally { setTtLabel(null) }
   }
 
   const stats = useMemo(() => {
@@ -1227,6 +1253,21 @@ export function OrdersHub() {
                               {primary !== "advance" && canAdvance && <DropdownMenuItem onClick={() => advanceOrder(o)}><SkipForward size={14} weight="fill" /> {tl("ui", "Next stage")}</DropdownMenuItem>}
                               {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> {tl("ui", "Create new label")}</DropdownMenuItem>}
                               {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> {tl("ui", "Reopen label")}</DropdownMenuItem>}
+                              {/* TikTok orders can be shipped on TIKTOK'S label, which lives
+                                  only in Seller Center — so it's fetched on demand, not a
+                                  file we hold. Shown for any TikTok order rather than gated
+                                  on the shipping type: orders synced before that field was
+                                  recorded have no type stored, and the server answers with
+                                  the actual reason ("no package on TikTok yet") which is
+                                  more use than a hidden menu item. */}
+                              {/^tiktok-/i.test(o.id) && (
+                                <DropdownMenuItem disabled={ttLabel === o.id} onClick={() => openTiktokLabel(o)}>
+                                  {ttLabel === o.id
+                                    ? <CircleNotch size={14} className="animate-spin" />
+                                    : <FileArrowDown size={14} weight="bold" />}
+                                  {ttLabel === o.id ? tl("ui", "Fetching…") : tl("ui", "TikTok label")}
+                                </DropdownMenuItem>
+                              )}
                               {/* Only printable once a blank is chosen — the barcode is the
                                   STOCK code, so a line without a blank has nothing to
                                   encode. Disabled with the reason rather than hidden, so
