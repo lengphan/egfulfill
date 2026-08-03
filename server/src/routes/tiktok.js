@@ -610,6 +610,16 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
            -- as-is. Enforced here rather than only in the UI, because the UI is a suggestion
            -- and the request body is whatever the client sends.
            backfill_days=greatest(platform_connections.backfill_days, excluded.backfill_days),
+           -- WIDENING must actually pull. The window above only records the choice; the sync
+           -- decides full-vs-incremental from last_sync_at, so without this a seller who moved
+           -- 30 → 90 would get 90 stored and no backfill ever run — the chooser would be
+           -- lying, which is the whole failure this feature exists to remove. Cleared ONLY on
+           -- a genuine widening, so re-authorising an expired token stays a cheap incremental
+           -- sync. Safe now that nothing in a sync path deletes: a full pull is an upsert.
+           last_sync_at = case
+             when excluded.backfill_days is not null
+              and excluded.backfill_days > coalesce(platform_connections.backfill_days, -1)
+             then null else platform_connections.last_sync_at end,
            updated_at=now()`,
         [shopId, shopName, d.access_token, d.refresh_token, expires, scopes, req.user.sub, bd]
       );
