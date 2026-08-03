@@ -43,14 +43,13 @@ function FilterMenu({ label, value, options, onPick }: {
         <CaretDown size={10} weight="bold" className="shrink-0 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-72 w-48 overflow-y-auto p-1">
-        {/* The reset row reads "Any" — not "Platform: any". The label is already on the
-            trigger you just clicked, and repeating it with a colon made the one row that
-            clears the filter look like a value you could set. It stays an explicit row
-            rather than only a Clear button: a dropdown you can enter but not leave is the
-            classic filter trap. */}
+        {/* The reset row is the filter's own TITLE — "Platform", not "Platform: any". It
+            reads as the unfiltered heading the trigger falls back to, which is exactly what
+            picking it does. It stays an explicit row rather than only a Clear button: a
+            dropdown you can enter but not leave is the classic filter trap. */}
         <DropdownMenuItem onClick={() => onPick("")} className="flex items-center gap-2 text-xs">
           <Check size={12} weight="bold" className={value ? "opacity-0" : "text-primary"} />
-          <span className={value ? "text-muted-foreground" : "font-medium"}>Any</span>
+          <span className={value ? "text-muted-foreground" : "font-medium"}>{label}</span>
         </DropdownMenuItem>
         {options.map((o) => (
           <DropdownMenuItem key={o.value} onClick={() => onPick(o.value)} className="flex items-center gap-2 text-xs">
