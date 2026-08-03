@@ -327,13 +327,32 @@ async function syncConnection(conn, opts = {}) {
   const connectedSec = conn.created_at ? Math.floor(new Date(conn.created_at).getTime() / 1000) : 0;
   // Factory shop (admin) vs seller's own shop — sets factory_order on each receipt.
   const isFactory = await ownerIsStaff(conn.connected_by);
-  // One-time: drop the pre-connection shipped backlog (full/first sync only).
-  if ((full || firstSync) && connectedSec) {
-    const del = await q(
-      `delete from orders where source='etsy' and seller_id=$1 and status='shipped' and created_at < to_timestamp($2)`,
-      [conn.connected_by, connectedSec]);
-    purgedShipped = del.rowCount || 0;
-  }
+  // REMOVED: the pre-connection shipped-backlog purge.
+  //
+  // It ran `delete from orders where source='etsy' and seller_id=$1 and status='shipped'
+  // and created_at < connect_time` on every full OR first sync. Three facts made that a
+  // data-loss path rather than a tidy-up:
+  //
+  //   1. The pull below deliberately reaches back BEFORE the connect date when the seller
+  //      picks a history window ("Past 90 days") — see minCreated. So the purge's cutoff and
+  //      the seller's chosen window contradicted each other.
+  //   2. The exchange route sets last_sync_at=null on every reconnect, so ANY reconnect —
+  //      changing the window, or just re-authorising an expired token — counted as a full
+  //      sync and re-ran the purge.
+  //   3. It ran BEFORE the pulls. So on a reconnect it deleted the backfilled history first;
+  //      and if the new window was narrower (e.g. "New orders only"), the re-pull did not
+  //      bring it back. Permanent, and silent.
+  //
+  // The blast radius was bigger than the orders: design_cards.order_id is ON DELETE CASCADE,
+  // so the design cards went with them, and re-imported orders come back as fresh rows —
+  // losing factory picks, variants and line ids, which item state is keyed on.
+  //
+  // It is not needed for its stated purpose either: the pulls below are already SCOPED to the
+  // chosen window (that's what fixed the API-quota problem), so a backlog nobody asked for is
+  // never fetched in the first place. The window governs what is IMPORTED. Nothing in a sync
+  // path may delete an order — CLAUDE.md §2.6, and this is the only importer that ever did.
+  //
+  // purgedShipped stays in the return shape (always 0) so callers reading it don't break.
   const isIncremental = !full && !!conn.last_sync_at;
   const imgCache = {};
   // Pull one filtered page-set of receipts and import each (importReceipt upserts,

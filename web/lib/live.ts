@@ -1,4 +1,4 @@
-import { API_BASE } from "./api"
+import { API_BASE, invalidateLists } from "./api"
 import { getToken } from "./auth"
 
 /**
@@ -25,8 +25,18 @@ let poll: ReturnType<typeof setInterval> | null = null
 /** The token the current stream was opened with. Sign out and back in as someone else and
  *  the old socket is still bound to the old user server-side, so it has to be replaced. */
 let openedWith: string | null = null
+/** Did the stream actually drop? Distinguishes a genuine reconnect — where events were
+ *  missed and cached reads must be thrown away — from the first open of a new connection,
+ *  where nothing has been missed and the caller has usually just fetched. */
+let missedWhileDown = false
 
 function fanout(e: LiveEvent) {
+  // A server event means something changed that this browser did NOT do — another operator
+  // advancing a stage, a sync importing an order. Subscribers respond by re-reading through
+  // their own endpoints, so the cached lists must be dropped FIRST or they'd re-read the
+  // copy taken before the change. Cleared unconditionally, even when nothing here is
+  // subscribed to this type: the event still proves the server's data moved.
+  invalidateLists()
   const set = handlers.get(String(e.type ?? ""))
   if (!set) return
   // Copy before iterating: a handler that unsubscribes itself would otherwise mutate the
@@ -56,16 +66,30 @@ function connect() {
     // If the stream dies — a proxy timing out, a laptop sleeping, the API restarting —
     // fall back to a slow poll rather than silently freezing. A board that stopped
     // updating looks exactly like a board where nothing is happening.
-    es.onerror = () => { if (!poll) poll = setInterval(pollAll, 60000) }
+    es.onerror = () => {
+      missedWhileDown = true
+      // While the stream is down there is no invalidation signal at all, so the poll has to
+      // drop the cached lists itself before waking subscribers — otherwise it would re-read
+      // a copy taken before whatever it's polling to discover.
+      if (!poll) poll = setInterval(() => { invalidateLists(); pollAll() }, 60000)
+    }
     es.onopen = () => {
       if (poll) { clearInterval(poll); poll = null }
       // Refetch on (re)connect: anything that changed while the stream was down was
       // never delivered, and nothing will resend it.
+      //
+      // But only DROP THE CACHE if there actually was an outage. This fires on the first
+      // open of every fresh connection too — including the one opened when a board mounts,
+      // moments after that board fetched — and invalidating there re-fetched a list the
+      // browser had just loaded, on the single most common navigation in the app. That cost
+      // a request per board visit and made the cache look like it did nothing.
+      if (missedWhileDown) { missedWhileDown = false; invalidateLists() }
       pollAll()
     }
   } catch {
     es = null
-    if (!poll) poll = setInterval(pollAll, 60000)
+    missedWhileDown = true
+    if (!poll) poll = setInterval(() => { invalidateLists(); pollAll() }, 60000)
   }
 }
 

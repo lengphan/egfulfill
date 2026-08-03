@@ -18,6 +18,48 @@ export class ApiError extends Error {
   }
 }
 
+/* ── Shared-list cache ────────────────────────────────────────────────────────
+ *
+ * A handful of endpoints are fetched by nearly every board, unchanged, on every mount:
+ * /api/orders above all (the hub, the dispatch board, both dashboards), plus the catalog and
+ * inventory the hub resolves blanks against. Four components mounting at once fired four
+ * identical requests, and moving Orders → Board → Dashboard refetched the same list each
+ * time — so you watched a skeleton for a list the browser had just finished loading.
+ *
+ * Two mechanisms, both small:
+ *   · DE-DUPLICATION — concurrent callers share one in-flight promise. Always on; it cannot
+ *     serve anything stale because there is only ever one request.
+ *   · A SHORT TTL — a repeat read within the window skips the network entirely. This is what
+ *     makes board-to-board navigation instant.
+ *
+ * Staleness is handled by invalidating rather than by guessing:
+ *   · any non-GET through api() clears everything (see below) — blunt on purpose, because a
+ *     rule that lists which endpoints a mutation affects is a rule that eventually misses one;
+ *   · any live event or SSE reconnect clears it too (live.ts calls invalidateLists()).
+ * So the window only ever elides a re-read of data that nothing has touched.
+ *
+ * Errors are never cached — a rejected load leaves the entry absent, so the next call retries.
+ */
+const _lists = new Map<string, { at: number; data: unknown }>()
+const _listInflight = new Map<string, Promise<unknown>>()
+
+/** Drop every cached list. Called on any write, and by live.ts on any server event. */
+export function invalidateLists() { _lists.clear() }
+
+async function cachedList<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+  const hit = _lists.get(key)
+  if (hit && Date.now() - hit.at < ttlMs) return hit.data as T
+  const flight = _listInflight.get(key) as Promise<T> | undefined
+  if (flight) return flight
+  const p = (async () => {
+    const data = await load()
+    _lists.set(key, { at: Date.now(), data })
+    return data
+  })()
+  _listInflight.set(key, p)
+  try { return await p } finally { _listInflight.delete(key) }
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken()
   const headers = new Headers(init.headers)
@@ -26,6 +68,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) headers.set("Authorization", `Bearer ${token}`)
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
+  // Anything that isn't a GET may have changed what a cached list holds. Clearing on EVERY
+  // write — rather than mapping each mutation to the lists it touches — is deliberate: that
+  // map would have to be updated by every future route, and the first time someone forgot,
+  // the symptom would be a board showing an order state that no longer exists. The cost of
+  // being blunt is one extra fetch after a write, which is the request that was happening
+  // anyway before any of this existed.
+  if (init.method && init.method.toUpperCase() !== "GET") invalidateLists()
   if (!res.ok) {
     let message = res.statusText
     let body: unknown
@@ -542,8 +591,10 @@ export function getSheetRows(url: string) {
   return api<{ rows?: string[][]; title?: string; tab?: string; error?: string }>(`/api/sheets?url=${encodeURIComponent(url)}`)
 }
 
+/** The blank catalog. Cached longer than the order list — it's reference data, and the only
+ *  thing that changes it is a product edit, which is a write, which clears this. */
 export function getCatalogProducts() {
-  return api<CatalogProduct[]>(`/api/catalog_products`)
+  return cachedList("catalog_products", 120_000, () => api<CatalogProduct[]>(`/api/catalog_products`))
 }
 // Staff: whole-catalog upsert (send the full array; missing ids are removed).
 export function saveCatalogProducts(products: CatalogProduct[]) {
@@ -724,8 +775,10 @@ export function importSanmarCatalog(csv: string) {
 
 // ── Inventory (staff) — whole-array upsert: send the full list, missing SKUs are dropped ──
 export type InventoryItem = { sku: string; name?: string | null; variant?: string | null; in_stock?: number; reserved?: number; reorder_at?: number; category?: string | null; supplier?: string | null; updated_at?: string }
+/** Stock levels. Short window — a scan on the floor changes these, and a scan is a write,
+ *  which clears the cache, so the window only ever elides a re-read while nothing has moved. */
 export function getInventory() {
-  return api<InventoryItem[]>(`/api/inventory`)
+  return cachedList("inventory", 30_000, () => api<InventoryItem[]>(`/api/inventory`))
 }
 /**
  * Whole-list upsert: every SKU missing from `items` is DELETED server-side, and every
@@ -1133,7 +1186,17 @@ export type OrderRow = {
 export function getOrder(id: string) {
   return api<OrderRow & { error?: string }>(`/api/orders/${encodeURIComponent(id)}`)
 }
-export async function getOrders() {
+/** The order list, shared and briefly cached — see the cache note at the top of this file.
+ *  Pass `{ force: true }` to bypass the window (a deliberate "refresh now" by a person). */
+export async function getOrders(opts?: { force?: boolean }): Promise<OrderRow[]> {
+  if (opts?.force) _lists.delete("orders")
+  // Returned as a copy so a caller that sorts or splices in place can't corrupt the entry
+  // every other board is about to read. The rows themselves are shared and treated as
+  // immutable, which is how every consumer already handles them.
+  return (await cachedList("orders", 30_000, loadOrders)).slice()
+}
+
+async function loadOrders() {
   const rows = await api<OrderRow[]>(`/api/orders`)
   // The list no longer inlines base64 thumbnails — it sends `img_ref`, a cacheable URL for
   // the same bytes (see the aggregate in orders.js; it was 74% of a 6MB response). Resolve
