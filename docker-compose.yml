@@ -138,6 +138,13 @@ services:
       # Brevo HTTP API — preferred email transport (sends over HTTPS:443, so it works
       # even though the host blocks outbound SMTP ports). Set BREVO_API_KEY in .env.
       BREVO_API_KEY: ${BREVO_API_KEY:-}
+      # Bulk/marketing sender, e.g. "EGFULFILL <news@mail.egful.store>". Broadcasts send
+      # from HERE so a campaign that trips a spam filter can't damage the reputation of
+      # the transactional domain that password resets and top-up alerts ride on. Unset =
+      # falls back to SMTP_FROM (shared reputation, but mail still goes out). Not a
+      # UI-settable secret, so it must be listed here AND in .env — this file forwards
+      # env by NAME, so an .env line alone never reaches the container.
+      MAIL_FROM_BULK: ${MAIL_FROM_BULK:-}
 
       # Object storage for design artwork (S3-compatible). Unset = inline base64 in
       # Postgres, which also means no URL to give an outside design partner. See
