@@ -1989,6 +1989,10 @@ export type EtsyConnection = {
    *  made before the chooser existed). The chooser reads it to grey out anything narrower —
    *  the window ratchets, and backfill.js enforces that server-side regardless. */
   backfill_days?: number | null
+  /** The earliest order actually held for this channel. The chooser's fallback floor when
+   *  backfill_days is null: history that exists is proof of how far back this shop imported,
+   *  even when nothing recorded the window that produced it. */
+  oldest_order_at?: string | null
 }
 
 export type EtsyConfig = {

@@ -259,11 +259,18 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
   // Staff see all; a seller sees only their own connected store.
   app.get('/api/shopify/connections', { preHandler: requireAuth }, async (req) => {
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+      // oldest_order_at: the earliest order we actually hold for this shop's owner on this
+      // channel. It's the ONLY evidence of how far back a shop has already imported when
+      // backfill_days is null — which is every connection made before the chooser existed.
+      // The chooser ratchets against whichever is wider, so a shop with 60 days of orders
+      // can't be re-connected at "Today" just because nobody recorded a window for it.
     const r = await q(
-      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days
-                 from platform_connections where platform='shopify' order by created_at`
-            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days
-                 from platform_connections where platform='shopify' and connected_by=$1 order by created_at`,
+      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days,
+                        (select min(o.created_at) from orders o where o.source='shopify' and o.seller_id = pc.connected_by) as oldest_order_at
+                 from platform_connections pc where platform='shopify' order by created_at`
+            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days,
+                        (select min(o.created_at) from orders o where o.source='shopify' and o.seller_id = pc.connected_by) as oldest_order_at
+                 from platform_connections pc where platform='shopify' and connected_by=$1 order by created_at`,
       staff ? [] : [req.user.sub]);
     return r.rows;
   });

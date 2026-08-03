@@ -185,16 +185,46 @@ export function StoresManager() {
     { days: 90, label: "Past 90 days", sub: "The last quarter" },
   ]
 
-  /** The window this shop was ALREADY synced with, if it's still connected.
+  /** How far back this channel has ALREADY imported — the floor the chooser ratchets against.
    *
-   *  The window only ever widens (enforced server-side in backfill.js). A narrower choice
-   *  could not do anything anyway: the orders from the wider window are already here and no
-   *  sync path deletes an order, so "Past 7 days" on a shop synced at 30 would neither remove
-   *  the other 23 days nor describe what's on screen. */
+   *  Two sources, because either can be missing:
+   *   · `backfill_days`, the window the seller picked. Null on every shop connected before
+   *     the chooser existed — which is why an already-connected Etsy shop was still being
+   *     offered "Today".
+   *   · `oldest_order_at`, the age of the earliest order actually held. Evidence rather than
+   *     a record: if orders reach back 60 days, the shop has imported 60 days regardless of
+   *     what was or wasn't written down.
+   *
+   *  The WIDER of the two wins, and it's rounded UP to the nearest offered option — an option
+   *  narrower than what's already here can't describe the screen, and nothing is ever deleted
+   *  to make it true. */
   const syncedWindowFor = (ch: string): number | null => {
     const mine = (conns ?? []).filter((c) => (c.platform || "etsy").toLowerCase() === ch)
-    const days = mine.map((c) => c.backfill_days).filter((d): d is number => typeof d === "number")
-    return days.length ? Math.max(...days) : null
+    if (!mine.length) return null
+    const recorded = mine.map((c) => c.backfill_days).filter((d): d is number => typeof d === "number")
+
+    const ages = mine
+      .map((c) => c.oldest_order_at)
+      .filter((s): s is string => !!s)
+      .map((s) => (Date.now() - new Date(s).getTime()) / 86400000)
+      .filter((d) => Number.isFinite(d) && d >= 0)
+    // Round the observed age UP to an offered option: 12 days of history means "Past 7" is
+    // already too narrow, so the floor is 30. Beyond the widest option, the floor is that one.
+    //
+    // Two roundings, both erring wide except where that would be absurd:
+    //  · under a day → 0, so a shop holding only today's orders can still pick "Today". A raw
+    //    0.2 would otherwise round up to 7 and grey out the very window it's already on.
+    //  · otherwise ceil, so 7.9 days of history needs 30 rather than squeaking into "Past 7",
+    //    which wouldn't actually cover the oldest order.
+    const widest = SCOPE_OPTIONS[SCOPE_OPTIONS.length - 1].days
+    const oldest = ages.length ? Math.max(...ages) : null
+    const needed = oldest === null ? null : (oldest < 1 ? 0 : Math.ceil(oldest))
+    const implied = needed === null
+      ? null
+      : (SCOPE_OPTIONS.find((o) => o.days >= needed)?.days ?? widest)
+
+    const floors = [...recorded, ...(implied === null ? [] : [implied])]
+    return floors.length ? Math.max(...floors) : null
   }
   const channelName = (k: string) => CHANNELS.find((c) => c.key === k)?.name || "shop"
 
