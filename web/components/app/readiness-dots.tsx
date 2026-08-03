@@ -37,11 +37,6 @@ export type TagFile = { key: string; name: string; note?: string; href?: string;
 
 function Tag({ id, label, state, title, orderId, status, files }: {
   id: TagId; label: string; state: State; title?: string; orderId: string
-  /** Compact form for a table row: a small coloured DOT followed by the word, instead of
-   *  the full tinted pill. The dot carries progress (grey/amber/violet) and the word stays
-   *  readable — the floor asked to see the word, not decode a colour. State, popover and
-   *  history are identical to the pill; only the chrome is lighter. */
-  dot?: boolean
   /** The sentence that used to be baked into the tag's name. */
   status?: string
   files?: TagFile[]
@@ -86,7 +81,11 @@ function Tag({ id, label, state, title, orderId, status, files }: {
         openOnHover
         delay={120}
         closeDelay={200}
-        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + cls}
+        // Tight on purpose: four of these plus the Stock chip share ONE table cell, and at
+        // px-2.5/text-xs/semibold they were the loudest thing in the row — heavier than the
+        // order number they sit beside, for what is supporting detail. Same words, same
+        // colours, about a third less width.
+        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " + cls}
       >
         {tl("ui", label)}
       </PopoverTrigger>
@@ -178,7 +177,7 @@ function TagFileRow({ file }: { file: TagFile }) {
   )
 }
 
-export function ReadinessStrip({ order, items, designs, files, className, compact }: {
+export function ReadinessStrip({ order, items, designs, files, className }: {
   order: OrderRow
   items?: OrderItem[]
   /** Placed artwork keyed by sku — presence means a design exists to work from. */
@@ -186,11 +185,12 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
   /** Machine files produced for this order — presence means a design was approved. */
   files?: DesignFileRow[]
   className?: string
-  /** Dots, not words — for a table column that already has a heading. */
-  compact?: boolean
 }) {
-  // The states and their sentences live in lib/order-readiness.ts — the Ready filter reads
-  // the SAME function, so a chip and the filter that hides its row can never disagree.
+  // (A `compact` flag used to select a dot-instead-of-pill variant that Tag never actually
+  // implemented — it took a prop it ignored. The one rendering is now the compact one.)
+  //
+  // The states and their sentences live in lib/order-readiness.ts — the Prep filter
+  // reads the SAME function, so a chip and the filter that hides its row can't disagree.
   const ready = orderReadiness(order, { items, designs, files })
   const { withArt, buyerUploads } = ready
 
@@ -228,14 +228,14 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
   const designFiles = designFilesAll.filter((f) => f.href || f.designId)
 
   return (
-    <span className={"inline-flex items-center " + (compact ? "gap-1.5 " : "gap-1.5 ") + (className ?? "")}>
+    <span className={"inline-flex items-center gap-1 " + (className ?? "")}>
       {/* Names are fixed. Colour carries progress; the words live in each popover. */}
       <Tag id="label" orderId={order.id} label="Label" state={ready.label.state}
-           title={ready.label.status} status={ready.label.status} files={labelFile} dot={compact} />
+           title={ready.label.status} status={ready.label.status} files={labelFile} />
       <Tag id="scan" orderId={order.id} label="Scan" state={ready.scan.state}
-           title={ready.scan.status} status={ready.scan.status} files={labelFile} dot={compact} />
+           title={ready.scan.status} status={ready.scan.status} files={labelFile} />
       <Tag id="design" orderId={order.id} label="Design" state={ready.design.state}
-           title={ready.design.status} status={ready.design.status} files={designFiles} dot={compact} />
+           title={ready.design.status} status={ready.design.status} files={designFiles} />
     </span>
   )
 }

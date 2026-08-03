@@ -61,7 +61,11 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
     state === "in" ? "bg-primary/10 text-primary hover:bg-primary/15"
     : state === "out" ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
     : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
-  const label = state === "in" ? "In stock" : state === "out" ? "No stock" : "Stock"
+  // Always "Stock" — it used to say "In stock" / "No stock" / "Stock", which broke the one
+  // rule the three chips beside it keep (see readiness-dots.tsx): a chip whose text changes
+  // row to row can't be compared down a column, and it was the widest thing in the cell for
+  // a word the colour already carries. The state is in the tone and the hover.
+  const label = "Stock"
   const clickable = state === "out" && canPO
   const title = state === "in" ? "Blank stock is on hand for every line"
     : state === "out" ? (canPO ? "Short on blank stock — click to add to a draft purchase order. Open the order for the per-line breakdown." : "Short on blank stock — open the order for the per-line breakdown")
@@ -72,7 +76,7 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
       disabled={!clickable || sending}
       onClick={clickable ? () => onSend(order) : undefined}
       title={title}
-      className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
+      className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
     >
       {sending ? "Sending…" : label}
     </button>
@@ -163,11 +167,16 @@ const openLabel = (r: UspsLabelResult) => {
 // NB: "draft" and the first pipeline stage (in_review) are DIFFERENT states. Draft =
 // arrived/created but nobody has started it (where factory-synced orders land, unpaid);
 // in_review = Pending: the seller submitted + paid, awaiting factory approval.
+//
+// The three exception states get their OWN pills after Issues rather than only living
+// inside it. Issues stays: "show me everything that's gone wrong" and "show me what's
+// cancelled" are different questions, and the bundle is the one you ask first.
 const FILTERS: { label: string; id: string }[] = [
   { label: "All", id: "" },
   { label: "Draft", id: "draft" },
   ...FACTORY_STAGES.map((s) => ({ label: s.label, id: s.id })),
   { label: "Issues", id: "issues" },
+  ...EXCEPTION_STAGES.map((s) => ({ label: s.label, id: s.id })),
 ]
 
 // ONE order page for the whole factory team. The queue + item controls are shared; the
@@ -900,15 +909,15 @@ export function OrdersHub() {
         <div className="flex flex-wrap items-start gap-x-4 gap-y-2 border-b border-border px-5 py-2.5">
           <div className="flex shrink-0 flex-wrap items-center gap-1">
             {FILTERS.map((f) => {
-              // Issues also lights for any ONE exception state. Nothing in the UI sets those
-              // individually today, but a restored/linked status would otherwise leave the
-              // whole pill row looking unselected while the list was plainly narrowed.
-              const on = query.status === f.id || (f.id === "issues" && isException(query.status))
+              // Straight equality. Issues used to also light for any single exception state,
+              // because none of them had a pill; now that all three do, lighting two pills
+              // for one selection would just be wrong.
+              const on = query.status === f.id
               return (
                 <button
                   key={f.id}
                   onClick={() => setQuery({ ...query, status: f.id })}
-                  className={"eg-tap h-7 rounded-md px-2.5 text-xs font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                  className={"eg-tap h-7 rounded-md px-2 text-xs font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
                 >
                   {tl("stage", f.label)}
                 </button>
@@ -1070,8 +1079,8 @@ export function OrdersHub() {
                   </div>
                 ),
                 ready: (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} compact />
+                  <div className="flex flex-wrap items-center gap-1">
+                    <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} />
                     <StockChip order={o} items={items} catalog={catalog} stock={stock} canPO={canPO} sending={poBusy === o.id} onSend={sendToPO} />
                   </div>
                 ),

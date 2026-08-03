@@ -116,14 +116,19 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // WOULD have fitted whole.
   items:    { id: "items",    label: "Items",    grid: "minmax(0,1.2fr)" },
   // Four solid coloured pills — Label · Scan · Design + the Stock chip, all tinted by state.
-  // Titled "Checklist", not "Ready": the column is four separate gates in mixed states, and
-  // "Ready" both claimed a verdict the chips don't give and read as a rival to Status two
-  // columns over. The ID stays `ready` — it's the localStorage key for saved column layouts,
-  // so renaming it would silently reset everyone's board.
-  // Fixed width (the header cell can't size it), sized to hold the four on ONE line with the
-  // short stock labels ("In stock" / "No stock" / "Stock —"); the rest goes back to the
-  // flexible Customer/Items columns so the name breathes a little more than at 18rem.
-  ready:    { id: "ready",    label: "Checklist", grid: "16rem" },
+  //
+  // Titled "Prep": the column is the four gates an order passes before it can be made and
+  // shipped. "Ready" claimed a verdict four mixed-state chips don't give, and read as a
+  // rival to Status two columns over; "Checklist" said the right thing at twice the width
+  // of any other header on the row.
+  //
+  // The ID stays `ready` — it's the localStorage key for saved column layouts, so renaming
+  // it would silently reset everyone's board.
+  //
+  // Fixed width (the header cell can't size it), sized to hold all four on ONE line now the
+  // chips are px-1.5/11px and Stock no longer rewrites itself to "In stock" / "No stock".
+  // The 4rem that frees goes back to the flexible Customer/Items columns.
+  ready:    { id: "ready",    label: "Prep",     grid: "12rem" },
   action:   { id: "action",   label: "",         grid: "12rem" },  // header stays blank: buttons need no title
 }
 

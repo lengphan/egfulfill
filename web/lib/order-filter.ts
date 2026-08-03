@@ -66,7 +66,7 @@ export function matchesStatus(o: OrderRow, value: string): boolean {
   return stage === value
 }
 
-/** The Checklist dropdown's roster.
+/** The Prep dropdown's roster.
  *
  *  The NOT-DONE half comes first: "which orders still need a label" is the question a floor
  *  actually asks, and burying it under its own inverse makes the control read as a report
@@ -88,12 +88,12 @@ export const READY_OPTIONS: { value: string; label: string; stock?: true }[] = [
 
 export const readyLabel = (v: string) => READY_OPTIONS.find((o) => o.value === v)?.label ?? v
 
-/** What the stock half of the Ready filter needs to answer at all: stock is held against the
+/** What the stock half of the Prep filter needs to answer at all: stock is held against the
  *  BLANK sku, so a line has to be resolved through the catalog before it can be looked up. */
 export type FilterContext = { catalog?: CatalogProduct[]; stock?: Record<string, number> }
 
 /**
- * Does an order match a Ready filter value?
+ * Does an order match a Prep filter value?
  *
  * Readiness is read from `orderReadiness` with NO per-row designs/files — deliberately.
  * Those are fetched lazily for expanded rows only, so feeding them in would make a row

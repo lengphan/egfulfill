@@ -117,9 +117,9 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
           answers to one question. (Cost of that: On hold / Cancelled / Refunded can only be
           selected as the "Issues" pill's bundle, since no pill names them individually.) */}
 
-      {/* The Checklist column, filterable: "which orders still need a label" is the question
-          those chips are read for, and reading them was the only way to ask it. */}
-      <FilterMenu label="Checklist" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
+      {/* The Prep column, filterable: "which orders still need a label" is the question those
+          chips are read for, and reading them was the only way to ask it. */}
+      <FilterMenu label="Prep" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
 
       {facets.platforms.length > 1 && (
         <FilterMenu
