@@ -706,7 +706,15 @@ export function getSanmarCatalogStyle(style: string) {
   return api<SanmarCatalogDetail>(`/api/sanmar/catalog/${encodeURIComponent(style)}`)
 }
 export function getSanmarCatalogStatus() {
-  return api<{ count: number; last: string | null }>(`/api/sanmar/catalog/status`)
+  return api<{ count: number; last: string | null; variants?: number }>(`/api/sanmar/catalog/status`)
+}
+// Re-read the SDL the server already holds on disk. This is the ONLY route that can carry the
+// real catalog: SanMar_SDL_N.csv is ~195MB, over the API's 60MB body limit and far over
+// Vercel's ~4.5MB proxy cap, so it can never be uploaded from the browser. Admin-only.
+export function syncSanmarCatalog(file?: string) {
+  return api<{ ok?: boolean; file?: string; variantRows?: number; styles?: number; imported?: number
+               total?: number; seconds?: number; available?: string[]; error?: string; detail?: string }>(
+    `/api/sanmar/import/local`, { method: "POST", body: JSON.stringify(file ? { file } : {}) })
 }
 // Import the SDL/EPDD file. Send its raw text ({ csv }) — the server parses it by column name.
 export function importSanmarCatalog(csv: string) {

@@ -15,7 +15,7 @@ import { parseCSV } from "@/lib/order-import"
 import {
   getSsStylesAll, getSsStyleImgs, getSsStyle, toggleSsFavorite, ssWarm, ssSync,
   getOttoProducts, getOttoStyle, getSsStyleSkus, getCatalogFilters, toggleOttoFavorite, importOttoProducts,
-  getSanmarCatalog, getSanmarCatalogStyle, toggleSanmarFavorite, importSanmarCatalog,
+  getSanmarCatalog, getSanmarCatalogStyle, toggleSanmarFavorite, syncSanmarCatalog,
   getCatalogProducts, saveCatalogProducts, colorNames,
   type SsStyle, type OttoStyle, type OttoImportRow, type SanmarCatalogStyle, type CatalogProduct,
 } from "@/lib/api"
@@ -95,7 +95,6 @@ export function AllSuppliers() {
   const [refreshing, setRefreshing] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const sanmarFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { const id = setTimeout(() => setDebounced(search.trim().toLowerCase()), 350); return () => clearTimeout(id) }, [search])
 
@@ -310,15 +309,17 @@ export function AllSuppliers() {
   // SanMar's SDL/EPDD file is a comma-delimited CSV with a header row. Send the raw text —
   // the server parses it by column name. (Big files may exceed the 60MB body limit; the
   // basic SDL is well under, but a full EPDD with inventory can be split if it errors.)
-  const onImportSanmar = async (file?: File) => {
-    if (!file) return
+  // SanMar is a SERVER-side sync, not an upload. The SDL is ~195MB — over the API's 60MB body
+  // limit and far over Vercel's ~4.5MB proxy cap — so it can never travel through the browser.
+  // The server reads the copy already on its disk instead.
+  const onSyncSanmar = async () => {
     setImporting(true); setMsg(null)
     try {
-      const text = await file.text()
-      const r = await importSanmarCatalog(text)
-      if (r.error) throw new Error(r.error)
-      setMsg(`Imported ${r.imported ?? 0} SanMar rows — ${(r.total ?? 0).toLocaleString()} in the catalog.`); reload(debounced)
-    } catch (e) { setMsg(e instanceof Error ? e.message : "SanMar import failed.") } finally { setImporting(false); if (sanmarFileRef.current) sanmarFileRef.current.value = "" }
+      const r = await syncSanmarCatalog()
+      if (r.error) throw new Error(r.available?.length ? `${r.error} Found: ${r.available.join(", ")}` : r.error)
+      setMsg(`SanMar synced — ${(r.styles ?? 0).toLocaleString()} styles from ${(r.variantRows ?? 0).toLocaleString()} rows in ${r.seconds ?? "?"}s.`)
+      reload(debounced)
+    } catch (e) { setMsg(e instanceof Error ? e.message : "SanMar sync failed.") } finally { setImporting(false) }
   }
 
   // Filters (supplier / brand / category / price) — applied to what's loaded, like SpyDeck.
@@ -368,9 +369,9 @@ export function AllSuppliers() {
             <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
               {importing ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />} Import Otto
             </Button>
-            <input ref={sanmarFileRef} type="file" accept=".csv,.txt,text/csv" className="hidden" onChange={(e) => onImportSanmar(e.target.files?.[0])} />
-            <Button size="sm" variant="outline" onClick={() => sanmarFileRef.current?.click()} disabled={importing}>
-              {importing ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />} Import SanMar
+            <Button size="sm" variant="outline" onClick={onSyncSanmar} disabled={importing}
+                    title="Re-read the SanMar SDL catalog the server holds on disk">
+              {importing ? <CircleNotch size={14} className="animate-spin" /> : <ArrowsClockwise size={14} weight="bold" />} Sync SanMar
             </Button>
             <Button size="sm" variant="outline" onClick={() => { setRefreshing(true); ssWarm().catch(() => {}).finally(() => setRefreshing(false)) }} disabled={refreshing}>
               <ArrowsClockwise size={14} weight="bold" className={refreshing ? "animate-spin" : ""} /> Refresh
