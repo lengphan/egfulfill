@@ -526,6 +526,11 @@ export function ordersRoutes(app, requireAuth) {
     // storage, not Postgres. Readers take url ?? data.
     .then(() => q('alter table order_designs add column if not exists storage_key text'))
     .then(() => q('create index if not exists order_designs_art_hash on order_designs (art_hash)'))
+    // GET /api/orders ends `order by o.created_at desc` on every board, with no index behind
+    // it — so each load sorted the whole table. The seller list additionally filters by
+    // seller_id, and the existing orders_seller_idx can't serve both the filter and the sort.
+    .then(() => q('create index if not exists orders_created_idx on orders (created_at desc)').catch(() => {}))
+    .then(() => q('create index if not exists orders_seller_created_idx on orders (seller_id, created_at desc)').catch(() => {}))
     /**
      * LINE IDENTITY. The primary key was (order_id, sku, kind), so two lines of the SAME
      * sku on one order shared ONE design row — attaching artwork to the second silently

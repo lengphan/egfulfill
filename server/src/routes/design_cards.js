@@ -129,6 +129,14 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // Who made it and when — a manual card has no order to inherit provenance from.
   q('alter table design_cards add column if not exists created_by text').catch(() => {});
   q('alter table design_cards add column if not exists created_at timestamptz default now()').catch(() => {});
+  // The table had NO index but its primary key, while GET /api/orders runs TWO correlated
+  // EXISTS against design_cards.order_id for EVERY order row (the Design readiness chip:
+  // "on the board" and "approved"). That's two sequential scans per order — the order list's
+  // cost grew with orders × cards, which is why the boards got slower as the board filled up
+  // rather than as orders arrived. The partial index serves the `col = 'approved'` half
+  // without widening the common lookup.
+  q('create index if not exists design_cards_order_idx on design_cards (order_id)').catch(() => {});
+  q("create index if not exists design_cards_order_approved_idx on design_cards (order_id) where col = 'approved'").catch(() => {});
 
   const artUrlOf = (row) => {
     if (!row || !row.art_key) return null;
