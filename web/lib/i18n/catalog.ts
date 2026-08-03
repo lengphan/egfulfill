@@ -116,7 +116,7 @@ const vi: Dict = {
   "col.Store": "Cửa hàng",
   "col.Customer": "Khách hàng",
   "col.Items": "Sản phẩm",
-  "col.Ready": "Sẵn sàng",
+  "col.Checklist": "Danh mục kiểm tra",
   // Readiness tags
   "ui.Label": "Nhãn",
   "ui.Scan": "Quét",

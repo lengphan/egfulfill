@@ -156,10 +156,9 @@ const openLabel = (r: UspsLabelResult) => {
   }
 }
 
-// The stage pills. Same vocabulary as the Status dropdown in the filter bar (STATUS_OPTIONS)
-// and driven by the SAME query field, so the two can't disagree — the pills are the six
-// stages a floor moves between, the dropdown additionally breaks "Issues" into the three
-// exception states it bundles.
+// The stage pills — the ONLY control over query.status. The filter bar deliberately carries
+// no Status dropdown: a second control for the same field, one row apart, is two answers to
+// one question.
 //
 // NB: "draft" and the first pipeline stage (in_review) are DIFFERENT states. Draft =
 // arrived/created but nobody has started it (where factory-synced orders land, unpaid);
@@ -901,8 +900,8 @@ export function OrdersHub() {
         <div className="flex flex-wrap items-start gap-x-4 gap-y-2 border-b border-border px-5 py-2.5">
           <div className="flex shrink-0 flex-wrap items-center gap-1">
             {FILTERS.map((f) => {
-              // The Issues pill also lights for the three individual exception states, which
-              // only the Status dropdown can select — otherwise picking "Refunded" left the
+              // Issues also lights for any ONE exception state. Nothing in the UI sets those
+              // individually today, but a restored/linked status would otherwise leave the
               // whole pill row looking unselected while the list was plainly narrowed.
               const on = query.status === f.id || (f.id === "issues" && isException(query.status))
               return (

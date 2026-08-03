@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import {
   DATE_RANGES, dateRangeLabel, orderFacets, isOrderQueryActive, activeFilterCount,
-  STATUS_OPTIONS, statusLabel, READY_OPTIONS, readyLabel, EMPTY_ORDER_QUERY,
+  statusLabel, READY_OPTIONS, readyLabel, EMPTY_ORDER_QUERY,
   type OrderQuery, type FilterContext,
 } from "@/lib/order-filter"
 import { PRODUCT_METHODS } from "@/lib/print-method"
@@ -71,9 +71,8 @@ function FilterMenu({ label, value, options, onPick }: {
  * dropdown with a single option is dropped entirely — "Shop: OLVERA-TEES" beside a list where
  * every order is OLVERA-TEES is a control that cannot change anything.
  *
- * Status is the exception to that rule: it mirrors the stage pills, which are a fixed
- * vocabulary the floor learns once. A stage list that reshuffles as work moves through it
- * would be unusable as a set of tabs.
+ * The production stage is deliberately NOT here: the stage pills beside this bar already own
+ * `query.status`.
  */
 export function OrderFilterBar({ orders, query, onChange, catalog, className = "" }: {
   orders: OrderRow[]
@@ -113,13 +112,14 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
         />
       </div>
 
-      {/* Same value the stage pills write, so the two are one control in two shapes — the
-          pills for the six stages a floor moves between, this for the exception states the
-          "Issues" pill can only offer as a bundle. */}
-      <FilterMenu label="Status" value={query.status} options={STATUS_OPTIONS} onPick={(v) => set({ status: v })} />
-      {/* The Ready column, filterable: "which orders still need a label" is the question the
-          chips are read for, and reading them was the only way to ask it. */}
-      <FilterMenu label="Ready" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
+      {/* NO Status dropdown. `query.status` is written by the stage pills sitting to the
+          left of this bar — a second control for the same field, one row apart, is two
+          answers to one question. (Cost of that: On hold / Cancelled / Refunded can only be
+          selected as the "Issues" pill's bundle, since no pill names them individually.) */}
+
+      {/* The Checklist column, filterable: "which orders still need a label" is the question
+          those chips are read for, and reading them was the only way to ask it. */}
+      <FilterMenu label="Checklist" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
 
       {facets.platforms.length > 1 && (
         <FilterMenu

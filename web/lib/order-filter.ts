@@ -10,7 +10,7 @@
 import { type OrderRow, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { numOf, platformOf, decodeEntities } from "@/lib/order-format"
 import { normalizeMethods, PRODUCT_METHODS, type PrintMethod } from "@/lib/print-method"
-import { FACTORY_STAGES, EXCEPTION_STAGES, ALL_STATUSES, orderStage, isException } from "@/lib/factory-status"
+import { ALL_STATUSES, orderStage, isException } from "@/lib/factory-status"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 
@@ -49,21 +49,13 @@ export const activeFilterCount = (q: OrderQuery) =>
   (q.text.trim() ? 1 : 0) + (q.status ? 1 : 0) + (q.ready ? 1 : 0) +
   (q.platform ? 1 : 0) + (q.store ? 1 : 0) + (q.method ? 1 : 0) + (q.days !== null ? 1 : 0)
 
-/** The Status dropdown's roster, and the vocabulary the stage pills speak.
- *
- *  Derived from the canonical pipeline, never hand-listed, so a stage added to
- *  factory-status.ts turns up here rather than silently becoming unfilterable. "Issues"
- *  sits with the three exception states it bundles: the pills only offer the bundle, and
- *  "which of my orders are REFUNDED" is a question the bundle can't answer. */
-export const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "draft", label: "Draft" },
-  ...FACTORY_STAGES.map((s) => ({ value: s.id, label: s.label })),
-  { value: "issues", label: "Issues" },
-  ...EXCEPTION_STAGES.map((s) => ({ value: s.id, label: s.label })),
-]
-
+/** How a status value reads in a sentence. The two pseudo-values the pills add on top of the
+ *  canonical stage ids come first; everything else is looked up in the pipeline itself, so a
+ *  stage added to factory-status.ts is named here without being listed twice. */
 export const statusLabel = (v: string) =>
-  STATUS_OPTIONS.find((o) => o.value === v)?.label ?? ALL_STATUSES.find((s) => s.id === v)?.label ?? v
+  v === "draft" ? "Draft"
+  : v === "issues" ? "Issues"
+  : ALL_STATUSES.find((s) => s.id === v)?.label ?? v
 
 /** Does an order sit at this Status filter value? */
 export function matchesStatus(o: OrderRow, value: string): boolean {
@@ -74,7 +66,7 @@ export function matchesStatus(o: OrderRow, value: string): boolean {
   return stage === value
 }
 
-/** The Ready dropdown's roster.
+/** The Checklist dropdown's roster.
  *
  *  The NOT-DONE half comes first: "which orders still need a label" is the question a floor
  *  actually asks, and burying it under its own inverse makes the control read as a report
