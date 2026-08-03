@@ -8,6 +8,7 @@ import {
   CheckCircle,
   Storefront,
   Warning,
+  Prohibit,
 } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
@@ -175,11 +176,26 @@ export function StoresManager() {
   // Pre-connect scope options — how much order history the FIRST import reaches back for.
   // New orders always sync automatically afterward, so this only bounds the initial backfill.
   const SCOPE_OPTIONS: { days: number; label: string; sub: string; rec?: boolean }[] = [
-    { days: 0, label: "New orders only", sub: "From now on — nothing from the past" },
+    // "Today", not "New orders only": the server now reads 0 as midnight UTC rather than the
+    // instant you connect, so a shop linked at 4pm still gets that morning's sales. The old
+    // label described the old behaviour and would now be wrong.
+    { days: 0, label: "Today", sub: "Today's orders — nothing older" },
     { days: 7, label: "Past 7 days", sub: "Roughly this week" },
     { days: 30, label: "Past 30 days", sub: "About a month", rec: true },
     { days: 90, label: "Past 90 days", sub: "The last quarter" },
   ]
+
+  /** The window this shop was ALREADY synced with, if it's still connected.
+   *
+   *  The window only ever widens (enforced server-side in backfill.js). A narrower choice
+   *  could not do anything anyway: the orders from the wider window are already here and no
+   *  sync path deletes an order, so "Past 7 days" on a shop synced at 30 would neither remove
+   *  the other 23 days nor describe what's on screen. */
+  const syncedWindowFor = (ch: string): number | null => {
+    const mine = (conns ?? []).filter((c) => (c.platform || "etsy").toLowerCase() === ch)
+    const days = mine.map((c) => c.backfill_days).filter((d): d is number => typeof d === "number")
+    return days.length ? Math.max(...days) : null
+  }
   const channelName = (k: string) => CHANNELS.find((c) => c.key === k)?.name || "shop"
 
   // A channel's Connect button opens this chooser first; picking a window stashes it for the
@@ -434,28 +450,62 @@ export function StoresManager() {
                 server&apos;s <code className="font-mono">TIKTOK_REGION</code> is set to the wrong region.
               </div>
             )}
+            {/* Already-synced shops: say the rule ONCE, up here, rather than repeating it on
+                every greyed row. */}
+            {syncedWindowFor(pending) !== null && (
+              <div className="mt-3 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                This shop already imported{" "}
+                <span className="font-medium text-foreground">
+                  {SCOPE_OPTIONS.find((o) => o.days === syncedWindowFor(pending))?.label.toLowerCase() ?? `${syncedWindowFor(pending)} days`}
+                </span>
+                . You can widen that, but not narrow it — nothing already imported is ever removed.
+              </div>
+            )}
             <div className="mt-4 space-y-2">
-              {SCOPE_OPTIONS.map((o) => (
+              {SCOPE_OPTIONS.map((o) => {
+                // Greyed, not hidden: a missing option reads as a bug, while a disabled one
+                // with a reason says what happened and what to do instead.
+                const synced = syncedWindowFor(pending)
+                const off = synced !== null && o.days < synced
+                return (
                 <button
                   key={o.days}
                   type="button"
-                  onClick={() => chooseScope(o.days)}
-                  className="flex w-full items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:border-primary hover:bg-primary/5"
+                  disabled={off}
+                  aria-disabled={off}
+                  title={off ? "Already imported a longer period — the window can only widen" : undefined}
+                  onClick={() => !off && chooseScope(o.days)}
+                  className={
+                    "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors " +
+                    (off
+                      ? "cursor-not-allowed border-border/60 bg-muted/30 opacity-55"
+                      : "border-border bg-background hover:border-primary hover:bg-primary/5")
+                  }
                 >
                   <span className="min-w-0">
                     <span className="flex items-center gap-2 font-medium">
                       {o.label}
-                      {o.rec && (
+                      {o.rec && !off && synced === null && (
                         <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                           Recommended
                         </span>
                       )}
+                      {synced === o.days && (
+                        <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Current
+                        </span>
+                      )}
                     </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{o.sub}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {off ? "Shorter than what's already imported" : o.sub}
+                    </span>
                   </span>
-                  <Plus size={15} weight="bold" className="shrink-0 text-muted-foreground" />
+                  {off
+                    ? <Prohibit size={15} weight="bold" className="shrink-0 text-muted-foreground/70" />
+                    : <Plus size={15} weight="bold" className="shrink-0 text-muted-foreground" />}
                 </button>
-              ))}
+                )
+              })}
             </div>
             <button
               type="button"

@@ -6,6 +6,7 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
+import { clampDays, windowStartSec } from '../backfill.js';
 
 const API_KEY     = process.env.SHOPIFY_API_KEY || '';
 const API_SECRET  = process.env.SHOPIFY_API_SECRET || '';
@@ -50,12 +51,6 @@ const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 const genLineId = () => 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 // Sanitize the connect-time "how far back to import" choice → whole days in [0,365], or null
 // when the caller didn't choose (older connection). 0 = new orders only (no history).
-function clampDays(v) {
-  if (v == null || v === '') return null;
-  const n = Math.floor(Number(v));
-  if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.min(365, n));
-}
 
 // A Shopify line item's custom properties ([{name,value}]) carry the buyer's uploaded
 // file + personalization, exactly like Etsy variations. Same split rule as importReceipt.
@@ -140,14 +135,14 @@ async function syncShopifyConnection(conn) {
   const isFactory = await connIsFactory(conn);
   let imported = 0, cancelled = 0;
   // Bound the pull to the scope chosen at connect (conn.backfill_days): N → the last N days;
-  // 0 → new orders only (from when the store connected); null (older connection) → unchanged
-  // (up to Shopify's 250 most recent, as before). Webhooks keep things current after connect.
+  // 0 → today (since midnight UTC); null (older connection) → unchanged (up to Shopify's 250
+  // most recent, as before). Webhooks keep things current after connect. The cutoff comes
+  // from the shared helper so "0 means today" is the same statement on all three channels.
   let url = `https://${conn.shop_id}/admin/api/${API_VERSION}/orders.json?status=any&limit=250`;
   if (conn.backfill_days != null) {
-    const sinceIso = conn.backfill_days > 0
-      ? new Date(Date.now() - conn.backfill_days * 86400000).toISOString()
-      : (conn.created_at ? new Date(conn.created_at).toISOString() : null);
-    if (sinceIso) url += `&created_at_min=${encodeURIComponent(sinceIso)}`;
+    const connectedSec = conn.created_at ? Math.floor(new Date(conn.created_at).getTime() / 1000) : 0;
+    const sinceSec = windowStartSec(conn.backfill_days, connectedSec);
+    if (sinceSec) url += `&created_at_min=${encodeURIComponent(new Date(sinceSec * 1000).toISOString())}`;
   }
   const r = await fetch(url, { headers: { 'X-Shopify-Access-Token': conn.access_token } });
   recordUsage('shopify', { endpoint: 'GET /orders', ok: r.ok });
@@ -265,9 +260,9 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
   app.get('/api/shopify/connections', { preHandler: requireAuth }, async (req) => {
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
     const r = await q(
-      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at
+      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days
                  from platform_connections where platform='shopify' order by created_at`
-            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at
+            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days
                  from platform_connections where platform='shopify' and connected_by=$1 order by created_at`,
       staff ? [] : [req.user.sub]);
     return r.rows;
@@ -307,7 +302,10 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
          on conflict (platform, shop_id) do update set
            shop_name=excluded.shop_name, access_token=excluded.access_token,
            scopes=excluded.scopes, connected_by=excluded.connected_by,
-           backfill_days=excluded.backfill_days, updated_at=now()`,
+           -- Ratchets: widen only, never narrow (see backfill.js). GREATEST ignores nulls,
+           -- so a reconnect with no choice keeps whatever the seller originally picked.
+           backfill_days=greatest(platform_connections.backfill_days, excluded.backfill_days),
+           updated_at=now()`,
         [shop, shopName, t.access_token, t.scope || SCOPES, req.user.sub, bd]
       );
       // Register order webhooks now, so real-time sync works without manual setup.

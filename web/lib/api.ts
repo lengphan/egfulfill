@@ -1985,6 +1985,10 @@ export type EtsyConnection = {
   scopes: string | null
   last_sync_at: string | null
   created_at: string
+  /** The import window this shop was connected with, in days (0 = today, null = a connection
+   *  made before the chooser existed). The chooser reads it to grey out anything narrower —
+   *  the window ratchets, and backfill.js enforces that server-side regardless. */
+  backfill_days?: number | null
 }
 
 export type EtsyConfig = {

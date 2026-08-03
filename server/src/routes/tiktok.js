@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
+import { clampDays, windowStartSec } from '../backfill.js';
 import { imageBytesFrom } from '../images.js';
 
 const APP_KEY    = process.env.TIKTOK_APP_KEY || '';
@@ -47,14 +48,6 @@ const RESOLVED_REGION = /services\.us\.tiktokshop\.com/i.test(AUTHORIZE_URL) ? '
 const API_HOST      = (process.env.TIKTOK_API_HOST || 'https://open-api.tiktokglobalshop.com').replace(/\/+$/, '');
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
-// Sanitize the connect-time "how far back to import" choice → whole days in [0,365], or null
-// when the caller didn't choose (older connections). 0 = new orders only (no history).
-function clampDays(v) {
-  if (v == null || v === '') return null;
-  const n = Math.floor(Number(v));
-  if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.min(365, n));
-}
 
 // ── token helpers ────────────────────────────────────────────────────────────
 // TikTok wraps every response as { code, message, data, request_id }; code===0 = ok.
@@ -430,10 +423,11 @@ async function syncTiktokConnection(conn, opts = {}) {
     // only (forward from connect); N = the last N days; null (older connection) = the env
     // default. After this, the 5-min incremental poll keeps the queue current on its own.
     const connectedSec = conn.created_at ? Math.floor(new Date(conn.created_at).getTime() / 1000) : 0;
+    // A connection predating the chooser has no stored window; the env default stands in.
     const days = conn.backfill_days != null
       ? conn.backfill_days
       : Math.max(0, parseInt(process.env.TIKTOK_BACKFILL_DAYS, 10) || 30);
-    body.create_time_ge = days > 0 ? (nowSec - days * 86400) : (connectedSec || nowSec);
+    body.create_time_ge = windowStartSec(days, connectedSec || nowSec);
   } else {
     body.update_time_ge = Math.max(0, Math.floor(new Date(conn.last_sync_at).getTime() / 1000) - 300);
   }
@@ -561,9 +555,9 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
   app.get('/api/tiktok/connections', { preHandler: requireAuth }, async (req) => {
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
     const r = await q(
-      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at
+      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days
                  from platform_connections where platform='tiktok' order by created_at`
-            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at
+            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days
                  from platform_connections where platform='tiktok' and connected_by=$1 order by created_at`,
       staff ? [] : [req.user.sub]);
     return r.rows;
@@ -603,7 +597,13 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
            shop_name=excluded.shop_name, access_token=excluded.access_token,
            refresh_token=excluded.refresh_token, token_expires_at=excluded.token_expires_at,
            scopes=excluded.scopes, connected_by=excluded.connected_by,
-           backfill_days=excluded.backfill_days, updated_at=now()`,
+           -- The import window RATCHETS: it may widen, never narrow (see backfill.js).
+           -- GREATEST ignores nulls in Postgres, so a reconnect that sends no choice keeps
+           -- the stored one, and a first choice on a connection that never had one is taken
+           -- as-is. Enforced here rather than only in the UI, because the UI is a suggestion
+           -- and the request body is whatever the client sends.
+           backfill_days=greatest(platform_connections.backfill_days, excluded.backfill_days),
+           updated_at=now()`,
         [shopId, shopName, d.access_token, d.refresh_token, expires, scopes, req.user.sub, bd]
       );
       return { ok: true, shop_id: shopId, shop_name: shopName, scopes };

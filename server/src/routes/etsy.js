@@ -9,6 +9,7 @@ import { usdRates } from '../fx.js';
 import { requireSpydeck } from '../entitlements.js';
 import { fetchSheetRows } from './sheets.js';
 import { imageBytesFrom } from '../images.js';
+import { clampDays, windowStartSec } from '../backfill.js';
 
 const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
 const SHARED_SECRET = (process.env.ETSY_SHARED_SECRET || '').trim();
@@ -41,12 +42,6 @@ const API = 'https://api.etsy.com/v3/application';
 function money(m) { return m && m.divisor ? (m.amount / m.divisor) : 0; }
 // Sanitize the connect-time "how far back to import" choice → whole days in [0,365], or null
 // when the caller didn't choose (older connection). 0 = new orders only (from connect forward).
-function clampDays(v) {
-  if (v == null || v === '') return null;
-  const n = Math.floor(Number(v));
-  if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.min(365, n));
-}
 // Stable per-line id stamped at creation, so itemDK() on the client never shifts from
 // the SKU to a later-assigned id and orphans the line's design/blank.
 function genLineId() { return 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
@@ -384,8 +379,7 @@ async function syncConnection(conn, opts = {}) {
     // The unshipped pass stays UNBOUNDED on purpose: an open order is active work you want
     // regardless of when it was placed — the scope only limits how much created-date HISTORY
     // gets pulled, which is the "thousands of old orders" case the seller is guarding against.
-    const days = conn.backfill_days;
-    const minCreated = (days != null && days > 0) ? (Math.floor(Date.now() / 1000) - days * 86400) : connectedSec;
+    const minCreated = windowStartSec(conn.backfill_days, connectedSec);
     if (minCreated) await pullPass(`&min_created=${minCreated}`);
     await pullPass(`&was_shipped=false`);
   }
@@ -900,9 +894,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   app.get('/api/etsy/connections', { preHandler: requireAuth }, async (req) => {
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
     const r = await q(
-      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at
+      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days
                  from platform_connections where platform='etsy' order by created_at`
-            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at
+            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days
                  from platform_connections where platform='etsy' and connected_by=$1 order by created_at`,
       staff ? [] : [req.user.sub]);
     return r.rows;
@@ -1172,7 +1166,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
            shop_name=excluded.shop_name, access_token=excluded.access_token,
            refresh_token=excluded.refresh_token, token_expires_at=excluded.token_expires_at,
            scopes=excluded.scopes, connected_by=excluded.connected_by,
-           backfill_days=excluded.backfill_days,
+           -- Ratchets: widen only, never narrow (see backfill.js). GREATEST ignores nulls,
+           -- so a reconnect with no choice keeps whatever the seller originally picked.
+           backfill_days=greatest(platform_connections.backfill_days, excluded.backfill_days),
            last_sync_at=null, updated_at=now()`,
         [shopId, shopName, t.access_token, t.refresh_token, expires, SCOPES, req.user.sub, bd]
       );
