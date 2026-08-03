@@ -35,16 +35,18 @@ async function readVisibility() {
   } catch { return {}; }
 }
 
-// Keep only known roles, each mapped to a deduped, capped array of string keys. Anything
-// else is dropped rather than stored — a typo becomes "nothing hidden", never a crash.
+// Keep only known roles, each mapped to a deduped, capped array of string keys. An empty
+// array is KEPT (not dropped): "role present with []" means "explicitly nothing hidden",
+// which is how an admin overrides a client-side default-hidden surface to SHOW it again.
+// A role absent from the map falls back to the client default. Unknown keys are harmless —
+// the client only ever reads keys it knows, and this map can only hide, never grant.
 function normalize(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   const out = {};
   for (const role of ROLES) {
     const arr = input[role];
     if (!Array.isArray(arr)) continue;
-    const keys = [...new Set(arr.map((k) => String(k)).filter(Boolean))].slice(0, 300);
-    if (keys.length) out[role] = keys;
+    out[role] = [...new Set(arr.map((k) => String(k)).filter(Boolean))].slice(0, 300);
   }
   return out;
 }
