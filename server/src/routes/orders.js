@@ -694,11 +694,63 @@ export function ordersRoutes(app, requireAuth) {
     return healOrphanLines(row);
   });
 
+  /**
+   * One line's thumbnail, as BYTES rather than as base64 inside the order list.
+   *
+   * The list hands back `img_ref` pointing here whenever the stored value is a data: URL (see
+   * the aggregate in GET /api/orders). Splitting it out is what takes the list from 6MB to
+   * ~1.5MB: the browser fetches only the thumbnails on screen, in parallel, and the immutable
+   * cache header means it never fetches the same one twice — across pages OR across boards.
+   *
+   * Immutable is safe here because the URL is keyed by the ITEM's row id and the bytes are
+   * part of that row: changing the artwork writes a different row or a different value, and
+   * anything that re-uses this id with new bytes would need this header revisited.
+   */
+  app.get('/api/order_items/:id/img', { preHandler: requireAuth }, async (req, reply) => {
+    const r = await q(
+      `select i.img, o.seller_id, o.factory_order from order_items i
+         join orders o on o.id = i.order_id where i.id = $1::uuid`, [String(req.params.id)]).catch(() => null);
+    const row = r && r.rows[0];
+    // 404 (not 403) on a refusal, for the same reason GET /api/orders/:id does it: telling a
+    // stranger "that exists but isn't yours" confirms the id.
+    if (!row || !row.img) { reply.code(404); return { error: 'No image' }; }
+    if (!isStaff(req.user)) {
+      const sel = await resolveSeller(req.user);
+      const mine = sel && sel.id && String(row.seller_id) === String(sel.id);
+      if (!mine || !_canSurface(sel, 'orders') || row.factory_order) { reply.code(404); return { error: 'No image' }; }
+    }
+    const m = String(row.img).match(/^data:([^;,]+);base64,(.+)$/s);
+    // Not a data: URL — the list would have passed it through and never pointed here, so this
+    // is only reachable if the value changed under us. Redirect rather than 404: the caller
+    // wants the image, and that URL is the image.
+    if (!m) { reply.redirect(String(row.img)); return; }
+    reply
+      .header('Content-Type', m[1])
+      .header('Cache-Control', 'public, max-age=31536000, immutable')
+      .send(Buffer.from(m[2], 'base64'));
+  });
+
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {
     const join = `left join order_items i on i.order_id = o.id`;
     // ORDER BY i.id keeps line-item order stable across every board, so the per-line
     // design "slot" (1st vs 2nd same-SKU item) resolves to the same artwork everywhere.
-    const agg  = `coalesce(json_agg(i.* order by i.id) filter (where i.id is not null), '[]') as items`;
+    // IMAGE BYTES DO NOT TRAVEL IN THE LIST. Measured on a real board: 703 orders came to
+    // 5.97MB, of which items.img alone was 4.44MB — 74% — because some import paths store the
+    // thumbnail as a `data:` URL, i.e. base64 image bytes inlined into every row. That made
+    // the JSON un-cacheable, un-parallel and blocking: nothing rendered until all 6MB had
+    // arrived and been parsed, on every board, on every navigation.
+    //
+    // So a data: URL is swapped for a REFERENCE to /api/order_items/:id/img, which serves the
+    // same bytes with an immutable cache header. The browser then fetches only the thumbnails
+    // actually on screen, in parallel, and never fetches them twice. Ordinary http(s) URLs are
+    // already references and pass through untouched. Nothing stored changes; this is purely
+    // what the LIST hands back. The single-order route below still returns img inline — one
+    // order's thumbnails are not a payload problem.
+    const agg = `coalesce(jsonb_agg(
+        (to_jsonb(i.*) - 'img') || jsonb_build_object(
+          'img',     case when i.img like 'data:%' then null else i.img end,
+          'img_ref', case when i.img like 'data:%' then '/api/order_items/' || i.id::text || '/img' else null end
+        ) order by i.id) filter (where i.id is not null), '[]'::jsonb) as items`;
     // Does this order have a machine file (a .pes/.emb) already? The Design readiness tag
     // flips to "done" on one, but the full file list is only fetched when a row is expanded
     // — so on a collapsed row the tag couldn't tell, and an order with an uploaded .emb read

@@ -1042,6 +1042,9 @@ export type OrderItem = {
   blank?: string // the catalog product this line resolves to (name/sku/id)
   line_id?: string // stable per-line id — keys identical-SKU siblings apart
   img?: string
+  /** Set by the ORDER LIST in place of an inlined base64 `img`: a cacheable URL serving the
+   *  same bytes. getOrders() folds it back onto `img`, so nothing downstream reads this. */
+  img_ref?: string
   // The BUYER's uploaded artwork from a marketplace order (Etsy/Shopify), + any
   // personalization text they entered. Distinct from the factory-placed design in
   // order_designs — this is what the customer sent, to adopt or reference.
@@ -1122,8 +1125,17 @@ export type OrderRow = {
 export function getOrder(id: string) {
   return api<OrderRow & { error?: string }>(`/api/orders/${encodeURIComponent(id)}`)
 }
-export function getOrders() {
-  return api<OrderRow[]>(`/api/orders`)
+export async function getOrders() {
+  const rows = await api<OrderRow[]>(`/api/orders`)
+  // The list no longer inlines base64 thumbnails — it sends `img_ref`, a cacheable URL for
+  // the same bytes (see the aggregate in orders.js; it was 74% of a 6MB response). Resolve
+  // it back onto `img` HERE, at the API boundary, so every consumer — the avatars, the row
+  // photo strip, the design canvas — keeps reading the one field it always has, and none of
+  // them had to learn that the transport changed.
+  for (const o of rows ?? []) {
+    for (const it of o.items ?? []) if (!it.img && it.img_ref) it.img = `${API_BASE}${it.img_ref}`
+  }
+  return rows
 }
 /** Orders to suggest when "@"-tagging in a support thread — the THREAD's seller's orders,
  *  so it works for staff on a seller's inbox thread too (getOrders is caller-only). */
