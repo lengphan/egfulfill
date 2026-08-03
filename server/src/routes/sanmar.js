@@ -313,41 +313,197 @@ function absolutizeImg(v) {
   return SANMAR_IMG_BASE + s.replace(/^\/+/, '');
 }
 
-// Parse a SanMar SDL/EPDD CSV into normalized variant rows. Returns [] if there's no
-// recognisable header (so a wrong file can't silently write junk).
-function parseSanmarCsv(text) {
-  const rows = parseCsvRows(text);
-  if (rows.length < 2) return [];
-  const header = rows[0].map(normHeader);
+// Header row -> {field: columnIndex}. Returns null when the file has no recognisable SDL
+// header, so a wrong file can't silently write junk.
+function buildSanmarIdx(headerRow) {
+  const header = headerRow.map(normHeader);
   const idx = {};
   for (const [field, cands] of Object.entries(SANMAR_CSV_FIELDS)) {
     for (const cand of cands) { const i = header.indexOf(cand); if (i >= 0) { idx[field] = i; break; } }
   }
-  // Need at least a style column to be a real product file.
-  if (idx.style == null && idx.uniqueKey == null) return [];
+  return (idx.style != null || idx.uniqueKey != null) ? idx : null;
+}
+
+// One CSV record -> one normalized variant, or null if it isn't a usable product row.
+function rowToVariant(r, idx) {
   const num = (v) => { const n = parseFloat(String(v).replace(/[$,]/g, '')); return isFinite(n) ? n : null; };
-  const cell = (r, f) => (idx[f] != null ? String(r[idx[f]] ?? '').trim() : '');
+  const cell = (f) => (idx[f] != null ? String(r[idx[f]] ?? '').trim() : '');
+  const style = cell('style');
+  let uniqueKey = cell('uniqueKey');
+  const color = cell('color') || cell('catalogColor');
+  const size = cell('size');
+  if (!uniqueKey) uniqueKey = [style, color, size].filter(Boolean).join('_');
+  if (!uniqueKey || (!style && !cell('title'))) return null;
+  return {
+    uniqueKey, style, title: cell('title'), description: cell('description'),
+    brand: cell('brand'), category: cell('category'),
+    color, catalogColor: cell('catalogColor'), size, sizeIndex: cell('sizeIndex'),
+    inventoryKey: cell('inventoryKey'), status: cell('status'), keywords: cell('keywords'),
+    piecePrice: num(cell('piecePrice')), casePrice: num(cell('casePrice')), msrp: num(cell('msrp')),
+    qty: idx.qty != null ? (parseInt(cell('qty').replace(/[^0-9-]/g, ''), 10) || 0) : null,
+    image: absolutizeImg(cell('image')), swatch: absolutizeImg(cell('swatch')),
+    thumbnail: absolutizeImg(cell('thumbnail')),
+  };
+}
+
+// Parse a SanMar SDL/EPDD CSV into normalized variant rows. Whole-string; only safe for the
+// small hand-made files the browser route accepts. The real 195MB SDL goes through
+// streamSanmarStyles() instead — see the note there.
+function parseSanmarCsv(text) {
+  const rows = parseCsvRows(text);
+  if (rows.length < 2) return [];
+  const idx = buildSanmarIdx(rows[0]);
+  if (!idx) return [];
   const out = [];
   for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    const style = cell(r, 'style');
-    let uniqueKey = cell(r, 'uniqueKey');
-    const color = cell(r, 'color') || cell(r, 'catalogColor');
-    const size = cell(r, 'size');
-    if (!uniqueKey) uniqueKey = [style, color, size].filter(Boolean).join('_');
-    if (!uniqueKey || (!style && !cell(r, 'title'))) continue;
-    out.push({
-      uniqueKey, style, title: cell(r, 'title'), description: cell(r, 'description'),
-      brand: cell(r, 'brand'), category: cell(r, 'category'),
-      color, catalogColor: cell(r, 'catalogColor'), size, sizeIndex: cell(r, 'sizeIndex'),
-      inventoryKey: cell(r, 'inventoryKey'), status: cell(r, 'status'), keywords: cell(r, 'keywords'),
-      piecePrice: num(cell(r, 'piecePrice')), casePrice: num(cell(r, 'casePrice')), msrp: num(cell(r, 'msrp')),
-      qty: idx.qty != null ? (parseInt(cell(r, 'qty').replace(/[^0-9-]/g, ''), 10) || 0) : null,
-      image: absolutizeImg(cell(r, 'image')), swatch: absolutizeImg(cell(r, 'swatch')),
-      thumbnail: absolutizeImg(cell(r, 'thumbnail')),
-    });
+    const v = rowToVariant(rows[i], idx);
+    if (v) out.push(v);
   }
   return out;
+}
+
+// ── style-level aggregation ──────────────────────────────────────────────────
+// The SDL is one row per style+colour+size: 161,304 rows for 4,081 styles. Almost all of
+// that is REPEATED style text — the same title, description, brand and category copied onto
+// every variant (descriptions alone are 61.9MB of the 187MB file). Stored raw it roughly
+// DOUBLES the database and every nightly backup, to serve a browse grid that immediately
+// collapses it back to one card per style with GROUP BY.
+//
+// So we fold it here: one row per style, style text stored once, and the genuinely
+// per-variant fields kept as a compact JSONB array. Short keys (c/s/i/k/u/p) are deliberate
+// — this array is repeated 161k times in aggregate, so the key names are a real cost.
+// Nothing is lost: inventoryKey is SanMar's ordering handle and it survives, which is why
+// this isn't simply "drop the variants".
+// Canonical size order. SIZE_INDEX CANNOT be used for this: it restarts per price group, so
+// in style 29M both S and 3XL carry index 2, and both M and 4XL carry 3 — sorting by it
+// interleaves the ladder ("2XL,3XL,S,4XL,M,5XL,L,XL"). Built against the real file's 213
+// distinct SIZE values: the letter ladder, tall (LT/2XLT), combos (S/M), toddler (2T, 5/6T),
+// infant months (06M), and 4-digit waist+inseam (3230).
+const SIZE_LADDER = ['XXXS', 'XXS', '2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL',
+  '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
+const LADDER_RANK = new Map(SIZE_LADDER.map((s, i) => [s, i]));
+// Same garment, two spellings — keep them adjacent instead of sorting XXL far from 2XL.
+LADDER_RANK.set('XXL', LADDER_RANK.get('2XL'));
+LADDER_RANK.set('XXXL', LADDER_RANK.get('3XL'));
+LADDER_RANK.set('XXXXL', LADDER_RANK.get('4XL'));
+
+// [group, value, text] — compared left to right, so families stay together and only sort
+// within themselves. Unknown sizes land in a trailing group alphabetically rather than
+// scrambling the known ones.
+function sizeRank(raw) {
+  const s = String(raw || '').trim().toUpperCase();
+  if (!s) return [99, 0, ''];
+  if (s === 'OSFA' || s === 'OS' || s === 'ONE SIZE') return [0, 0, s];
+  let m;
+  if ((m = s.match(/^0*(\d+)M$/))) return [10, parseInt(m[1], 10), s];             // 06M, 24M
+  // 2T, 5/6T. A range sorts just after the exact size it starts at, so 5T precedes 5/6T.
+  if ((m = s.match(/^(\d+)(?:\/\d+)?T$/))) return [20, parseInt(m[1], 10) + (s.includes('/') ? 0.5 : 0), s];
+  if ((m = s.match(/^(.+?)T$/)) && LADDER_RANK.has(m[1])) return [40, LADDER_RANK.get(m[1]), s]; // LT, 2XLT
+  // SR/MR/LR are "regular" lengths — same ladder, nudged after the plain size.
+  if ((m = s.match(/^(.+?)R$/)) && LADDER_RANK.has(m[1])) return [30, LADDER_RANK.get(m[1]) + 0.5, s];
+  if (LADDER_RANK.has(s)) return [30, LADDER_RANK.get(s), s];
+  if ((m = s.match(/^([A-Z0-9]+)\/[A-Z0-9]+$/)) && LADDER_RANK.has(m[1])) {        // S/M, L/XL
+    return [30, LADDER_RANK.get(m[1]) + 0.25, s];
+  }
+  if (/^\d+$/.test(s)) return [50, parseInt(s, 10), s];                            // 3230 waist+inseam
+  return [90, 0, s];
+}
+const bySize = (a, b) => {
+  const x = sizeRank(a), y = sizeRank(b);
+  return x[0] - y[0] || x[1] - y[1] || x[2].localeCompare(y[2]);
+};
+
+function makeStyleAggregator() {
+  const byStyle = new Map();
+  const best = (a, b) => (a && String(a).trim() ? a : b);   // first non-empty wins
+  return {
+    add(v) {
+      const key = v.style || v.uniqueKey;
+      if (!key) return;
+      let s = byStyle.get(key);
+      if (!s) {
+        s = { style: key, title: '', description: '', brand: '', category: '',
+              priceMin: null, priceMax: null, msrp: null,
+              image: null, swatch: null, thumbnail: null,
+              colors: new Set(), sizes: new Set(), variants: [] };
+        byStyle.set(key, s);
+      }
+      s.title = best(s.title, v.title); s.description = best(s.description, v.description);
+      s.brand = best(s.brand, v.brand); s.category = best(s.category, v.category);
+      s.image = s.image || v.image || v.thumbnail || v.swatch;
+      s.swatch = s.swatch || v.swatch; s.thumbnail = s.thumbnail || v.thumbnail;
+      if (v.piecePrice != null) {
+        s.priceMin = s.priceMin == null ? v.piecePrice : Math.min(s.priceMin, v.piecePrice);
+        s.priceMax = s.priceMax == null ? v.piecePrice : Math.max(s.priceMax, v.piecePrice);
+      }
+      if (v.msrp != null && s.msrp == null) s.msrp = v.msrp;
+      if (v.color) s.colors.add(v.color);
+      if (v.size) s.sizes.add(v.size);
+      s.variants.push({
+        c: v.color || null, s: v.size || null, i: v.sizeIndex || null,
+        k: v.inventoryKey || null, u: v.uniqueKey, p: v.piecePrice,
+      });
+    },
+    styles() {
+      return [...byStyle.values()].map((s) => ({
+        style: s.style, title: s.title || s.style, description: s.description || null,
+        brand: s.brand || 'SanMar', category: s.category || null,
+        priceMin: s.priceMin, priceMax: s.priceMax, msrp: s.msrp,
+        image: s.image, swatch: s.swatch, thumbnail: s.thumbnail,
+        colors: [...s.colors].sort(),
+        sizes: [...s.sizes].sort(bySize),
+        variantCount: s.variants.length,
+        // Variants in the same order the UI lists them: colour, then the size ladder.
+        variants: s.variants.sort((a, b) =>
+          String(a.c || '').localeCompare(String(b.c || '')) || bySize(a.s, b.s)),
+      }));
+    },
+  };
+}
+
+// Fold a whole-string parse into styles (used by the browser/JSON import route).
+function stylesFromVariants(rows) {
+  const agg = makeStyleAggregator();
+  for (const v of rows) agg.add(v);
+  return agg.styles();
+}
+
+// STREAM the SDL off disk and aggregate as we go. The whole-string path cannot be used for
+// the real file: reading 195MB into a string and building 161k objects was enough memory
+// pressure to restart the API container mid-import. Here peak memory is the ~4,081 style
+// accumulators, not the file.
+//
+// Records are assembled by QUOTE PARITY rather than by line, because a CSV field may legally
+// contain a newline inside quotes; splitting on \n alone would shear those records in half.
+// Escaped quotes ("") count as two, so parity still holds.
+async function streamSanmarStyles(filePath) {
+  const { createReadStream } = await import('node:fs');
+  const readline = await import('node:readline');
+  const rl = readline.createInterface({
+    input: createReadStream(filePath, { encoding: 'utf8' }), crlfDelay: Infinity,
+  });
+  const agg = makeStyleAggregator();
+  let idx = null, pending = '', variants = 0, skipped = 0;
+  try {
+    for await (const line of rl) {
+      pending = pending === '' ? line : pending + '\n' + line;
+      let quotes = 0;
+      for (let i = 0; i < pending.length; i++) if (pending[i] === '"') quotes++;
+      if (quotes % 2 !== 0) continue;                 // record continues on the next line
+      const rec = parseCsvRows(pending)[0];
+      pending = '';
+      if (!rec) continue;
+      if (!idx) {                                     // first record is the header
+        idx = buildSanmarIdx(rec);
+        if (!idx) throw new Error('No recognisable SDL header row.');
+        continue;
+      }
+      const v = rowToVariant(rec, idx);
+      if (v) { agg.add(v); variants++; } else skipped++;
+    }
+  } finally { rl.close(); }
+  if (!idx) throw new Error('File was empty — no header row.');
+  return { styles: agg.styles(), variants, skipped };
 }
 
 export const sanmarEnabled = () => sanmarConfigured();
@@ -371,6 +527,22 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
        piece_price numeric(12,2), case_price numeric(12,2), msrp numeric(12,2), qty int,
        image text, swatch text, thumbnail text,
        data jsonb, synced_at timestamptz default now())`).catch(() => {});
+
+  // The catalog as the app actually reads it: ONE ROW PER STYLE (~4k), with the per-variant
+  // fields folded into `variants` jsonb. See makeStyleAggregator() for why — storing the raw
+  // 161k SDL rows doubles the database and every nightly backup to render the same grid.
+  q(`create table if not exists sanmar_styles (
+       style text primary key,
+       title text, description text, brand text, category text,
+       price_min numeric(12,2), price_max numeric(12,2), msrp numeric(12,2),
+       image text, swatch text, thumbnail text,
+       colors text[], sizes text[],
+       variant_count integer, variants jsonb,
+       synced_at timestamptz default now())`).catch(() => {});
+  q(`create index if not exists sanmar_styles_search
+       on sanmar_styles using gin (to_tsvector('simple',
+         coalesce(style,'') || ' ' || coalesce(title,'') || ' ' ||
+         coalesce(brand,'') || ' ' || coalesce(category,'')))`).catch(() => {});
 
   app.get('/api/sanmar/status', { preHandler: requireStaff }, async () => ({
     configured: sanmarConfigured(), stage: isStage(), base: cfg().base,
@@ -539,99 +711,83 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
   });
 
   // ── Bulk catalog import + browse ───────────────────────────────────────────
-  // One row of the upsert, as a parameter array. Shared by the batched writer below so the
-  // column order can never drift between the single- and multi-row paths.
-  const IMPORT_COLS = 21;
-  const importParams = (r) => [
-    String(r.uniqueKey || r.unique_key || '').trim(),
-    r.style || null, r.title || null, r.description || null, r.brand || null,
-    r.category || null, r.color || null, r.catalogColor || r.catalog_color || null, r.size || null,
-    r.sizeIndex || r.size_index || null, r.inventoryKey || r.inventory_key || null, r.status || null,
-    r.keywords || null,
-    (r.piecePrice != null && isFinite(Number(r.piecePrice))) ? Number(r.piecePrice) : null,
-    (r.casePrice != null && isFinite(Number(r.casePrice))) ? Number(r.casePrice) : null,
-    (r.msrp != null && isFinite(Number(r.msrp))) ? Number(r.msrp) : null,
-    (r.qty != null && isFinite(Number(r.qty))) ? Math.trunc(Number(r.qty)) : null,
-    r.image || null, r.swatch || null, r.thumbnail || null, JSON.stringify(r.data || {}),
+  // One STYLE row of the upsert, as a parameter array.
+  const STYLE_COLS = 14;
+  const styleParams = (s) => [
+    s.style, s.title || null, s.description || null, s.brand || null, s.category || null,
+    s.priceMin != null ? Number(s.priceMin) : null,
+    s.priceMax != null ? Number(s.priceMax) : null,
+    s.msrp != null ? Number(s.msrp) : null,
+    s.image || null, s.swatch || null, s.thumbnail || null,
+    s.colors || [], s.sizes || [],
+    JSON.stringify(s.variants || []),
   ];
 
-  // Upsert rows in MULTI-ROW batches. The original loop awaited one INSERT per row, which is
-  // fine for a 500-row test file and hopeless for the real SDL: 161k rows x one round-trip
-  // each ran far longer than any HTTP request survives. 500 rows/statement keeps us well
-  // under Postgres' 65535-parameter cap (500 x 21 = 10,500) and turns 161k round-trips into
-  // ~320. A failed batch is retried row-by-row so one bad record can't discard 499 good ones.
-  async function upsertSanmarRows(rows, onProgress) {
-    const SQL_HEAD = `insert into sanmar_products
-           (unique_key, style, title, description, brand, category, color, catalog_color, size,
-            size_index, inventory_key, status, keywords, piece_price, case_price, msrp, qty,
-            image, swatch, thumbnail, data, synced_at)
+  // Upsert STYLE rows in multi-row batches. ~4k rows means this is quick either way, but the
+  // batching matters because `variants` is a sizeable jsonb per row — 200/statement keeps the
+  // parameter count (200 x 14 = 2,800) and the payload per round-trip both comfortable.
+  // A failed batch retries row-by-row so one bad style can't discard 199 good ones.
+  async function upsertSanmarStyles(styles) {
+    const SQL_HEAD = `insert into sanmar_styles
+           (style, title, description, brand, category, price_min, price_max, msrp,
+            image, swatch, thumbnail, colors, sizes, variants, variant_count, synced_at)
          values `;
     const SQL_TAIL = `
-         on conflict (unique_key) do update set
-           style=excluded.style, title=excluded.title, description=excluded.description,
-           brand=excluded.brand, category=excluded.category, color=excluded.color,
-           catalog_color=excluded.catalog_color, size=excluded.size, size_index=excluded.size_index,
-           inventory_key=excluded.inventory_key, status=excluded.status, keywords=excluded.keywords,
-           piece_price=excluded.piece_price, case_price=excluded.case_price, msrp=excluded.msrp,
-           qty=excluded.qty, image=excluded.image, swatch=excluded.swatch, thumbnail=excluded.thumbnail,
-           data=excluded.data, synced_at=now()`;
-    const BATCH = 500;
-    // Last write wins inside a single statement, and Postgres rejects a batch that touches
-    // the same conflict target twice ("cannot affect row a second time"). The SDL does repeat
-    // a unique_key occasionally, so collapse duplicates before batching rather than losing
-    // the whole batch to one repeat.
-    const byKey = new Map();
-    for (const r of rows) {
-      const k = String(r.uniqueKey || r.unique_key || '').trim();
-      if (k) byKey.set(k, r);
-    }
-    const deduped = [...byKey.values()];
+         on conflict (style) do update set
+           title=excluded.title, description=excluded.description, brand=excluded.brand,
+           category=excluded.category, price_min=excluded.price_min, price_max=excluded.price_max,
+           msrp=excluded.msrp, image=excluded.image, swatch=excluded.swatch,
+           thumbnail=excluded.thumbnail, colors=excluded.colors, sizes=excluded.sizes,
+           variants=excluded.variants, variant_count=excluded.variant_count, synced_at=now()`;
+    const BATCH = 200;
+    // Postgres rejects a statement that hits the same conflict target twice, so collapse any
+    // repeated style before batching rather than losing the whole batch to one repeat.
+    const byStyle = new Map();
+    for (const s of styles) if (s && s.style) byStyle.set(String(s.style), s);
+    const deduped = [...byStyle.values()];
+    const tuple = (j) => {
+      const base = j * STYLE_COLS;
+      const ph = Array.from({ length: STYLE_COLS }, (_, k) => `$${base + k + 1}`).join(',');
+      // variant_count is derived in SQL from the jsonb we just passed — it can never disagree.
+      return `(${ph}, jsonb_array_length($${base + STYLE_COLS}::jsonb), now())`;
+    };
     let n = 0;
     for (let i = 0; i < deduped.length; i += BATCH) {
       const chunk = deduped.slice(i, i + BATCH);
       const params = [];
-      const tuples = chunk.map((r, j) => {
-        params.push(...importParams(r));
-        const base = j * IMPORT_COLS;
-        const ph = Array.from({ length: IMPORT_COLS }, (_, k) => `$${base + k + 1}`).join(',');
-        return `(${ph}, now())`;
-      });
+      const tuples = chunk.map((s, j) => { params.push(...styleParams(s)); return tuple(j); });
       try {
         await q(SQL_HEAD + tuples.join(',') + SQL_TAIL, params);
         n += chunk.length;
       } catch {
-        // Fall back to one-at-a-time for this chunk so a single malformed row costs one row.
-        for (const r of chunk) {
-          const ph = Array.from({ length: IMPORT_COLS }, (_, k) => `$${k + 1}`).join(',');
-          const ok = await q(SQL_HEAD + `(${ph}, now())` + SQL_TAIL, importParams(r))
+        for (const s of chunk) {
+          const ok = await q(SQL_HEAD + tuple(0) + SQL_TAIL, styleParams(s))
             .then(() => true).catch(() => false);
           if (ok) n++;
         }
       }
-      if (onProgress) onProgress(n, deduped.length);
     }
-    return { imported: n, skipped: rows.length - deduped.length };
+    return { imported: n, duplicateStyles: styles.length - deduped.length };
   }
 
-  // Import the SDL/EPDD catalog into sanmar_products. Accepts EITHER the raw CSV text
-  // ({ csv }) — parsed server-side by the documented column names — OR pre-parsed rows
-  // ({ products: [...] }), mirroring /api/otto/import. Whole-batch upsert by unique_key.
-  // NOTE: the real SanMar_SDL_N.csv is ~195MB, which exceeds both the 60MB body limit here
-  // and Vercel's ~4.5MB proxy cap, so the browser can never carry it — use
-  // POST /api/sanmar/import/local below for the real file. This route stays for small
-  // hand-made files and for the pre-parsed shape. Staff-gated, like Otto: it's supplier
+  // Import a SMALL SDL/EPDD file sent as text ({ csv }) or pre-parsed rows ({ products: [...] }),
+  // mirroring /api/otto/import. Variant rows are folded to styles before writing.
+  // NOTE: the real SanMar_SDL_N.csv is ~195MB — over the 60MB body limit here and far over
+  // Vercel's ~4.5MB proxy cap, so the browser can never carry it. Use
+  // POST /api/sanmar/import/local for the real file. Staff-gated, like Otto: it's supplier
   // REFERENCE data, spends nothing, and adds nothing sellable on its own.
   app.post('/api/sanmar/import', { preHandler: requireStaff }, async (req, reply) => {
     const b = req.body || {};
-    let rows = Array.isArray(b.products) ? b.products
+    const rows = Array.isArray(b.products) ? b.products
       : (typeof b.csv === 'string' ? parseSanmarCsv(b.csv) : []);
     if (!rows.length) {
       reply.code(400);
       return { error: 'No products found. Send { csv } (the SDL/EPDD file text, with its header row) or { products: [...] }.' };
     }
-    const { imported: n } = await upsertSanmarRows(rows);
-    const c = await q('select count(*)::int as n from sanmar_products').catch(() => ({ rows: [{ n: 0 }] }));
-    return { ok: true, imported: n, total: c.rows[0]?.n || 0 };
+    const styles = stylesFromVariants(rows);
+    const { imported } = await upsertSanmarStyles(styles);
+    const c = await q('select count(*)::int as n from sanmar_styles').catch(() => ({ rows: [{ n: 0 }] }));
+    return { ok: true, variants: rows.length, styles: styles.length, imported, total: c.rows[0]?.n || 0 };
   });
 
   // Import the SDL straight off local disk — the only route that can carry the real file.
@@ -645,30 +801,44 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
     if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only' }; }
     const dir = (process.env.SANMAR_DATA_DIR || '').trim();
     if (!dir) { reply.code(400); return { error: 'SANMAR_DATA_DIR is not set — no local catalog directory is mounted.' }; }
-    const { readFile, readdir } = await import('node:fs/promises');
+    const { access, readdir } = await import('node:fs/promises');
     const { join, basename } = await import('node:path');
     const wanted = basename(String((req.body && req.body.file) || 'SanMar_SDL_N.csv'));
-    let text;
+    const path = join(dir, wanted);
     try {
-      text = await readFile(join(dir, wanted), 'utf8');
+      await access(path);
     } catch (e) {
       let available = [];
       try { available = (await readdir(dir)).filter((f) => /\.(csv|txt)$/i.test(f)); } catch { /* dir unreadable */ }
       reply.code(400);
       return { error: `Could not read ${wanted} from the catalog directory.`, detail: (e && e.message) || null, available };
     }
-    const rows = parseSanmarCsv(text);
-    text = null;                                    // 195MB — let it go before the upsert
-    if (!rows.length) { reply.code(400); return { error: `${wanted} has no recognisable SDL header row.` }; }
-    const { imported, skipped } = await upsertSanmarRows(rows);
-    const c = await q('select count(*)::int as n from sanmar_products').catch(() => ({ rows: [{ n: 0 }] }));
-    return { ok: true, file: wanted, parsed: rows.length, duplicateKeys: skipped, imported, total: c.rows[0]?.n || 0 };
+    const t0 = Date.now();
+    let parsed;
+    try {
+      parsed = await streamSanmarStyles(path);       // streams; never holds the file in memory
+    } catch (e) {
+      reply.code(400);
+      return { error: `Could not parse ${wanted}.`, detail: (e && e.message) || null };
+    }
+    const { imported, duplicateStyles } = await upsertSanmarStyles(parsed.styles);
+    const c = await q('select count(*)::int as n from sanmar_styles').catch(() => ({ rows: [{ n: 0 }] }));
+    return {
+      ok: true, file: wanted, variantRows: parsed.variants, unusableRows: parsed.skipped,
+      styles: parsed.styles.length, duplicateStyles, imported,
+      total: c.rows[0]?.n || 0, seconds: Math.round((Date.now() - t0) / 100) / 10,
+    };
   });
 
   // Catalog status — count + last import time (drives the "import the catalog" empty state).
   app.get('/api/sanmar/catalog/status', { preHandler: requireStaff }, async () => {
-    try { const r = await q('select count(*)::int as n, max(synced_at) as last from sanmar_products'); return { count: r.rows[0]?.n || 0, last: r.rows[0]?.last || null }; }
-    catch { return { count: 0, last: null }; }
+    try {
+      const r = await q(`select count(*)::int as n, max(synced_at) as last,
+                                coalesce(sum(variant_count),0)::int as variants
+                           from sanmar_styles`);
+      return { count: r.rows[0]?.n || 0, last: r.rows[0]?.last || null, variants: r.rows[0]?.variants || 0 };
+    }
+    catch { return { count: 0, last: null, variants: 0 }; }
   });
 
   // Browse the imported catalog, one card per style — the SanMar equivalent of
@@ -681,18 +851,18 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
       ? `where lower(coalesce(style,'') || ' ' || coalesce(title,'') || ' ' || coalesce(brand,'') || ' ' || coalesce(category,'') || ' ' || coalesce(color,'') || ' ' || coalesce(keywords,'')) like $1`
       : '';
     const params = search ? ['%' + search + '%'] : [];
+    // One row per style already — no GROUP BY. That is the whole point of sanmar_styles:
+    // the old query read 161k variant rows and collapsed them to ~4k cards on every request.
+    const filter = search
+      ? `where lower(coalesce(style,'') || ' ' || coalesce(title,'') || ' ' || coalesce(brand,'') || ' ' || coalesce(category,'') || ' ' || array_to_string(coalesce(colors,'{}'), ' ')) like $1`
+      : '';
     try {
-      const total = await q(`select count(*)::int as n from (select coalesce(style, unique_key) g from sanmar_products ${where} group by coalesce(style, unique_key)) t`, params);
+      const total = await q(`select count(*)::int as n from sanmar_styles ${filter}`, params);
       const r = await q(
-        `select coalesce(style, unique_key) as style, min(brand) as brand, min(title) as name,
-                min(description) as description, min(category) as category,
-                min(piece_price) as price, max(piece_price) as price_max,
-                (array_agg(coalesce(image, thumbnail, swatch)) filter (where coalesce(image, thumbnail, swatch) is not null))[1] as image,
-                array_agg(distinct color) filter (where color is not null) as colors,
-                array_agg(distinct size) filter (where size is not null) as sizes,
-                coalesce(sum(qty), 0) as qty
-           from sanmar_products ${where}
-          group by coalesce(style, unique_key)
+        `select style, brand, title as name, description, category,
+                price_min as price, price_max, image, colors, sizes,
+                variant_count, 0 as qty
+           from sanmar_styles ${filter}
           order by style
           limit ${limit} offset ${offset}`, params);
       let favs = new Set();
@@ -704,37 +874,42 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
 
   // One style's full detail from the imported catalog — every colour, size and variant key.
   // Mirrors /api/otto/style/:style so the "Add to catalog" + quick-order paths treat SanMar
-  // exactly like Otto (no live SOAP call needed; all data is the ingested flat file).
+  // exactly like Otto. Variants come out of the folded jsonb, so inventoryKey — SanMar's
+  // ordering handle — is still present per colour+size without storing 161k rows.
+  //
+  // Live stock is NOT here and never was: the SDL has no quantity column at all. Inventory
+  // comes from GET /api/sanmar/inventory (SOAP), which is what SanMar's guide asks you to use
+  // web services for.
   app.get('/api/sanmar/catalog/:style', { preHandler: requireStaff }, async (req, reply) => {
     const style = String(req.params?.style || '').trim();
     if (!style) { reply.code(400); return { error: 'style required' }; }
     try {
       const r = await q(
-        `select unique_key, style, title, description, brand, category, color, catalog_color,
-                size, size_index, inventory_key, piece_price, image, swatch, thumbnail
-           from sanmar_products where style=$1 order by color, size`, [style]);
+        `select style, title, description, brand, category, price_min, price_max,
+                image, swatch, thumbnail, colors, sizes, variants, variant_count
+           from sanmar_styles where style=$1`, [style]);
       if (!r.rows.length) { reply.code(404); return { error: 'Not in the imported catalog.' }; }
-      const rows = r.rows;
-      const colorImages = {};
-      for (const v of rows) {
-        const c = v.color || v.catalog_color;
-        if (c && !colorImages[c]) colorImages[c] = sanmarImg(v.image || v.thumbnail || v.swatch);
-      }
-      const uniq = (arr) => Array.from(new Set(arr.filter(Boolean)));
-      const variants = rows.map((v) => ({
-        color: v.color || v.catalog_color || null, size: v.size || null,
+      const s = r.rows[0];
+      const raw = Array.isArray(s.variants) ? s.variants : [];
+      const styleImage = sanmarImg(s.image || s.thumbnail || s.swatch);
+      const variants = raw.map((v) => ({
+        color: v.c || null, size: v.s || null,
         // SanMar's canonical variant handle is the inventory key; fall back to unique_key.
-        sku: v.inventory_key || v.unique_key, inventoryKey: v.inventory_key || null, sizeIndex: v.size_index || null,
-        price: v.piece_price != null ? Number(v.piece_price) : null, image: sanmarImg(v.image || v.thumbnail),
+        sku: v.k || v.u, inventoryKey: v.k || null, sizeIndex: v.i || null,
+        price: v.p != null ? Number(v.p) : null,
+        // Per-colour photos are not kept: those columns are bare names under a dated imglib
+        // path the file gives no way to rebuild (they 302). The style image stands in.
+        image: styleImage,
       }));
-      const first = rows[0];
+      const colorImages = {};
+      for (const v of variants) if (v.color && !colorImages[v.color]) colorImages[v.color] = styleImage;
       return {
-        style, name: first.title || style, brand: first.brand || 'SanMar', category: first.category || null,
-        description: first.description || null,
-        price: first.piece_price != null ? Number(first.piece_price) : null,
-        image: sanmarImg(first.image || first.thumbnail || first.swatch),
-        colors: uniq(rows.map((v) => v.color || v.catalog_color)),
-        sizes: uniq(rows.map((v) => v.size)),
+        style: s.style, name: s.title || s.style, brand: s.brand || 'SanMar', category: s.category || null,
+        description: s.description || null,
+        price: s.price_min != null ? Number(s.price_min) : null,
+        priceMax: s.price_max != null ? Number(s.price_max) : null,
+        image: styleImage,
+        colors: s.colors || [], sizes: s.sizes || [],
         colorImages, variants, skus: variants.map((v) => v.sku),
       };
     } catch (e) { reply.code(500); return { error: String((e && e.message) || e) }; }
