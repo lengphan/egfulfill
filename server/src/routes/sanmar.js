@@ -282,11 +282,36 @@ const SANMAR_CSV_FIELDS = {
   casePrice:    ['caseprice'],
   msrp:         ['msrp', 'piecepricemsrp'],
   qty:          ['qty', 'quantity', 'totalqty', 'inventory', 'totalinventory'],
-  image:        ['productimage', 'frontmodelimageurl', 'frontmodelimage', 'colorproductimage'],
-  swatch:       ['colorswatchimageurl', 'colorswatchimage', 'colorsquareimage', 'swatchimage'],
+  // Image columns are ordered "resolves to a real picture first", which is NOT the same as
+  // "most specific first". SanMar mixes two conventions and only some of them are fetchable:
+  //   FRONT_MODEL_IMAGE_URL          full https URL, colour-specific   -> 200  ✅
+  //   PRODUCT_IMAGE  "29M.jpg"       bare, under /catalog/images/      -> 200  ✅
+  //   THUMBNAIL_IMAGE "29MTN.jpg"    bare, under /catalog/images/      -> 200  ✅
+  //   COLOR_SWATCH_IMAGE "29Msw.jpg" bare, under /catalog/images/      -> 200  ✅
+  //   COLOR_PRODUCT_IMAGE, COLOR_PRODUCT_IMAGE_THUMBNAIL, COLOR_SQUARE_IMAGE
+  //                                  bare, but live under a DATED imglib path we cannot
+  //                                  reconstruct from the file          -> 302  ❌
+  // The COLOR_* names are excluded for that reason. Beware when re-checking: a missing image
+  // 302s to Image404ErrorHandler.jsp which SERVES A PLACEHOLDER JPEG, so `curl -L` reports
+  // 200 for everything. Test without following redirects.
+  image:        ['frontmodelimageurl', 'productimage', 'frontmodelimage'],
+  swatch:       ['colorswatchimageurl', 'colorswatchimage', 'swatchimage'],
   thumbnail:    ['thumbnailimage', 'thumbnailimageurl'],
 };
 const normHeader = (h) => String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// SanMar's SDL mixes two conventions in the image columns: the *_URL ones carry a full
+// https://cdnm.sanmar.com/... address, every other one carries a BARE FILENAME ("29M.jpg",
+// "29Msw.jpg"). Storing the bare name renders a broken tile, so anything that isn't already
+// absolute gets the catalog base prepended. Verified against the live CDN:
+//   https://cdnm.sanmar.com/catalog/images/29M.jpg -> 200
+const SANMAR_IMG_BASE = 'https://cdnm.sanmar.com/catalog/images/';
+function absolutizeImg(v) {
+  const s = String(v || '').trim();          // the raw file has trailing spaces on some URLs
+  if (!s) return null;
+  if (/^https?:\/\//i.test(s)) return s;
+  return SANMAR_IMG_BASE + s.replace(/^\/+/, '');
+}
 
 // Parse a SanMar SDL/EPDD CSV into normalized variant rows. Returns [] if there's no
 // recognisable header (so a wrong file can't silently write junk).
@@ -318,7 +343,8 @@ function parseSanmarCsv(text) {
       inventoryKey: cell(r, 'inventoryKey'), status: cell(r, 'status'), keywords: cell(r, 'keywords'),
       piecePrice: num(cell(r, 'piecePrice')), casePrice: num(cell(r, 'casePrice')), msrp: num(cell(r, 'msrp')),
       qty: idx.qty != null ? (parseInt(cell(r, 'qty').replace(/[^0-9-]/g, ''), 10) || 0) : null,
-      image: cell(r, 'image') || null, swatch: cell(r, 'swatch') || null, thumbnail: cell(r, 'thumbnail') || null,
+      image: absolutizeImg(cell(r, 'image')), swatch: absolutizeImg(cell(r, 'swatch')),
+      thumbnail: absolutizeImg(cell(r, 'thumbnail')),
     });
   }
   return out;
@@ -513,11 +539,88 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
   });
 
   // ── Bulk catalog import + browse ───────────────────────────────────────────
+  // One row of the upsert, as a parameter array. Shared by the batched writer below so the
+  // column order can never drift between the single- and multi-row paths.
+  const IMPORT_COLS = 21;
+  const importParams = (r) => [
+    String(r.uniqueKey || r.unique_key || '').trim(),
+    r.style || null, r.title || null, r.description || null, r.brand || null,
+    r.category || null, r.color || null, r.catalogColor || r.catalog_color || null, r.size || null,
+    r.sizeIndex || r.size_index || null, r.inventoryKey || r.inventory_key || null, r.status || null,
+    r.keywords || null,
+    (r.piecePrice != null && isFinite(Number(r.piecePrice))) ? Number(r.piecePrice) : null,
+    (r.casePrice != null && isFinite(Number(r.casePrice))) ? Number(r.casePrice) : null,
+    (r.msrp != null && isFinite(Number(r.msrp))) ? Number(r.msrp) : null,
+    (r.qty != null && isFinite(Number(r.qty))) ? Math.trunc(Number(r.qty)) : null,
+    r.image || null, r.swatch || null, r.thumbnail || null, JSON.stringify(r.data || {}),
+  ];
+
+  // Upsert rows in MULTI-ROW batches. The original loop awaited one INSERT per row, which is
+  // fine for a 500-row test file and hopeless for the real SDL: 161k rows x one round-trip
+  // each ran far longer than any HTTP request survives. 500 rows/statement keeps us well
+  // under Postgres' 65535-parameter cap (500 x 21 = 10,500) and turns 161k round-trips into
+  // ~320. A failed batch is retried row-by-row so one bad record can't discard 499 good ones.
+  async function upsertSanmarRows(rows, onProgress) {
+    const SQL_HEAD = `insert into sanmar_products
+           (unique_key, style, title, description, brand, category, color, catalog_color, size,
+            size_index, inventory_key, status, keywords, piece_price, case_price, msrp, qty,
+            image, swatch, thumbnail, data, synced_at)
+         values `;
+    const SQL_TAIL = `
+         on conflict (unique_key) do update set
+           style=excluded.style, title=excluded.title, description=excluded.description,
+           brand=excluded.brand, category=excluded.category, color=excluded.color,
+           catalog_color=excluded.catalog_color, size=excluded.size, size_index=excluded.size_index,
+           inventory_key=excluded.inventory_key, status=excluded.status, keywords=excluded.keywords,
+           piece_price=excluded.piece_price, case_price=excluded.case_price, msrp=excluded.msrp,
+           qty=excluded.qty, image=excluded.image, swatch=excluded.swatch, thumbnail=excluded.thumbnail,
+           data=excluded.data, synced_at=now()`;
+    const BATCH = 500;
+    // Last write wins inside a single statement, and Postgres rejects a batch that touches
+    // the same conflict target twice ("cannot affect row a second time"). The SDL does repeat
+    // a unique_key occasionally, so collapse duplicates before batching rather than losing
+    // the whole batch to one repeat.
+    const byKey = new Map();
+    for (const r of rows) {
+      const k = String(r.uniqueKey || r.unique_key || '').trim();
+      if (k) byKey.set(k, r);
+    }
+    const deduped = [...byKey.values()];
+    let n = 0;
+    for (let i = 0; i < deduped.length; i += BATCH) {
+      const chunk = deduped.slice(i, i + BATCH);
+      const params = [];
+      const tuples = chunk.map((r, j) => {
+        params.push(...importParams(r));
+        const base = j * IMPORT_COLS;
+        const ph = Array.from({ length: IMPORT_COLS }, (_, k) => `$${base + k + 1}`).join(',');
+        return `(${ph}, now())`;
+      });
+      try {
+        await q(SQL_HEAD + tuples.join(',') + SQL_TAIL, params);
+        n += chunk.length;
+      } catch {
+        // Fall back to one-at-a-time for this chunk so a single malformed row costs one row.
+        for (const r of chunk) {
+          const ph = Array.from({ length: IMPORT_COLS }, (_, k) => `$${k + 1}`).join(',');
+          const ok = await q(SQL_HEAD + `(${ph}, now())` + SQL_TAIL, importParams(r))
+            .then(() => true).catch(() => false);
+          if (ok) n++;
+        }
+      }
+      if (onProgress) onProgress(n, deduped.length);
+    }
+    return { imported: n, skipped: rows.length - deduped.length };
+  }
+
   // Import the SDL/EPDD catalog into sanmar_products. Accepts EITHER the raw CSV text
   // ({ csv }) — parsed server-side by the documented column names — OR pre-parsed rows
-  // ({ products: [...] }), mirroring /api/otto/import. Whole-batch upsert by unique_key;
-  // send the file in chunks if it exceeds the 60MB body limit. Staff-gated, like Otto:
-  // it's supplier REFERENCE data, spends nothing, and adds nothing sellable on its own.
+  // ({ products: [...] }), mirroring /api/otto/import. Whole-batch upsert by unique_key.
+  // NOTE: the real SanMar_SDL_N.csv is ~195MB, which exceeds both the 60MB body limit here
+  // and Vercel's ~4.5MB proxy cap, so the browser can never carry it — use
+  // POST /api/sanmar/import/local below for the real file. This route stays for small
+  // hand-made files and for the pre-parsed shape. Staff-gated, like Otto: it's supplier
+  // REFERENCE data, spends nothing, and adds nothing sellable on its own.
   app.post('/api/sanmar/import', { preHandler: requireStaff }, async (req, reply) => {
     const b = req.body || {};
     let rows = Array.isArray(b.products) ? b.products
@@ -526,38 +629,40 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
       reply.code(400);
       return { error: 'No products found. Send { csv } (the SDL/EPDD file text, with its header row) or { products: [...] }.' };
     }
-    let n = 0;
-    for (const r of rows) {
-      const uniqueKey = String(r.uniqueKey || r.unique_key || '').trim();
-      if (!uniqueKey) continue;
-      await q(
-        `insert into sanmar_products
-           (unique_key, style, title, description, brand, category, color, catalog_color, size,
-            size_index, inventory_key, status, keywords, piece_price, case_price, msrp, qty,
-            image, swatch, thumbnail, data, synced_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21, now())
-         on conflict (unique_key) do update set
-           style=excluded.style, title=excluded.title, description=excluded.description,
-           brand=excluded.brand, category=excluded.category, color=excluded.color,
-           catalog_color=excluded.catalog_color, size=excluded.size, size_index=excluded.size_index,
-           inventory_key=excluded.inventory_key, status=excluded.status, keywords=excluded.keywords,
-           piece_price=excluded.piece_price, case_price=excluded.case_price, msrp=excluded.msrp,
-           qty=excluded.qty, image=excluded.image, swatch=excluded.swatch, thumbnail=excluded.thumbnail,
-           data=excluded.data, synced_at=now()`,
-        [uniqueKey, r.style || null, r.title || null, r.description || null, r.brand || null,
-         r.category || null, r.color || null, r.catalogColor || r.catalog_color || null, r.size || null,
-         r.sizeIndex || r.size_index || null, r.inventoryKey || r.inventory_key || null, r.status || null,
-         r.keywords || null,
-         (r.piecePrice != null && isFinite(Number(r.piecePrice))) ? Number(r.piecePrice) : null,
-         (r.casePrice != null && isFinite(Number(r.casePrice))) ? Number(r.casePrice) : null,
-         (r.msrp != null && isFinite(Number(r.msrp))) ? Number(r.msrp) : null,
-         (r.qty != null && isFinite(Number(r.qty))) ? Math.trunc(Number(r.qty)) : null,
-         r.image || null, r.swatch || null, r.thumbnail || null, JSON.stringify(r.data || {})]
-      ).catch(() => {});
-      n++;
-    }
+    const { imported: n } = await upsertSanmarRows(rows);
     const c = await q('select count(*)::int as n from sanmar_products').catch(() => ({ rows: [{ n: 0 }] }));
     return { ok: true, imported: n, total: c.rows[0]?.n || 0 };
+  });
+
+  // Import the SDL straight off local disk — the only route that can carry the real file.
+  // The catalog is ~195MB unzipped, so it can reach neither the browser upload path (Vercel
+  // caps a proxied body at ~4.5MB) nor the JSON route above (60MB). The host fetches the zip
+  // over SFTP into SANMAR_DATA_DIR, and this reads it from a read-only bind mount.
+  //
+  // ADMIN-only, and the filename is confined to SANMAR_DATA_DIR by basename() — the path is
+  // never allowed to escape via "../", so this cannot be turned into an arbitrary-file read.
+  app.post('/api/sanmar/import/local', { preHandler: requireStaff }, async (req, reply) => {
+    if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only' }; }
+    const dir = (process.env.SANMAR_DATA_DIR || '').trim();
+    if (!dir) { reply.code(400); return { error: 'SANMAR_DATA_DIR is not set — no local catalog directory is mounted.' }; }
+    const { readFile, readdir } = await import('node:fs/promises');
+    const { join, basename } = await import('node:path');
+    const wanted = basename(String((req.body && req.body.file) || 'SanMar_SDL_N.csv'));
+    let text;
+    try {
+      text = await readFile(join(dir, wanted), 'utf8');
+    } catch (e) {
+      let available = [];
+      try { available = (await readdir(dir)).filter((f) => /\.(csv|txt)$/i.test(f)); } catch { /* dir unreadable */ }
+      reply.code(400);
+      return { error: `Could not read ${wanted} from the catalog directory.`, detail: (e && e.message) || null, available };
+    }
+    const rows = parseSanmarCsv(text);
+    text = null;                                    // 195MB — let it go before the upsert
+    if (!rows.length) { reply.code(400); return { error: `${wanted} has no recognisable SDL header row.` }; }
+    const { imported, skipped } = await upsertSanmarRows(rows);
+    const c = await q('select count(*)::int as n from sanmar_products').catch(() => ({ rows: [{ n: 0 }] }));
+    return { ok: true, file: wanted, parsed: rows.length, duplicateKeys: skipped, imported, total: c.rows[0]?.n || 0 };
   });
 
   // Catalog status — count + last import time (drives the "import the catalog" empty state).

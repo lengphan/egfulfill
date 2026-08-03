@@ -169,6 +169,16 @@ services:
       GOOGLE_SHEETS_API_KEY: ${GOOGLE_SHEETS_API_KEY:-}
       GOOGLE_SERVICE_ACCOUNT: ${GOOGLE_SERVICE_ACCOUNT:-}
       SHEETS_TEMPLATE_URL: ${SHEETS_TEMPLATE_URL:-}
+      # Where POST /api/sanmar/import/local reads the SDL catalog from, INSIDE the container.
+      # The real SanMar_SDL_N.csv is ~195MB unzipped — too big for the browser upload path
+      # (Vercel caps a proxied body at ~4.5MB) and for the 60MB JSON route. So the host pulls
+      # it over SFTP and the container reads it off this mount instead.
+      SANMAR_DATA_DIR: ${SANMAR_DATA_DIR:-/data/sanmar}
+    volumes:
+      # Read-only, and deliberately OUTSIDE the repo: the repo root is Caddy's webroot
+      # (./:/srv:ro below) and @hidden is an exclusion list, so a catalog dropped in the repo
+      # would be publicly downloadable — SanMar's data carries account-specific pricing.
+      - ${SANMAR_HOST_DIR:-/root/sanmar/sdl}:/data/sanmar:ro
     depends_on: [db]
     restart: unless-stopped
 
