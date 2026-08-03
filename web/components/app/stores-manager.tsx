@@ -39,14 +39,25 @@ const fmtDate = (s: string | null) => {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-// Channels shown even when unconnected. Etsy + TikTok are granted/live and lead; Shopify
-// and WooCommerce follow. (Etsy + Shopify also import orders; TikTok is connect-only so far.)
-const CHANNELS = [
+// Channels shown even when unconnected. Etsy + TikTok are granted/live and lead; Walmart and
+// Amazon sit next because their developer applications are in flight; Shopify and WooCommerce
+// follow. (Etsy + Shopify also import orders; TikTok is connect-only so far.)
+//
+// `live` means the connect button actually works end to end. Walmart and Amazon have no server
+// route yet — `soon` says WHY they can't be connected rather than implying a broken button,
+// because "Coming soon" and "we're waiting on the marketplace" are different facts to a seller.
+const CHANNELS: { key: string; name: string; blurb: string; live: boolean; soon?: string }[] = [
   { key: "etsy", name: "Etsy", blurb: "Sync orders & push tracking back", live: true },
   { key: "tiktok", name: "TikTok Shop", blurb: "Marketplace order sync", live: true },
+  { key: "walmart", name: "Walmart", blurb: "Marketplace order sync", live: false, soon: "Awaiting app approval" },
+  { key: "amazon", name: "Amazon", blurb: "Seller Central order sync", live: false, soon: "Awaiting app approval" },
   { key: "shopify", name: "Shopify", blurb: "Storefront order sync", live: true },
   { key: "woocommerce", name: "WooCommerce", blurb: "WordPress store sync", live: false },
 ]
+// The two counters above the list read off the same array, so adding a channel can't leave a
+// hard-coded "3 live" behind.
+const liveChannels = CHANNELS.filter((c) => c.live)
+const soonChannels = CHANNELS.filter((c) => !c.live)
 
 export function StoresManager() {
   const reduce = useReducedMotion()
@@ -237,8 +248,17 @@ export function StoresManager() {
     <div className="space-y-5">
       <StatGrid>
         <StatCard label="Connected shops" value={String(connected.length)} sub="syncing orders" />
-        <StatCard label="Channels live" value="3" sub="Etsy · TikTok · Shopify" tone="pos" />
-        <StatCard label="Coming soon" value="1" sub="WooCommerce" />
+        <StatCard
+          label="Channels live"
+          value={String(liveChannels.length)}
+          sub={liveChannels.map((c) => c.name.replace(" Shop", "")).join(" · ")}
+          tone="pos"
+        />
+        <StatCard
+          label="Coming soon"
+          value={String(soonChannels.length)}
+          sub={soonChannels.map((c) => c.name).join(" · ")}
+        />
         <StatCard
           label="Last sync"
           value={connected.length ? fmtDate(connected[0].last_sync_at).split(",")[0] : "—"}
@@ -352,7 +372,7 @@ export function StoresManager() {
       {/* Available channels */}
       <div>
         <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Add a channel</div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CHANNELS.map((ch, i) => (
             <motion.div
               key={ch.key}
@@ -379,8 +399,8 @@ export function StoresManager() {
                   {busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect") ? "Connecting…" : "Connect"}
                 </Button>
               ) : (
-                <span className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground">
-                  Coming soon
+                <span className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-dashed border-border px-3 text-center text-xs font-medium text-muted-foreground">
+                  {ch.soon ?? "Coming soon"}
                 </span>
               )}
             </motion.div>
