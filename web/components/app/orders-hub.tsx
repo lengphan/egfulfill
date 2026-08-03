@@ -156,14 +156,17 @@ const openLabel = (r: UspsLabelResult) => {
   }
 }
 
-// Filters derive from the canonical pipeline so they always match the status model.
-// NB: id "" and the first pipeline stage (in_review) are DIFFERENT states. "" = Draft:
+// The stage pills. Same vocabulary as the Status dropdown in the filter bar (STATUS_OPTIONS)
+// and driven by the SAME query field, so the two can't disagree — the pills are the six
+// stages a floor moves between, the dropdown additionally breaks "Issues" into the three
+// exception states it bundles.
+//
+// NB: "draft" and the first pipeline stage (in_review) are DIFFERENT states. Draft =
 // arrived/created but nobody has started it (where factory-synced orders land, unpaid);
-// in_review = Pending: the seller submitted + paid, awaiting factory approval. Labelled
-// "Draft" vs "Pending" so they're distinguishable — matches ALL_STATUSES's label for "".
+// in_review = Pending: the seller submitted + paid, awaiting factory approval.
 const FILTERS: { label: string; id: string }[] = [
-  { label: "All", id: "all" },
-  { label: "Draft", id: "" },
+  { label: "All", id: "" },
+  { label: "Draft", id: "draft" },
   ...FACTORY_STAGES.map((s) => ({ label: s.label, id: s.id })),
   { label: "Issues", id: "issues" },
 ]
@@ -185,10 +188,10 @@ export function OrdersHub() {
   const canPO = isAdmin || role === "warehouse"
 
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
-  const [filter, setFilter] = useState("all")
-  // Search + platform/shop/print/date narrowing, applied AFTER the stage pill. Separate
-  // state because the two answer different questions ("whose turn is it" vs "which orders"),
-  // and clearing one must not silently clear the other.
+  // ONE narrowing state: the stage pills, the search box and every dropdown all write into
+  // it. They used to be two — a `filter` string for the pills and a query for the rest —
+  // which meant "Shipped" and a Status dropdown could hold contradictory answers, and the
+  // empty-state sentence could only ever name one of them.
   const [query, setQuery] = useState<OrderQuery>(EMPTY_ORDER_QUERY)
   // Fetching the TikTok-made label for a platform-shipped order. Per-order id so the row
   // that was clicked is the one that shows as busy.
@@ -640,16 +643,15 @@ export function OrdersHub() {
     }
   }, [orders])
 
-  const filtered = useMemo(() => {
-    const list = orders ?? []
-    const byStage =
-      filter === "all" ? list
-      : filter === "issues" ? list.filter((o) => isException(orderStage(o.items ?? [])))
-      : list.filter((o) => orderStage(o.items ?? []) === filter)
-    // Stage first, then the search/facet query — so the pill counts keep meaning "at this
-    // stage", and a search never has to re-answer a question the pill already answered.
-    return filterOrders(byStage, query)
-  }, [orders, filter, query])
+  // The catalog + stock map are what let the Ready filter answer its stock half: stock is
+  // held against the resolved BLANK sku, not the listing's. Both are page-level (loaded for
+  // every order, not per row), so filtering on them can't make rows appear as you scroll.
+  const filterCtx = useMemo(() => ({ catalog, stock }), [catalog, stock])
+
+  const filtered = useMemo(
+    () => filterOrders(orders ?? [], query, filterCtx),
+    [orders, query, filterCtx],
+  )
 
   const paged = usePaged(filtered, 25)
 
@@ -885,21 +887,47 @@ export function OrdersHub() {
           </div>
         }
       >
-        {/* Two rows, deliberately: the stage pills answer "whose turn is it", the bar below
-            answers "which orders". Stacking them keeps each readable at narrow widths, where
-            one combined row wraps into an unreadable jumble of pills and dropdowns. */}
-        <div className="space-y-3 border-b border-border px-5 py-3">
-          <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => (
-              <button key={f.id} onClick={() => setFilter(f.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (filter === f.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {tl("stage", f.label)}
-              </button>
-            ))}
+        {/* ONE toolbar row: stage pills left, search + dropdowns right.
+            They were stacked, which spent a whole row on seven short pills and left the
+            right two-thirds of both rows empty — the widest, emptiest thing on the page sat
+            directly above the densest. Everything is the same h-7 / text-xs metric as the
+            chips in the rows below, so the toolbar reads as part of the table.
+            The pills keep line one and the filters take whatever is left of it. `basis` is
+            the hinge: while at least ~26rem remains beside the pills the group stays on the
+            row and wraps INTERNALLY (a bar that jumps to its own row the moment it's snug
+            puts the blank space straight back where it started); below that it drops to a
+            full-width row of its own and goes back to reading left-to-right, rather than
+            stacking into a narrow column hugging the right edge. */}
+        <div className="flex flex-wrap items-start gap-x-4 gap-y-2 border-b border-border px-5 py-2.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-1">
+            {FILTERS.map((f) => {
+              // The Issues pill also lights for the three individual exception states, which
+              // only the Status dropdown can select — otherwise picking "Refunded" left the
+              // whole pill row looking unselected while the list was plainly narrowed.
+              const on = query.status === f.id || (f.id === "issues" && isException(query.status))
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => setQuery({ ...query, status: f.id })}
+                  className={"eg-tap h-7 rounded-md px-2.5 text-xs font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                >
+                  {tl("stage", f.label)}
+                </button>
+              )
+            })}
           </div>
           {/* Only once there's something to search. A search box over an empty board is a
               control that cannot do anything, and it makes "no orders yet" look like a
               failed query. */}
-          {!!orders?.length && <OrderFilterBar orders={orders} query={query} onChange={setQuery} />}
+          {!!orders?.length && (
+            <OrderFilterBar
+              orders={orders}
+              query={query}
+              onChange={setQuery}
+              catalog={catalog}
+              className="min-w-0 flex-1 basis-[26rem] xl:justify-end"
+            />
+          )}
         </div>
 
         {orders === null ? (
@@ -911,7 +939,7 @@ export function OrdersHub() {
             {/* Names what's actually narrowing the list — "no matches for OLVERA-TEES ·
                 last 7 days" is recoverable, "Nothing here" over a filter you forgot you set
                 is not. */}
-            <div className="text-sm">{tl("ui", emptyOrdersMessage(orders.length, filter !== "all", query))}</div>
+            <div className="text-sm">{tl("ui", emptyOrdersMessage(orders.length, query, filterCtx))}</div>
           </div>
         ) : (
           <>

@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { CircleNotch, DownloadSimple } from "@phosphor-icons/react"
-import { getOrderHistory, downloadDesignFile, type AuditRow, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
+import { getOrderHistory, downloadDesignFile, designForLine, type AuditRow, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
+import { orderReadiness } from "@/lib/order-readiness"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { forTag, EMPTY_HINT, DONE_NO_HISTORY, type TagId } from "@/components/app/tag-history"
@@ -188,119 +189,10 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
   /** Dots, not words — for a table column that already has a heading. */
   compact?: boolean
 }) {
-  const stage = String(order.factory_status ?? "").toLowerCase()
-
-  // A label needs an address, so its absence covers both — the tooltip names the reason
-  // rather than spending a second tag on it.
-  const hasLabel = !!order.tracking
-  const addr = (order.address ?? {}) as Record<string, string>
-  const hasAddr = !!((addr.street || addr.first_line || addr.line1 || addr.address1) && (addr.zip || addr.postal_code))
-  const labelTitle = hasLabel
-    ? `Label ${order.label_printed_at ? "printed" : "created"} · ${order.tracking}`
-    : hasAddr ? "No label bought yet" : "No address yet — a label can't be created without one"
-
-  // SCAN = the label was pre-scanned at dispatch, which is what starts the carrier /
-  // marketplace clock. Read from label_scanned_at — the actual recorded fact — rather
-  // than inferred from the pipeline stage, which was only ever a proxy and went "done"
-  // for orders whose label had never been scanned at all.
-  //
-  // NO stage fallback. Inferring "scanned" from working/printed/shipped marked orders
-  // done that had never been scanned at all — this component's own rule is that a done
-  // tag must never contradict itself, because that's what teaches people to distrust the
-  // board. An order with no recorded pre-scan reads as not pre-scanned, which is simply
-  // true: we have no evidence it was. Orders predating this field read the same way, and
-  // that's honest rather than flattering.
-  const preScanned = !!order.label_scanned_at
-  // Sent to the partner's queue but not yet scanned back — previously indistinguishable
-  // from "nothing has happened", which is the state you most want to tell apart when
-  // chasing a parcel.
-  // AMBER = queued to be scanned, by either route. Two ways in, and they read
-  // differently, because "we haven't got to it" and "someone else has it" are different
-  // problems with different people to chase.
-  const withPartner = !!(order as { dispatch_pdf_id?: string | null }).dispatch_pdf_id
-  const queuedHere = String(order.factory_status || "") === "awaiting_scan"
-  // On a USPS SCAN form. Amber, not violet: the form is a document we printed, and USPS
-  // scanning it is a separate event that happens at handover — or doesn't, if the pile
-  // never goes out. Recording the form as a scan would be us making the carrier's claim
-  // for them, which is exactly the thing these tags exist not to do.
-  const manifested = !!(order as { manifested_at?: string | null }).manifested_at
-  const scanPending = !preScanned && (withPartner || queuedHere || manifested)
-
-  const scanTitle = preScanned
-    // VIOLET the moment a scan is actually recorded, whoever did it. The route is a
-    // detail; the fact is that the buyer's tracking has started.
-    ? `Scanned ${new Date(order.label_scanned_at as string).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${
-        (order as { scanned_via?: string | null }).scanned_via === "partner" ? " by the dispatch partner" :
-        (order as { scanned_via?: string | null }).scanned_via === "in-house" ? " here" :
-        // The carrier's own acceptance scan, arriving through tracking. Worth naming:
-        // it's the only one of the three routes nobody here asserted.
-        (order as { scanned_via?: string | null }).scanned_via === "carrier" ? " by the carrier" : ""
-      } — tracking is live for the buyer. The parcel may still be in production.`
-    // AMBER covers both queued cases, and stays amber while the partner holds it. Their
-    // receiving it is not their scanning it — the buyer's tracking hasn't moved until
-    // they actually scan, so the colour mustn't move either. Where it is goes in the
-    // words, and the history below records the hand-off.
-    : scanPending
-      ? withPartner
-        ? "With the dispatch partner — in their queue, not scanned yet."
-        // Deliberately says what's still missing rather than "manifested". The form being
-        // printed is not the parcel being accepted, and only one of those the buyer sees.
-        : manifested
-          ? "On today's USPS SCAN form — printed, but the carrier hasn't accepted it yet."
-          : "On the dispatch board, waiting to be scanned."
-      : order.tracking
-        ? "Label exists but hasn't been scanned — the buyer's tracking has not started."
-        : "No label yet, so nothing to scan."
-
-  const list = items ?? order.items ?? []
-  const decorated = list.filter((it) => String(it.print_type || "").trim())
-  // ONLY artwork actually attached to the order counts as a design.
-  //
-  // This used to also count `it.design_src`, which is written by marketplace sync from
-  // the BUYER's personalization upload (etsy.js reads it off the transaction variations).
-  // Nobody attached it and nobody sent it anywhere, so an ordinary Etsy order arrived with
-  // the tag already reading "Design sent" and a tooltip claiming it was with a designer —
-  // while the order detail, which reads order_designs, correctly showed nothing. The tag
-  // was the thing lying. A buyer upload is still real evidence, so it moves into the
-  // tag's file list below rather than being thrown away.
-  // LINE FIRST. Keyed on sku alone, two lines of the same sku both resolved to whichever
-  // design was stored last — so an order with one decorated line and one bare sibling read
-  // as fully covered, and the tag said the artwork was in hand for a line that had none.
-  const artFor = (it: OrderItem) =>
-    (it.line_id ? designs?.[it.line_id] : undefined) ?? (it.sku ? designs?.[it.sku] : undefined)
-  const withArt = decorated.filter((it) => artFor(it)?.data)
-  const buyerUploads = list.filter((it) => it.design_src)
-  // A machine file marks the design done. The loaded file list WINS when it's present
-  // (even when empty) — so removing the last file reverts the tag immediately, rather than
-  // the stale row-level flag keeping it "done". Only when the list hasn't been fetched (a
-  // collapsed row) do we fall back to has_machine_file from the orders query, which is what
-  // lets the tag be right on a row nobody expanded.
-  const hasFile = files
-    ? files.some((f) => f.kind === "pes" || f.kind === "emb")
-    : order.has_machine_file === true
-  const onBoard = order.design_on_board === true
-  const boardApproved = order.design_approved === true
-
-  // VIOLET ("done") only when APPROVED — the design board approved the card, or a finished
-  // machine file exists and it never went through the board (a direct upload, nothing to
-  // review). A card SENT to the board for review, or a check file waiting on sign-off, stays
-  // AMBER until it's approved — a file existing is not the same as it being approved.
-  const approved = boardApproved || (hasFile && !onBoard)
-  const designState: State = approved
-    ? "done"
-    : onBoard || hasFile || (decorated.length > 0 && withArt.length === decorated.length)
-      ? "doing"
-      : "todo"
-  const designStatus = approved
-    ? "Design approved — ready to make."
-    : onBoard
-      ? "On the design board — waiting on approval."
-      : designState === "doing"
-        ? hasFile ? "File attached — waiting on approval." : "Artwork attached — waiting on the machine file."
-        : decorated.length === 0
-          ? "No design added yet."
-          : `${decorated.length - withArt.length} of ${decorated.length} items still need artwork.`
-  const designTitle = designStatus
+  // The states and their sentences live in lib/order-readiness.ts — the Ready filter reads
+  // the SAME function, so a chip and the filter that hides its row can never disagree.
+  const ready = orderReadiness(order, { items, designs, files })
+  const { withArt, buyerUploads } = ready
 
   // The label PDF hangs off both Label and Scan: it's the Label tag's own artefact, and
   // the scan is an event ABOUT that label, so someone checking a scan wants the same sheet
@@ -314,7 +206,7 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
     ...withArt.map((it) => ({
       key: `art-${it.line_id ?? it.sku}`,
       name: `Artwork — ${it.name || it.sku}`,
-      href: artFor(it)?.data,
+      href: designForLine(designs, it)?.data,
     })),
     // The buyer's own upload. Labelled as theirs so nobody mistakes it for a production
     // file: it's what they sent, not what we made.
@@ -338,12 +230,12 @@ export function ReadinessStrip({ order, items, designs, files, className, compac
   return (
     <span className={"inline-flex items-center " + (compact ? "gap-1.5 " : "gap-1.5 ") + (className ?? "")}>
       {/* Names are fixed. Colour carries progress; the words live in each popover. */}
-      <Tag id="label" orderId={order.id} label="Label" state={hasLabel ? "done" : "todo"}
-           title={labelTitle} status={labelTitle} files={labelFile} dot={compact} />
-      <Tag id="scan" orderId={order.id} label="Scan" state={preScanned ? "done" : scanPending ? "doing" : "todo"}
-           title={scanTitle} status={scanTitle} files={labelFile} dot={compact} />
-      <Tag id="design" orderId={order.id} label="Design" state={designState}
-           title={designTitle} status={designStatus} files={designFiles} dot={compact} />
+      <Tag id="label" orderId={order.id} label="Label" state={ready.label.state}
+           title={ready.label.status} status={ready.label.status} files={labelFile} dot={compact} />
+      <Tag id="scan" orderId={order.id} label="Scan" state={ready.scan.state}
+           title={ready.scan.status} status={ready.scan.status} files={labelFile} dot={compact} />
+      <Tag id="design" orderId={order.id} label="Design" state={ready.design.state}
+           title={ready.design.status} status={ready.design.status} files={designFiles} dot={compact} />
     </span>
   )
 }
