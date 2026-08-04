@@ -145,6 +145,13 @@ services:
       # UI-settable secret, so it must be listed here AND in .env — this file forwards
       # env by NAME, so an .env line alone never reaches the container.
       MAIL_FROM_BULK: ${MAIL_FROM_BULK:-}
+      # Alibaba.com Open Platform — BUYER APIs for sourcing (not seller). App Key/Secret come
+      # from an app registered at openapi.alibaba.com; the app must be APPROVED for the
+      # Buyer-Product scopes or calls authenticate and then 403. Auth is OAuth: these two
+      # sign the request, and a browser authorisation supplies the access token.
+      ALIBABA_APP_KEY: ${ALIBABA_APP_KEY:-}
+      ALIBABA_APP_SECRET: ${ALIBABA_APP_SECRET:-}
+      ALIBABA_API_BASE: ${ALIBABA_API_BASE:-}
 
       # Object storage for design artwork (S3-compatible). Unset = inline base64 in
       # Postgres, which also means no URL to give an outside design partner. See

@@ -56,6 +56,7 @@ import { ssOrderStatus } from './routes/ss.js';
 import { startSupplierPoll } from './supplier-poll.js';
 import { manifestRoutes } from './routes/manifests.js';
 import { manualSupplierRoutes } from './routes/manual_suppliers.js';
+import { alibabaRoutes } from './routes/alibaba.js';
 import { pinkDesignRoutes } from './routes/pinkdesign.js';
 import { backupRoutes } from './routes/backup.js';
 import { piiRetentionRoutes } from './routes/pii_retention.js';
@@ -371,6 +372,7 @@ siteContentRoutes(app, requireAdmin);                  // editable marketing-hom
 dispatchRoutes(app, requireAuth, requireWarehouse);    // byeastside: push labels for pre-scan, poll PICKED
 manifestRoutes(app, requireWarehouse);                  // USPS SCAN forms via Shippo manifests
 manualSupplierRoutes(app, requireAdmin);               // Sourcing — saved supplier links, costs, MOQ, margins. ADMIN-ONLY: these rows are what we pay and what we make
+alibabaRoutes(app, requireAdmin);                      // ADMIN: Alibaba.com BUYER APIs (sourcing) — signed IOP gateway, OAuth token, product search
 
 /**
  * Ask S&S whether our open orders are still open.
