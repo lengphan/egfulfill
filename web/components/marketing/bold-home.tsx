@@ -68,18 +68,28 @@ function MaskedWords({ text, className = "", delay = 0 }: { text: string; classN
 function HighlightPhrase({ text, delay = 0 }: { text: string; delay?: number }) {
   const reduce = useReducedMotion()
   return (
-    <span className="relative inline-block px-[0.18em] align-bottom">
+    <span className="relative inline-block align-bottom">
+      <span className="relative" style={{ color: INK }}>
+        <MaskedWords text={text} delay={delay} />
+      </span>
+      {/* A RULE, not a slab. A filled white block behind the phrase read as a sticker pasted
+          over the plate — it fought the type it was meant to serve and put a hard rectangle
+          in the middle of a page whose whole idea is open space. A thick white underline
+          keeps white as an accent, leaves the headline reading straight through in ink on
+          the plate (17:1), and gives the eye one clean horizontal to land on.
+
+          It draws left-to-right AFTER the words have risen, so it reads as underlining a
+          finished sentence rather than sliding in with it. Rounded ends so it looks drawn
+          rather than cropped. */}
       <motion.span
         aria-hidden
-        className="absolute inset-0 origin-left"
-        style={{ background: "#FFFFFF" }}
+        className="absolute -bottom-[0.06em] left-0 right-0 origin-left rounded-full"
+        style={{ height: "0.11em", background: "#FFFFFF" }}
         initial={reduce ? { opacity: 0 } : { scaleX: 0 }}
-        animate={reduce ? { opacity: 1 } : { scaleX: 1 }}
-        transition={{ duration: 0.55, delay, ease: [0.16, 1, 0.3, 1] }}
+        whileInView={reduce ? { opacity: 1 } : { scaleX: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6, delay: delay + 0.35, ease: [0.16, 1, 0.3, 1] }}
       />
-      <span className="relative" style={{ color: INK }}>
-        <MaskedWords text={text} delay={delay + 0.18} />
-      </span>
     </span>
   )
 }
