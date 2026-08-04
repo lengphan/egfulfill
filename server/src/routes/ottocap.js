@@ -431,37 +431,47 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
     let card;
     if (String(b.payment_method || '').toLowerCase().replace(/[^a-z]/g, '') === 'creditcard') {
       // ── PCI gate ──────────────────────────────────────────────────────────
-      // Taking a card here means this server PROCESSES and TRANSMITS a PAN, which is
-      // PCI DSS scope — SAQ D, not SAQ A. Not storing it avoids one of the three verbs,
-      // not the obligation. Otto expose no saved-card profile the way S&S do, so there
-      // is no token to send instead; the only ways out are their account terms, or Otto
-      // holding the card on their side.
+      // The gate is about a PAN CROSSING THIS SERVER, not about the payment method.
       //
-      // OFF unless deliberately enabled, because otherwise anyone with purchase access
-      // puts the business in scope by choosing an option in a dropdown. That should be a
-      // decision someone makes on purpose.
-      if (String(process.env.OTTO_CARD_ORDERS || '') !== '1') {
-        reply.code(400);
-        return {
-          error: 'Card payments to Otto are turned off.',
-          code: 'card_orders_disabled',
-          detail: 'Sending a card through EGFULFILL would put it inside PCI DSS scope, so this is disabled unless someone sets OTTO_CARD_ORDERS=1 on the server. Use Otto account terms instead — pick one in Settings › Suppliers — or ask Otto to keep the card on their side and bill it.',
-        };
+      // Otto's payload treats card_details as OPTIONAL. "Credit Card" with none supplied
+      // means Otto bills the card already held on your account: no number is typed here,
+      // none is transmitted by us, and there is nothing in PCI scope to gate. Gating that
+      // case refused the normal way this business pays Otto and pushed people to change
+      // their payment terms to suit our software, which is backwards.
+      //
+      // Typing a card into EGFULFILL is different — that PROCESSES and TRANSMITS a PAN,
+      // which is PCI DSS SAQ D. Not storing it avoids one of the three verbs, not the
+      // obligation, and Otto expose no saved-card token the way S&S do, so there's nothing
+      // safer to send instead. That stays off unless someone deliberately sets
+      // OTTO_CARD_ORDERS=1, so nobody puts the business in scope via a dropdown.
+      const raw = b.card_details || {};
+      const cardSupplied = !!(raw.card_number || raw.cvv || raw.exp_date || raw.name);
+
+      if (cardSupplied) {
+        if (String(process.env.OTTO_CARD_ORDERS || '') !== '1') {
+          reply.code(400);
+          return {
+            error: 'Entering a card here is turned off.',
+            code: 'card_orders_disabled',
+            detail: 'Typing a card into EGFULFILL would put this server inside PCI DSS scope, so it is disabled unless someone sets OTTO_CARD_ORDERS=1. You can still pay Otto by card — leave the card fields empty and Otto bills the card held on your account.',
+          };
+        }
+        const number = String(raw.card_number || '').replace(/\D/g, '');
+        const cvv = String(raw.cvv || '').replace(/\D/g, '');
+        const exp = String(raw.exp_date || '').trim();
+        const problems = [];
+        if (!raw.name) problems.push('the name on the card');
+        if (number.length < 13 || number.length > 19 || !luhnOk(number)) problems.push('a valid card number');
+        if (cvv.length < 3 || cvv.length > 4) problems.push('a 3 or 4 digit CVV');
+        if (!/^\d{2}\/\d{2,4}$/.test(exp)) problems.push('an expiry as MM/YY or MM/YYYY');
+        if (problems.length) {
+          reply.code(400);
+          return { error: `Otto need ${problems.join(', ')} for a credit-card order.` };
+        }
+        card = { name: String(raw.name), card_number: number, cvv, exp_date: exp };
       }
-      const c = b.card_details || {};
-      const number = String(c.card_number || '').replace(/\D/g, '');
-      const cvv = String(c.cvv || '').replace(/\D/g, '');
-      const exp = String(c.exp_date || '').trim();
-      const problems = [];
-      if (!c.name) problems.push('the name on the card');
-      if (number.length < 13 || number.length > 19 || !luhnOk(number)) problems.push('a valid card number');
-      if (cvv.length < 3 || cvv.length > 4) problems.push('a 3 or 4 digit CVV');
-      if (!/^\d{2}\/\d{2,4}$/.test(exp)) problems.push('an expiry as MM/YY or MM/YYYY');
-      if (problems.length) {
-        reply.code(400);
-        return { error: `Otto need ${problems.join(', ')} for a credit-card order.` };
-      }
-      card = { name: String(c.name), card_number: number, cvv, exp_date: exp };
+      // else: card stays null. payment_method is still "Credit Card", card_details is
+      // omitted from the payload, and Otto charges the card on file.
     }
 
     if (!b.payment_method) {
