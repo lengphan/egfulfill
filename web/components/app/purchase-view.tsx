@@ -1230,7 +1230,17 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
       <StatGrid>
         <StatCard label="Low stock" value={String((inv ?? []).filter(isLow).length)} sub="need reorder" tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
         <StatCard label="To order" value={String(saved.length)} sub="waiting to be placed" />
-        <StatCard label="Placed" value={String((pos ?? []).filter((p) => p.status === "placed").length)} sub="sent to suppliers" />
+        {/* Counts only what REALLY went. status === "placed" also covers a manual supplier
+            recorded for hand-ordering and a dry run that never left the building — both
+            already carry a "Not sent" badge in the list, so a tile reading "sent to
+            suppliers" while counting them contradicted the rows underneath it. The unsent
+            ones get their own tile rather than disappearing: they are the pile someone still
+            has to act on. */}
+        <StatCard label="Placed" value={String((pos ?? []).filter((p) => p.status === "placed" && reallySent(p)).length)} sub="sent to suppliers" />
+        {(() => {
+          const unsent = (pos ?? []).filter((p) => p.status === "placed" && !reallySent(p)).length
+          return unsent ? <StatCard label="Not sent" value={String(unsent)} sub="order these by hand" tone="neg" /> : null
+        })()}
         <StatCard label="Received" value={String((pos ?? []).filter((p) => p.status === "received").length)} sub="into inventory" tone="pos" />
       </StatGrid>
 
