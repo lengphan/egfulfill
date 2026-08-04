@@ -742,13 +742,16 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
     // name their own fields, and arrive one round trip later — "shipping_address.state:
     // California is not a valid choice" is a better message than nothing, but a refusal
     // that names the setting to change is better still.
-    // Otto want the card ON THE REQUEST (they have no saved-card API). But that is OTTO's
-    // requirement alone — an S&S order pays by its own saved payment profile and NEVER sees
-    // this card, so the Otto card dialog must not hold an S&S order hostage. We no longer
-    // gate the whole batch: place everything that can go now, defer ONLY the Otto group, and
-    // open the card entry afterwards.
-    const payMethod = String(opts.defaults.otto_payment_method || "").toLowerCase().replace(/[^a-z]/g, "")
-    const ottoNeedsCard = payMethod === "creditcard" && !card
+    // Otto DO NOT need the card on the request. Their payload treats card_details as
+    // optional: payment_method "Credit Card" with none supplied means Otto bills the card
+    // already held on the account, which is how this business actually pays them. Demanding
+    // it here asked for a card number that nothing needed, on every single order — and the
+    // server now refuses a typed card anyway unless OTTO_CARD_ORDERS=1, so the dialog was
+    // collecting a PAN that could not be used.
+    //
+    // The card path still exists for an account that genuinely has no card on file: if one
+    // was entered this session it is passed through, but it is never demanded.
+    const ottoNeedsCard = false
     const ottoMissingParty = !(opts.defaults.otto_customer && opts.defaults.otto_contact)
 
     setBusy("place-all"); setMsg(null)
