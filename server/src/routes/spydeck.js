@@ -166,7 +166,13 @@ async function buildTrending(offset = 0) {
     if (k) counts[k] = (counts[k] || 0) + 1;
   }
   const keywords = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([t]) => t);
-  return { date: new Date().toISOString().slice(0, 10), products, keywords, offset, built_at: new Date().toISOString(), v: FEED_VERSION };
+  // Did this build actually come back with PICTURES? A pool where the image enrichment
+  // failed looks completely healthy — titles, prices, tags all present — and renders as a
+  // wall of placeholders. Recording it is what lets the cache refuse to keep it.
+  const withImg = products.filter((l) => l && l.image).length;
+  const imgOk = products.length === 0 || withImg / products.length >= 0.5;
+  if (!imgOk) console.warn(`[spydeck] pool built with only ${withImg}/${products.length} images — not caching as today's feed`);
+  return { date: new Date().toISOString().slice(0, 10), products, keywords, offset, built_at: new Date().toISOString(), v: FEED_VERSION, imgOk };
 }
 
 /**
@@ -180,7 +186,11 @@ async function buildTrending(offset = 0) {
  */
 function poolUsable(v, today) {
   return !!(v && v.date === today && Array.isArray(v.products) && v.products.length
-    && v.products[0] && v.products[0]._sold24 !== undefined && v.v === FEED_VERSION);
+    && v.products[0] && v.products[0]._sold24 !== undefined && v.v === FEED_VERSION
+    // An image-less pool is never "fresh", however new it is. This is the whole reason
+    // SpyDeck sat blank for a day: the build failed its enrichment, the result looked
+    // structurally fine, and the day cache happily kept it until midnight.
+    && v.imgOk !== false);
 }
 
 const saveFeed = (feed) => q("insert into settings (key,value,updated_at) values ('spydeck_trending',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(feed)]).catch(() => {});
@@ -192,9 +202,16 @@ const saveFeed = (feed) => q("insert into settings (key,value,updated_at) values
  * must not become ten builds — that's a rate-limit ban, not a slow page. Everyone waiting
  * shares the one in-flight promise; whoever asks after it settles starts a fresh one.
  */
+// A pool that keeps coming back image-less must not be retried on every request — Etsy
+// being unwell is not a reason to search it 16 times a minute. Blocking callers (nothing
+// cached at all) always build; BACKGROUND refreshes back off to one attempt per cooldown.
+const REBUILD_COOLDOWN_MS = 10 * 60 * 1000;
+let lastRebuildAt = 0;
 let rebuilding = null;
-function rebuildOnce(offset = 0) {
+function rebuildOnce(offset = 0, { background = false } = {}) {
+  if (background && Date.now() - lastRebuildAt < REBUILD_COOLDOWN_MS) return Promise.resolve(null);
   if (!rebuilding) {
+    lastRebuildAt = Date.now();
     rebuilding = buildTrending(offset)
       .then(async (feed) => { if (feed && feed.products && feed.products.length) await saveFeed(feed); return feed; })
       .catch((e) => { console.warn('[spydeck] pool rebuild failed:', e && e.message); return null; })
@@ -416,26 +433,35 @@ export function spydeckRoutes(app, requireAuth) {
       products: sliceFor(feed.products, staff, seed).map(gridRow),
     });
 
-    let stale = null;
+    let cachedPool = null;
     try {
       const cached = await q("select value from settings where key='spydeck_trending'");
       const v = cached.rows[0] ? (readSetting(cached.rows[0]) || {}) : null;
       if (poolUsable(v, today)) return serve(v);
-      // STALE-WHILE-REVALIDATE. A cold build is ~16 Etsy searches, which is seconds of
-      // staring at skeletons. If yesterday's pool (or one from an older FEED_VERSION) is
-      // still on disk, hand it over NOW and refresh in the background — a day-old trending
-      // feed is a far better answer than a spinner.
-      //
-      // Only if it still has PICTURES, though. Serving an image-less pool instantly is just
-      // serving the bug instantly, so those wait for the real build.
-      if (v && Array.isArray(v.products) && v.products.length && v.products.some((l) => l && l.image)) stale = v;
+      if (v && Array.isArray(v.products) && v.products.length) cachedPool = v;
     } catch { /* rebuild below */ }
-    if (stale) { rebuildOnce(); return serve(stale); }
-    const feed = await rebuildOnce();
-    if (!feed || !feed.products || !feed.products.length) {
-      reply.code(502); return { error: 'Could not build the trending feed', products: [], keywords: [] };
+
+    // STALE-WHILE-REVALIDATE. A cold build is ~16 Etsy searches, which is seconds of staring
+    // at skeletons. If yesterday's pool (or one from an older FEED_VERSION) is still on disk,
+    // hand it over NOW and refresh behind the request — a day-old trending feed is a far
+    // better answer than a spinner.
+    //
+    // Only if it still has PICTURES, though. Serving an image-less pool instantly is just
+    // serving the bug instantly, so that case waits for a real build.
+    if (cachedPool && cachedPool.products.some((l) => l && l.image)) {
+      rebuildOnce(0, { background: true });
+      return serve(cachedPool);
     }
-    return serve(feed);
+
+    // Nothing servable. Build — but only BLOCK-and-build when the cache is truly empty. With
+    // an image-less pool sitting there, a blocking build per request is 16 Etsy searches per
+    // visitor for as long as Etsy stays unwell; the cooldown turns that into one attempt per
+    // 10 minutes, and meanwhile we show the placeholders we already have. Ugly beats banned.
+    const feed = await rebuildOnce(0, { background: !!cachedPool });
+    if (feed && feed.products && feed.products.length) return serve(feed);
+    if (cachedPool) return serve(cachedPool);
+    reply.code(502);
+    return { error: 'Could not build the trending feed', products: [], keywords: [] };
   });
 
   // Fresh scan — rebuild the SHARED pool from new niches. This is the only path that
@@ -779,7 +805,7 @@ export function spydeckRoutes(app, requireAuth) {
       const c = await q("select value from settings where key='spydeck_trending'");
       const v = readSetting(c.rows[0]) || {};
       if (poolUsable(v, today)) return;
-      await rebuildOnce(0);
+      await rebuildOnce(0, { background: true });
     } catch { /* on-demand build still covers a miss */ }
   }
   const warmSoon = setTimeout(warmTrending, 25000);            // ~25s after boot
