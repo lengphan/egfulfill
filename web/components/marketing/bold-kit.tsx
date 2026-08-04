@@ -16,22 +16,28 @@ import { ArrowUpRight } from "@phosphor-icons/react"
  * decoration usually does. Black on the accent is ~17:1, so it can hold real text anywhere.
  */
 export const ACCENT = "#C3D0FF"        // periwinkle — the plate/fill
-// The accent lettering sits ON the periwinkle plate, so it needs the DEEP step: #4C5FD5 is
-// only 3.53:1 against the plate, while #1B2270 is 9.13:1. Measured, not guessed — this value
-// changed twice in this session purely because the background under it changed.
-export const ACCENT_INK = "#1B2270"
+// The accent phrase is INK, like the rest of the headline — no second type colour.
+//
+// A dark purple on a light purple plate is a tint of the background wearing itself as
+// foreground: it reads muddy and slightly dated, because the eye sees one hue at two
+// strengths rather than a decision. Modern display typography in this style carries ONE ink
+// colour and lets the plate be the colour — the headline stays a single confident voice and
+// the periwinkle does the shouting.
+//
+// The typed phrase still reads as distinct because it MOVES: it types, holds and rewrites
+// itself. Motion is the differentiator, which is a stronger one than a hue nobody can name.
+export const ACCENT_INK = "#0B0B0C"
 export const INK = "#0B0B0C"
-// A COOL off-white, tinted with the accent's own hue — not a warm paper.
+// WARM PAPER, under a cool periwinkle banner. Chosen deliberately, not by default.
 //
-// Warm beige under a periwinkle accent put two temperatures on one page: the lavender read
-// smooth and current, the beige read dated, and the mismatch was doing that rather than
-// either colour on its own. Tinting the surface toward the accent instead makes the page one
-// family, which is what reads as modern. It is still not pure white — #FFF beside a coloured
-// mark reads as an absence — it is just cool now instead of warm.
+// It was briefly swapped to a cool off-white because a warm page under a cool accent puts two
+// temperatures on one screen. That IS the tension — but it's the tension the look is built on:
+// the banner reads modern, the page reads printed, and the contrast between them is the point
+// rather than a mistake. The earlier version failed because the warm tone was carrying a
+// purple hero as well; now the purple has its own plate and the paper is only ever the page.
 //
-// Same hue as the app canvas in globals.css, a step lighter, so marketing and the product
-// look like one product.
-export const SURFACE = "#F4F5FD"
+// Both letterings clear it comfortably: ink 18.54:1, the accent purple 13.11:1.
+export const SURFACE = "#FAF8F3"
 
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
