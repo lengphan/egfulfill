@@ -48,7 +48,9 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   // TrueView review → edit → export a machine file. Dormant for now (the page is a
   // placeholder + API-key holder). Currently surfaced to admin ONLY so it can be reviewed;
   // set roles: [] to hide it again, or widen roles to open it up — same toggle as Campaigns.
-  { label: "Digitizer", href: "/digitizer", icon: Needle, roles: ["operator", "admin"] },
+  // Digitizer stays operator/designer/admin — warehouse is excluded server-side too
+  // (requireDesignStaff), since each Wilcom call bills.
+  { label: "Digitizer", href: "/digitizer", icon: Needle, roles: ["operator", "designer", "admin"] },
   // Console retired — Users + Activity live in Settings, Top-ups in Wallet, Products at /products.
 ]
 

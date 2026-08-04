@@ -125,6 +125,27 @@ function requireWarehouse(req, reply, done) {
   done();
 }
 
+/**
+ * Design-side staff — operator, designer, admin. EXCLUDES WAREHOUSE.
+ *
+ * Sits between requireStaff and requireAdmin because the design tools are neither: they
+ * aren't admin-only (a designer's whole job runs through them) but they aren't the floor's
+ * either, and each Wilcom/Pink Design call bills. Warehouse still sees the ARTWORK on the
+ * orders it fulfils — design_files and design_images are requireAuth and untouched — it just
+ * can't spend money digitising or commissioning it.
+ *
+ * Designer never reaches requireWarehouse, and warehouse never reaches this: the two
+ * mid-tier gates are deliberately disjoint rather than nested.
+ */
+function requireDesignStaff(req, reply, done) {
+  const role = req.user && req.user.role;
+  if (role !== 'admin' && role !== 'operator' && role !== 'designer') {
+    reply.code(403).send({ error: 'Design staff only' });
+    return;
+  }
+  done();
+}
+
 function requireAdmin(req, reply, done) {
   if (!req.user || req.user.role !== 'admin') { reply.code(403).send({ error: 'Admin only' }); return; }
   done();
@@ -357,7 +378,7 @@ teamRoutes(app, requireAuth);                          // seller team members + 
 sandboxRoutes(app, requireAuth);                       // seller API keys (/api/keys) + safe /api/test/* sandbox (simulated, no side effects) — isolated key-auth, global hook untouched
 webhookRoutes(app, requireAuth, authKey, keyAllows);              // outbound webhooks (/api/webhooks) — what makes the public API push instead of poll-only; JWT *or* X-API-Key, since registering one is a partner action
 adminSecretsRoutes(app, requireAdmin);                 // ADMIN: masked last-4 of integration credentials — even masked it maps which integrations are worth attacking
-wilcomRoutes(app, requireStaff);                       // Wilcom EWA: config check + live connectivity/auth test (reads WILCOM_APP_ID/KEY at call time)
+wilcomRoutes(app, requireDesignStaff);                  // Wilcom EWA digitising — operator/designer/admin, NOT warehouse: every call bills
 usageRoutes(app, requireAdmin, requireAdmin);          // ADMIN: what the integrations COST us per platform + threshold config — not needed to pick, print or ship
 auditRoutes(app, requireAdmin, requireAuth);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
@@ -389,7 +410,7 @@ startSupplierPoll({
   enabled: () => !!(process.env.SS_ACCOUNT_NUMBER && process.env.SS_API_KEY),
   ssOrderStatus,
 });
-pinkDesignRoutes(app, requireAuth, requireStaff);      // Pink Design: outsourced DTG/DTF artwork
+pinkDesignRoutes(app, requireAuth, requireDesignStaff); // Pink Design outsourced artwork — operator/designer/admin, NOT warehouse: commissioning spends money
 backupRoutes(app, requireAdmin);                       // admin-only Postgres backups → R2 (on-demand + nightly), download + prune
 piiRetentionRoutes(app, requireAdmin);                 // buyer-PII retention purge — SHIPS DISABLED; admin opts in (Amazon DPP: delete within 30d of shipment)
 
