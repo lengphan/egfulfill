@@ -163,18 +163,22 @@
 @media (min-width: 1440px) { .eg-content { padding-inline: 4rem; } }
 @media (min-width: 1800px) { .eg-content { padding-inline: 5rem; } }
 
-/* CONTENT ZOOM. One rule, both shells — the level is a custom property on <html> written by
-   lib/zoom.ts, so it survives client-side navigation and needs no provider.
+/* CONTENT ZOOM. One rule for the WHOLE app — the level is a custom property on <html>
+   written by lib/zoom.ts, so it survives client-side navigation, refresh and sign-out
+   (logout removes named keys, never the whole store) and needs no provider.
 
-   Scoped to .eg-content on purpose: the sidebar and top bar keep their real size, so the way
-   OUT of a zoom level is never itself magnified off the screen. `zoom` (not transform: scale)
-   because it relayouts — a transform would keep the unscaled layout box and overlap
-   everything around it.
+   On <body>, not on the content container. Scoping it to the content alone left the sidebar
+   and top bar at their original size, which read as the page and its chrome disagreeing —
+   and the nav is text you have to read too. Everything scales together now, including the
+   fixed sidebar and the `md:pl-60` gutter that has to keep matching its width.
 
-   Note for anything dense living in here: media queries still read the REAL viewport, so a
-   breakpoint will not fire just because zoom made the content wider than the room it has.
-   Give wide things their own overflow-x container rather than a breakpoint. */
-.eg-content { zoom: var(--eg-zoom, 1); }
+   `zoom`, not transform: scale() — it relayouts. A transform keeps the unscaled layout box
+   and overlaps everything around it.
+
+   Note for anything dense: media queries still read the REAL viewport, so a breakpoint will
+   not fire just because zoom left the content short of room. Give wide things their own
+   overflow-x container rather than a breakpoint (see the orders table). */
+body { zoom: var(--eg-zoom, 1); }
 
 /* Print — only the label sheet (Inventory → Print labels, Orders → Labels).
    The sheet is portalled to <body> (see label-sheet.tsx) precisely so we can
