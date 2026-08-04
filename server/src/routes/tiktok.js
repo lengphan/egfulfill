@@ -9,6 +9,8 @@ import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 import { clampDays, windowStartSec } from '../backfill.js';
 import { imageBytesFrom } from '../images.js';
+import { moveFunds, balanceOf } from './wallet.js';
+import { readAll as readSettings } from './factory_settings.js';
 
 const APP_KEY    = process.env.TIKTOK_APP_KEY || '';
 const APP_SECRET = process.env.TIKTOK_APP_SECRET || '';
@@ -336,6 +338,63 @@ function mapAddress(ra) {
   };
 }
 
+/**
+ * Bill the TikTok label fee — charged on IMPORT, for TIKTOK-shipped orders only.
+ *
+ * The split matters and is the whole point of recording shipping_type:
+ *   TIKTOK shipping → TikTok already made the label. We fetch and print it, so there is no
+ *                     carrier purchase; this flat fee is that handling, charged here.
+ *   SELLER shipping → no label exists anywhere. We buy a real one through the normal
+ *                     shipping path, which charges for itself. Billing this fee too would
+ *                     charge a seller twice for one parcel.
+ *
+ * Mirrors billExpedite in dispatch.js, deliberately, down to the guarantees:
+ *   · Idempotent on the order id, so the 5-minute sync re-importing the same order bills
+ *     ONCE. moveFunds de-dupes on (account, type, ref) — this is the property that makes
+ *     charging from a polling importer safe at all.
+ *   · Money never blocks an order. A short wallet, a settings read failure, anything —
+ *     the order still imports. An unbilled order is a number to chase; a lost order is a
+ *     parcel that never ships.
+ *   · A short wallet is retried, not forgotten: the next sync that touches this order tries
+ *     again, and the ref stops it double-charging once it succeeds.
+ *   · Factory-owned orders are never billed — there's no seller on the other side, so it
+ *     would be the house charging itself.
+ *
+ * Cancellation refunds, matching the rest of the money model (charge on submit, refund on
+ * cancel): if TikTok later reports the order cancelled and we did charge, it's given back.
+ */
+async function billTiktokLabel({ orderId, sellerId, shipType, cancelled, isFactory }) {
+  if (isFactory || !sellerId) return;
+  if (String(shipType || '').toUpperCase() !== 'TIKTOK') return;
+  const cfg = await readSettings().catch(() => ({}));
+  const fee = Number(cfg.tiktok_label_fee ?? 0) || 0;
+  if (fee <= 0) return;                        // unset/zero = the feature is off
+  const ref = `tiktok-label-${orderId}`;
+  const refundRef = `tiktok-label-refund-${orderId}`;
+
+  const charged = await q('select 1 from wallet_ledger where ref=$1 limit 1', [ref])
+    .then((r) => r.rowCount > 0).catch(() => false);
+
+  if (cancelled) {
+    if (!charged) return;
+    const refunded = await q('select 1 from wallet_ledger where ref=$1 limit 1', [refundRef])
+      .then((r) => r.rowCount > 0).catch(() => false);
+    if (refunded) return;
+    // factory is a house account, so this is never refused for balance.
+    await moveFunds({ from: 'factory', to: sellerId, amount: fee, type: 'tiktok-label-refund',
+      ref: refundRef, note: `TikTok label fee refunded · cancelled order ${orderId}` }).catch(() => {});
+    return;
+  }
+
+  if (charged) return;
+  // Checked before moving so a short wallet is a no-op we retry, not a thrown error that
+  // would abort the import mid-order.
+  const bal = await balanceOf(sellerId).catch(() => 0);
+  if (bal < fee) return;
+  await moveFunds({ from: sellerId, to: 'factory', amount: fee, type: 'tiktok-label',
+    ref, note: `TikTok label · order ${orderId}` }).catch(() => {});
+}
+
 // Upsert one TikTok order into `orders`. Mirrors importShopifyOrder: a re-sync refreshes
 // money + address + tracking only, NEVER the internal pipeline (status/factory_status) or
 // items, so a seller's in-progress order isn't reset when TikTok pings an update. Returns
@@ -403,6 +462,11 @@ async function importTiktokOrder(conn, order, isFactory) {
       );
     }
   }
+  // Billed AFTER the order row exists, and never allowed to throw — an import that fails
+  // because of money would lose the order, which is the one outcome worse than not billing.
+  await billTiktokLabel({
+    orderId: id, sellerId: conn.connected_by, shipType, cancelled, isFactory,
+  }).catch(() => {});
   return cancelled ? 'cancelled' : 'imported';
 }
 
