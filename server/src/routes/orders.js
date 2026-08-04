@@ -702,23 +702,31 @@ export function ordersRoutes(app, requireAuth) {
    * ~1.5MB: the browser fetches only the thumbnails on screen, in parallel, and the immutable
    * cache header means it never fetches the same one twice — across pages OR across boards.
    *
-   * Immutable is safe here because the URL is keyed by the ITEM's row id and the bytes are
-   * part of that row: changing the artwork writes a different row or a different value, and
-   * anything that re-uses this id with new bytes would need this header revisited.
+   * UNAUTHENTICATED BY DESIGN, exactly like /api/design_cards/art/:hash, /api/wilcom/asset and
+   * the supplier image proxy: AN <img> CANNOT CARRY A BEARER HEADER. This route originally sat
+   * behind requireAuth, so every thumbnail on every board 401'd and the whole Items column
+   * rendered as broken-image icons — the browser sends no Authorization on an image load, and
+   * there is no cookie session to fall back on (the JWT lives in localStorage).
+   *
+   * What guards it instead is the key: order_items.id is `gen_random_uuid()`, 122 bits, so the
+   * URL can't be walked the way a sequential id could. It is a capability URL — holding it is
+   * the permission — and it only ever reaches someone the order list already authorised, since
+   * that list is where img_ref comes from. Same trade the card-art route already makes.
+   *
+   * Immutable is safe because the URL is keyed by the ITEM's row id and the bytes are part of
+   * that row: changing the artwork writes a different row or a different value, and anything
+   * that re-uses this id with new bytes would need this header revisited.
    */
-  app.get('/api/order_items/:id/img', { preHandler: requireAuth }, async (req, reply) => {
-    const r = await q(
-      `select i.img, o.seller_id, o.factory_order from order_items i
-         join orders o on o.id = i.order_id where i.id = $1::uuid`, [String(req.params.id)]).catch(() => null);
-    const row = r && r.rows[0];
-    // 404 (not 403) on a refusal, for the same reason GET /api/orders/:id does it: telling a
-    // stranger "that exists but isn't yours" confirms the id.
-    if (!row || !row.img) { reply.code(404); return { error: 'No image' }; }
-    if (!isStaff(req.user)) {
-      const sel = await resolveSeller(req.user);
-      const mine = sel && sel.id && String(row.seller_id) === String(sel.id);
-      if (!mine || !_canSurface(sel, 'orders') || row.factory_order) { reply.code(404); return { error: 'No image' }; }
+  app.get('/api/order_items/:id/img', async (req, reply) => {
+    // Validate the shape before it reaches Postgres: a non-UUID would make `$1::uuid` throw,
+    // and .catch(() => null) would turn that into an indistinguishable 404.
+    const id = String(req.params.id || '');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      reply.code(404); return { error: 'No image' };
     }
+    const r = await q(`select img from order_items where id = $1::uuid`, [id]).catch(() => null);
+    const row = r && r.rows[0];
+    if (!row || !row.img) { reply.code(404); return { error: 'No image' }; }
     const m = String(row.img).match(/^data:([^;,]+);base64,(.+)$/s);
     // Not a data: URL — the list would have passed it through and never pointed here, so this
     // is only reachable if the value changed under us. Redirect rather than 404: the caller
