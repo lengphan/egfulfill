@@ -71,7 +71,10 @@ export function BoldHome({ content }: { content: SiteContent }) {
           at the top of the window instead of under a white bar. The header itself goes
           transparent on this route (site-header.tsx) — between them, the hero reads as one
           full-bleed plate with the nav sitting on it. */}
-      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
+      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: ACCENT }}>
+        {/* The diagonal returns the page to the cool off-white below the plate — one shape
+            doing the job a whole illustration usually does. */}
+        <div style={{ background: SURFACE }} className="absolute inset-x-0 bottom-0 h-24 [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
         <div className="mx-auto max-w-6xl px-6 pb-40 pt-24 sm:pt-32">

@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 
-import { SURFACE } from "@/components/marketing/bold-kit"
+import { ACCENT } from "@/components/marketing/bold-kit"
 
 const nav = [
   { label: "Products", href: "/catalog" },
@@ -29,8 +29,9 @@ export function SiteHeader() {
   return (
     <header
       className="sticky top-0 z-30"
-      // The page's own paper, opaque. No blur: blurring a flat colour only muddies it.
-      style={{ background: SURFACE }}
+      // The PLATE's colour, opaque, at every scroll position. One appearance throughout —
+      // it just belongs to the hero rather than to the page below it.
+      style={{ background: ACCENT }}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
         <Link href="/" className={"font-display text-2xl font-semibold tracking-tight " + "text-[#0B0B0C]"}>

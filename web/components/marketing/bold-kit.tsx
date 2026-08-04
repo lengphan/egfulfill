@@ -16,7 +16,10 @@ import { ArrowUpRight } from "@phosphor-icons/react"
  * decoration usually does. Black on the accent is ~17:1, so it can hold real text anywhere.
  */
 export const ACCENT = "#C3D0FF"        // periwinkle — the plate/fill
-export const ACCENT_INK = "#4C5FD5"    // vivid periwinkle-blue — the accent LETTERING, on paper
+// The accent lettering sits ON the periwinkle plate, so it needs the DEEP step: #4C5FD5 is
+// only 3.53:1 against the plate, while #1B2270 is 9.13:1. Measured, not guessed — this value
+// changed twice in this session purely because the background under it changed.
+export const ACCENT_INK = "#1B2270"
 export const INK = "#0B0B0C"
 // A COOL off-white, tinted with the accent's own hue — not a warm paper.
 //
