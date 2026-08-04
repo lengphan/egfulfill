@@ -18,6 +18,8 @@ type Handlers = {
   onToggleSave: (l: EtsyListing, wasSaved: boolean) => void
   onSearchTag: (t: string) => void
   onMakeProduct: (l: EtsyListing) => void
+  /** Admin-only: open the supplier-suggestion panel for this listing. Undefined otherwise. */
+  onSource?: (l: EtsyListing) => void
   // Set by SpyDeckView when a listing card's shop is clicked — jump straight into that
   // shop's catalog. A new object each click so the effect re-fires for the same shop.
   jumpShop?: { shop_id: string; shop_name?: string | null } | null
@@ -282,6 +284,7 @@ export function StoresTab(h: Handlers) {
                 saved={h.savedIds.has(String(l.listing_id))}
                 uploaded={h.uploadedIds.has(String(l.listing_id))}
                 onToggleSave={h.onToggleSave} onSearchTag={h.onSearchTag} onMakeProduct={h.onMakeProduct}
+                onSource={h.onSource}
               />
             ))}
           </div>

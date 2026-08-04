@@ -6,7 +6,9 @@ export type StaffNavItem = { label: string; href: string; icon: Icon; roles: str
 export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Dashboard", href: "/overview", icon: SquaresFour, roles: ["operator", "warehouse", "admin"] },
   { label: "Orders", href: "/operator", icon: Printer, roles: ["operator", "warehouse", "admin"] },
-  { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
+  // Warehouse removed: the design board is about artwork moving toward approval, which is
+  // upstream of anything the floor does — their work starts at the print queue.
+  { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "designer", "admin"] },
   // Earnings = a designer's own payout view. Admin sees designer credits in Wallet instead.
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer"] },
   // Shipping = Dispatch (today's out-queue) + Shipments (parcel archive) as two tabs.
@@ -69,7 +71,8 @@ export function isStaffRole(role?: string | null): boolean {
 // Seller-side tool pages (in the (app) group) that specific staff roles may also use.
 // Admin gets everything; others get a curated set. Designers get none (design-only).
 export const STAFF_TOOLS: StaffNavItem[] = [
-  { label: "SpyDeck", href: "/spydeck", icon: Binoculars, roles: ["operator", "warehouse", "admin"] },
+  // Warehouse removed: competitor research is a merchandising decision, not a fulfilment one.
+  { label: "SpyDeck", href: "/spydeck", icon: Binoculars, roles: ["operator", "admin"] },
   { label: "Products", href: "/products", icon: Tag, roles: ["operator", "warehouse", "admin"] },
   // The shop window we publish OUTWARD — curated selection, trade prices, CSV export.
   // Warehouse/admin only: it sets the prices outside buyers are shown, which is a

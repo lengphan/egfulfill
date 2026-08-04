@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch } from "@phosphor-icons/react"
+import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Compass } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -17,6 +17,7 @@ import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
 import { StoresTab } from "@/components/app/spydeck-stores"
 import { detectTrademarks } from "@/lib/trademarks"
 import { PublishProductDialog } from "@/components/app/publish-product-dialog"
+import { SourcingSuggestDialog } from "@/components/app/sourcing-suggest-dialog"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ShopAnalyzer } from "@/components/app/shop-analyzer"
 
@@ -107,7 +108,7 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
 // Memoised: the trending grid re-renders on every keystroke/filter/save, and each card ran
 // estFor() + detectTrademarks() (a regex over ~40 brands) on every one of those. With stable
 // callbacks from the parent, memo means a card only re-renders when ITS own data changes.
-export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct, onOpenShop }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing, wasSaved: boolean) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void; onOpenShop?: (l: EtsyListing) => void }) {
+export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct, onOpenShop, onSource }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing, wasSaved: boolean) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void; onOpenShop?: (l: EtsyListing) => void; onSource?: (l: EtsyListing) => void }) {
   const e = estFor(l)
   const trending = e.trending
   const tags = (l.tags ?? []).slice(0, 13)
@@ -211,14 +212,26 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
           )}
 
           {/* Pinned to the card bottom so cards with more keywords don't misalign the button row */}
-          <div className="mt-auto pt-3">
+          <div className="mt-auto flex gap-1.5 pt-3">
             <button
               type="button"
               onClick={(ev) => { ev.preventDefault(); onMakeProduct(l) }}
-              className={"flex w-full items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (uploaded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
+              className={"flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (uploaded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
             >
               {uploaded ? <><CheckCircle size={13} weight="fill" /> Uploaded</> : <><Storefront size={13} weight="bold" /> Make product</>}
             </button>
+            {/* Sourcing is admin-only server-side, so the button only exists for an admin —
+                anyone else would be clicking a control that always 403s. */}
+            {onSource && (
+              <button
+                type="button"
+                title="Work out what this is and how to search for it on a B2B marketplace"
+                onClick={(ev) => { ev.preventDefault(); onSource(l) }}
+                className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-foreground hover:text-background"
+              >
+                <Compass size={13} weight="bold" /> Suppliers
+              </button>
+            )}
           </div>
         </div>
       </a>
@@ -374,6 +387,15 @@ export function SpyDeckView() {
   //   Account  — the shop analyzer — is hidden from operators; sellers keep their own shop view.
   // Resolved after mount, since role is read from localStorage.
   const [showTrending, setShowTrending] = useState(true)
+  // Sourcing is admin-only server-side; its own effect rather than folding into the larger
+  // role effect below, which keeps React Compiler's inference for the neighbouring callbacks
+  // exactly as it was.
+  const [isAdmin, setIsAdmin] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setIsAdmin(getUser()?.role === "admin"), 0)
+    return () => clearTimeout(t)
+  }, [])
+  const [sourceListing, setSourceListing] = useState<EtsyListing | null>(null)
   const [showAccount, setShowAccount] = useState(true)
   const [showStores, setShowStores] = useState(true)
   useEffect(() => {
@@ -531,7 +553,12 @@ export function SpyDeckView() {
   const onSearchTag = useCallback((t: string) => runRef.current(t), [])
 
   // "More ideas" — new seed, refetch the reshuffled pool for FREE (no Etsy call), page 1.
-  const moreIdeas = useCallback(async () => {
+  // Not useCallback: both handlers are only ever an onClick on a plain <button>, never a
+  // prop to a memoized child, so manual memoization bought nothing — and its dependency list
+  // ([trendingPaged], while the body also touches setSeed/setRefreshing) made React Compiler
+  // abandon optimizing this whole component with "existing memoization could not be
+  // preserved". The compiler memoizes these automatically.
+  const moreIdeas = async () => {
     const s = Math.floor(Math.random() * 1_000_000) + 1
     setSeed(s); setRefreshing(true); setRefreshMsg(null)
     try {
@@ -541,11 +568,11 @@ export function SpyDeckView() {
     } catch (e) {
       setRefreshMsg(e instanceof Error ? e.message : "Couldn't refresh the feed.")
     } finally { setRefreshing(false) }
-  }, [trendingPaged])
+  }
 
   // "Fresh scan" — re-hit Etsy for a genuinely new pool. The server enforces the rate limits
   // and returns a friendly 429 reason (global 30-min lock / seller once-2-days / 20-a-day cap).
-  const freshScan = useCallback(async () => {
+  const freshScan = async () => {
     setFreshScanning(true); setRefreshMsg(null)
     try {
       const r = await rebuildSpydeckTrending(seed || 1)
@@ -555,7 +582,7 @@ export function SpyDeckView() {
     } catch (e) {
       setRefreshMsg(e instanceof ApiError || e instanceof Error ? e.message : "Fresh scan failed.")
     } finally { setFreshScanning(false) }
-  }, [seed, trendingPaged])
+  }
 
   // Stats reflect whatever's on screen — search results, or the trending feed when
   // no search has run yet — so the cards fill in without a search.
@@ -711,6 +738,7 @@ export function SpyDeckView() {
             onToggleSave={toggleSave}
             onSearchTag={onSearchTag}
             onMakeProduct={setMakeListing}
+            onSource={isAdmin ? setSourceListing : undefined}
             jumpShop={jumpShop}
           />
         ) : view === "account" ? (
@@ -753,7 +781,7 @@ export function SpyDeckView() {
               </div>
               <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {trendingPaged.pageItems.map((l) => (
-                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} />
+                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} onSource={isAdmin ? setSourceListing : undefined} />
                 ))}
               </div>
               <Pagination page={trendingPaged.page} pageCount={trendingPaged.pageCount} perPage={trendingPaged.perPage} total={trendingPaged.total} start={trendingPaged.start} onPage={trendingPaged.setPage} onPerPage={trendingPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -772,7 +800,7 @@ export function SpyDeckView() {
             <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {uploadedPaged.pageItems.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} onSource={isAdmin ? setSourceListing : undefined} />
               ))}
             </div>
             <Pagination page={uploadedPaged.page} pageCount={uploadedPaged.pageCount} perPage={uploadedPaged.perPage} total={uploadedPaged.total} start={uploadedPaged.start} onPage={uploadedPaged.setPage} onPerPage={uploadedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -791,7 +819,7 @@ export function SpyDeckView() {
             <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {savedPaged.pageItems.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} onSource={isAdmin ? setSourceListing : undefined} />
               ))}
             </div>
             <Pagination page={savedPaged.page} pageCount={savedPaged.pageCount} perPage={savedPaged.perPage} total={savedPaged.total} start={savedPaged.start} onPage={savedPaged.setPage} onPerPage={savedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -837,6 +865,8 @@ export function SpyDeckView() {
       {/* Same dialog the design maker uses — only the prefill source differs. A spy'd
           listing supplies title/description/tags/images; the blank is chosen in the
           dialog, which is what makes cost and margin computable. */}
+      <SourcingSuggestDialog listing={sourceListing} onClose={() => setSourceListing(null)} />
+
       <PublishProductDialog
         open={!!makeListing}
         onOpenChange={(v) => !v && setMakeListing(null)}
