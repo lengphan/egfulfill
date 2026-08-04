@@ -12,8 +12,12 @@ const sections = [
     p: "To process and fulfill orders, sync your connected stores, provide support, prevent fraud, and improve the product. We process data on the lawful bases of contract performance and legitimate interest.",
   },
   {
-    h: "Connected sales channels (Etsy & others)",
-    p: "When you connect a third-party store such as Etsy, we access your data through that platform's official API using OAuth authorization that you grant. We receive your shop identity and order data — order details, totals, line items, and the buyer name and shipping address required to fulfill the order — and we store the access/refresh tokens the platform issues so we can keep your orders in sync. We access this data only on your behalf, use it solely to provide the fulfillment service to you, never sell or share it, and never use it to build a competing product. You can disconnect a store at any time (Settings → Stores → Disconnect), which deletes the stored tokens and stops syncing.",
+    h: "Connected sales channels (Etsy, Shopify, TikTok Shop, Amazon)",
+    p: "When you connect a third-party store, we access your data through that platform's official API using OAuth authorization that you grant. We receive your shop identity and order data — order details, totals, line items, and the buyer name and shipping address required to fulfill the order — and we store the access/refresh tokens the platform issues so we can keep your orders in sync. We access this data only on your behalf, use it solely to provide the fulfillment service to you, never sell or share it, never use it for marketing, never use it to train machine-learning models, and never use it to build a competing product. Buyer data is never shared between sellers. You can disconnect a store at any time (Settings → Stores → Disconnect), which deletes the stored tokens and stops syncing.",
+  },
+  {
+    h: "Buyer personal data & how long we keep it",
+    p: "To ship an order we must handle the buyer's name and delivery address. We collect only what delivery requires — never payment card details. Buyer personal data is deleted within 30 days of the order shipping: an automated job destroys the buyer's name, street address and the stored shipping-label file, keeping only the order number, totals, item SKUs and tracking number needed for accounting, tax and support. Country and state are retained for shipping-mix reporting; neither identifies a buyer. Backups age out on their own retention schedule.",
   },
   {
     h: "How we store & protect data",
@@ -25,7 +29,11 @@ const sections = [
   },
   {
     h: "Sharing & third parties",
-    p: "We share data only with processors that help us run the service (e.g. payment, shipping, and hosting providers) under appropriate data-protection terms, or where required by law.",
+    p: "We share data only with processors that help us run the service, under data-protection terms, or where required by law. Buyer name and address go to our shipping aggregators (Shippo, EasyPost) to buy a label, to the delivering carrier (USPS, UPS), and to our dispatch partner who hands parcels to the carrier. Our infrastructure sub-processors are DigitalOcean (hosting), Cloudflare (encrypted backups and file storage) and Vercel (front end). Our seller support assistant sends order status, totals and tracking to Anthropic's API to draft replies; buyer names and addresses are excluded from those requests. We never sell personal data.",
+  },
+  {
+    h: "Security contact",
+    p: "To report a vulnerability or a suspected data incident, email security@embroiderygoods.com. We acknowledge reports promptly and notify affected customers and the relevant marketplaces in line with our incident response plan.",
   },
   {
     h: "Your rights",
