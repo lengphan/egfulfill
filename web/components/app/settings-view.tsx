@@ -1175,6 +1175,15 @@ function PlatformPanel() {
           <div className="sm:col-span-2"><MarkupFormula value={baseMarkup} onChange={setBaseMarkup} /></div>
           <MoneyField label="Shipping — first item" value={shipFirst} onChange={setShipFirst} />
           <MoneyField label="Shipping — each additional" value={shipExtra} onChange={setShipExtra} />
+          {/* Belongs with the seller's shipping charges, not with partner rates: this is
+              money coming IN from a seller, and the two rate blocks read in opposite
+              directions. Only TikTok-SHIPPED orders — a seller-shipped TikTok order buys a
+              real label through the rates above and must never pay both. */}
+          <MoneyField
+            label="TikTok label fee"
+            hint="Per TikTok-shipped order, charged on import. TikTok made the label, so there's no carriage to buy — this is handling. 0 = off."
+            value={tiktokLabelFee} onChange={setTiktokLabelFee}
+          />
         </FeeGroup>
       </Fold>
 
@@ -1204,13 +1213,6 @@ function PlatformPanel() {
             label="Design — what Pink Design charges us"
             hint="Per outsourced task. Booked when the card is approved."
             value={designPartnerCost} onChange={setDesignPartnerCost}
-          />
-          {/* Only TikTok-SHIPPED orders. A seller-shipped TikTok order buys a real label
-              through the normal shipping path and is never charged this as well. */}
-          <MoneyField
-            label="TikTok label — what we charge the seller"
-            hint="Per TikTok-shipped order, charged on import. TikTok made the label, so there's no carrier cost — this is handling. 0 = off."
-            value={tiktokLabelFee} onChange={setTiktokLabelFee}
           />
         </div>
 
