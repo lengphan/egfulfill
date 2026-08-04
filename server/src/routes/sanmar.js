@@ -571,16 +571,35 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
   });
 
   // Image proxy — allowlisted to SanMar's CDN so it can't be pointed at an internal host.
-  app.get('/api/sanmar/img-proxy', { preHandler: requireStaff }, async (req, reply) => {
+  /**
+   * DELIBERATELY NOT AUTH-GATED, and that is the fix rather than an oversight.
+   *
+   * Every catalog image is rewritten to this route by sanmarImg(), and the browser loads it
+   * with <img src="...">. An img tag cannot send an Authorization header — the JWT lives in
+   * localStorage and is attached by fetch(), not by the image loader — so a requireStaff
+   * gate here meant every request arrived unauthenticated, 403'd, and rendered a broken
+   * image. Titles and prices looked fine because those come from the authenticated JSON
+   * call, which made it read like a SanMar CDN problem rather than an auth one.
+   *
+   * What actually protects this endpoint is the HOST ALLOWLIST, not the session: it can only
+   * ever fetch *.sanmar.com, so it cannot be pointed at 169.254.169.254, at this API, or at
+   * the Docker network. The images it returns are already public on SanMar's CDN, so nothing
+   * is exposed that wasn't. The response is additionally restricted to image content types,
+   * so it can't be used to relay SanMar HTML pages, and given a timeout so a hanging upstream
+   * can't pin a connection open.
+   */
+  app.get('/api/sanmar/img-proxy', async (req, reply) => {
     const url = req.query && req.query.url;
     if (!url) { reply.code(400); return { error: 'url required' }; }
     let host; try { host = new URL(url).hostname; } catch { reply.code(400); return { error: 'bad url' }; }
     if (!/(^|\.)sanmar\.com$/i.test(host)) { reply.code(403); return { error: 'host not allowed' }; }
     try {
-      const r = await fetch(url);
+      const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
       if (!r.ok) { reply.code(502); return { error: 'upstream ' + r.status }; }
+      const type = r.headers.get('content-type') || '';
+      if (!/^image\//i.test(type)) { reply.code(415); return { error: 'not an image' }; }
       const buf = Buffer.from(await r.arrayBuffer());
-      reply.header('Content-Type', r.headers.get('content-type') || 'image/jpeg');
+      reply.header('Content-Type', type);
       reply.header('Cache-Control', 'public, max-age=86400');
       return reply.send(buf);
     } catch (e) { reply.code(502); return { error: String(e && e.message || e) }; }
