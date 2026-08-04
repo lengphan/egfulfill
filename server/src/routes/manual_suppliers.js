@@ -8,6 +8,7 @@
 // visible HTML is not offered.
 import { q } from '../db.js';
 import { audit } from '../audit.js';
+import { aiComplete } from './support_ai.js';
 
 /**
  * Is this URL safe for OUR SERVER to fetch?
@@ -270,6 +271,93 @@ export function manualSupplierRoutes(app, requireAdmin) {
        String((req.user && req.user.sub) || '')]);
     audit(req, 'manual-supplier.added', { entityType: 'manual_supplier', entityId: String(r.rows[0].id), after: { title, shop, cost, sell } });
     return { ok: true, id: String(r.rows[0].id) };
+  });
+
+  // ── Supplier suggestions ───────────────────────────────────────────────────
+  // Cached forever against the SpyDeck listing id. The cache is the point: this is the only
+  // part of Sourcing that costs money, so a product you looked at last month costs nothing
+  // to look at again, and a product you never click costs nothing at all.
+  q(`create table if not exists sourcing_suggestions (
+       listing_id text primary key,
+       payload jsonb,
+       model text,
+       created_at timestamptz default now()
+     )`).catch(() => {});
+
+  // Turn a MARKETING title into SOURCING queries. That translation is the entire feature:
+  // "Cute Cat Mom Sweatshirt Gift For Her" is unsearchable on a B2B marketplace, while
+  // "unisex pullover hoodie 320gsm cotton fleece" is what a supplier actually lists under.
+  const SUGGEST_SYSTEM = `You turn a retail product listing into sourcing intelligence for a print-on-demand company.
+
+Return ONLY a JSON object, no prose and no code fence:
+{
+  "productType": "plain noun phrase for what this physically is",
+  "material": "likely material/construction, or null if not inferable",
+  "attributes": ["3-6 short spec phrases a supplier would list"],
+  "queries": ["3 B2B search queries, most specific first"],
+  "podBlank": true|false,
+  "note": "one sentence of sourcing advice"
+}
+
+Rules:
+- queries are for a B2B wholesale marketplace. Use trade vocabulary (gsm, panel count, fabric blend, closure type), never marketing words (cute, gift, personalized, custom, mom, funny).
+- podBlank is TRUE when this is a decorated blank garment or accessory the company should buy from its existing US blanks suppliers (SanMar, S&S, Otto Cap) rather than import. T-shirts, hoodies, sweatshirts, caps and totes are almost always podBlank:true.
+- podBlank is FALSE for finished goods those suppliers do not carry: jewellery, enamel pins, drinkware, candles, stationery, packaging, keychains, home decor.
+- When podBlank is true, say so plainly in note - importing a blank at MOQ 100 is usually the wrong call when the domestic one ships in 2 days with no minimum.`;
+
+  app.post('/api/manual-suppliers/suggest', { preHandler: requireAdmin }, async (req, reply) => {
+    const b = req.body || {};
+    const listingId = String(b.listingId || '').trim();
+    const title = String(b.title || '').trim().slice(0, 300);
+    if (!title) { reply.code(400); return { error: 'A product title is required.' }; }
+
+    if (listingId) {
+      const hit = await q('select payload, model, created_at from sourcing_suggestions where listing_id=$1', [listingId])
+        .catch(() => ({ rows: [] }));
+      if (hit.rows.length) {
+        return { ...hit.rows[0].payload, cached: true, model: hit.rows[0].model, at: hit.rows[0].created_at };
+      }
+    }
+
+    // The image goes as a URL block, not base64 — the listing image already sits on a public
+    // CDN, so re-uploading the bytes would cost bandwidth and tokens for nothing.
+    const content = [];
+    const img = String(b.image || '').trim();
+    if (/^https:\/\//i.test(img)) content.push({ type: 'image', source: { type: 'url', url: img } });
+    content.push({ type: 'text', text: `Listing title: ${title}` });
+
+    let text;
+    try {
+      text = await aiComplete({ system: SUGGEST_SYSTEM, messages: [{ role: 'user', content }], maxTokens: 700 });
+    } catch (e) {
+      reply.code(e && e.status === 503 ? 503 : 502);
+      return { error: (e && e.message) || 'Could not reach the AI service.' };
+    }
+
+    let parsed;
+    // The model is told to return bare JSON; a stray code fence is the classic slip, so strip
+    // it rather than failing the request over formatting.
+    try { parsed = JSON.parse(String(text).replace(/^```(?:json)?|```$/gm, '').trim()); }
+    catch { reply.code(502); return { error: 'The AI reply was not usable JSON.', raw: String(text).slice(0, 400) }; }
+
+    const arr = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()).slice(0, 6) : []);
+    const out = {
+      productType: parsed.productType ? String(parsed.productType).slice(0, 120) : null,
+      material: parsed.material ? String(parsed.material).slice(0, 120) : null,
+      attributes: arr(parsed.attributes),
+      queries: arr(parsed.queries).slice(0, 3),
+      podBlank: !!parsed.podBlank,
+      note: parsed.note ? String(parsed.note).slice(0, 400) : null,
+    };
+    if (!out.queries.length) { reply.code(502); return { error: 'The AI returned no usable search queries.' }; }
+
+    if (listingId) {
+      await q(`insert into sourcing_suggestions (listing_id, payload, model) values ($1,$2,$3)
+               on conflict (listing_id) do update set payload=excluded.payload, model=excluded.model, created_at=now()`,
+        [listingId, JSON.stringify(out), '']).catch(() => {});
+    }
+    audit(req, 'sourcing.suggested', { entityType: 'spydeck_listing', entityId: listingId || null, after: { title, podBlank: out.podBlank } });
+    return { ...out, cached: false };
   });
 
   /** A saved source is how someone re-orders, and losing one loses the only record of
