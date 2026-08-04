@@ -60,6 +60,17 @@ export function BoldHome({ content }: { content: SiteContent }) {
   const panelY = useTransform(smooth, [0, 1], [0, -70])
   const panelScale = useTransform(smooth, [0, 1], [1, 0.94])
 
+  /** One half of the marquee, repeated until it is long enough to span a wide screen on its
+   *  own. Both halves must be identical for the -50% loop to be seamless, so the padding
+   *  happens HERE rather than in the render. */
+  const marqueeHalf = (() => {
+    const src = hero.integrations ?? []
+    if (!src.length) return []
+    const out: string[] = []
+    while (out.length < 10) out.push(...src)
+    return out
+  })()
+
   return (
     <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
       {/* ── HERO ───────────────────────────────────────────────────────────────── */}
@@ -81,7 +92,11 @@ export function BoldHome({ content }: { content: SiteContent }) {
           <h1 className="max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] text-[#0B0B0C] mx-auto"
               style={{ fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" }}>
             <MaskedWords text={hero.headline} />{" "}
-            <TypedPhrase text={hero.accent} />
+            {/* Paper, not ink. The phrase that changes is the one thing on the plate that
+                should read as cut OUT of it — and it carries the page's own surface colour
+                down from the header, so the hero and everything below share a palette rather
+                than meeting at a hard edge. */}
+            <TypedPhrase text={hero.accent} color={SURFACE} />
           </h1>
 
           <motion.p
@@ -189,16 +204,38 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </motion.div>
       </section>
 
-      {/* ── WORKS WITH — a marquee, paused for reduced-motion ──────────────────── */}
-      <section className="overflow-hidden border-y border-black/[0.07] bg-white py-6 pt-36">
-        <div className="mb-4 text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-black/40">{hero.worksWithLabel}</div>
-        <div className="relative flex overflow-hidden">
+      {/* ── The channel marquee ────────────────────────────────────────────────
+          NO "WORKS WITH" label and no white band. The label named what the logos already
+          say, and the white strip was a third colour wedged between the periwinkle plate and
+          the paper page — the one thing breaking the run of colour down from the header. On
+          paper with no borders, the hero's diagonal now lands straight into the page.
+
+          The strip is masked to transparent at both ends rather than clipped by the section:
+          a name sliced in half at the edge reads as broken layout, a name fading out reads as
+          a band that carries on past the screen — which is what it is. */}
+      {/* The top padding is load-bearing, not taste: the hero's app mockup is absolutely
+          positioned and hangs well below the plate's diagonal, so a short gap here puts the
+          names UNDER it. This clears the overhang. */}
+      <section className="overflow-hidden pb-14 pt-44" style={{ background: SURFACE }}>
+        <div
+          className="relative flex overflow-hidden"
+          style={{
+            maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)",
+            WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)",
+          }}
+        >
+          {/* TWO IDENTICAL HALVES, and the animation travels exactly one of them (-50%), so
+              the loop point lands on a frame identical to the start — that is what makes it
+              seamless rather than snapping back.
+              The half is padded out to at least ten names first: with only four channels the
+              half was narrower than a wide screen, so the strip ran out and left a gap before
+              it wrapped, which is the "cut off" you can see. */}
           <motion.div
             className="flex shrink-0 gap-12 pr-12"
             animate={reduce ? undefined : { x: ["0%", "-50%"] }}
-            transition={{ duration: 22, ease: "linear", repeat: Infinity }}
+            transition={{ duration: 28, ease: "linear", repeat: Infinity }}
           >
-            {[...hero.integrations, ...hero.integrations].map((name, i) => (
+            {[...marqueeHalf, ...marqueeHalf].map((name, i) => (
               <span key={`${name}-${i}`} className="whitespace-nowrap text-2xl font-black tracking-tight text-black/25">{name}</span>
             ))}
           </motion.div>

@@ -87,7 +87,9 @@ export function MaskedWords({ text, className = "", delay = 0 }: { text: string;
  * Under reduced-motion it prints the first phrase and stops — a caret blinking forever is
  * exactly the perpetual motion that setting exists to remove.
  */
-export function TypedPhrase({ text }: { text: string }) {
+/** `color` overrides the ink. The hero sets it to the paper tone so the phrase reads as
+ *  cut OUT of the periwinkle plate rather than printed on top of it. */
+export function TypedPhrase({ text, color = ACCENT_INK }: { text: string; color?: string }) {
   const reduce = useReducedMotion()
   const phrases = text.split("|").map((t) => t.trim()).filter(Boolean)
   const [shown, setShown] = useState(phrases[0] ?? "")
@@ -118,13 +120,13 @@ export function TypedPhrase({ text }: { text: string }) {
   return (
     <span className="relative inline-grid align-bottom">
       <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre">{longest}</span>
-      <span className="col-start-1 row-start-1 whitespace-pre text-left" style={{ color: ACCENT_INK }}>
+      <span className="col-start-1 row-start-1 whitespace-pre text-left" style={{ color }}>
         {reduce || phrases.length < 2 ? phrases[0] : shown}
         {!reduce && phrases.length > 1 && (
           <motion.span
             aria-hidden
             className="ml-[0.06em] inline-block w-[0.055em] align-baseline"
-            style={{ background: ACCENT_INK, height: "0.78em" }}
+            style={{ background: color, height: "0.78em" }}
             animate={{ opacity: [1, 1, 0, 0] }}
             transition={{ duration: 1, repeat: Infinity, times: [0, 0.5, 0.5, 1], ease: "linear" }}
           />
