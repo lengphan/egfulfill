@@ -158,14 +158,19 @@ const vi: Dict = {
   "field.No variant set": "Chưa chọn biến thể",
   "field.Buyer": "Người mua",
   // Stat cards
-  "stat.New": "Mới",
-  "stat.awaiting start": "chờ bắt đầu",
-  "stat.In production": "Đang sản xuất",
-  "stat.scan → pack": "quét → đóng gói",
-  "stat.Working": "Đang làm",
-  "stat.being made": "đang thực hiện",
-  "stat.Shipped": "Đã gửi hàng",
-  "stat.complete": "hoàn tất",
+  "stat.To approve": "Chờ duyệt",
+  "stat.seller paid, waiting on you": "khách đã trả, chờ bạn duyệt",
+  "stat.nothing waiting": "không có gì chờ",
+  "stat.Need design": "Cần thiết kế",
+  "stat.no approved file yet": "chưa có file được duyệt",
+  "stat.all designs approved": "tất cả thiết kế đã duyệt",
+  "stat.Short on stock": "Thiếu hàng tồn",
+  "stat.stock not loaded": "chưa tải được tồn kho",
+  "stat.can't be made yet": "chưa thể sản xuất",
+  "stat.blanks on hand": "đủ phôi trong kho",
+  "stat.Awaiting scan": "Chờ quét",
+  "stat.labels made, not scanned": "đã tạo nhãn, chưa quét",
+  "stat.scan queue clear": "hàng chờ quét đã hết",
 }
 
 export const messages: Record<Locale, Dict> = { en, vi }

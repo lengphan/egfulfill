@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, validateAddress, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
+import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
@@ -24,7 +25,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
-import { filterOrders, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
+import { filterOrders, matchesStatus, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
@@ -636,17 +637,46 @@ export function OrdersHub() {
     setTtLabel(null)
   }
 
+  /**
+   * FOUR THINGS WAITING ON THIS FLOOR — not four ways of counting the same pile.
+   *
+   * The old set was New / In production / Working / Shipped, and it didn't help: "New" was
+   * the whole unstarted backlog (688 on a real board — a number nobody acts on), Working was
+   * a SUBSET of In production so two cards moved together, and Shipped counted every order
+   * ever shipped, so it only ever went up.
+   *
+   * Each of these is instead a queue somebody has to clear, they don't overlap, and each one
+   * is exactly one filter — so the card is a button that shows you the rows it counted.
+   * Everything closed (cancelled/refunded/on hold) and everything already shipped is out:
+   * a cancelled order needs nothing from anyone.
+   */
   const stats = useMemo(() => {
     const list = orders ?? []
-    const by = (id: string) => list.filter((o) => orderStage(o.items ?? []) === id).length
-    const inProd = ["awaiting_scan", "printed", "working"]
+    // matchesStatus, not a local predicate — the card's NUMBER and the list you land on after
+    // clicking it have to be the same set. Counting "open orders needing design" while the
+    // click filtered on "any order needing design" is how a card says 4 and shows you 8.
+    const open = list.filter((o) => matchesStatus(o, "open"))
     return {
-      newCount: by(""),
-      production: list.filter((o) => inProd.includes(orderStage(o.items ?? []))).length,
-      ready: by("working"),
-      shipped: by("shipped"),
+      pending: list.filter((o) => matchesStatus(o, "in_review")).length,
+      design: open.filter((o) => orderReadiness(o).design.state !== "done").length,
+      // NULL, not 0, until the catalog is in: stock resolves through it, so before it loads
+      // "0 short" would be a claim we can't back. The card says which.
+      short: catalog.length
+        ? open.filter((o) => orderStock(o.items ?? [], catalog, stock).state === "out").length
+        : null,
+      scan: list.filter((o) => matchesStatus(o, "awaiting_scan")).length,
     }
-  }, [orders])
+  }, [orders, catalog, stock])
+
+  /** Jump the list to what a stat card counted — and clicking the lit one clears it, the
+   *  same toggle the pills use. Replaces the whole query rather than merging: a stat means
+   *  "show me these", and leaving an unrelated search on would show a subset of them. */
+  const jumpTo = (patch: Partial<OrderQuery>) => {
+    const isOn = Object.entries(patch).every(([k, v]) => query[k as keyof OrderQuery] === v)
+    setQuery(isOn ? { ...EMPTY_ORDER_QUERY } : { ...EMPTY_ORDER_QUERY, ...patch })
+  }
+  const jumpedTo = (patch: Partial<OrderQuery>) =>
+    Object.entries(patch).every(([k, v]) => query[k as keyof OrderQuery] === v)
 
   // The catalog + stock map are what let the Ready filter answer its stock half: stock is
   // held against the resolved BLANK sku, not the listing's. Both are page-level (loaded for
@@ -852,10 +882,32 @@ export function OrdersHub() {
       </div>
 
       <StatGrid>
-        <StatCard label={tl("stat", "New")} value={String(stats.newCount)} sub={tl("stat", "awaiting start")} tone={stats.newCount ? "neg" : undefined} />
-        <StatCard label={tl("stat", "In production")} value={String(stats.production)} sub={tl("stat", "scan → pack")} />
-        <StatCard label={tl("stat", "Working")} value={String(stats.ready)} sub={tl("stat", "being made")} tone={stats.ready ? "pos" : undefined} />
-        <StatCard label={tl("stat", "Shipped")} value={String(stats.shipped)} sub={tl("stat", "complete")} tone="pos" />
+        <StatCard
+          label={tl("stat", "To approve")} value={String(stats.pending)}
+          sub={tl("stat", stats.pending ? "seller paid, waiting on you" : "nothing waiting")}
+          tone={stats.pending ? "neg" : undefined}
+          onClick={() => jumpTo({ status: "in_review" })} active={jumpedTo({ status: "in_review" })}
+        />
+        <StatCard
+          label={tl("stat", "Need design")} value={String(stats.design)}
+          sub={tl("stat", stats.design ? "no approved file yet" : "all designs approved")}
+          tone={stats.design ? "neg" : undefined}
+          onClick={() => jumpTo({ status: "open", ready: "design:todo" })} active={jumpedTo({ status: "open", ready: "design:todo" })}
+        />
+        <StatCard
+          // "—" while the catalog is still loading. A 0 here would read as "nothing is
+          // short", which is a different claim from "we can't tell yet".
+          label={tl("stat", "Short on stock")} value={stats.short === null ? "—" : String(stats.short)}
+          sub={tl("stat", stats.short === null ? "stock not loaded" : stats.short ? "can't be made yet" : "blanks on hand")}
+          tone={stats.short ? "neg" : undefined}
+          onClick={stats.short === null ? undefined : () => jumpTo({ status: "open", ready: "stock:out" })}
+          active={jumpedTo({ status: "open", ready: "stock:out" })}
+        />
+        <StatCard
+          label={tl("stat", "Awaiting scan")} value={String(stats.scan)}
+          sub={tl("stat", stats.scan ? "labels made, not scanned" : "scan queue clear")}
+          onClick={() => jumpTo({ status: "awaiting_scan" })} active={jumpedTo({ status: "awaiting_scan" })}
+        />
       </StatGrid>
 
       {/* Why an action was refused — the ship gate's reasons land here rather than the

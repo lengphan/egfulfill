@@ -17,8 +17,9 @@ import { orderStock } from "@/lib/stock-status"
 export type OrderQuery = {
   /** Free text — order number, customer, tracking, store, SKU, item name. */
   text: string
-  /** Production stage. "" = any · "draft" = arrived, not started · "issues" = any exception
-   *  state · otherwise a canonical stage id from factory-status.ts.
+  /** Production stage. "" = any · "open" = still live work (not shipped, not an exception) ·
+   *  "draft" = arrived, not started · "issues" = any exception state · otherwise a canonical
+   *  stage id from factory-status.ts.
    *
    *  "draft" is spelled out rather than reusing the stage's own id, which is the empty
    *  string — "" already means "no filter" here, and one value can't mean both. */
@@ -53,7 +54,8 @@ export const activeFilterCount = (q: OrderQuery) =>
  *  canonical stage ids come first; everything else is looked up in the pipeline itself, so a
  *  stage added to factory-status.ts is named here without being listed twice. */
 export const statusLabel = (v: string) =>
-  v === "draft" ? "Draft"
+  v === "open" ? "Open"
+  : v === "draft" ? "Draft"
   : v === "issues" ? "Issues"
   : ALL_STATUSES.find((s) => s.id === v)?.label ?? v
 
@@ -66,6 +68,10 @@ export const statusLabel = (v: string) =>
  */
 export const STATUS_PILLS: { value: string; label: string }[] = [
   { value: "", label: "All" },
+  // "Open" = there is still work to do on it. Not a stage — a stage answers "where is it",
+  // this answers "is anyone still waiting on us", which is what the stat cards count and
+  // what a floor means by "my queue".
+  { value: "open", label: "Open" },
   { value: "draft", label: "Draft" },
   ...FACTORY_STAGES.map((s) => ({ value: s.id, label: s.label })),
   { value: "issues", label: "Issues" },
@@ -81,7 +87,9 @@ export const STATUS_PILLS: { value: string; label: string }[] = [
 // most days a floor never filters by Refunded — but when it does, it wants a pill, not a
 // dropdown. So they ship behind the "+" instead of being absent.
 const PILLS_KEY = "eg_factory_status_pills_hidden"
-const DEFAULT_HIDDEN_PILLS: string[] = EXCEPTION_STAGES.map((s) => s.id)
+// "Open" ships hidden too: the stat cards above the board are how most people reach it, and
+// it would otherwise push the row wider for a pill many floors never click.
+const DEFAULT_HIDDEN_PILLS: string[] = ["open", ...EXCEPTION_STAGES.map((s) => s.id)]
 const PILL_VALUES = new Set(STATUS_PILLS.map((p) => p.value))
 
 export function loadHiddenStatusPills(): string[] {
@@ -103,6 +111,7 @@ export function saveHiddenStatusPills(ids: string[]) {
 export function matchesStatus(o: OrderRow, value: string): boolean {
   if (!value) return true
   const stage = orderStage(o.items ?? [])
+  if (value === "open") return !isException(stage) && stage !== "shipped"
   if (value === "draft") return stage === ""
   if (value === "issues") return isException(stage)
   return stage === value
