@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, useContext, createContext, isValidElement, Children } from "react"
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
 import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight, X, DownloadSimple, Database } from "@phosphor-icons/react"
@@ -848,29 +848,75 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
  * looking longer than it is.
  */
 function FeeGroup({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+  const q = useContext(SettingsSearch)
+  // Filter the ROWS, not just the group. Opening a fold because one field matched and then
+  // showing all fourteen of its fields is the same "where is it" problem one level down.
+  // A group whose own title matches keeps all its rows — you asked for the group.
+  const groupItself = !!q && [title, hint].join(" ").toLowerCase().includes(q)
+  const rows = !q || groupItself
+    ? children
+    : Children.toArray(children).filter((c) => matches(c, q))
+  if (q && !groupItself && Children.count(rows) === 0) return null
   return (
     <section className="mt-5 first:mt-0">
       <h4 className="text-[13px] font-semibold uppercase tracking-widest text-primary">{title}</h4>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-      <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">{children}</div>
+      <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">{rows}</div>
     </section>
   )
 }
 
+/**
+ * SETTINGS SEARCH.
+ *
+ * This page is ~10 folds deep and every one of them is a legitimate factory setting, so it
+ * can't be shortened by deleting things — the answer to "I can't find anything" has to be
+ * filtering, not fewer settings.
+ *
+ * The searchable text is read straight off the JSX: every control here is a declarative
+ * <Fold>/<FeeGroup>/<MoneyField> with its label, title and hint in props, so walking the
+ * element tree gives the same words the person is looking at. That's deliberately not a
+ * hand-maintained keyword index — an index drifts the first time someone renames a field,
+ * and the failure is silent (the setting simply stops being findable).
+ */
+const SettingsSearch = createContext("")
+
+/** Every word rendered by a node, gathered from the props that actually become text. */
+function nodeText(node: React.ReactNode): string {
+  if (node == null || typeof node === "boolean") return ""
+  if (typeof node === "string" || typeof node === "number") return String(node)
+  if (Array.isArray(node)) return node.map(nodeText).join(" ")
+  if (isValidElement(node)) {
+    const p = (node.props ?? {}) as Record<string, unknown>
+    const own = [p.label, p.title, p.hint, p.description]
+      .filter((t): t is string => typeof t === "string").join(" ")
+    return own + " " + nodeText(p.children as React.ReactNode)
+  }
+  return ""
+}
+
+const matches = (node: React.ReactNode, q: string) =>
+  !q || nodeText(node).toLowerCase().includes(q)
+
 function Fold({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
+  const q = useContext(SettingsSearch)
+  // A search that leaves everything collapsed has answered nothing, so a matching fold opens
+  // itself — and closes back to whatever the person had chosen once the box is cleared.
+  if (!matches([title, hint, children], q)) return null
+  const expanded = open || !!q
   return (
     <div className="border-t border-border">
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
+        aria-expanded={expanded}
         className="eg-tap flex w-full items-center gap-2 px-5 py-3.5 text-left transition-colors hover:bg-accent/40"
       >
-        <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
+        <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (expanded ? "rotate-90" : "")} />
         <span className="text-sm font-medium">{title}</span>
         {hint && <span className="truncate text-xs text-muted-foreground">· {hint}</span>}
       </button>
-      {open && <div className="px-5 pb-5">{children}</div>}
+      {expanded && <div className="px-5 pb-5">{children}</div>}
     </div>
   )
 }
@@ -892,6 +938,7 @@ function PlatformPanel() {
   // is recorded at all and their Billing statement reads as though they did no work.
   const [expediteFee, setExpediteFee] = useState("")
   const [tiktokLabelFee, setTiktokLabelFee] = useState("")
+  const [settingsQ, setSettingsQ] = useState("")
   const [expediteCost, setExpediteCost] = useState("")
   const [designPartnerCost, setDesignPartnerCost] = useState("")
   // Default Pink Design product type: the value applied to every push, plus the options to
@@ -1059,6 +1106,30 @@ function PlatformPanel() {
 
   return (
     <SectionCard title="Platform" description="Factory-wide defaults (warehouse & admin)">
+      <SettingsSearch.Provider value={settingsQ.trim().toLowerCase()}>
+      {/* Sticky, because the point is to type a word and watch the page below it shrink —
+          scrolling away from the box you're filtering with defeats that. */}
+      <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-5 py-3 backdrop-blur">
+        <div className="relative">
+          <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={settingsQ}
+            onChange={(e) => setSettingsQ(e.target.value)}
+            placeholder="Search settings — try “tiktok”, “shipping”, “payout”…"
+            className="h-9 pl-8"
+            aria-label="Search settings"
+          />
+          {!!settingsQ && (
+            <button
+              onClick={() => setSettingsQ("")}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground"
+            >
+              <X size={12} weight="bold" />
+            </button>
+          )}
+        </div>
+      </div>
       <Fold title="Warehouse ship-from address" hint="the return address on every label">
 
         <p className="mb-3 text-xs text-muted-foreground">
@@ -1539,11 +1610,14 @@ function PlatformPanel() {
           <MoneyField label="Laser" value={bands.method_lsr ?? ""} onChange={(v) => setBand("method_lsr", v)} />
         </div>
       </Fold>
+      {/* Save stays OUTSIDE the search filter and always visible: a filtered page still
+          edits the same form, and hiding Save behind a query is how an edit gets lost. */}
       <div className="flex items-center gap-3 border-t border-border px-5 py-3">
         <Button size="sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         {saved && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check size={14} weight="bold" /> Saved</span>}
         {err && <span className="text-sm text-destructive">{err}</span>}
       </div>
+      </SettingsSearch.Provider>
     </SectionCard>
   )
 }
