@@ -971,7 +971,7 @@ export function OrdersHub() {
                 Only once there's something to search: a search box over an empty board is a
                 control that cannot do anything, and it makes "no orders yet" look like a
                 failed query. */}
-            {!!orders?.length && <OrderSearchInput query={query} onChange={setQuery} className="w-40 sm:w-56" />}
+            {!!orders?.length && <OrderSearchInput query={query} onChange={setQuery} className="w-full sm:w-72 lg:w-80" />}
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
               <UploadSimple size={14} weight="bold" /> {tl("ui", "Import")}
             </Button>
@@ -991,7 +991,7 @@ export function OrdersHub() {
             straight back where it started); below that it drops to a full-width row of its
             own and reads left-to-right, rather than stacking into a narrow column hugging
             the right edge. */}
-        <div className="flex flex-wrap items-start gap-x-4 gap-y-2 border-b border-border px-5 py-2.5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-5 py-2">
           <div className="flex shrink-0 flex-wrap items-center gap-1">
             {STATUS_PILLS.map((p) => {
               // A hidden pill still renders while it's the ACTIVE filter. Hiding the thing
@@ -1056,7 +1056,7 @@ export function OrdersHub() {
               query={query}
               onChange={setQuery}
               catalog={catalog}
-              className="min-w-0 flex-1 basis-[18rem] xl:justify-end"
+              className="ml-auto"
             />
           )}
         </div>
@@ -1113,7 +1113,16 @@ export function OrdersHub() {
               titles drift out of line with the columns they name. */}
           <div className="overflow-x-auto">
           <div
-            className="grid items-center gap-x-3 border-b border-border bg-muted/30 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            /* Sentence case, NOT uppercase+tracking. Same family as the stage pills a few
+               pixels above (both Inter) — but 13px/medium sentence case over 11px/semibold
+               UPPERCASE with letter-spacing read as two different typefaces stacked on each
+               other. Uppercase plus tracking is what does that; drop the two and the row
+               reads as the same face, one step quieter. The tinted bar, the muted colour and
+               the smaller size are already enough to mark it as a header.
+               (Deliberately NOT an app-wide sweep: `uppercase tracking-wide` is the idiom for
+               section labels, the sidebar's TOOLS/ACCOUNT and the stat cards. This is the one
+               place two type treatments collide inside a single control strip.) */
+            className="grid items-center gap-x-3 border-b border-border bg-muted/30 px-5 py-2 text-xs font-semibold text-muted-foreground"
             style={{ gridTemplateColumns: gridTmpl, minWidth: gridMinPx }}
           >
             {dispatchOn && <span />}
@@ -1123,14 +1132,14 @@ export function OrdersHub() {
                 // The pinned last column carries the Columns settings (reorder is by drag on
                 // the header labels; this menu toggles which columns show).
                 <div key={id} className="relative flex justify-end normal-case tracking-normal">
-                  <button type="button" onClick={() => setColsMenuOpen((v) => !v)} className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" title="Show/hide columns">
+                  <button type="button" onClick={() => setColsMenuOpen((v) => !v)} className="rounded px-2 py-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" title="Show/hide columns">
                     Columns
                   </button>
                   {colsMenuOpen && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setColsMenuOpen(false)} />
                       <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1.5 shadow-lg">
-                        <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Show columns</div>
+                        <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">Show columns</div>
                         {FACTORY_DATA_COLS.map((cid) => {
                           const locked = isFactoryColLocked(cid)
                           const shown = !hiddenCols.includes(cid)

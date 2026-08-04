@@ -1,9 +1,10 @@
 "use client"
 
-import { MagnifyingGlass, CaretDown, X, Check } from "@phosphor-icons/react"
+import { MagnifyingGlass, CaretDown, X, Check, FunnelSimple } from "@phosphor-icons/react"
 
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import {
   DATE_RANGES, dateRangeLabel, orderFacets, isOrderQueryActive, activeFilterCount,
   statusLabel, READY_OPTIONS, readyLabel, EMPTY_ORDER_QUERY,
@@ -78,7 +79,7 @@ export function OrderSearchInput({ query, onChange, className = "" }: {
 }) {
   return (
     <div className={"relative " + className}>
-      <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+      <MagnifyingGlass size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
       <Input
         value={query.text}
         onChange={(e) => onChange({ ...query, text: e.target.value })}
@@ -87,7 +88,7 @@ export function OrderSearchInput({ query, onChange, className = "" }: {
         // title and the label, where it isn't clipped.
         placeholder="Search orders…"
         title="Search order number, customer, tracking, store, SKU or item name"
-        className="h-8 rounded-md pl-8 text-[13px]"
+        className="h-9 rounded-md pl-8 text-[13px]"
         aria-label="Search order number, customer, tracking, store, SKU or item name"
       />
     </div>
@@ -122,55 +123,96 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
   const count = activeFilterCount(query)
   const canStock = !!catalog?.length
   const readyOptions = READY_OPTIONS.filter((o) => !o.stock || canStock)
+  // What the trigger counts: everything in this panel. The stage pills and the search box
+  // are their own visible controls, so counting them here would report a filter the panel
+  // can't clear.
+  const facetCount = (query.ready ? 1 : 0) + (query.platform ? 1 : 0) + (query.store ? 1 : 0)
+    + (query.method ? 1 : 0) + (query.days !== null ? 1 : 0)
 
   return (
-    <div className={"flex flex-wrap items-center gap-1.5 " + className}>
-      {/* NO Status dropdown. `query.status` is written by the stage pills sitting to the
-          left of this bar — a second control for the same field, one row apart, is two
-          answers to one question. (Cost of that: On hold / Cancelled / Refunded can only be
-          selected as the "Issues" pill's bundle, since no pill names them individually.) */}
+    <Popover>
+      {/* ONE button, not five dropdowns in a row.
+          Five always-visible triggers plus the pills plus the search made three stacked
+          strips of controls above a table — the controls were louder than the data. This is
+          the same shape SpyDeck already uses (search, then a single Filters button), so it's
+          a pattern in this app rather than a new one to learn.
+          The count on the trigger is what keeps it honest: a collapsed filter you've
+          forgotten you set is the one real cost of hiding these, so the button says how many
+          are on and turns violet while any are. */}
+      <PopoverTrigger
+        className={
+          "eg-tap inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
+          (facetCount
+            ? "border-primary/40 bg-primary/5 text-foreground"
+            : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground") +
+          " " + className
+        }
+      >
+        <FunnelSimple size={14} weight="bold" />
+        Filters
+        {facetCount > 0 && (
+          <span className="rounded bg-primary px-1.5 text-[11px] font-bold leading-[1.45] text-primary-foreground">{facetCount}</span>
+        )}
+        <CaretDown size={11} weight="bold" className="opacity-60" />
+      </PopoverTrigger>
 
-      {/* The List column, filterable: "which orders still need a label" is the question those
-          chips are read for, and reading them was the only way to ask it. */}
-      <FilterMenu label="List" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
+      <PopoverContent align="end" className="w-72 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[13px] font-semibold">Filters</span>
+          {active && (
+            <button
+              onClick={() => onChange({ ...EMPTY_ORDER_QUERY })}
+              className="eg-tap inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X size={11} weight="bold" /> Clear{count > 1 ? ` (${count})` : ""}
+            </button>
+          )}
+        </div>
 
-      {facets.platforms.length > 1 && (
-        <FilterMenu
-          label="Platform"
-          value={query.platform}
-          options={facets.platforms.map((p) => ({ value: p, label: p }))}
-          onPick={(v) => set({ platform: v })}
-        />
-      )}
-      {facets.stores.length > 1 && (
-        <FilterMenu
-          label="Shop"
-          value={query.store}
-          options={facets.stores.map((s) => ({ value: s, label: s }))}
-          onPick={(v) => set({ store: v })}
-        />
-      )}
-      {facets.methods.length > 1 && (
-        <FilterMenu label="Print" value={query.method} options={facets.methods} onPick={(v) => set({ method: v })} />
-      )}
+        {/* Labelled rows, not a bare row of triggers: inside a panel there is room to say
+            what each one narrows, which is exactly what the cramped toolbar could not. */}
+        <div className="space-y-2">
+          <FilterRow label="List">
+            <FilterMenu label="List" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
+          </FilterRow>
+          {facets.platforms.length > 1 && (
+            <FilterRow label="Platform">
+              <FilterMenu label="Platform" value={query.platform}
+                options={facets.platforms.map((p) => ({ value: p, label: p }))}
+                onPick={(v) => set({ platform: v })} />
+            </FilterRow>
+          )}
+          {facets.stores.length > 1 && (
+            <FilterRow label="Shop">
+              <FilterMenu label="Shop" value={query.store}
+                options={facets.stores.map((x) => ({ value: x, label: x }))}
+                onPick={(v) => set({ store: v })} />
+            </FilterRow>
+          )}
+          {facets.methods.length > 1 && (
+            <FilterRow label="Print">
+              <FilterMenu label="Print" value={query.method} options={facets.methods} onPick={(v) => set({ method: v })} />
+            </FilterRow>
+          )}
+          {/* Date is always offered — unlike the others it needs no data to be meaningful,
+              and "what came in today" is the question a floor asks most. */}
+          <FilterRow label="Date">
+            <FilterMenu label="Date" value={query.days === null ? "" : String(query.days)}
+              options={DATE_RANGES.filter((r) => r.days !== null).map((r) => ({ value: String(r.days), label: r.label }))}
+              onPick={(v) => set({ days: v === "" ? null : Number(v) })} />
+          </FilterRow>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
-      {/* Date is always offered — unlike the others it needs no data to be meaningful, and
-          "what came in today" is the question a floor asks most. */}
-      <FilterMenu
-        label="Date"
-        value={query.days === null ? "" : String(query.days)}
-        options={DATE_RANGES.filter((r) => r.days !== null).map((r) => ({ value: String(r.days), label: r.label }))}
-        onPick={(v) => set({ days: v === "" ? null : Number(v) })}
-      />
-
-      {active && (
-        <button
-          onClick={() => onChange({ ...EMPTY_ORDER_QUERY })}
-          className="eg-tap inline-flex h-8 items-center gap-1 rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <X size={11} weight="bold" /> Clear{count > 1 ? ` (${count})` : ""}
-        </button>
-      )}
+/** One labelled line inside the Filters panel. */
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-[13px] text-muted-foreground">{label}</span>
+      {children}
     </div>
   )
 }
