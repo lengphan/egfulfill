@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, type DesignFileRow } from "@/lib/api"
+import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, type DesignFileRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
 // A file id that's stable per (order, sku, filename) so re-dropping the same file
 // REPLACES it rather than piling up duplicates on the card.
-const idFor = (orderId: string, sku: string | undefined, name: string) =>
-  `DF-${orderId}-${sku || "x"}-${name}`.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 120)
+const idFor = (orderId: string, scope: string | undefined, name: string) =>
+  `DF-${orderId}-${scope || "all"}-${name}`.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 120)
 
 // What counts as a machine file, in one place — the seller drop zone tests names against
 // the regex and offers the same list in its accept attribute, so the picker can never
@@ -53,7 +53,24 @@ const KIND_META: Record<string, { label: string; hint: string; cls: string; icon
  *   image/* → artwork + mockups (factory)
  * Pricing is admin/warehouse only — enforced server-side too, not just hidden here.
  */
-export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; sku?: string; compact?: boolean }) {
+/**
+ * What this file APPLIES TO, in words — the thing the panel could never say before.
+ *
+ * A file with a line id belongs to that one item; without one it covers the order, which is
+ * both what "apply to all" writes and what every file written before line_id existed already
+ * does. Saying which is the whole point: two rows with the same filename and no scope shown
+ * is exactly how a per-item file and an everything file became indistinguishable.
+ *
+ * The sku is shown as the item's name when there is one, because a bare line id means nothing
+ * to a person. A marketplace line with no variant chosen yet gets that stated rather than left
+ * blank — "not chosen yet" is information; an empty chip reads as missing data.
+ */
+function scopeLabel(f: DesignFileRow): string {
+  if (!f.lineId) return "All items · "
+  return f.sku ? `Item ${f.sku} · ` : "This item (variant not chosen yet) · "
+}
+
+export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: string; sku?: string; lineId?: string | null; compact?: boolean }) {
   const [files, setFiles] = useState<DesignFileRow[] | null>(null)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
@@ -63,9 +80,17 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
   const confirm = useConfirm()
 
   const canPrice = role === "admin" || role === "warehouse"
-  // When mounted for a specific line, show only THAT line's files (uploads already target
-  // the sku). Order-level mounts (no sku) show everything, unchanged.
-  const shown = sku ? (files ?? []).filter((f) => (f.sku || "") === sku) : (files ?? [])
+  /**
+   * Mounted for a LINE → that line's own files, plus the order-wide ones. Mounted for the
+   * order → everything.
+   *
+   * This filtered on `(f.sku || "") === sku`, which is the bug this panel is on both ends of:
+   * two lines of the same SKU shared every file, and a marketplace line with no variant has
+   * sku "" — so an empty-sku file matched every empty-sku line on the order. A designer's
+   * file for one item appeared on items it was never made for.
+   */
+  const forLine = !!(lineId || sku)
+  const shown = forLine ? filesForLine(files ?? [], { line_id: lineId, sku }) : (files ?? [])
 
   const load = useCallback(() => {
     getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
@@ -91,7 +116,14 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
           fr.onerror = () => rej(new Error("Could not read the file"))
           fr.readAsDataURL(f)
         })
-        await uploadDesignFile({ designId: idFor(orderId, sku, f.name), orderId, sku, name: f.name, mime: f.type || undefined, data })
+        // The id is keyed on the LINE, not the sku: re-dropping the same filename on the
+        // same line still replaces itself (which is the point of a stable id), but two lines
+        // that share a SKU no longer overwrite each other's file.
+        await uploadDesignFile({
+          designId: idFor(orderId, lineId || sku, f.name),
+          orderId, sku, lineId: lineId ?? undefined,
+          name: f.name, mime: f.type || undefined, data,
+        })
       } catch (e) {
         setErr(e instanceof Error ? e.message : `Could not upload ${f.name}`)
       } finally {
@@ -172,7 +204,7 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
                     <span className="truncate text-xs font-medium">{f.name}</span>
                     {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
                   </div>
-                  <div className="truncate text-[10px] text-muted-foreground">{f.sku ? `Item ${f.sku} · ` : "Whole order · "}{k.hint}</div>
+                  <div className="truncate text-[10px] text-muted-foreground">{scopeLabel(f)}{k.hint}</div>
                 </div>
 
                 {/* Only .pes is sold, so only .pes gets a price — and only admin/warehouse

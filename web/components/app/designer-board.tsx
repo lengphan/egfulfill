@@ -1315,7 +1315,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         {card.order_id && (
           <div className="space-y-1.5">
             <span className="text-sm font-medium">Files</span>
-            <DesignFilesPanel orderId={String(card.order_id)} sku={card.sku || undefined} />
+            {/* The card already knows its LINE (design_cards.line_id) — pass it, or a file a
+                designer uploads here lands on every sibling of the same SKU. */}
+            <DesignFilesPanel orderId={String(card.order_id)} sku={card.sku || undefined} lineId={card.line_id || undefined} />
             {/* Who touched this design and when. A designer is gated to the design story
                 server-side; operator/warehouse/admin see the order's full history here
                 too, including which team member uploaded or removed a file. */}

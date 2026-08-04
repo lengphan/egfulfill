@@ -850,7 +850,22 @@ export function setAdCampaignStatus(channel: string, id: string, status: "ACTIVE
 // Every type is stored; the SERVER routes by `kind`: .pes = the seller's paid
 // deliverable, .emb = factory working file, image/* = artwork. Price is admin+
 // warehouse only, and that's enforced server-side — not just hidden in the UI.
-export type DesignFileRow = { designId: string; sku?: string | null; name?: string | null; mime?: string | null; kind?: string; price?: number; paid?: boolean; canPrice?: boolean; created_at?: string }
+/** `lineId` is the file's SCOPE: a line id pins it to that one line, null/absent means it
+ *  applies to the whole order. Files written before the column existed have no lineId, which
+ *  is why "no line" reads as order-wide rather than as unattributed. */
+export type DesignFileRow = { designId: string; sku?: string | null; lineId?: string | null; name?: string | null; mime?: string | null; kind?: string; price?: number; paid?: boolean; canPrice?: boolean; created_at?: string }
+
+/** Which files apply to THIS line: its own, else the order-wide ones. Line beats whole-order,
+ *  the same precedence designForLine uses for artwork — so a file filed against one item
+ *  overrides an "apply to all" without deleting it. */
+export function filesForLine(files: DesignFileRow[] | undefined, line: { line_id?: string | null; sku?: string | null }): DesignFileRow[] {
+  const list = files ?? []
+  const own = line.line_id ? list.filter((f) => f.lineId === line.line_id) : []
+  if (own.length) return own
+  // Order-wide files. `sku` is the LEGACY fallback only — rows written before line_id
+  // existed carry a sku and no line, and dropping them would hide real files on live orders.
+  return list.filter((f) => !f.lineId && (!f.sku || !line.sku || f.sku === line.sku))
+}
 /** A prior deliverable made from the same artwork. `distance` is set only on fuzzy hits. */
 export type ReuseMatch = { design_id: string; file_name?: string | null; kind?: string; order_id?: string; seller?: string; created_at?: string; distance?: number }
 /** exact = identical artwork, safe to reuse. similar = looks alike, needs a human to confirm. */
@@ -868,7 +883,8 @@ export function getDesignReuse(orderId: string, sku: string) {
 export function getDesignFiles(orderId: string) {
   return api<DesignFileRow[]>(`/api/design_files?orderId=${encodeURIComponent(orderId)}`)
 }
-export function uploadDesignFile(body: { designId: string; orderId?: string; sku?: string; name?: string; mime?: string; data: string; price?: number }) {
+/** `lineId` scopes the file to one line; omit it (or pass null) for "applies to every item". */
+export function uploadDesignFile(body: { designId: string; orderId?: string; sku?: string; lineId?: string | null; name?: string; mime?: string; data: string; price?: number }) {
   return api<{ ok?: boolean; stored?: string; error?: string }>(`/api/design_files`, { method: "POST", body: JSON.stringify(body) })
 }
 export function setDesignFilePrice(designId: string, price: number) {

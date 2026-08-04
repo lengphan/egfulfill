@@ -459,13 +459,13 @@ export function designFilesRoutes(app, requireAuth) {
       if (r.rows.length && !mine.length) { reply.code(403); return { error: 'forbidden' }; }
       // Tell the seller what's unlocked without handing over any bytes.
       return Promise.all(mine.map(async (x) => ({
-        designId: x.design_id, sku: x.sku, name: x.file_name, mime: x.mime, kind: x.kind,
+        designId: x.design_id, sku: x.sku, lineId: x.line_id, name: x.file_name, mime: x.mime, kind: x.kind,
         price: Number(x.price) || 0, created_at: x.created_at,
         paid: (Number(x.price) || 0) <= 0 || (await isPaid(x, eff)),
       })));
     }
     // Staff (every factory board) see every file on the order.
-    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, name: x.file_name, mime: x.mime, kind: x.kind, price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user) }));
+    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, lineId: x.line_id, name: x.file_name, mime: x.mime, kind: x.kind, price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user) }));
   });
 
   // Download a machine file. Staff any; a seller only their own AND only once paid.

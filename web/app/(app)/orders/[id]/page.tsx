@@ -402,7 +402,7 @@ export default function OrderDetailPage() {
                             </div>
                             {isStaff && attachFor === String(it.sku) && (
                               <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
-                                <DesignFilesPanel orderId={String(id)} sku={String(it.sku)} compact />
+                                <DesignFilesPanel orderId={String(id)} sku={String(it.sku)} lineId={it.line_id ?? undefined} compact />
                               </div>
                             )}
                           </>

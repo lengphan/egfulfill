@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { uploadDesignFile, downloadDesignFile, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -512,14 +512,21 @@ export function DesignCanvasDialog({
   // Fetching the bytes. Per-file busy/error so a paywalled or missing file says so HERE
   // rather than failing silently under the cursor.
   const [dlBusy, setDlBusy] = useState(false)
+  const [fileBusy, setFileBusy] = useState(false)
   const [dlErr, setDlErr] = useState<string | null>(null)
   useEffect(() => {
     if (!open) return   // read for sellers too — it drives their "you uploaded your file" status
     const t = setTimeout(() => {
       getDesignFiles(orderId)
         .then((rows) => {
-          const mine = (rows ?? []).filter((f) =>
-            (f.kind === "emb" || f.kind === "pes") && (!f.sku || !item.sku || f.sku === item.sku))
+          // filesForLine, not a sku match. Keying on sku alone meant a file filed against
+          // ONE line showed on every sibling of the same SKU — and on a marketplace line,
+          // where the variant (and so the sku) is unset, it matched every unset line on the
+          // order. That is the bug: nothing was being "applied to all", the lines were never
+          // distinguishable. Line beats order-wide; order-wide still shows when the line has
+          // nothing of its own.
+          const mine = filesForLine(rows ?? [], { line_id: item.line_id, sku: item.sku })
+            .filter((f) => f.kind === "emb" || f.kind === "pes")
           setHasFile(mine.length > 0)
           const newest = mine.slice().sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0]
           setLatestMachine(newest ? { designId: newest.designId, name: newest.name || "Machine file" } : null)
@@ -527,7 +534,7 @@ export function DesignCanvasDialog({
         .catch(() => { setHasFile(false); setLatestMachine(null) })
     }, 0)
     return () => clearTimeout(t)
-  }, [open, orderId, item.sku])
+  }, [open, orderId, item.sku, item.line_id])
   const hasMachineFile = hasFile || !!attached
 
   const [tier, setTier] = useState<DesignTier | null>((item.design_tier as DesignTier | null) ?? null)
@@ -581,6 +588,8 @@ export function DesignCanvasDialog({
       })
       const r = await uploadDesignFile({
         designId, orderId, sku: item.sku ?? undefined,
+        // THIS line only. "Apply file to all items" below is the deliberate way to widen it.
+        lineId: item.line_id ?? undefined,
         name: f.name, mime: f.type || undefined, data,
       })
       if (r?.error) throw new Error(r.error)
@@ -618,6 +627,45 @@ export function DesignCanvasDialog({
       setDlErr(/402|purchase|paid/i.test(m) ? "Not purchased yet." : m)
     } finally { setDlBusy(false) }
   }, [latestMachine])
+
+  /**
+   * Widen THIS line's machine file to the whole order.
+   *
+   * Re-files the same row with line_id null rather than copying it once per line: one file,
+   * one row, and the drop zone can then label it "Whole order" instead of listing the same
+   * name N times. The upsert deliberately does not coalesce line_id, which is what makes
+   * this able to widen a file that started life pinned to a line.
+   *
+   * Only widens. It never narrows an order-wide file back onto one line — that would silently
+   * remove it from every other item, which is not what a button called "apply to all" should
+   * be capable of.
+   */
+  const applyFileToAll = useCallback(async () => {
+    if (!latestMachine) return
+    const ok = await confirm({
+      title: "Use this machine file on every item?",
+      body: `${latestMachine.name} will apply to all items on this order, including any added later. Items with their own file keep it.`,
+      confirmLabel: "Apply to all",
+      destructive: false,
+    })
+    if (!ok) return
+    setFileBusy(true); setDlErr(null)
+    try {
+      const r = await downloadDesignFile(latestMachine.designId)
+      const data = r.data || r.url
+      if (!data) throw new Error("Couldn't read the file back to re-file it.")
+      const up = await uploadDesignFile({
+        designId: latestMachine.designId, orderId,
+        // null, not undefined — the whole point is to CLEAR the line and go order-wide.
+        lineId: null, name: latestMachine.name, data,
+      })
+      if (up?.error) throw new Error(up.error)
+      setAttached(`${latestMachine.name} now applies to every item on this order.`)
+      onSaved?.()
+    } catch (e) {
+      setDlErr(e instanceof Error ? e.message : "Couldn't apply that file to all items.")
+    } finally { setFileBusy(false) }
+  }, [latestMachine, orderId, confirm, onSaved])
 
   const applyToAll = useCallback(async () => {
     const others = siblings ?? []
@@ -1009,10 +1057,23 @@ export function DesignCanvasDialog({
             </div>
           </div>
           {/* Ten shirts, one file — only when there IS another line to apply to. */}
-          {designUrl && !!siblings?.length && (
-            <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}>
-              {applying ? "Applying…" : "Apply image to all items"}
-            </Button>
+          {/* Ten shirts, one file — only when there IS another line to apply to. Two separate
+              buttons because they are two separate things: the image is what the mockup shows,
+              the machine file is what the machine stitches, and an order can legitimately want
+              one shared and the other per-item. */}
+          {(designUrl || latestMachine) && !!siblings?.length && (
+            <div className="flex flex-wrap gap-1.5">
+              {designUrl && (
+                <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}>
+                  {applying ? "Applying…" : "Apply image to all items"}
+                </Button>
+              )}
+              {latestMachine && (
+                <Button variant="outline" size="sm" disabled={fileBusy} onClick={() => void applyFileToAll()}>
+                  {fileBusy ? "Applying…" : "Apply file to all items"}
+                </Button>
+              )}
+            </div>
           )}
           {err && <div className="text-sm text-destructive">{err}</div>}
           {/* A machine file was filed. Green, not red, and it says what it did AND what it
