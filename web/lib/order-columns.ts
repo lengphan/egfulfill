@@ -129,10 +129,35 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // chips are px-1.5/11px and Stock no longer rewrites itself to "In stock" / "No stock".
   // The 4rem that frees goes back to the flexible Customer/Items columns.
   ready:    { id: "ready",    label: "List",     grid: "12rem" },
-  action:   { id: "action",   label: "",         grid: "12rem" },  // header stays blank: buttons need no title
+  // 9.5rem, not 12: the widest button here is "Create label" at ~7rem, so 12 left 2.5rem of
+  // permanent air in the one column whose width decided whether the row fitted at all.
+  action:   { id: "action",   label: "",         grid: "9.5rem" },  // header stays blank: buttons need no title
 }
 
+/** NB: nothing reads this. The board's starting order comes from FACTORY_DATA_COLS via
+ *  loadFactoryColOrder; the columns shown are that list minus loadFactoryHiddenCols. Kept
+ *  because it documents the intended left-to-right order, but edit the two loaders below to
+ *  change what a board actually opens with. */
 export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "tracking", "store", "customer", "items", "ready", "action"]
+
+/**
+ * HIDDEN on a board nobody has customised — `items`, and only `items`. One click in the
+ * Columns menu brings it back.
+ *
+ * Two flexible columns can't both survive at a laptop width. The row's minimum is the sum of
+ * its fixed tracks plus a 5rem floor for EACH flexible one; measured, that came to 1192px
+ * against the 1057px a 1440px screen actually offers. So the table always opened mid-scroll
+ * with the row's primary action off the right edge — you had to scroll sideways to reach the
+ * button you came for. Dropping one flexible column, plus 2.5rem of slack from `action`,
+ * brings the minimum under the container.
+ *
+ * `items` is the one to drop because it is the one that can't be read at any width it would
+ * realistically get: an Etsy title runs ~130 characters and truncates to "Heavy…" whether it
+ * has 40px or 140px, while a customer name FITS as soon as it stops sharing. That only makes
+ * explicit what this file already said — items is "deliberately the first thing squeezed" —
+ * rather than shipping a column permanently squeezed past legibility.
+ */
+export const DEFAULT_HIDDEN_FACTORY_COLS: FactoryColId[] = ["items"]
 
 export function factoryGridTemplate(ids: FactoryColId[], lead: number): string {
   // Lead tracks are fixed for the same reason: the header renders empty spacers there.
@@ -169,11 +194,13 @@ export function saveFactoryColOrder(ids: FactoryColId[]) { try { localStorage.se
 export function loadFactoryHiddenCols(): FactoryColId[] {
   try {
     const raw = localStorage.getItem(FACTORY_HIDDEN_KEY)
-    if (!raw) return []
+    // No saved preference → the default hidden set, NOT "nothing hidden". Anyone who has
+    // already chosen their columns keeps exactly what they chose, including items.
+    if (!raw) return [...DEFAULT_HIDDEN_FACTORY_COLS]
     const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
+    if (!Array.isArray(parsed)) return [...DEFAULT_HIDDEN_FACTORY_COLS]
     return parsed.filter(isFactoryDataId).filter((id) => !FACTORY_LOCKED.includes(id))
-  } catch { return [] }
+  } catch { return [...DEFAULT_HIDDEN_FACTORY_COLS] }
 }
 export function saveFactoryHiddenCols(ids: FactoryColId[]) { try { localStorage.setItem(FACTORY_HIDDEN_KEY, JSON.stringify(ids)) } catch {} }
 
