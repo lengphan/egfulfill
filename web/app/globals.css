@@ -57,7 +57,7 @@
      * every row and strained to look at. The colour moves to the SIDEBAR instead: one bounded
      * block that's pleasant in the corner of your eye and never underneath the data. Cards
      * keep their separation from a slightly firmer border rather than from a tinted backdrop. */
-    --background: oklch(0.9806 0.0056 91);
+    --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
@@ -348,4 +348,22 @@ body { zoom: var(--eg-zoom, 1); }
     radial-gradient(circle at 50% 36%, rgba(255, 255, 255, 0.06), transparent 62%),
     linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+}
+
+/* Slim scroller for panels that scroll inside the layout (the left nav above all). The
+   platform default is a wide, high-contrast bar; against a coloured sidebar it looks like a
+   border someone drew by accident. Thin, transparent track, thumb tinted from the surface it
+   sits on — visible enough to grab, quiet enough to ignore. */
+.eg-scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, currentColor 22%, transparent) transparent;
+}
+.eg-scroll-slim::-webkit-scrollbar { width: 6px; height: 6px; }
+.eg-scroll-slim::-webkit-scrollbar-track { background: transparent; }
+.eg-scroll-slim::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, currentColor 20%, transparent);
+  border-radius: 9999px;
+}
+.eg-scroll-slim:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, currentColor 32%, transparent);
 }

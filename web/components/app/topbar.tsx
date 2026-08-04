@@ -183,7 +183,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
   const money = balance == null ? "—" : balance.toLocaleString("en-US", { style: "currency", currency: "USD" })
 
   return (
-    <header className="sticky top-0 z-20 hidden h-16 items-center gap-3 border-b border-border bg-card px-6 md:flex">
+    <header className="sticky top-0 z-20 hidden h-16 items-center gap-3 border-b border-border bg-background px-6 md:flex">
       <h1 className="text-[22px] font-bold tracking-tight">{title}</h1>
 
       <div className="ml-auto flex items-center gap-1">

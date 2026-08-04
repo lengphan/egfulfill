@@ -51,10 +51,10 @@ export function StaffSidebar() {
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
       <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-5">
         <span className="font-display text-2xl font-semibold tracking-tight">egfulfill</span>
-        {role && <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium capitalize tracking-normal text-primary">{role}</span>}
+        {role && <span className="ml-auto rounded-full bg-sidebar-primary px-2 py-0.5 text-[11px] font-medium capitalize tracking-normal text-sidebar-primary-foreground">{role}</span>}
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-3">
+      <nav className="eg-scroll-slim flex-1 overflow-y-auto p-3">
         {items.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/")
           const Icon = item.icon
@@ -64,10 +64,10 @@ export function StaffSidebar() {
               href={item.href}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                active ? "bg-primary/10 text-primary" : "text-foreground/70 hover:bg-accent hover:text-foreground"
+                active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
-              <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+              <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60")} />
               {nl("nav", item.label)}
             </Link>
           )
@@ -76,13 +76,13 @@ export function StaffSidebar() {
         {/* Seller-side tools this role may use (admin: all; operator/warehouse: a curated set). */}
         {tools.length > 0 && (
           <>
-            <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">{nl("nav", "Tools")}</div>
+            <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/55">{nl("nav", "Tools")}</div>
             {tools.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/")
               const Icon = item.icon
               return (
-                <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors", active ? "bg-primary/10 text-primary" : "text-foreground/70 hover:bg-accent hover:text-foreground")}>
-                  <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors", active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
+                  <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60")} />
                   {nl("nav", item.label)}
                 </Link>
               )
@@ -91,13 +91,13 @@ export function StaffSidebar() {
         )}
 
         {/* Common to every staff member — profile + factory chat. */}
-        <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">{nl("nav", "Account")}</div>
+        <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/55">{nl("nav", "Account")}</div>
         {[{ label: "Chat", href: "/chat", icon: ChatCircleDots }, { label: "Settings", href: "/settings", icon: Gear }].map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/")
           const Icon = item.icon
           return (
-            <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors", active ? "bg-primary/10 text-primary" : "text-foreground/70 hover:bg-accent hover:text-foreground")}>
-              <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+            <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors", active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
+              <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60")} />
               {nl("nav", item.label)}
             </Link>
           )
@@ -105,8 +105,8 @@ export function StaffSidebar() {
       </nav>
 
       <div className="shrink-0 border-t border-border p-3">
-        <button onClick={logout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-accent hover:text-foreground">
-          <SignOut size={19} className="text-muted-foreground" />
+        <button onClick={logout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+          <SignOut size={19} className="text-sidebar-foreground/60" />
           {nl("nav", "Log out")}
         </button>
       </div>
