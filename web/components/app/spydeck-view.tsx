@@ -219,7 +219,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
           <div className="mt-auto flex gap-1.5 pt-3">
             <button
               type="button"
-              onClick={(ev) => { ev.preventDefault(); onMakeProduct(l) }}
+              onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); onMakeProduct(l) }}
               className={"flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (uploaded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
             >
               {uploaded ? <><CheckCircle size={13} weight="fill" /> Uploaded</> : <><Storefront size={13} weight="bold" /> Make product</>}
@@ -230,7 +230,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
               <button
                 type="button"
                 title="Work out what this is and how to search for it on a B2B marketplace"
-                onClick={(ev) => { ev.preventDefault(); onSource(l) }}
+                onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); onSource(l) }}
                 className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-foreground hover:text-background"
               >
                 <Compass size={13} weight="bold" /> Suppliers

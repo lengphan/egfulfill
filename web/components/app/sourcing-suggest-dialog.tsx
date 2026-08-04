@@ -33,7 +33,6 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
   onSaved?: (label: string) => void
 }) {
   const [data, setData] = useState<Suggestion | null>(null)
-  const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [url, setUrl] = useState("")
   const [saving, setSaving] = useState(false)
@@ -45,7 +44,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
   useEffect(() => {
     if (!listing) return
     const t = setTimeout(() => {
-      setData(null); setErr(null); setUrl(""); setSavedCount(0); setNote(null); setLoading(true)
+      setData(null); setErr(null); setUrl(""); setSavedCount(0); setNote(null)
       suggestSuppliers({
         listingId: String(listing.listing_id),
         title: listing.title,
@@ -53,7 +52,6 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
       })
         .then((r) => { if (r.error) setErr(r.error); else setData(r) })
         .catch((e) => setErr(e instanceof Error ? e.message : "Couldn't get suggestions."))
-        .finally(() => setLoading(false))
     }, 0)
     return () => clearTimeout(t)
   }, [listing])
@@ -101,17 +99,22 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
           <DialogDescription className="line-clamp-2">{listing.title}</DialogDescription>
         </DialogHeader>
 
-        {loading && (
+        {/* DERIVED, not a loading flag. A `loading` state initialised to false only flips
+            true inside the deferred effect, so between opening the dialog and that state
+            landing there was a frame with no spinner, no error and no data — a blank panel
+            that reads as a broken feature. "Nothing has arrived yet" is exactly
+            !data && !err, so ask that instead of tracking it. */}
+        {!data && !err && (
           <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
             <CircleNotch size={16} className="animate-spin" /> Reading the product…
           </div>
         )}
 
-        {err && !loading && (
+        {err && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">{err}</div>
         )}
 
-        {data && !loading && (
+        {data && (
           <div className="space-y-4">
             {/* The most valuable output is often "don't import this" — so it goes first, not
                 buried under the queries it would contradict. */}
