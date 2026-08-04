@@ -8,7 +8,7 @@ import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, Paperclip, FileArrowDown, CircleNotch } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
-import { getOrderDesignStatus, type OrderDesignStatus } from "@/lib/api"
+import { getOrderDesignStatus, getOrderDesignCards, cardForLine, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
@@ -114,6 +114,16 @@ export default function OrderDetailPage() {
   // canFulfill = warehouse/admin; the ⋯ menu itself is per-stage/role-gated inside.
   const role = getUser()?.role || "seller"
   const isStaff = role !== "seller"
+  /** Board cards for this order, one per line that has been sent to design. Staff only —
+   *  the route is gated, so a seller just gets nothing rather than a factory lane name. */
+  const [boardCards, setBoardCards] = useState<OrderDesignCard[]>([])
+  useEffect(() => {
+    if (!isStaff || !id) return
+    const t = setTimeout(() => {
+      getOrderDesignCards(String(id)).then((r) => setBoardCards(r ?? [])).catch(() => setBoardCards([]))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [isStaff, id])
   const canFulfill = role === "warehouse" || role === "admin"
   const [labelOpen, setLabelOpen] = useState(false)
   const [actionErr, setActionErr] = useState<string | null>(null)
@@ -327,6 +337,9 @@ export default function OrderDetailPage() {
             ) : (
               <div className="divide-y divide-border">
                 {items.map((it, i) => {
+                  // Per LINE, not per order: the order-level readiness chip said "on the
+                  // board" for every item the moment one of them was sent.
+                  const card = isStaff ? cardForLine(boardCards, { line_id: it.line_id, sku: it.sku }) : undefined
                   const design = it.sku ? designs[it.sku] : undefined
                   const artwork = designSrc(design?.data)
                   const qty = Number(it.qty) || 1
@@ -357,6 +370,16 @@ export default function OrderDetailPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
+                            {/* THIS LINE's board state, with the lane named. "Sent to design"
+                                and "Approved" are different answers, and until now the only
+                                signal was an order-wide chip that lit for every item the
+                                moment one of them was sent. */}
+                            {card && (
+                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                                On design board
+                                <span className="font-semibold">{card.lane_label || card.col || "Incoming"}</span>
+                              </span>
+                            )}
                             {it.sku && <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{it.sku}</div>}
                           </div>
                           <div className="shrink-0 text-right text-sm">

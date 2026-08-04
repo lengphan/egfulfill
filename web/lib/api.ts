@@ -1744,6 +1744,28 @@ export type DesignCard = {
 export function getDesignCards() {
   return api<DesignCard[]>(`/api/design_cards`)
 }
+/** One card per line that has been sent to the design board, for THIS order. Staff only —
+ *  a lane name is factory workflow, not seller-facing status. `lane_label` is resolved
+ *  server-side because lanes are renameable. */
+export type OrderDesignCard = {
+  id: number | string
+  line_id?: string | null
+  sku?: string | null
+  col?: string | null
+  lane_label?: string | null
+  title?: string | null
+  claimed_by?: string | null
+}
+export function getOrderDesignCards(orderId: string) {
+  return api<OrderDesignCard[]>(`/api/design_cards/for-order/${encodeURIComponent(orderId)}`)
+}
+/** The card covering a line: its own, else one filed against the order before lines were
+ *  tracked (matched on sku, the same legacy fallback filesForLine uses). */
+export function cardForLine(cards: OrderDesignCard[] | undefined, line: { line_id?: string | null; sku?: string | null }): OrderDesignCard | undefined {
+  const list = cards ?? []
+  return (line.line_id ? list.find((c) => c.line_id === line.line_id) : undefined)
+    ?? list.find((c) => !c.line_id && !!c.sku && !!line.sku && c.sku === line.sku)
+}
 /** The board's audit history — deletions, lane moves, credits, assignments — newest first.
  *  Warehouse + admin only (the server gates it), the same people who may delete a card. */
 export function getDesignBoardHistory() {

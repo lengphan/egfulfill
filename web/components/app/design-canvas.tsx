@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { getOrderDesignCards, cardForLine, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -511,6 +511,25 @@ export function DesignCanvasDialog({
   const [latestMachine, setLatestMachine] = useState<{ designId: string; name: string } | null>(null)
   // Fetching the bytes. Per-file busy/error so a paywalled or missing file says so HERE
   // rather than failing silently under the cursor.
+  /**
+   * Has THIS line been sent to the design board, and where has it got to?
+   *
+   * The readiness chip on the order row answers that for the whole order, which is not the
+   * question you are asking with one item open in front of you — on a two-line order it said
+   * "on the board" for the line that was still untouched. Staff only; the route is gated, so
+   * a seller simply gets nothing here rather than a factory lane name.
+   */
+  const [boardCard, setBoardCard] = useState<OrderDesignCard | null>(null)
+  useEffect(() => {
+    if (!open || !isStaff) return
+    const t = setTimeout(() => {
+      getOrderDesignCards(orderId)
+        .then((cards) => setBoardCard(cardForLine(cards ?? [], { line_id: item.line_id, sku: item.sku }) ?? null))
+        .catch(() => setBoardCard(null))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [open, isStaff, orderId, item.line_id, item.sku])
+
   const [dlBusy, setDlBusy] = useState(false)
   const [fileBusy, setFileBusy] = useState(false)
   const [dlErr, setDlErr] = useState<string | null>(null)
@@ -1073,6 +1092,18 @@ export function DesignCanvasDialog({
                   {fileBusy ? "Applying…" : "Apply file to all items"}
                 </Button>
               )}
+            </div>
+          )}
+          {/* WHERE THIS LINE IS ON THE BOARD. Named lane, not a generic "sent" — "sent to
+              design" three days ago and "Approved" are very different answers, and the lane
+              is the one the board itself shows. */}
+          {boardCard && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-[13px]">
+              <span className="font-medium text-foreground">On the design board</span>
+              <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                {boardCard.lane_label || boardCard.col || "Incoming"}
+              </span>
+              {boardCard.claimed_by && <span className="text-muted-foreground">· {boardCard.claimed_by}</span>}
             </div>
           )}
           {err && <div className="text-sm text-destructive">{err}</div>}

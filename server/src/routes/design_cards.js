@@ -119,6 +119,9 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // matching on sku alone — and two lines of the same sku are different jobs, so a second
   // line either silently reused the first card or duplicated it. See CLAUDE.md §5.
   q('alter table design_cards add column if not exists line_id text').catch(() => {});
+  // Looked up per ORDER by the item dialog and the order page, so give it an index rather
+  // than a sequential scan of the whole board on every order someone opens.
+  q('create index if not exists design_cards_order_idx on design_cards (order_id)').catch(() => {});
   // A MANUAL card carries its own artwork, because it exists before any order does. The
   // bytes go to object storage under the SAME namespace order designs use — identical
   // content whichever door it came in by — so assigning the card to an order later is a
@@ -352,6 +355,35 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
    * is public, private, or behind a CDN alias whose DNS was never set up — the exact failure that
    * was blanking the board. Best-effort: any miss is a 404 and the card keeps its placeholder.
    */
+  /**
+   * The board cards for ONE order, per line — "has this item been sent to design, and where
+   * has it got to?"
+   *
+   * The readiness chip on the order row answers that for the whole ORDER, which is not the
+   * question anyone standing over a two-line order is asking. This is the per-line answer,
+   * for the item dialog and the order page.
+   *
+   * STAFF ONLY. A lane name is factory workflow ("Checking", "With Pink"), and a seller
+   * seeing our internal board state is a leak, not a feature — their own status vocabulary
+   * already covers "being made".
+   *
+   * The lane LABEL is resolved here rather than in the client: lanes are user-renameable
+   * (design_lanes), so a client mapping the raw col id would print a stale name the day
+   * someone renames a lane.
+   */
+  app.get('/api/design_cards/for-order/:orderId', { preHandler: requireStaff }, async (req) => {
+    const orderId = String(req.params.orderId || '');
+    if (!orderId) return [];
+    const r = await q(
+      `select c.id, c.line_id, c.sku, c.col, c.title, c.claimed_by,
+              coalesce(l.label, c.col) as lane_label
+         from design_cards c
+         left join design_lanes l on l.id = c.col
+        where c.order_id = $1
+        order by c.id`, [orderId]).catch(() => ({ rows: [] }));
+    return r.rows;
+  });
+
   app.get('/api/design_cards/art/:hash', async (req, reply) => {
     const hash = String(req.params.hash || '').replace(/\.[a-z0-9]+$/i, '').toLowerCase();
     if (!/^[0-9a-f]{16,64}$/.test(hash)) { reply.code(404); return { error: 'not found' }; }
