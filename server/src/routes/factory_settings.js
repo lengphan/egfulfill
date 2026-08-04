@@ -37,6 +37,11 @@ const KEYS = [
   'base_markup',
   // Expedited dispatch: what the seller pays vs what the partner costs us.
   'expedite_fee', 'expedite_cost', 'design_partner_cost',
+  // What a seller pays on a TIKTOK-SHIPPED order — one where TikTok produced the label and
+  // we only fetch and print it. It is NOT a shipping charge: a seller-shipped TikTok order
+  // buys a real label through the normal shipping path and must never be charged both.
+  // Nothing books this yet; see the note in tiktok.js before wiring it to wallet_ledger.
+  'tiktok_label_fee',
   'low_balance_warn',
   // Seller payout guardrails. payout_max = 0 means "no fixed ceiling — limited only by the
   // seller's own balance", which is always the hard cap regardless.
@@ -111,6 +116,10 @@ export const SETTING_DEFAULTS = {
   expedite_fee: 2,    // charged to the seller, per order
   expedite_cost: 0.5, // what the dispatch partner charges us, per label
   design_partner_cost: 0, // what the outsourced design partner costs us, per task
+  // TikTok-shipped orders: the label is TikTok's, so there's no carrier purchase — this is
+  // the handling charge for fetching and printing it. Defaults to 0 so enabling the feature
+  // never silently starts charging sellers; an admin sets the number deliberately.
+  tiktok_label_fee: 0,
   // When to start warning a seller their wallet is running out. A seller wallet must stay
   // POSITIVE — an order can't be submitted without funds — so the warning has to arrive
   // while there's still time to top up, not at the moment a submit is refused.

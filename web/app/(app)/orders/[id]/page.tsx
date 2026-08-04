@@ -5,7 +5,8 @@ import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, Paperclip } from "@phosphor-icons/react"
+import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, Paperclip, FileArrowDown, CircleNotch } from "@phosphor-icons/react"
+import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, type OrderDesignStatus } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
@@ -86,6 +87,10 @@ export default function OrderDetailPage() {
   const id = decodeURIComponent(String(params?.id ?? ""))
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [one, setOne] = useState<OrderRow | null>(null)
+  // Fetching TikTok's own label for this order. Kept local to the Shipping card — it's a
+  // read, not a state change on the order, so it has no business in the page-level banner.
+  const [ttLabelBusy, setTtLabelBusy] = useState(false)
+  const [ttLabelErr, setTtLabelErr] = useState<string | null>(null)
   const [designs, setDesigns] = useState<Record<string, OrderDesign>>({})
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
@@ -510,13 +515,58 @@ export default function OrderDetailPage() {
             </div>
           </SectionCard>
 
-          {(order.tracking || order.carrier) && (
+          {/* Also shown for a TikTok platform-shipped order that has no tracking yet — the
+              label exists on TikTok's side before the number reaches us, and a Shipping card
+              that isn't there reads as "nothing has shipped". */}
+          {(order.tracking || order.carrier || canFetchTiktokLabel(order)) && (
             <SectionCard title="Shipping">
               <div className="flex items-start gap-2 p-5 text-sm">
                 <Truck size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
-                <div>
+                <div className="min-w-0 flex-1">
+                  {/* WHO owes the label. On TikTok shipping it already exists and is fetched;
+                      on seller shipping nothing exists until we buy one — and a floor that
+                      confuses the two either waits forever or buys a second label. Stated
+                      before the carrier and tracking because it decides what those mean. */}
+                  {(() => {
+                    const ship = tiktokShippingOf(order)
+                    if (!ship) return null
+                    const tone =
+                      ship.key === "tiktok" ? "bg-primary/10 text-primary"
+                      : ship.key === "seller" ? "bg-muted text-foreground"
+                      : "bg-amber-100 text-amber-800"
+                    return (
+                      <div className="mb-1.5">
+                        <span className={"inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold " + tone}>
+                          {ship.label}
+                        </span>
+                        <div className="mt-1 text-xs text-muted-foreground">{ship.hint}</div>
+                      </div>
+                    )
+                  })()}
                   {order.carrier && <div className="font-medium">{order.carrier}</div>}
                   {order.tracking && <div className="font-mono text-xs text-muted-foreground">{order.tracking}</div>}
+                  {canFetchTiktokLabel(order) && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setTtLabelBusy(true); setTtLabelErr(null)
+                          const err = await openTiktokLabelFor(order)
+                          setTtLabelErr(err); setTtLabelBusy(false)
+                        }}
+                        disabled={ttLabelBusy}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-60"
+                      >
+                        {ttLabelBusy
+                          ? <CircleNotch size={12} className="animate-spin" />
+                          : <FileArrowDown size={12} weight="bold" />}
+                        {ttLabelBusy ? "Fetching…" : "TikTok label"}
+                      </button>
+                      {/* TikTok's own wording, not a generic failure — the reason is usually
+                          actionable ("no package on TikTok yet"). */}
+                      {ttLabelErr && <div className="mt-1.5 text-xs text-amber-700">{ttLabelErr}</div>}
+                    </>
+                  )}
                 </div>
               </div>
             </SectionCard>
