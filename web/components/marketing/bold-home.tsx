@@ -18,12 +18,16 @@ import type { SiteContent } from "@/lib/site-content"
  *     nothing bounces for attention, and every effect is skipped under reduced-motion
  *   · black on lime is ~16:1, well past AA, so the accent can hold real text
  */
-const LIME = "#D8F651"
+// Creamier than the first pass. #D8F651 was an acid yellow-green — high energy but it
+// vibrates against black and reads cheap at full-bleed size. This is the same hue pulled
+// toward cream: less chroma, a touch more lightness, so a whole plate of it stays warm
+// instead of shouting. Black on it is ~16.5:1, so it still carries real text.
+const LIME = "#CFEB86"
 const INK = "#0B0B0C"
 
 /** Words rise out of a mask, one after another. The mask is what makes it read as
  *  typesetting rather than a fade — letters emerge from an edge instead of materialising. */
-function MaskedWords({ text, className = "", delay = 0, boxed = false }: { text: string; className?: string; delay?: number; boxed?: boolean }) {
+function MaskedWords({ text, className = "", delay = 0 }: { text: string; className?: string; delay?: number }) {
   const reduce = useReducedMotion()
   const words = text.split(" ").filter(Boolean)
   return (
@@ -31,11 +35,7 @@ function MaskedWords({ text, className = "", delay = 0, boxed = false }: { text:
       {words.map((w, i) => (
         <span key={`${w}-${i}`} className="inline-block overflow-hidden pb-[0.08em] align-bottom">
           <motion.span
-            className={"inline-block " + (boxed ? "px-[0.18em]" : "")}
-            // WHITE box, not lime: the hero plate is already lime, so a lime highlight on it
-            // is invisible. The reference boxes its accent words in the surface colour, which
-            // is what makes them read as cut out of the page rather than drawn on it.
-            style={boxed ? { background: "#FFFFFF", color: INK } : undefined}
+            className="inline-block"
             initial={reduce ? { opacity: 0 } : { y: "110%" }}
             animate={reduce ? { opacity: 1 } : { y: "0%" }}
             transition={reduce ? { duration: 0.3, delay } : { duration: 0.75, delay: delay + i * 0.055, ease: [0.16, 1, 0.3, 1] }}
@@ -45,6 +45,35 @@ function MaskedWords({ text, className = "", delay = 0, boxed = false }: { text:
           {i < words.length - 1 && <span>&nbsp;</span>}
         </span>
       ))}
+    </span>
+  )
+}
+
+/**
+ * The accent phrase in ONE highlight, not one per word.
+ *
+ * Boxing each word separately gave "printed" and "itself?" a block each — two competing
+ * marks where the sentence has one idea, and the gap between them broke the phrase in half.
+ * A single plate behind the whole phrase reads as one emphasis.
+ *
+ * The plate wipes open from the left before the words rise through it, so the highlight looks
+ * drawn under the text rather than pasted behind it.
+ */
+function HighlightPhrase({ text, delay = 0 }: { text: string; delay?: number }) {
+  const reduce = useReducedMotion()
+  return (
+    <span className="relative inline-block px-[0.18em] align-bottom">
+      <motion.span
+        aria-hidden
+        className="absolute inset-0 origin-left"
+        style={{ background: "#FFFFFF" }}
+        initial={reduce ? { opacity: 0 } : { scaleX: 0 }}
+        animate={reduce ? { opacity: 1 } : { scaleX: 1 }}
+        transition={{ duration: 0.55, delay, ease: [0.16, 1, 0.3, 1] }}
+      />
+      <span className="relative" style={{ color: INK }}>
+        <MaskedWords text={text} delay={delay + 0.18} />
+      </span>
     </span>
   )
 }
@@ -112,7 +141,11 @@ export function BoldHome({ content }: { content: SiteContent }) {
           edge — that overhang is the depth — and clipping the section amputated it to a strip
           of window chrome. The diagonal below does its own clipping via clip-path, so the
           section never needed to clip anything. */}
-      <section ref={heroRef} className="relative" style={{ background: LIME }}>
+      {/* -mt-16 pt-16 pulls the plate UP behind the sticky 4rem header, so the colour starts
+          at the top of the window instead of under a white bar. The header itself goes
+          transparent on this route (site-header.tsx) — between them, the hero reads as one
+          full-bleed plate with the nav sitting on it. */}
+      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: LIME }}>
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
         <div className="absolute inset-x-0 bottom-0 h-24 bg-white [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
@@ -121,7 +154,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           <h1 className="max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] text-[#0B0B0C] mx-auto"
               style={{ fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" }}>
             <MaskedWords text={hero.headline} />{" "}
-            <MaskedWords text={hero.accent} delay={0.12} boxed />
+            <HighlightPhrase text={hero.accent} delay={0.28} />
           </h1>
 
           <motion.p
@@ -163,6 +196,26 @@ export function BoldHome({ content }: { content: SiteContent }) {
             <div className="flex items-center gap-1.5 pb-3">
               {["#ff5f57", "#febc2e", "#28c840"].map((c) => <span key={c} className="size-2.5 rounded-full" style={{ background: c }} />)}
             </div>
+            {/* The chart from the reference: columns that GROW from the baseline as the panel
+                arrives, left to right. Height is the only thing animated (via scaleY off a
+                bottom origin), which the compositor can do on the GPU — animating the actual
+                height would relayout the panel on every frame. */}
+            <div className="mb-3 rounded-xl border border-black/[0.07] bg-[#FAFAF9] p-4">
+              <div className="flex items-end justify-between gap-1.5" style={{ height: 92 }}>
+                {[38, 55, 30, 72, 48, 90, 64, 78, 44, 84, 58, 96].map((h, i) => (
+                  <motion.span
+                    key={i}
+                    className="flex-1 rounded-t-[3px]"
+                    style={{ background: i % 3 === 2 ? INK : LIME, transformOrigin: "bottom", height: `${h}%` }}
+                    initial={reduce ? { opacity: 0 } : { scaleY: 0 }}
+                    whileInView={reduce ? { opacity: 1 } : { scaleY: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.6, delay: 0.7 + i * 0.045, ease: [0.16, 1, 0.3, 1] }}
+                  />
+                ))}
+              </div>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-3">
               {stats.slice(0, 3).map((s, i) => (
                 <motion.div
@@ -178,6 +231,33 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 </motion.div>
               ))}
             </div>
+
+            {/* Figures peeled OFF the panel and floated beside it — the reference's clearest
+                device. They drift in late and from opposite sides, so they read as lifted off
+                the screen rather than drawn on it. Hidden below lg, where they'd overlap the
+                panel they're meant to annotate. */}
+            {stats[3] && (
+              <motion.div
+                className="absolute -left-24 top-1/3 hidden rounded-2xl border border-black/10 bg-white p-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.35)] lg:block"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, x: 24, y: 10 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                transition={{ duration: 0.7, delay: 1.05, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-black/45">{stats[3].label}</div>
+                <CountUp value={stats[3].value} className="mt-1 block text-xl font-black tracking-tight" />
+              </motion.div>
+            )}
+            {stats[0] && (
+              <motion.div
+                className="absolute -right-20 top-16 hidden rounded-full border border-black/10 bg-white px-4 py-2 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.35)] lg:block"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, x: -24, y: -10 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                transition={{ duration: 0.7, delay: 1.2, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <span className="text-sm font-bold tracking-tight">{stats[0].value}</span>
+                <span className="ml-1.5 text-xs text-black/50">{stats[0].label}</span>
+              </motion.div>
+            )}
           </motion.div>
         </motion.div>
       </section>

@@ -1,50 +1,14 @@
 import Link from "next/link"
-import { buttonVariants } from "@/components/ui/button"
-
-const nav = [
-  { label: "Products", href: "/catalog" },
-  { label: "Features", href: "/features" },
-  { label: "How it works", href: "/how-it-works" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "API", href: "/docs" },
-]
+import { SiteHeader } from "@/components/marketing/site-header"
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
-  // The home hero used to be a black brand plate, so the header inverted to
-  // light-on-dark on "/" only. The hero is a themed light surface now, so that special
-  // case is gone — one header everywhere, which also means it can't be half-inverted
-  // during a theme switch.
+  // The header moved to components/marketing/site-header.tsx so it can read the route and
+  // sit ON a full-bleed hero plate where a page has one. Still ONE component with one set of
+  // links — the hazard the old note here warned about was two headers that could disagree,
+  // not a background that varies.
   return (
     <div className="flex min-h-svh flex-col bg-background">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
-          <Link href="/" className="font-display text-2xl font-semibold tracking-tight">
-            egfulfill
-          </Link>
-          <nav className="hidden items-center gap-6 md:flex">
-            {nav.map((n) => (
-              <Link
-                key={n.label}
-                href={n.href}
-                className="rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-2">
-            <Link
-              href="/login"
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-            >
-              Log in
-            </Link>
-            <Link href="/login" className={buttonVariants({ size: "sm" })}>
-              Start free
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="flex-1">{children}</main>
 
