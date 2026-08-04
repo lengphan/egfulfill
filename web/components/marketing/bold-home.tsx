@@ -129,7 +129,7 @@ function Pill({ href, children, tone = "ink" }: { href: string; children: React.
 const ICONS = [PlugsConnected, Printer, Wallet, Truck]
 
 export function BoldHome({ content }: { content: SiteContent }) {
-  const { hero, stats, features, steps, cta } = content
+  const { hero, stats, features, steps, testimonials, faq, cta } = content
   const reduce = useReducedMotion()
   const heroRef = useRef<HTMLDivElement>(null)
 
@@ -340,6 +340,55 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 <h3 className="mt-3 text-xl font-bold tracking-tight">{s.title}</h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-black/55">{s.body}</p>
               </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TESTIMONIALS ───────────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-6xl px-6 py-28">
+        <h2 className="max-w-3xl font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+          {testimonials.heading}
+        </h2>
+        <div className="mt-14 grid gap-4 md:grid-cols-3">
+          {testimonials.items.slice(0, 3).map((t, i) => (
+            <motion.figure
+              key={t.name}
+              className="rounded-2xl border border-black/[0.09] bg-white p-7"
+              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 22 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "0px 0px -12% 0px" }}
+              transition={{ duration: 0.55, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {/* The quote mark is set in the accent and oversized — the one piece of
+                  ornament the style allows, because it's type doing it. */}
+              <span aria-hidden className="block text-6xl font-black leading-[0.6]" style={{ color: ACCENT }}>&ldquo;</span>
+              <blockquote className="mt-3 text-[15px] leading-relaxed text-black/70">{t.quote}</blockquote>
+              <figcaption className="mt-5 text-sm">
+                <span className="font-bold">{t.name}</span>
+                <span className="text-black/45"> · {t.role}</span>
+              </figcaption>
+            </motion.figure>
+          ))}
+        </div>
+      </section>
+
+      {/* ── FAQ — plain disclosure elements: keyboard and screen-reader behaviour for
+              free, and no state to get wrong. ─────────────────────────────────────── */}
+      <section className="border-y border-black/[0.07] bg-[#FAFAF9] py-28">
+        <div className="mx-auto max-w-3xl px-6">
+          <h2 className="font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+            {faq.heading}
+          </h2>
+          <div className="mt-12 divide-y divide-black/[0.09] border-y border-black/[0.09]">
+            {faq.items.map((f, i) => (
+              <details key={i} className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-left text-lg font-bold tracking-tight [&::-webkit-details-marker]:hidden">
+                  {f.q}
+                  <span aria-hidden className="shrink-0 text-2xl font-black transition-transform duration-200 group-open:rotate-45">+</span>
+                </summary>
+                <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-black/60">{f.a}</p>
+              </details>
             ))}
           </div>
         </div>
