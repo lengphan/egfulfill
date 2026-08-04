@@ -1,93 +1,155 @@
 "use client"
 
-import { FACTORY_STAGES, orderStage, type FactoryTone } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, orderStage } from "@/lib/factory-status"
+import { platformOf } from "@/lib/order-format"
 import { type OrderRow } from "@/lib/api"
 
-// The linear stages, Draft first — the same vocabulary the boards show as badges.
-const LINE = [{ id: "", label: "Draft", tone: "new" as FactoryTone }, ...FACTORY_STAGES]
-
-// Fill colours for the flow bar: the SAME hues as the stage badges (TONE_CLASS), one step
-// stronger so a thin bar still reads, and given a dark-mode step so it isn't a pale smear
-// on near-black. This is the app's semantic stage palette (like TONE_CLASS), which the
-// neutral tokens deliberately don't express — so it lives here rather than being faked
-// from --primary, which would make every stage look the same.
-const BAR: Record<FactoryTone, string> = {
-  new: "bg-slate-300 dark:bg-slate-600",
-  review: "bg-indigo-400 dark:bg-indigo-500",
-  neutral: "bg-slate-400 dark:bg-slate-500",
-  qc: "bg-amber-400 dark:bg-amber-500",
-  prod: "bg-violet-500",
-  packed: "bg-sky-400 dark:bg-sky-500",
-  shipped: "bg-emerald-500",
-  hold: "bg-amber-500",
-  alert: "bg-red-500",
-  backorder: "bg-orange-500",
-  closed: "bg-muted",
-}
-
-// The stages that are actually WORK-IN-PROGRESS (not the intake edge, not the done edge).
-// The busiest of these is where the floor is backing up — worth drawing the eye to.
-const WIP = new Set(["in_review", "awaiting_scan", "printed", "working"])
+// The linear stages, Draft first — the same vocabulary the boards show as badges. Exception
+// states hang off the pipeline rather than sitting in it, so they're appended and only shown
+// when they hold something: an always-visible "Cancelled 0" is a row that never earns its space.
+const LINE = [{ id: "", label: "Draft" }, ...FACTORY_STAGES.map((s) => ({ id: s.id, label: s.label }))]
+const OFF_LINE = EXCEPTION_STAGES.map((s) => ({ id: s.id, label: s.label }))
 
 /**
- * The production floor as a single glance: how many orders sit at each stage, and where
- * the pile is. A proportional bar shows the shape of the backlog; the nodes below read the
- * exact counts. Every number is a live count off the order feed — nothing is modelled.
+ * WHICH CHANNEL, not which stage, carries the colour here.
+ *
+ * The stage is already named at the head of its own row, so hues spent telling stages apart
+ * are decoration. Spent on the channel instead they answer a question the card couldn't
+ * answer at all: *whose* orders are piling up — which matters, because a backlog that's all
+ * one marketplace is a different problem from one spread evenly.
+ *
+ * Fixed slots, assigned by name and never cycled, so a channel keeps its colour when another
+ * disappears from the data — colour follows the entity, never its rank.
+ *
+ * Hexes are the validated categorical slots 1–4 with their own dark-mode steps (not an
+ * automatic flip). Verified with the palette validator in both modes: worst adjacent CVD
+ * ΔE 9.1 light / 8.4 dark against a ≥8 target, normal-vision 22.9 / 19.8 against a ≥15 floor.
+ * The light column sits under 3:1 on two slots, which obliges visible labels — hence the
+ * legend below and the count on every row, never colour alone.
+ */
+const CHANNELS: { name: string; cls: string }[] = [
+  { name: "Etsy", cls: "bg-[#2a78d6] dark:bg-[#3987e5]" },
+  { name: "TikTok", cls: "bg-[#eb6834] dark:bg-[#d95926]" },
+  { name: "Shopify", cls: "bg-[#1baf7a] dark:bg-[#199e70]" },
+  { name: "Manual", cls: "bg-[#eda100] dark:bg-[#c98500]" },
+]
+const OTHER = { name: "Other", cls: "bg-slate-400 dark:bg-slate-500" }
+const slotFor = (p: string) => CHANNELS.find((c) => c.name === p) ?? OTHER
+
+const dayjs = (iso?: string | null) => (iso ? (Date.now() - new Date(iso).getTime()) / 86400000 : NaN)
+/** How long the oldest thing in a stage has been sitting. A stage holding old work is a
+ *  different problem from a busy one, and the count alone can't say which. */
+const ageLabel = (d: number) => (!Number.isFinite(d) ? "" : d < 1 ? "today" : `${Math.floor(d)}d`)
+
+/**
+ * The production floor as a single glance: how many orders sit at each stage, which channels
+ * they came from, and how long the oldest has waited. Every number is a live count off the
+ * order feed — nothing is modelled.
  */
 export function ProductionLine({ orders }: { orders: OrderRow[] }) {
-  const counts = LINE.map((s) => ({ ...s, n: orders.filter((o) => orderStage(o.items ?? []) === s.id).length }))
-  // The busiest work-in-progress stage — highlighted so a bottleneck stands out. -1 seed so
-  // an all-zero floor picks nothing rather than lighting up Received.
-  const peak = counts.filter((s) => WIP.has(s.id)).reduce((a, s) => (s.n > a.n ? s : a), { id: "", n: 0 })
+  const rows = [...LINE, ...OFF_LINE].map((s) => {
+    const inStage = orders.filter((o) => orderStage(o.items ?? []) === s.id)
+    // Grouped in the fixed slot order, so a stack's bands sit in the same order on every row
+    // and can be compared straight down the card.
+    const byChannel = [...CHANNELS, OTHER]
+      .map((c) => ({
+        ...c,
+        n: inStage.filter((o) => slotFor(platformOf(o)).name === c.name).length,
+      }))
+      .filter((c) => c.n > 0)
+    // Seeded at 0, NOT NaN: Math.max(NaN, x) is NaN, so a NaN seed silently blanked the age
+    // on every row. An empty stage is handled by the `r.n` check at render instead.
+    const oldest = inStage.reduce((a, o) => {
+      const d = dayjs(o.created_at)
+      return Number.isFinite(d) && d > a ? d : a
+    }, 0)
+    return { ...s, n: inStage.length, byChannel, oldest, off: OFF_LINE.some((x) => x.id === s.id) }
+  })
 
-  // HORIZONTAL rows, not columns. A real floor is extremely lopsided — 207 drafts against
-  // 8 pending and 5 awaiting scan — and as columns that shape fails twice: every stage but
-  // the biggest collapses to a 6px stub on the baseline, and the tall bar forces a chart
-  // height that the other four columns leave as empty air. Rows fix both. Each stage owns a
-  // band whether its count is 207 or 0, the card's height goes into bands instead of
-  // headroom, and the count sits at the end of its own row, so a one-pixel bar is still
-  // perfectly readable — the number never depended on the bar's length.
-  //
-  // It also reads as what it is: a pipeline, top to bottom, in pipeline order.
-  const max = Math.max(1, ...counts.map((s) => s.n))
-  const total = counts.reduce((a, s) => a + s.n, 0)
+  // Exception rows only when they hold something; pipeline rows always, so the shape of the
+  // line is stable even on a quiet day.
+  const shown = rows.filter((r) => !r.off || r.n > 0)
+  const max = Math.max(1, ...shown.map((r) => r.n))
+  const total = shown.reduce((a, r) => a + r.n, 0)
+  const channelsPresent = CHANNELS.concat(OTHER).filter((c) => shown.some((r) => r.byChannel.some((b) => b.name === c.name)))
 
   return (
-    // h-full + flex-1 rows: this card is stretched to match the fulfilment-speed card beside
-    // it, so a content-height chart left a third of it empty — the "doesn't use the height it
-    // has" complaint. The bands absorb the slack instead, which also gives each row a bigger
-    // hover target. min-h keeps them from collapsing when the card is short.
-    <div className="flex flex-1 flex-col justify-center px-5 py-3">
-      {counts.map((s) => {
-        const hot = s.id === peak.id && peak.n > 0
+    <div className="flex flex-1 flex-col px-5 py-3">
+      {/* Legend — mandatory above one series, and the relief the light palette's contrast
+          WARN requires: identity is never carried by colour alone. */}
+      {channelsPresent.length > 1 && (
+        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {channelsPresent.map((c) => (
+            <span key={c.name} className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+              <span className={"size-2 rounded-[2px] " + c.cls} />
+              {c.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {shown.map((r) => {
         // Proportional to the busiest stage, with a floor so a non-zero stage is never
-        // invisible — a stage holding 5 orders is not the same as one holding none, and at
-        // 5/207 an honest proportion would round to nothing.
-        const pct = s.n ? Math.max(1.5, (s.n / max) * 100) : 0
+        // invisible — at 5/207 an honest proportion would round away to nothing, and a stage
+        // holding five orders is not the same as one holding none.
+        const pct = r.n ? Math.max(2, (r.n / max) * 100) : 0
+        // Too little width for inter-segment gaps to be anything but noise — see below.
+        const narrow = pct < 12
         return (
           <div
-            key={s.id || "received"}
-            className="group flex min-h-[34px] flex-1 items-center gap-3 rounded-md px-1 transition-colors hover:bg-accent/40"
-            title={`${s.label}: ${s.n} order${s.n === 1 ? "" : "s"}${total ? ` · ${Math.round((s.n / total) * 100)}% of the floor` : ""}`}
+            key={r.id || "draft"}
+            className="group flex min-h-[32px] flex-1 items-center gap-3 rounded-md px-1 transition-colors hover:bg-accent/40"
+            title={
+              `${r.label}: ${r.n} order${r.n === 1 ? "" : "s"}` +
+              (total ? ` · ${Math.round((r.n / total) * 100)}% of the floor` : "") +
+              (r.byChannel.length ? `\n${r.byChannel.map((c) => `${c.name} ${c.n}`).join(" · ")}` : "") +
+              (Number.isFinite(r.oldest) ? `\nOldest waiting ${ageLabel(r.oldest)}` : "")
+            }
           >
-            <div className={"w-28 shrink-0 truncate text-xs font-medium " + (hot ? "text-foreground" : "text-muted-foreground")}>
-              {s.label}
+            <div className={"w-24 shrink-0 truncate text-xs font-medium " + (r.off ? "text-muted-foreground/70 italic" : "text-muted-foreground")}>
+              {r.label}
             </div>
-            {/* The track is the full width every stage gets, so the bars share one scale and
-                the eye can compare them down the column edge. */}
-            <div className="relative h-2.5 flex-1 overflow-hidden rounded-sm bg-muted/60">
-              {s.n > 0 && (
-                <div
-                  className={"absolute inset-y-0 left-0 rounded-r-[4px] transition-[width] duration-500 " + BAR[s.tone]}
-                  style={{ width: `${pct}%` }}
-                />
+
+            {/* One shared track, so every stack is measured against the same width and the
+                eye can compare them down the card's edge. */}
+            <div className="relative h-2.5 flex-1 rounded-sm bg-muted/60">
+              {r.n > 0 && (
+                <div className="absolute inset-y-0 left-0 flex overflow-hidden rounded-sm" style={{ width: `${pct}%` }}>
+                  {r.byChannel.map((c, i) => (
+                    <div
+                      key={c.name}
+                      // 2px surface gap between touching segments (never a stroke), and the
+                      // rounded data-end only on the last one — the stack ends there.
+                      //
+                      // The gap is DROPPED on a narrow stack. At 8 orders against a 207 peak
+                      // the bar is ~2% wide, and three 2px gaps then cost more of it than the
+                      // data does — it renders as confetti rather than a bar. Below the
+                      // threshold the segments butt together and read as one small bar with
+                      // its mix hinted; the exact split is in the tooltip, which is where a
+                      // breakdown that cannot fit belongs.
+                      className={
+                        c.cls +
+                        (i && !narrow ? " ml-[2px]" : "") +
+                        (i === r.byChannel.length - 1 ? " rounded-r-[4px]" : "")
+                      }
+                      style={{ flex: `${c.n} 0 0%` }}
+                    />
+                  ))}
+                </div>
               )}
             </div>
-            {/* Value at the tip of the row, not the tip of the bar: a 1.5% bar has nowhere to
-                put a label, and a number that moves with the bar is a number you have to hunt
-                for. Right-aligned and tabular so the digits line up as a readable column. */}
-            <div className={"w-10 shrink-0 text-right text-sm font-semibold tabular-nums " + (s.n ? "text-foreground" : "text-muted-foreground/60")}>
-              {s.n}
+
+            {/* Oldest-waiting, muted: context for the count rather than a competing number.
+                Fixed width so it never shoves the counts out of their column. */}
+            <div className="w-12 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground/70">
+              {r.n ? ageLabel(r.oldest) : ""}
+            </div>
+
+            {/* Value at the end of the ROW, not the end of the bar: a 2%-wide stack has
+                nowhere to put a label, and a number that moves with the bar is one you have
+                to hunt for. Right-aligned and tabular so the digits read as a column. */}
+            <div className={"w-10 shrink-0 text-right text-sm font-semibold tabular-nums " + (r.n ? "text-foreground" : "text-muted-foreground/60")}>
+              {r.n}
             </div>
           </div>
         )
