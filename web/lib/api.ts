@@ -3099,6 +3099,8 @@ export type SourcingRow = {
   supplierRef?: string | null
   currency?: string | null
   decorationCost?: number | null
+  /** absolute http(s) only — this renders straight into an <img src> */
+  image?: string | null
   archived?: boolean
 }
 export function getSourcing() {
@@ -3113,8 +3115,13 @@ export function deleteSourcing(id: string, hard = false) {
   return api<{ ok?: boolean; error?: string }>(
     `/api/manual-suppliers/${encodeURIComponent(id)}${hard ? "?hard=1" : ""}`, { method: "DELETE" })
 }
-/** Read a price off a listing page. Never writes — the caller decides whether to keep it. */
+/**
+ * Read a listing page: price, title and image, in one safe server-side fetch.
+ * Never writes — the caller decides what to keep. `ok:false` still carries title/image when
+ * only the PRICE was unreadable, which is the common case on shops that render it in JS.
+ */
 export function fetchSourcingPrice(url: string) {
-  return api<{ ok?: boolean; price?: number; found?: number; why?: string; error?: string }>(
+  return api<{ ok?: boolean; price?: number; found?: number; title?: string | null
+               image?: string | null; why?: string; error?: string }>(
     `/api/manual-suppliers/price`, { method: "POST", body: JSON.stringify({ url }) })
 }

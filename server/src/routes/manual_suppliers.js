@@ -102,12 +102,55 @@ async function fetchPrice(url) {
     if (isFinite(n) && n > 0) prices.push(n);
   }
 
+  // Title and image come out of the SAME html we already downloaded — no second request,
+  // no new host to reach, so nothing to re-guard. Worth having even when the price is
+  // unreadable: a row with the right name and picture is still far better than a bare link.
+  const meta = (re) => { const m = html.match(re); return m ? m[1] : null; };
+  const unent = (v) => String(v || '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").trim();
+
+  let title = unent(
+    meta(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i) ||
+    meta(/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)/i) ||
+    meta(/<title[^>]*>([^<]{1,300})<\/title>/i) || ''
+  ).slice(0, 200) || null;
+
+  let image = unent(
+    meta(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)/i) ||
+    meta(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)/i) ||
+    meta(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)/i) || ''
+  ) || null;
+  // JSON-LD carries the image as a string, an array, or an ImageObject; take the first
+  // usable one rather than rendering "[object Object]" into an <img src>.
+  if (!image) {
+    for (const m of html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+      try {
+        const pick = (v) => {
+          if (!v) return null;
+          if (typeof v === 'string') return v;
+          if (Array.isArray(v)) { for (const x of v) { const r = pick(x); if (r) return r; } return null; }
+          if (typeof v === 'object') return pick(v.url || v.contentUrl || v.image);
+          return null;
+        };
+        const found = pick(JSON.parse(m[1]).image);
+        if (found) { image = found; break; }
+      } catch { /* skip malformed blocks */ }
+    }
+  }
+  // Only absolute http(s) images: a relative path or a data: URI would render broken, and
+  // resolving relatives means trusting a host we deliberately do not follow redirects to.
+  if (image && !/^https?:\/\//i.test(image)) image = null;
+
   if (!prices.length) {
-    return { ok: false, error: "This shop doesn't publish its price in a readable form. Type it in instead — it'll be saved with the link." };
+    return {
+      ok: false, title, image,
+      error: "This shop doesn't publish its price in a readable form. Type it in — the name and picture were still read.",
+    };
   }
   // The LOWEST declared price. Variant pages list every option, and quoting the dearest
   // as "the cost" would overstate what we pay and understate the margin.
-  return { ok: true, price: Math.min(...prices), found: prices.length };
+  return { ok: true, price: Math.min(...prices), found: prices.length, title, image };
 }
 
 // ADMIN-only, all of it. These rows carry what we pay and what we make on it — margin is
@@ -138,6 +181,7 @@ export function manualSupplierRoutes(app, requireAdmin) {
     'supplier_ref text',              // internal supplier style, e.g. "sanmar:PC61" — price re-reads on catalog sync
     'currency text',                  // as quoted; converted at display time, never stored converted
     'decoration_cost numeric(12,2)',  // print/embroidery per unit, if not our own factory
+    'image text',
     'archived boolean default false',
   ]) q(`alter table manual_suppliers add column if not exists ${col}`).catch(() => {});
 
@@ -155,6 +199,7 @@ export function manualSupplierRoutes(app, requireAdmin) {
         leadDays: x.lead_days == null ? null : Number(x.lead_days),
         supplierRef: x.supplier_ref || null,
         currency: x.currency || 'USD',
+        image: x.image || null,
         decorationCost: x.decoration_cost == null ? null : Number(x.decoration_cost),
         archived: !!x.archived,
       })),
@@ -201,23 +246,27 @@ export function manualSupplierRoutes(app, requireAdmin) {
     const decoration = num(b.decorationCost);
     const supplierRef = b.supplierRef ? String(b.supplierRef).trim().slice(0, 120) : null;
     const currency = b.currency ? String(b.currency).trim().toUpperCase().slice(0, 3) : 'USD';
+    // Only absolute http(s) — this string goes straight into an <img src>, so a
+    // javascript: or data: value must never survive the round trip.
+    const image = b.image && /^https?:\/\//i.test(String(b.image)) ? String(b.image).slice(0, 1000) : null;
 
     if (b.id) {
       await q(`update manual_suppliers set title=$2, url=$3, shop=$4, cost=$5, markup_pct=$6,
                  sell_price=$7, product_id=$8, note=$9, moq=$10, ship_total=$11, lead_days=$12,
-                 supplier_ref=$13, currency=$14, decoration_cost=$15, updated_at=now()
+                 supplier_ref=$13, currency=$14, decoration_cost=$15, image=$16, updated_at=now()
                where id=$1::bigint`,
         [String(b.id), title, b.url || null, shop, cost, pct, sell, b.productId || null, b.note || null,
-         moq, shipTotal, leadDays, supplierRef, currency, decoration]);
+         moq, shipTotal, leadDays, supplierRef, currency, decoration, image]);
       audit(req, 'manual-supplier.updated', { entityType: 'manual_supplier', entityId: String(b.id), after: { title, cost, sell } });
       return { ok: true, id: String(b.id) };
     }
     const r = await q(
       `insert into manual_suppliers (title, url, shop, cost, markup_pct, sell_price, product_id, note,
-                                     moq, ship_total, lead_days, supplier_ref, currency, decoration_cost, created_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
+                                     moq, ship_total, lead_days, supplier_ref, currency, decoration_cost,
+                                     image, created_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning id`,
       [title, b.url || null, shop, cost, pct, sell, b.productId || null, b.note || null,
-       moq, shipTotal, leadDays, supplierRef, currency, decoration,
+       moq, shipTotal, leadDays, supplierRef, currency, decoration, image,
        String((req.user && req.user.sub) || '')]);
     audit(req, 'manual-supplier.added', { entityType: 'manual_supplier', entityId: String(r.rows[0].id), after: { title, shop, cost, sell } });
     return { ok: true, id: String(r.rows[0].id) };
