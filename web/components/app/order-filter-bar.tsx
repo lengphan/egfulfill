@@ -14,10 +14,10 @@ import { type OrderRow, type CatalogProduct } from "@/lib/api"
 
 /** One dropdown in the bar.
  *
- *  Sized to the TABLE, not to a form: h-7 / text-xs / rounded-md is the same metric as the
- *  Label · Scan · Design chips in the List column, so the toolbar reads as part of the list
- *  it narrows. At h-9 / text-sm it was visibly a size up from every word beneath it — the
- *  heaviest type on a screen whose job is the rows.
+ *  h-8 / 13px / rounded-md. It went to h-9/text-sm originally (a size up from every word
+ *  beneath it — the heaviest type on a screen whose job is the rows), then over-corrected to
+ *  h-7/text-xs, which read as small print you had to lean in for. 13px sits between: clearly
+ *  a control, still quieter than the order numbers it narrows.
  *
  *  Selected state is carried by weight and foreground colour, not a second accent — the
  *  stage pills beside it are the only violet in this row. */
@@ -33,26 +33,26 @@ function FilterMenu({ label, value, options, onPick }: {
     <DropdownMenu>
       <DropdownMenuTrigger
         className={
-          "inline-flex h-7 max-w-[10rem] items-center gap-1 rounded-md border px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
+          "inline-flex h-8 max-w-[11rem] items-center gap-1 rounded-md border px-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
           (on
             ? "border-primary/40 bg-primary/5 text-foreground"
             : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground")
         }
       >
         <span className="truncate">{on ? current?.label ?? value : label}</span>
-        <CaretDown size={10} weight="bold" className="shrink-0 opacity-60" />
+        <CaretDown size={11} weight="bold" className="shrink-0 opacity-60" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-72 w-48 overflow-y-auto p-1">
+      <DropdownMenuContent align="end" className="max-h-72 w-52 overflow-y-auto p-1">
         {/* The reset row is the filter's own TITLE — "Platform", not "Platform: any". It
             reads as the unfiltered heading the trigger falls back to, which is exactly what
             picking it does. It stays an explicit row rather than only a Clear button: a
             dropdown you can enter but not leave is the classic filter trap. */}
-        <DropdownMenuItem onClick={() => onPick("")} className="flex items-center gap-2 text-xs">
+        <DropdownMenuItem onClick={() => onPick("")} className="flex items-center gap-2 text-[13px]">
           <Check size={12} weight="bold" className={value ? "opacity-0" : "text-primary"} />
           <span className={value ? "text-muted-foreground" : "font-medium"}>{label}</span>
         </DropdownMenuItem>
         {options.map((o) => (
-          <DropdownMenuItem key={o.value} onClick={() => onPick(o.value)} className="flex items-center gap-2 text-xs">
+          <DropdownMenuItem key={o.value} onClick={() => onPick(o.value)} className="flex items-center gap-2 text-[13px]">
             <Check size={12} weight="bold" className={value === o.value ? "text-primary" : "opacity-0"} />
             <span className="truncate">{o.label}</span>
           </DropdownMenuItem>
@@ -87,7 +87,7 @@ export function OrderSearchInput({ query, onChange, className = "" }: {
         // title and the label, where it isn't clipped.
         placeholder="Search orders…"
         title="Search order number, customer, tracking, store, SKU or item name"
-        className="h-8 rounded-md pl-8 text-xs"
+        className="h-8 rounded-md pl-8 text-[13px]"
         aria-label="Search order number, customer, tracking, store, SKU or item name"
       />
     </div>
@@ -166,7 +166,7 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
       {active && (
         <button
           onClick={() => onChange({ ...EMPTY_ORDER_QUERY })}
-          className="eg-tap inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="eg-tap inline-flex h-8 items-center gap-1 rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <X size={11} weight="bold" /> Clear{count > 1 ? ` (${count})` : ""}
         </button>

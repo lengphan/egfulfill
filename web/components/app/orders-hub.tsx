@@ -738,6 +738,35 @@ export function OrdersHub() {
   /** One grid template for the header and every row. Lead tracks (caret, + checkbox when
    *  dispatch is on) precede the data columns; action is pinned last. */
   const gridTmpl = factoryGridTemplate(gridCols, dispatchOn ? 2 : 1)
+  /**
+   * The width this table actually WANTS, so it can scroll instead of bursting its card.
+   *
+   * The columns are fixed rem tracks (order-columns.ts) plus two flexible ones, and their
+   * fixed part alone outgrows the card somewhere under ~1250px — the row then overflowed the
+   * card's rounded edge with Customer, Items and the actions sliced off, unreachable. Page
+   * zoom makes that worse in a way media queries CANNOT catch: `zoom` doesn't change the
+   * viewport width the breakpoints read, so at 125% the layout still believes it has 1600px.
+   *
+   * So the table gets its own horizontal scroller and a min-width equal to the sum of its
+   * fixed tracks (+1fr each for the two flexible ones, which is their floor). Nothing is ever
+   * clipped; a narrow screen or a zoomed one scrolls sideways, which is what every dense
+   * table does.
+   */
+  const gridMinPx = useMemo(() => {
+    const lead = dispatchOn ? 1.25 + 1.5 : 1.5
+    const fixed = gridCols.reduce((n, id) => {
+      const g = FACTORY_COLS[id].grid
+      const rem = /^([0-9.]+)rem$/.exec(g)
+      // minmax(0,Nfr) tracks have no intrinsic width. 5rem is a FLOOR, not a target: above it
+      // Customer and Items keep absorbing the slack and truncating, which is the documented
+      // trade (see order-columns.ts) and keeps a 1600px desktop scroll-free. Below it they'd
+      // be unreadable, so that is where sideways scrolling takes over from squeezing — and,
+      // crucially, from the silent clipping that came before.
+      return n + (rem ? Number(rem[1]) : 5)
+    }, lead)
+    // gap-x-3 is 0.75rem between every track, and px-5 is 1.25rem of gutter each side.
+    return Math.round((fixed + gridCols.length * 0.75 + 2.5) * 16)
+  }, [gridCols, dispatchOn])
   const selectableOnPage = paged.pageItems.filter(dispatchable)
   const allOnPageSelected = selectableOnPage.length > 0 && selectableOnPage.every((o) => selected.has(o.id))
 
@@ -978,7 +1007,7 @@ export function OrdersHub() {
                   onClick={() => setQuery({ ...query, status: on ? "" : p.value })}
                   aria-pressed={on}
                   title={on && p.value ? `Showing ${p.label} only — click to clear` : undefined}
-                  className={"eg-tap h-7 rounded-md px-2 text-xs font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                  className={"eg-tap h-8 rounded-md px-2.5 text-[13px] font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
                 >
                   {tl("stage", p.label)}
                 </button>
@@ -992,9 +1021,9 @@ export function OrdersHub() {
               <DropdownMenuTrigger
                 aria-label="Choose which status pills to show"
                 title="Choose which status pills to show"
-                className="eg-tap flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="eg-tap flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
-                <Plus size={13} weight="bold" />
+                <Plus size={14} weight="bold" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-44 p-1">
                 {/* Label INSIDE the Group — Base UI's Menu.GroupLabel throws outside one,
@@ -1009,7 +1038,7 @@ export function OrdersHub() {
                         // The menu closes on each pick. Re-opening between toggles is the
                         // lesser evil versus hand-rolling a popover to keep it open.
                         onClick={() => togglePill(p.value)}
-                        className="flex items-center gap-2 text-xs"
+                        className="flex items-center gap-2 text-[13px]"
                       >
                         <Check size={12} weight="bold" className={shown ? "text-primary" : "opacity-0"} />
                         <span className="truncate">{tl("stage", p.label)}</span>
@@ -1080,9 +1109,12 @@ export function OrdersHub() {
           {/* THE HEADER. What the card list never had, and the reason it read as
               clutter: columns with no titles are just text at different x-positions.
               Same template as every row below, from the same list of ids. */}
+          {/* ONE scroller around the header AND the rows. Two separate ones would let the
+              titles drift out of line with the columns they name. */}
+          <div className="overflow-x-auto">
           <div
             className="grid items-center gap-x-3 border-b border-border bg-muted/30 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-            style={{ gridTemplateColumns: gridTmpl }}
+            style={{ gridTemplateColumns: gridTmpl, minWidth: gridMinPx }}
           >
             {dispatchOn && <span />}
             <span />
@@ -1128,7 +1160,7 @@ export function OrdersHub() {
               )
             )}
           </div>
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border" style={{ minWidth: gridMinPx }}>
             {paged.pageItems.map((o) => {
               const items = o.items ?? []
               const stage = orderStage(items)
@@ -1881,6 +1913,7 @@ export function OrdersHub() {
               )
             })}
           </div>
+          </div>{/* /overflow-x-auto */}
           {/* "We may already have made this." Exact and similar are kept visually
               separate on purpose: identical artwork is a safe reuse, whereas a
               lookalike is a lead to check. Attaching a fuzzy match automatically
@@ -2047,7 +2080,7 @@ export function OrdersHub() {
                 </p>
                 <ol className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
                   {path.map((s, i) => (
-                    <li key={s || "new"} className="flex items-center gap-2 text-xs">
+                    <li key={s || "new"} className="flex items-center gap-2 text-[13px]">
                       <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-medium text-primary">{i + 1}</span>
                       {stageMeta(s)?.label ?? s}
                     </li>

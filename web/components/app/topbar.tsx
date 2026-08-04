@@ -30,6 +30,7 @@ import { UserAvatar } from "@/components/app/user-avatar"
 import { NotificationBell } from "@/components/app/notification-bell"
 import { OrderSearch } from "@/components/app/order-search"
 import { LanguageSwitcher } from "@/components/app/language-switcher"
+import { ZoomControl } from "@/components/app/zoom-control"
 import { useT, useLabelT } from "@/lib/i18n"
 
 /**
@@ -193,6 +194,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
         <CapacityBadge staff={isStaff} />
         <NotificationBell />
         <LanguageSwitcher />
+        <ZoomControl />
         <IconButton
           label={t("topbar.toggleTheme")}
           onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
