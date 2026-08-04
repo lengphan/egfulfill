@@ -16,7 +16,7 @@ import { ArrowUpRight } from "@phosphor-icons/react"
  * decoration usually does. Black on the accent is ~17:1, so it can hold real text anywhere.
  */
 export const ACCENT = "#C3D0FF"        // periwinkle — the plate/fill
-export const ACCENT_INK = "#1B2270"    // deep indigo — the accent LETTERING on that plate
+export const ACCENT_INK = "#4C5FD5"    // vivid periwinkle-blue — the accent LETTERING, on paper
 export const INK = "#0B0B0C"
 // Warm off-white, not pure white. Against a coloured plate, #FFF reads as an absence; a paper
 // tone makes the accent look chosen and gives the whole page the vintage-modern warmth.
@@ -167,9 +167,12 @@ export function PlateHero({ title, accent, sub, children }: {
   title: string; accent?: string; sub?: string; children?: React.ReactNode
 }) {
   const reduce = useReducedMotion()
+  // PAPER, not a colour plate. A periwinkle field with periwinkle lettering on it is
+  // purple-on-purple: the accent has nothing to contrast against and stops being an accent.
+  // Paper carries the page; the colour appears in the ONE phrase, the CTA band and the chart,
+  // which is what makes those read as chosen.
   return (
-    <section className="relative -mt-16 pt-16" style={{ background: ACCENT }}>
-      <div className="absolute inset-x-0 bottom-0 h-24 bg-white [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
+    <section className="relative -mt-16 pt-16" style={{ background: PAPER }}>
       <div className="mx-auto max-w-6xl px-6 pb-28 pt-20 sm:pt-28">
         <h1 className="mx-auto max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] text-[#0B0B0C]" style={DISPLAY}>
           <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} /></> : null}

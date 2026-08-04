@@ -71,11 +71,9 @@ export function BoldHome({ content }: { content: SiteContent }) {
           at the top of the window instead of under a white bar. The header itself goes
           transparent on this route (site-header.tsx) — between them, the hero reads as one
           full-bleed plate with the nav sitting on it. */}
-      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: ACCENT }}>
+      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: PAPER }}>
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
-        <div style={{ background: PAPER }} className="absolute inset-x-0 bottom-0 h-24 [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
-
         <div className="mx-auto max-w-6xl px-6 pb-40 pt-24 sm:pt-32">
           <h1 className="max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] text-[#0B0B0C] mx-auto"
               style={{ fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" }}>
