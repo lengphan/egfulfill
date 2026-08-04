@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform, animate } from "motion/react"
 import { ArrowUpRight, PlugsConnected, Printer, Truck, Wallet } from "@phosphor-icons/react"
 import type { SiteContent } from "@/lib/site-content"
+import { ACCENT, INK, PAPER, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -18,81 +19,7 @@ import type { SiteContent } from "@/lib/site-content"
  *     nothing bounces for attention, and every effect is skipped under reduced-motion
  *   · black on lime is ~16:1, well past AA, so the accent can hold real text
  */
-/**
- * ONE accent, one value — #D4F897, chosen by eye against the real page.
- *
- * This replaces a two-step split (a lighter value for full-bleed fields, a deeper one for
- * small marks) that existed because a large field reads duller than a small mark of the same
- * colour. That effect is real, but it was solving for a deeper base; at this value the plate
- * already reads bright, so the split bought nothing except two things to keep in sync.
- *
- * Black on it is ~17:1, so it carries real type anywhere it appears.
- */
-const ACCENT = "#D4F897"
-const INK = "#0B0B0C"
 
-/** Words rise out of a mask, one after another. The mask is what makes it read as
- *  typesetting rather than a fade — letters emerge from an edge instead of materialising. */
-function MaskedWords({ text, className = "", delay = 0 }: { text: string; className?: string; delay?: number }) {
-  const reduce = useReducedMotion()
-  const words = text.split(" ").filter(Boolean)
-  return (
-    <span className={className}>
-      {words.map((w, i) => (
-        <span key={`${w}-${i}`} className="inline-block overflow-hidden pb-[0.08em] align-bottom">
-          <motion.span
-            className="inline-block"
-            initial={reduce ? { opacity: 0 } : { y: "110%" }}
-            animate={reduce ? { opacity: 1 } : { y: "0%" }}
-            transition={reduce ? { duration: 0.3, delay } : { duration: 0.75, delay: delay + i * 0.055, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {w}
-          </motion.span>
-          {i < words.length - 1 && <span>&nbsp;</span>}
-        </span>
-      ))}
-    </span>
-  )
-}
-
-/**
- * The accent phrase in ONE highlight, not one per word.
- *
- * Boxing each word separately gave "printed" and "itself?" a block each — two competing
- * marks where the sentence has one idea, and the gap between them broke the phrase in half.
- * A single plate behind the whole phrase reads as one emphasis.
- *
- * The plate wipes open from the left before the words rise through it, so the highlight looks
- * drawn under the text rather than pasted behind it.
- */
-function HighlightPhrase({ text, delay = 0 }: { text: string; delay?: number }) {
-  const reduce = useReducedMotion()
-  return (
-    <span className="relative inline-block align-bottom">
-      <span className="relative" style={{ color: INK }}>
-        <MaskedWords text={text} delay={delay} />
-      </span>
-      {/* A RULE, not a slab. A filled white block behind the phrase read as a sticker pasted
-          over the plate — it fought the type it was meant to serve and put a hard rectangle
-          in the middle of a page whose whole idea is open space. A thick white underline
-          keeps white as an accent, leaves the headline reading straight through in ink on
-          the plate (17:1), and gives the eye one clean horizontal to land on.
-
-          It draws left-to-right AFTER the words have risen, so it reads as underlining a
-          finished sentence rather than sliding in with it. Rounded ends so it looks drawn
-          rather than cropped. */}
-      <motion.span
-        aria-hidden
-        className="absolute -bottom-[0.06em] left-0 right-0 origin-left rounded-full"
-        style={{ height: "0.11em", background: "#FFFFFF" }}
-        initial={reduce ? { opacity: 0 } : { scaleX: 0 }}
-        whileInView={reduce ? { opacity: 1 } : { scaleX: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6, delay: delay + 0.35, ease: [0.16, 1, 0.3, 1] }}
-      />
-    </span>
-  )
-}
 
 /** A number that counts to its value once, when it first arrives. Reads as the figure
  *  settling rather than a slot machine — no loop, no re-run on scroll-back. */
@@ -119,23 +46,6 @@ function CountUp({ value, className }: { value: string; className?: string }) {
   return <span ref={ref} className={className}>{m ? shown : value}</span>
 }
 
-/** Pill button. The arrow travels on hover — a 200ms cue that the thing goes somewhere,
- *  which is the whole reason the arrow is there. */
-function Pill({ href, children, tone = "ink" }: { href: string; children: React.ReactNode; tone?: "ink" | "lime" | "ghost" }) {
-  const base = "group inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-  const tones = {
-    ink: "bg-[#0B0B0C] text-white hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]",
-    lime: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
-    ghost: "border border-[#0B0B0C]/15 text-[#0B0B0C] hover:border-[#0B0B0C]/40 hover:bg-[#0B0B0C]/[0.03] focus-visible:ring-[#0B0B0C]",
-  }
-  return (
-    <Link href={href} className={`${base} ${tones[tone]}`} style={tone === "lime" ? { background: ACCENT } : undefined}>
-      {children}
-      <ArrowUpRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-    </Link>
-  )
-}
-
 const ICONS = [PlugsConnected, Printer, Wallet, Truck]
 
 export function BoldHome({ content }: { content: SiteContent }) {
@@ -151,7 +61,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
   const panelScale = useTransform(smooth, [0, 1], [1, 0.94])
 
   return (
-    <div className="bg-white text-[#0B0B0C]">
+    <div className="text-[#0B0B0C]" style={{ background: PAPER }}>
       {/* ── HERO ───────────────────────────────────────────────────────────────── */}
       {/* NOT overflow-hidden. The product panel deliberately hangs past the plate's bottom
           edge — that overhang is the depth — and clipping the section amputated it to a strip
@@ -164,13 +74,13 @@ export function BoldHome({ content }: { content: SiteContent }) {
       <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: ACCENT }}>
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-white [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
+        <div style={{ background: PAPER }} className="absolute inset-x-0 bottom-0 h-24 [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
 
         <div className="mx-auto max-w-6xl px-6 pb-40 pt-24 sm:pt-32">
           <h1 className="max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] text-[#0B0B0C] mx-auto"
               style={{ fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" }}>
             <MaskedWords text={hero.headline} />{" "}
-            <HighlightPhrase text={hero.accent} delay={0.28} />
+            <TypedPhrase text={hero.accent} />
           </h1>
 
           <motion.p
@@ -216,7 +126,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 arrives, left to right. Height is the only thing animated (via scaleY off a
                 bottom origin), which the compositor can do on the GPU — animating the actual
                 height would relayout the panel on every frame. */}
-            <div className="mb-3 rounded-xl border border-black/[0.07] bg-[#FAFAF9] p-4">
+            <div className="mb-3 rounded-xl border border-black/[0.07] bg-black/[0.03] p-4">
               <div className="flex items-end justify-between gap-1.5" style={{ height: 92 }}>
                 {[38, 55, 30, 72, 48, 90, 64, 78, 44, 84, 58, 96].map((h, i) => (
                   <motion.span
@@ -236,7 +146,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
               {stats.slice(0, 3).map((s, i) => (
                 <motion.div
                   key={s.label}
-                  className="rounded-xl border border-black/[0.07] bg-[#FAFAF9] p-4"
+                  className="rounded-xl border border-black/[0.07] bg-black/[0.03] p-4"
                   initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -330,7 +240,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       </section>
 
       {/* ── STEPS — numbers oversized, the way the style wants ──────────────────── */}
-      <section className="border-y border-black/[0.07] bg-[#FAFAF9] py-28">
+      <section className="border-y border-black/[0.07] bg-black/[0.03] py-28">
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             {steps.heading}
@@ -385,7 +295,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
 
       {/* ── FAQ — plain disclosure elements: keyboard and screen-reader behaviour for
               free, and no state to get wrong. ─────────────────────────────────────── */}
-      <section className="border-y border-black/[0.07] bg-[#FAFAF9] py-28">
+      <section className="border-y border-black/[0.07] bg-black/[0.03] py-28">
         <div className="mx-auto max-w-3xl px-6">
           <h2 className="font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             {faq.heading}

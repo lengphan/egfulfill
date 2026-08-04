@@ -1,7 +1,7 @@
 "use client"
 
 import { Check } from "@phosphor-icons/react"
-import { ACCENT, HEADING, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
+import { ACCENT, HEADING, PAPER, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 
 /**
  * Pricing, in the house style. Same copy and the same two ideas the old page had — what's
@@ -30,7 +30,7 @@ const examples = [
 
 export function BoldPricing() {
   return (
-    <div className="bg-white text-[#0B0B0C]">
+    <div className="text-[#0B0B0C]" style={{ background: PAPER }}>
       <PlateHero
         title="Simple,"
         accent="pay-as-you-go."
@@ -66,7 +66,7 @@ export function BoldPricing() {
           </Rise>
 
           {/* What an order costs — the second question, and the honest caveat with it. */}
-          <Rise delay={0.08} className="rounded-2xl border border-black/[0.09] bg-[#FAFAF9] p-9">
+          <Rise delay={0.08} className="rounded-2xl border border-black/[0.09] bg-black/[0.03] p-9">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/45">Example base costs</div>
             <p className="mt-3 text-[15px] leading-relaxed text-black/55">
               Blank + print, before shipping. The final price depends on product, placement and method.

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
 import { ArrowUpRight } from "@phosphor-icons/react"
 
@@ -14,8 +15,12 @@ import { ArrowUpRight } from "@phosphor-icons/react"
  * "Exaggerated Minimalism": black and white carry the page, ONE accent, and type does the work
  * decoration usually does. Black on the accent is ~17:1, so it can hold real text anywhere.
  */
-export const ACCENT = "#D4F897"
+export const ACCENT = "#C3D0FF"        // periwinkle — the plate/fill
+export const ACCENT_INK = "#1B2270"    // deep indigo — the accent LETTERING on that plate
 export const INK = "#0B0B0C"
+// Warm off-white, not pure white. Against a coloured plate, #FFF reads as an absence; a paper
+// tone makes the accent look chosen and gives the whole page the vintage-modern warmth.
+export const PAPER = "#FAF8F3"
 
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
@@ -47,31 +52,67 @@ export function MaskedWords({ text, className = "", delay = 0 }: { text: string;
 }
 
 /**
- * The accent phrase, underlined in white — a RULE, not a slab.
+ * The accent phrase, TYPED — and coloured rather than underlined.
  *
- * A filled white block behind the phrase read as a sticker pasted over the plate: it fought
- * the type it was meant to serve and put a hard rectangle through a page whose whole idea is
- * open space. The rule keeps white as an accent and lets the headline read straight through.
+ * Both earlier treatments (a white slab, then a white rule) existed for one reason: white on
+ * this plate measures 1.52:1, so it could never carry the words itself and needed a shape to
+ * sit on. Deep indigo on periwinkle is 9.13:1 — the phrase can simply BE a second colour, and
+ * the device disappears.
  *
- * It draws left-to-right AFTER the words have risen, so it underlines a finished sentence
- * rather than sliding in alongside it.
+ * It types itself, holds, backspaces, and moves to the next phrase: the page reads as
+ * thinking rather than decorating, and one headline gets to ask several questions.
+ *
+ * The phrases come from the SAME stored copy field, split on "|" — an admin writes
+ * "printed itself?|shipped itself?|packed itself?" in Settings › Site content and gets a
+ * rotation, with no schema change and no new field to explain. One phrase and it renders
+ * statically.
+ *
+ * Under reduced-motion it prints the first phrase and stops — a caret blinking forever is
+ * exactly the perpetual motion that setting exists to remove.
  */
-export function HighlightPhrase({ text, delay = 0 }: { text: string; delay?: number }) {
+export function TypedPhrase({ text }: { text: string }) {
   const reduce = useReducedMotion()
+  const phrases = text.split("|").map((t) => t.trim()).filter(Boolean)
+  const [shown, setShown] = useState(phrases[0] ?? "")
+  const [idx, setIdx] = useState(0)
+  const [phase, setPhase] = useState<"type" | "hold" | "erase">("type")
+
+  useEffect(() => {
+    if (reduce || phrases.length < 2) return
+    const full = phrases[idx % phrases.length]
+    let t: ReturnType<typeof setTimeout>
+    if (phase === "type") {
+      t = shown.length < full.length
+        ? setTimeout(() => setShown(full.slice(0, shown.length + 1)), 55)
+        : setTimeout(() => setPhase("hold"), 0)
+    } else if (phase === "hold") {
+      t = setTimeout(() => setPhase("erase"), 1800)
+    } else {
+      t = shown.length > 0
+        ? setTimeout(() => setShown(full.slice(0, shown.length - 1)), 28)
+        : setTimeout(() => { setIdx((i) => i + 1); setPhase("type") }, 120)
+    }
+    return () => clearTimeout(t)
+  }, [shown, phase, idx, reduce, phrases])
+
+  // Reserve the LONGEST phrase's width so nothing below jumps as it types. A headline that
+  // reflows on every keystroke drags the whole page with it.
+  const longest = phrases.reduce((a, b) => (b.length > a.length ? b : a), "")
   return (
-    <span className="relative inline-block align-bottom">
-      <span className="relative" style={{ color: INK }}>
-        <MaskedWords text={text} delay={delay} />
+    <span className="relative inline-grid align-bottom">
+      <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre">{longest}</span>
+      <span className="col-start-1 row-start-1 whitespace-pre text-left" style={{ color: ACCENT_INK }}>
+        {reduce || phrases.length < 2 ? phrases[0] : shown}
+        {!reduce && phrases.length > 1 && (
+          <motion.span
+            aria-hidden
+            className="ml-[0.06em] inline-block w-[0.055em] align-baseline"
+            style={{ background: ACCENT_INK, height: "0.78em" }}
+            animate={{ opacity: [1, 1, 0, 0] }}
+            transition={{ duration: 1, repeat: Infinity, times: [0, 0.5, 0.5, 1], ease: "linear" }}
+          />
+        )}
       </span>
-      <motion.span
-        aria-hidden
-        className="absolute -bottom-[0.06em] left-0 right-0 origin-left rounded-full"
-        style={{ height: "0.11em", background: "#FFFFFF" }}
-        initial={reduce ? { opacity: 0 } : { scaleX: 0 }}
-        whileInView={reduce ? { opacity: 1 } : { scaleX: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6, delay: delay + 0.35, ease: EASE }}
-      />
     </span>
   )
 }
@@ -131,7 +172,7 @@ export function PlateHero({ title, accent, sub, children }: {
       <div className="absolute inset-x-0 bottom-0 h-24 bg-white [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
       <div className="mx-auto max-w-6xl px-6 pb-28 pt-20 sm:pt-28">
         <h1 className="mx-auto max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] text-[#0B0B0C]" style={DISPLAY}>
-          <MaskedWords text={title} />{accent ? <> <HighlightPhrase text={accent} delay={0.28} /></> : null}
+          <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} /></> : null}
         </h1>
         {sub && (
           <motion.p
