@@ -8,7 +8,17 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        // THE BRAND LIME, not --primary. A filled button is the one place the accent gets to
+        // be itself: it's a large fill with a foreground we control, so the bright lime works
+        // exactly as it does on the marketing plates, with ink text at ~17:1.
+        //
+        // --primary stays the deeper green because it also inks ~247 pieces of TEXT, where a
+        // colour this light is invisible on white. Fill and ink are different jobs; this is
+        // the fill.
+        //
+        // hover dims via brightness rather than an alpha step: /80 on a light fill fades it
+        // toward the white page instead of reading as pressed.
+        default: "bg-brand text-brand-foreground hover:brightness-95",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-input/30",
         secondary:
