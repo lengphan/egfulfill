@@ -169,6 +169,40 @@ async function buildTrending(offset = 0) {
   return { date: new Date().toISOString().slice(0, 10), products, keywords, offset, built_at: new Date().toISOString(), v: FEED_VERSION };
 }
 
+/**
+ * Is this cached pool servable as today's feed?
+ *
+ * ONE predicate, called by the request path AND the pre-warm tick. They used to each carry
+ * their own copy, and the copies drifted the moment FEED_VERSION arrived: the warmer still
+ * thought a v1 pool was fine and skipped, while every request judged it stale and rebuilt —
+ * so instead of one background build a day, EVERY visitor paid 16 Etsy searches. Two
+ * definitions of "fresh" is the bug; this is the fix.
+ */
+function poolUsable(v, today) {
+  return !!(v && v.date === today && Array.isArray(v.products) && v.products.length
+    && v.products[0] && v.products[0]._sold24 !== undefined && v.v === FEED_VERSION);
+}
+
+const saveFeed = (feed) => q("insert into settings (key,value,updated_at) values ('spydeck_trending',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(feed)]).catch(() => {});
+
+/**
+ * Rebuild the pool AT MOST ONCE AT A TIME, process-wide.
+ *
+ * A pool build is 16 searches plus a batch call each. Ten visitors arriving on a cold cache
+ * must not become ten builds — that's a rate-limit ban, not a slow page. Everyone waiting
+ * shares the one in-flight promise; whoever asks after it settles starts a fresh one.
+ */
+let rebuilding = null;
+function rebuildOnce(offset = 0) {
+  if (!rebuilding) {
+    rebuilding = buildTrending(offset)
+      .then(async (feed) => { if (feed && feed.products && feed.products.length) await saveFeed(feed); return feed; })
+      .catch((e) => { console.warn('[spydeck] pool rebuild failed:', e && e.message); return null; })
+      .finally(() => { rebuilding = null; });
+  }
+  return rebuilding;
+}
+
 // Slice the shared pool for who's asking. Same data, different priority — staff
 // boards are the higher tier and get the winners handed to them; sellers browse.
 //  - Staff (admin/warehouse): ALL trending first, then everything else. Nothing is
@@ -382,25 +416,26 @@ export function spydeckRoutes(app, requireAuth) {
       products: sliceFor(feed.products, staff, seed).map(gridRow),
     });
 
+    let stale = null;
     try {
       const cached = await q("select value from settings where key='spydeck_trending'");
-      if (cached.rows[0]) {
-        const v = readSetting(cached.rows[0]) || {};
-        // `_sold24` guards against a cache written by the OLD builder, which stripped
-        // the computed fields — without them every row would look un-trending and
-        // staff would get an empty feed until tomorrow.
-        const usable = v && v.date === today && Array.isArray(v.products) && v.products.length
-          && v.products[0]._sold24 !== undefined && v.v === FEED_VERSION;
-        if (usable) return serve(v);
-      }
+      const v = cached.rows[0] ? (readSetting(cached.rows[0]) || {}) : null;
+      if (poolUsable(v, today)) return serve(v);
+      // STALE-WHILE-REVALIDATE. A cold build is ~16 Etsy searches, which is seconds of
+      // staring at skeletons. If yesterday's pool (or one from an older FEED_VERSION) is
+      // still on disk, hand it over NOW and refresh in the background — a day-old trending
+      // feed is a far better answer than a spinner.
+      //
+      // Only if it still has PICTURES, though. Serving an image-less pool instantly is just
+      // serving the bug instantly, so those wait for the real build.
+      if (v && Array.isArray(v.products) && v.products.length && v.products.some((l) => l && l.image)) stale = v;
     } catch { /* rebuild below */ }
-    try {
-      const feed = await buildTrending();
-      await q("insert into settings (key,value,updated_at) values ('spydeck_trending',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(feed)]).catch(() => {});
-      return serve(feed);
-    } catch (e) {
-      reply.code(502); return { error: e.message || 'Could not build the trending feed', products: [], keywords: [] };
+    if (stale) { rebuildOnce(); return serve(stale); }
+    const feed = await rebuildOnce();
+    if (!feed || !feed.products || !feed.products.length) {
+      reply.code(502); return { error: 'Could not build the trending feed', products: [], keywords: [] };
     }
+    return serve(feed);
   });
 
   // Fresh scan — rebuild the SHARED pool from new niches. This is the only path that
@@ -743,11 +778,8 @@ export function spydeckRoutes(app, requireAuth) {
       const today = new Date().toISOString().slice(0, 10);
       const c = await q("select value from settings where key='spydeck_trending'");
       const v = readSetting(c.rows[0]) || {};
-      if (v.date === today && Array.isArray(v.products) && v.products.length && v.products[0] && v.products[0]._sold24 !== undefined) return;
-      const feed = await buildTrending(0);
-      if (feed.products && feed.products.length) {
-        await q("insert into settings (key,value,updated_at) values ('spydeck_trending',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(feed)]).catch(() => {});
-      }
+      if (poolUsable(v, today)) return;
+      await rebuildOnce(0);
     } catch { /* on-demand build still covers a miss */ }
   }
   const warmSoon = setTimeout(warmTrending, 25000);            // ~25s after boot
