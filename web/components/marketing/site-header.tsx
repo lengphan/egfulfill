@@ -24,7 +24,7 @@ const nav = [
  * ordinary sticky bar over a themed surface. Both use the same links and the same markup, so
  * they can't drift.
  */
-const PLATE_ROUTES = new Set(["/"])
+const PLATE_ROUTES = new Set(["/", "/pricing"])
 
 export function SiteHeader() {
   const onPlate = PLATE_ROUTES.has(usePathname())
