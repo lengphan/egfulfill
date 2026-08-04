@@ -22,19 +22,21 @@ const OFF_LINE = EXCEPTION_STAGES.map((s) => ({ id: s.id, label: s.label }))
  * Fixed slots, assigned by name and never cycled, so a channel keeps its colour when another
  * disappears from the data — colour follows the entity, never its rank.
  *
- * Hexes are the validated categorical slots 1–4 with their own dark-mode steps (not an
- * automatic flip). Verified with the palette validator in both modes: worst adjacent CVD
- * ΔE 9.1 light / 8.4 dark against a ≥8 target, normal-vision 22.9 / 19.8 against a ≥15 floor.
- * The light column sits under 3:1 on two slots, which obliges visible labels — hence the
- * legend below and the count on every row, never colour alone.
+ * THE THEME'S chart tokens, not fixed hexes. --chart-1…5 are defined for light AND dark in
+ * globals.css, so these track a re-theme (and dark mode) on their own; the hard-coded hexes
+ * they replace could not, and were the one thing on this card that stayed put when the
+ * palette moved. It is also the house rule: never hard-code a colour a token expresses.
+ *
+ * Colour is never the only signal — the light steps sit under 3:1 on some slots — so every
+ * row carries a count and the legend spells the channel out.
  */
 const CHANNELS: { name: string; cls: string }[] = [
-  { name: "Etsy", cls: "bg-[#2a78d6] dark:bg-[#3987e5]" },
-  { name: "TikTok", cls: "bg-[#eb6834] dark:bg-[#d95926]" },
-  { name: "Shopify", cls: "bg-[#1baf7a] dark:bg-[#199e70]" },
-  { name: "Manual", cls: "bg-[#eda100] dark:bg-[#c98500]" },
+  { name: "Etsy", cls: "bg-chart-1" },
+  { name: "TikTok", cls: "bg-chart-2" },
+  { name: "Shopify", cls: "bg-chart-3" },
+  { name: "Manual", cls: "bg-chart-4" },
 ]
-const OTHER = { name: "Other", cls: "bg-slate-400 dark:bg-slate-500" }
+const OTHER = { name: "Other", cls: "bg-muted-foreground/50" }
 const slotFor = (p: string) => CHANNELS.find((c) => c.name === p) ?? OTHER
 
 const dayjs = (iso?: string | null) => (iso ? (Date.now() - new Date(iso).getTime()) / 86400000 : NaN)
@@ -47,13 +49,17 @@ const ageLabel = (d: number) => (!Number.isFinite(d) ? "" : d < 1 ? "today" : `$
  * they came from, and how long the oldest has waited. Every number is a live count off the
  * order feed — nothing is modelled.
  */
-/** How long a draft has been sitting. Draft is nearly always the biggest number on the card
- *  and it is not one pile — a draft from this morning is untouched work, one from six weeks
- *  ago is abandoned, and a single "207" says neither. Only non-empty bands render, so a
- *  narrow time window simply doesn't show the older ones. */
+/** How long a draft has been sitting.
+ *
+ *  ONE band, and only the one that names a problem. Three bands re-stated the same total
+ *  three ways — "under 7 days" and "7 – 30 days" are just the healthy remainder split in
+ *  two, and neither is something anyone acts on, so they cost three rows of the card to say
+ *  what the Draft count above them already said.
+ *
+ *  Over 30 days is different in kind: a draft from this morning is untouched work, one from
+ *  six weeks ago is abandoned, and that is worth a row of its own. It renders only when it
+ *  holds something, so a healthy board shows nothing here at all. */
 const AGE_BANDS: { label: string; hit: (d: number) => boolean }[] = [
-  { label: "under 7 days", hit: (d) => d < 7 },
-  { label: "7 – 30 days", hit: (d) => d >= 7 && d < 30 },
   { label: "over 30 days", hit: (d) => d >= 30 },
 ]
 /** Below this there's nothing to split — three sub-rows off a pile of six is noise. */
