@@ -77,7 +77,7 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
       disabled={!clickable || sending}
       onClick={clickable ? () => onSend(order) : undefined}
       title={title}
-      className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
+      className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
     >
       {sending ? "Sending…" : label}
     </button>

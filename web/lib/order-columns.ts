@@ -130,7 +130,7 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // it would silently reset everyone's board.
   //
   // Fixed width (the header cell can't size it), sized to hold all four on ONE line now the
-  // chips are px-1.5/11px and Stock no longer rewrites itself to "In stock" / "No stock".
+  // chips are px-2/12px and Stock no longer rewrites itself to "In stock" / "No stock".
   // The 4rem that frees goes back to the flexible Customer/Items columns.
   // Now the column that ABSORBS the slack. Floor stays 12rem — the width that holds all four
   // chips on one line — so the row's minimum is unchanged and nothing new overflows; above

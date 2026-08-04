@@ -81,11 +81,10 @@ function Tag({ id, label, state, title, orderId, status, files }: {
         openOnHover
         delay={120}
         closeDelay={200}
-        // Tight on purpose: four of these plus the Stock chip share ONE table cell, and at
-        // px-2.5/text-xs/semibold they were the loudest thing in the row — heavier than the
-        // order number they sit beside, for what is supporting detail. Same words, same
-        // colours, about a third less width.
-        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " + cls}
+        // 12px, not the 11px this was condensed to — that read as small print you had to
+        // lean in for. Still lighter than the 13px/semibold it started at, which made four
+        // chips the loudest thing in a row whose job is the order number beside them.
+        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium transition-colors " + cls}
       >
         {tl("ui", label)}
       </PopoverTrigger>
