@@ -1,7 +1,7 @@
 "use client"
 
 import { Check } from "@phosphor-icons/react"
-import { ACCENT, HEADING, PAPER, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
+import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 
 /**
  * Pricing, in the house style. Same copy and the same two ideas the old page had — what's
@@ -30,7 +30,7 @@ const examples = [
 
 export function BoldPricing() {
   return (
-    <div className="text-[#0B0B0C]" style={{ background: PAPER }}>
+    <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
       <PlateHero
         title="Simple,"
         accent="pay-as-you-go."

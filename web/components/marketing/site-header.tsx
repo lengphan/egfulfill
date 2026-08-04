@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 
-import { PAPER } from "@/components/marketing/bold-kit"
+import { SURFACE } from "@/components/marketing/bold-kit"
 
 const nav = [
   { label: "Products", href: "/catalog" },
@@ -17,7 +17,7 @@ const nav = [
  * ONE header, ONE appearance, on every page and at every scroll position.
  *
  * It used to go transparent at the top of a colour plate and swap to a bar once you scrolled.
- * That was solving a problem the palette has since removed: the page is PAPER now, so the
+ * That was solving a problem the palette has since removed: the page is SURFACE now, so the
  * header simply wears the page's own colour and there is nothing to transition between. The
  * swap was the jarring part — links, buttons and background all changed at 24px of scroll,
  * which reads as a glitch rather than an effect.
@@ -30,7 +30,7 @@ export function SiteHeader() {
     <header
       className="sticky top-0 z-30"
       // The page's own paper, opaque. No blur: blurring a flat colour only muddies it.
-      style={{ background: PAPER }}
+      style={{ background: SURFACE }}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
         <Link href="/" className={"font-display text-2xl font-semibold tracking-tight " + "text-[#0B0B0C]"}>

@@ -52,7 +52,15 @@
 
 :root {
     /* Modern NEUTRAL base (true grey, chroma 0) + one violet accent that pops (Stripe-inspired). */
-    --background: oklch(0.9806 0.0056 91);
+    /* A TINTED CANVAS, not a white one. Paper canvas + white cards sit two points apart in
+     * lightness, so nothing separated them and the whole app read as pale — a flat sheet with
+     * faint rectangles on it. Tinting the canvas periwinkle and leaving the cards white gives
+     * every card an edge without drawing one: the surface it sits on is doing the work.
+     *
+     * Deliberately a soft tint, not the brand plate. #C3D0FF behind a 700-row queue is a
+     * coloured page you have to read THROUGH; this is the same hue at a fraction of the
+     * chroma, so it reads as a surface and the accent stays the loudest thing on screen. */
+    --background: oklch(0.958 0.019 277);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
@@ -79,7 +87,7 @@
     --brand-foreground: oklch(0.145 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
+    --muted: oklch(0.962 0.010 277);
     --muted-foreground: oklch(0.556 0 0);
     --accent: oklch(0.968 0.015 275);
     --accent-foreground: oklch(0.42 0.16 274);
@@ -93,7 +101,7 @@
     --chart-4: oklch(0.77 0.16 70);
     --chart-5: oklch(0.65 0.22 15);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
+    --sidebar: oklch(0.973 0.012 277);
     --sidebar-foreground: oklch(0.145 0 0);
     --sidebar-primary: oklch(0.47 0.19 274);
     --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -109,9 +117,9 @@
        as brown haze rather than black, and is what made dark mode look faded. Surfaces
        are also further apart now (0.145 → 0.205) so a card separates from the page
        without needing a border to do it. */
-    --background: oklch(0.145 0 0);
+    --background: oklch(0.155 0.017 277);
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
+    --card: oklch(0.215 0.014 277);
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
@@ -121,7 +129,7 @@
     --brand-foreground: oklch(0.145 0 0);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
+    --muted: oklch(0.272 0.012 277);
     --muted-foreground: oklch(0.708 0 0);
     --accent: oklch(0.31 0.04 274);
     --accent-foreground: oklch(0.92 0.05 274);
@@ -134,7 +142,7 @@
     --chart-3: oklch(0.72 0.14 195);
     --chart-4: oklch(0.8 0.16 70);
     --chart-5: oklch(0.68 0.22 15);
-    --sidebar: oklch(0.205 0 0);
+    --sidebar: oklch(0.195 0.015 277);
     --sidebar-foreground: oklch(0.985 0 0);
     --sidebar-primary: oklch(0.72 0.14 274);
     --sidebar-primary-foreground: oklch(0.985 0 0);

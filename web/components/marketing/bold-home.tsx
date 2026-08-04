@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform, animate } from "motion/react"
 import { ArrowUpRight, PlugsConnected, Printer, Truck, Wallet } from "@phosphor-icons/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, INK, PAPER, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
+import { ACCENT, INK, SURFACE, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -61,7 +61,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
   const panelScale = useTransform(smooth, [0, 1], [1, 0.94])
 
   return (
-    <div className="text-[#0B0B0C]" style={{ background: PAPER }}>
+    <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
       {/* ── HERO ───────────────────────────────────────────────────────────────── */}
       {/* NOT overflow-hidden. The product panel deliberately hangs past the plate's bottom
           edge — that overhang is the depth — and clipping the section amputated it to a strip
@@ -71,7 +71,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           at the top of the window instead of under a white bar. The header itself goes
           transparent on this route (site-header.tsx) — between them, the hero reads as one
           full-bleed plate with the nav sitting on it. */}
-      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: PAPER }}>
+      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
         <div className="mx-auto max-w-6xl px-6 pb-40 pt-24 sm:pt-32">

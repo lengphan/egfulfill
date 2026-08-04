@@ -18,9 +18,17 @@ import { ArrowUpRight } from "@phosphor-icons/react"
 export const ACCENT = "#C3D0FF"        // periwinkle — the plate/fill
 export const ACCENT_INK = "#4C5FD5"    // vivid periwinkle-blue — the accent LETTERING, on paper
 export const INK = "#0B0B0C"
-// Warm off-white, not pure white. Against a coloured plate, #FFF reads as an absence; a paper
-// tone makes the accent look chosen and gives the whole page the vintage-modern warmth.
-export const PAPER = "#FAF8F3"
+// A COOL off-white, tinted with the accent's own hue — not a warm paper.
+//
+// Warm beige under a periwinkle accent put two temperatures on one page: the lavender read
+// smooth and current, the beige read dated, and the mismatch was doing that rather than
+// either colour on its own. Tinting the surface toward the accent instead makes the page one
+// family, which is what reads as modern. It is still not pure white — #FFF beside a coloured
+// mark reads as an absence — it is just cool now instead of warm.
+//
+// Same hue as the app canvas in globals.css, a step lighter, so marketing and the product
+// look like one product.
+export const SURFACE = "#F4F5FD"
 
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
@@ -167,12 +175,12 @@ export function PlateHero({ title, accent, sub, children }: {
   title: string; accent?: string; sub?: string; children?: React.ReactNode
 }) {
   const reduce = useReducedMotion()
-  // PAPER, not a colour plate. A periwinkle field with periwinkle lettering on it is
+  // SURFACE, not a colour plate. A periwinkle field with periwinkle lettering on it is
   // purple-on-purple: the accent has nothing to contrast against and stops being an accent.
   // Paper carries the page; the colour appears in the ONE phrase, the CTA band and the chart,
   // which is what makes those read as chosen.
   return (
-    <section className="relative -mt-16 pt-16" style={{ background: PAPER }}>
+    <section className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
       <div className="mx-auto max-w-6xl px-6 pb-28 pt-20 sm:pt-28">
         <h1 className="mx-auto max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] text-[#0B0B0C]" style={DISPLAY}>
           <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} /></> : null}
