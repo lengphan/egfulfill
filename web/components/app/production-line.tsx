@@ -1,5 +1,6 @@
 "use client"
 
+import { Fragment } from "react"
 import { FACTORY_STAGES, EXCEPTION_STAGES, orderStage } from "@/lib/factory-status"
 import { platformOf } from "@/lib/order-format"
 import { type OrderRow } from "@/lib/api"
@@ -46,6 +47,18 @@ const ageLabel = (d: number) => (!Number.isFinite(d) ? "" : d < 1 ? "today" : `$
  * they came from, and how long the oldest has waited. Every number is a live count off the
  * order feed — nothing is modelled.
  */
+/** How long a draft has been sitting. Draft is nearly always the biggest number on the card
+ *  and it is not one pile — a draft from this morning is untouched work, one from six weeks
+ *  ago is abandoned, and a single "207" says neither. Only non-empty bands render, so a
+ *  narrow time window simply doesn't show the older ones. */
+const AGE_BANDS: { label: string; hit: (d: number) => boolean }[] = [
+  { label: "under 7 days", hit: (d) => d < 7 },
+  { label: "7 – 30 days", hit: (d) => d >= 7 && d < 30 },
+  { label: "over 30 days", hit: (d) => d >= 30 },
+]
+/** Below this there's nothing to split — three sub-rows off a pile of six is noise. */
+const SPLIT_MIN = 10
+
 export function ProductionLine({ orders }: { orders: OrderRow[] }) {
   const rows = [...LINE, ...OFF_LINE].map((s) => {
     const inStage = orders.filter((o) => orderStage(o.items ?? []) === s.id)
@@ -63,7 +76,20 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
       const d = dayjs(o.created_at)
       return Number.isFinite(d) && d > a ? d : a
     }, 0)
-    return { ...s, n: inStage.length, byChannel, oldest, off: OFF_LINE.some((x) => x.id === s.id) }
+    // Draft only: the one stage that is reliably several piles wearing one number.
+    const bands = s.id === "" && inStage.length >= SPLIT_MIN
+      ? AGE_BANDS.map((b) => {
+          const hits = inStage.filter((o) => b.hit(dayjs(o.created_at)))
+          return {
+            label: b.label,
+            n: hits.length,
+            byChannel: [...CHANNELS, OTHER]
+              .map((c) => ({ ...c, n: hits.filter((o) => slotFor(platformOf(o)).name === c.name).length }))
+              .filter((c) => c.n > 0),
+          }
+        }).filter((b) => b.n > 0)
+      : []
+    return { ...s, n: inStage.length, byChannel, oldest, bands, off: OFF_LINE.some((x) => x.id === s.id) }
   })
 
   // Exception rows only when they hold something; pipeline rows always, so the shape of the
@@ -96,8 +122,8 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
         // Too little width for inter-segment gaps to be anything but noise — see below.
         const narrow = pct < 12
         return (
+          <Fragment key={r.id || "draft"}>
           <div
-            key={r.id || "draft"}
             className="group flex min-h-[32px] flex-1 items-center gap-3 rounded-md px-1 transition-colors hover:bg-accent/40"
             title={
               `${r.label}: ${r.n} order${r.n === 1 ? "" : "s"}` +
@@ -152,6 +178,37 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
               {r.n}
             </div>
           </div>
+
+          {/* Age bands, indented under their stage. Subordinate on purpose — smaller, muted,
+              no hover fill — so they read as a breakdown OF the row above rather than as more
+              stages. Same four columns, so every number still lines up in its column. */}
+          {r.bands.map((b) => {
+            const bp = Math.max(1.5, (b.n / max) * 100)
+            const bnarrow = bp < 12
+            return (
+              <div
+                key={b.label}
+                className="flex min-h-[22px] items-center gap-3 px-1"
+                title={`${r.label} · ${b.label}: ${b.n}\n${b.byChannel.map((c) => `${c.name} ${c.n}`).join(" · ")}`}
+              >
+                <div className="w-24 shrink-0 truncate pl-3 text-[11px] text-muted-foreground/70">{b.label}</div>
+                <div className="relative h-1.5 flex-1 rounded-sm bg-muted/40">
+                  <div className="absolute inset-y-0 left-0 flex overflow-hidden rounded-sm" style={{ width: `${bp}%` }}>
+                    {b.byChannel.map((c, i) => (
+                      <div
+                        key={c.name}
+                        className={c.cls + " opacity-70" + (i && !bnarrow ? " ml-[2px]" : "") + (i === b.byChannel.length - 1 ? " rounded-r-[3px]" : "")}
+                        style={{ flex: `${c.n} 0 0%` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="w-12 shrink-0" />
+                <div className="w-10 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">{b.n}</div>
+              </div>
+            )
+          })}
+          </Fragment>
         )
       })}
     </div>
