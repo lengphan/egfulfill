@@ -242,10 +242,13 @@ function renderText(body, name, unsubUrl) {
 }
 
 /**
- * @param requireStaff  read + draft: anyone on the team can write one
+ * @param requireDraft  read + draft: anyone on the team can write one
  * @param requireAdmin  the send itself. See the note on POST /:id/send.
  */
-export function broadcastsRoutes(app, requireStaff, requireAdmin) {
+// ADMIN-only to draft, as well as to send. Sending was already admin-gated, but drafting
+// let any staff account compose mail to the ENTIRE seller list and read the audience — the
+// draft is most of the blast radius.
+export function broadcastsRoutes(app, requireDraft, requireAdmin) {
   ensureTables();
 
   // ── PUBLIC. No preHandler, by design: Gmail's one-click POSTs from their own
@@ -288,7 +291,7 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
   });
 
   // ── Staff: the list. Newest first; this IS the record of who sent what to how many.
-  app.get('/api/broadcasts', { preHandler: requireStaff }, async () => {
+  app.get('/api/broadcasts', { preHandler: requireDraft }, async () => {
     await ensureTables();
     const r = await q(`select id, subject, body, audience, status, recipient_count, sent_count,
                               failed_count, created_by, created_by_name, created_at, sent_at
@@ -299,7 +302,7 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
   // ── Count an audience WITHOUT sending. Powers the "this will go to N sellers" line the
   // send dialog shows before anything leaves. Same resolver the send uses, so the number
   // shown and the number mailed can't drift apart.
-  app.post('/api/broadcasts/preview', { preHandler: requireStaff }, async (req) => {
+  app.post('/api/broadcasts/preview', { preHandler: requireDraft }, async (req) => {
     await ensureTables();
     const rows = await resolveRecipients((req.body || {}).audience);
     const optedOut = await q('select count(*)::int as n from users where role = $1 and coalesce(marketing_opt_out,false) = true', ['seller']);
@@ -310,7 +313,7 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
   // Read is staff (the editor + preview need it); the write is admin, like the site content.
   // The `settings` table is shared with site_content.js and created idempotently here too,
   // so this works whichever route registers first.
-  app.get('/api/email-branding', { preHandler: requireStaff }, async () => {
+  app.get('/api/email-branding', { preHandler: requireDraft }, async () => {
     return { branding: await getEmailBranding(), presets: Object.keys(EMAIL_PRESETS) };
   });
   app.put('/api/email-branding', { preHandler: requireAdmin }, async (req) => {
@@ -324,7 +327,7 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
     return { ok: true, branding: clean };
   });
 
-  app.post('/api/broadcasts', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/broadcasts', { preHandler: requireDraft }, async (req, reply) => {
     await ensureTables();
     const b = req.body || {};
     const subject = String(b.subject || '').trim();
@@ -337,7 +340,7 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
     return r.rows[0];
   });
 
-  app.patch('/api/broadcasts/:id', { preHandler: requireStaff }, async (req, reply) => {
+  app.patch('/api/broadcasts/:id', { preHandler: requireDraft }, async (req, reply) => {
     await ensureTables();
     const b = req.body || {};
     // A sent broadcast is a historical record. Editing its subject after the fact would
@@ -356,7 +359,7 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
     return r.rows[0];
   });
 
-  app.delete('/api/broadcasts/:id', { preHandler: requireStaff }, async (req, reply) => {
+  app.delete('/api/broadcasts/:id', { preHandler: requireDraft }, async (req, reply) => {
     await ensureTables();
     const r = await q("delete from broadcasts where id = $1::bigint and status = 'draft' returning id", [String(req.params.id)]);
     if (!r.rows.length) { reply.code(409); return { error: 'Only a draft can be deleted — a sent broadcast is a record.' }; }
@@ -366,11 +369,11 @@ export function broadcastsRoutes(app, requireStaff, requireAdmin) {
   /**
    * Send.
    *
-   * ADMIN, not staff. requireStaff includes operator, and an operator's zone ends at the
+   * ADMIN, not staff. requireDraft includes operator, and an operator's zone ends at the
    * scan — mailing every seller on the platform is the least reversible action in the
    * product: there is no unsend, and the blast radius is the entire customer base. Drafting
    * is open to the team; the irreversible step is not. To widen it, swap requireAdmin for
-   * requireStaff on this one route.
+   * requireDraft on this one route.
    *
    * Returns as soon as the audience is resolved rather than after the last message. A few
    * hundred sequential Brevo calls outlives any sane request timeout, and a send that

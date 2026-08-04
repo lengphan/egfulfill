@@ -355,22 +355,22 @@ factoryListsRoutes(app, requireAuth);                  // shared factory queues 
 teamRoutes(app, requireAuth);                          // seller team members + per-member access surfaces (drives nav-hiding); auth/login untouched
 sandboxRoutes(app, requireAuth);                       // seller API keys (/api/keys) + safe /api/test/* sandbox (simulated, no side effects) — isolated key-auth, global hook untouched
 webhookRoutes(app, requireAuth, authKey, keyAllows);              // outbound webhooks (/api/webhooks) — what makes the public API push instead of poll-only; JWT *or* X-API-Key, since registering one is a partner action
-adminSecretsRoutes(app, requireStaff);                 // READ-ONLY masked last-4 of integration credentials (staff) — powers Settings › Integrations last-4 display; no plaintext/write
+adminSecretsRoutes(app, requireAdmin);                 // ADMIN: masked last-4 of integration credentials — even masked it maps which integrations are worth attacking
 wilcomRoutes(app, requireStaff);                       // Wilcom EWA: config check + live connectivity/auth test (reads WILCOM_APP_ID/KEY at call time)
-usageRoutes(app, requireStaff, requireAdmin);          // integration usage/spend dashboard (staff read) + per-platform cost/threshold config (admin)
+usageRoutes(app, requireAdmin, requireAdmin);          // ADMIN: what the integrations COST us per platform + threshold config — not needed to pick, print or ship
 auditRoutes(app, requireAdmin, requireAuth);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
-factorySettingsRoutes(app, requireAuth, requireStaff); // platform factory settings — design fee, default shipping, emb file price (warehouse/admin)
+factorySettingsRoutes(app, requireAuth, requireStaff, requireAdmin); // staff READ the fee/shipping (the factory needs it); ADMIN writes them — they are pricing levers
 navVisibilityRoutes(app, requireAuth);                 // role → hidden nav pages/tabs (admin-editable, HIDE-only; never grants access)
-purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse);        // purchase orders — draft → placed (S&S/Otto) → received into inventory
+purchaseRoutes(app, requireAuth, requireAdmin, requireAdmin);            // ADMIN: purchase orders — commits company money + exposes unit cost across every blank. Receiving stock stays warehouse (inventory.js)
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)
 notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
-adsRoutes(app, requireStaff);                          // Meta + Google Ads: connect, read spend/ROAS, create + pause campaigns
-broadcastsRoutes(app, requireStaff, requireAdmin);     // seller email broadcasts — staff draft, ADMIN sends; PUBLIC one-click unsubscribe at /api/broadcasts/unsubscribe
+adsRoutes(app, requireAdmin);                          // ADMIN: Meta + Google Ads — these CREATE and PAUSE campaigns, i.e. they move money
+broadcastsRoutes(app, requireAdmin, requireAdmin);     // ADMIN: seller email broadcasts — drafting reaches the whole seller list, so it's gated like sending; PUBLIC unsubscribe at /api/broadcasts/unsubscribe
 siteContentRoutes(app, requireAdmin);                  // editable marketing-home copy — PUBLIC GET (homepage reads it), ADMIN PUT (Settings › Site content)
 dispatchRoutes(app, requireAuth, requireWarehouse);    // byeastside: push labels for pre-scan, poll PICKED
 manifestRoutes(app, requireWarehouse);                  // USPS SCAN forms via Shippo manifests
-manualSupplierRoutes(app, requireStaff, requireWarehouse); // shops with no API — saved links + prices
+manualSupplierRoutes(app, requireAdmin);               // Sourcing — saved supplier links, costs, MOQ, margins. ADMIN-ONLY: these rows are what we pay and what we make
 
 /**
  * Ask S&S whether our open orders are still open.

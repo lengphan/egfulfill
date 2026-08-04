@@ -27,8 +27,12 @@ function maskKey(v) {
   return s.slice(0, 4) + '••••••' + s.slice(-4);
 }
 
-export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse) {
-  app.get('/api/purchase', { preHandler: requireStaff }, async () => {
+// ADMIN-only, both the reads and the writes. Purchasing commits company money to a supplier
+// and the list itself shows unit costs across every blank we buy. Receiving stock is NOT
+// here — that's /api/inventory/scan and /api/inventory/item in inventory.js, still on the
+// warehouse gate — so locking this does not stop the floor booking deliveries in.
+export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite) {
+  app.get('/api/purchase', { preHandler: requireAdmin }, async () => {
     await ensure();
     // A failed query used to return [] — "no purchase orders", which is exactly what a
     // warehouse with nothing on order also sees. Log it and keep the fallback so the
@@ -49,7 +53,7 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
    * DISTINCT over indexed columns rather than loading rows to derive it — the point is to
    * avoid paging through a catalogue, not to page through it server-side instead.
    */
-  app.get('/api/purchase/catalog-filters', { preHandler: requireStaff }, async () => {
+  app.get('/api/purchase/catalog-filters', { preHandler: requireAdmin }, async () => {
     const [ssB, ottoB, ssC, ottoC, ssP, ottoP] = await Promise.all([
       softQ('ss brands', "select distinct brand from ss_products where coalesce(brand,'') <> ''"),
       softQ('otto brands', "select distinct brand from otto_products where coalesce(brand,'') <> ''"),
@@ -85,7 +89,7 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
    *   2. inventory.supplier — what a human recorded when the blank was stocked
    * A sku in neither resolves to no API: placeable by hand, never guessed at.
    */
-  app.post('/api/purchase/resolve-suppliers', { preHandler: requireStaff }, async (req) => {
+  app.post('/api/purchase/resolve-suppliers', { preHandler: requireAdmin }, async (req) => {
     await ensure();
     const skus = [...new Set((Array.isArray(req.body?.skus) ? req.body.skus : [])
       .map((x) => String(x || '').trim()).filter(Boolean))];
@@ -152,7 +156,7 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
    * anyone but whoever it was copied from, and wrong silently. S&S has no such endpoint —
    * it bills the account on file — which is stated rather than faked with an empty list.
    */
-  app.get('/api/purchase/supplier-options', { preHandler: requireStaff }, async () => {
+  app.get('/api/purchase/supplier-options', { preHandler: requireAdmin }, async () => {
     const { readShipFrom, shipFromComplete, readAll } = await import('./factory_settings.js');
     const [shipFrom, cfg] = await Promise.all([readShipFrom().catch(() => ({})), readAll().catch(() => ({}))]);
 
@@ -271,7 +275,7 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
   // Writing a PO commits the factory to spend, so it is warehouse/admin — operator was
   // explicitly allowed here, which contradicted every other spend boundary in the app.
   // Reading stays open to any staff: knowing what's on order is not the same as ordering.
-  app.post('/api/purchase', { preHandler: requireWarehouse }, async (req, reply) => {
+  app.post('/api/purchase', { preHandler: requireAdminWrite }, async (req, reply) => {
     await ensure();
     const b = req.body || {};
     const num = String(b.num || '').trim();
@@ -316,7 +320,7 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
    * documented return endpoint in anything we hold, so the RMA is raised with them the
    * usual way; this records what left and what is owed back.
    */
-  app.post('/api/purchase/:num/return', { preHandler: requireWarehouse }, async (req, reply) => {
+  app.post('/api/purchase/:num/return', { preHandler: requireAdminWrite }, async (req, reply) => {
     await ensure();
     const num = String(req.params.num);
     const b = req.body || {};
@@ -372,7 +376,7 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
    * The credit actually landed. Books it as a positive row against the blanks cost —
    * append-only, so "spent $400, got $120 back" stays two facts rather than one net $280.
    */
-  app.post('/api/purchase/:num/return/:id/credit', { preHandler: requireWarehouse }, async (req, reply) => {
+  app.post('/api/purchase/:num/return/:id/credit', { preHandler: requireAdminWrite }, async (req, reply) => {
     await ensure();
     const num = String(req.params.num);
     const po = (await q('select num, supplier, meta from purchase_orders where num=$1', [num])).rows[0];
@@ -398,7 +402,7 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
     return { ok: true, return: returns[idx] };
   });
 
-  app.delete('/api/purchase/:num', { preHandler: requireWarehouse }, async (req) => {
+  app.delete('/api/purchase/:num', { preHandler: requireAdminWrite }, async (req) => {
     await ensure();
     await q('delete from purchase_orders where num=$1', [req.params.num]).catch(() => {});
     return { ok: true };

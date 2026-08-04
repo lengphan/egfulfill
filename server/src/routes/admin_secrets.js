@@ -62,7 +62,7 @@ function maskSecret(v, full) {
   if (!s) return null;
   // Consistent "first 4 · dot run · last 4" across every credential — the shape a Kiloship /
   // Stripe dashboard shows, easy to eyeball "is the right key in?". ADMINS only; other staff
-  // on this requireStaff route get last-4, so a short secret isn't largely revealed to them.
+  // on this requireAdmin route get last-4, so a short secret isn't largely revealed to them.
   if (full && s.length >= 10) return `${s.slice(0, 4)}${'•'.repeat(8)}${s.slice(-4)}`;
   return `${'•'.repeat(8)}${s.slice(-4)}`;
 }
@@ -76,8 +76,10 @@ function keyMode(v) {
   return null;
 }
 
-export function adminSecretsRoutes(app, requireStaff) {
-  app.get('/api/admin/secrets', { preHandler: requireStaff }, async (req) => {
+// ADMIN-only. Even masked, this enumerates which integrations hold credentials and shows
+// the last 4 — a map of what's worth attacking. The PUT was already admin-checked inline.
+export function adminSecretsRoutes(app, requireAdmin) {
+  app.get('/api/admin/secrets', { preHandler: requireAdmin }, async (req) => {
     const full = req.user?.role === 'admin';
     return {
       secrets: SECRET_DEFS.map((d) => {
@@ -92,7 +94,7 @@ export function adminSecretsRoutes(app, requireStaff) {
 
   // Admin: set/replace/clear one secret in the DB (loaded into env at boot; also
   // applied live). Whitelisted names only. Takes full effect on the next restart.
-  app.put('/api/admin/secrets', { preHandler: requireStaff }, async (req, reply) => {
+  app.put('/api/admin/secrets', { preHandler: requireAdmin }, async (req, reply) => {
     if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only' }; }
     const b = req.body || {};
     const name = String(b.name || '');

@@ -290,7 +290,10 @@ export async function readAll() {
   return out;
 }
 
-export function factorySettingsRoutes(app, requireAuth, requireStaff) {
+// The factory READS the design fee, default shipping and embroidery file price to quote a
+// job, so the GET stays open to staff. The PUT is a pricing lever — it changes what every
+// order costs — so it's admin. Split deliberately: locking the read would break the floor.
+export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdmin) {
   // Types + their category mockups are needed by the SELLER-side Design Maker to resolve a
   // blank, but /api/factory/settings is staff-only (it carries cost and margin policy).
   // So the types get their own read, open to any signed-in user — names and mockup images
@@ -328,7 +331,7 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff) {
     return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: types, thread_palette: threads };
   });
 
-  app.put('/api/factory/settings', { preHandler: requireStaff }, async (req, reply) => {
+  app.put('/api/factory/settings', { preHandler: requireAdmin }, async (req, reply) => {
     const role = req.user && req.user.role;
     if (role !== 'admin' && role !== 'warehouse') { reply.code(403); return { error: 'Warehouse or admin only' }; }
     await ensure();

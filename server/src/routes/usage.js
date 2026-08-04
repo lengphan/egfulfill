@@ -35,9 +35,11 @@ async function readConfig() {
   catch { return {}; }
 }
 
-export function usageRoutes(app, requireStaff, requireAdmin) {
+// ADMIN-only. This is what the integrations COST us per platform; it isn't needed to pick,
+// print or ship an order.
+export function usageRoutes(app, requireAdminRead, requireAdmin) {
   // Per-platform call volume + estimated/real $ over a window, with monthly-normalised alerts.
-  app.get('/api/usage/summary', { preHandler: requireStaff }, async (req) => {
+  app.get('/api/usage/summary', { preHandler: requireAdminRead }, async (req) => {
     await ensureUsage();
     const days = Math.min(365, Math.max(1, Number(req.query?.days) || 30));
     const cfg = await readConfig();

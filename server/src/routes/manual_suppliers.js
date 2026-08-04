@@ -110,7 +110,10 @@ async function fetchPrice(url) {
   return { ok: true, price: Math.min(...prices), found: prices.length };
 }
 
-export function manualSupplierRoutes(app, requireStaff, requireWarehouse) {
+// ADMIN-only, all of it. These rows carry what we pay and what we make on it — margin is
+// not something an operator, warehouse picker or designer needs to do their job, and the
+// nav permission matrix is HIDE-only so it can never be the boundary. The gate is here.
+export function manualSupplierRoutes(app, requireAdmin) {
   q(`create table if not exists manual_suppliers (
        id bigserial primary key,
        title text not null,
@@ -125,9 +128,21 @@ export function manualSupplierRoutes(app, requireStaff, requireWarehouse) {
        created_at timestamptz default now(),
        updated_at timestamptz default now()
      )`).catch(() => {});
+  // Added for the Sourcing tab. A unit price on its own can't be compared across suppliers:
+  // $3.10 at MOQ 100 with $85 freight is really $3.95 a unit, and 25 days later than the
+  // $8.42 domestic blank with no minimum. These are what make the comparison honest.
+  for (const col of [
+    'moq integer',                    // minimum order quantity (1 = buy one)
+    'ship_total numeric(12,2)',       // inbound freight for the whole MOQ, not per unit
+    'lead_days integer',              // quoted production + transit
+    'supplier_ref text',              // internal supplier style, e.g. "sanmar:PC61" — price re-reads on catalog sync
+    'currency text',                  // as quoted; converted at display time, never stored converted
+    'decoration_cost numeric(12,2)',  // print/embroidery per unit, if not our own factory
+    'archived boolean default false',
+  ]) q(`alter table manual_suppliers add column if not exists ${col}`).catch(() => {});
 
-  app.get('/api/manual-suppliers', { preHandler: requireStaff }, async () => {
-    const r = await q('select * from manual_suppliers order by created_at desc limit 500').catch(() => ({ rows: [] }));
+  app.get('/api/manual-suppliers', { preHandler: requireAdmin }, async () => {
+    const r = await q('select * from manual_suppliers where coalesce(archived,false) = false order by created_at desc limit 500').catch(() => ({ rows: [] }));
     return {
       items: r.rows.map((x) => ({
         id: String(x.id), title: x.title, url: x.url, shop: x.shop,
@@ -135,19 +150,26 @@ export function manualSupplierRoutes(app, requireStaff, requireWarehouse) {
         markupPct: x.markup_pct == null ? null : Number(x.markup_pct),
         sellPrice: x.sell_price == null ? null : Number(x.sell_price),
         productId: x.product_id, note: x.note, createdAt: x.created_at,
+        moq: x.moq == null ? null : Number(x.moq),
+        shipTotal: x.ship_total == null ? null : Number(x.ship_total),
+        leadDays: x.lead_days == null ? null : Number(x.lead_days),
+        supplierRef: x.supplier_ref || null,
+        currency: x.currency || 'USD',
+        decorationCost: x.decoration_cost == null ? null : Number(x.decoration_cost),
+        archived: !!x.archived,
       })),
     };
   });
 
   /** Try to read the price off a listing. Never writes — the caller decides whether to
    *  keep what came back. */
-  app.post('/api/manual-suppliers/price', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/manual-suppliers/price', { preHandler: requireAdmin }, async (req, reply) => {
     const url = (req.body || {}).url;
     if (!url) { reply.code(400); return { error: 'A link is required.' }; }
     return fetchPrice(url);
   });
 
-  app.post('/api/manual-suppliers', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/manual-suppliers', { preHandler: requireAdmin }, async (req, reply) => {
     const b = req.body || {};
     const title = String(b.title || '').trim();
     if (!title) { reply.code(400); return { error: 'Give it a name — a row with only a link is unfindable later.' }; }
@@ -166,26 +188,51 @@ export function manualSupplierRoutes(app, requireStaff, requireWarehouse) {
     let shop = null;
     try { shop = b.url ? new URL(String(b.url)).hostname.replace(/^www\./, '') : null; } catch { /* not fatal */ }
 
+    // Blank string means "cleared", not zero — a 0 MOQ would silently divide freight by
+    // nothing later. num() keeps null null.
+    const num = (v, { int = false, min = 0 } = {}) => {
+      if (v == null || v === '') return null;
+      const n = int ? parseInt(v, 10) : Number(v);
+      return isFinite(n) ? Math.max(min, n) : null;
+    };
+    const moq = num(b.moq, { int: true, min: 1 });
+    const shipTotal = num(b.shipTotal);
+    const leadDays = num(b.leadDays, { int: true });
+    const decoration = num(b.decorationCost);
+    const supplierRef = b.supplierRef ? String(b.supplierRef).trim().slice(0, 120) : null;
+    const currency = b.currency ? String(b.currency).trim().toUpperCase().slice(0, 3) : 'USD';
+
     if (b.id) {
       await q(`update manual_suppliers set title=$2, url=$3, shop=$4, cost=$5, markup_pct=$6,
-                 sell_price=$7, product_id=$8, note=$9, updated_at=now() where id=$1::bigint`,
-        [String(b.id), title, b.url || null, shop, cost, pct, sell, b.productId || null, b.note || null]);
+                 sell_price=$7, product_id=$8, note=$9, moq=$10, ship_total=$11, lead_days=$12,
+                 supplier_ref=$13, currency=$14, decoration_cost=$15, updated_at=now()
+               where id=$1::bigint`,
+        [String(b.id), title, b.url || null, shop, cost, pct, sell, b.productId || null, b.note || null,
+         moq, shipTotal, leadDays, supplierRef, currency, decoration]);
       audit(req, 'manual-supplier.updated', { entityType: 'manual_supplier', entityId: String(b.id), after: { title, cost, sell } });
       return { ok: true, id: String(b.id) };
     }
     const r = await q(
-      `insert into manual_suppliers (title, url, shop, cost, markup_pct, sell_price, product_id, note, created_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
+      `insert into manual_suppliers (title, url, shop, cost, markup_pct, sell_price, product_id, note,
+                                     moq, ship_total, lead_days, supplier_ref, currency, decoration_cost, created_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
       [title, b.url || null, shop, cost, pct, sell, b.productId || null, b.note || null,
+       moq, shipTotal, leadDays, supplierRef, currency, decoration,
        String((req.user && req.user.sub) || '')]);
     audit(req, 'manual-supplier.added', { entityType: 'manual_supplier', entityId: String(r.rows[0].id), after: { title, shop, cost, sell } });
     return { ok: true, id: String(r.rows[0].id) };
   });
 
-  /** Warehouse/admin: a saved source is how someone re-orders, and losing one loses the
-   *  only record of where a blank came from. */
-  app.delete('/api/manual-suppliers/:id', { preHandler: requireWarehouse }, async (req, reply) => {
-    const r = await q('delete from manual_suppliers where id=$1::bigint', [String(req.params.id)]).catch(() => ({ rowCount: 0 }));
+  /** A saved source is how someone re-orders, and losing one loses the only record of
+   *  where a blank came from — so this is admin-only like the rest, and the UI archives
+   *  by default rather than deleting. */
+  app.delete('/api/manual-suppliers/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    // Archive, don't destroy: a source is the only record of where a blank came from, and
+    // an order placed months ago may still point at it. ?hard=1 really deletes.
+    const hard = /^(1|true)$/i.test(String(req.query?.hard || ''));
+    const r = hard
+      ? await q('delete from manual_suppliers where id=$1::bigint', [String(req.params.id)]).catch(() => ({ rowCount: 0 }))
+      : await q('update manual_suppliers set archived=true, updated_at=now() where id=$1::bigint', [String(req.params.id)]).catch(() => ({ rowCount: 0 }));
     if (!r.rowCount) { reply.code(404); return { error: 'Not found.' }; }
     audit(req, 'manual-supplier.removed', { entityType: 'manual_supplier', entityId: String(req.params.id) });
     return { ok: true };

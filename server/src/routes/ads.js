@@ -164,28 +164,32 @@ async function googleCampaigns(conn, since, until) {
 
 const ymd = (d) => d.toISOString().slice(0, 10);
 
-export function adsRoutes(app, requireStaff) {
+// ADMIN-only. These routes don't just REPORT ad spend, they create and pause campaigns —
+// i.e. they move money. That sat behind requireAdmin, which includes warehouse, operator
+// and designer. The nav already hid the page (roles: [] in staff-nav), but hiding a menu
+// item is not a permission: the endpoint was callable by any staff account.
+export function adsRoutes(app, requireAdmin) {
   // What's switched on + where to send the OAuth flow. Public config only — never
   // the secrets.
-  app.get('/api/ads/config', { preHandler: requireStaff }, async () => ({
+  app.get('/api/ads/config', { preHandler: requireAdmin }, async () => ({
     meta: { enabled: metaEnabled(), appId: META_APP_ID || null, scopes: 'ads_read,ads_management,business_management' },
     google: { enabled: googleEnabled(), clientId: GADS_CLIENT_ID || null, scopes: 'https://www.googleapis.com/auth/adwords' },
   }));
 
-  app.get('/api/ads/connections', { preHandler: requireStaff }, async () => {
+  app.get('/api/ads/connections', { preHandler: requireAdmin }, async () => {
     const r = await q(`select id, platform, shop_id as account_id, shop_name, created_at, updated_at
                          from platform_connections where platform in ('meta_ads','google_ads') order by created_at`);
     return r.rows;
   });
 
-  app.delete('/api/ads/connections/:id', { preHandler: requireStaff }, async (req) => {
+  app.delete('/api/ads/connections/:id', { preHandler: requireAdmin }, async (req) => {
     await q(`delete from platform_connections where id=$1 and platform in ('meta_ads','google_ads')`, [req.params.id]);
     return { ok: true };
   });
 
   // ── Meta connect: exchange the short-lived code for a long-lived token, then
   //    store one connection PER ad account the user can see.
-  app.post('/api/ads/meta/exchange', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/ads/meta/exchange', { preHandler: requireAdmin }, async (req, reply) => {
     if (!metaEnabled()) { reply.code(400); return { error: 'Meta is not configured — add META_APP_ID / META_APP_SECRET in Settings › Integrations.' }; }
     const { code, redirectUri } = req.body || {};
     if (!code || !redirectUri) { reply.code(400); return { error: 'Missing code or redirectUri' }; }
@@ -222,7 +226,7 @@ export function adsRoutes(app, requireStaff) {
   });
 
   // ── Google connect
-  app.post('/api/ads/google/exchange', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/ads/google/exchange', { preHandler: requireAdmin }, async (req, reply) => {
     if (!googleEnabled()) { reply.code(400); return { error: 'Google Ads is not configured — needs client id/secret and a developer token.' }; }
     const { code, redirectUri } = req.body || {};
     if (!code || !redirectUri) { reply.code(400); return { error: 'Missing code or redirectUri' }; }
@@ -261,7 +265,7 @@ export function adsRoutes(app, requireStaff) {
   });
 
   // ── The dashboard: every campaign across both channels, plus totals.
-  app.get('/api/ads/campaigns', { preHandler: requireStaff }, async (req) => {
+  app.get('/api/ads/campaigns', { preHandler: requireAdmin }, async (req) => {
     const days = Math.min(90, Math.max(1, Number(req.query?.days) || 7));
     const until = ymd(new Date());
     const since = ymd(new Date(Date.now() - (days - 1) * 86400000));
@@ -297,7 +301,7 @@ export function adsRoutes(app, requireStaff) {
   // Scope note: this creates the CAMPAIGN shell (name, objective, budget). Ad sets,
   // targeting and creatives are a much larger surface and still live in Meta/Google's
   // own tools — building a full ad composer here would be a product of its own.
-  app.post('/api/ads/campaigns', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/ads/campaigns', { preHandler: requireAdmin }, async (req, reply) => {
     const b = req.body || {};
     const channel = String(b.channel || '').toLowerCase();
     const name = String(b.name || '').trim();
@@ -367,7 +371,7 @@ export function adsRoutes(app, requireStaff) {
   });
 
   // Pause / resume — the safest write, and the one you actually need mid-flight.
-  app.post('/api/ads/campaigns/:channel/:id/status', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/ads/campaigns/:channel/:id/status', { preHandler: requireAdmin }, async (req, reply) => {
     const { channel, id } = req.params;
     const want = String((req.body && req.body.status) || '').toUpperCase();
     if (!['ACTIVE', 'PAUSED'].includes(want)) { reply.code(400); return { error: 'status must be ACTIVE or PAUSED' }; }

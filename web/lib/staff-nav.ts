@@ -20,7 +20,10 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
   // Purchasing = Suppliers (browse) + Purchase (cart/on-order/history) folded into one
   // section with tabs. Old /suppliers + /purchase routes redirect here (next.config).
-  { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, roles: ["operator", "warehouse", "admin"] },
+  // ADMIN ONLY. Purchasing commits company money to a supplier and the list shows unit cost
+  // across every blank we buy. Receiving stock is NOT here — that's the Inventory > Scan
+  // station, still open to warehouse — so the floor can still book deliveries in.
+  { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, roles: ["admin"] },
   // Partner billing — what byeastside / Pink Design / carriers / suppliers are owed.
   // Money, so warehouse and admin only, matching every other spend boundary.
   // Finance = Wallet (balances/transactions) + Partner costs (byeastside/carriers/suppliers)
