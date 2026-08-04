@@ -18,11 +18,20 @@ import type { SiteContent } from "@/lib/site-content"
  *     nothing bounces for attention, and every effect is skipped under reduced-motion
  *   · black on lime is ~16:1, well past AA, so the accent can hold real text
  */
-// Creamier than the first pass. #D8F651 was an acid yellow-green — high energy but it
-// vibrates against black and reads cheap at full-bleed size. This is the same hue pulled
-// toward cream: less chroma, a touch more lightness, so a whole plate of it stays warm
-// instead of shouting. Black on it is ~16.5:1, so it still carries real text.
-const LIME = "#CFEB86"
+/**
+ * TWO steps of one hue, because area changes how a colour reads.
+ *
+ * The chart columns and the hero plate were the same hex, and the plate still looked darker
+ * and more muted than the columns. That isn't a bug — a large field reads duller than a small
+ * mark of the same colour (the mark is judged against the white around it; the field is all
+ * there is). So the field gets its own lighter, slightly more saturated step to LOOK like the
+ * marks do, rather than to measure the same.
+ *
+ * LIME is the mark colour — the one that looked right on the columns. PLATE is that hue for
+ * full-bleed use. Both keep black text above 15:1, so either can carry real type.
+ */
+const LIME = "#CFEB86"   // marks: chart columns, small fills
+const PLATE = "#D9F58F"  // full-bleed fields: the hero, the CTA band
 const INK = "#0B0B0C"
 
 /** Words rise out of a mask, one after another. The mask is what makes it read as
@@ -145,7 +154,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           at the top of the window instead of under a white bar. The header itself goes
           transparent on this route (site-header.tsx) — between them, the hero reads as one
           full-bleed plate with the nav sitting on it. */}
-      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: LIME }}>
+      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: PLATE }}>
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
         <div className="absolute inset-x-0 bottom-0 h-24 bg-white [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
@@ -343,7 +352,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       <section className="px-6 py-24">
         <motion.div
           className="mx-auto max-w-5xl overflow-hidden rounded-3xl px-8 py-20 text-center"
-          style={{ background: LIME }}
+          style={{ background: PLATE }}
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 26 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "0px 0px -10% 0px" }}
