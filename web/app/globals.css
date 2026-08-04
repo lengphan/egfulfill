@@ -350,20 +350,36 @@ body { zoom: var(--eg-zoom, 1); }
     linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
 }
 
-/* Slim scroller for panels that scroll inside the layout (the left nav above all). The
-   platform default is a wide, high-contrast bar; against a coloured sidebar it looks like a
-   border someone drew by accident. Thin, transparent track, thumb tinted from the surface it
-   sits on — visible enough to grab, quiet enough to ignore. */
+/* Scroller for panels that scroll inside the layout (the left nav above all).
+   HIDDEN AT REST, revealed on hover. The platform default is a wide, high-contrast bar; on a
+   coloured sidebar it reads as a border someone drew by accident, and it is permanent for a
+   control you only need while actually dragging. Transparent until the pointer is over the
+   panel, then a thin tinted thumb — the space is still reserved, so revealing it never shifts
+   the nav's contents sideways.
+
+   No hover on touch, so `@media (hover: none)` keeps a faint thumb permanently visible there:
+   on a touch device the bar is the only thing saying the panel scrolls at all. */
 .eg-scroll-slim {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklch, currentColor 22%, transparent) transparent;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 200ms ease;
 }
-.eg-scroll-slim::-webkit-scrollbar { width: 6px; height: 6px; }
+.eg-scroll-slim:hover,
+.eg-scroll-slim:focus-within {
+  scrollbar-color: color-mix(in oklch, currentColor 26%, transparent) transparent;
+}
+.eg-scroll-slim::-webkit-scrollbar { width: 5px; height: 5px; }
 .eg-scroll-slim::-webkit-scrollbar-track { background: transparent; }
 .eg-scroll-slim::-webkit-scrollbar-thumb {
-  background: color-mix(in oklch, currentColor 20%, transparent);
+  background: transparent;
   border-radius: 9999px;
+  transition: background 200ms ease;
 }
-.eg-scroll-slim:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in oklch, currentColor 32%, transparent);
+.eg-scroll-slim:hover::-webkit-scrollbar-thumb,
+.eg-scroll-slim:focus-within::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, currentColor 26%, transparent);
+}
+@media (hover: none) {
+  .eg-scroll-slim { scrollbar-color: color-mix(in oklch, currentColor 18%, transparent) transparent; }
+  .eg-scroll-slim::-webkit-scrollbar-thumb { background: color-mix(in oklch, currentColor 18%, transparent); }
 }

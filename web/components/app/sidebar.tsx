@@ -70,7 +70,7 @@ export function Sidebar() {
         {sections.map((section, i) => (
           <div key={i} className="mb-1">
             {section.heading && (
-              <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/55">
+              <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
                 {nl("nav", section.heading)}
               </div>
             )}
@@ -92,7 +92,7 @@ export function Sidebar() {
                   <Icon
                     size={19}
                     weight={active ? "fill" : "regular"}
-                    className={cn("shrink-0", active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60")}
+                    className={cn("shrink-0", active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/75")}
                   />
                   <span className="flex-1">{nl("nav", item.label)}</span>
                   {locked && <LockSimple size={13} weight="fill" className="shrink-0 text-muted-foreground/60" />}
@@ -106,9 +106,9 @@ export function Sidebar() {
       <div className="shrink-0 border-t border-border p-3">
         <button
           onClick={logout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
-          <SignOut size={19} className="text-sidebar-foreground/60" />
+          <SignOut size={19} className="text-sidebar-foreground/75" />
           {nl("nav", "Log out")}
         </button>
       </div>
