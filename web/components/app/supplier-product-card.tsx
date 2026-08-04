@@ -40,8 +40,23 @@ export type SupplierCardData = {
 
 export function SupplierProductCard({
   data, added, adding, onAdd, onFavorite, loadColors, supplierLabel, onQuickOrder, onSync,
+  imageFit = "contain",
 }: {
   data: SupplierCardData
+  /**
+   * How the product photo fills the square bed.
+   *
+   * "contain" is the right default and why the bed is square at all — S&S mixes lifestyle
+   * and product shots, and cropping a lifestyle photo cuts the subject.
+   *
+   * SanMar needs "cover". EVERY SanMar image is 1200x1800 (2:3 portrait) with the product
+   * centred inside generous white padding — measured across caps and apparel, detail, model
+   * and flat variants alike. Contained in a square bed that letterboxes to 67% of the width
+   * before the image's own padding is even counted, so the product reads as tiny beside
+   * Otto's square shots. Because the shape and centring are uniform across their whole
+   * catalogue, cropping to square removes padding rather than product.
+   */
+  imageFit?: "contain" | "cover" 
   added: boolean
   adding: boolean
   onAdd: () => void
@@ -116,7 +131,7 @@ export function SupplierProductCard({
           // Absolutely-positioned children don't contribute to the parent's height, so
           // the box is now exactly square regardless of the image's shape.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt="" loading="lazy" className="absolute inset-0 size-full object-contain" />
+          <img src={img} alt="" loading="lazy" className={`absolute inset-0 size-full ${imageFit === "cover" ? "object-cover" : "object-contain"}`} />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50">No image</div>
         )}

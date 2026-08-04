@@ -750,6 +750,72 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
     JSON.stringify(s.variants || []),
   ];
 
+  // ── Price / availability change log ────────────────────────────────────────
+  // A nightly sync that silently overwrites is WORSE than no sync for accounting: the cost
+  // moves, every margin quietly recalculates against the new number, and nobody is told. So
+  // the import diffs against what was there and records what moved. This table is the answer
+  // to "how would I know" — the sync keeps you current, this tells you what changed.
+  q(`create table if not exists supplier_changes (
+       id bigserial primary key,
+       source text not null,
+       style text not null,
+       title text,
+       field text not null,
+       old_value text,
+       new_value text,
+       detected_at timestamptz default now()
+     )`).catch(() => {});
+  q(`create index if not exists supplier_changes_detected
+       on supplier_changes (detected_at desc)`).catch(() => {});
+
+  /**
+   * Diff incoming styles against what's stored and log what moved. Runs BEFORE the upsert,
+   * because afterwards the old values are gone.
+   *
+   * Only price and discontinued are tracked: those are the two that change an order or an
+   * account. Title and description churn constantly on a supplier feed and would bury the
+   * signal in noise.
+   */
+  async function logSanmarChanges(styles) {
+    if (!styles.length) return 0;
+    const ids = styles.map((s2) => String(s2.style));
+    const prev = await q(
+      'select style, price_min, price_max, discontinued from sanmar_styles where style = any($1::text[])',
+      [ids]).catch(() => ({ rows: [] }));
+    const before = new Map(prev.rows.map((r) => [String(r.style), r]));
+
+    const rows = [];
+    const money = (v) => (v == null ? null : Number(v).toFixed(2));
+    for (const s2 of styles) {
+      const b = before.get(String(s2.style));
+      if (!b) continue;                       // brand new style — an addition, not a change
+      const oldMin = money(b.price_min), newMin = money(s2.priceMin);
+      if (oldMin !== newMin && (oldMin || newMin)) {
+        rows.push([ 'sanmar', s2.style, s2.title || null, 'price_min', oldMin, newMin ]);
+      }
+      const oldMax = money(b.price_max), newMax = money(s2.priceMax);
+      if (oldMax !== newMax && (oldMax || newMax)) {
+        rows.push([ 'sanmar', s2.style, s2.title || null, 'price_max', oldMax, newMax ]);
+      }
+      const wasGone = !!b.discontinued, isGone = !!s2.discontinued;
+      if (wasGone !== isGone) {
+        rows.push([ 'sanmar', s2.style, s2.title || null, 'discontinued', String(wasGone), String(isGone) ]);
+      }
+    }
+    for (let i = 0; i < rows.length; i += 200) {
+      const chunk = rows.slice(i, i + 200);
+      const params = [];
+      const tuples = chunk.map((r, j) => {
+        params.push(...r);
+        const b0 = j * 6;
+        return `($${b0 + 1},$${b0 + 2},$${b0 + 3},$${b0 + 4},$${b0 + 5},$${b0 + 6})`;
+      });
+      await q(`insert into supplier_changes (source, style, title, field, old_value, new_value)
+               values ${tuples.join(',')}`, params).catch(() => {});
+    }
+    return rows.length;
+  }
+
   // Upsert STYLE rows in multi-row batches. ~4k rows means this is quick either way, but the
   // batching matters because `variants` is a sizeable jsonb per row — 200/statement keeps the
   // parameter count (200 x 14 = 2,800) and the payload per round-trip both comfortable.
@@ -850,11 +916,13 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
       reply.code(400);
       return { error: `Could not parse ${wanted}.`, detail: (e && e.message) || null };
     }
+    // Diff BEFORE writing — afterwards the previous prices no longer exist.
+    const changes = await logSanmarChanges(parsed.styles);
     const { imported, duplicateStyles } = await upsertSanmarStyles(parsed.styles);
     const c = await q('select count(*)::int as n from sanmar_styles').catch(() => ({ rows: [{ n: 0 }] }));
     return {
       ok: true, file: wanted, variantRows: parsed.variants, unusableRows: parsed.skipped,
-      styles: parsed.styles.length, duplicateStyles, imported,
+      styles: parsed.styles.length, duplicateStyles, imported, changes,
       total: c.rows[0]?.n || 0, seconds: Math.round((Date.now() - t0) / 100) / 10,
     };
   });

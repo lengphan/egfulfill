@@ -425,6 +425,7 @@ export function AllSuppliers() {
             <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3 lg:grid-cols-4">
               {paged.pageItems.map((it) => (
                 <SupplierProductCard
+              imageFit={it.supplier === "sanmar" ? "cover" : "contain"}
                   key={keyOf(it)}
                   data={cardData(it)}
                   supplierLabel={it.supplier === "ss" ? "S&S" : it.supplier === "otto" ? "Otto" : "SanMar"}
