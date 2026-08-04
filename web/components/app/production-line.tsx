@@ -40,43 +40,58 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
   // an all-zero floor picks nothing rather than lighting up Received.
   const peak = counts.filter((s) => WIP.has(s.id)).reduce((a, s) => (s.n > a.n ? s : a), { id: "", n: 0 })
 
-  // Each column is scaled to the BUSIEST stage, not to the total — so a lopsided floor
-  // (everything in one stage, nothing shipped yet) still reads as a clean chart instead of
-  // one segment eating a shared track. A non-zero stage never drops below a visible stub.
-  const CHART_H = 128
-  const BAR_MAX = CHART_H - 22 // leaves room for the value label riding on top
+  // HORIZONTAL rows, not columns. A real floor is extremely lopsided — 207 drafts against
+  // 8 pending and 5 awaiting scan — and as columns that shape fails twice: every stage but
+  // the biggest collapses to a 6px stub on the baseline, and the tall bar forces a chart
+  // height that the other four columns leave as empty air. Rows fix both. Each stage owns a
+  // band whether its count is 207 or 0, the card's height goes into bands instead of
+  // headroom, and the count sits at the end of its own row, so a one-pixel bar is still
+  // perfectly readable — the number never depended on the bar's length.
+  //
+  // It also reads as what it is: a pipeline, top to bottom, in pipeline order.
   const max = Math.max(1, ...counts.map((s) => s.n))
+  const total = counts.reduce((a, s) => a + s.n, 0)
 
   return (
-    <div className="px-5 py-4">
-      {/* columns — value label on top, bar grounded on a shared baseline */}
-      <div className="flex items-end gap-1.5 border-b border-border" style={{ height: CHART_H }}>
-        {counts.map((s) => {
-          const hot = s.id === peak.id && peak.n > 0
-          const h = s.n ? Math.max(6, Math.round((s.n / max) * BAR_MAX)) : 2
-          return (
-            <div key={s.id || "received"} className="flex flex-1 flex-col items-center justify-end gap-1.5">
-              <div className={"text-sm font-bold leading-none tabular-nums " + (hot ? "text-primary" : s.n ? "text-foreground" : "text-muted-foreground")}>{s.n}</div>
-              <div
-                className={"w-full max-w-[88px] rounded-t-[5px] transition-[height] duration-500 " + (s.n ? BAR[s.tone] : "bg-muted")}
-                style={{ height: h }}
-                title={`${s.label}: ${s.n}`}
-              />
-            </div>
-          )
-        })}
-      </div>
-      {/* stage labels, aligned under each column */}
-      <div className="mt-2 flex gap-1.5">
-        {counts.map((s) => {
-          const hot = s.id === peak.id && peak.n > 0
-          return (
-            <div key={s.id || "received"} className={"flex-1 text-center text-[11px] font-medium leading-tight " + (hot ? "text-primary" : "text-muted-foreground")}>
+    // h-full + flex-1 rows: this card is stretched to match the fulfilment-speed card beside
+    // it, so a content-height chart left a third of it empty — the "doesn't use the height it
+    // has" complaint. The bands absorb the slack instead, which also gives each row a bigger
+    // hover target. min-h keeps them from collapsing when the card is short.
+    <div className="flex flex-1 flex-col justify-center px-5 py-3">
+      {counts.map((s) => {
+        const hot = s.id === peak.id && peak.n > 0
+        // Proportional to the busiest stage, with a floor so a non-zero stage is never
+        // invisible — a stage holding 5 orders is not the same as one holding none, and at
+        // 5/207 an honest proportion would round to nothing.
+        const pct = s.n ? Math.max(1.5, (s.n / max) * 100) : 0
+        return (
+          <div
+            key={s.id || "received"}
+            className="group flex min-h-[34px] flex-1 items-center gap-3 rounded-md px-1 transition-colors hover:bg-accent/40"
+            title={`${s.label}: ${s.n} order${s.n === 1 ? "" : "s"}${total ? ` · ${Math.round((s.n / total) * 100)}% of the floor` : ""}`}
+          >
+            <div className={"w-28 shrink-0 truncate text-xs font-medium " + (hot ? "text-foreground" : "text-muted-foreground")}>
               {s.label}
             </div>
-          )
-        })}
-      </div>
+            {/* The track is the full width every stage gets, so the bars share one scale and
+                the eye can compare them down the column edge. */}
+            <div className="relative h-2.5 flex-1 overflow-hidden rounded-sm bg-muted/60">
+              {s.n > 0 && (
+                <div
+                  className={"absolute inset-y-0 left-0 rounded-r-[4px] transition-[width] duration-500 " + BAR[s.tone]}
+                  style={{ width: `${pct}%` }}
+                />
+              )}
+            </div>
+            {/* Value at the tip of the row, not the tip of the bar: a 1.5% bar has nowhere to
+                put a label, and a number that moves with the bar is a number you have to hunt
+                for. Right-aligned and tabular so the digits line up as a readable column. */}
+            <div className={"w-10 shrink-0 text-right text-sm font-semibold tabular-nums " + (s.n ? "text-foreground" : "text-muted-foreground/60")}>
+              {s.n}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -226,7 +226,9 @@ export function StaffDashboard() {
             title="Production line"
             description={windowed ? `Orders from the ${rangeMeta.sub}, by current stage` : "Where the work is right now — every order by stage"}
             actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">Open queue <ArrowRight size={13} weight="bold" /></Link>}
-            bodyClassName="divide-y divide-border"
+            /* flex-1 so the body actually receives the card's stretched height — without it
+               the chart sized to its content and left a third of the card empty. */
+            bodyClassName="flex flex-1 flex-col divide-y divide-border"
           >
             {orders === null ? (
               <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
