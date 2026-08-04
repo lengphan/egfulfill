@@ -169,13 +169,25 @@ export function SupplierOrderingSettings() {
               </select>
             </Row>
 
-            {/* The honest limit. Otto expose no saved cards, so a card-paid order needs the
-                number each time — and keeping it here would put this app in PCI scope,
-                which is precisely what we're avoiding. */}
+            {/* This note used to say a card-paid order "still asks for the card each time".
+                It doesn't — the server REFUSES card orders outright unless OTTO_CARD_ORDERS=1,
+                so the copy promised a prompt that never comes and the order failed at
+                placement instead. Saving a setting that is guaranteed to fail is worse than
+                not offering it, so the warning now fires at the moment it's chosen. */}
+            {/^credit\s*card$/i.test(String(form.otto_payment_method ?? "").replace(/[^a-z ]/gi, "")) && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <strong>Orders with this setting will be refused.</strong> Card payments to Otto are
+                turned off on the server — sending a card number through EGFULFILL would put it inside
+                PCI DSS scope. Pick account terms (Net 30, Net 45, Wire Transfer or Cash) and every
+                order goes through without asking you anything.
+              </div>
+            )}
+
             <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Paying Otto by card still asks for the card on each order. Otto&apos;s API exposes no saved
-              cards, and storing one here would put EGFULFILL inside PCI DSS scope. To stop being asked,
-              use account terms above, or ask Otto to keep the card on their side.
+              Unlike S&amp;S, Otto&apos;s API exposes no saved cards — there is no token to send, only
+              raw card details — so a card cannot be stored here the way an S&amp;S payment profile can.
+              Account terms are the set-once option: pick one above and it applies to every order
+              automatically. To pay Otto by card, ask them to keep it on their side and bill it.
             </div>
 
             <Row label="Order as" hint="Otto require a customer and a contact on every order.">
