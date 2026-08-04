@@ -152,6 +152,21 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
           <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-sm font-bold tabular-nums text-white backdrop-blur">
             <span title={l.price_converted ? origPrice(l.price, l.currency) : undefined}>{priceLabel(l)}</span>
           </span>
+          {/* Trademark heads-up — static keyword match, not legal advice.
+              OVERLAID on the image, deliberately: as a row in the card body it added its own
+              height, so the handful of flagged listings made their tiles taller than the rest
+              and the whole grid went ragged. A warning shouldn't reflow the page it warns
+              about. Sits opposite the price, truncated to one line, with the full list of
+              matches in the tooltip. */}
+          {tmHits.length > 0 && (
+            <span
+              className="absolute bottom-2 right-2 inline-flex max-w-[62%] items-center gap-1 rounded-md bg-amber-500/90 px-1.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur"
+              title={`Possible trademark: ${tmHits.join(", ")} — heuristic check, not legal advice. A listing mentioning a known brand may risk takedown; verify before copying the idea.`}
+            >
+              <Warning size={11} weight="fill" className="shrink-0" />
+              <span className="truncate">{tmHits[0]}{tmHits.length > 1 ? ` +${tmHits.length - 1}` : ""}</span>
+            </span>
+          )}
         </div>
         <div className="flex flex-1 flex-col p-3">
           <div className="line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
@@ -165,17 +180,6 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
             </button>
           ) : (
             <div className="mt-1 truncate text-xs text-muted-foreground">{l.shop_name || "—"}</div>
-          )}
-
-          {/* Trademark heads-up — static keyword match, not legal advice. */}
-          {tmHits.length > 0 && (
-            <div
-              className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-700"
-              title="Heuristic check — a listing mentioning a known brand may risk trademark takedown. Verify before copying the idea."
-            >
-              <Warning size={13} weight="fill" className="mt-px shrink-0" />
-              <span>Possible trademark: {tmHits.slice(0, 3).join(", ")}{tmHits.length > 3 ? "…" : ""}</span>
-            </div>
           )}
 
           {/* Estimate boxes — Views/Sold (24h) + Revenue/Sold (all time). */}
