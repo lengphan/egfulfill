@@ -35,6 +35,21 @@ export function designFilesRoutes(app, requireAuth) {
     // = artwork/mockup | 'other' = anything else. Every type is stored; `kind` only
     // decides who SEES it.
     .then(() => q("alter table design_file_data add column if not exists kind text default 'other'"))
+    /**
+     * WHICH LINE this file belongs to. NULL means "every line on the order".
+     *
+     * Files used to carry only (order_id, sku), so a file dropped on one item showed up on
+     * all of them — two lines of the same SKU are different jobs, and a marketplace line
+     * arrives with its variant (and therefore its SKU) unset, which made the sku match
+     * universal. That is the bug this column exists to end.
+     *
+     * NULL = all is deliberate, not a leftover: every row that predates this column already
+     * has no line_id, and "applies to the whole order" is exactly the behaviour those files
+     * have today. So the existing data needs no migration and no guess about which line a
+     * file was really meant for — it keeps doing what it already did, and only new per-item
+     * uploads are scoped.
+     */
+    .then(() => q('alter table design_file_data add column if not exists line_id text'))
     .then(() => q('create index if not exists design_file_data_order on design_file_data (order_id)'))
     .catch(() => {});
 
@@ -213,18 +228,25 @@ export function designFilesRoutes(app, requireAuth) {
       } catch (e) { /* storage failed → keep inline */ }
     }
     await q(
-      `insert into design_file_data (design_id, order_id, sku, seller_id, file_name, mime, data, url, content_hash, price, kind, created_at, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9, coalesce($10, 0), $11, now(), now())
+      `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, content_hash, price, kind, created_at, updated_at)
+       values ($1,$2,$3,$12,$4,$5,$6,$7,$8,$9, coalesce($10, 0), $11, now(), now())
        on conflict (design_id) do update set
          order_id=coalesce(excluded.order_id, design_file_data.order_id),
          sku=coalesce(excluded.sku, design_file_data.sku),
+         -- line_id takes the INCOMING value verbatim, including null. Everywhere else here
+         -- coalesces to keep the old value, but scope is the one thing a re-upload has to be
+         -- able to widen: re-filing a per-line file as an "applies to all" file (line_id
+         -- null) must not silently keep it pinned to the line it started on.
+         line_id=excluded.line_id,
          seller_id=coalesce(excluded.seller_id, design_file_data.seller_id),
          file_name=excluded.file_name, mime=excluded.mime, data=excluded.data, url=excluded.url,
          content_hash=excluded.content_hash,
          price=coalesce($10, design_file_data.price), kind=excluded.kind, updated_at=now()`,
       [String(b.designId), b.orderId || null, b.sku || null, seller || null, b.name || null, b.mime || null, data, url, b.hash || null,
        priceFor(req.user, b, defaultPrice),
-       kindOf(b.name, b.mime)]);
+       kindOf(b.name, b.mime),
+       // "" and undefined both mean the whole order — only a real line id scopes a file.
+       (b.lineId || b.line_id) ? String(b.lineId || b.line_id) : null]);
     /**
      * Record it + wake the boards. Without these two lines the file lands in storage but
      * nothing tells the UI: the Design readiness tag stayed grey until a full reload (it
@@ -415,7 +437,7 @@ export function designFilesRoutes(app, requireAuth) {
     const orderId = String(req.query?.orderId || '');
     if (!orderId) { reply.code(400); return { error: 'orderId is required' }; }
     const r = await q(
-      'select design_id, order_id, sku, seller_id, file_name, mime, price, kind, created_at from design_file_data where order_id=$1 order by created_at',
+      'select design_id, order_id, sku, line_id, seller_id, file_name, mime, price, kind, created_at from design_file_data where order_id=$1 order by created_at',
       [orderId]
     );
     if (!isStaff(req.user)) {
