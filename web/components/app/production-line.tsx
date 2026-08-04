@@ -49,21 +49,11 @@ const ageLabel = (d: number) => (!Number.isFinite(d) ? "" : d < 1 ? "today" : `$
  * they came from, and how long the oldest has waited. Every number is a live count off the
  * order feed — nothing is modelled.
  */
-/** How long a draft has been sitting.
- *
- *  ONE band, and only the one that names a problem. Three bands re-stated the same total
- *  three ways — "under 7 days" and "7 – 30 days" are just the healthy remainder split in
- *  two, and neither is something anyone acts on, so they cost three rows of the card to say
- *  what the Draft count above them already said.
- *
- *  Over 30 days is different in kind: a draft from this morning is untouched work, one from
- *  six weeks ago is abandoned, and that is worth a row of its own. It renders only when it
- *  holds something, so a healthy board shows nothing here at all. */
-const AGE_BANDS: { label: string; hit: (d: number) => boolean }[] = [
-  { label: "over 30 days", hit: (d) => d >= 30 },
-]
-/** Below this there's nothing to split — three sub-rows off a pile of six is noise. */
-const SPLIT_MIN = 10
+// (Age bands were here — Draft split into "under 7 days" / "7 – 30 days" / "over 30 days"
+// as sub-rows. Removed at the user's request: they re-stated the Draft count above them in
+// different words, and the card's job is one glance, not a breakdown. If "how much of this
+// is stale" is ever wanted again, it belongs as a column or a filter on the queue, not as
+// three extra rows here.)
 
 export function ProductionLine({ orders }: { orders: OrderRow[] }) {
   const rows = [...LINE, ...OFF_LINE].map((s) => {
@@ -82,20 +72,7 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
       const d = dayjs(o.created_at)
       return Number.isFinite(d) && d > a ? d : a
     }, 0)
-    // Draft only: the one stage that is reliably several piles wearing one number.
-    const bands = s.id === "" && inStage.length >= SPLIT_MIN
-      ? AGE_BANDS.map((b) => {
-          const hits = inStage.filter((o) => b.hit(dayjs(o.created_at)))
-          return {
-            label: b.label,
-            n: hits.length,
-            byChannel: [...CHANNELS, OTHER]
-              .map((c) => ({ ...c, n: hits.filter((o) => slotFor(platformOf(o)).name === c.name).length }))
-              .filter((c) => c.n > 0),
-          }
-        }).filter((b) => b.n > 0)
-      : []
-    return { ...s, n: inStage.length, byChannel, oldest, bands, off: OFF_LINE.some((x) => x.id === s.id) }
+    return { ...s, n: inStage.length, byChannel, oldest, off: OFF_LINE.some((x) => x.id === s.id) }
   })
 
   // Exception rows only when they hold something; pipeline rows always, so the shape of the
@@ -185,35 +162,7 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
             </div>
           </div>
 
-          {/* Age bands, indented under their stage. Subordinate on purpose — smaller, muted,
-              no hover fill — so they read as a breakdown OF the row above rather than as more
-              stages. Same four columns, so every number still lines up in its column. */}
-          {r.bands.map((b) => {
-            const bp = Math.max(1.5, (b.n / max) * 100)
-            const bnarrow = bp < 12
-            return (
-              <div
-                key={b.label}
-                className="flex min-h-[22px] items-center gap-3 px-1"
-                title={`${r.label} · ${b.label}: ${b.n}\n${b.byChannel.map((c) => `${c.name} ${c.n}`).join(" · ")}`}
-              >
-                <div className="w-24 shrink-0 truncate pl-3 text-[11px] text-muted-foreground/70">{b.label}</div>
-                <div className="relative h-1.5 flex-1 rounded-sm bg-muted/40">
-                  <div className="absolute inset-y-0 left-0 flex overflow-hidden rounded-sm" style={{ width: `${bp}%` }}>
-                    {b.byChannel.map((c, i) => (
-                      <div
-                        key={c.name}
-                        className={c.cls + " opacity-70" + (i && !bnarrow ? " ml-[2px]" : "") + (i === b.byChannel.length - 1 ? " rounded-r-[3px]" : "")}
-                        style={{ flex: `${c.n} 0 0%` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="w-12 shrink-0" />
-                <div className="w-10 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">{b.n}</div>
-              </div>
-            )
-          })}
+
           </Fragment>
         )
       })}
