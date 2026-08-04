@@ -22,9 +22,9 @@ import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, isFactoryColLocked, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
-import { OrderFilterBar, emptyOrdersMessage } from "@/components/app/order-filter-bar"
-import { getTiktokLabel } from "@/lib/api"
-import { filterOrders, EMPTY_ORDER_QUERY, type OrderQuery } from "@/lib/order-filter"
+import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
+import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
+import { filterOrders, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
@@ -167,17 +167,9 @@ const openLabel = (r: UspsLabelResult) => {
 // NB: "draft" and the first pipeline stage (in_review) are DIFFERENT states. Draft =
 // arrived/created but nobody has started it (where factory-synced orders land, unpaid);
 // in_review = Pending: the seller submitted + paid, awaiting factory approval.
-//
-// The three exception states get their OWN pills after Issues rather than only living
-// inside it. Issues stays: "show me everything that's gone wrong" and "show me what's
-// cancelled" are different questions, and the bundle is the one you ask first.
-const FILTERS: { label: string; id: string }[] = [
-  { label: "All", id: "" },
-  { label: "Draft", id: "draft" },
-  ...FACTORY_STAGES.map((s) => ({ label: s.label, id: s.id })),
-  { label: "Issues", id: "issues" },
-  ...EXCEPTION_STAGES.map((s) => ({ label: s.label, id: s.id })),
-]
+// (The pill roster itself is STATUS_PILLS in lib/order-filter.ts, beside the matcher that
+// reads it. Which of them a person keeps on their row is a per-browser preference — see
+// loadHiddenStatusPills.)
 
 // ONE order page for the whole factory team. The queue + item controls are shared; the
 // action set adapts to the role: operators review artwork + drive production, warehouse
@@ -201,6 +193,17 @@ export function OrdersHub() {
   // which meant "Shipped" and a Status dropdown could hold contradictory answers, and the
   // empty-state sentence could only ever name one of them.
   const [query, setQuery] = useState<OrderQuery>(EMPTY_ORDER_QUERY)
+  // Which stage pills this browser keeps on the row. Read after mount (localStorage), so the
+  // first paint is the default set rather than a flash of everything.
+  const [hiddenPills, setHiddenPills] = useState<string[]>([])
+  useEffect(() => {
+    const t = setTimeout(() => setHiddenPills(loadHiddenStatusPills()), 0)
+    return () => clearTimeout(t)
+  }, [])
+  const togglePill = (id: string) => {
+    const next = hiddenPills.includes(id) ? hiddenPills.filter((x) => x !== id) : [...hiddenPills, id]
+    setHiddenPills(next); saveHiddenStatusPills(next)
+  }
   // Fetching the TikTok-made label for a platform-shipped order. Per-order id so the row
   // that was clicked is the one that shows as busy.
   const [ttLabel, setTtLabel] = useState<string | null>(null)
@@ -628,15 +631,9 @@ export function OrdersHub() {
    */
   const openTiktokLabel = async (o: OrderRow) => {
     setTtLabel(o.id); setActionErr(null)
-    try {
-      const d = await getTiktokLabel(o.id)
-      if (d.error) throw new Error(d.error)
-      const url = d.documents?.[0]?.url
-      if (!url) throw new Error("TikTok returned no document URL for this order.")
-      window.open(url, "_blank", "noopener")
-    } catch (e) {
-      setActionErr(`Couldn't fetch the TikTok label: ${e instanceof Error ? e.message : "unknown error"}`)
-    } finally { setTtLabel(null) }
+    const err = await openTiktokLabelFor(o)
+    if (err) setActionErr(`Couldn't fetch the TikTok label: ${err}`)
+    setTtLabel(null)
   }
 
   const stats = useMemo(() => {
@@ -885,7 +882,15 @@ export function OrdersHub() {
       <SectionCard
         title={tl("ui", "Production queue")}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* Search sits UP HERE, not in the filter row. Sharing that row with the pills
+                and five dropdowns squeezed it to a stub against the right edge and made the
+                whole strip read as jammed — and "find me this one order" is a header job on
+                every other screen in the app anyway.
+                Only once there's something to search: a search box over an empty board is a
+                control that cannot do anything, and it makes "no orders yet" look like a
+                failed query. */}
+            {!!orders?.length && <OrderSearchInput query={query} onChange={setQuery} className="w-40 sm:w-56" />}
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
               <UploadSimple size={14} weight="bold" /> {tl("ui", "Import")}
             </Button>
@@ -895,45 +900,82 @@ export function OrdersHub() {
           </div>
         }
       >
-        {/* ONE toolbar row: stage pills left, search + dropdowns right.
-            They were stacked, which spent a whole row on seven short pills and left the
-            right two-thirds of both rows empty — the widest, emptiest thing on the page sat
-            directly above the densest. Everything is the same h-7 / text-xs metric as the
-            chips in the rows below, so the toolbar reads as part of the table.
-            The pills keep line one and the filters take whatever is left of it. `basis` is
-            the hinge: while at least ~26rem remains beside the pills the group stays on the
-            row and wraps INTERNALLY (a bar that jumps to its own row the moment it's snug
-            puts the blank space straight back where it started); below that it drops to a
-            full-width row of its own and goes back to reading left-to-right, rather than
-            stacking into a narrow column hugging the right edge. */}
+        {/* ONE toolbar row: stage pills left, narrowing dropdowns right. Search is up in the
+            card header — three kinds of control on one line is what made this read as jammed.
+            Everything here is the same h-7 / text-xs metric as the chips in the rows below,
+            so the toolbar reads as part of the table.
+            The pills keep line one and the dropdowns take whatever is left of it. `basis` is
+            the hinge: while at least ~18rem remains beside the pills the group stays on the
+            row (a bar that jumps to its own row the moment it's snug puts the blank space
+            straight back where it started); below that it drops to a full-width row of its
+            own and reads left-to-right, rather than stacking into a narrow column hugging
+            the right edge. */}
         <div className="flex flex-wrap items-start gap-x-4 gap-y-2 border-b border-border px-5 py-2.5">
           <div className="flex shrink-0 flex-wrap items-center gap-1">
-            {FILTERS.map((f) => {
-              // Straight equality. Issues used to also light for any single exception state,
-              // because none of them had a pill; now that all three do, lighting two pills
-              // for one selection would just be wrong.
-              const on = query.status === f.id
+            {STATUS_PILLS.map((p) => {
+              // A hidden pill still renders while it's the ACTIVE filter. Hiding the thing
+              // that's narrowing the list leaves a board that's plainly filtered with nothing
+              // on screen saying so — the exact trap the empty-state sentence exists to avoid.
+              if (p.value && hiddenPills.includes(p.value) && query.status !== p.value) return null
+              const on = query.status === p.value
               return (
                 <button
-                  key={f.id}
-                  onClick={() => setQuery({ ...query, status: f.id })}
+                  key={p.value}
+                  // Clicking the LIT pill clears it. A tab strip you can enter but not leave
+                  // except by finding "All" is the same trap as a dropdown with no "any" row.
+                  onClick={() => setQuery({ ...query, status: on ? "" : p.value })}
+                  aria-pressed={on}
+                  title={on && p.value ? `Showing ${p.label} only — click to clear` : undefined}
                   className={"eg-tap h-7 rounded-md px-2 text-xs font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
                 >
-                  {tl("stage", f.label)}
+                  {tl("stage", p.label)}
                 </button>
               )
             })}
+
+            {/* "+" — which stages get a pill, per browser. All ten at once was a wall of
+                tabs; the ones a given floor never filters by shouldn't cost row space, but
+                they also shouldn't be unreachable. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label="Choose which status pills to show"
+                title="Choose which status pills to show"
+                className="eg-tap flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                <Plus size={13} weight="bold" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44 p-1">
+                {/* Label INSIDE the Group — Base UI's Menu.GroupLabel throws outside one,
+                    which blanks the whole page rather than misrendering a heading. */}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="px-2 py-1 text-[11px] text-muted-foreground">Show these pills</DropdownMenuLabel>
+                  {STATUS_PILLS.filter((p) => p.value).map((p) => {
+                    const shown = !hiddenPills.includes(p.value)
+                    return (
+                      <DropdownMenuItem
+                        key={p.value}
+                        // The menu closes on each pick. Re-opening between toggles is the
+                        // lesser evil versus hand-rolling a popover to keep it open.
+                        onClick={() => togglePill(p.value)}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <Check size={12} weight="bold" className={shown ? "text-primary" : "opacity-0"} />
+                        <span className="truncate">{tl("stage", p.label)}</span>
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          {/* Only once there's something to search. A search box over an empty board is a
-              control that cannot do anything, and it makes "no orders yet" look like a
-              failed query. */}
+
           {!!orders?.length && (
             <OrderFilterBar
               orders={orders}
               query={query}
               onChange={setQuery}
               catalog={catalog}
-              className="min-w-0 flex-1 basis-[26rem] xl:justify-end"
+              className="min-w-0 flex-1 basis-[18rem] xl:justify-end"
             />
           )}
         </div>
@@ -1050,13 +1092,31 @@ export function OrdersHub() {
                 status: <span className="justify-self-start"><StageBadge status={stage} /></span>,
                 order: <div className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</div>,
                 tracking: (
-                  <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-1.5">
                     {track ? (
-                      <a href={trackUrl(o.carrier || label?.carrier, track)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-xs font-medium text-emerald-600 hover:underline" title={`${o.carrier || label?.carrier || "USPS"} ${track}`}>
-                        {track}<ArrowSquareOut size={9} weight="bold" className="shrink-0" />
+                      <a href={trackUrl(o.carrier || label?.carrier, track)} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 font-mono text-xs font-medium text-emerald-600 hover:underline" title={`${o.carrier || label?.carrier || "USPS"} ${track}`}>
+                        <span className="truncate">{track}</span><ArrowSquareOut size={9} weight="bold" className="shrink-0" />
                       </a>
                     ) : (
                       <span className="text-xs text-muted-foreground/60">—</span>
+                    )}
+                    {/* The parcel came from TikTok, so its LABEL did too — and this is where
+                        someone looks for it. Fetched on demand (it lives in TikTok's system,
+                        not ours), which is also why it's an icon beside the number rather
+                        than a link: there is no URL until it's asked for. */}
+                    {canFetchTiktokLabel(o) && (
+                      <button
+                        type="button"
+                        onClick={() => openTiktokLabel(o)}
+                        disabled={ttLabel === o.id}
+                        title="Open the shipping label TikTok generated for this order"
+                        aria-label="Open TikTok label"
+                        className="eg-tap shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      >
+                        {ttLabel === o.id
+                          ? <CircleNotch size={12} className="animate-spin" />
+                          : <FileArrowDown size={12} weight="bold" />}
+                      </button>
                     )}
                   </div>
                 ),
@@ -1296,7 +1356,7 @@ export function OrdersHub() {
                                   recorded have no type stored, and the server answers with
                                   the actual reason ("no package on TikTok yet") which is
                                   more use than a hidden menu item. */}
-                              {/^tiktok-/i.test(o.id) && (
+                              {canFetchTiktokLabel(o) && (
                                 <DropdownMenuItem disabled={ttLabel === o.id} onClick={() => openTiktokLabel(o)}>
                                   {ttLabel === o.id
                                     ? <CircleNotch size={14} className="animate-spin" />

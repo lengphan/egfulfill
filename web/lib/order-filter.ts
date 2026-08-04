@@ -10,7 +10,7 @@
 import { type OrderRow, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { numOf, platformOf, decodeEntities } from "@/lib/order-format"
 import { normalizeMethods, PRODUCT_METHODS, type PrintMethod } from "@/lib/print-method"
-import { ALL_STATUSES, orderStage, isException } from "@/lib/factory-status"
+import { ALL_STATUSES, FACTORY_STAGES, EXCEPTION_STAGES, orderStage, isException } from "@/lib/factory-status"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 
@@ -57,6 +57,48 @@ export const statusLabel = (v: string) =>
   : v === "issues" ? "Issues"
   : ALL_STATUSES.find((s) => s.id === v)?.label ?? v
 
+/**
+ * The stage pills, in row order. Derived from the canonical pipeline so a stage added to
+ * factory-status.ts turns up here instead of quietly becoming unfilterable.
+ *
+ * "" (All) is not a status — it's the cleared state, and it's the one pill that can never be
+ * hidden or toggled off.
+ */
+export const STATUS_PILLS: { value: string; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "draft", label: "Draft" },
+  ...FACTORY_STAGES.map((s) => ({ value: s.id, label: s.label })),
+  { value: "issues", label: "Issues" },
+  ...EXCEPTION_STAGES.map((s) => ({ value: s.id, label: s.label })),
+]
+
+// Which pills a person has taken OFF their row, persisted per browser — the same shape as the
+// column prefs in order-columns.ts, and for the same reason: storing what's HIDDEN means a
+// stage added later shows up by default rather than being invisible to everyone who ever
+// customised the row.
+//
+// The three exception states start hidden. All ten pills at once was a wall of tabs, and
+// most days a floor never filters by Refunded — but when it does, it wants a pill, not a
+// dropdown. So they ship behind the "+" instead of being absent.
+const PILLS_KEY = "eg_factory_status_pills_hidden"
+const DEFAULT_HIDDEN_PILLS: string[] = EXCEPTION_STAGES.map((s) => s.id)
+const PILL_VALUES = new Set(STATUS_PILLS.map((p) => p.value))
+
+export function loadHiddenStatusPills(): string[] {
+  try {
+    const raw = localStorage.getItem(PILLS_KEY)
+    if (raw === null) return [...DEFAULT_HIDDEN_PILLS]
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return [...DEFAULT_HIDDEN_PILLS]
+    // "" can never be hidden, even if an old save says so — a row with no way back to
+    // unfiltered is a trap.
+    return parsed.filter((v): v is string => typeof v === "string" && v !== "" && PILL_VALUES.has(v))
+  } catch { return [...DEFAULT_HIDDEN_PILLS] }
+}
+export function saveHiddenStatusPills(ids: string[]) {
+  try { localStorage.setItem(PILLS_KEY, JSON.stringify(ids)) } catch {}
+}
+
 /** Does an order sit at this Status filter value? */
 export function matchesStatus(o: OrderRow, value: string): boolean {
   if (!value) return true
@@ -66,7 +108,7 @@ export function matchesStatus(o: OrderRow, value: string): boolean {
   return stage === value
 }
 
-/** The Prep dropdown's roster.
+/** The List dropdown's roster.
  *
  *  The NOT-DONE half comes first: "which orders still need a label" is the question a floor
  *  actually asks, and burying it under its own inverse makes the control read as a report
@@ -88,12 +130,12 @@ export const READY_OPTIONS: { value: string; label: string; stock?: true }[] = [
 
 export const readyLabel = (v: string) => READY_OPTIONS.find((o) => o.value === v)?.label ?? v
 
-/** What the stock half of the Prep filter needs to answer at all: stock is held against the
+/** What the stock half of the List filter needs to answer at all: stock is held against the
  *  BLANK sku, so a line has to be resolved through the catalog before it can be looked up. */
 export type FilterContext = { catalog?: CatalogProduct[]; stock?: Record<string, number> }
 
 /**
- * Does an order match a Prep filter value?
+ * Does an order match a List filter value?
  *
  * Readiness is read from `orderReadiness` with NO per-row designs/files — deliberately.
  * Those are fetched lazily for expanded rows only, so feeding them in would make a row

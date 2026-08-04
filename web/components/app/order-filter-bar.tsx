@@ -15,7 +15,7 @@ import { type OrderRow, type CatalogProduct } from "@/lib/api"
 /** One dropdown in the bar.
  *
  *  Sized to the TABLE, not to a form: h-7 / text-xs / rounded-md is the same metric as the
- *  Label · Scan · Design chips in the Ready column, so the toolbar reads as part of the list
+ *  Label · Scan · Design chips in the List column, so the toolbar reads as part of the list
  *  it narrows. At h-9 / text-sm it was visibly a size up from every word beneath it — the
  *  heaviest type on a screen whose job is the rows.
  *
@@ -63,8 +63,40 @@ function FilterMenu({ label, value, options, onPick }: {
 }
 
 /**
- * Search + narrowing for an orders table. Shared by every board, so a filter learned on one
- * is the same control on the next.
+ * The search field, ALONE — it lives in the card header beside Import / New order, not in the
+ * filter row.
+ *
+ * Sharing a row with the pills and five dropdowns, it was squeezed to a stub against the
+ * right edge and the whole strip read as jammed. Search is also a different kind of control
+ * from the rest: the dropdowns narrow by facets the board already knows about, search is
+ * "find me this one order", which is a header job on every other screen in the app.
+ */
+export function OrderSearchInput({ query, onChange, className = "" }: {
+  query: OrderQuery
+  onChange: (q: OrderQuery) => void
+  className?: string
+}) {
+  return (
+    <div className={"relative " + className}>
+      <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        value={query.text}
+        onChange={(e) => onChange({ ...query, text: e.target.value })}
+        // Short: the full "order, customer, tracking or SKU" list truncated to "Search
+        // order, customer, t", which reads as a broken field. What it searches is in the
+        // title and the label, where it isn't clipped.
+        placeholder="Search orders…"
+        title="Search order number, customer, tracking, store, SKU or item name"
+        className="h-8 rounded-md pl-8 text-xs"
+        aria-label="Search order number, customer, tracking, store, SKU or item name"
+      />
+    </div>
+  )
+}
+
+/**
+ * The narrowing dropdowns for an orders table. Shared by every board, so a filter learned on
+ * one is the same control on the next.
  *
  * The dropdown OPTIONS come from the orders actually in hand (`orderFacets`), so a factory
  * with no TikTok orders is never offered a TikTok filter that can only return nothing. A
@@ -78,7 +110,7 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
   orders: OrderRow[]
   query: OrderQuery
   onChange: (q: OrderQuery) => void
-  /** Whether the board can answer the stock half of Ready — stock is held against the
+  /** Whether the board can answer the stock half of List — stock is held against the
    *  resolved BLANK sku, so without a catalog there's nothing to resolve against and those
    *  two options aren't offered. (The lookup itself happens in filterOrders' context.) */
   catalog?: CatalogProduct[]
@@ -93,33 +125,14 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
 
   return (
     <div className={"flex flex-wrap items-center gap-1.5 " + className}>
-      {/* Capped, not free-growing: left to fill the card the input became the widest thing
-          on the page and pushed the dropdowns to the far edge, reading as a search page with
-          filters bolted on rather than one toolbar. */}
-      <div className="relative min-w-[9rem] flex-1 sm:max-w-[13rem]">
-        <MagnifyingGlass size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query.text}
-          onChange={(e) => set({ text: e.target.value })}
-          // Short, because the box is now one control in a packed toolbar rather than the
-          // widest thing on the page: the full "order, customer, tracking or SKU" list
-          // truncated to "Search order, customer, t", which reads as a broken field. What
-          // it searches is in the title and the label, where it isn't clipped.
-          placeholder="Search orders…"
-          title="Search order number, customer, tracking, store, SKU or item name"
-          className="h-7 rounded-md pl-7 text-xs"
-          aria-label="Search order number, customer, tracking, store, SKU or item name"
-        />
-      </div>
-
       {/* NO Status dropdown. `query.status` is written by the stage pills sitting to the
           left of this bar — a second control for the same field, one row apart, is two
           answers to one question. (Cost of that: On hold / Cancelled / Refunded can only be
           selected as the "Issues" pill's bundle, since no pill names them individually.) */}
 
-      {/* The Prep column, filterable: "which orders still need a label" is the question those
+      {/* The List column, filterable: "which orders still need a label" is the question those
           chips are read for, and reading them was the only way to ask it. */}
-      <FilterMenu label="Prep" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
+      <FilterMenu label="List" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
 
       {facets.platforms.length > 1 && (
         <FilterMenu

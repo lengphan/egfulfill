@@ -189,7 +189,7 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
   // (A `compact` flag used to select a dot-instead-of-pill variant that Tag never actually
   // implemented — it took a prop it ignored. The one rendering is now the compact one.)
   //
-  // The states and their sentences live in lib/order-readiness.ts — the Prep filter
+  // The states and their sentences live in lib/order-readiness.ts — the List filter
   // reads the SAME function, so a chip and the filter that hides its row can't disagree.
   const ready = orderReadiness(order, { items, designs, files })
   const { withArt, buyerUploads } = ready
