@@ -1,4 +1,4 @@
-import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Megaphone, Truck, EnvelopeSimple, Needle, type Icon } from "@phosphor-icons/react"
+import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Megaphone, Truck, EnvelopeSimple, Needle, Compass, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -24,6 +24,11 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   // across every blank we buy. Receiving stock is NOT here — that's the Inventory > Scan
   // station, still open to warehouse — so the floor can still book deliveries in.
   { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, roles: ["admin"] },
+  // Sourcing — the supplier pipeline: where a product could come from, what it lands at, and
+  // how far along each supplier is (Prospect -> Talking -> Sampling -> In rotation). Its own
+  // page rather than a Purchasing tab: Purchasing is about buying from suppliers we already
+  // use, Sourcing is about deciding who those should be. ADMIN-only, same as Purchasing.
+  { label: "Sourcing", href: "/sourcing", icon: Compass, roles: ["admin"] },
   // Partner billing — what byeastside / Pink Design / carriers / suppliers are owed.
   // Money, so warehouse and admin only, matching every other spend boundary.
   // Finance = Wallet (balances/transactions) + Partner costs (byeastside/carriers/suppliers)

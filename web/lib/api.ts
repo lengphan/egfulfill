@@ -3101,7 +3101,25 @@ export type SourcingRow = {
   decorationCost?: number | null
   /** absolute http(s) only — this renders straight into an <img src> */
   image?: string | null
+  /** supplier pipeline stage — several rows for one product can sit at 'prospect' at once */
+  stage?: SourcingStage
   archived?: boolean
+}
+export type SourcingStage = "prospect" | "talking" | "sampling" | "rotation" | "archived"
+export const SOURCING_STAGES: { id: SourcingStage; label: string; hint: string }[] = [
+  { id: "prospect", label: "Prospect", hint: "saved, not contacted" },
+  { id: "talking", label: "Talking", hint: "messaged them / have a quote" },
+  { id: "sampling", label: "Sampling", hint: "sample ordered or in transit" },
+  { id: "rotation", label: "In rotation", hint: "approved — actively buying" },
+]
+/** Ask the AI what this product is and how to search for it on a B2B marketplace. Admin-only,
+ *  charged per call, and cached server-side against the listing id — so re-opening a product
+ *  you already looked at is free. */
+export function suggestSuppliers(p: { listingId?: string; title: string; image?: string | null }) {
+  return api<{ productType?: string | null; material?: string | null; attributes?: string[]
+               queries?: string[]; podBlank?: boolean; note?: string | null; cached?: boolean
+               error?: string }>(
+    `/api/manual-suppliers/suggest`, { method: "POST", body: JSON.stringify(p) })
 }
 export function getSourcing() {
   return api<{ items: SourcingRow[] }>(`/api/manual-suppliers`)

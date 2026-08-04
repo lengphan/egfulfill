@@ -183,11 +183,18 @@ export function manualSupplierRoutes(app, requireAdmin) {
     'currency text',                  // as quoted; converted at display time, never stored converted
     'decoration_cost numeric(12,2)',  // print/embroidery per unit, if not our own factory
     'image text',
+    // Supplier pipeline. A product can have SEVERAL rows at 'prospect' at once — that is the
+    // point: you shortlist a few, talk to two, and one graduates to 'rotation'. Stage lives on
+    // the row (the product+supplier pair), not on the product.
+    "stage text default 'prospect'",
     'archived boolean default false',
   ]) q(`alter table manual_suppliers add column if not exists ${col}`).catch(() => {});
 
   app.get('/api/manual-suppliers', { preHandler: requireAdmin }, async () => {
-    const r = await q('select * from manual_suppliers where coalesce(archived,false) = false order by created_at desc limit 500').catch(() => ({ rows: [] }));
+    const r = await q(`select * from manual_suppliers
+                        where coalesce(archived,false) = false
+                          and coalesce(stage,'prospect') <> 'archived'
+                        order by created_at desc limit 500`).catch(() => ({ rows: [] }));
     return {
       items: r.rows.map((x) => ({
         id: String(x.id), title: x.title, url: x.url, shop: x.shop,
@@ -201,6 +208,7 @@ export function manualSupplierRoutes(app, requireAdmin) {
         supplierRef: x.supplier_ref || null,
         currency: x.currency || 'USD',
         image: x.image || null,
+        stage: x.stage || 'prospect',
         decorationCost: x.decoration_cost == null ? null : Number(x.decoration_cost),
         archived: !!x.archived,
       })),
@@ -250,24 +258,29 @@ export function manualSupplierRoutes(app, requireAdmin) {
     // Only absolute http(s) — this string goes straight into an <img src>, so a
     // javascript: or data: value must never survive the round trip.
     const image = b.image && /^https?:\/\//i.test(String(b.image)) ? String(b.image).slice(0, 1000) : null;
+    // Unknown stage falls back to 'prospect' rather than being stored — a typo must not
+    // create a phantom column in the board.
+    const STAGES = ['prospect', 'talking', 'sampling', 'rotation', 'archived'];
+    const stage = STAGES.includes(String(b.stage || '')) ? String(b.stage) : null;
 
     if (b.id) {
       await q(`update manual_suppliers set title=$2, url=$3, shop=$4, cost=$5, markup_pct=$6,
                  sell_price=$7, product_id=$8, note=$9, moq=$10, ship_total=$11, lead_days=$12,
-                 supplier_ref=$13, currency=$14, decoration_cost=$15, image=$16, updated_at=now()
+                 supplier_ref=$13, currency=$14, decoration_cost=$15, image=$16,
+                 stage=coalesce($17, stage), updated_at=now()
                where id=$1::bigint`,
         [String(b.id), title, b.url || null, shop, cost, pct, sell, b.productId || null, b.note || null,
-         moq, shipTotal, leadDays, supplierRef, currency, decoration, image]);
+         moq, shipTotal, leadDays, supplierRef, currency, decoration, image, stage]);
       audit(req, 'manual-supplier.updated', { entityType: 'manual_supplier', entityId: String(b.id), after: { title, cost, sell } });
       return { ok: true, id: String(b.id) };
     }
     const r = await q(
       `insert into manual_suppliers (title, url, shop, cost, markup_pct, sell_price, product_id, note,
                                      moq, ship_total, lead_days, supplier_ref, currency, decoration_cost,
-                                     image, created_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning id`,
+                                     image, stage, created_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id`,
       [title, b.url || null, shop, cost, pct, sell, b.productId || null, b.note || null,
-       moq, shipTotal, leadDays, supplierRef, currency, decoration, image,
+       moq, shipTotal, leadDays, supplierRef, currency, decoration, image, stage || 'prospect',
        String((req.user && req.user.sub) || '')]);
     audit(req, 'manual-supplier.added', { entityType: 'manual_supplier', entityId: String(r.rows[0].id), after: { title, shop, cost, sell } });
     return { ok: true, id: String(r.rows[0].id) };

@@ -7,7 +7,7 @@ import { Loading } from "@/components/app/loading"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSourcing, saveSourcing, deleteSourcing, fetchSourcingPrice, getSpydeckSaves,
-         type SourcingRow, type SavedListing } from "@/lib/api"
+         SOURCING_STAGES, type SourcingRow, type SourcingStage, type SavedListing } from "@/lib/api"
 import { computeProfit, money, pct, FEE_MODELS, PAYMENT_DEFAULT } from "@/lib/profit"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
@@ -43,6 +43,7 @@ export function SourcingView() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [stageFilter, setStageFilter] = useState<SourcingStage | "">("")
 
   // Calculator inputs that aren't a property of the supplier row.
   const [feeId, setFeeId] = useState("etsy")
@@ -56,6 +57,23 @@ export function SourcingView() {
       .catch(() => setRows([]))
   }, [])
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+
+  // Counts drive the stage chips; several rows for the same product can sit at Prospect at
+  // once, which is the point — you shortlist a few and one graduates.
+  const stageCounts = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const r of rows ?? []) c[r.stage || "prospect"] = (c[r.stage || "prospect"] ?? 0) + 1
+    return c
+  }, [rows])
+  const shown = useMemo(
+    () => (rows ?? []).filter((r) => !stageFilter || (r.stage || "prospect") === stageFilter),
+    [rows, stageFilter])
+
+  const setStage = async (row: SourcingRow, stage: SourcingStage) => {
+    setRows((prev) => (prev ?? []).map((r) => (r.id === row.id ? { ...r, stage } : r)))  // optimistic
+    const r = await saveSourcing({ ...row, stage }).catch(() => null)
+    if (!r || r.error) { setMsg("Couldn't change the stage."); load() }
+  }
 
   const active = useMemo(() => (rows ?? []).find((r) => r.id === selected) ?? null, [rows, selected])
   const fee = FEE_MODELS.find((f) => f.id === feeId) ?? FEE_MODELS[0]
@@ -223,6 +241,21 @@ export function SourcingView() {
           </Button>
         </div>
 
+        {rows.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
+            <button onClick={() => setStageFilter("")}
+                    className={"rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (stageFilter === "" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
+              All {rows.length}
+            </button>
+            {SOURCING_STAGES.map((st) => (
+              <button key={st.id} onClick={() => setStageFilter(stageFilter === st.id ? "" : st.id)} title={st.hint}
+                      className={"rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (stageFilter === st.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
+                {st.label} {stageCounts[st.id] ?? 0}
+              </button>
+            ))}
+          </div>
+        )}
+
         {msg && <div className="border-b border-border bg-muted/40 px-4 py-2 text-xs">{msg}</div>}
 
         {pickerOpen && (
@@ -348,11 +381,12 @@ export function SourcingView() {
                   <th className="px-4 py-2 text-right font-medium">Freight/unit</th>
                   <th className="px-4 py-2 text-right font-medium">Landed</th>
                   <th className="px-4 py-2 text-right font-medium">Lead</th>
+                  <th className="px-4 py-2 text-left font-medium">Stage</th>
                   <th className="px-4 py-2" />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => {
+                {shown.map((r) => {
                   const moq = Math.max(1, r.moq ?? 1)
                   const freightUnit = (r.shipTotal ?? 0) / moq
                   const landed = (r.cost ?? 0) + (r.decorationCost ?? 0) + freightUnit
@@ -376,6 +410,12 @@ export function SourcingView() {
                       <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{freightUnit ? money(freightUnit) : "—"}</td>
                       <td className="px-4 py-2 text-right font-semibold tabular-nums">{money(landed)}</td>
                       <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.leadDays != null ? `${r.leadDays}d` : "—"}</td>
+                      <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                        <select value={r.stage || "prospect"} onChange={(e) => setStage(r, e.target.value as SourcingStage)}
+                                className="eg-select h-7 rounded-md border border-border bg-card px-1.5 text-xs">
+                          {SOURCING_STAGES.map((st) => <option key={st.id} value={st.id}>{st.label}</option>)}
+                        </select>
+                      </td>
                       <td className="px-4 py-2 text-right">
                         <div className="flex justify-end gap-1">
                           {r.url && (
