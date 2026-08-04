@@ -891,6 +891,7 @@ function PlatformPanel() {
   // Until it's set the rate is 0 — and recordCost skips anything <= 0, so no partner cost
   // is recorded at all and their Billing statement reads as though they did no work.
   const [expediteFee, setExpediteFee] = useState("")
+  const [tiktokLabelFee, setTiktokLabelFee] = useState("")
   const [expediteCost, setExpediteCost] = useState("")
   const [designPartnerCost, setDesignPartnerCost] = useState("")
   // Default Pink Design product type: the value applied to every push, plus the options to
@@ -952,6 +953,7 @@ function PlatformPanel() {
       setEmbCx(r.emb_price_complex != null ? String(r.emb_price_complex) : "")
       setBaseMarkup(r.base_markup != null ? String(r.base_markup) : "")
       setExpediteFee(r.expedite_fee != null ? String(r.expedite_fee) : "")
+      setTiktokLabelFee(r.tiktok_label_fee != null ? String(r.tiktok_label_fee) : "")
       setExpediteCost(r.expedite_cost != null ? String(r.expedite_cost) : "")
       setDesignPartnerCost(r.design_partner_cost != null ? String(r.design_partner_cost) : "")
       setPinkProductType(r.pink_product_type != null ? String(r.pink_product_type) : "")
@@ -1012,6 +1014,7 @@ function PlatformPanel() {
         emb_price_complex: embCx === "" ? undefined : Number(embCx),
         base_markup: baseMarkup === "" ? undefined : Number(baseMarkup),
         expedite_fee: expediteFee === "" ? undefined : Number(expediteFee),
+        tiktok_label_fee: tiktokLabelFee === "" ? undefined : Number(tiktokLabelFee),
         expedite_cost: expediteCost === "" ? undefined : Number(expediteCost),
         design_partner_cost: designPartnerCost === "" ? undefined : Number(designPartnerCost),
         pink_product_type: pinkProductType,
@@ -1201,6 +1204,13 @@ function PlatformPanel() {
             label="Design — what Pink Design charges us"
             hint="Per outsourced task. Booked when the card is approved."
             value={designPartnerCost} onChange={setDesignPartnerCost}
+          />
+          {/* Only TikTok-SHIPPED orders. A seller-shipped TikTok order buys a real label
+              through the normal shipping path and is never charged this as well. */}
+          <MoneyField
+            label="TikTok label — what we charge the seller"
+            hint="Per TikTok-shipped order, charged on import. TikTok made the label, so there's no carrier cost — this is handling. 0 = off."
+            value={tiktokLabelFee} onChange={setTiktokLabelFee}
           />
         </div>
 
