@@ -446,35 +446,58 @@ export async function searchListings(query, opts = {}) {
   // Real price RANGE per listing. A listing's `price` is a single figure that often does
   // not match what a buyer sees: variations override it (a necklace listing priced 38 can
   // sell 19–30 across lengths), so one number is both wrong and hides that a range exists.
-  // The range lives in Inventory, and /listings/batch already runs for images — asking for
-  // Inventory on the SAME call costs no extra request, up to 100 listings at a time.
+  // The range lives in Inventory, which /listings/batch can include alongside Images.
   const rangeById = {};
   const ids = base.map((l) => l.listing_id).filter(Boolean);
   if (ids.length) {
-    try {
-      const bu = API + '/listings/batch?listing_ids=' + ids.slice(0, 100).join(',') + '&includes=Images,Inventory';
+    /**
+     * IMAGES MUST NOT DIE WITH INVENTORY.
+     *
+     * This asked for `includes=Images,Inventory` in ONE call, to get the price range for
+     * free. But `br.ok` gates the whole response: if Etsy refuses the request for any
+     * reason belonging to Inventory, `imgsById` stays empty — and since the active-listings
+     * search drops the Images include most of the time, that means EVERY card loses its
+     * picture. SpyDeck rendered a wall of placeholders with prices and titles intact, which
+     * is exactly the shape of this bug. The old catch swallowed it without a word.
+     *
+     * So: ask for both, and if that is refused, immediately re-ask for Images alone — the
+     * shape that shipped before price ranges were added. One request in the happy path, two
+     * only when Inventory is the thing being rejected, and the picture never depends on the
+     * price range succeeding.
+     */
+    const batch = async (includes) => {
+      const bu = API + '/listings/batch?listing_ids=' + ids.slice(0, 100).join(',') + '&includes=' + includes;
       const br = await fetch(bu, { headers: { 'x-api-key': API_KEY_HEADER } });
-      if (br.ok) {
-        const bd = await br.json().catch(() => ({}));
-        (bd.results || []).forEach((l) => {
-          const arr = (l.images || []).map(pickImg).filter(Boolean);
-          if (arr.length) imgsById[l.listing_id] = arr;
-          const offs = (l.inventory && l.inventory.products) || [];
-          const prices = [];
-          for (const prod of offs) {
-            for (const o of (prod.offerings || [])) {
-              if (o && o.is_enabled === false) continue;
-              const p = o && o.price ? Number(o.price.amount) / (Number(o.price.divisor) || 100) : 0;
-              if (p > 0) prices.push(p);
-            }
+      if (br.ok) return br.json().catch(() => ({}));
+      // Say WHY, once, with the status and a snippet. A silent catch here is what let this
+      // run for weeks: the feed looked built, and only the images were missing.
+      const body = await br.text().catch(() => '');
+      console.warn(`[etsy] listings/batch includes=${includes} -> ${br.status} ${body.slice(0, 180)}`);
+      return null;
+    };
+    try {
+      const bd = (await batch('Images,Inventory')) || (await batch('Images'));
+      (((bd || {}).results) || []).forEach((l) => {
+        const arr = (l.images || []).map(pickImg).filter(Boolean);
+        if (arr.length) imgsById[l.listing_id] = arr;
+        const offs = (l.inventory && l.inventory.products) || [];
+        const prices = [];
+        for (const prod of offs) {
+          for (const o of (prod.offerings || [])) {
+            if (o && o.is_enabled === false) continue;
+            const p = o && o.price ? Number(o.price.amount) / (Number(o.price.divisor) || 100) : 0;
+            if (p > 0) prices.push(p);
           }
-          if (prices.length) {
-            prices.sort((a, b) => a - b);
-            rangeById[l.listing_id] = { min: prices[0], max: prices[prices.length - 1] };
-          }
-        });
-      }
-    } catch (e) { /* enrichment is best-effort — never fail a search over it */ }
+        }
+        if (prices.length) {
+          prices.sort((a, b) => a - b);
+          rangeById[l.listing_id] = { min: prices[0], max: prices[prices.length - 1] };
+        }
+      });
+    } catch (e) {
+      // Enrichment is best-effort — never fail a search over it. But say so.
+      console.warn('[etsy] listings/batch enrichment threw:', e && e.message);
+    }
   }
   const results = await attachUsd(base.map((l) => mapListing(l, imgsById, rangeById)));
   return { count: d.count || results.length, query, offset, limit, results };

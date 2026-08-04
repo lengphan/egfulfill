@@ -115,6 +115,20 @@ const TREND_NICHES = [
 // the rate limit for no reason.
 const POOL_SIZE = 200;      // was 120 — deeper pool so the free "More ideas" reshuffle
                             // has ~8 screens of variety before a card repeats
+/**
+ * Bump to throw away every cached pool built by an older builder, ONCE, on deploy.
+ *
+ * v2: pools built before the listings/batch fix stored `image: null` on every product —
+ * Etsy refused the Images+Inventory batch, the failure was swallowed, and the nulls were
+ * cached for the day. Fixing the builder alone would not have helped anyone until the
+ * following morning; this discards the poisoned pool the moment the fix lands.
+ *
+ * A version check, NOT "rebuild if the pool has no images": that would re-run 16 Etsy
+ * searches on EVERY request whenever Etsy is genuinely down, which is a thundering herd
+ * into a rate limit. A version bump invalidates exactly once — the rebuild writes the
+ * current version and is then usable whatever it found.
+ */
+const FEED_VERSION = 2;
 const NICHES_PER_DAY = 16;  // niches searched per pool build
 const SEARCH_CONCURRENCY = 5; // Etsy allows ~10 req/sec; batch searches 5-at-a-time so a
                               // build (or fresh scan) never bursts past the per-second limit
@@ -152,7 +166,7 @@ async function buildTrending(offset = 0) {
     if (k) counts[k] = (counts[k] || 0) + 1;
   }
   const keywords = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([t]) => t);
-  return { date: new Date().toISOString().slice(0, 10), products, keywords, offset, built_at: new Date().toISOString() };
+  return { date: new Date().toISOString().slice(0, 10), products, keywords, offset, built_at: new Date().toISOString(), v: FEED_VERSION };
 }
 
 // Slice the shared pool for who's asking. Same data, different priority — staff
@@ -375,7 +389,8 @@ export function spydeckRoutes(app, requireAuth) {
         // `_sold24` guards against a cache written by the OLD builder, which stripped
         // the computed fields — without them every row would look un-trending and
         // staff would get an empty feed until tomorrow.
-        const usable = v && v.date === today && Array.isArray(v.products) && v.products.length && v.products[0]._sold24 !== undefined;
+        const usable = v && v.date === today && Array.isArray(v.products) && v.products.length
+          && v.products[0]._sold24 !== undefined && v.v === FEED_VERSION;
         if (usable) return serve(v);
       }
     } catch { /* rebuild below */ }
