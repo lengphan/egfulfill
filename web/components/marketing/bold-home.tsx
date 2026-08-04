@@ -19,19 +19,16 @@ import type { SiteContent } from "@/lib/site-content"
  *   · black on lime is ~16:1, well past AA, so the accent can hold real text
  */
 /**
- * TWO steps of one hue, because area changes how a colour reads.
+ * ONE accent, one value — #D4F897, chosen by eye against the real page.
  *
- * The chart columns and the hero plate were the same hex, and the plate still looked darker
- * and more muted than the columns. That isn't a bug — a large field reads duller than a small
- * mark of the same colour (the mark is judged against the white around it; the field is all
- * there is). So the field gets its own lighter, slightly more saturated step to LOOK like the
- * marks do, rather than to measure the same.
+ * This replaces a two-step split (a lighter value for full-bleed fields, a deeper one for
+ * small marks) that existed because a large field reads duller than a small mark of the same
+ * colour. That effect is real, but it was solving for a deeper base; at this value the plate
+ * already reads bright, so the split bought nothing except two things to keep in sync.
  *
- * LIME is the mark colour — the one that looked right on the columns. PLATE is that hue for
- * full-bleed use. Both keep black text above 15:1, so either can carry real type.
+ * Black on it is ~17:1, so it carries real type anywhere it appears.
  */
-const LIME = "#CFEB86"   // marks: chart columns, small fills
-const PLATE = "#D9F58F"  // full-bleed fields: the hero, the CTA band
+const ACCENT = "#D4F897"
 const INK = "#0B0B0C"
 
 /** Words rise out of a mask, one after another. The mask is what makes it read as
@@ -122,7 +119,7 @@ function Pill({ href, children, tone = "ink" }: { href: string; children: React.
     ghost: "border border-[#0B0B0C]/15 text-[#0B0B0C] hover:border-[#0B0B0C]/40 hover:bg-[#0B0B0C]/[0.03] focus-visible:ring-[#0B0B0C]",
   }
   return (
-    <Link href={href} className={`${base} ${tones[tone]}`} style={tone === "lime" ? { background: LIME } : undefined}>
+    <Link href={href} className={`${base} ${tones[tone]}`} style={tone === "lime" ? { background: ACCENT } : undefined}>
       {children}
       <ArrowUpRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
     </Link>
@@ -154,7 +151,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           at the top of the window instead of under a white bar. The header itself goes
           transparent on this route (site-header.tsx) — between them, the hero reads as one
           full-bleed plate with the nav sitting on it. */}
-      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: PLATE }}>
+      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: ACCENT }}>
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
         <div className="absolute inset-x-0 bottom-0 h-24 bg-white [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
@@ -215,7 +212,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
                   <motion.span
                     key={i}
                     className="flex-1 rounded-t-[3px]"
-                    style={{ background: i % 3 === 2 ? INK : LIME, transformOrigin: "bottom", height: `${h}%` }}
+                    style={{ background: i % 3 === 2 ? INK : ACCENT, transformOrigin: "bottom", height: `${h}%` }}
                     initial={reduce ? { opacity: 0 } : { scaleY: 0 }}
                     whileInView={reduce ? { opacity: 1 } : { scaleY: 1 }}
                     viewport={{ once: true }}
@@ -311,7 +308,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 <span
                   aria-hidden
                   className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100"
-                  style={{ background: LIME }}
+                  style={{ background: ACCENT }}
                 />
                 <Icon size={26} weight="duotone" className="relative text-[#0B0B0C]" />
                 <h3 className="relative mt-6 text-xl font-bold tracking-tight">{c.title}</h3>
@@ -352,7 +349,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       <section className="px-6 py-24">
         <motion.div
           className="mx-auto max-w-5xl overflow-hidden rounded-3xl px-8 py-20 text-center"
-          style={{ background: PLATE }}
+          style={{ background: ACCENT }}
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 26 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "0px 0px -10% 0px" }}
