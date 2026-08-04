@@ -52,15 +52,12 @@
 
 :root {
     /* Modern NEUTRAL base (true grey, chroma 0) + one violet accent that pops (Stripe-inspired). */
-    /* A TINTED CANVAS, not a white one. Paper canvas + white cards sit two points apart in
-     * lightness, so nothing separated them and the whole app read as pale — a flat sheet with
-     * faint rectangles on it. Tinting the canvas periwinkle and leaving the cards white gives
-     * every card an edge without drawing one: the surface it sits on is doing the work.
-     *
-     * Deliberately a soft tint, not the brand plate. #C3D0FF behind a 700-row queue is a
-     * coloured page you have to read THROUGH; this is the same hue at a fraction of the
-     * chroma, so it reads as a surface and the accent stays the loudest thing on screen. */
-    --background: oklch(0.958 0.019 277);
+    /* PAPER, not a tinted canvas. A periwinkle page behind a dense queue is a coloured sheet
+     * you have to read THROUGH all day — the tint that gave cards their edge also sat under
+     * every row and strained to look at. The colour moves to the SIDEBAR instead: one bounded
+     * block that's pleasant in the corner of your eye and never underneath the data. Cards
+     * keep their separation from a slightly firmer border rather than from a tinted backdrop. */
+    --background: oklch(0.9806 0.0056 91);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
@@ -87,12 +84,12 @@
     --brand-foreground: oklch(0.145 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.962 0.010 277);
+    --muted: oklch(0.968 0.004 91);
     --muted-foreground: oklch(0.556 0 0);
     --accent: oklch(0.968 0.015 275);
     --accent-foreground: oklch(0.42 0.16 274);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
+    --border: oklch(0.902 0.004 91);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.47 0.19 274);
     --chart-1: oklch(0.47 0.19 274);
@@ -101,13 +98,13 @@
     --chart-4: oklch(0.77 0.16 70);
     --chart-5: oklch(0.65 0.22 15);
     --radius: 0.625rem;
-    --sidebar: oklch(0.973 0.012 277);
+    --sidebar: oklch(0.8419 0.0716 279.6);
     --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.47 0.19 274);
+    --sidebar-primary: oklch(0.20 0.10 274);
     --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.968 0.007 280);
-    --sidebar-accent-foreground: oklch(0.42 0.18 280);
-    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-accent: oklch(0.885 0.055 279.6);
+    --sidebar-accent-foreground: oklch(0.20 0.10 274);
+    --sidebar-border: oklch(0.79 0.075 279.6);
     --sidebar-ring: oklch(0.47 0.19 274);
 }
 
@@ -117,7 +114,7 @@
        as brown haze rather than black, and is what made dark mode look faded. Surfaces
        are also further apart now (0.145 → 0.205) so a card separates from the page
        without needing a border to do it. */
-    --background: oklch(0.155 0.017 277);
+    --background: oklch(0.145 0.006 277);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.215 0.014 277);
     --card-foreground: oklch(0.985 0 0);
@@ -142,12 +139,12 @@
     --chart-3: oklch(0.72 0.14 195);
     --chart-4: oklch(0.8 0.16 70);
     --chart-5: oklch(0.68 0.22 15);
-    --sidebar: oklch(0.195 0.015 277);
+    --sidebar: oklch(0.255 0.065 274);
     --sidebar-foreground: oklch(0.985 0 0);
     --sidebar-primary: oklch(0.72 0.14 274);
     --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.31 0.03 280);
-    --sidebar-accent-foreground: oklch(0.92 0.03 280);
+    --sidebar-accent: oklch(0.33 0.075 274);
+    --sidebar-accent-foreground: oklch(0.95 0.03 274);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.72 0.14 274);
 }
