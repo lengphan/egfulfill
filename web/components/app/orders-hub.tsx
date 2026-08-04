@@ -756,7 +756,11 @@ export function OrdersHub() {
     const lead = dispatchOn ? 1.25 + 1.5 : 1.5
     const fixed = gridCols.reduce((n, id) => {
       const g = FACTORY_COLS[id].grid
-      const rem = /^([0-9.]+)rem$/.exec(g)
+      // A plain `Nrem` track, or the FLOOR of a `minmax(Nrem, …)` one. Reading the minmax
+      // floor matters: List is minmax(12rem,1fr), and treating it as the generic 5rem
+      // fallback would under-report the row's real minimum by 7rem and reintroduce exactly
+      // the silent horizontal overflow this figure exists to prevent.
+      const rem = /^([0-9.]+)rem$/.exec(g) ?? /^minmax\(\s*([0-9.]+)rem/.exec(g)
       // minmax(0,Nfr) tracks have no intrinsic width. 5rem is a FLOOR, not a target: above it
       // Customer and Items keep absorbing the slack and truncating, which is the documented
       // trade (see order-columns.ts) and keeps a 1600px desktop scroll-free. Below it they'd

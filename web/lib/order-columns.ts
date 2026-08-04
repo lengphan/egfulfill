@@ -109,7 +109,11 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // row at all — so it is sized to the longest carrier format, not to the space left over.
   tracking: { id: "tracking", label: "Tracking", grid: "12rem" },
   store:    { id: "store",    label: "Store",    grid: "7rem" },
-  customer: { id: "customer", label: "Customer", grid: "minmax(0,1fr)" },
+  // CAPPED, not flexible. As the only 1fr track it swallowed every spare pixel, so a board
+  // with room ended up with a very wide Customer column holding "Philipp Bumb" and a lot of
+  // white space, while the List chips next to it stayed cramped. A name needs about 11rem;
+  // past that the extra width buys nothing, so the slack goes to List instead (below).
+  customer: { id: "customer", label: "Customer", grid: "minmax(5rem,11rem)" },
   // The listing name lives here now, like the seller's Items column, and is deliberately
   // the first thing squeezed: an Etsy title runs 130 characters and truncates whatever
   // width it gets, so spending the table's flexible space on it starves everything that
@@ -128,7 +132,11 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // Fixed width (the header cell can't size it), sized to hold all four on ONE line now the
   // chips are px-1.5/11px and Stock no longer rewrites itself to "In stock" / "No stock".
   // The 4rem that frees goes back to the flexible Customer/Items columns.
-  ready:    { id: "ready",    label: "List",     grid: "12rem" },
+  // Now the column that ABSORBS the slack. Floor stays 12rem — the width that holds all four
+  // chips on one line — so the row's minimum is unchanged and nothing new overflows; above
+  // that it takes whatever a wider window offers, which is where the extra pixels are worth
+  // most: four chips read more easily with air between them than a name does with air after it.
+  ready:    { id: "ready",    label: "List",     grid: "minmax(12rem,1fr)" },
   // 9.5rem, not 12: the widest button here is "Create label" at ~7rem, so 12 left 2.5rem of
   // permanent air in the one column whose width decided whether the row fitted at all.
   action:   { id: "action",   label: "",         grid: "9.5rem" },  // header stays blank: buttons need no title
