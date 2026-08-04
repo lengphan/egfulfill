@@ -1,13 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { uploadDesignFile, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { uploadDesignFile, downloadDesignFile, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -508,7 +508,11 @@ export function DesignCanvasDialog({
   const [hasFile, setHasFile] = useState(false)
   // The NEWEST machine file for this line, by name — so slot ② can show which fixed file is
   // current after a revision, instead of a bare "added".
-  const [latestMachine, setLatestMachine] = useState<string | null>(null)
+  const [latestMachine, setLatestMachine] = useState<{ designId: string; name: string } | null>(null)
+  // Fetching the bytes. Per-file busy/error so a paywalled or missing file says so HERE
+  // rather than failing silently under the cursor.
+  const [dlBusy, setDlBusy] = useState(false)
+  const [dlErr, setDlErr] = useState<string | null>(null)
   useEffect(() => {
     if (!open) return   // read for sellers too — it drives their "you uploaded your file" status
     const t = setTimeout(() => {
@@ -518,7 +522,7 @@ export function DesignCanvasDialog({
             (f.kind === "emb" || f.kind === "pes") && (!f.sku || !item.sku || f.sku === item.sku))
           setHasFile(mine.length > 0)
           const newest = mine.slice().sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0]
-          setLatestMachine(newest?.name ?? null)
+          setLatestMachine(newest ? { designId: newest.designId, name: newest.name || "Machine file" } : null)
         })
         .catch(() => { setHasFile(false); setLatestMachine(null) })
     }, 0)
@@ -600,6 +604,21 @@ export function DesignCanvasDialog({
    * Counts what it would OVERWRITE and says so first. This is one click and it can replace
    * artwork on lines nobody is currently looking at.
    */
+  /** Open this line's machine file. 402 is the paywall, not a fault — say which. */
+  const downloadMachine = useCallback(async () => {
+    if (!latestMachine) return
+    setDlBusy(true); setDlErr(null)
+    try {
+      const r = await downloadDesignFile(latestMachine.designId)
+      const url = r.url || r.data
+      if (!url) throw new Error("No file came back.")
+      window.open(url, "_blank", "noopener")
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "Couldn't open that file."
+      setDlErr(/402|purchase|paid/i.test(m) ? "Not purchased yet." : m)
+    } finally { setDlBusy(false) }
+  }, [latestMachine])
+
   const applyToAll = useCallback(async () => {
     const others = siblings ?? []
     if (!designUrl || !others.length) return
@@ -967,12 +986,26 @@ export function DesignCanvasDialog({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">Machine file</div>
-                  <div className="truncate text-[11px] text-muted-foreground" title={latestMachine || undefined}>{hasMachineFile ? (latestMachine ? `Latest: ${latestMachine}` : "Added — the stitch file") : "The stitch file — .emb / .pes / .dst …"}</div>
+                  <div className="truncate text-[11px] text-muted-foreground" title={latestMachine?.name || undefined}>{hasMachineFile ? (latestMachine ? `Latest: ${latestMachine.name}` : "Added — the stitch file") : "The stitch file — .emb / .pes / .dst …"}</div>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Button variant="outline" size="sm" onClick={() => machineRef.current?.click()}>{hasMachineFile ? "Replace file" : "Attach file"}</Button>
+                {/* DOWNLOAD. The file could be attached, named and confirmed here with no way
+                    to actually get it — the only route to the bytes was the readiness chip in
+                    the row behind this dialog, which is not where anyone looks for it.
+                    Routed through downloadDesignFile (/api/design_files/:id) rather than a raw
+                    URL, because that route is where the paywall and the seller/staff checks
+                    live — a direct link would hand out bytes the caller may not have bought. */}
+                {latestMachine && (
+                  <Button variant="outline" size="sm" disabled={dlBusy} onClick={() => void downloadMachine()}>
+                    {dlBusy
+                      ? <><CircleNotch size={13} className="animate-spin" /> Fetching…</>
+                      : <><DownloadSimple size={13} weight="bold" /> Download</>}
+                  </Button>
+                )}
               </div>
+              {dlErr && <div className="mt-1.5 text-[11px] text-destructive">{dlErr}</div>}
             </div>
           </div>
           {/* Ten shirts, one file — only when there IS another line to apply to. */}
