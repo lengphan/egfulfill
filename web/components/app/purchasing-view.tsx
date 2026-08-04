@@ -5,8 +5,9 @@ import { ShoppingCart } from "@phosphor-icons/react"
 import { AllSuppliers } from "@/components/app/all-suppliers"
 import { FavoritesView } from "@/components/app/favorites-view"
 import { PurchaseView } from "@/components/app/purchase-view"
+import { SourcingView } from "@/components/app/sourcing-view"
 
-type Tab = "all" | "favorites" | "purchase"
+type Tab = "all" | "favorites" | "purchase" | "sourcing"
 
 /**
  * Purchasing — the one home for buying blanks. Flattened to a SINGLE tab row —
@@ -21,7 +22,7 @@ export function PurchasingView() {
   useEffect(() => {
     const id = setTimeout(() => {
       const p = new URLSearchParams(window.location.search).get("tab")
-      if (p === "all" || p === "favorites" || p === "purchase") setTab(p)
+      if (p === "all" || p === "favorites" || p === "purchase" || p === "sourcing") setTab(p)
       else if (p === "browse") setTab("all")   // legacy alias
     }, 0)
     return () => clearTimeout(id)
@@ -48,7 +49,7 @@ export function PurchasingView() {
         </div>
       </div>
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }, { id: "purchase", label: "Orders" }] as const).map((t) => (
+        {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }, { id: "purchase", label: "Orders" }, { id: "sourcing", label: "Sourcing" }] as const).map((t) => (
           <button
             key={t.id}
             onClick={() => pick(t.id)}
@@ -59,7 +60,10 @@ export function PurchasingView() {
         ))}
       </div>
 
-      {tab === "all" ? <AllSuppliers /> : tab === "favorites" ? <FavoritesView /> : <PurchaseView embedded />}
+      {tab === "all" ? <AllSuppliers />
+        : tab === "favorites" ? <FavoritesView />
+        : tab === "sourcing" ? <SourcingView />
+        : <PurchaseView embedded />}
     </div>
   )
 }

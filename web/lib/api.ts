@@ -3075,3 +3075,46 @@ export function backupDownloadUrl(id: number) {
 export function deleteBackup(id: number) {
   return api<{ ok: boolean }>(`/api/backups/${id}`, { method: "DELETE" })
 }
+
+// ── Sourcing (admin) — the saved cost book behind Purchasing › Sourcing ──────────────────
+// Backed by `manual_suppliers`, which already existed with a full backend (SSRF-guarded URL
+// fetching, structured-data price reading, audit trail) and no UI at all. Extended rather
+// than replaced: MOQ, inbound freight, lead time and an internal supplier reference are what
+// make two quotes actually comparable.
+export type SourcingRow = {
+  id: string
+  title: string
+  url?: string | null
+  shop?: string | null
+  cost?: number | null
+  markupPct?: number | null
+  sellPrice?: number | null
+  productId?: string | null
+  note?: string | null
+  createdAt?: string
+  moq?: number | null
+  shipTotal?: number | null
+  leadDays?: number | null
+  /** internal supplier style, e.g. "sanmar:PC61" — distinguishes an in-app source from a pasted link */
+  supplierRef?: string | null
+  currency?: string | null
+  decorationCost?: number | null
+  archived?: boolean
+}
+export function getSourcing() {
+  return api<{ items: SourcingRow[] }>(`/api/manual-suppliers`)
+}
+export function saveSourcing(row: Partial<SourcingRow> & { title: string }) {
+  return api<{ ok?: boolean; id?: string; error?: string }>(
+    `/api/manual-suppliers`, { method: "POST", body: JSON.stringify(row) })
+}
+/** Archives by default — a saved source is often the only record of where a blank came from. */
+export function deleteSourcing(id: string, hard = false) {
+  return api<{ ok?: boolean; error?: string }>(
+    `/api/manual-suppliers/${encodeURIComponent(id)}${hard ? "?hard=1" : ""}`, { method: "DELETE" })
+}
+/** Read a price off a listing page. Never writes — the caller decides whether to keep it. */
+export function fetchSourcingPrice(url: string) {
+  return api<{ ok?: boolean; price?: number; found?: number; why?: string; error?: string }>(
+    `/api/manual-suppliers/price`, { method: "POST", body: JSON.stringify({ url }) })
+}
