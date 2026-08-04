@@ -163,8 +163,22 @@ export function walletRoutes(app, requireAuth) {
   // Which accounts may the caller touch?
   //  • a seller → only their OWN user id
   //  • staff    → any seller id, plus the shared 'factory' / 'designer' wallets
+  /**
+   * Who may READ a wallet account.
+   *
+   * `isStaff(user) => true` was too wide: isStaff admits operator, warehouse AND designer,
+   * so any staff account could read the FACTORY wallet (company revenue, COGS, postage) and
+   * the full ledger of EVERY seller. Reading money is not needed to pick, print or ship.
+   *
+   * Now: admin sees everything; a designer keeps the shared 'designer' account because that
+   * IS their earnings page (designer-earnings.tsx reads it); everyone else sees only their
+   * own. Sellers are unaffected — they were already limited to their own id, plus the
+   * owner-granted team opt-in handled by ownerWalletFor().
+   */
   function canAccess(user, account) {
-    if (isStaff(user)) return true;
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (user.role === 'designer' && account === 'designer') return true;
     return account === user.sub;
   }
 
@@ -319,7 +333,9 @@ export function walletRoutes(app, requireAuth) {
 
   /** Which partners actually appear in the ledger — so the filter offers real values. */
   app.get('/api/wallet/partners', { preHandler: requireAuth }, async (req, reply) => {
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    // Admin only, matching canAccess above — this is what we OWE partners, which is spend
+    // data, not something the floor needs to fulfil an order.
+    if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'admin only' }; }
     const r = await q(
       `select ${PARTNER_SQL} as partner, count(*)::int as entries, sum(delta)::float as total
          from wallet_ledger where ${PARTNER_SQL} is not null

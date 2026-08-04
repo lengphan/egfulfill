@@ -174,7 +174,11 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
 
   const title = nl("nav", isStaff ? staffNavTitle(pathname) : navTitle(pathname))
   // Balance only for accounts with a selling wallet — sellers, admin, warehouse. Not operator/designer.
-  const showBalance = !isStaff || role === "admin" || role === "warehouse"
+  // Sellers see their own balance (it is their money and they need it to submit orders).
+  // Among staff, ADMIN only: the factory balance is company revenue, and warehouse no
+  // longer has any wallet surface to click through to. Matches canAccess in wallet.js —
+  // the chip would otherwise 403 on load and render an empty box.
+  const showBalance = !isStaff || role === "admin"
   const money = balance == null ? "—" : balance.toLocaleString("en-US", { style: "currency", currency: "USD" })
 
   return (

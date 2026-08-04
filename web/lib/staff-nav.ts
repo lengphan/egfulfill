@@ -28,7 +28,7 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   // Money, so warehouse and admin only, matching every other spend boundary.
   // Finance = Wallet (balances/transactions) + Partner costs (byeastside/carriers/suppliers)
   // as tabs on one page. Replaces the separate Billing + Wallet items.
-  { label: "Finance", href: "/finance", icon: Wallet, roles: ["warehouse", "admin"] },
+  { label: "Finance", href: "/finance", icon: Wallet, roles: ["admin"] },
   // Campaigns is HIDDEN until Meta/Google connections exist — there are no settings to
   // connect an ad account yet, so the page can only show an empty shell. The route and
   // component are intact; restore the roles here to bring it back.
