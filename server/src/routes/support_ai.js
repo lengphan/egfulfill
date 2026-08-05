@@ -136,7 +136,13 @@ async function runSupportNudges() {
 let _settingsReady = null;
 function ensureSettings() {
   if (_settingsReady) return _settingsReady;
-  _settingsReady = q(`create table if not exists settings (key text primary key, value text, updated_at timestamptz default now())`)
+  // value is JSONB, matching schema.sql. It said `text` here, which disagreed with the
+  // schema — harmless on any database schema.sql created (create-if-not-exists is a no-op on
+  // an existing table, so jsonb won), but a landmine on one where it didn't: writes go
+  // through to_jsonb(), so against a TEXT column the stored value keeps its JSON quotes and
+  // reads back as `"claude-haiku-4-5"` — a model id that 404s, and an API key that 401s,
+  // with nothing in either message hinting at the quotes.
+  _settingsReady = q(`create table if not exists settings (key text primary key, value jsonb, updated_at timestamptz default now())`)
     .catch((e) => { _settingsReady = null; throw e; });
   return _settingsReady;
 }
