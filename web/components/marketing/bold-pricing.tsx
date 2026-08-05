@@ -37,7 +37,7 @@ export function BoldPricing() {
         sub="No monthly fee. No minimums. You pay the per-order fulfilment cost when an order actually ships — funded from your wallet."
       />
 
-      <section className="mx-auto max-w-6xl px-6 py-24">
+      <section className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr]">
           {/* What you pay to be here — the answer first, at display size. */}
           <Rise className="rounded-2xl border border-black/[0.09] bg-white p-9">
@@ -88,8 +88,8 @@ export function BoldPricing() {
 
       {/* The band IS the Rise — nesting a padded wrapper around a padded inner div gave it
           two sets of padding and a white gutter inside its own rounded corner. */}
-      <section className="px-6 pb-24">
-        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-20 text-center" style={{ background: ACCENT }}>
+      <section className="px-6 pb-16">
+        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
           <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             Only pay when it ships.
           </h2>

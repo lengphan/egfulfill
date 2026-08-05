@@ -84,15 +84,19 @@ export function Sidebar() {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    // The selected item is the ONLY coloured thing in the nav — a solid
+                    // inverted block, not a 10% tint of the accent. A tint that faint reads
+                    // as "slightly warmer row" rather than "you are here", which is why the
+                    // active page was hard to spot at a glance.
                     active
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground/70 hover:bg-accent hover:text-foreground"
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                 >
                   <Icon
                     size={19}
                     weight={active ? "fill" : "regular"}
-                    className={cn("shrink-0", active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/75")}
+                    className={cn("shrink-0", !active && "text-sidebar-foreground/60")}
                   />
                   <span className="flex-1">{nl("nav", item.label)}</span>
                   {locked && <LockSimple size={13} weight="fill" className="shrink-0 text-muted-foreground/60" />}

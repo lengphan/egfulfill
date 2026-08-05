@@ -36,7 +36,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] }) {
         sub="Live from our catalogue — every product here is one you can order today, at the price shown."
       />
 
-      <section className="mx-auto max-w-6xl px-6 py-24">
+      <section className="mx-auto max-w-6xl px-6 py-16">
         {products.length === 0 ? (
           <Rise className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
             <h2 className="text-xl font-bold tracking-tight">The catalogue isn&apos;t published yet</h2>
@@ -86,9 +86,9 @@ export function BoldCatalog({ products }: { products: PublicProduct[] }) {
         )}
       </section>
 
-      <section className="px-6 pb-24">
-        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-20 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>
+      <section className="px-6 pb-16">
+        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
+          <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             Pick a blank, upload art, ship it.
           </h2>
           <div className="mt-8 flex justify-center">

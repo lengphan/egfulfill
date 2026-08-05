@@ -48,7 +48,7 @@ export function BoldHow() {
         sub="Connect, upload, submit. Everything after that happens without you opening a shipping screen."
       />
 
-      <section className="mx-auto max-w-6xl px-6 py-24">
+      <section className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-4 md:grid-cols-3">
           {steps.map((s, i) => (
             <Rise key={s.title} delay={i * 0.07} className="rounded-2xl border border-black/[0.09] bg-white p-8">
@@ -71,7 +71,7 @@ export function BoldHow() {
       </section>
 
       {/* The real status flow. Tones are the product's own, deliberately not re-tinted. */}
-      <section className="py-24" style={{ background: "rgba(0,0,0,0.03)" }}>
+      <section className="py-16" style={{ background: "rgba(0,0,0,0.03)" }}>
         <div className="mx-auto max-w-4xl px-6">
           <h2 className="font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>
             What you&apos;ll actually see.
@@ -92,8 +92,8 @@ export function BoldHow() {
         </div>
       </section>
 
-      <section className="px-6 py-24">
-        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-20 text-center" style={{ background: ACCENT }}>
+      <section className="px-6 py-16">
+        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
           <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             Connect a store and watch it work.
           </h2>

@@ -89,34 +89,43 @@
    * Status colours are untouched: emerald still means shipped, amber still means warning.
    * Those carry meaning on the floor and must not be crowded by a brand hue.
    */
-    --primary: oklch(0.47 0.19 274);
+    --primary: oklch(0.47 0.14 132);
     --primary-foreground: oklch(0.985 0 0);
-    --brand: oklch(0.5700 0.1626 264.2);
-    --brand-foreground: oklch(0.985 0 0);
+    --brand: oklch(0.900 0.191 123.3);
+    --brand-foreground: oklch(0.175 0.008 277);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.968 0.004 91);
     --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.968 0.015 275);
-    --accent-foreground: oklch(0.42 0.16 274);
+    --accent: oklch(0.966 0.020 130);
+    --accent-foreground: oklch(0.40 0.13 132);
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.902 0.004 91);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.47 0.19 274);
-    --chart-1: oklch(0.47 0.19 274);
+    --ring: oklch(0.47 0.14 132);
+    --chart-1: oklch(0.47 0.14 132);
     --chart-2: oklch(0.62 0.19 250);
     --chart-3: oklch(0.7 0.14 195);
     --chart-4: oklch(0.77 0.16 70);
     --chart-5: oklch(0.65 0.22 15);
     --radius: 0.625rem;
-    --sidebar: oklch(0.5700 0.1626 264.2);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.985 0 0);
-    --sidebar-primary-foreground: oklch(0.30 0.13 264.2);
-    --sidebar-accent: oklch(0.505 0.155 264.2);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.485 0.150 264.2);
-    --sidebar-ring: oklch(0.47 0.19 274);
+  /* THE NAV IS THE PAGE. The sidebar takes the background colour and separates with a
+   * border alone — a coloured panel beside white content is a second surface competing
+   * with the data, and a full-height block of brand hue is the single thing that dated the
+   * app fastest. Colour moves OUT of the panel and into one place: the selected item.
+   *
+   * Selected = inverted. Ink block, acid label — the highest-contrast pair in the system
+   * (15.2:1) and the exact move the references make. One item on the whole screen is loud,
+   * so "where am I" is answered instantly instead of being one tint among many.
+   * Hover is a plain neutral wash: it must read as "reachable", not as a second selection. */
+    --sidebar: oklch(1 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.175 0.008 277);
+    --sidebar-primary-foreground: oklch(0.900 0.191 123.3);
+    --sidebar-accent: oklch(0.965 0 0);
+    --sidebar-accent-foreground: oklch(0.145 0 0);
+    --sidebar-border: oklch(0.902 0.004 91);
+    --sidebar-ring: oklch(0.47 0.14 132);
 }
 
 .dark {
@@ -131,33 +140,37 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.72 0.14 274);
-    --primary-foreground: oklch(0.145 0 0);
-    --brand: oklch(0.5700 0.1626 264.2);
-    --brand-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.80 0.17 128);
+    --primary-foreground: oklch(0.175 0.008 277);
+    --brand: oklch(0.900 0.191 123.3);
+    --brand-foreground: oklch(0.175 0.008 277);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.272 0.012 277);
     --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.31 0.04 274);
-    --accent-foreground: oklch(0.92 0.05 274);
+    --accent: oklch(0.29 0.045 132);
+    --accent-foreground: oklch(0.92 0.09 130);
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.72 0.14 274);
-    --chart-1: oklch(0.72 0.14 274);
+    --ring: oklch(0.80 0.17 128);
+    --chart-1: oklch(0.80 0.17 128);
     --chart-2: oklch(0.66 0.19 250);
     --chart-3: oklch(0.72 0.14 195);
     --chart-4: oklch(0.8 0.16 70);
     --chart-5: oklch(0.68 0.22 15);
-    --sidebar: oklch(0.255 0.065 274);
+  /* Same rule inverted: the panel IS the page, and the selected item is the acid block with
+   * ink on it. On a near-black page the loud colour has to be the fill rather than the label
+   * — an acid *label* on near-black is legible but quiet, while the filled block reads across
+   * the room, which is what a "you are here" marker is for. */
+    --sidebar: oklch(0.145 0.006 277);
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.72 0.14 274);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.33 0.075 274);
-    --sidebar-accent-foreground: oklch(0.95 0.03 274);
+    --sidebar-primary: oklch(0.900 0.191 123.3);
+    --sidebar-primary-foreground: oklch(0.175 0.008 277);
+    --sidebar-accent: oklch(0.225 0.008 277);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.72 0.14 274);
+    --sidebar-ring: oklch(0.80 0.17 128);
 }
 
 @layer base {

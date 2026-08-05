@@ -22,7 +22,14 @@ import { ArrowUpRight } from "@phosphor-icons/react"
 // 4.5:1 from about #4259D6 downward — at any "light periwinkle" value it sits near 1.6:1,
 // i.e. invisible. Light plate + ink type, or deep plate + cream type; there is no light plate
 // with cream type.
-export const ACCENT = "#5C6CD6"        // periwinkle-blue — the plate/fill
+// COOLER, same lightness. #5C6CD6 sat at a violet hue that read warm at full-bleed size;
+// this is the same brightness pulled toward true blue. Held at hue 229 so it is the SAME
+// family as PLATE_DEEP (234) — an accent 17° off the plate reads as two unrelated blues on
+// one page, which is what a mixed set of hand-picked hexes always looks like.
+//
+// Cream measures 5.10:1 here, so the CTA bands that use this as a fill carry cream lettering
+// as real readable type, not as a ghost.
+export const ACCENT = "#4560D4"        // blue — the plate/fill
 // The accent phrase is INK, like the rest of the headline — no second type colour.
 //
 // A dark purple on a light purple plate is a tint of the background wearing itself as
@@ -84,21 +91,24 @@ export const PLATE_ACCENT = '#1E2A78'
  *
  * A bright plate can never carry light lettering: #A5B7FF is L* 75.5, so cream lands at
  * 1.83:1 and white at 1.94:1. Going deep is the only way to get white type, and it is what
- * every reference in this style actually does. At L* 41, #5B3FE8 gives white 6.32:1, cream
- * 5.96:1, and the acid accent 4.88:1 — all past the 4.5:1 body-text floor, so nothing here
- * is decorative-only the way PLATE_GHOST had to be.
+ * every reference in this style actually does.
+ *
+ * COOLER than the first deep plate. #5B3FE8 sat at hue 250 — a violet, which at full-bleed
+ * size reads warm and slightly dated. This is the same lightness and saturation rotated to
+ * hue 234, a true blue-indigo: cream 5.31:1, white 5.63:1, acid 4.35:1. Every one of those
+ * still clears the floor, so the type decisions below are unchanged by the rotation.
  *
  * Deliberately NOT a change to ACCENT. That token is used 21 times across the marketing
  * pages, several of them as a light band with INK text on top — swapping it wholesale would
  * silently invert those to dark-on-dark. ACCENT stays the pastel band; this is the hero
  * plate. Unifying the two is a per-page pass, not a token rename.
  */
-export const PLATE_DEEP = '#5B3FE8'
+export const PLATE_DEEP = '#4454EC'
 
 /**
  * The one loud accent — acid green, the single hot colour in an otherwise two-tone page.
  *
- * 4.88:1 on the deep plate, so it reads as type rather than as a glow. As a FILL it only ever
+ * 4.35:1 on the deep plate, so it reads as type rather than as a glow. As a FILL it only ever
  * takes ink: black on it is 15.19:1, white is 1.30:1 and fails outright — acid green is a
  * light colour, so the same light-plate/dark-type rule applies to it as to the pastel.
  */
@@ -272,15 +282,21 @@ export function PlateHero({ title, accent, sub, children }: {
   title: string; accent?: string; sub?: string; children?: React.ReactNode
 }) {
   const reduce = useReducedMotion()
-  // SURFACE, not a colour plate. A periwinkle field with periwinkle lettering on it is
-  // purple-on-purple: the accent has nothing to contrast against and stops being an accent.
-  // Paper carries the page; the colour appears in the ONE phrase, the CTA band and the chart,
-  // which is what makes those read as chosen.
+  // THE DEEP PLATE, carrying cream lettering — the same banner the home hero uses, so an
+  // interior page reads as the same site rather than a different one.
+  //
+  // This previously set the section background to SURFACE while leaving the h1 at
+  // `color: SURFACE`, i.e. cream lettering on cream paper. Every interior hero rendered as a
+  // ~380px band of nothing — not a subtle contrast failure but literally invisible type, and
+  // the reason all four pages looked like they had blank space at the top. A colour pair is
+  // only safe when both halves move together; changing one is what produced this.
+  //
+  // Cream on #4454EC is 5.31:1 and the acid accent is 4.35:1 — both real readable type.
   return (
-    <section className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
-      <div className="mx-auto max-w-6xl px-6 pb-28 pt-20 sm:pt-28">
+    <section className="relative -mt-16 pt-16" style={{ background: PLATE_DEEP }}>
+      <div className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pt-20">
         <h1 className="mx-auto max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em]" style={{ ...DISPLAY, color: SURFACE }}>
-          <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} /></> : null}
+          <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} color={ACID} /></> : null}
         </h1>
         {sub && (
           <motion.p

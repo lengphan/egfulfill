@@ -59,7 +59,7 @@ export function BoldFeatures() {
         sub="Six things this platform does so you don't have to. Every one of them runs whether you're watching or not."
       />
 
-      <section className="mx-auto max-w-5xl px-6 py-24">
+      <section className="mx-auto max-w-5xl px-6 py-16">
         <div className="divide-y divide-black/[0.09]">
           {features.map((f, i) => (
             <Rise key={f.title} delay={i * 0.05} className="grid gap-6 py-12 md:grid-cols-[auto_1fr_auto] md:gap-10">
@@ -92,8 +92,8 @@ export function BoldFeatures() {
         </div>
       </section>
 
-      <section className="px-6 pb-24">
-        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-20 text-center" style={{ background: ACCENT }}>
+      <section className="px-6 pb-16">
+        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
           <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             All of it, from the first order.
           </h2>

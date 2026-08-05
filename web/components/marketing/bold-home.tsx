@@ -92,7 +92,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
         <div style={{ background: SURFACE }} className="absolute inset-x-0 -bottom-px h-24 [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
-        <div className="mx-auto max-w-6xl px-6 pb-40 pt-24 sm:pt-32">
+        <div className="mx-auto max-w-6xl px-6 pb-32 pt-16 sm:pt-24">
           <h1 className="max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] mx-auto"
               // Cream, not pure white: 5.96:1 on the plate, and it ties the hero to the paper
               // page below instead of introducing a third neutral.
@@ -225,7 +225,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       {/* The top padding is load-bearing, not taste: the hero's app mockup is absolutely
           positioned and hangs well below the plate's diagonal, so a short gap here puts the
           names UNDER it. This clears the overhang. */}
-      <section className="overflow-hidden pb-14 pt-44" style={{ background: SURFACE }}>
+      <section className="overflow-hidden pb-14 pt-36" style={{ background: SURFACE }}>
         <div
           className="relative flex overflow-hidden"
           style={{
@@ -252,7 +252,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       </section>
 
       {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-6 py-28">
+      <section className="mx-auto max-w-6xl px-6 py-20">
         <h2 className="max-w-3xl font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
           {features.heading}
         </h2>
@@ -287,7 +287,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       </section>
 
       {/* ── STEPS — numbers oversized, the way the style wants ──────────────────── */}
-      <section className="bg-black/[0.03] py-28">
+      <section className="bg-black/[0.03] py-20">
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             {steps.heading}
@@ -313,7 +313,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       </section>
 
       {/* ── TESTIMONIALS ───────────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-6 py-28">
+      <section className="mx-auto max-w-6xl px-6 py-20">
         <h2 className="max-w-3xl font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
           {testimonials.heading}
         </h2>
@@ -342,7 +342,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
 
       {/* ── FAQ — plain disclosure elements: keyboard and screen-reader behaviour for
               free, and no state to get wrong. ─────────────────────────────────────── */}
-      <section className="bg-black/[0.03] py-28">
+      <section className="bg-black/[0.03] py-20">
         <div className="mx-auto max-w-3xl px-6">
           <h2 className="font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             {faq.heading}
@@ -362,9 +362,9 @@ export function BoldHome({ content }: { content: SiteContent }) {
       </section>
 
       {/* ── CTA ────────────────────────────────────────────────────────────────── */}
-      <section className="px-6 py-24">
+      <section className="px-6 py-16">
         <motion.div
-          className="mx-auto max-w-5xl overflow-hidden rounded-3xl px-8 py-20 text-center"
+          className="mx-auto max-w-5xl overflow-hidden rounded-3xl px-8 py-14 text-center"
           style={{ background: ACCENT }}
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 26 }}
           whileInView={{ opacity: 1, y: 0 }}
