@@ -600,6 +600,10 @@ function CreateTab() {
   const [compare, setCompare] = useState(true) // show the generated result beside the arrangement
   const [dragId, setDragId] = useState<string | null>(null) // layer card being drag-reordered
   const [garment, setGarment] = useState("#f4f4f5") // preview backdrop (garment colour) — cosmetic
+  // Width box draft. The box is CONTROLLED by a derived, rounded footprint, so resizing on
+  // every keystroke fed a half-typed number ("9" of "90") back through the scale clamp and the
+  // rounding — typing 90 actually landed on 110. Hold the keystrokes, commit on blur/Enter.
+  const [wDraft, setWDraft] = useState<string | null>(null)
   // Drop `dragId` onto `targetId`: dragId takes the target's slot in the stack.
   const reorderTo = (dragId: string, targetId: string) => setLayers((prev) => {
     if (dragId === targetId) return prev
@@ -720,6 +724,47 @@ function CreateTab() {
       setRes(r); return r
     } catch (e) { setErr(e instanceof Error ? e.message : "Failed"); return null } finally { setStatus("idle") }
   }
+  /**
+   * THE ARRANGEMENT'S REAL FOOTPRINT, in mm — the bounding box of every layer.
+   *
+   * The old readout showed res.width/res.height, which only exists AFTER a generate: while you
+   * were actually arranging, the one number that decides whether this fits a left chest read
+   * "—". This is computed from the layer boxes, so it is live.
+   *
+   * Rotation is ignored deliberately: a rotated box's true AABB is larger, but the boxes are
+   * what the user is dragging, and a footprint that grows when you spin a layer reads as a bug.
+   */
+  const footprint = (() => {
+    if (!layers.length) return null
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    for (const l of layers) {
+      const r = resById[l.id]
+      const sc = l.tf.scale || 1
+      const w = (r?.width || NOMINAL_MM) * sc, h = (r?.height || NOMINAL_MM) * sc
+      x0 = Math.min(x0, l.tf.x - w / 2); x1 = Math.max(x1, l.tf.x + w / 2)
+      y0 = Math.min(y0, l.tf.y - h / 2); y1 = Math.max(y1, l.tf.y + h / 2)
+    }
+    const w = x1 - x0, h = y1 - y0
+    return Number.isFinite(w) && w > 0 && h > 0 ? { w, h } : null
+  })()
+
+  /**
+   * Resize the WHOLE arrangement to a target width, keeping its proportions and layout.
+   *
+   * One factor applied to every layer's scale AND its offset — scaling the sizes alone would
+   * leave the pieces at their old spacing and pull the composition apart. clampScale still caps
+   * each layer at 0.25–4, so an extreme target lands short rather than distorting the layout.
+   */
+  const resizeTo = (targetW: number) => {
+    if (!footprint || !(targetW > 0)) return
+    const f = targetW / footprint.w
+    if (!Number.isFinite(f) || f <= 0) return
+    setLayers((prev) => prev.map((l) => ({
+      ...l,
+      tf: { ...l.tf, scale: clampScale((l.tf.scale || 1) * f), x: +(l.tf.x * f).toFixed(2), y: +(l.tf.y * f).toFixed(2) },
+    })))
+  }
+
   // Generate then download ONE format. The .emb is the MACHINE FILE (stitches only). The PNG
   // is the rendered image. Each click regenerates so it always reflects the current arrangement.
   const generateAnd = async (kind: "emb" | "png") => {
@@ -885,13 +930,6 @@ function CreateTab() {
           </div>
         )}
 
-        {/* Live readout — stitch count, size, file format. */}
-        <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-muted/30 p-3 text-center">
-          <div><div className="text-base font-semibold tabular-nums">{shownStitches != null ? shownStitches.toLocaleString() : "—"}</div><div className="text-2xs text-muted-foreground">stitches</div></div>
-          <div><div className="text-base font-semibold tabular-nums">{res?.width != null && res?.height != null ? `${Math.round(res.width)}×${Math.round(res.height)}` : "—"}</div><div className="text-2xs text-muted-foreground">mm</div></div>
-          <div><div className="text-base font-semibold">{ext ?? "—"}</div><div className="text-2xs text-muted-foreground">file</div></div>
-        </div>
-
         {/* Two explicit generate actions, side by side — grab whichever you need. Machine file
             = the .emb (stitches only, for the embroidery machine); PNG = the rendered image. */}
         <div className="flex gap-2">
@@ -927,6 +965,76 @@ function CreateTab() {
             </button>
           )}
         </div>
+        {/* SIZE TABLE — above the preview, where the arrangement it describes actually is.
+            It used to sit at the bottom of the left column, under the layer list, so the two
+            numbers that decide whether a design fits a placement were the furthest thing on
+            screen from the design. */}
+        <div className="mb-2 flex flex-wrap items-end gap-x-5 gap-y-2 rounded-xl border border-border bg-muted/30 px-3 py-2">
+          <div>
+            <div className="text-2xs text-muted-foreground">Stitches</div>
+            <div className="text-base font-semibold tabular-nums">{shownStitches != null ? shownStitches.toLocaleString() : "—"}</div>
+          </div>
+
+          {/* Editable, and LIVE — driven by the layer boxes, so it reads a real size while you
+              are still arranging instead of "—" until the first generate. */}
+          <div>
+            <div className="text-2xs text-muted-foreground">Width × height</div>
+            {/* Empty until there is something to measure. An enabled-looking input with no
+                value reads as a field that failed to load, not as "nothing here yet". */}
+            {!footprint ? (
+              <div className="text-base font-semibold">—</div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <input
+                  inputMode="decimal"
+                  value={wDraft ?? String(Math.round(footprint.w))}
+                  onChange={(e) => setWDraft(e.target.value)}
+                  // Commit, then drop the draft so the box snaps back to the size actually
+                  // achieved — clampScale can land short of the target, and showing the number
+                  // you asked for instead of the one you got would hide that.
+                  onBlur={() => { if (wDraft != null) { resizeTo(Number(wDraft)); setWDraft(null) } }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setWDraft(null) }}
+                  aria-label="Design width in millimetres"
+                  className="h-7 w-16 rounded-md border border-input bg-background px-1.5 text-base font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                />
+                <span className="text-sm text-muted-foreground">×</span>
+                {/* Height follows: the resize is uniform, so letting you type a height that
+                    broke the arrangement's proportions would be a lie about what happened. */}
+                <span className="text-base font-semibold tabular-nums">{Math.round(footprint.h)}</span>
+                <span className="text-2xs text-muted-foreground">mm</span>
+              </div>
+            )}
+          </div>
+
+          {footprint && (
+            <div>
+              <div className="text-2xs text-muted-foreground">Inches</div>
+              <div className="text-base font-semibold tabular-nums">{fmtIn(footprint.w)} × {fmtIn(footprint.h)}</div>
+            </div>
+          )}
+
+          {/* Same placements as the digitize modal, so a size learned in one is the same
+              button in the other. */}
+          {footprint && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {PLACEMENTS.map((pl) => (
+                <button
+                  key={pl.label}
+                  onClick={() => { setWDraft(null); resizeTo(Math.min(pl.w, pl.h * (footprint.w / footprint.h))) }}
+                  className="eg-tap rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  {pl.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="ml-auto">
+            <div className="text-2xs text-muted-foreground">File</div>
+            <div className="text-base font-semibold">{ext ?? "—"}</div>
+          </div>
+        </div>
+
         <div className={"grid gap-2 " + (res?.trueview && compare ? "xl:grid-cols-2" : "grid-cols-1")}>
           <div className="space-y-1">
             {/* Clicking the empty canvas deselects — the layer boxes stopPropagation, so only a
