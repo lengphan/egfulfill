@@ -256,6 +256,15 @@ export function CatalogView() {
                             <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
                               <span className="font-mono">{p.sku || id}</span>
                               {p.inCatalog && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">published</span>}
+                              {/* Published but with no price from EITHER source, so the public
+                                  site drops it. Without this the row looks fully live and
+                                  silently isn't — the exact case where an empty state is
+                                  indistinguishable from a broken one. */}
+                              {p.inCatalog && p.catalogPrice == null && !(Number(p.price) > 0) && (
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800">
+                                  needs a price to show publicly
+                                </span>
+                              )}
                             </div>
                             {/* Colourways as their own supplier photos where we have them.
                                 Capped at eight with a count — a 40-colour style would

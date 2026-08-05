@@ -68,26 +68,47 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * catalog_products, a redaction list silently starts publishing it. This builds a new object
    * from four named fields and nothing else can leak by being added upstream.
    *
-   * Published only (in_catalog), priced only. An unpriced product on a pricing-led page
-   * reads as "free" or as broken, and a draft nobody chose to publish should not be visible
-   * at all — that flag is what "published" MEANS.
+   * PUBLISHING IS THE DECISION. in_catalog is the flag a human ticks, so it — and it alone —
+   * decides visibility. This used to also require catalog_price, which meant a product could
+   * be ticked "published" and still be invisible on the public site with nothing anywhere
+   * saying why. That is not a stricter guardrail, it is a second hidden condition on an
+   * explicit choice: every product in the catalogue was in exactly that state.
+   *
+   * catalog_price is now an OVERRIDE, not a gate. When it is set it wins; otherwise the
+   * product's own price is used, which is the same number the seller-facing catalogue shows
+   * — this page quotes what a seller would pay to order the item, so it is the right figure
+   * rather than a fallback that leaks something internal.
+   *
+   * The ALLOW-LIST is untouched. Only in_catalog rows are read, and only these four fields
+   * are ever emitted, so widening the price rule cannot widen what a row exposes.
+   *
+   * A product with no usable price at all is still dropped: an unpriced item on a pricing-led
+   * page reads as "free" or as broken. The coalesce happens in JS rather than SQL because
+   * data->>'price' is free text — an unparseable value would abort the whole query on a cast,
+   * taking every other product down with it.
    */
   app.get('/api/public/products', async () => {
     const r = await q(
       `select data, catalog_price from catalog_products
-        where in_catalog = true and catalog_price is not null
-        order by catalog_price asc nulls last limit 24`
+        where in_catalog = true
+        order by created_at desc limit 60`
     ).catch(() => ({ rows: [] }));
     return {
       products: r.rows
         .filter((row) => row.data && row.data.name)
-        .map((row) => ({
-          name: String(row.data.name),
-          // The mockup a seller sees, if there is one. Never a supplier URL or an internal key.
-          image: typeof row.data.image === 'string' ? row.data.image : null,
-          category: typeof row.data.category === 'string' ? row.data.category : null,
-          price: Number(row.catalog_price),
-        })),
+        .map((row) => {
+          const price = row.catalog_price == null ? Number(row.data.price) : Number(row.catalog_price);
+          return {
+            name: String(row.data.name),
+            // The mockup a seller sees, if there is one. Never a supplier URL or an internal key.
+            image: typeof row.data.image === 'string' ? row.data.image : null,
+            category: typeof row.data.category === 'string' ? row.data.category : null,
+            price,
+          };
+        })
+        .filter((p) => Number.isFinite(p.price) && p.price > 0)
+        .sort((a, b) => a.price - b.price)
+        .slice(0, 24),
     };
   });
 
