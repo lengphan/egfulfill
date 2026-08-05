@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getToken, getUser, setSession } from "@/lib/auth"
+import { getToken, getUser, setSession, getRememberedIdentifier, setRememberedIdentifier } from "@/lib/auth"
 import { API_BASE } from "@/lib/api"
 import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
@@ -28,6 +28,13 @@ function safeNext(raw: string | null): string | null {
 export default function LoginPage() {
   const router = useRouter()
   const [next, setNext] = useState<string | null>(null)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  // Defaults ON, which is exactly today's behaviour — nobody who ignores this box is
+  // signed out by its arrival.
+  const [remember, setRemember] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   // Read the intended destination, and skip the form entirely for someone who already
   // has a session — arriving at a login page you don't need is the failure this fixes.
@@ -39,14 +46,16 @@ export default function LoginPage() {
       if (getToken()) {
         const role = getUser()?.role
         router.replace(want ?? landingFor(typeof role === "string" ? role : null))
+        return
       }
+      // Fill in who you are, so the only thing left to type is the secret. Deferred with
+      // the rest: reading localStorage at useState-init time would make the server and
+      // client markup disagree.
+      const last = getRememberedIdentifier()
+      if (last) setEmail(last)
     }, 0)
     return () => clearTimeout(id)
   }, [router])
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -70,7 +79,10 @@ export default function LoginPage() {
       const token = j.token ?? j.data?.token ?? j.session?.access_token
       const user = (j.user ?? j.data?.user ?? {}) as Record<string, unknown>
       if (!token) throw new Error("No session token returned")
-      setSession(token, user)
+      setSession(token, user, remember)
+      // Only after the credentials were accepted. Storing it on submit would leave a
+      // typo remembered as though it were the account.
+      setRememberedIdentifier(remember ? email.trim() : null)
       router.push(next ?? landingFor(typeof user.role === "string" ? user.role : null))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed")
@@ -110,6 +122,24 @@ export default function LoginPage() {
               required
             />
           </label>
+          {/* Two jobs in one box, and the second is the one worth naming: it decides
+              whether the session survives the browser closing. Unchecked, it lives in
+              sessionStorage — which is what you want on the shared floor terminal, where
+              the previous person otherwise stays signed in for you. */}
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="size-4 accent-primary"
+              />
+              Remember me
+            </label>
+            <span className="text-xs text-muted-foreground">
+              {remember ? "Stay signed in on this device" : "Sign out when the browser closes"}
+            </span>
+          </div>
           {error && (
             <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>
           )}
