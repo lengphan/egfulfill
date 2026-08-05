@@ -1,4 +1,4 @@
-import { getToken, clearSession } from "./auth"
+import { getToken, clearSession, setToken } from "./auth"
 import type { SiteContent } from "./site-content"
 
 // Same-origin in production (Caddy reverse-proxies /api → Fastify). For local
@@ -99,6 +99,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   // being blunt is one extra fetch after a write, which is the request that was happening
   // anyway before any of this existed.
   if (init.method && init.method.toUpperCase() !== "GET") invalidateLists()
+  /* SLIDING SESSION. The server reissues a still-valid token once it is past half its life
+     and returns it here, so an active session never hits the 7-day expiry mid-task. Storing
+     it is the whole client side of that — nothing else changes, and a response without the
+     header (the normal case) does nothing. */
+  const renewed = res.headers.get("X-Session-Token")
+  if (renewed) setToken(renewed)
   if (!res.ok) {
     let message = res.statusText
     let body: unknown

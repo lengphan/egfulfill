@@ -58,6 +58,24 @@ export function getUser(): User | null {
   }
 }
 
+/**
+ * Replace ONLY the token, leaving the stored user and the remember-me choice alone.
+ *
+ * For the sliding-session renewal: the server hands back a fresh token on a response, and
+ * nothing else about the session has changed. setSession would be wrong here — it needs a
+ * User it doesn't have, and its remember flag would MOVE the session between localStorage
+ * and sessionStorage, quietly converting "don't remember me" into "remember me".
+ */
+export function setToken(token: string) {
+  try {
+    for (const s of stores()) {
+      if (s && s.getItem(TOKEN_KEY) != null) { s.setItem(TOKEN_KEY, token); return }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export function setSession(token: string, user: User, remember = true) {
   const [session, local] = stores()
   if (!session || !local) return

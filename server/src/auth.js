@@ -57,6 +57,27 @@ export function verify(token) {
   try { return jwt.verify(token, SECRET); } catch { return null; }
 }
 
+/**
+ * SLIDING SESSIONS. A token lives 7 days and nothing ever renewed it, so every signed-in
+ * person was silently logged out a week after signing in — mid-task, with no warning, and
+ * (until the client learned to handle 401) into an app full of "Not signed in" panels.
+ * Expiry is meant to bound an ABANDONED session, not to evict someone who is still working.
+ *
+ * So a still-valid token that is over halfway through its life is reissued on the next
+ * request. Someone using the product never reaches the wall; someone who stops using it
+ * still ages out on the original schedule, because renewal only happens on a real request.
+ *
+ * Returns a fresh token, or null when the current one has plenty of life left — the caller
+ * only sets a header when there is something to set.
+ */
+export function renewIfStale(claims) {
+  if (!claims || !claims.exp || !claims.sub) return null;
+  const secondsLeft = claims.exp - Math.floor(Date.now() / 1000);
+  const HALF_LIFE = 3.5 * 24 * 3600;
+  if (secondsLeft <= 0 || secondsLeft > HALF_LIFE) return null;
+  return sign({ id: claims.sub, role: claims.role, email: claims.email });
+}
+
 export async function signup({ email, password, role = 'seller', name = '', store_name = '', username = '' }) {
   if (!email || !password) throw new Error('Email and password are required');
   // A real address, not just a non-empty string.

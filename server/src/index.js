@@ -1,7 +1,7 @@
 // EGFULFILL API — Fastify entry point.
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn } from './auth.js';
+import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn, renewIfStale } from './auth.js';
 import { q } from './db.js';
 import { ordersRoutes } from './routes/orders.js';
 import { orderRefundRoutes } from './routes/order_refunds.js';
@@ -95,9 +95,24 @@ app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string
 });
 
 // Attach req.user from the Bearer token on every request (null if not signed in).
-app.addHook('onRequest', async (req) => {
+//
+// A still-valid token past half its life is reissued here and handed back on the response,
+// so an ACTIVE session never reaches the 7-day wall. Without this every signed-in person was
+// logged out a week after signing in, mid-task and without warning. An abandoned session
+// still ages out normally: renewal only happens on a real request.
+//
+// The header must be named in Access-Control-Expose-Headers or a cross-origin caller
+// (app.egful.store → api.egful.store) cannot read it, and the renewal would be invisible.
+app.addHook('onRequest', async (req, reply) => {
   const m = (req.headers.authorization || '').match(/^Bearer (.+)$/);
   req.user = m ? verify(m[1]) : null;
+  if (req.user) {
+    const fresh = renewIfStale(req.user);
+    if (fresh) {
+      reply.header('X-Session-Token', fresh);
+      reply.header('Access-Control-Expose-Headers', 'X-Session-Token');
+    }
+  }
 });
 function requireAuth(req, reply, done) {
   if (!req.user) { reply.code(401).send({ error: 'Not signed in' }); return; }
