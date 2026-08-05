@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform, animate } from "motion/react"
 import { ArrowUpRight, PlugsConnected, Printer, Truck, Wallet } from "@phosphor-icons/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, INK, SURFACE, PLATE_GHOST, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
+import { ACCENT, INK, SURFACE, PLATE_ACCENT, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -96,12 +96,10 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 should read as cut OUT of it — and it carries the page's own surface colour
                 down from the header, so the hero and everything below share a palette rather
                 than meeting at a hard edge. */}
-            {/* Only the LAST word of the accent ("itself?") takes the paper tone — the rest
-                of the headline stays ink. See PLATE_GHOST in bold-kit: paper on the plate is
-                1.83:1, so this is a deliberate decorative ghost, not readable type. It is one
-                word of a sentence whose meaning survives without it being legible at a
-                glance, and the subhead below restates the promise in ink. */}
-            <TypedPhrase text={hero.accent} lastWordColor={PLATE_GHOST} />
+            {/* The last word carries the accent. Deep indigo, not cream: see PLATE_ACCENT —
+                on a plate this light, a paler accent can only ghost (cream 1.83:1, white
+                1.94:1), while #1E2A78 reaches 6.53:1 and actually reads. */}
+            <TypedPhrase text={hero.accent} lastWordColor={PLATE_ACCENT} />
           </h1>
 
           <motion.p

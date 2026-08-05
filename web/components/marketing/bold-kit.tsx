@@ -61,6 +61,24 @@ export const SURFACE = "#FAF8F3"
  */
 export const PLATE_GHOST = SURFACE
 
+/**
+ * The accent word on the plate — a DEEPER shade of the plate's own hue.
+ *
+ * The instinct on a bright background is a lighter accent, and it cannot work: #A5B7FF sits
+ * at L* 75.5, so it IS the light colour. Cream measures 1.83:1 on it and pure white only
+ * 1.94:1 — white is not the fix, because the problem is the plate's lightness, not which pale
+ * tone sits on it. Bright plate takes dark type; light type needs a dark plate. Not both.
+ *
+ * #1E2A78 is 6.53:1 here — comfortably past the 4.5:1 body-text floor, so it is real readable
+ * type rather than a decorative ghost. Same hue family as the plate, which is what makes it
+ * read as a deliberate accent instead of an unrelated colour dropped in.
+ *
+ * A drop shadow was considered and rejected: it changes no measured contrast, and a blur
+ * behind font-black display type reads as a smudge. If cream must be kept, the only version
+ * that works is a HARD zero-blur ink offset — a deliberate letterpress style, not a patch.
+ */
+export const PLATE_ACCENT = '#1E2A78'
+
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
 export const HEADING = { fontSize: "clamp(2rem, 4.6vw, 3.6rem)" } as const
