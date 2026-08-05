@@ -3,8 +3,7 @@
 import Link from "next/link"
 
 
-import { usePathname } from "next/navigation"
-import { ACCENT, PLATE_DEEP, ACID } from "@/components/marketing/bold-kit"
+import { PLATE_DEEP, ACID } from "@/components/marketing/bold-kit"
 
 const nav = [
   { label: "Products", href: "/catalog" },
@@ -28,22 +27,25 @@ const nav = [
  */
 export function SiteHeader() {
   /**
-   * The home hero sits on the DEEP plate; every other marketing page sits on the pastel
-   * band. One header serves both, so it reads the route rather than being forked into two
-   * components — and the ink/light swap has to move WITH the background, or the links land
-   * dark-on-dark the moment the plate goes deep.
+   * ONE appearance, on every marketing route: the deep plate, opaque, at every scroll
+   * position, with light lettering.
+   *
+   * This used to fork on `pathname === "/"` — deep plate for home, the pastel ACCENT band
+   * everywhere else. That check silently went wrong the moment PlateHero moved the interior
+   * heroes onto the deep plate too: the four inner pages rendered a lighter blue bar with
+   * DARK ink sitting directly above a deep plate carrying cream, which is both a visible
+   * seam between two near-identical blues and a legibility drop on the links.
+   *
+   * The lesson is the reason there's no route list here now. A hardcoded set of "pages with
+   * a plate" is a second source of truth about what the pages render, and it drifts the
+   * first time someone changes a hero. One appearance everywhere can't drift.
    */
-  const onDeepPlate = usePathname() === "/"
-  const ink = onDeepPlate ? "text-[#FAF8F3]" : "text-[#0B0B0C]"
-  const muted = onDeepPlate
-    ? "text-[#FAF8F3]/75 hover:bg-[#FAF8F3]/10 hover:text-[#FAF8F3]"
-    : "text-[#0B0B0C]/70 hover:bg-[#0B0B0C]/[0.06] hover:text-[#0B0B0C]"
+  const ink = "text-[#FAF8F3]"
+  const muted = "text-[#FAF8F3]/75 hover:bg-[#FAF8F3]/10 hover:text-[#FAF8F3]"
   return (
     <header
       className="sticky top-0 z-30"
-      // The PLATE's colour, opaque, at every scroll position. One appearance throughout —
-      // it just belongs to the hero rather than to the page below it.
-      style={{ background: onDeepPlate ? PLATE_DEEP : ACCENT }}
+      style={{ background: PLATE_DEEP }}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
         <Link href="/" className={"font-display text-2xl font-semibold tracking-tight " + ink}>
@@ -64,14 +66,14 @@ export function SiteHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
                       <>
-              <Link href="/login" className={"rounded-full px-4 py-2 text-sm font-semibold transition-colors " + (onDeepPlate ? "text-[#FAF8F3] hover:bg-[#FAF8F3]/10" : "text-[#0B0B0C] hover:bg-[#0B0B0C]/[0.06]")}>
+              <Link href="/login" className={"rounded-full px-4 py-2 text-sm font-semibold transition-colors " + muted}>
                 Log in
               </Link>
               <Link
                 href="/login"
-                // Acid on the deep plate (ink label, 15.19:1); ink pill elsewhere.
-                className={"rounded-full px-5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 " + (onDeepPlate ? "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#FAF8F3]" : "bg-[#0B0B0C] text-[#FAF8F3] hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]")}
-                style={onDeepPlate ? { background: ACID } : undefined}
+                // Acid pill, ink label — 15.19:1, and the one loud thing in the bar.
+                className="rounded-full px-5 py-2 text-sm font-semibold text-[#0B0B0C] transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FAF8F3] focus-visible:ring-offset-2"
+                style={{ background: ACID }}
               >
                 Start free
               </Link>
