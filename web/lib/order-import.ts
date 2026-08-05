@@ -28,7 +28,7 @@ export const REQUIRED_COLS = ["ship_name", "ship_address_1", "ship_city", "ship_
 // validator then breaks — the chip says safe to skip, the row comes back "No item (SKU or name)".
 export type CsvColumn = { header: string; key: string; required: boolean; oneOf?: string; help: string }
 export const CSV_COLUMNS: CsvColumn[] = [
-  { header: "Order Number", key: "order_number", required: false, help: "Groups multiple item rows into one order. Auto-generated if left blank." },
+  { header: "Order Number", key: "order_number", required: false, help: "The BUYER's order number — kept as the order's reference, not as its ID (we always mint our own FF- number). It is also what groups rows: give every line of one order the same number, or each line imports as a SEPARATE order. Safe to leave blank only for single-line orders." },
   { header: "Ship Name", key: "ship_name", required: true, help: "Recipient's full name." },
   { header: "Ship Email", key: "ship_email", required: false, help: "Buyer email, kept for your records." },
   { header: "Ship Address 1", key: "ship_address_1", required: true, help: "Street address." },
@@ -187,13 +187,22 @@ export type ImportOrder = {
   items: ImportItem[]
 }
 
+// Prefix for a grouping key we invented because the row had no Order Number. Internal only —
+// see the orderNumber field below for why it must never reach the saved order.
+const AUTO_KEY = " AUTO-"
+
 // Group valid rows by Order Number into orders with aggregated line items.
+//
+// The key is what decides how many ORDERS come out of N rows. Rows sharing an Order Number
+// become one order with several lines; a row without one can only ever be its own order,
+// because there is nothing to group it by. That is why a multi-line order must carry the
+// number even though the column is otherwise skippable.
 export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
   const valid = records.filter((r) => r._valid)
   const groups: Record<string, ImportRecord[]> = {}
   const order: string[] = []
   valid.forEach((r, i) => {
-    const key = S(r.order_number) || `AUTO-${i}`
+    const key = S(r.order_number) || `${AUTO_KEY}${i}`
     if (!groups[key]) { groups[key] = []; order.push(key) }
     groups[key].push(r)
   })
@@ -225,7 +234,11 @@ export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
       if (withHero) items[0].img = withHero.img
     }
     return {
-      orderNumber: String(key).replace(/^#/, ""),
+      // A synthesized key groups the row and then stops. It must NOT survive as the order's
+      // number: the dialog persists this to meta.sourceOrderNumber and address.ref, which are
+      // "the buyer's own reference" — writing "AUTO-3" there records a placeholder as if it
+      // were the customer's real order number. Blank in, blank out.
+      orderNumber: key.startsWith(AUTO_KEY) ? "" : String(key).replace(/^#/, ""),
       customer: { name: S(head.ship_name) || "Customer", email: S(head.ship_email) },
       address: {
         name: S(head.ship_name),

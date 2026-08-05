@@ -256,7 +256,7 @@ export function ImportOrdersDialog({
                 <p className="text-[11px] text-muted-foreground">
                   <span className="font-medium text-foreground">Bold + <span className="text-destructive">*</span></span> = required.
                   <span className="ml-1 rounded bg-primary/10 px-1 font-medium text-primary">Violet †</span> = fill at least one of them (<b>Item SKU</b> or <b>Product Title</b>) or the row is skipped.
-                  <span className="ml-1 rounded bg-amber-50 px-1 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">Amber</span> = genuinely optional — <b>Order Number</b> is auto-generated and <b>Image Link/ID</b> can be blank. Hover a chip for details.
+                  <span className="ml-1 rounded bg-amber-50 px-1 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">Amber</span> = optional. Note <b>Order Number</b> is what groups lines: rows sharing one become a single multi-item order, and a blank one always imports as its own order. Hover a chip for details.
                 </p>
               </div>
             </details>
