@@ -47,6 +47,9 @@ export function CatalogView() {
   // Bumped whenever something is published, priced or removed, so the bar can't drift from
   // the tables under it.
   const [summaryTick, setSummaryTick] = useState(0)
+  // Controlled, because the search box now sits on the tab bar and must only appear for
+  // the tab it filters.
+  const [tab, setTab] = useState("mine")
 
   const load = useCallback(() => {
     getCatalogProducts()
@@ -142,28 +145,34 @@ export function CatalogView() {
           said so, so the only way to know was to open the preview and count. That is how
           you add two, close the window, add a third, and find three. */}
       <CatalogSummaryBar refresh={summaryTick} />
-      <Tabs defaultValue="mine">
-        <TabsList className="mx-5 mt-4">
-          {/* TWO SOURCES, ONE CATALOGUE. Products we built carry our own SKU and print
-              method; supplier styles are published by reference and read live from the
-              sync. Both land in the same PDF and the same CSV — the tabs are about where
-              a thing comes FROM, not about two separate catalogues. */}
-          <TabsTrigger value="mine">Our products</TabsTrigger>
-          <TabsTrigger value="supplier">Supplier styles</TabsTrigger>
-          <TabsTrigger value="history">Sent catalogues</TabsTrigger>
-        </TabsList>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as string)}>
+        {/* Search rides the tab bar rather than owning a row under it — it filters ONE
+            tab's table, so it belongs beside the tab it acts on, and it's hidden on the
+            other two where it would do nothing. */}
+        <div className="mx-5 mt-4 flex flex-wrap items-center gap-2">
+          <TabsList>
+            {/* TWO SOURCES, ONE CATALOGUE. Products we built carry our own SKU and print
+                method; supplier styles are published by reference and read live from the
+                sync. Both land in the same PDF and the same CSV — the tabs are about where
+                a thing comes FROM, not about two separate catalogues. */}
+            <TabsTrigger value="mine">Our products</TabsTrigger>
+            <TabsTrigger value="supplier">Supplier styles</TabsTrigger>
+            <TabsTrigger value="history">Sent catalogues</TabsTrigger>
+          </TabsList>
+          {tab === "mine" && (
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{published} published</span>
+              <div className="relative">
+                <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or SKU…" className="h-9 w-64 pl-8" />
+              </div>
+            </div>
+          )}
+        </div>
         <TabsContent value="supplier"><SupplierStylesPicker onChanged={() => setSummaryTick((t) => t + 1)} /></TabsContent>
         <TabsContent value="history"><CatalogExportHistory onOpen={setReopenId} /></TabsContent>
         <TabsContent value="mine">
       <div className="space-y-3 px-5 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or SKU…" className="h-9 w-64 pl-8" />
-          </div>
-          <span className="text-xs text-muted-foreground">{published} published · </span>
-        </div>
-
         {(rows ?? []).some((p) => p.inCatalog) && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
             {/* No publish/remove buttons: the tick already is that decision, and two ways
