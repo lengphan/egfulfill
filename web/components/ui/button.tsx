@@ -18,7 +18,23 @@ const buttonVariants = cva(
         //
         // hover dims via brightness rather than an alpha step: /80 on a light fill fades it
         // toward the white page instead of reading as pressed.
-        default: "bg-brand text-brand-foreground hover:brightness-95",
+        //
+        // THE INK OUTLINE IS LOAD-BEARING, not styling. Lime measures 1.19:1 against the
+        // white page — far under the 3:1 a UI component boundary needs — so the fill has no
+        // findable edge and the primary action dissolves into the page. The LABEL was never
+        // the problem (ink on lime is 16.56:1); the SHAPE was.
+        //
+        // border-brand-foreground is the same token as the label, so the outline can never
+        // drift from the text it encloses. It's ink in both modes: on the dark canvas it
+        // recedes to a quiet definition line, which is correct there because the lime already
+        // carries a 16.64:1 edge of its own.
+        //
+        // 1px at full ink — the thinnest border available. An alpha step was tried first and
+        // read WORSE, not softer: at 1px an 85% line antialiases into the page and comes out
+        // as a muddy grey smudge, where full ink at the same width is a crisp hairline. The
+        // findability problem is solved by the edge EXISTING, not by weight, so thickness
+        // stays at 1px and the colour stays clean.
+        default: "border-brand-foreground bg-brand text-brand-foreground hover:brightness-95",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-input/30",
         secondary:

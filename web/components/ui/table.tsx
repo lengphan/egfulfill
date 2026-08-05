@@ -23,7 +23,10 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      // The header row takes the beige. On a white card a white header is separated from the
+      // data only by a hairline, so a long table loses its column names the moment you scroll
+      // past the first screen — the band is what keeps them readable as a unit.
+      className={cn("bg-muted [&_tr]:border-b", className)}
       {...props}
     />
   )
