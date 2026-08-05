@@ -119,27 +119,27 @@ export const ACID = '#D4F897'
 /**
  * THE DARK BEIGE GROUND — currently the auth pages only.
  *
- * A warm dark ground rather than a neutral one: same hue family as SURFACE, several stops
- * down, so it reads as beige turned down rather than as black. It is the one surface where
- * the palette inverts — lime does the lettering and the violet becomes the button, instead of
- * the violet being the ground and lime the accent on it.
+ * An actual beige: SURFACE turned down a few stops, still a light surface. The previous value
+ * (#332C23) was an espresso brown — dark enough that the page read as near-black with a warm
+ * cast rather than as beige at all.
  *
- * Every value here was MEASURED against BEIGE_GROUND, not picked by eye:
+ * Going light INVERTS what can letter this page, and the numbers are unambiguous. On this
+ * ground the lime measures 1.25:1 and the violet 4.06:1 — the lime is invisible and the violet
+ * is under the 4.5:1 body floor — so NEITHER brand colour can carry type here. Ink does, at
+ * 13.26:1. The brand pair still appears exactly once, as the button, which is the intent the
+ * dark version was reaching for: the one saturated thing on the screen is the control you are
+ * meant to press. Violet is 4.06:1 against the ground, past the 3:1 a control shape needs.
  *
- *   ACID   lettering    11.59:1     PAPER  body/labels   12.97:1
- *   PAPER  on a field   10.22:1     BEIGE_EDGE boundary   3.24:1
- *
- * BEIGE_EDGE looks arbitrarily light and is not. The obvious border a shade above the field
- * (#554B3D) measures 1.61:1 against the ground — under the 3:1 floor for a UI boundary, which
- * means the inputs are decoration rather than findable controls. #877961 is the first step up
- * the ramp that actually clears it. Do not darken it to "look nicer"; it is doing work.
- *
- * BEIGE_FIELD is only 1.27:1 against the ground ON PURPOSE. The field is not what marks the
- * control — the edge is. The fill just has to sit quietly behind the text.
+ * BEIGE_EDGE is doing real work and is not free to be prettier. A white field on this ground
+ * is 1.48:1 — it has no edge of its own, so the border is the only thing marking the control.
+ * #7C6E55 is the first step up the ramp that clears the 3:1 boundary floor at 3.35:1; the more
+ * natural-looking #8C7E63 is 2.68:1 and fails. Do not lighten it to soften the look.
  */
-export const BEIGE_GROUND = '#332C23'
-export const BEIGE_FIELD = '#443C31'
-export const BEIGE_EDGE = '#877961'
+export const BEIGE_GROUND = '#DED3BC'
+export const BEIGE_FIELD = '#FFFFFF'
+export const BEIGE_EDGE = '#7C6E55'
+/** Body/secondary type on BEIGE_GROUND — 5.04:1, so it stays real text rather than a hint. */
+export const BEIGE_MUTED = '#5C5445'
 
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
