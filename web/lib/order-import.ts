@@ -60,6 +60,12 @@ export const TEMPLATE_HEADERS = CSV_COLUMNS.map((c) => (c.required ? c.header : 
 // Used by the .xlsx download AND "Make a copy in Google Sheets".
 export const CSV_TEMPLATE = TEMPLATE_HEADERS.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
 
+// The same headers as TAB-separated text, which is what a spreadsheet paste actually wants.
+// Built from the array rather than by replacing commas in CSV_TEMPLATE: that left every CSV
+// quote in place, so a paste produced cells reading `"Ship Name"` — quotes and all — and any
+// header that ever contains a comma would have been split into two columns.
+export const TEMPLATE_TSV = TEMPLATE_HEADERS.join("\t")
+
 // Header aliases → canonical key. Lets a generic marketplace export import as-is.
 const COL_ALIASES: Record<string, string[]> = {
   order_number: ["order", "order_id", "order_no", "order_number", "order_num"],

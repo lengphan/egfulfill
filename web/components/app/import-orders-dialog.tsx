@@ -11,9 +11,9 @@ import {
   parsePasted,
   rowsToRecords,
   groupToOrders,
-  CSV_TEMPLATE,
   CSV_COLUMNS,
   TEMPLATE_HEADERS,
+  TEMPLATE_TSV,
   type ImportRecord,
 } from "@/lib/order-import"
 import { createOrder, getOrders, getSheetsConfig, getSheetRows } from "@/lib/api"
@@ -46,6 +46,8 @@ export function ImportOrdersDialog({
   const [paste, setPaste] = useState("")
   const [sheetUrl, setSheetUrl] = useState("")
   const [notice, setNotice] = useState<string | null>(null)
+  // Header row shown for manual copying when the clipboard write did not happen.
+  const [copyFallback, setCopyFallback] = useState<string | null>(null)
   const [sheetLoading, setSheetLoading] = useState(false)
   const [sheetsEnabled, setSheetsEnabled] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -124,10 +126,26 @@ export function ImportOrdersDialog({
    * which is where most import failures start.
    */
   const makeSheetCopy = async () => {
-    try { await navigator.clipboard?.writeText(CSV_TEMPLATE.replace(/,/g, "\t")) } catch { /* clipboard may be blocked */ }
+    // Whether the copy ACTUALLY happened decides what we tell them. navigator.clipboard is
+    // undefined outside a secure context, and `await undefined` resolves happily — so the old
+    // optional-chained call could no-op without throwing, and we would still promise the
+    // template was on their clipboard. They then opened a blank sheet with nothing to paste,
+    // which is exactly the "Google Sheet import is blank" report.
+    let copied = false
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(TEMPLATE_TSV)
+        copied = true
+      }
+    } catch { copied = false }
+    setCopyFallback(copied ? null : TEMPLATE_TSV)
     window.open("https://sheets.new", "_blank", "noopener")
     setError(null)
-    setNotice("A blank Google Sheet is opening — the template is on your clipboard, so press ⌘V / Ctrl+V in cell A1.")
+    setNotice(
+      copied
+        ? "A blank Google Sheet is opening — the header row is on your clipboard. Click cell A1 and press ⌘V / Ctrl+V."
+        : "A blank Google Sheet is opening, but this browser blocked the clipboard. Copy the header row below and paste it into cell A1."
+    )
   }
 
   const loadSheet = async () => {
@@ -320,7 +338,19 @@ export function ImportOrdersDialog({
             </Tabs>
 
             {notice && (
-              <div className="mt-3 rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">{notice}</div>
+              <div className="mt-3 rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
+                {notice}
+                {/* Manual escape hatch when the clipboard is unavailable — a dead end here means
+                    building 22 columns by hand, which is where import failures start. */}
+                {copyFallback && (
+                  <textarea
+                    readOnly
+                    onFocus={(e) => e.currentTarget.select()}
+                    value={copyFallback}
+                    className="mt-2 h-16 w-full resize-none rounded-md border border-border bg-background p-2 font-mono text-[11px] text-foreground"
+                  />
+                )}
+              </div>
             )}
             {error && (
               <div className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
