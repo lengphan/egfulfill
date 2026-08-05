@@ -59,6 +59,38 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return rest;
   };
 
+  /**
+   * PUBLIC product cards for the marketing site. NO AUTH — the only route here without it.
+   *
+   * Because of that it is an ALLOW-LIST, not a redaction. sellerSafe() strips known-sensitive
+   * keys from whatever the row happens to hold, which is the right shape for a logged-in
+   * seller but the wrong one for the open internet: the day someone adds a field to
+   * catalog_products, a redaction list silently starts publishing it. This builds a new object
+   * from four named fields and nothing else can leak by being added upstream.
+   *
+   * Published only (in_catalog), priced only. An unpriced product on a pricing-led page
+   * reads as "free" or as broken, and a draft nobody chose to publish should not be visible
+   * at all — that flag is what "published" MEANS.
+   */
+  app.get('/api/public/products', async () => {
+    const r = await q(
+      `select data, catalog_price from catalog_products
+        where in_catalog = true and catalog_price is not null
+        order by catalog_price asc nulls last limit 24`
+    ).catch(() => ({ rows: [] }));
+    return {
+      products: r.rows
+        .filter((row) => row.data && row.data.name)
+        .map((row) => ({
+          name: String(row.data.name),
+          // The mockup a seller sees, if there is one. Never a supplier URL or an internal key.
+          image: typeof row.data.image === 'string' ? row.data.image : null,
+          category: typeof row.data.category === 'string' ? row.data.category : null,
+          price: Number(row.catalog_price),
+        })),
+    };
+  });
+
   app.get('/api/catalog_products', { preHandler: requireAuth }, async (req) => {
     const r = await q('select data, in_catalog, catalog_price from catalog_products order by created_at desc');
     const rows = r.rows

@@ -593,6 +593,14 @@ export function getSheetRows(url: string) {
 
 /** The blank catalog. Cached longer than the order list — it's reference data, and the only
  *  thing that changes it is a product edit, which is a write, which clears this. */
+export type PublicProduct = { name: string; image: string | null; category: string | null; price: number }
+/** Published products for the PUBLIC marketing site — no auth, allow-listed server-side to
+ *  four fields. Never use this inside the app; it deliberately omits cost, supplier and
+ *  variant data that the authenticated catalog carries. */
+export function getPublicProducts() {
+  return api<{ products: PublicProduct[] }>(`/api/public/products`)
+}
+
 export function getCatalogProducts() {
   return cachedList("catalog_products", 120_000, () => api<CatalogProduct[]>(`/api/catalog_products`))
 }
