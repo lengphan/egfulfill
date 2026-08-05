@@ -43,6 +43,12 @@ export function previousPeriod(key) {
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
+/** The period AFTER the given one — what this month's units will apply to. */
+export function nextPeriod(key) {
+  const [y, m] = String(key).split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
 /**
  * Normalise an admin-entered tier table: numeric, sorted ascending, no duplicates,
  * nothing negative or over 100%.

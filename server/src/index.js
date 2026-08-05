@@ -9,6 +9,7 @@ import { inventoryRoutes } from './routes/inventory.js';
 import { designCardsRoutes } from './routes/design_cards.js';
 import { designImagesRoutes } from './routes/design_images.js';
 import { catalogRoutes } from './routes/catalog.js';
+import { partnerTemplatesRoutes } from './routes/partner_templates.js';
 import { etsyRoutes } from './routes/etsy.js';
 import { tiktokRoutes } from './routes/tiktok.js';
 import { shopifyRoutes } from './routes/shopify.js';
@@ -19,6 +20,7 @@ import { usersRoutes } from './routes/users.js';
 import { uspsRoutes } from './routes/usps.js';
 import { templatesRoutes } from './routes/templates.js';
 import { billingRoutes } from './routes/billing.js';
+import { planRoutes } from './routes/plan.js';
 import { consignmentRoutes } from './routes/consignment.js';
 import { mailIngestRoutes } from './routes/mail_ingest.js';
 import { vietqrRoutes } from './routes/vietqr.js';
@@ -350,6 +352,7 @@ inventoryRoutes(app, requireStaff, requireWarehouse);
 designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);
 designImagesRoutes(app, requireAuth);                   // seller's reusable Images library for the design maker (own uploads + buyer order art)
 catalogRoutes(app, requireAuth, requireStaff, requireWarehouse);
+partnerTemplatesRoutes(app, requireStaff);              // a POD partner's own workbook, stored as layout + field mapping so their sheet can be filled from our catalogue
 etsyRoutes(app, requireAuth, requireStaff);
 tiktokRoutes(app, requireAuth, requireStaff);   // TikTok Shop OAuth connect (seller + admin connect their own shop)
 shopifyRoutes(app, requireAuth, requireStaff);  // Shopify per-store OAuth connect (seller + admin connect their own store)
@@ -370,6 +373,7 @@ designLibraryRoutes(app, requireAuth, requireStaff);   // per-seller "my uploads
 designFilesRoutes(app, requireAuth);                   // machine deliverable files (.pes/.emb) stored server-side, access-controlled (staff any; seller own)
 sheetsRoutes(app, requireAuth);                        // Google Sheets order import (link-shared sheet → existing import pipeline)
 billingRoutes(app, requireAuth);                       // subscription plan + SpyDeck add-on, charged from the wallet (402 names the shortfall so the client can offer a top-up)
+planRoutes(app, requireAuth, requireStaff, requireAdmin);  // volume tiers: the admin ladder + a seller's own meter. MEASURES ONLY — quoteOrder does not import it, so a ladder cannot move a charge
 consignmentRoutes(app, requireAuth, requireStaff);     // inventory services: seller-owned stock (ASN -> count -> internal SKU + bin); kept OUT of `inventory`, which has no owner column
 mailIngestRoutes(app, requireAuth);                                // inbound Etsy sale emails -> order addresses (shared-secret URL; sender must be a known account)
 walletRoutes(app, requireAuth);                        // SERVER-authoritative wallet balance + append-only ledger (seller/factory/designer), idempotent by ref
