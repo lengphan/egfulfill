@@ -1,81 +1,108 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { Card } from "@/components/ui/card"
-import { PLATE_DEEP, ACID, SURFACE } from "@/components/marketing/bold-kit"
+import { PLATE_DEEP, ACID, SURFACE, INK } from "@/components/marketing/bold-kit"
 
 /**
- * Shared card shell for auth pages (login/signup/forgot/reset) — one wordmark, one layout.
+ * Shared shell for the auth pages (login / signup / forgot / reset) — one layout, one wordmark.
  *
- * Auth belongs to the MARKETING look, not the app shell (CLAUDE.md §4): signing in is the
- * last page of the marketing site rather than the first page of the product. This sat on a
- * plain `bg-background` — a white card centred on a white page — so it was the one surface
- * the palette never reached, and it read as a different product to anyone arriving from
- * the site.
+ * Auth belongs to the MARKETING look, not the app shell (CLAUDE.md §4): signing in is the last
+ * page of the marketing site rather than the first page of the product.
  *
- * The plate is the same PLATE_DEEP the hero and the header use, so there is exactly one
- * violet in the system and no second value here to drift when that one moves.
+ * SPLIT SCREEN, and the split is the point. Four centred-card versions came before this — plain
+ * plate, filled paper bands, lime hairlines, a one-hue gradient — and every one of them was an
+ * attempt to decorate AROUND a white box floating in the middle of an empty page. The box was
+ * the problem. Here the form sits ON a surface, so there is nothing left to frame:
+ *
+ *   left    the plate, carrying the brand line in Playfair at real display size
+ *   right   warm paper, carrying the form
+ *
+ * That is the same paper-under-plate tension the marketing hero is built on, and it means type
+ * does the decorating — which is the house rule rather than a preference.
+ *
+ * Contrast is all measured, not eyeballed: paper on the plate is 5.68:1, the green on the plate
+ * 5.07:1, and ink on paper 18.54:1. Nothing here is decorative-only text.
  */
-/**
- * THE GRADIENT IS ONE HUE. This is the whole point of it.
- *
- * Two decorated versions came before this and both were wrong in the same way — they added
- * VALUES. Filled paper bands read as four different purples; lime waves put a second colour
- * across the page as ornament. The depth here comes from lightening and darkening the ONE
- * violet instead: lit at the top, sinking at the bottom, no second hue anywhere.
- *
- * The stops are derived from PLATE_DEEP with color-mix rather than written as their own hex
- * values, so they cannot drift. Move the plate and the gradient moves with it — the same
- * reason the plate is a single exported constant in the first place.
- *
- * `background` is set FIRST as a flat colour and the gradient rides on `backgroundImage`.
- * That is the fallback: a browser without color-mix throws the whole gradient out as invalid
- * and lands on the flat plate, which is the previous design rather than a broken page.
- *
- * Frosted glass was considered and rejected for this screen specifically. A translucent panel
- * makes label and input contrast depend on whatever sits behind it — measured around 3:1 and
- * varying across the card, under the 4.5:1 floor — and the blur only reads at all against
- * foreign hues, so it would have cost the palette as well. The card here stays opaque, which
- * is what keeps every contrast on it a fixed, checkable number.
- */
-const PLATE_GRADIENT =
-  `radial-gradient(125% 95% at 50% 0%,` +
-  ` color-mix(in oklab, ${PLATE_DEEP}, white 20%) 0%,` +
-  ` ${PLATE_DEEP} 46%,` +
-  ` color-mix(in oklab, ${PLATE_DEEP}, black 26%) 100%)`
-
 export function AuthShell({ subtitle, children }: { subtitle: string; children: ReactNode }) {
   return (
-    <div
-      className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden p-6"
-      style={{ background: PLATE_DEEP, backgroundImage: PLATE_GRADIENT }}
-    >
-      <div className="relative z-10 flex w-full flex-col items-center">
-      {/* The wordmark sits ON the plate rather than inside the card. It belongs to the site,
-          and lifting it out is what stops the card reading as a lone box floating in the
-          middle of an empty page. Paper on the plate is 5.68:1, the green 5.07:1. */}
-      <Link
-        href="/"
-        className="font-display text-3xl font-semibold tracking-tight"
-        style={{ color: SURFACE }}
+    <div className="flex min-h-svh">
+      {/* THE BRAND SIDE. Hidden below lg — on a phone there is no room for a second column, and
+          a squashed one would push the form below the fold. Collapsing it costs nothing because
+          the wordmark reappears above the form (see the lg:hidden link below), so this needs no
+          separate mobile design. */}
+      <aside
+        className="hidden w-[46%] max-w-[620px] flex-col justify-between p-12 lg:flex"
+        style={{ background: PLATE_DEEP }}
       >
-        egful
-      </Link>
-      <p className="mt-2 text-sm" style={{ color: ACID }}>{subtitle}</p>
+        <Link
+          href="/"
+          className="font-display text-3xl font-semibold tracking-tight"
+          style={{ color: SURFACE }}
+        >
+          egful
+        </Link>
 
-      {/* A LONG, SOFT, LOW-OPACITY shadow rather than shadow-xl. Tailwind's step is tuned for
-          a card on a light page; over a saturated plate it reads as a hard grey rim. This one
-          is offset far down and blurred wide, so the card looks lifted off the gradient
-          instead of stuck to it — which is the entire effect being asked for. */}
-      <Card className="mt-7 w-full max-w-sm gap-0 p-6 shadow-[0_26px_60px_-20px_rgba(0,0,0,0.5)]">{children}</Card>
+        {/* The hero's line, at the size the typeface is FOR. Playfair earns its keep as display
+            type; at 30px above a card it was just a label in a serif. */}
+        <div>
+          <p
+            className="font-display font-bold leading-[1.03] tracking-[-0.02em]"
+            style={{ fontSize: "clamp(2.1rem, 3.4vw, 3.1rem)", color: SURFACE }}
+          >
+            Every order,
+            <br />
+            <span style={{ color: ACID }}>printed itself.</span>
+          </p>
+          <p
+            className="mt-5 max-w-sm text-sm leading-relaxed"
+            style={{ color: "rgba(250,248,243,0.72)" }}
+          >
+            Orders sync into one queue, print on a vetted network, and ship with tracking
+            pushed back automatically.
+          </p>
+        </div>
 
-      <Link
-        href="/"
-        className="mt-6 text-xs opacity-70 transition-opacity hover:opacity-100"
-        style={{ color: SURFACE }}
+        {/* Channels, NOT a headline figure. An order count here would be a second copy of a
+            number that lives in editable site content, and the two would drift the first time
+            one was updated. These are simply the integrations that exist. */}
+        <p className="text-xs tracking-wide" style={{ color: "rgba(250,248,243,0.5)" }}>
+          Etsy · Shopify · TikTok Shop
+        </p>
+      </aside>
+
+      {/* THE FORM SIDE. Paper, so the form reads as a page rather than a panel. */}
+      <main
+        className="flex flex-1 flex-col items-center justify-center p-6 sm:p-10"
+        style={{ background: SURFACE }}
       >
-        ← Back to egful
-      </Link>
-      </div>
+        <div className="w-full max-w-sm">
+          {/* Only below lg, where the brand column is gone and the page would otherwise open
+              with no mark on it at all. */}
+          <Link
+            href="/"
+            className="font-display text-2xl font-semibold tracking-tight lg:hidden"
+            style={{ color: INK }}
+          >
+            egful
+          </Link>
+
+          <h1
+            className="mt-6 font-display text-3xl font-semibold tracking-tight lg:mt-0"
+            style={{ color: INK }}
+          >
+            {subtitle}
+          </h1>
+
+          <div className="mt-7">{children}</div>
+
+          <Link
+            href="/"
+            className="mt-8 inline-block text-xs opacity-60 transition-opacity hover:opacity-100"
+            style={{ color: INK }}
+          >
+            ← Back to egful
+          </Link>
+        </div>
+      </main>
     </div>
   )
 }
