@@ -134,7 +134,11 @@ export function ShortcutsCard({
             (editing ? "cursor-grab bg-card active:cursor-grabbing" : "hover:border-primary/40 hover:bg-accent")
           const inner = (
             <>
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon size={16} weight="duotone" /></span>
+              {/* Bare, monochrome, no tinted plate. Four tiles in a grid each wearing the same
+                  violet chip meant the eye met four identical coloured squares before it read a
+                  single word — the icon was slowing recognition down rather than speeding it up.
+                  The accent is kept for things that need you, not for every tile. */}
+              <span className="flex size-8 items-center justify-center text-muted-foreground transition-colors group-hover:text-foreground"><Icon size={18} /></span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium leading-tight">{q.label}</span>
                 {q.desc && <span className="mt-0.5 block truncate text-xs text-muted-foreground leading-tight">{q.desc}</span>}

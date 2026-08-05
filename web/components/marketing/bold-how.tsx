@@ -55,9 +55,8 @@ export function BoldHow() {
               <div className="font-display font-black leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(3rem, 6vw, 4.5rem)" }}>
                 {String(i + 1).padStart(2, "0")}
               </div>
-              <span className="mt-6 flex size-10 items-center justify-center rounded-xl text-[#FAF8F3]" style={{ background: ACCENT }}>
-                <s.icon size={20} weight="duotone" />
-              </span>
+              {/* No icon plate — the 01/02/03 above already carries the step, and stacking a
+                  filled accent tile under it repeated the same idea in a louder colour. */}
               <h2 className="mt-5 text-xl font-bold tracking-tight">{s.title}</h2>
               <p className="mt-2 text-[15px] leading-relaxed text-black/60">{s.body}</p>
               <ul className="mt-5 space-y-1.5">

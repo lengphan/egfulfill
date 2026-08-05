@@ -70,12 +70,11 @@ export function BoldFeatures() {
               </div>
 
               <div className="min-w-0">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl text-[#FAF8F3]" style={{ background: ACCENT }}>
-                    <f.icon size={18} weight="duotone" />
-                  </span>
-                  <h2 className="text-2xl font-bold tracking-tight">{f.title}</h2>
-                </div>
+                {/* No icon plate. The big number to the left is already the ordering cue, so a
+                    filled accent tile beside the heading said nothing the row wasn't saying —
+                    it just put a second coloured object in front of the words. The heading is
+                    the thing to read. */}
+                <h2 className="text-2xl font-bold tracking-tight">{f.title}</h2>
                 <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-black/60">{f.body}</p>
               </div>
 
