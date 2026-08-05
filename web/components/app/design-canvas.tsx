@@ -803,8 +803,15 @@ export function DesignCanvasDialog({
             when it does scroll the garment stays put instead of leaving the screen. Below lg
             it collapses back to the original single stack — two columns in a phone-width
             dialog would make both of them useless. */}
-        <div className="grid gap-5 lg:grid-cols-2 lg:items-start lg:gap-6">
-        <div className="lg:sticky lg:top-0 lg:self-start">
+        <div className="grid gap-5 lg:grid-cols-[auto_minmax(300px,1fr)] lg:items-start lg:gap-6">
+        {/* The left column is sized to the stage itself rather than to half the dialog. An
+            even 50/50 split gave the controls far more width than their cards use and stranded
+            the remainder as dead space beside them; letting the garment take what it needs and
+            the controls take the rest removes that gap and makes the garment bigger at once. */}
+        {/* Both terms are viewport units on purpose. `min(100%,78vh)` collapsed the column to
+            zero: the column is `auto`, so its width comes from its content, and the content
+            asked for a percentage OF that column — a circular reference resolving to nothing. */}
+        <div className="lg:sticky lg:top-0 lg:w-[min(64vh,46vw)] lg:self-start">
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {faces.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
