@@ -79,6 +79,31 @@ export const PLATE_GHOST = SURFACE
  */
 export const PLATE_ACCENT = '#1E2A78'
 
+/**
+ * THE DEEP PLATE — the home hero only.
+ *
+ * A bright plate can never carry light lettering: #A5B7FF is L* 75.5, so cream lands at
+ * 1.83:1 and white at 1.94:1. Going deep is the only way to get white type, and it is what
+ * every reference in this style actually does. At L* 41, #5B3FE8 gives white 6.32:1, cream
+ * 5.96:1, and the acid accent 4.88:1 — all past the 4.5:1 body-text floor, so nothing here
+ * is decorative-only the way PLATE_GHOST had to be.
+ *
+ * Deliberately NOT a change to ACCENT. That token is used 21 times across the marketing
+ * pages, several of them as a light band with INK text on top — swapping it wholesale would
+ * silently invert those to dark-on-dark. ACCENT stays the pastel band; this is the hero
+ * plate. Unifying the two is a per-page pass, not a token rename.
+ */
+export const PLATE_DEEP = '#5B3FE8'
+
+/**
+ * The one loud accent — acid green, the single hot colour in an otherwise two-tone page.
+ *
+ * 4.88:1 on the deep plate, so it reads as type rather than as a glow. As a FILL it only ever
+ * takes ink: black on it is 15.19:1, white is 1.30:1 and fails outright — acid green is a
+ * light colour, so the same light-plate/dark-type rule applies to it as to the pastel.
+ */
+export const ACID = '#C6F24E'
+
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
 export const HEADING = { fontSize: "clamp(2rem, 4.6vw, 3.6rem)" } as const
@@ -196,16 +221,20 @@ export function TypedPhrase({ text, color = ACCENT_INK, lastWordColor }: { text:
 /** Pill button. The arrow travels on hover — a 200ms cue that the thing goes somewhere,
  *  which is the whole reason the arrow is there. */
 export function Pill({ href, children, tone = "ink", className = "" }: {
-  href: string; children: React.ReactNode; tone?: "ink" | "accent" | "ghost"; className?: string
+  href: string; children: React.ReactNode; tone?: "ink" | "accent" | "acid" | "ghost" | "ghostLight"; className?: string
 }) {
   const base = "group inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
   const tones = {
     ink: "bg-[#0B0B0C] text-white hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]",
     accent: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
+    // Ink on acid is 15.19:1. White on acid is 1.30:1 — never do that.
+    acid: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
     ghost: "border border-[#0B0B0C]/15 text-[#0B0B0C] hover:border-[#0B0B0C]/40 hover:bg-[#0B0B0C]/[0.03] focus-visible:ring-[#0B0B0C]",
+    // The ghost outline inverted, for use ON the deep plate where ink would disappear.
+    ghostLight: "border border-white/30 text-white hover:border-white/60 hover:bg-white/10 focus-visible:ring-white",
   }
   return (
-    <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "accent" ? { background: ACCENT } : undefined}>
+    <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "accent" ? { background: ACCENT } : tone === "acid" ? { background: ACID } : undefined}>
       {children}
       <ArrowUpRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
     </Link>

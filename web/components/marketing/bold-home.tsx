@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform, animate } from "motion/react"
 import { ArrowUpRight, PlugsConnected, Printer, Truck, Wallet } from "@phosphor-icons/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, INK, SURFACE, PLATE_ACCENT, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
+import { ACCENT, INK, SURFACE, PLATE_DEEP, ACID, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -82,28 +82,32 @@ export function BoldHome({ content }: { content: SiteContent }) {
           at the top of the window instead of under a white bar. The header itself goes
           transparent on this route (site-header.tsx) — between them, the hero reads as one
           full-bleed plate with the nav sitting on it. */}
-      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: ACCENT }}>
+      {/* DEEP plate, not the pastel. Light lettering needs a dark ground — on the old
+          #A5B7FF (L* 75.5) cream was 1.83:1 and white 1.94:1, so the headline had to be ink
+          and every "make it pop" attempt fought the background. At L* 41 the same cream is
+          5.96:1 and the acid accent 4.88:1. See PLATE_DEEP. */}
+      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: PLATE_DEEP }}>
         {/* The diagonal returns the page to the cool off-white below the plate — one shape
             doing the job a whole illustration usually does. */}
         <div style={{ background: SURFACE }} className="absolute inset-x-0 bottom-0 h-24 [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
         <div className="mx-auto max-w-6xl px-6 pb-40 pt-24 sm:pt-32">
-          <h1 className="max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] text-[#0B0B0C] mx-auto"
-              style={{ fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" }}>
+          <h1 className="max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] mx-auto"
+              // Cream, not pure white: 5.96:1 on the plate, and it ties the hero to the paper
+              // page below instead of introducing a third neutral.
+              style={{ color: SURFACE }}
+              // eslint-disable-next-line react/jsx-props-no-multi-spaces
+              >
+            <span style={{ fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" }}>
             <MaskedWords text={hero.headline} />{" "}
-            {/* Paper, not ink. The phrase that changes is the one thing on the plate that
-                should read as cut OUT of it — and it carries the page's own surface colour
-                down from the header, so the hero and everything below share a palette rather
-                than meeting at a hard edge. */}
-            {/* The last word carries the accent. Deep indigo, not cream: see PLATE_ACCENT —
-                on a plate this light, a paler accent can only ghost (cream 1.83:1, white
-                1.94:1), while #1E2A78 reaches 6.53:1 and actually reads. */}
-            <TypedPhrase text={hero.accent} lastWordColor={PLATE_ACCENT} />
+            {/* The one hot colour on the page. 4.88:1 on the plate — real type, not a glow. */}
+            <TypedPhrase text={hero.accent} color={SURFACE} lastWordColor={ACID} />
+            </span>
           </h1>
 
           <motion.p
-            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed text-[#0B0B0C]/70"
+            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed text-white/75"
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
@@ -117,8 +121,10 @@ export function BoldHome({ content }: { content: SiteContent }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
           >
-            <Pill href="/signup" tone="ink">{hero.ctaPrimary}</Pill>
-            <Pill href="/how-it-works" tone="ghost">{hero.ctaSecondary}</Pill>
+            {/* Acid fill + ink label (15.19:1) is the reference's primary; the secondary
+                inverts to a light outline because ink would vanish on the deep plate. */}
+            <Pill href="/signup" tone="acid">{hero.ctaPrimary}</Pill>
+            <Pill href="/how-it-works" tone="ghostLight">{hero.ctaSecondary}</Pill>
           </motion.div>
         </div>
 
