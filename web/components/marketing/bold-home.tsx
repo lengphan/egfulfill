@@ -96,7 +96,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 should read as cut OUT of it — and it carries the page's own surface colour
                 down from the header, so the hero and everything below share a palette rather
                 than meeting at a hard edge. */}
-            <TypedPhrase text={hero.accent} color={SURFACE} />
+            <TypedPhrase text={hero.accent} />
           </h1>
 
           <motion.p
@@ -278,7 +278,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       </section>
 
       {/* ── STEPS — numbers oversized, the way the style wants ──────────────────── */}
-      <section className="border-y border-black/[0.07] bg-black/[0.03] py-28">
+      <section className="bg-black/[0.03] py-28">
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             {steps.heading}
@@ -333,7 +333,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
 
       {/* ── FAQ — plain disclosure elements: keyboard and screen-reader behaviour for
               free, and no state to get wrong. ─────────────────────────────────────── */}
-      <section className="border-y border-black/[0.07] bg-black/[0.03] py-28">
+      <section className="bg-black/[0.03] py-28">
         <div className="mx-auto max-w-3xl px-6">
           <h2 className="font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             {faq.heading}

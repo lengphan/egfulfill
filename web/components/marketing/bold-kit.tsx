@@ -15,7 +15,14 @@ import { ArrowUpRight } from "@phosphor-icons/react"
  * "Exaggerated Minimalism": black and white carry the page, ONE accent, and type does the work
  * decoration usually does. Black on the accent is ~17:1, so it can hold real text anywhere.
  */
-export const ACCENT = "#C3D0FF"        // periwinkle — the plate/fill
+// A step deeper than #C3D0FF, which read washed out at full-bleed size. Ink on it is
+// 10.13:1, so the headline stays comfortable.
+//
+// NB: this plate cannot carry CREAM lettering. Measured across the ramp, cream only reaches
+// 4.5:1 from about #4259D6 downward — at any "light periwinkle" value it sits near 1.6:1,
+// i.e. invisible. Light plate + ink type, or deep plate + cream type; there is no light plate
+// with cream type.
+export const ACCENT = "#A5B7FF"        // periwinkle — the plate/fill
 // The accent phrase is INK, like the rest of the headline — no second type colour.
 //
 // A dark purple on a light purple plate is a tint of the background wearing itself as
