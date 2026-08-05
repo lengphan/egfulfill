@@ -24,17 +24,18 @@ const buttonVariants = cva(
         // findable edge and the primary action dissolves into the page. The LABEL was never
         // the problem (ink on lime is 16.56:1); the SHAPE was.
         //
-        // border-brand-foreground is the same token as the label, so the outline can never
-        // drift from the text it encloses. It's ink in both modes: on the dark canvas it
-        // recedes to a quiet definition line, which is correct there because the lime already
-        // carries a 16.64:1 edge of its own.
+        // The edge is --brand-edge: a DEEPER STEP OF THE LIME, not ink. Ink solved findability
+        // at 18.98:1, which is right for a lone CTA and far too loud in a table where the
+        // button repeats on every row — twenty black outlines stop reading as definition and
+        // start reading as a grid of rules. The moss step is 3.78:1 against the page: still
+        // past the 3:1 a component boundary needs, at about a fifth of the contrast, and in
+        // the lime's own hue so it reads as the fill's shadow rather than a drawn border.
         //
-        // 1px at full ink — the thinnest border available. An alpha step was tried first and
-        // read WORSE, not softer: at 1px an 85% line antialiases into the page and comes out
-        // as a muddy grey smudge, where full ink at the same width is a crisp hairline. The
-        // findability problem is solved by the edge EXISTING, not by weight, so thickness
-        // stays at 1px and the colour stays clean.
-        default: "border-brand-foreground bg-brand text-brand-foreground hover:brightness-95",
+        // Thickness stays at 1px, the minimum. An alpha step was tried and read WORSE, not
+        // softer: at 1px an alpha line antialiases into the page as a muddy grey, where a
+        // solid colour at the same width is a clean hairline. Harshness here is a COLOUR
+        // problem, not a weight one.
+        default: "border-brand-edge bg-brand text-brand-foreground hover:brightness-95",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-input/30",
         secondary:
