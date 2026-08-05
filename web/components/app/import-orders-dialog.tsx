@@ -239,17 +239,24 @@ export function ImportOrdersDialog({
                         "inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs " +
                         (c.required
                           ? "border-border bg-foreground/5 font-medium text-foreground"
-                          : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300")
+                          : c.oneOf
+                            ? "border-primary/40 bg-primary/10 font-medium text-primary"
+                            : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300")
                       }
                     >
                       {c.header}
                       {c.required && <span className="text-destructive">*</span>}
+                      {/* Conditionally-required chips carry their own marker. Amber next to a
+                          footnote was read as "skippable" — which is how a sheet with neither
+                          Item SKU nor Product Title got filled in and every row skipped. */}
+                      {!c.required && c.oneOf && <span className="opacity-70">†</span>}
                     </span>
                   ))}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   <span className="font-medium text-foreground">Bold + <span className="text-destructive">*</span></span> = required.
-                  <span className="ml-1 rounded bg-amber-50 px-1 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">Amber</span> = optional (safe to leave blank). Plus one of <b>Item SKU</b> or <b>Product Title</b>. Hover a chip for details.
+                  <span className="ml-1 rounded bg-primary/10 px-1 font-medium text-primary">Violet †</span> = fill at least one of them (<b>Item SKU</b> or <b>Product Title</b>) or the row is skipped.
+                  <span className="ml-1 rounded bg-amber-50 px-1 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">Amber</span> = genuinely optional — <b>Order Number</b> is auto-generated and <b>Image Link/ID</b> can be blank. Hover a chip for details.
                 </p>
               </div>
             </details>

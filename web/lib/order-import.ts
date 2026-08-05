@@ -22,7 +22,11 @@ export const REQUIRED_COLS = ["ship_name", "ship_address_1", "ship_city", "ship_
 // Per-column reference for the import dialog: which headers are required vs optional, and what
 // each does. Drives the legend so a filler knows exactly what they can skip. `key` is the
 // canonical field (see COL_ALIASES); headers in the template are these in order.
-export type CsvColumn = { header: string; key: string; required: boolean; help: string }
+// `oneOf` marks a column that is required only as part of a set: leave EVERY member blank and
+// the row is rejected, fill any one and it passes. Item SKU / Product Title are the case that
+// exists today. Without this the two of them render as plain "optional", which is a promise the
+// validator then breaks — the chip says safe to skip, the row comes back "No item (SKU or name)".
+export type CsvColumn = { header: string; key: string; required: boolean; oneOf?: string; help: string }
 export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Order Number", key: "order_number", required: false, help: "Groups multiple item rows into one order. Auto-generated if left blank." },
   { header: "Ship Name", key: "ship_name", required: true, help: "Recipient's full name." },
@@ -33,9 +37,9 @@ export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Ship State", key: "ship_state", required: true, help: "State / province." },
   { header: "Ship Zip", key: "ship_zip", required: true, help: "Postal code." },
   { header: "Store Name", key: "store_name", required: false, help: "Which shop the order came from." },
-  { header: "Product Title", key: "item_name", required: false, help: "Item name on the board. Either this or Item SKU is required." },
+  { header: "Product Title", key: "item_name", required: false, oneOf: "item", help: "Item name on the board. Fill this OR Item SKU — a row with neither is skipped." },
   { header: "Image Link/ID", key: "hero_image", required: false, help: "URL of the listing photo shown on the card." },
-  { header: "Item SKU", key: "item_sku", required: false, help: "Your listing SKU. Either this or Product Title is required." },
+  { header: "Item SKU", key: "item_sku", required: false, oneOf: "item", help: "Your listing SKU. Fill this OR Product Title — a row with neither is skipped. Left blank, it's derived from the title." },
   { header: "Blank", key: "blank", required: false, help: "The catalog blank you produce on — needed to cost & barcode the line; without it it reads “not set up for production”." },
   { header: "Template ID", key: "template_id", required: false, help: "A saved design template to apply (fills blank + artwork + placement + method)." },
   { header: "Item Quantity", key: "item_quantity", required: false, help: "Defaults to 1 if blank." },
