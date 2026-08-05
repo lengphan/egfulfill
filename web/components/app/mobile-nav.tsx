@@ -23,7 +23,7 @@ export function MobileNav({ sections, onLogout, role }: { sections: MobileNavSec
         <button onClick={() => setOpen(true)} aria-label={nl("nav", "Open menu")} className="flex size-9 items-center justify-center rounded-lg text-foreground hover:bg-accent">
           <List size={20} weight="bold" />
         </button>
-        <span className="font-title text-xl font-semibold tracking-tight">egfulfill</span>
+        <span className="font-display text-xl font-semibold tracking-tight">egful</span>
         {role && <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-medium capitalize tracking-normal text-primary">{role}</span>}
       </div>
 
@@ -32,7 +32,7 @@ export function MobileNav({ sections, onLogout, role }: { sections: MobileNavSec
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="absolute inset-y-0 left-0 flex w-72 max-w-[82%] flex-col border-r border-border bg-card shadow-xl">
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-              <span className="font-title text-xl font-semibold tracking-tight">egfulfill</span>
+              <span className="font-display text-xl font-semibold tracking-tight">egful</span>
               <button onClick={() => setOpen(false)} aria-label={nl("nav", "Close menu")} className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent">
                 <X size={18} weight="bold" />
               </button>

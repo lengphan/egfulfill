@@ -59,10 +59,13 @@ export function Sidebar() {
     <>
     <MobileNav sections={mobileSections} onLogout={logout} />
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
-      {/* Wordmark — clean bold sans (retired the serif logo) */}
+      {/* THE WORDMARK IS BRAND, NOT CHROME — so it takes `font-display` (Playfair), the
+          marketing face, even though every other heading in the app takes `font-title`.
+          A logo that changes typeface between the marketing site and the product is two
+          companies; the rest of the app staying sans is a UI decision, not a brand one. */}
       <div className="flex h-16 shrink-0 items-center border-b border-border px-5">
-        <Link href="/dashboard" className="font-title text-2xl font-semibold tracking-tight text-foreground">
-          egfulfill
+        <Link href="/dashboard" className="font-display text-2xl font-semibold tracking-tight text-foreground">
+          egful
         </Link>
       </div>
 

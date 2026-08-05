@@ -49,7 +49,7 @@ export function SiteHeader() {
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
         <Link href="/" className={"font-display text-2xl font-semibold tracking-tight " + ink}>
-          egfulfill
+          egful
         </Link>
         <nav className="hidden items-center gap-6 md:flex">
           {nav.map((n) => (

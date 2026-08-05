@@ -74,7 +74,7 @@ export default function DocsPage() {
             EGFULFILL API" in all-caps Fraunces was doing. "API" stays in the body face so
             the line reads as a label, not a second logo. */}
         <h1 className="text-3xl font-semibold tracking-tight">
-          <span className="font-display">egfulfill</span> API
+          <span className="font-display">egful</span> API
         </h1>
         <p className="text-muted-foreground">
           Push orders into our factory and get production status and tracking back. REST over HTTPS,
