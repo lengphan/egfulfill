@@ -63,7 +63,19 @@ export function planRoutes(app, requireAuth, requireStaff, requireAdmin) {
    * would earn" is the whole difference between a preview and a lie.
    */
   app.get('/api/plan/usage', { preHandler: requireAuth }, async (req) => {
-    const sellerId = await effectiveSeller(req.user);
+    /**
+     * ?sellerId lets STAFF read someone else's standing, and is ignored for everyone else.
+     *
+     * Honoured through this route rather than given its own admin endpoint, deliberately: an
+     * admin previewing a seller has to see exactly what that seller sees, and the only way to
+     * guarantee that is to make it literally the same code path. A parallel "admin view of a
+     * seller" query is a second implementation, and second implementations drift.
+     *
+     * The staff check is what keeps it safe — a seller passing another seller's id is
+     * ignored, not obeyed, so this cannot become a way to read a competitor's volume.
+     */
+    const asked = req.query?.sellerId ? String(req.query.sellerId) : null;
+    const sellerId = asked && isStaff(req.user) ? asked : await effectiveSeller(req.user);
     const tiers = await readTiers();
     const now = new Date();
     const thisPeriod = periodKey(now);

@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
 import {
-  getVolumeTiers, saveVolumeTiers, getVolumeReport,
-  type VolumeTier, type VolumeSeller,
+  getVolumeTiers, saveVolumeTiers, getVolumeReport, getPlanUsage,
+  type VolumeTier, type VolumeSeller, type PlanUsage,
 } from "@/lib/api"
+import { VolumeRail } from "@/components/app/volume-board"
 
 /**
  * The volume ladder, and what it would do to real sellers.
@@ -33,6 +34,9 @@ export function VolumeTiersPanel() {
   const [rows, setRows] = useState<VolumeTier[]>([])
   const [period, setPeriod] = useState(() => prevPeriod(periodOf(new Date())))
   const [sellers, setSellers] = useState<VolumeSeller[] | null>(null)
+  // Which seller's card is being previewed, and their standing once it loads.
+  const [preview, setPreview] = useState<string | null>(null)
+  const [previewData, setPreviewData] = useState<PlanUsage | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -165,20 +169,48 @@ export function VolumeTiersPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sellers.map((s) => (
-                    <tr key={s.sellerId} className="border-t border-border">
-                      <td className="py-1.5 pr-3 font-mono text-2xs">{s.sellerId.slice(0, 8)}…</td>
-                      <td className="py-1.5 pr-3 text-right tabular-nums">{s.orders}</td>
-                      <td className="py-1.5 pr-3 text-right tabular-nums">{s.units.toLocaleString()}</td>
-                      <td className="py-1.5 text-right tabular-nums">
-                        {s.pct > 0
-                          ? <span className="font-semibold text-primary">{s.pct}%</span>
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                    </tr>
-                  ))}
+                  {sellers.map((s) => {
+                    const open = preview === s.sellerId
+                    return (
+                      <tr
+                        key={s.sellerId}
+                        onClick={() => {
+                          // Toggle, and clear the old standing first so a second seller can
+                          // never be read against the previous one's numbers mid-fetch.
+                          if (open) { setPreview(null); setPreviewData(null); return }
+                          setPreview(s.sellerId); setPreviewData(null)
+                          getPlanUsage(s.sellerId).then(setPreviewData).catch((e: Error) => setErr(e.message))
+                        }}
+                        className={"cursor-pointer border-t border-border transition-colors hover:bg-accent " + (open ? "bg-accent" : "")}
+                      >
+                        <td className="py-1.5 pr-3 font-mono text-2xs">{s.sellerId.slice(0, 8)}…</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums">{s.orders}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums">{s.units.toLocaleString()}</td>
+                        <td className="py-1.5 text-right tabular-nums">
+                          {s.pct > 0
+                            ? <span className="font-semibold text-primary">{s.pct}%</span>
+                            : <span className="text-muted-foreground">—</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* WHAT THAT SELLER ACTUALLY SEES — rendered with the seller's own component, via
+              the seller's own endpoint. Not a rendering of the same idea: the same code. An
+              admin setting thresholds has to be able to look at the result, and a separate
+              preview implementation would be free to disagree with the real thing. */}
+          {preview && (
+            <div className="mt-4 rounded-xl border border-border bg-card p-4">
+              <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Seller&apos;s view · <span className="font-mono normal-case">{preview.slice(0, 8)}…</span>
+              </div>
+              {previewData
+                ? <VolumeRail data={previewData} />
+                : <p className="text-sm text-muted-foreground">Loading…</p>}
             </div>
           )}
         </div>

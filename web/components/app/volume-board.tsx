@@ -38,21 +38,15 @@ function Shell({ children, note }: { children: React.ReactNode; note?: string })
   )
 }
 
-export function VolumeBoard() {
-  const [data, setData] = useState<PlanUsage | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-
-  useEffect(() => {
-    const t = setTimeout(() => { getPlanUsage().then(setData).catch((e: Error) => setErr(e.message)) }, 0)
-    return () => clearTimeout(t)
-  }, [])
-
-  // Unreadable and empty are different facts and must never look alike — a seller shown
-  // "0 units" when the request failed would believe it.
-  if (err) return <Shell><p className="text-sm text-muted-foreground">We couldn&apos;t load your volume — that&apos;s a problem on our side, not a zero.</p></Shell>
-  if (!data) return <Shell><p className="text-sm text-muted-foreground">Loading…</p></Shell>
-  if (!data.tiers.length) return <Shell><p className="text-sm text-muted-foreground">There&apos;s no volume programme running right now.</p></Shell>
-
+/**
+ * The rail, the sentence and the receipt — everything the seller actually reads.
+ *
+ * Exported so the admin's ladder editor can preview a chosen seller with THIS component
+ * rather than its own rendering of the same idea. An admin who sets thresholds needs to see
+ * what a seller sees from them; a second implementation would let the two drift, which is
+ * how the mis-aligned tier labels survived until they were spotted by eye.
+ */
+export function VolumeRail({ data }: { data: PlanUsage }) {
   const running = data.running
   const earned = data.earned
   const tiers = data.tiers
@@ -63,11 +57,7 @@ export function VolumeBoard() {
   const pos = Math.min(100, (units / top) * 100)
 
   return (
-    <Shell note={
-      data.applied
-        ? "Ship more in a month, pay less the next."
-        : "Ship more in a month, pay less the next. We're tracking this now — it isn't discounting orders yet."
-    }>
+    <>
       {!data.applied && (
         <div className="mb-4 inline-flex rounded-full bg-muted px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
           Preview
@@ -136,6 +126,33 @@ export function VolumeBoard() {
             : <> — no tier reached.</>}
         </p>
       )}
+    </>
+  )
+}
+
+/** The seller's own card: fetches their standing and wraps the rail in the section chrome. */
+export function VolumeBoard() {
+  const [data, setData] = useState<PlanUsage | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => { getPlanUsage().then(setData).catch((e: Error) => setErr(e.message)) }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Unreadable and empty are different facts and must never look alike — a seller shown
+  // "0 units" when the request failed would believe it.
+  if (err) return <Shell><p className="text-sm text-muted-foreground">We couldn&apos;t load your volume — that&apos;s a problem on our side, not a zero.</p></Shell>
+  if (!data) return <Shell><p className="text-sm text-muted-foreground">Loading…</p></Shell>
+  if (!data.tiers.length) return <Shell><p className="text-sm text-muted-foreground">There&apos;s no volume programme running right now.</p></Shell>
+
+  return (
+    <Shell note={
+      data.applied
+        ? "Ship more in a month, pay less the next."
+        : "Ship more in a month, pay less the next. We're tracking this now — it isn't discounting orders yet."
+    }>
+      <VolumeRail data={data} />
     </Shell>
   )
 }

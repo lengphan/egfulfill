@@ -2601,8 +2601,10 @@ export type PlanUsage = {
   earned?: VolumeStanding
   running?: VolumeStanding
 }
-export function getPlanUsage() {
-  return api<PlanUsage>(`/api/plan/usage`)
+/** `sellerId` is honoured for STAFF only and ignored otherwise, so an admin previewing a
+ *  seller reads the exact same route — and therefore the exact same numbers — the seller does. */
+export function getPlanUsage(sellerId?: string) {
+  return api<PlanUsage>(`/api/plan/usage${sellerId ? `?sellerId=${encodeURIComponent(sellerId)}` : ""}`)
 }
 export function getVolumeTiers() {
   return api<{ tiers: VolumeTier[] }>(`/api/plan/tiers`)
