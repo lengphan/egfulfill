@@ -1,4 +1,4 @@
-import { getToken } from "./auth"
+import { getToken, clearSession } from "./auth"
 import type { SiteContent } from "./site-content"
 
 // Same-origin in production (Caddy reverse-proxies /api → Fastify). For local
@@ -110,6 +110,24 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       if (err != null) message = typeof err === "string" ? err : JSON.stringify(err)
     } catch {
       /* non-JSON error body */
+    }
+    /* A DEAD SESSION IS NOT A FAILED FETCH.
+       401 means the token is gone, expired or no longer accepted — signing in elsewhere,
+       a 7-day expiry lapsing, or the server no longer honouring it. Nothing handled that
+       centrally, so every panel caught its own error and rendered its own "couldn't load"
+       message: the app stayed fully drawn while saying "Not signed in" in a dozen places
+       at once, with no way back to a login screen except typing the URL.
+
+       So end the session where it dies. Clear it and go to /login carrying where we were,
+       which is the same return path the shell's gate uses.
+
+       Only 401. A 403 means signed in but not allowed — bouncing that to /login would
+       throw a legitimate user out of the app and, on a role-gated page, loop them. It
+       stays an error for the caller to render. */
+    if (res.status === 401 && typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      clearSession()
+      const here = window.location.pathname + window.location.search
+      window.location.replace(`/login?next=${encodeURIComponent(here)}`)
     }
     throw new ApiError(res.status, message, body)
   }
