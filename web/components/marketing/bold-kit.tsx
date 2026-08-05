@@ -117,29 +117,34 @@ export const PLATE_DEEP = '#6633FF'
 export const ACID = '#D4F897'
 
 /**
- * THE DARK BEIGE GROUND — currently the auth pages only.
+ * THE AUTH GROUND — login, signup, forgot, reset.
  *
- * An actual beige: SURFACE turned down a few stops, still a light surface. The previous value
- * (#332C23) was an espresso brown — dark enough that the page read as near-black with a warm
- * cast rather than as beige at all.
+ * The marketing pages' own section tint: SURFACE under rgba(0,0,0,0.03), which computes to
+ * #F2F1EC. Using the same value rather than a near-miss is the point — auth is the last page
+ * of the marketing site, so it should be the same paper, not a colour that merely resembles it.
  *
- * Going light INVERTS what can letter this page, and the numbers are unambiguous. On this
- * ground the lime measures 1.25:1 and the violet 4.06:1 — the lime is invisible and the violet
- * is under the 4.5:1 body floor — so NEITHER brand colour can carry type here. Ink does, at
- * 13.26:1. The brand pair still appears exactly once, as the button, which is the intent the
- * dark version was reaching for: the one saturated thing on the screen is the control you are
- * meant to press. Violet is 4.06:1 against the ground, past the 3:1 a control shape needs.
+ * This replaced two earlier grounds that were both too dark: #332C23 (an espresso brown that
+ * read as near-black) and #DED3BC (a real beige, but heavy enough to feel like its own theme).
  *
- * BEIGE_EDGE is doing real work and is not free to be prettier. A white field on this ground
- * is 1.48:1 — it has no edge of its own, so the border is the only thing marking the control.
- * #7C6E55 is the first step up the ramp that clears the 3:1 boundary floor at 3.35:1; the more
- * natural-looking #8C7E63 is 2.68:1 and fails. Do not lighten it to soften the look.
+ * Measured against AUTH_GROUND, and the constraint survives every lightening:
+ *
+ *   INK   17.40:1   text        VIOLET  5.33:1   text and shape
+ *   LIME   1.05:1   invisible   WHITE   1.13:1   no edge of its own
+ *
+ * LIME CAN NEVER LETTER THIS PAGE. It is a light colour, so the lighter the ground gets the
+ * worse it does — 1.25:1 on the old beige, 1.05:1 here. The brand pair appears once, as the
+ * button, and that is the only place it can appear on a light ground.
+ *
+ * AUTH_EDGE is load-bearing, not decoration. A white field on this ground is 1.13:1, so the
+ * border is the ONLY thing marking the control. #8A8577 is the first step up the ramp clearing
+ * the 3:1 boundary floor, at 3.26:1; the softer #9C9789 measures 2.58:1 and fails. Do not
+ * lighten it to calm the page down — the fields stop being findable.
  */
-export const BEIGE_GROUND = '#DED3BC'
-export const BEIGE_FIELD = '#FFFFFF'
-export const BEIGE_EDGE = '#7C6E55'
-/** Body/secondary type on BEIGE_GROUND — 5.04:1, so it stays real text rather than a hint. */
-export const BEIGE_MUTED = '#5C5445'
+export const AUTH_GROUND = '#F2F1EC'
+export const AUTH_FIELD = '#FFFFFF'
+export const AUTH_EDGE = '#8A8577'
+/** Secondary type on AUTH_GROUND — 5.06:1, so it stays real text rather than a hint. */
+export const AUTH_MUTED = '#6B6659'
 
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
