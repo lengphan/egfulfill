@@ -89,7 +89,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: PLATE_DEEP }}>
         {/* The diagonal returns the page to the cool off-white below the plate — one shape
             doing the job a whole illustration usually does. */}
-        <div style={{ background: SURFACE }} className="absolute inset-x-0 bottom-0 h-24 [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
+        <div style={{ background: SURFACE }} className="absolute inset-x-0 -bottom-px h-24 [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
         <div className="mx-auto max-w-6xl px-6 pb-40 pt-24 sm:pt-32">
@@ -107,7 +107,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           </h1>
 
           <motion.p
-            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed text-white/75"
+            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed text-[#FAF8F3]/75"
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
@@ -374,7 +374,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           <h2 className="mx-auto max-w-3xl font-black leading-[0.95] tracking-[-0.035em] text-[#0B0B0C]" style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}>
             {cta.heading}
           </h2>
-          <p className="mx-auto mt-4 max-w-lg text-[17px] leading-relaxed text-[#0B0B0C]/65">{cta.subhead}</p>
+          <p className="mx-auto mt-4 max-w-lg text-[17px] leading-relaxed" style={{ color: "rgba(250,248,243,0.75)" }}>{cta.subhead}</p>
           <div className="mt-9 flex justify-center">
             <Pill href="/signup" tone="ink">{cta.button}</Pill>
           </div>

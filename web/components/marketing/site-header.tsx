@@ -34,9 +34,9 @@ export function SiteHeader() {
    * dark-on-dark the moment the plate goes deep.
    */
   const onDeepPlate = usePathname() === "/"
-  const ink = onDeepPlate ? "text-white" : "text-[#0B0B0C]"
+  const ink = onDeepPlate ? "text-[#FAF8F3]" : "text-[#0B0B0C]"
   const muted = onDeepPlate
-    ? "text-white/75 hover:bg-white/10 hover:text-white"
+    ? "text-[#FAF8F3]/75 hover:bg-[#FAF8F3]/10 hover:text-[#FAF8F3]"
     : "text-[#0B0B0C]/70 hover:bg-[#0B0B0C]/[0.06] hover:text-[#0B0B0C]"
   return (
     <header
@@ -64,13 +64,13 @@ export function SiteHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
                       <>
-              <Link href="/login" className={"rounded-full px-4 py-2 text-sm font-semibold transition-colors " + (onDeepPlate ? "text-white hover:bg-white/10" : "text-[#0B0B0C] hover:bg-[#0B0B0C]/[0.06]")}>
+              <Link href="/login" className={"rounded-full px-4 py-2 text-sm font-semibold transition-colors " + (onDeepPlate ? "text-[#FAF8F3] hover:bg-[#FAF8F3]/10" : "text-[#0B0B0C] hover:bg-[#0B0B0C]/[0.06]")}>
                 Log in
               </Link>
               <Link
                 href="/login"
                 // Acid on the deep plate (ink label, 15.19:1); ink pill elsewhere.
-                className={"rounded-full px-5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 " + (onDeepPlate ? "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-white" : "bg-[#0B0B0C] text-white hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]")}
+                className={"rounded-full px-5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 " + (onDeepPlate ? "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#FAF8F3]" : "bg-[#0B0B0C] text-[#FAF8F3] hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]")}
                 style={onDeepPlate ? { background: ACID } : undefined}
               >
                 Start free

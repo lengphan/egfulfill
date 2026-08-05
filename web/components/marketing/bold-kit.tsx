@@ -225,13 +225,13 @@ export function Pill({ href, children, tone = "ink", className = "" }: {
 }) {
   const base = "group inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
   const tones = {
-    ink: "bg-[#0B0B0C] text-white hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]",
+    ink: "bg-[#0B0B0C] text-[#FAF8F3] hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]",
     accent: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
     // Ink on acid is 15.19:1. White on acid is 1.30:1 — never do that.
     acid: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
     ghost: "border border-[#FAF8F3]/35 text-[#FAF8F3] hover:border-[#FAF8F3]/70 hover:bg-[#FAF8F3]/10 focus-visible:ring-[#FAF8F3]",
     // The ghost outline inverted, for use ON the deep plate where ink would disappear.
-    ghostLight: "border border-white/30 text-white hover:border-white/60 hover:bg-white/10 focus-visible:ring-white",
+    ghostLight: "border border-[#FAF8F3]/30 text-[#FAF8F3] hover:border-[#FAF8F3]/60 hover:bg-[#FAF8F3]/10 focus-visible:ring-[#FAF8F3]",
   }
   return (
     <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "accent" ? { background: ACCENT } : tone === "acid" ? { background: ACID } : undefined}>

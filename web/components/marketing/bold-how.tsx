@@ -94,7 +94,7 @@ export function BoldHow() {
 
       <section className="px-6 py-24">
         <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-20 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>
+          <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             Connect a store and watch it work.
           </h2>
           <div className="mt-8 flex justify-center">

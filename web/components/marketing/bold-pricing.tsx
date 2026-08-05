@@ -90,7 +90,7 @@ export function BoldPricing() {
           two sets of padding and a white gutter inside its own rounded corner. */}
       <section className="px-6 pb-24">
         <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-20 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>
+          <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             Only pay when it ships.
           </h2>
           <div className="mt-8 flex justify-center">
