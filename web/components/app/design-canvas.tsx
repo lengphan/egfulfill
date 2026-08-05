@@ -12,7 +12,7 @@ import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
 import { decodeEntities, usd } from "@/lib/order-format"
-import { matchThreadColors, nearestThread, hexToRgb, matchQuality, matchThreadRegions, canvasReadableSrc, type Thread, type ThreadRegion } from "@/lib/thread-match"
+import { matchThreadColors, nearestThread, hexToRgb, matchThreadRegions, canvasReadableSrc, type Thread, type ThreadRegion } from "@/lib/thread-match"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { Eyedropper, MapPinSimple } from "@phosphor-icons/react"
 
@@ -433,20 +433,18 @@ export function DesignCanvasDialog({
     return () => { alive = false; clearTimeout(id) }
   }, [mapOpen, designUrl])
 
-  // What the eyedropper landed on, when nothing in stock is actually close. The cone is
-  // still added — refusing to add one would leave the line with no thread at all — but
-  // the sample is named so the difference is visible, and the fix (add that colour, or
-  // choose a different cone) is stated.
-  const [pickWarn, setPickWarn] = useState<{ hex: string; thread: string } | null>(null)
-
+  // The eyedropper adds the nearest cone and says nothing about how near it is.
+  //
+  // It used to raise a "not a real match" banner when matchQuality called the sample poor,
+  // but that verdict is measured against DEFAULT_THREAD_PALETTE — 16 colours, which is not
+  // the stock actually on the floor. A cone we hold but the palette has never heard of came
+  // back as "no close match", so the warning fired on colours that were fine. A judgement
+  // that wrong that often is worse than no judgement: the crop shows the real colour and the
+  // dropdown offers every alternative, so the human decides.
   const onPickColor = (hex: string) => {
     const { r, g, b } = hexToRgb(hex)
     const t = nearestThread(r, g, b)
-    if (t) {
-      setThreads((prev) => (prev.some((x) => x.code === t.code) ? prev : [...prev, t]))
-      const { poor } = matchQuality(r, g, b, t)
-      setPickWarn(poor ? { hex, thread: `${t.code} ${t.name}` } : null)
-    }
+    if (t) setThreads((prev) => (prev.some((x) => x.code === t.code) ? prev : [...prev, t]))
     setPicking(false)
   }
   const [err, setErr] = useState<string | null>(null)
@@ -939,17 +937,11 @@ export function DesignCanvasDialog({
 
             {/* The map. Each row is a crop of the artwork taken from where that colour
                 actually sits — the half a digitiser was previously guessing at. */}
-            {pickWarn && (
-              <div className="mt-2 flex items-start gap-2 rounded-md bg-amber-50 px-2 py-1.5 text-2xs text-amber-800">
-                <span className="mt-0.5 size-3 shrink-0 rounded-full border border-black/15" style={{ background: pickWarn.hex }} />
-                <span>
-                  You sampled <span className="font-mono font-medium">{pickWarn.hex}</span>, but the closest cone you stock is{" "}
-                  <span className="font-medium">{pickWarn.thread}</span> — not a real match. Add this colour under
-                  Settings → Platform → Embroidery threads, or pick a different cone.
-                </span>
-                <button onClick={() => setPickWarn(null)} className="ml-auto shrink-0 font-medium hover:underline">Dismiss</button>
-              </div>
-            )}
+            {/* The eyedropper's "not a real match" banner is gone too, for the same reason as
+                the per-row warning: it judged the sample against a 16-colour palette that does
+                not describe the cones actually on the floor, so it cried wolf about colours we
+                stock. The cone is added and shown; the human picks a different one if it is
+                wrong. */}
             {mapOpen && (
               <div className="mt-2 rounded-md border border-border bg-card">
                 {regions === null ? (
@@ -969,30 +961,16 @@ export function DesignCanvasDialog({
                           <span className="size-14 shrink-0 rounded border border-border" style={{ background: r.srcHex }} />
                         )}
                         <div className="min-w-0 flex-1">
-                          {/* The SAMPLED colour — what's actually in the artwork. */}
+                          {/* THE CROP AND THE CONE, nothing else.
+                              The hex, the sampled percentage, the two colour dots and the
+                              "no close match" warning have all gone. Every one of them was a
+                              claim about a 16-cone palette that does not describe the stock
+                              actually on the floor — a colour we hold but the palette has
+                              never heard of was reported as "no close match", which is worse
+                              than saying nothing. The crop on the left already shows the
+                              colour truthfully, straight from the artwork, and the dropdown
+                              is where the human decides. */}
                           <div className="flex items-center gap-1.5">
-                            <span className="size-3 shrink-0 rounded-full border border-black/15" style={{ background: r.srcHex }} />
-                            <span className="font-mono text-2xs font-medium">{r.srcHex}</span>
-                            <span className="ml-auto text-3xs font-medium text-muted-foreground">{r.pct}%</span>
-                          </div>
-                          {/* -> the cone. A dropdown, not a verdict: the nearest cone by
-                              maths isn't always the one you want stitched, so every close
-                              alternative is offered and the human decides. */}
-                          {/* No cone you stock is close. Said plainly, because the
-                              dropdown below still has to name SOMETHING — and a wrong
-                              cone presented confidently is how the floor loads red as
-                              white. */}
-                          {r.poor && (
-                            <div className="mt-1 rounded bg-amber-50 px-1.5 py-0.5 text-3xs font-medium text-amber-700">
-                              No close match in your thread stock — pick one below, or add this colour in Settings.
-                            </div>
-                          )}
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <span className="text-3xs text-muted-foreground">&rarr;</span>
-                            <span
-                              className="size-3 shrink-0 rounded-full border border-black/15"
-                              style={{ background: (r.options.find((o) => o.code === (picks[r.srcHex] ?? r.thread.code)) ?? r.thread).hex }}
-                            />
                             <select
                               value={picks[r.srcHex] ?? r.thread.code}
                               onChange={(e) => chooseThread(r, e.target.value)}
@@ -1006,10 +984,6 @@ export function DesignCanvasDialog({
                               ))}
                             </select>
                           </div>
-                        </div>
-                        <div className="relative size-8 shrink-0 self-start rounded border border-border bg-muted" title="Position in the design">
-                          <span className="absolute rounded-[2px] bg-primary/70"
-                            style={{ left: `${r.box.x}%`, top: `${r.box.y}%`, width: `${r.box.w}%`, height: `${r.box.h}%` }} />
                         </div>
                       </div>
                     ))}
