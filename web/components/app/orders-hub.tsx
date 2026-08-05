@@ -1712,11 +1712,17 @@ export function OrdersHub() {
                               overlays the image corner on hover (below), so it costs no
                               space and stays where the image already is. */}
                           <div className="group/art relative shrink-0 self-start">
+                          {/* size: tall enough to span the whole identity block when the
+                              variant picker is open — title, the BLANK/COLOUR/SIZE/METHOD
+                              strip and its hint — instead of a small square floating beside
+                              three rows of text. Rows WITHOUT the picker are only a title and
+                              a chip strip, so they keep 64: sizing those to the tall case
+                              would add back the empty band this is meant to remove. */}
                           <ItemAvatar
                             item={it}
                             designs={designs[o.id]}
                             catalog={catalog}
-                            size={64}
+                            size={canDesign && stage === "" ? 104 : 64}
                             onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
                             onDropImage={canDesign && it.sku ? (dataUrl) => {
                               postOrderDesign(o.id, { sku: it.sku!, line_id: it.line_id, data: dataUrl, name: it.name })

@@ -57,9 +57,12 @@ export function VariantPicker({
 
   return (
     <div className="mt-3">
-      {/* Uneven tracks, but the SAME tracks on every line item — Blank holds full product
-          names so it gets the room; Size holds "S"/"2XL" so it needs least. */}
-      <div className="grid grid-cols-2 gap-x-2 gap-y-2.5 sm:grid-cols-[1.4fr_1.1fr_1fr_1.1fr]">
+      {/* Uneven tracks, but the SAME tracks on every line item. Sized to the LONGEST value
+          each field actually holds: Blank carries full product names, Colour carries words
+          like "Heather Grey", while Size is "S"/"2XL" and Method is "DTG"/"EMB" — three or
+          four characters. Giving those two an equal share left them mostly empty and starved
+          the blank name, which is the one that gets truncated. */}
+      <div className="grid grid-cols-2 gap-x-2 gap-y-2.5 sm:grid-cols-[1.7fr_1.25fr_0.7fr_0.85fr]">
         {/* Blank — the load-bearing pick; nothing else can price without it, so it's the
             only field that flags itself when empty. */}
         <VariantField
