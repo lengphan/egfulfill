@@ -748,7 +748,9 @@ export function DesignCanvasDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-xl"
+        // Wider than the default xl so the stage's 64vh cap is what actually bounds the
+        // garment on a normal window, rather than the dialog's own width doing it first.
+        className="sm:max-w-2xl"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -809,11 +811,14 @@ export function DesignCanvasDialog({
             artwork will land at, so the empty state teaches placement before there is
             anything to place. Once art is on, the overlay is gone entirely and the stage
             goes back to being a stage. */}
-        {/* The stage is aspect-square, so its WIDTH sets its height — at a full 528px inside
-            the dialog it alone was taller than a laptop viewport and pushed everything
-            below it off-screen. Capping the width by a viewport-height unit is what keeps
-            the window small, which was the whole ask. */}
-        <div className="relative mx-auto w-full max-w-[min(100%,42vh)]">
+        {/* The stage is aspect-square, so its WIDTH sets its height — uncapped it is taller
+            than a short laptop window on its own. It is still capped against viewport height,
+            but at 42vh a 620px-tall window rendered the garment about 258px across, which is
+            too small to judge placement on — the one thing this window exists for. 64vh is
+            the compromise: still bounded by the viewport, and DialogContent already carries
+            max-h-[calc(100dvh-2rem)] with overflow-y-auto, so on a short screen the steps
+            below scroll into reach rather than being lost. */}
+        <div className="relative mx-auto w-full max-w-[min(100%,64vh)]">
           <DesignStage
             className="w-full" mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos}
             onRemove={() => setDesignUrl("")} picking={picking} onPickColor={onPickColor}
