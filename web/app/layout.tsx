@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter, Space_Grotesk } from "next/font/google"
+import { Geist_Mono, Inter, Outfit } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -9,12 +9,18 @@ import { cn } from "@/lib/utils"
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
 // Display face for headings — marketing and app page titles alike, via `font-display`.
-// Space Grotesk tops out at 700; it has no 900, so headings use font-bold rather than
-// font-black. Asking for 900 would make the browser synthesise a fake bold, which smears
-// the very letterforms (the flat-topped a, the angular R) that it was chosen for.
-const spaceGrotesk = Space_Grotesk({
+//
+// Space Grotesk was tried here first and rejected: it is a WIDE face with generous
+// sidebearings, and at hero size (6.2rem) that built-in air scales with the type, so the
+// headline read as spaced-out letters rather than a word. Tracking couldn't fix it — the
+// hero was already at -0.04em and was fighting the typeface.
+//
+// Outfit is the same geometric family of shapes but drawn narrower, and — the part that
+// actually matters — it carries a true 900. The hero can be black again, and heavier
+// strokes against the same gaps is most of what closes a headline up.
+const outfit = Outfit({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800", "900"],
   variable: "--font-display-face",
 })
 
@@ -45,7 +51,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, spaceGrotesk.variable)}
+      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, outfit.variable)}
     >
       {/* Zoom, applied BEFORE first paint.
           Same trick next-themes uses for dark mode, and for the same reason: read from a

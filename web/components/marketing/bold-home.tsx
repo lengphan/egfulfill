@@ -93,7 +93,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
         {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
             job a whole illustration usually does. */}
         <div className="mx-auto max-w-6xl px-6 pb-32 pt-16 sm:pt-24">
-          <h1 className="max-w-5xl text-center font-display font-bold leading-[0.92] tracking-[-0.04em] mx-auto"
+          <h1 className="max-w-5xl text-center font-display font-black leading-[0.92] tracking-[-0.04em] mx-auto"
               // Cream, not pure white: 5.96:1 on the plate, and it ties the hero to the paper
               // page below instead of introducing a third neutral.
               style={{ color: SURFACE }}
@@ -178,7 +178,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
                   transition={{ duration: 0.5, delay: 0.65 + i * 0.08, ease: [0.16, 1, 0.3, 1] }}
                 >
                   <div className="text-[11px] font-semibold uppercase tracking-widest text-black/45">{s.label}</div>
-                  <CountUp value={s.value} className="mt-1.5 block text-2xl font-display font-bold tracking-tight" />
+                  <CountUp value={s.value} className="mt-1.5 block text-2xl font-display font-black tracking-tight" />
                 </motion.div>
               ))}
             </div>
@@ -195,7 +195,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 transition={{ duration: 0.7, delay: 1.05, ease: [0.16, 1, 0.3, 1] }}
               >
                 <div className="text-[10px] font-semibold uppercase tracking-widest text-black/45">{stats[3].label}</div>
-                <CountUp value={stats[3].value} className="mt-1 block text-xl font-display font-bold tracking-tight" />
+                <CountUp value={stats[3].value} className="mt-1 block text-xl font-display font-black tracking-tight" />
               </motion.div>
             )}
             {stats[0] && (
@@ -245,7 +245,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
             transition={{ duration: 28, ease: "linear", repeat: Infinity }}
           >
             {[...marqueeHalf, ...marqueeHalf].map((name, i) => (
-              <span key={`${name}-${i}`} className="whitespace-nowrap text-2xl font-display font-bold tracking-tight text-black/25">{name}</span>
+              <span key={`${name}-${i}`} className="whitespace-nowrap text-2xl font-display font-black tracking-tight text-black/25">{name}</span>
             ))}
           </motion.div>
         </div>
@@ -253,7 +253,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
 
       {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="max-w-3xl font-display font-bold leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+        <h2 className="max-w-3xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
           {features.heading}
         </h2>
         <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-black/55">{features.subhead}</p>
@@ -289,7 +289,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       {/* ── STEPS — numbers oversized, the way the style wants ──────────────────── */}
       <section className="bg-black/[0.03] py-20">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="font-display font-bold leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+          <h2 className="font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             {steps.heading}
           </h2>
           <div className="mt-14 grid gap-10 md:grid-cols-3">
@@ -301,7 +301,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 viewport={{ once: true, margin: "0px 0px -12% 0px" }}
                 transition={{ duration: 0.55, delay: i * 0.09, ease: [0.16, 1, 0.3, 1] }}
               >
-                <div className="font-display font-bold leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(3.5rem, 7vw, 5.5rem)" }}>
+                <div className="font-display font-black leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(3.5rem, 7vw, 5.5rem)" }}>
                   {String(i + 1).padStart(2, "0")}
                 </div>
                 <h3 className="mt-3 text-xl font-bold tracking-tight">{s.title}</h3>
@@ -314,7 +314,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
 
       {/* ── TESTIMONIALS ───────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="max-w-3xl font-display font-bold leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+        <h2 className="max-w-3xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
           {testimonials.heading}
         </h2>
         <div className="mt-14 grid gap-4 md:grid-cols-3">
@@ -329,7 +329,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
             >
               {/* The quote mark is set in the accent and oversized — the one piece of
                   ornament the style allows, because it's type doing it. */}
-              <span aria-hidden className="block text-6xl font-display font-bold leading-[0.6]" style={{ color: ACCENT }}>&ldquo;</span>
+              <span aria-hidden className="block text-6xl font-display font-black leading-[0.6]" style={{ color: ACCENT }}>&ldquo;</span>
               <blockquote className="mt-3 text-[15px] leading-relaxed text-black/70">{t.quote}</blockquote>
               <figcaption className="mt-5 text-sm">
                 <span className="font-bold">{t.name}</span>
@@ -344,7 +344,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
               free, and no state to get wrong. ─────────────────────────────────────── */}
       <section className="bg-black/[0.03] py-20">
         <div className="mx-auto max-w-3xl px-6">
-          <h2 className="font-display font-bold leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+          <h2 className="font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             {faq.heading}
           </h2>
           <div className="mt-12 divide-y divide-black/[0.09] border-y border-black/[0.09]">
@@ -352,7 +352,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
               <details key={i} className="group py-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-left text-lg font-bold tracking-tight [&::-webkit-details-marker]:hidden">
                   {f.q}
-                  <span aria-hidden className="shrink-0 text-2xl font-display font-bold transition-transform duration-200 group-open:rotate-45">+</span>
+                  <span aria-hidden className="shrink-0 text-2xl font-display font-black transition-transform duration-200 group-open:rotate-45">+</span>
                 </summary>
                 <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-black/60">{f.a}</p>
               </details>
@@ -371,7 +371,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           viewport={{ once: true, margin: "0px 0px -10% 0px" }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         >
-          <h2 className="mx-auto max-w-3xl font-display font-bold leading-[0.95] tracking-[-0.035em] text-[#0B0B0C]" style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}>
+          <h2 className="mx-auto max-w-3xl font-display font-black leading-[0.95] tracking-[-0.035em] text-[#0B0B0C]" style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}>
             {cta.heading}
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-[17px] leading-relaxed" style={{ color: "rgba(250,248,243,0.75)" }}>{cta.subhead}</p>

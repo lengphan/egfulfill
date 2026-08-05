@@ -81,7 +81,7 @@ export const PLATE_GHOST = SURFACE
  * read as a deliberate accent instead of an unrelated colour dropped in.
  *
  * A drop shadow was considered and rejected: it changes no measured contrast, and a blur
- * behind font-display font-bold display type reads as a smudge. If cream must be kept, the only version
+ * behind font-display font-black display type reads as a smudge. If cream must be kept, the only version
  * that works is a HARD zero-blur ink offset — a deliberate letterpress style, not a patch.
  */
 export const PLATE_ACCENT = '#1E2A78'
@@ -295,7 +295,7 @@ export function PlateHero({ title, accent, sub, children }: {
   return (
     <section className="relative -mt-16 pt-16" style={{ background: PLATE_DEEP }}>
       <div className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pt-20">
-        <h1 className="mx-auto max-w-5xl text-center font-display font-bold leading-[0.92] tracking-[-0.04em]" style={{ ...DISPLAY, color: SURFACE }}>
+        <h1 className="mx-auto max-w-5xl text-center font-display font-black leading-[0.92] tracking-[-0.04em]" style={{ ...DISPLAY, color: SURFACE }}>
           <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} color={ACID} /></> : null}
         </h1>
         {sub && (
