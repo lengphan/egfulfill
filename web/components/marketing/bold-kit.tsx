@@ -116,6 +116,31 @@ export const PLATE_DEEP = '#6633FF'
  */
 export const ACID = '#D4F897'
 
+/**
+ * THE DARK BEIGE GROUND — currently the auth pages only.
+ *
+ * A warm dark ground rather than a neutral one: same hue family as SURFACE, several stops
+ * down, so it reads as beige turned down rather than as black. It is the one surface where
+ * the palette inverts — lime does the lettering and the violet becomes the button, instead of
+ * the violet being the ground and lime the accent on it.
+ *
+ * Every value here was MEASURED against BEIGE_GROUND, not picked by eye:
+ *
+ *   ACID   lettering    11.59:1     PAPER  body/labels   12.97:1
+ *   PAPER  on a field   10.22:1     BEIGE_EDGE boundary   3.24:1
+ *
+ * BEIGE_EDGE looks arbitrarily light and is not. The obvious border a shade above the field
+ * (#554B3D) measures 1.61:1 against the ground — under the 3:1 floor for a UI boundary, which
+ * means the inputs are decoration rather than findable controls. #877961 is the first step up
+ * the ramp that actually clears it. Do not darken it to "look nicer"; it is doing work.
+ *
+ * BEIGE_FIELD is only 1.27:1 against the ground ON PURPOSE. The field is not what marks the
+ * control — the edge is. The fill just has to sit quietly behind the text.
+ */
+export const BEIGE_GROUND = '#332C23'
+export const BEIGE_FIELD = '#443C31'
+export const BEIGE_EDGE = '#877961'
+
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
 export const HEADING = { fontSize: "clamp(2rem, 4.6vw, 3.6rem)" } as const

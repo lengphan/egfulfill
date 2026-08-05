@@ -1,6 +1,13 @@
 import Link from "next/link"
-import type { ReactNode } from "react"
-import { PLATE_DEEP, ACID, SURFACE, INK } from "@/components/marketing/bold-kit"
+import type { CSSProperties, ReactNode } from "react"
+import {
+  ACID,
+  SURFACE,
+  PLATE_DEEP,
+  BEIGE_GROUND,
+  BEIGE_FIELD,
+  BEIGE_EDGE,
+} from "@/components/marketing/bold-kit"
 
 /**
  * Shared shell for the auth pages (login / signup / forgot / reset) — one layout, one wordmark.
@@ -8,101 +15,96 @@ import { PLATE_DEEP, ACID, SURFACE, INK } from "@/components/marketing/bold-kit"
  * Auth belongs to the MARKETING look, not the app shell (CLAUDE.md §4): signing in is the last
  * page of the marketing site rather than the first page of the product.
  *
- * SPLIT SCREEN, and the split is the point. Four centred-card versions came before this — plain
- * plate, filled paper bands, lime hairlines, a one-hue gradient — and every one of them was an
- * attempt to decorate AROUND a white box floating in the middle of an empty page. The box was
- * the problem. Here the form sits ON a surface, so there is nothing left to frame:
+ * THE PALETTE INVERTS HERE, and only here. Everywhere else the violet is the ground and the
+ * lime is the accent sitting on it. On this page the ground is a warm dark beige, the lime
+ * does the lettering, and the violet becomes the button — so the one saturated thing on the
+ * screen is the control you are meant to press.
  *
- *   left    the plate, carrying the brand line in Playfair at real display size
- *   right   warm paper, carrying the form
+ * There is no card, which is the point. Five earlier versions — flat plate, filled paper
+ * bands, lime hairlines, a one-hue gradient, then a violet/paper split — were all attempts to
+ * decorate around a white box floating in an empty page. The form sits directly on the ground
+ * now, so there is nothing left to frame.
  *
- * That is the same paper-under-plate tension the marketing hero is built on, and it means type
- * does the decorating — which is the house rule rather than a preference.
- *
- * Contrast is all measured, not eyeballed: paper on the plate is 5.68:1, the green on the plate
- * 5.07:1, and ink on paper 18.54:1. Nothing here is decorative-only text.
+ * Contrast is measured, not eyeballed (numbers live with the tokens in bold-kit):
+ * lime lettering 11.59:1, paper labels 12.97:1, paper on a field 10.22:1, field edge 3.24:1,
+ * and the button's paper label on violet 5.68:1.
  */
 export function AuthShell({ subtitle, children }: { subtitle: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-svh">
-      {/* THE BRAND SIDE. Hidden below lg — on a phone there is no room for a second column, and
-          a squashed one would push the form below the fold. Collapsing it costs nothing because
-          the wordmark reappears above the form (see the lg:hidden link below), so this needs no
-          separate mobile design. */}
-      <aside
-        className="hidden w-[46%] max-w-[620px] flex-col justify-between p-12 lg:flex"
-        style={{ background: PLATE_DEEP }}
-      >
+    <div
+      className="flex min-h-svh flex-col items-center justify-center p-6 sm:p-10"
+      style={{ background: BEIGE_GROUND }}
+    >
+      <div className="w-full max-w-sm">
         <Link
           href="/"
           className="font-display text-3xl font-semibold tracking-tight"
-          style={{ color: SURFACE }}
+          style={{ color: ACID }}
         >
           egful
         </Link>
 
-        {/* The hero's line, at the size the typeface is FOR. Playfair earns its keep as display
-            type; at 30px above a card it was just a label in a serif. */}
-        <div>
-          <p
-            className="font-display font-bold leading-[1.03] tracking-[-0.02em]"
-            style={{ fontSize: "clamp(2.1rem, 3.4vw, 3.1rem)", color: SURFACE }}
-          >
-            Every order,
-            <br />
-            <span style={{ color: ACID }}>printed itself.</span>
-          </p>
-          <p
-            className="mt-5 max-w-sm text-sm leading-relaxed"
-            style={{ color: "rgba(250,248,243,0.72)" }}
-          >
-            Orders sync into one queue, print on a vetted network, and ship with tracking
-            pushed back automatically.
-          </p>
+        {/* The page's own heading, in the lime. Each auth page passes its own copy, so this
+            one component covers sign-in, sign-up, forgot and reset without any of them
+            needing to know what the shell looks like. */}
+        <h1
+          className="mt-7 font-display text-3xl font-semibold tracking-tight"
+          style={{ color: ACID }}
+        >
+          {subtitle}
+        </h1>
+
+        {/* THE FORM RE-THEMES ITSELF, so none of the four auth pages had to change.
+         *
+         * The shadcn primitives read their colours from CSS variables, and a variable set on
+         * an ancestor cascades — so overriding them here is what turns an app-coloured form
+         * into a dark-ground one, rather than editing markup on login, signup, forgot and
+         * reset and hoping the four stay in step.
+         *
+         * Two of these are load-bearing rather than cosmetic:
+         *
+         *   --brand   the default Button is `bg-brand`, and brand is the LIME. On this page
+         *             the violet is the button, so brand is pointed at the plate colour and
+         *             its label at paper — 5.68:1, real readable type.
+         *   --input   Input ships `border-transparent` with `bg-input/50`. Over a dark ground
+         *             a half-opacity fill lands ~1.1:1 and the field simply disappears, so the
+         *             fill and a REAL border are set explicitly. BEIGE_EDGE is 3.24:1 against
+         *             the ground, which is the floor for a control boundary.
+         */}
+        <div
+          className="mt-7 [&_[data-slot=input]]:border-(--auth-edge) [&_[data-slot=input]]:bg-(--auth-field)"
+          style={
+            {
+              color: SURFACE,
+              "--auth-edge": BEIGE_EDGE,
+              "--auth-field": BEIGE_FIELD,
+              "--brand": PLATE_DEEP,
+              "--brand-foreground": SURFACE,
+              "--border": BEIGE_EDGE,
+              "--muted-foreground": "rgba(250,248,243,0.65)",
+              "--ring": ACID,
+              // `text-foreground` sets colour EXPLICITLY, so inheriting from the wrapper
+              // above does not reach it — "Create account" rendered near-black until this
+              // was here.
+              "--foreground": SURFACE,
+              // The "or" divider punches through its rule with `bg-card`. Left at the app's
+              // white, that is a white chip sitting on the dark ground.
+              "--card": BEIGE_GROUND,
+              "--background": BEIGE_GROUND,
+            } as CSSProperties
+          }
+        >
+          {children}
         </div>
 
-        {/* Channels, NOT a headline figure. An order count here would be a second copy of a
-            number that lives in editable site content, and the two would drift the first time
-            one was updated. These are simply the integrations that exist. */}
-        <p className="text-xs tracking-wide" style={{ color: "rgba(250,248,243,0.5)" }}>
-          Etsy · Shopify · TikTok Shop
-        </p>
-      </aside>
-
-      {/* THE FORM SIDE. Paper, so the form reads as a page rather than a panel. */}
-      <main
-        className="flex flex-1 flex-col items-center justify-center p-6 sm:p-10"
-        style={{ background: SURFACE }}
-      >
-        <div className="w-full max-w-sm">
-          {/* Only below lg, where the brand column is gone and the page would otherwise open
-              with no mark on it at all. */}
-          <Link
-            href="/"
-            className="font-display text-2xl font-semibold tracking-tight lg:hidden"
-            style={{ color: INK }}
-          >
-            egful
-          </Link>
-
-          <h1
-            className="mt-6 font-display text-3xl font-semibold tracking-tight lg:mt-0"
-            style={{ color: INK }}
-          >
-            {subtitle}
-          </h1>
-
-          <div className="mt-7">{children}</div>
-
-          <Link
-            href="/"
-            className="mt-8 inline-block text-xs opacity-60 transition-opacity hover:opacity-100"
-            style={{ color: INK }}
-          >
-            ← Back to egful
-          </Link>
-        </div>
-      </main>
+        <Link
+          href="/"
+          className="mt-8 inline-block text-xs opacity-55 transition-opacity hover:opacity-100"
+          style={{ color: SURFACE }}
+        >
+          ← Back to egful
+        </Link>
+      </div>
     </div>
   )
 }
