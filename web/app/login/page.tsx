@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getToken, getUser, setSession } from "@/lib/auth"
 import { API_BASE } from "@/lib/api"
 import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
+import { AuthShell } from "@/components/auth/auth-shell"
 
 /**
  * Where to go after signing in.
@@ -80,15 +80,11 @@ export default function LoginPage() {
   }
 
   return (
-    // Plain themed surface. The dithered dark plate that used to sit behind this was
-    // dropped at the user's request.
-    <div className="flex min-h-svh items-center justify-center bg-background p-6">
-      <Card className="relative w-full max-w-sm gap-0 p-0 shadow-lg">
-        <div className="border-b border-border px-6 py-5 text-center">
-          <div className="font-display text-2xl font-semibold tracking-tight">egfulfill</div>
-          <div className="mt-1 text-sm text-muted-foreground">Sign in to your account</div>
-        </div>
-        <form onSubmit={onSubmit} className="space-y-4 p-6">
+    // AuthShell, not a private copy of it. This page had its own inline card+wordmark that
+    // was a near-duplicate of the shared one, which is why signup picked up the new plate
+    // and login didn't.
+    <AuthShell subtitle="Sign in to your account">
+      <form onSubmit={onSubmit} className="space-y-4">
           <label className="flex flex-col gap-1.5">
             {/* Either identifier. type="text", NOT type="email" — the browser's email
                 validation would reject a bare username before the form ever submits.
@@ -142,8 +138,7 @@ export default function LoginPage() {
               Create account
             </Link>
           </div>
-        </form>
-      </Card>
-    </div>
+      </form>
+    </AuthShell>
   )
 }
