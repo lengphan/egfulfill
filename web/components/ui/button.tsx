@@ -8,34 +8,25 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // THE BRAND LIME, not --primary. A filled button is the one place the accent gets to
-        // be itself: it's a large fill with a foreground we control, so the bright lime works
-        // exactly as it does on the marketing plates, with ink text at ~17:1.
+        // THE ACTION PAIR — violet fill, lime label, and NO border in either mode.
         //
-        // --primary stays the deeper green because it also inks ~247 pieces of TEXT, where a
-        // colour this light is invisible on white. Fill and ink are different jobs; this is
-        // the fill.
+        // A borderless button is findable only if its FILL clears 3:1 against what's behind
+        // it. Lime is 1.19:1 on the white page, so it can never be the fill on a light
+        // surface — every attempt to make it work there ended in an outline, and an outline
+        // repeated down a table row reads as a grid of rules rather than as definition.
+        // Swapping the jobs solves it outright: the violet fills (6.03:1) and the lime becomes
+        // the label (5.07:1). Nothing is drawn around anything.
         //
-        // hover dims via brightness rather than an alpha step: /80 on a light fill fades it
-        // toward the white page instead of reading as pressed.
+        // Dark inverts, and has to. No single violet does both jobs there: by the time one is
+        // light enough to hold a shape against the dark card (L >= 0.59) the lime label has
+        // fallen under 4.5:1. The lime fill has no such conflict on a dark ground — 16.56:1
+        // in both directions — so dark runs lime fill + ink label. Same two colours, opposite
+        // jobs, which is exactly the rule the selected sidebar item already follows per mode.
+        // Both come straight from --brand / --brand-foreground, so the pair is defined once.
         //
-        // THE INK OUTLINE IS LOAD-BEARING, not styling. Lime measures 1.19:1 against the
-        // white page — far under the 3:1 a UI component boundary needs — so the fill has no
-        // findable edge and the primary action dissolves into the page. The LABEL was never
-        // the problem (ink on lime is 16.56:1); the SHAPE was.
-        //
-        // The edge is --brand-edge: a DEEPER STEP OF THE LIME, not ink. Ink solved findability
-        // at 18.98:1, which is right for a lone CTA and far too loud in a table where the
-        // button repeats on every row — twenty black outlines stop reading as definition and
-        // start reading as a grid of rules. The moss step is 3.78:1 against the page: still
-        // past the 3:1 a component boundary needs, at about a fifth of the contrast, and in
-        // the lime's own hue so it reads as the fill's shadow rather than a drawn border.
-        //
-        // Thickness stays at 1px, the minimum. An alpha step was tried and read WORSE, not
-        // softer: at 1px an alpha line antialiases into the page as a muddy grey, where a
-        // solid colour at the same width is a clean hairline. Harshness here is a COLOUR
-        // problem, not a weight one.
-        default: "border-brand-edge bg-brand text-brand-foreground hover:brightness-95",
+        // Hover lightens the violet and dims the lime: on a dark fill, brightening reads as
+        // hover, where dimming would read as disabled — and the reverse on a light one.
+        default: "bg-brand text-brand-foreground hover:brightness-110 dark:hover:brightness-95",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-input/30",
         secondary:
