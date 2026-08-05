@@ -156,7 +156,27 @@ async function aiConfig() {
   key = key || (process.env.ANTHROPIC_API_KEY || '').trim();
   model = model || (process.env.SUPPORT_AI_MODEL || '').trim() || DEFAULT_MODEL;
   const fromEnv = !!(process.env.ANTHROPIC_API_KEY || '').trim();
-  return { key, model, fromEnv };
+
+  /**
+   * A SAVED model is validated when written and never again — but AI_MODELS changes.
+   *
+   * Anthropic retires model ids on a published schedule, and this list has been updated at
+   * least once (it now offers Haiku 4.5 / Sonnet 5 / Opus 4.8). A model chosen under an older
+   * list stays in `settings` forever and keeps being sent, so the day that id retires every
+   * AI call starts coming back 404 `not_found_error` — which presents as "the assistant
+   * stopped responding", with nothing in the UI pointing at the model.
+   *
+   * So: re-check on READ. An unknown id falls back to the default rather than failing, and
+   * `staleModel` carries the dead id so the admin screen can say what happened instead of
+   * silently swapping it. Only a SAVED id is corrected — an operator who deliberately pins
+   * something via SUPPORT_AI_MODEL is left alone, since env is a deliberate override and may
+   * legitimately name a model that isn't in the dropdown.
+   */
+  let staleModel = null;
+  const known = AI_MODELS.some((m) => m.id === model);
+  const pinnedByEnv = model === (process.env.SUPPORT_AI_MODEL || '').trim();
+  if (!known && !pinnedByEnv) { staleModel = model; model = DEFAULT_MODEL; }
+  return { key, model, fromEnv, staleModel };
 }
 
 // Seller-friendly status label from the factory status (mirrors the front-end SELLER_STATUS:
@@ -408,6 +428,10 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       masked: maskKey(cfg.key, req.user?.role === 'admin'),
       fromEnv: cfg.fromEnv,        // true if the active key comes from the env (can't be cleared here)
       model: cfg.model,
+      // The saved model was retired or removed from the roster; `model` above is the default
+      // we fell back to. Surfaced so the screen can say so rather than quietly disagreeing
+      // with what the admin last picked.
+      staleModel: cfg.staleModel || null,
       models: AI_MODELS,
     };
   });
