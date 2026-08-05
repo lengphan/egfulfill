@@ -79,6 +79,11 @@ export function SubscriptionPanel() {
   const daysLeft = billing?.renews_at && now
     ? Math.max(0, Math.ceil((new Date(billing.renews_at).getTime() - now) / 86400000))
     : 0
+  // Same shape as daysLeft, and for the same reason: `now` is set in an effect rather than
+  // read during render, so the countdown can't shift between renders.
+  const trialDaysLeft = billing?.trial_ends_at && now
+    ? Math.max(0, Math.ceil((new Date(billing.trial_ends_at).getTime() - now) / 86400000))
+    : 0
 
   // A downgrade is a move to a CHEAPER monthly total, measured exactly as the server does
   // (billing.js), while a paid month is still running. This is the case that is now
@@ -175,9 +180,31 @@ export function SubscriptionPanel() {
             </span>
           </div>
 
+          {/* A TRIAL, which is not a subscription and must not be dressed as one.
+
+              A trial carries auto_renew=false and a renews_at, so the renewal block below
+              would otherwise render "keep <plan>" — a button that cannot do what it says,
+              because the trial branch in runRenewals fires before anything can renew. It is
+              shown instead of that block, not alongside it.
+
+              The promise made here is the one the server actually keeps: at the end you are
+              moved to Starter and NOTHING is charged. */}
+          {billing?.on_trial && billing.trial_ends_at && (
+            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/[0.06] p-2.5 text-xs">
+              <span className="font-semibold text-foreground">
+                Free trial — {trialDaysLeft} {trialDaysLeft === 1 ? "day" : "days"} left
+              </span>
+              <span className="text-muted-foreground">
+                {" "}· ends {fmtDate(billing.trial_ends_at)}. You won&apos;t be charged: at the end you
+                move back to Starter, and nothing you&apos;ve created is removed. Upgrade any time to
+                keep these features.
+              </span>
+            </div>
+          )}
+
           {/* Renewal state + the opt-out. Only meaningful on a paid plan — Starter has
-              nothing to renew. */}
-          {billing?.renews_at && current.monthlyPrice > 0 && (
+              nothing to renew, and a trial is handled above. */}
+          {billing?.renews_at && current.monthlyPrice > 0 && !billing?.on_trial && (
             <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               {billing.auto_renew ? (
                 <>

@@ -19,6 +19,8 @@ import { ACTION_CATEGORIES } from "@/components/app/activity-meta"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
+import { VolumeBoard } from "@/components/app/volume-board"
+import { VolumeTiersPanel } from "@/components/app/volume-tiers-panel"
 import { SiteContentPanel } from "@/components/app/site-content-panel"
 import { SupplierOrderingSettings } from "@/components/app/supplier-ordering-settings"
 import { getUser, updateUser } from "@/lib/auth"
@@ -2637,7 +2639,13 @@ export function SettingsView() {
       )}
       {canPlatform && (
         <TabsContent value="platform">
-          <PlatformPanel />
+          {/* The volume ladder sits with the other platform money settings rather than in
+              its own tab: it is the same kind of decision as a fee, and the seller-facing
+              half of it lives on their Plan tab. */}
+          <div className="space-y-4">
+            <PlatformPanel />
+            <VolumeTiersPanel />
+          </div>
         </TabsContent>
       )}
       {canPlatform && (
@@ -2689,7 +2697,13 @@ export function SettingsView() {
       )}
       {isSeller && (
         <TabsContent value="plan">
-          <SubscriptionPanel />
+          {/* The plan is BOUGHT; the volume rate is EARNED. They sit together because a
+              seller asking "what am I paying" means both, but they are separate cards
+              because conflating them is what makes a subscription look like a discount. */}
+          <div className="space-y-4">
+            <SubscriptionPanel />
+            <VolumeBoard />
+          </div>
         </TabsContent>
       )}
     </Tabs>

@@ -2523,6 +2523,12 @@ export type BillingPlan = {
   grace_days: number
   balance: number
   prices: { plans: Record<string, number>; spydeck_addon: number }
+  /** TRIAL state — display only. These never feed the upgrade/downgrade maths, which still
+   *  reads paid_plan/paid_addon exactly as before. A trial ends by LOCKING, never by
+   *  charging, so there is no amount here to price. */
+  on_trial?: boolean
+  trial_ends_at?: string | null
+  trial_used?: boolean
 }
 export function getBillingPlan() {
   return api<BillingPlan>(`/api/billing/plan`)
@@ -2539,6 +2545,54 @@ export type SubscribeResult = {
  *  the top-up methods that can fund it, so the caller offers a top-up rather than a dead end. */
 export function subscribePlan(body: { plan?: string; spydeckAddon?: boolean; method?: string }) {
   return api<SubscribeResult>(`/api/billing/subscribe`, { method: "POST", body: JSON.stringify(body) })
+}
+
+/** Admin: grant a free trial. Ends by locking to Starter — it never charges. */
+export function grantTrial(body: { userId: string; plan?: string; days?: number }) {
+  return api<{ ok?: boolean; plan?: string; days?: number; trial_ends_at?: string; error?: string }>(
+    `/api/billing/trial`, { method: "POST", body: JSON.stringify(body) })
+}
+
+/** One rung of the volume ladder: ship `minUnits` in a month, earn `pct` the next. */
+export type VolumeTier = { minUnits: number; pct: number }
+/** A resolved position on the ladder — what a period earned and what is still winnable. */
+export type VolumeStanding = {
+  period: string
+  /** The month this rate applies TO. Volume is earned in one month and spent in the next. */
+  appliesTo: string
+  units: number
+  pct: number
+  /** 1-based for display; 0 means no tier reached yet. */
+  index: number
+  minUnits: number
+  next: VolumeTier | null
+  unitsToNext: number | null
+}
+export type PlanUsage = {
+  seller: string | null
+  tiers: VolumeTier[]
+  /** FALSE while tiers are measured but not yet charged. The UI must say so rather than
+   *  implying a discount is already being applied — see /api/plan/usage. */
+  applied: boolean
+  earned?: VolumeStanding
+  running?: VolumeStanding
+}
+export function getPlanUsage() {
+  return api<PlanUsage>(`/api/plan/usage`)
+}
+export function getVolumeTiers() {
+  return api<{ tiers: VolumeTier[] }>(`/api/plan/tiers`)
+}
+/** Admin only. The server re-normalises whatever it's sent, so it is the one authority on
+ *  what a saved ladder means — the client never cleans tiers itself. */
+export function saveVolumeTiers(tiers: VolumeTier[]) {
+  return api<{ ok?: boolean; tiers: VolumeTier[]; dropped?: number; error?: string }>(
+    `/api/plan/tiers`, { method: "POST", body: JSON.stringify({ tiers }) })
+}
+export type VolumeSeller = VolumeStanding & { sellerId: string; orders: number }
+export function getVolumeReport(period?: string) {
+  return api<{ period: string; tiers: VolumeTier[]; sellers: VolumeSeller[] }>(
+    `/api/plan/volume${period ? `?period=${encodeURIComponent(period)}` : ""}`)
 }
 
 /** Turn monthly renewal on/off. Off doesn't cancel now — the paid month runs out, then
