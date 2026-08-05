@@ -811,7 +811,7 @@ export function DesignCanvasDialog({
         {/* Both terms are viewport units on purpose. `min(100%,78vh)` collapsed the column to
             zero: the column is `auto`, so its width comes from its content, and the content
             asked for a percentage OF that column — a circular reference resolving to nothing. */}
-        <div className="lg:sticky lg:top-0 lg:w-[min(64vh,46vw)] lg:self-start">
+        <div className="lg:sticky lg:top-0 lg:w-[min(74vh,46vw)] lg:self-start">
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {faces.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
