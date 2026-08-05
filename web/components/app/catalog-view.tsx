@@ -13,6 +13,7 @@ import { CatalogPrint } from "@/components/app/catalog-print"
 import { SupplierStylesPicker } from "@/components/app/supplier-styles-picker"
 import { CatalogExportHistory } from "@/components/app/catalog-export-history"
 import { CatalogSummaryBar } from "@/components/app/catalog-summary-bar"
+import { PartnerSheets } from "@/components/app/partner-sheets"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { colorsOf, swatchHex } from "@/components/app/products-catalog"
 import { sizesOf } from "@/lib/variant-resolve"
@@ -157,6 +158,10 @@ export function CatalogView() {
                 a thing comes FROM, not about two separate catalogues. */}
             <TabsTrigger value="mine">Our products</TabsTrigger>
             <TabsTrigger value="supplier">Supplier styles</TabsTrigger>
+            {/* A partner's own workbook, filled from this same catalogue. It lives beside
+                the lookbook and the CSV because they are three renderings of one picked
+                set, not three features. */}
+            <TabsTrigger value="partners">Partner sheets</TabsTrigger>
             <TabsTrigger value="history">Sent catalogues</TabsTrigger>
           </TabsList>
           {tab === "mine" && (
@@ -170,6 +175,7 @@ export function CatalogView() {
           )}
         </div>
         <TabsContent value="supplier"><SupplierStylesPicker onChanged={() => setSummaryTick((t) => t + 1)} /></TabsContent>
+        <TabsContent value="partners"><PartnerSheets /></TabsContent>
         <TabsContent value="history"><CatalogExportHistory onOpen={setReopenId} /></TabsContent>
         <TabsContent value="mine">
       <div className="space-y-3 px-5 py-4">

@@ -461,6 +461,55 @@ export function catalogExportUrl(all = false) {
 }
 
 /**
+ * The same rows the CSV is built from, as data.
+ *
+ * A partner sheet is filled in the browser — the mapping has to be previewed against real
+ * values before anything is written — so the rows come back as JSON rather than a file.
+ * `fields` is the server's own list of what a row contains, so the mapping UI can never
+ * offer a field the export doesn't actually emit.
+ */
+export type CatalogExportRow = Record<string, string>
+export function getCatalogRows(all = false) {
+  return api<{ rows: CatalogExportRow[]; fields: string[]; products: number; picks: number }>(
+    `/api/catalog/rows${all ? "?all=1" : ""}`
+  )
+}
+
+/**
+ * A partner's workbook, stored as the SHAPE it was found to have plus a field mapping.
+ * See lib/partner-sheet.ts — the parsing and the writing both happen client-side; the
+ * server only remembers the arrangement so it survives the tab closing.
+ */
+export type PartnerTemplate = {
+  id: string
+  name: string
+  fileName: string | null
+  layout: { sheets: { name: string; blocks: { id: string; title: string; headerRow: number; columns: { index: number; label: string }[] }[] }[] }
+  mapping: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+export function getPartnerTemplates() {
+  return api<{ templates: PartnerTemplate[] }>(`/api/partner/templates`)
+}
+export function createPartnerTemplate(body: { name: string; fileName?: string; layout: unknown; mapping: unknown }) {
+  return api<PartnerTemplate & { error?: string }>(`/api/partner/templates`, {
+    method: "POST", body: JSON.stringify(body),
+  })
+}
+/** Partial on purpose — saving a mapping must not clear the layout it refers to. */
+export function updatePartnerTemplate(id: string, body: { name?: string; fileName?: string; layout?: unknown; mapping?: unknown }) {
+  return api<PartnerTemplate & { error?: string }>(`/api/partner/templates/${encodeURIComponent(id)}`, {
+    method: "PUT", body: JSON.stringify(body),
+  })
+}
+export function deletePartnerTemplate(id: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/partner/templates/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  })
+}
+
+/**
  * A supplier style, rolled up from the synced sku rows. `picked` is whether it's published.
  *
  * `maxCost` is OUR supplier cost and this route is staff-only — it exists so the markup
