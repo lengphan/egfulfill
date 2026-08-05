@@ -85,7 +85,7 @@ export function DigitizerStudio() {
       <div className="flex items-center gap-3">
         <span className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Needle size={22} weight="duotone" /></span>
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Digitizer</h1>
+          <h1 className="font-title text-2xl font-semibold tracking-tight">Digitizer</h1>
           <p className="text-sm text-muted-foreground">Turn artwork into an embroidery preview and a machine file — or build one from scratch.</p>
         </div>
       </div>

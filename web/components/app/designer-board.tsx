@@ -448,7 +448,7 @@ export function DesignerBoard() {
             on the right stays. On mobile the hero is the title. */}
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><PenNib size={18} weight="fill" /></span>
         <div className="min-w-0 md:hidden">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Designer</h1>
+          <h1 className="font-title text-2xl font-semibold tracking-tight">Designer</h1>
           <p className="truncate text-sm text-muted-foreground">{view === "board" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
         </div>
         {/* Add design — the explicit way in, in EITHER view. Drag-drop onto a lane only

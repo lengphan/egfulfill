@@ -40,7 +40,7 @@ export function HelpCenter() {
     <div className="mx-auto max-w-5xl space-y-6">
       {/* Hero + search */}
       <div className="rounded-2xl border border-border bg-card p-8 text-center">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">How can we help?</h1>
+        <h1 className="font-title text-3xl font-semibold tracking-tight">How can we help?</h1>
         <p className="mt-1 text-muted-foreground">Search our docs or browse by topic below.</p>
         <div className="relative mx-auto mt-5 max-w-md">
           <MagnifyingGlass size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />

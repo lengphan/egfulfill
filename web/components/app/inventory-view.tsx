@@ -100,7 +100,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         {!embedded && (<>
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><Package size={18} weight="fill" /></span>
           <div className="min-w-0 md:hidden">
-            <h1 className="font-display text-2xl font-semibold tracking-tight">Inventory</h1>
+            <h1 className="font-title text-2xl font-semibold tracking-tight">Inventory</h1>
             <p className="truncate text-sm text-muted-foreground">Track stock per variant, flag low/out, and print SKU barcodes.</p>
           </div>
         </>)}

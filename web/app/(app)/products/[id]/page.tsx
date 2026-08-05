@@ -126,7 +126,7 @@ export default function ProductDetailPage() {
               <Image src={gallery[active] ?? gallery[0]} alt={product.name ?? "Product"} fill unoptimized className="object-cover" />
             ) : (
               <div className="flex size-full items-center justify-center bg-gradient-to-br from-violet-100 to-indigo-50 text-violet-500">
-                <span className="font-display text-6xl font-semibold">
+                <span className="font-title text-6xl font-semibold">
                   {(product.name ?? "?").trim().charAt(0).toUpperCase()}
                 </span>
               </div>
@@ -167,7 +167,7 @@ export default function ProductDetailPage() {
                 <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{product.type}</span>
               )}
             </div>
-            <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">{product.name ?? "Untitled"}</h1>
+            <h1 className="mt-2 font-title text-3xl font-semibold tracking-tight">{product.name ?? "Untitled"}</h1>
             <div className="mt-1 font-mono text-sm text-muted-foreground">{product.sku ?? "—"}</div>
           </div>
 

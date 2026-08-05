@@ -251,7 +251,7 @@ export function ProductsCatalog() {
                     />
                   ) : (
                     <div className={"flex size-full items-center justify-center " + PLACEHOLDER}>
-                      <span className="font-display text-4xl font-semibold">
+                      <span className="font-title text-4xl font-semibold">
                         {(p.name ?? "?").trim().charAt(0).toUpperCase()}
                       </span>
                     </div>

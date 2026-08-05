@@ -909,7 +909,7 @@ export function OrdersHub() {
       <div className="flex items-center gap-3 md:hidden">
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Orders</h1>
+          <h1 className="font-title text-2xl font-semibold tracking-tight">Orders</h1>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
       </div>

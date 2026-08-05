@@ -103,7 +103,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   to sell, the number belongs where the eye lands. */}
               <div className="mb-6 flex items-start justify-between gap-6 border-b border-neutral-200 pb-4">
                 <div className="min-w-0">
-                  <h2 className="font-display text-3xl font-bold uppercase leading-none tracking-tight">{st.name}</h2>
+                  <h2 className="font-title text-3xl font-bold uppercase leading-none tracking-tight">{st.name}</h2>
                   <div className="mt-1.5 flex items-baseline gap-2 text-xs text-neutral-500">
                     <span className="font-mono">{st.sku}</span>
                     {st.brand && <span>· {st.brand}</span>}
@@ -111,7 +111,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 </div>
                 {st.price != null && (
                   <div className="shrink-0 text-right">
-                    <div className="font-display text-4xl font-bold leading-none tabular-nums">{money(st.price)}</div>
+                    <div className="font-title text-4xl font-bold leading-none tabular-nums">{money(st.price)}</div>
                     <div className="mt-1 text-[9px] uppercase tracking-widest text-neutral-400">per unit</div>
                   </div>
                 )}
@@ -245,7 +245,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               </div>
 
               <footer className="mt-6 flex items-center justify-between border-t border-neutral-200 pt-3 text-[9px] text-neutral-400">
-                <span className="font-display text-sm font-semibold tracking-tight text-neutral-700">EGFULFILL</span>
+                <span className="font-title text-sm font-semibold tracking-tight text-neutral-700">EGFULFILL</span>
                 <span>{new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
               </footer>
             </section>

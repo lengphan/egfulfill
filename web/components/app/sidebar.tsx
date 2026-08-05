@@ -61,7 +61,7 @@ export function Sidebar() {
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
       {/* Wordmark — clean bold sans (retired the serif logo) */}
       <div className="flex h-16 shrink-0 items-center border-b border-border px-5">
-        <Link href="/dashboard" className="font-display text-2xl font-semibold tracking-tight text-foreground">
+        <Link href="/dashboard" className="font-title text-2xl font-semibold tracking-tight text-foreground">
           egfulfill
         </Link>
       </div>

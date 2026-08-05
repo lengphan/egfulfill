@@ -41,7 +41,7 @@ export function DesignerEarnings() {
       <div className="flex items-center gap-3 md:hidden">
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><CurrencyDollar size={18} weight="fill" /></span>
         <div className="min-w-0">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Earnings</h1>
+          <h1 className="font-title text-2xl font-semibold tracking-tight">Earnings</h1>
           <p className="truncate text-sm text-muted-foreground">Credits land here when a design is approved. Every entry is on the ledger.</p>
         </div>
       </div>

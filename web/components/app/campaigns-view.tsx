@@ -68,7 +68,7 @@ export function CampaignsView() {
         <div className="flex items-center gap-3 md:hidden">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Megaphone size={18} weight="fill" /></span>
           <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight">Campaigns</h1>
+            <h1 className="font-title text-2xl font-semibold tracking-tight">Campaigns</h1>
             <p className="text-sm text-muted-foreground">Facebook &amp; Google ad performance{data ? ` · ${data.since} → ${data.until}` : ""}</p>
           </div>
         </div>

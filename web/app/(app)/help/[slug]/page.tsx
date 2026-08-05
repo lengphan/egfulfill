@@ -39,7 +39,7 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
 
       {/* Answer */}
       <article className="rounded-2xl border border-border bg-card p-7">
-        <h1 className="font-display text-2xl font-semibold tracking-tight">{article.title}</h1>
+        <h1 className="font-title text-2xl font-semibold tracking-tight">{article.title}</h1>
         <p className="mt-1.5 text-muted-foreground">{article.summary}</p>
 
         <div className="mt-5 space-y-4">

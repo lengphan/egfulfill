@@ -1209,7 +1209,7 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
         <div className="flex items-center gap-3 md:hidden">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={18} weight="fill" /></span>
           <div className="min-w-0">
-            <h1 className="font-display text-2xl font-semibold tracking-tight">Purchase</h1>
+            <h1 className="font-title text-2xl font-semibold tracking-tight">Purchase</h1>
             <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
           </div>
         </div>

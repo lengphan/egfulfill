@@ -216,7 +216,7 @@ export default function NewOrderPage() {
         <Button variant="ghost" size="sm" onClick={() => router.push("/orders")} className="text-muted-foreground">
           <ArrowLeft size={16} weight="bold" /> Orders
         </Button>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">New order</h1>
+        <h1 className="font-title text-2xl font-semibold tracking-tight">New order</h1>
       </div>
 
       <SectionCard title="Shipping">

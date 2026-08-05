@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter, Outfit } from "next/font/google"
+import { Geist_Mono, Inter, Playfair_Display } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -8,19 +8,32 @@ import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
-// Display face for headings — marketing and app page titles alike, via `font-display`.
-//
-// Space Grotesk was tried here first and rejected: it is a WIDE face with generous
-// sidebearings, and at hero size (6.2rem) that built-in air scales with the type, so the
-// headline read as spaced-out letters rather than a word. Tracking couldn't fix it — the
-// hero was already at -0.04em and was fighting the typeface.
-//
-// Outfit is the same geometric family of shapes but drawn narrower, and — the part that
-// actually matters — it carries a true 900. The hero can be black again, and heavier
-// strokes against the same gaps is most of what closes a headline up.
-const outfit = Outfit({
+/**
+ * MARKETING DISPLAY FACE — Playfair Display. Chosen from a rendered specimen of the real
+ * headline on the real plate, not from a description.
+ *
+ * Three faces were tried and rejected here first, and the reasons are worth keeping because
+ * each one was a different mistake:
+ *
+ *   Fraunces        the original. Judged to lack character — correctly, as shipped: its
+ *                   personality lives in custom SOFT/WONK axes that were both at zero.
+ *   Space Grotesk   a WIDE face. At the hero's 6.2rem its generous sidebearings scale up
+ *                   with the type, so the headline read as spaced-out letters, not words.
+ *   Outfit          narrow and punchy with a real 900, but a neutral geometric sans has no
+ *                   voice by design — "alright, but not sophisticated".
+ *
+ * Playfair Display is a high-contrast transitional serif: the dramatic thick/thin stroke
+ * modulation is what reads as "sophisticated", and it is exactly what a geometric sans
+ * cannot do at any weight. Variable 400–900, so `font-display font-black` is a real 900.
+ *
+ * NOTE it is a WIDE face — wider than Outfit — so the hero wraps to two lines where Outfit
+ * fit one. That is a compositional change, not a bug; the hero's leading is already tuned
+ * for a two-line headline.
+ *
+ * This face is MARKETING + auth only. App page titles take `--font-title`; see globals.css.
+ */
+const playfair = Playfair_Display({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
   variable: "--font-display-face",
 })
 
@@ -51,7 +64,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, outfit.variable)}
+      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, playfair.variable)}
     >
       {/* Zoom, applied BEFORE first paint.
           Same trick next-themes uses for dark mode, and for the same reason: read from a

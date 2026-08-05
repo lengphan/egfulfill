@@ -42,7 +42,7 @@ export function ShippingView() {
       <div className="flex items-center gap-3 md:hidden">
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Truck size={18} weight="fill" /></span>
         <div className="min-w-0">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Shipping</h1>
+          <h1 className="font-title text-2xl font-semibold tracking-tight">Shipping</h1>
           <p className="truncate text-sm text-muted-foreground">Today&apos;s dispatch queue and the shipment archive.</p>
         </div>
       </div>
