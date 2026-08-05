@@ -321,7 +321,7 @@ export function IntegrationsPanel() {
       }
     >
       <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-5 py-2.5 text-xs text-muted-foreground">
-        <ShieldCheck size={14} weight="fill" className="text-emerald-600" />
+        <ShieldCheck size={14} weight="fill" className="text-success" />
         Set or replace a credential inside its row — saved to the database and used straight away. A few read
         their credential once at boot and need a server restart to pick up a change.
       </div>
@@ -389,7 +389,7 @@ export function IntegrationsPanel() {
                     <div className="break-all font-mono text-xs text-muted-foreground">{res.detail}</div>
                   )}
                   {tests[i.key]?.result && (
-                    <div className={"break-words text-xs " + (tests[i.key]!.result!.ok ? "text-emerald-600" : "text-destructive")}>
+                    <div className={"break-words text-xs " + (tests[i.key]!.result!.ok ? "text-success" : "text-destructive")}>
                       {tests[i.key]!.result!.ok ? "✓ " : "✗ "}{tests[i.key]!.result!.msg}
                     </div>
                   )}
@@ -545,10 +545,10 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
         {cfg?.keySet && !cfg.fromEnv && (
           <Button size="sm" variant="outline" onClick={removeKey} disabled={saving}>Remove key</Button>
         )}
-        {saved && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check size={14} weight="bold" /> Saved</span>}
+        {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
       </div>
       {testResult && (
-        <div className={"mt-2 text-sm " + (testResult.ok ? "text-emerald-600" : "text-destructive")}>
+        <div className={"mt-2 text-sm " + (testResult.ok ? "text-success" : "text-destructive")}>
           {testResult.ok ? "✓ " : "✗ "}{testResult.msg}
         </div>
       )}

@@ -76,7 +76,7 @@ export function DesignerEarnings() {
                         <td className="px-4 py-2 text-muted-foreground">{fmtDT(r.created_at)}</td>
                         <td className="px-4 py-2">{r.note || r.ref || "—"}</td>
                         <td className="px-4 py-2 text-muted-foreground">{String(r.type || "").replace(/-(in|out)$/, "")}</td>
-                        <td className={"px-4 py-2 text-right font-semibold tabular-nums " + (d >= 0 ? "text-emerald-600" : "text-foreground")}>{d >= 0 ? "+" : "−"}{money(Math.abs(d))}</td>
+                        <td className={"px-4 py-2 text-right font-semibold tabular-nums " + (d >= 0 ? "text-success" : "text-foreground")}>{d >= 0 ? "+" : "−"}{money(Math.abs(d))}</td>
                       </tr>
                     )
                   })}

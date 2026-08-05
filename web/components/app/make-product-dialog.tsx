@@ -119,7 +119,7 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
 
         {result?.ok ? (
           <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-            <div className="font-semibold text-emerald-600">{result.text}</div>
+            <div className="font-semibold text-success">{result.text}</div>
             {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">Open the draft on Etsy →</a>}
             <Button onClick={() => onOpenChange(false)}>Done</Button>
           </div>

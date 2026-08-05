@@ -224,7 +224,7 @@ function EmailBrandingCard() {
         </div>
       </div>
           <DialogFooter className="mt-2 flex-wrap items-center gap-3">
-            {saved && <span className="mr-auto text-xs text-emerald-600 dark:text-emerald-400">Saved — applies to the next send.</span>}
+            {saved && <span className="mr-auto text-xs text-success dark:text-emerald-400">Saved — applies to the next send.</span>}
             {err && <span className="mr-auto text-xs text-destructive">{err}</span>}
             <Button size="sm" onClick={save} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : null}Save branding</Button>
           </DialogFooter>

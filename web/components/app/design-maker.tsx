@@ -281,7 +281,7 @@ export function DesignMaker() {
     <div className="flex h-[calc(100svh-7rem)] flex-col gap-3">
       <div className="flex items-center gap-3">
         <DesignLabTabs />
-        {msg && <span className={"ml-2 text-sm " + (msg.tone === "ok" ? "text-emerald-600" : "text-destructive")}>{msg.text}</span>}
+        {msg && <span className={"ml-2 text-sm " + (msg.tone === "ok" ? "text-success" : "text-destructive")}>{msg.text}</span>}
       </div>
 
       <div className="flex min-h-0 flex-1 gap-3">

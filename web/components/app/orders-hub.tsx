@@ -1104,7 +1104,7 @@ export function OrdersHub() {
                 <X size={14} weight="bold" />
               </button>
               {pushMsg && (
-                <span className={"text-xs font-medium " + (pushMsg.tone === "ok" ? "text-emerald-600" : "text-destructive")}>
+                <span className={"text-xs font-medium " + (pushMsg.tone === "ok" ? "text-success" : "text-destructive")}>
                   {pushMsg.text}
                 </span>
               )}
@@ -1191,7 +1191,7 @@ export function OrdersHub() {
                 tracking: (
                   <div className="flex min-w-0 items-center gap-1.5">
                     {track ? (
-                      <a href={trackUrl(o.carrier || label?.carrier, track)} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 font-mono text-xs font-medium text-emerald-600 hover:underline" title={`${o.carrier || label?.carrier || "USPS"} ${track}`}>
+                      <a href={trackUrl(o.carrier || label?.carrier, track)} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 font-mono text-xs font-medium text-success hover:underline" title={`${o.carrier || label?.carrier || "USPS"} ${track}`}>
                         <span className="truncate">{track}</span><ArrowSquareOut size={9} weight="bold" className="shrink-0" />
                       </a>
                     ) : (
@@ -1555,7 +1555,7 @@ export function OrdersHub() {
                             />
                             <div className="pointer-events-none absolute bottom-2 right-2.5">
                               {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking…</span>}
-                              {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-emerald-600"><CheckCircle size={12} weight="fill" /> Validated</span>}
+                              {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-success"><CheckCircle size={12} weight="fill" /> Validated</span>}
                               {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
                             </div>
                           </div>
@@ -1854,7 +1854,7 @@ export function OrdersHub() {
                               onClick={() => sendToDesigner(o, it)}
                             >
                               {busy === `dsn:${key}` ? <CircleNotch size={13} className="animate-spin" />
-                                : sent.has(key) ? <><CheckCircle size={13} weight="fill" className="text-emerald-600" /> {tl("ui", "Sent")}</>
+                                : sent.has(key) ? <><CheckCircle size={13} weight="fill" className="text-success" /> {tl("ui", "Sent")}</>
                                 : <><PaperPlaneTilt size={13} weight="bold" /> {tl("ui", "Board")}</>}
                             </Button>
                           )}

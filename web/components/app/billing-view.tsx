@@ -163,7 +163,7 @@ export function BillingView() {
           </label>
           <span className="ml-auto text-sm">
             <span className="text-muted-foreground">Period total </span>
-            <span className={"font-semibold tabular-nums " + (total < 0 ? "text-destructive" : "text-emerald-600")}>{usd(total)}</span>
+            <span className={"font-semibold tabular-nums " + (total < 0 ? "text-destructive" : "text-success")}>{usd(total)}</span>
           </span>
         </div>
 
@@ -196,7 +196,7 @@ export function BillingView() {
                     <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.type}</td>
                     <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.ref || "—"}</td>
                     <td className="max-w-xs truncate px-3 py-2 text-muted-foreground">{r.note || "—"}</td>
-                    <td className={"whitespace-nowrap px-5 py-2 text-right font-semibold tabular-nums " + (r.delta < 0 ? "text-destructive" : "text-emerald-600")}>
+                    <td className={"whitespace-nowrap px-5 py-2 text-right font-semibold tabular-nums " + (r.delta < 0 ? "text-destructive" : "text-success")}>
                       {usd(r.delta)}
                     </td>
                   </tr>

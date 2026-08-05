@@ -400,7 +400,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                     ? "border-amber-400 bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
                     : "border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
             >
-              {routing ? <CircleNotch size={14} className="animate-spin" /> : routed ? <Check size={14} weight="bold" className="text-emerald-600" /> : <PaperPlaneTilt size={14} />}
+              {routing ? <CircleNotch size={14} className="animate-spin" /> : routed ? <Check size={14} weight="bold" className="text-success" /> : <PaperPlaneTilt size={14} />}
               {routed ? "Sent to Designer board" : "Send original to Designer board"}
             </button>
             <p className="text-2xs leading-tight text-muted-foreground">For complex art — a person digitizes the original artwork by hand. Sends the source file, not the auto-preview.</p>

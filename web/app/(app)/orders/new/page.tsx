@@ -240,7 +240,7 @@ export default function NewOrderPage() {
                   </span>
                 )}
                 {valid.kind === "ok" && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-[11px] font-medium text-success">
                     <CheckCircle size={12} weight="fill" /> Validated
                   </span>
                 )}

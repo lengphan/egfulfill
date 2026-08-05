@@ -134,7 +134,7 @@ export function ShopAnalyzer() {
                 { label: "One image", n: s.issues.singleImage, hint: "fewer than 2" },
               ].map((it) => (
                 <div key={it.label} className="bg-card p-4">
-                  <div className={"text-xl font-bold tabular-nums " + (it.n ? "text-amber-600" : "text-emerald-600")}>{it.n}</div>
+                  <div className={"text-xl font-bold tabular-nums " + (it.n ? "text-amber-600" : "text-success")}>{it.n}</div>
                   <div className="text-xs font-medium">{it.label}</div>
                   <div className="text-2xs text-muted-foreground">{it.hint}</div>
                 </div>

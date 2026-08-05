@@ -212,7 +212,7 @@ export function SupplierOrderingSettings() {
         <Button onClick={save} disabled={busy}>
           {busy ? <CircleNotch size={15} className="animate-spin" /> : <Check size={15} weight="bold" />} Save defaults
         </Button>
-        {saved && <span className="text-sm text-emerald-600">Saved — purchases will use these.</span>}
+        {saved && <span className="text-sm text-success">Saved — purchases will use these.</span>}
         {err && <span className="text-sm text-destructive">{err}</span>}
         <a href="/purchasing?tab=purchase" className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
           Purchasing <ArrowSquareOut size={11} weight="bold" />

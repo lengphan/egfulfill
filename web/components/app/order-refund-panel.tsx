@@ -140,11 +140,11 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
                     been refunded should say so, not just look unavailable. */}
                 <div className="text-xs text-muted-foreground">
                   {usd(p.charged)} charged
-                  {p.refunded > 0 && <> · <span className="text-emerald-600">{usd(p.refunded)} refunded</span></>}
+                  {p.refunded > 0 && <> · <span className="text-success">{usd(p.refunded)} refunded</span></>}
                 </div>
               </div>
               {spent ? (
-                <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                <span className="inline-flex items-center gap-1 text-xs text-success">
                   <CheckCircle size={12} weight="fill" /> fully refunded
                 </span>
               ) : (
@@ -204,7 +204,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
           <div className="space-y-1">
             {state.refunds.map((r, i) => (
               <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="tabular-nums text-emerald-600">{usd(r.amount)}</span>
+                <span className="tabular-nums text-success">{usd(r.amount)}</span>
                 {r.part && <span>· {parts.find((p) => p.key === r.part)?.label ?? r.part}</span>}
                 {r.note && <span className="truncate">· {r.note}</span>}
                 <span className="ml-auto shrink-0">{new Date(r.at).toLocaleDateString()}</span>

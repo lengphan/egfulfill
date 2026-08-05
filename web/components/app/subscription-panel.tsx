@@ -239,7 +239,7 @@ export function SubscriptionPanel() {
                   ) : downgradeScheduled && t.id === "starter" ? (
                     <span className="font-medium text-foreground">Starts {fmtDate(billing.renews_at)}</span>
                   ) : alreadyPaidFor(t.id as PlanId) ? (
-                    <span className="font-medium text-emerald-600">$0 now — paid through {fmtDate(billing.renews_at)}</span>
+                    <span className="font-medium text-success">$0 now — paid through {fmtDate(billing.renews_at)}</span>
                   ) : (priceOf({ plan: t.id as PlanId }) ?? 0) > 0 ? (
                     <>{usd(priceOf({ plan: t.id as PlanId }) ?? 0)} now for the {daysLeft} day{daysLeft === 1 ? "" : "s"} left</>
                   ) : null}
@@ -308,7 +308,7 @@ export function SubscriptionPanel() {
             ) : spydeckAddon ? (
               <div className="flex flex-col items-end gap-2">
                 <div className="text-sm text-muted-foreground">
-                  ${cfg.price}/mo · <span className="font-semibold text-emerald-600">Active</span>
+                  ${cfg.price}/mo · <span className="font-semibold text-success">Active</span>
                 </div>
                 <Button variant="outline" size="sm" disabled={!mounted}
                   onClick={() => { setErr(null); setShort(null); setPending({ addon: false, label: "Remove SpyDeck" }) }}>

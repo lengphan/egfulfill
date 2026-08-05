@@ -256,7 +256,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{busy ? <span className="inline-flex items-center gap-1"><CircleNotch size={12} className="animate-spin" /> saving…</span> : "Ready — the input stays focused for the gun."}</span>
-            {log.length > 0 && <span>Session net <b className={netToday >= 0 ? "text-emerald-600" : "text-red-600"}>{netToday >= 0 ? "+" : ""}{netToday}</b> · {log.length} scan{log.length === 1 ? "" : "s"}</span>}
+            {log.length > 0 && <span>Session net <b className={netToday >= 0 ? "text-success" : "text-red-600"}>{netToday >= 0 ? "+" : ""}{netToday}</b> · {log.length} scan{log.length === 1 ? "" : "s"}</span>}
           </div>
         </div>
       </SectionCard>
@@ -272,7 +272,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
           <div className="divide-y divide-border">
             {log.map((e) => (
               <div key={e.key} className="flex items-center gap-3 px-5 py-2.5">
-                <span className={"flex size-7 shrink-0 items-center justify-center rounded-lg " + (!e.ok ? "bg-red-100 text-red-600" : e.dir === "in" ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-700")}>
+                <span className={"flex size-7 shrink-0 items-center justify-center rounded-lg " + (!e.ok ? "bg-red-100 text-red-600" : e.dir === "in" ? "bg-emerald-100 text-success" : "bg-amber-100 text-amber-700")}>
                   {!e.ok ? <Warning size={13} weight="fill" /> : e.dir === "in" ? <ArrowDown size={13} weight="bold" /> : <ArrowUp size={13} weight="bold" />}
                 </span>
                 <div className="min-w-0 flex-1">

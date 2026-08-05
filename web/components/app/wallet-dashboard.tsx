@@ -400,7 +400,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <Badge className={detail.tone} variant="secondary">{detail.label}</Badge>
-                <span className={"text-lg font-semibold tabular-nums " + (detail.rejected ? "text-muted-foreground line-through" : detail.amount >= 0 ? "text-emerald-600" : "text-foreground")}>
+                <span className={"text-lg font-semibold tabular-nums " + (detail.rejected ? "text-muted-foreground line-through" : detail.amount >= 0 ? "text-success" : "text-foreground")}>
                   {usd(detail.amount, !detail.rejected)}
                 </span>
               </div>
@@ -437,7 +437,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             <div
               className={
                 "mt-1.5 text-[12.5px] font-medium " +
-                (k.tone === "pos" ? "text-emerald-600" : k.tone === "neg" ? "text-red-600" : "text-muted-foreground")
+                (k.tone === "pos" ? "text-success" : k.tone === "neg" ? "text-red-600" : "text-muted-foreground")
               }
             >
               {k.sub}
@@ -523,7 +523,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                       "text-right font-semibold tabular-nums " +
                       (t.rejected
                         ? "text-muted-foreground line-through"
-                        : t.amount >= 0 ? "text-emerald-600" : "text-foreground")
+                        : t.amount >= 0 ? "text-success" : "text-foreground")
                     }
                   >
                     {/* No +/- on a declined attempt: the sign says which way money moved,

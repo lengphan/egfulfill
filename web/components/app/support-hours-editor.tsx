@@ -129,7 +129,7 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
         )}
 
         <DialogFooter>
-          {saved && <span className="mr-auto self-center text-xs text-emerald-600 dark:text-emerald-400">Saved — applies immediately.</span>}
+          {saved && <span className="mr-auto self-center text-xs text-success dark:text-emerald-400">Saved — applies immediately.</span>}
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
           {isAdmin && <Button onClick={save} disabled={busy || !cfg}>{busy ? <CircleNotch size={14} className="animate-spin" /> : null}Save</Button>}
         </DialogFooter>

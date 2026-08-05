@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
     <AuthShell subtitle="Reset your password">
       {sent ? (
         <div className="space-y-4 text-center">
-          <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+          <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-100 text-success">
             <CheckCircle size={26} weight="fill" />
           </span>
           <div className="text-sm text-muted-foreground">

@@ -385,7 +385,7 @@ export function OrdersList() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-1 font-medium text-emerald-600 hover:underline"
+                                  className="inline-flex items-center gap-1 font-medium text-success hover:underline"
                                 >
                                   <Truck size={12} weight="fill" /> {o.carrier || "USPS"} {o.tracking} <ArrowSquareOut size={10} weight="bold" />
                                 </a>

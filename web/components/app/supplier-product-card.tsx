@@ -151,7 +151,7 @@ export function SupplierProductCard({
             title={synced ? "Synced" : "Re-sync this style from the supplier"}
             aria-label="Re-sync this product"
             className={"absolute bottom-2 left-2 flex size-7 items-center justify-center rounded-full border transition-colors " +
-              (synced ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+              (synced ? "border-emerald-200 bg-emerald-50 text-success"
                 : "border-border bg-background/80 text-muted-foreground hover:text-primary disabled:opacity-60")}>
             {syncing ? <CircleNotch size={14} className="animate-spin" />
               : synced ? <CheckCircle size={14} weight="fill" />

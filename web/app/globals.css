@@ -46,6 +46,7 @@
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-success: var(--success);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -109,6 +110,15 @@
     --muted-foreground: oklch(0.556 0 0);
     --accent: oklch(0.966 0.022 285);
     --accent-foreground: oklch(0.45 0.24 283.5);
+  /* SUCCESS is a TOKEN, not a fixed Tailwind shade. `text-emerald-600` was used in 56 places
+   * as the "positive" signal — and being a hardcoded shade it had no dark variant, so it
+   * measured 3.77:1 on the light card and 4.06:1 on the dark one. It failed the 4.5:1 body
+   * floor in BOTH modes: the single most-repeated status text in the product was the one
+   * nobody could read. These steps are measured against their own surface per mode.
+   *
+   * This is distinct from the emerald that means SHIPPED on the floor — that stays a status
+   * chip. This is the ink for "a number moved the right way". */
+    --success: oklch(0.48 0.135 158);
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.902 0.004 91);
     --input: oklch(0.922 0 0);
@@ -187,6 +197,7 @@
     --muted-foreground: oklch(0.715 0.012 285);
     --accent: oklch(0.29 0.055 285);
     --accent-foreground: oklch(0.92 0.08 285);
+    --success: oklch(0.80 0.155 158);
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(0.370 0.030 285);
     --input: oklch(0.345 0.028 285);

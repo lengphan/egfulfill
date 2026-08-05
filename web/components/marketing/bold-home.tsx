@@ -416,7 +416,10 @@ export function BoldHome({ content }: { content: SiteContent }) {
           viewport={{ once: true, margin: "0px 0px -10% 0px" }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         >
-          <h2 className="mx-auto max-w-3xl font-display font-black leading-[0.95] tracking-[-0.035em] text-[#0B0B0C]" style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}>
+          {/* LIME on the violet, not ink. Measured 5.07:1, so it clears the 3:1 floor for
+              large text with room to spare — this is real readable type, not a decorative
+              ghost. The subhead stays paper so the band still has one clear hierarchy. */}
+          <h2 className="mx-auto max-w-3xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 5vw, 4rem)", color: ACID }}>
             {cta.heading}
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-[17px] leading-relaxed" style={{ color: "rgba(250,248,243,0.75)" }}>{cta.subhead}</p>

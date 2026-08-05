@@ -600,7 +600,7 @@ export function ProductEditorDialog({
                         const m = baseN - costRow
                         return (
                           <span
-                            className={"text-right text-xs font-semibold tabular-nums " + (!isFinite(m) ? "text-muted-foreground" : m >= 0 ? "text-emerald-600" : "text-destructive")}
+                            className={"text-right text-xs font-semibold tabular-nums " + (!isFinite(m) ? "text-muted-foreground" : m >= 0 ? "text-success" : "text-destructive")}
                             title={isFinite(m) ? `Base ${baseN.toFixed(2)} − product cost ${costRow.toFixed(2)}` : "Enter a product cost and a base cost"}
                           >
                             {isFinite(m) ? `$${m.toFixed(2)}` : "—"}
@@ -750,7 +750,7 @@ export function ProductEditorDialog({
                       <img src={u} alt="" className="size-full object-cover" draggable={false} />
                     </button>
                     {u === img && <span className="pointer-events-none absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-3xs font-semibold text-primary-foreground shadow">Main</span>}
-                    {assigned && matchConf[assigned] === "high" && <Check size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-emerald-600" aria-label="Confident match" />}
+                    {assigned && matchConf[assigned] === "high" && <Check size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-success" aria-label="Confident match" />}
                     {assigned && matchConf[assigned] === "low" && <Question size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-amber-500" aria-label="Guessed — verify" />}
                     {/* Colour tag overlaid on the photo. */}
                     {colors.length > 0 && (

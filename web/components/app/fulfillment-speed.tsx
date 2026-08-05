@@ -64,7 +64,7 @@ export function FulfillmentSpeed({ orders, loading }: { orders: OrderRow[]; load
               <div className="text-xs text-muted-foreground leading-tight">delivered by USPS ETA</div>
             </div>
             <div className="ml-auto text-right">
-              <div className={"text-xl font-bold tabular-nums leading-none " + (s.onTime.pct === null ? "text-muted-foreground" : s.onTime.pct >= 90 ? "text-emerald-600 dark:text-emerald-400" : s.onTime.pct >= 75 ? "text-amber-600" : "text-red-600")}>{s.onTime.pct === null ? "—" : `${s.onTime.pct}%`}</div>
+              <div className={"text-xl font-bold tabular-nums leading-none " + (s.onTime.pct === null ? "text-muted-foreground" : s.onTime.pct >= 90 ? "text-success dark:text-emerald-400" : s.onTime.pct >= 75 ? "text-amber-600" : "text-red-600")}>{s.onTime.pct === null ? "—" : `${s.onTime.pct}%`}</div>
               <div className="mt-1 text-2xs text-muted-foreground">{s.onTime.n ? `of ${s.onTime.n} delivered` : "collecting"}</div>
             </div>
           </div>

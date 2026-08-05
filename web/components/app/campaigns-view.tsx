@@ -164,7 +164,7 @@ export function CampaignsView() {
                       <td className="px-4 py-2.5 text-right font-medium tabular-nums">{usd(c.spend)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{int(c.clicks)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{int(c.conversions)}</td>
-                      <td className={"px-4 py-2.5 text-right font-semibold tabular-nums " + ((c.roas ?? 0) >= 1 ? "text-emerald-600" : c.roas != null ? "text-red-600" : "text-muted-foreground")}>{c.roas != null ? `${c.roas}x` : "—"}</td>
+                      <td className={"px-4 py-2.5 text-right font-semibold tabular-nums " + ((c.roas ?? 0) >= 1 ? "text-success" : c.roas != null ? "text-red-600" : "text-muted-foreground")}>{c.roas != null ? `${c.roas}x` : "—"}</td>
                       <td className="px-4 py-2.5 text-right">
                         <Button size="sm" variant="ghost" disabled={busy === c.id} onClick={() => toggle(c.channel, c.id, c.status)} title={c.status === "active" ? "Pause" : "Resume"}>
                           {busy === c.id ? <CircleNotch size={13} className="animate-spin" /> : c.status === "active" ? <Pause size={13} weight="fill" /> : <Play size={13} weight="fill" />}
@@ -237,7 +237,7 @@ function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boole
           </div>
 
           {err && <div className="flex items-center gap-1.5 text-sm text-destructive"><Warning size={14} weight="fill" /> {err}</div>}
-          {done && <div className="flex items-center gap-1.5 text-sm text-emerald-600"><ArrowSquareOut size={14} weight="bold" /> {done}</div>}
+          {done && <div className="flex items-center gap-1.5 text-sm text-success"><ArrowSquareOut size={14} weight="bold" /> {done}</div>}
 
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Close</Button>

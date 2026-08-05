@@ -225,7 +225,7 @@ export function ImportOrdersDialog({
 
         {done ? (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <span className="flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+            <span className="flex size-14 items-center justify-center rounded-full bg-emerald-100 text-success">
               <CheckCircle size={30} weight="fill" />
             </span>
             <div className="font-semibold">Imported {done.imported} {done.imported === 1 ? "order" : "orders"}</div>
@@ -362,7 +362,7 @@ export function ImportOrdersDialog({
               <div className="rounded-xl border border-border">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-4 py-2.5 text-sm">
                   <span className="inline-flex items-center gap-1.5"><Table size={14} className="text-muted-foreground" /> {summary.orders} {summary.orders === 1 ? "order" : "orders"}</span>
-                  <span className="inline-flex items-center gap-1.5 text-emerald-600"><CheckCircle size={14} weight="fill" /> {summary.valid} valid</span>
+                  <span className="inline-flex items-center gap-1.5 text-success"><CheckCircle size={14} weight="fill" /> {summary.valid} valid</span>
                   {summary.invalid > 0 && <span className="inline-flex items-center gap-1.5 text-amber-600"><WarningCircle size={14} weight="fill" /> {summary.invalid} skipped</span>}
                 </div>
                 <div className="max-h-64 overflow-y-auto">
@@ -385,7 +385,7 @@ export function ImportOrdersDialog({
                           <td className="max-w-[160px] truncate px-3 py-1.5 text-muted-foreground">{r.product_title || r.item_name || r.item_sku || "—"}</td>
                           <td className="px-3 py-1.5">
                             {r._valid ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><CheckCircle size={13} weight="fill" /> OK</span>
+                              <span className="inline-flex items-center gap-1 text-xs text-success"><CheckCircle size={13} weight="fill" /> OK</span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-xs text-amber-600" title={r._errors}><WarningCircle size={13} weight="fill" /> {r._errors}</span>
                             )}

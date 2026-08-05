@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card"
 export type Tone = "pos" | "neg" | "mut"
 
 const toneClass: Record<Tone, string> = {
-  pos: "text-emerald-600",
+  pos: "text-success",
   neg: "text-destructive",
   mut: "text-muted-foreground",
 }

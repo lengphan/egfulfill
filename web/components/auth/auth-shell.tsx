@@ -16,52 +16,45 @@ import { PLATE_DEEP, ACID, SURFACE } from "@/components/marketing/bold-kit"
  * violet in the system and no second value here to drift when that one moves.
  */
 /**
- * The waves. Decoration, and deliberately the only decoration on the page.
+ * LINES, not bands. One plate colour and one accent — nothing else.
  *
- * Three stacked bands in PAPER at 5–13% over the plate, plus one hairline in the green. They
- * are tints of colours already in the system rather than new hues, so the plate stays the one
- * violet and nothing here can drift when it moves.
+ * The first version stacked filled paper bands over the plate, which read as several
+ * different purples rather than one: each translucent fill made a new value, so the page
+ * looked like it had a four-colour background instead of a violet one. Every fill is gone.
+ * What is left is the green, drawn as line.
  *
- * `preserveAspectRatio="none"` lets the SVG stretch to any width — the waves are a backdrop,
- * not a figure, so distorting them is correct and keeps a 380px phone and a 2560px monitor
- * both looking deliberate. `aria-hidden` + `pointer-events-none` keep it out of the
- * accessibility tree and out of the way of the form.
+ * The lines are grouped ABOVE and BELOW the form and never cross the middle band, so the card
+ * sits in clear space rather than on top of a pattern. That is a real layout constraint, not
+ * just a z-index: the card is opaque, so anything running under it would be hidden anyway —
+ * the point is that nothing crowds the EDGES of the card either.
  *
- * Static on purpose: the house style is that motion is spatial and meaningful, and a
- * perpetually drifting background on a sign-in form is neither.
+ * `preserveAspectRatio="none"` stretches the curves to any viewport. They are a backdrop, not
+ * a figure, so distorting them is correct. `aria-hidden` + `pointer-events-none` keep the
+ * whole thing out of the accessibility tree and out of the form's way.
+ *
+ * Static on purpose: the house rule is that motion is spatial and meaningful, and a
+ * perpetually drifting sign-in background is neither.
  */
 function Waves() {
   return (
     <svg
       aria-hidden
-      className="pointer-events-none absolute inset-x-0 bottom-0 h-[42svh] w-full select-none"
-      viewBox="0 0 1440 320"
+      className="pointer-events-none absolute inset-0 h-full w-full select-none"
+      viewBox="0 0 1440 900"
       preserveAspectRatio="none"
     >
-      <path
-        d="M0,160 C240,100 480,220 720,180 C960,140 1200,60 1440,120 L1440,320 L0,320 Z"
-        fill={SURFACE}
-        opacity="0.05"
-      />
-      <path
-        d="M0,200 C260,150 520,260 780,210 C1040,160 1240,120 1440,170 L1440,320 L0,320 Z"
-        fill={SURFACE}
-        opacity="0.08"
-      />
-      <path
-        d="M0,250 C300,200 600,290 900,250 C1140,218 1300,190 1440,225 L1440,320 L0,320 Z"
-        fill={SURFACE}
-        opacity="0.13"
-      />
-      {/* One green hairline riding the crest — the single accent, same role the acid plays
-          everywhere else in the system. */}
-      <path
-        d="M0,150 C240,90 480,210 720,170 C960,130 1200,50 1440,110"
-        fill="none"
-        stroke={ACID}
-        strokeWidth="2"
-        opacity="0.5"
-      />
+      {/* Paths run from -40 to 1480 rather than 0 to 1440 so no line ENDS on screen — a
+          stroke that stops at the viewport edge reads as a broken graphic. */}
+      <g fill="none" stroke={ACID} strokeLinecap="round">
+        {/* Above the form. */}
+        <path d="M-40,110 C260,30 520,180 780,110 C1020,46 1240,140 1480,80" strokeWidth="2" opacity="0.55" />
+        <path d="M-40,185 C240,115 520,245 800,175 C1060,111 1260,200 1480,155" strokeWidth="1.5" opacity="0.28" />
+
+        {/* Below it. Three, so the eye reads a current rather than a single stray rule. */}
+        <path d="M-40,700 C260,620 520,780 780,700 C1040,626 1260,730 1480,660" strokeWidth="2" opacity="0.55" />
+        <path d="M-40,772 C240,702 520,852 800,777 C1060,708 1280,802 1480,737" strokeWidth="1.5" opacity="0.34" />
+        <path d="M-40,844 C280,784 540,912 820,847 C1080,788 1280,867 1480,812" strokeWidth="1.5" opacity="0.2" />
+      </g>
     </svg>
   )
 }

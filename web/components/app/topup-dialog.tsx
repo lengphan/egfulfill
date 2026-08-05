@@ -19,7 +19,7 @@ const usd0 = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("en-US
 function Success({ title, sub, onDone }: { title: string; sub: string; onDone: () => void }) {
   return (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
-      <span className="flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+      <span className="flex size-14 items-center justify-center rounded-full bg-emerald-100 text-success">
         <CheckCircle size={30} weight="fill" />
       </span>
       <div className="font-semibold">{title}</div>

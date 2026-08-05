@@ -105,7 +105,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           </div>
         </>)}
         <div className="ml-auto flex items-center gap-2">
-          {saving ? <span className="text-xs text-muted-foreground"><CircleNotch size={13} className="inline animate-spin" /> Saving…</span> : saved ? <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><Check size={13} weight="bold" /> Saved</span> : null}
+          {saving ? <span className="text-xs text-muted-foreground"><CircleNotch size={13} className="inline animate-spin" /> Saving…</span> : saved ? <span className="inline-flex items-center gap-1 text-xs text-success"><Check size={13} weight="bold" /> Saved</span> : null}
         </div>
       </div>
 
@@ -366,7 +366,7 @@ function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () =
         </DialogHeader>
         <div className="flex items-center justify-between border-b border-border pb-2 text-sm">
           <span className="font-mono text-xs font-medium">{sku}</span>
-          {rows && rows.length > 0 && <span className="text-xs text-muted-foreground">Net <b className={net >= 0 ? "text-emerald-600" : "text-red-600"}>{net >= 0 ? "+" : ""}{net}</b> over {rows.length} scan{rows.length === 1 ? "" : "s"}</span>}
+          {rows && rows.length > 0 && <span className="text-xs text-muted-foreground">Net <b className={net >= 0 ? "text-success" : "text-red-600"}>{net >= 0 ? "+" : ""}{net}</b> over {rows.length} scan{rows.length === 1 ? "" : "s"}</span>}
         </div>
         {rows === null ? (
           <div className="flex justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
@@ -376,10 +376,10 @@ function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () =
           <div className="max-h-80 divide-y divide-border overflow-auto">
             {rows.map((r) => (
               <div key={r.id} className="flex items-center gap-3 py-2">
-                <span className={"flex size-6 shrink-0 items-center justify-center rounded-md " + (r.direction === "in" ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-700")}>
+                <span className={"flex size-6 shrink-0 items-center justify-center rounded-md " + (r.direction === "in" ? "bg-emerald-100 text-success" : "bg-amber-100 text-amber-700")}>
                   {r.direction === "in" ? <ArrowDown size={12} weight="bold" /> : <ArrowUp size={12} weight="bold" />}
                 </span>
-                <span className={"w-10 shrink-0 text-sm font-semibold tabular-nums " + (r.direction === "in" ? "text-emerald-600" : "text-red-600")}>
+                <span className={"w-10 shrink-0 text-sm font-semibold tabular-nums " + (r.direction === "in" ? "text-success" : "text-red-600")}>
                   {r.direction === "in" ? "+" : "−"}{r.qty}
                 </span>
                 <div className="min-w-0 flex-1">

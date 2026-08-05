@@ -122,17 +122,29 @@ export const HEADING = { fontSize: "clamp(2rem, 4.6vw, 3.6rem)" } as const
 export const EASE = [0.16, 1, 0.3, 1] as const
 
 /** Words rise out of a mask, one after another. The mask is what makes it read as typesetting
- *  rather than a fade — letters emerge from an edge instead of materialising. */
+ *  rather than a fade — letters emerge from an edge instead of materialising.
+ *
+ *  THE MASK HAS TO BE TALLER THAN THE LINE BOX, or it crops the typeface. The original
+ *  `pb-[0.08em]` was a descender allowance sized for a sans. Playfair has far longer
+ *  descenders and taller ascenders, and these headings run at leading 0.92–0.95, so the line
+ *  box is SHORTER than the glyphs — overflow-hidden then cut the tops off caps and sliced the
+ *  tails off every g, y and p.
+ *
+ *  The padding below grows the clip box; the matching negative margins take that growth back
+ *  out of the layout, so line spacing is unchanged and only the crop moves. The initial offset
+ *  goes to 140% to match: the word starts below the mask, the mask's floor just moved down by
+ *  0.3em, and at the old 110% the top sliver of each word would peek into that new padding
+ *  before its own animation began. */
 export function MaskedWords({ text, className = "", delay = 0 }: { text: string; className?: string; delay?: number }) {
   const reduce = useReducedMotion()
   const words = text.split(" ").filter(Boolean)
   return (
     <span className={className}>
       {words.map((w, i) => (
-        <span key={`${w}-${i}`} className="inline-block overflow-hidden pb-[0.08em] align-bottom">
+        <span key={`${w}-${i}`} className="inline-block overflow-hidden pt-[0.18em] pb-[0.3em] -mt-[0.18em] -mb-[0.3em] align-bottom">
           <motion.span
             className="inline-block"
-            initial={reduce ? { opacity: 0 } : { y: "110%" }}
+            initial={reduce ? { opacity: 0 } : { y: "140%" }}
             animate={reduce ? { opacity: 1 } : { y: "0%" }}
             transition={reduce ? { duration: 0.3, delay } : { duration: 0.75, delay: delay + i * 0.055, ease: EASE }}
           >

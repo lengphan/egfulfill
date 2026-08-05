@@ -127,7 +127,7 @@ export function SellerUploadHistory() {
                     {o.tracking && (
                       <a
                         href={trackUrl(o.carrier, o.tracking)} target="_blank" rel="noopener noreferrer"
-                        className="mt-0.5 flex items-center gap-1 font-mono text-2xs text-emerald-600 hover:underline"
+                        className="mt-0.5 flex items-center gap-1 font-mono text-2xs text-success hover:underline"
                         title={`Track ${o.tracking}`}
                       >
                         {o.tracking}<ArrowSquareOut size={9} weight="bold" className="shrink-0" />

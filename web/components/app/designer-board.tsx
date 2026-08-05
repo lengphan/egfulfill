@@ -1355,7 +1355,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
                 </span>
               )}
               {col === "approved" && (
-                <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle size={15} weight="fill" /> Approved · {vendorLabel(card.vendor)} (invoiced)</span>
+                <span className="inline-flex items-center gap-1 text-sm font-medium text-success"><CheckCircle size={15} weight="fill" /> Approved · {vendorLabel(card.vendor)} (invoiced)</span>
               )}
             </>
           ) : (
@@ -1374,7 +1374,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}><ArrowClockwise size={14} weight="bold" /> Back to work</Button>}
               {col === "approved" && (
                 card.credited
-                  ? <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle size={15} weight="fill" /> Credited {money(amt(card.payment))}</span>
+                  ? <span className="inline-flex items-center gap-1 text-sm font-medium text-success"><CheckCircle size={15} weight="fill" /> Credited {money(amt(card.payment))}</span>
                   : <Button size="sm" onClick={creditNow} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : <><CurrencyDollar size={14} weight="bold" /> Credit {money(Number(pay) || 0)}</>}</Button>
               )}
             </>

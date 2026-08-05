@@ -259,7 +259,7 @@ function ProfilePanel() {
           <Button onClick={save} disabled={!dirty || saving}>
             {saving ? "Saving…" : "Save changes"}
           </Button>
-          {saved && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check size={14} weight="bold" /> Saved</span>}
+          {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
         </div>
       </div>
     </SectionCard>
@@ -1614,7 +1614,7 @@ function PlatformPanel() {
           edits the same form, and hiding Save behind a query is how an edit gets lost. */}
       <div className="flex items-center gap-3 border-t border-border px-5 py-3">
         <Button size="sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-        {saved && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check size={14} weight="bold" /> Saved</span>}
+        {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
         {err && <span className="text-sm text-destructive">{err}</span>}
       </div>
       </SettingsSearch.Provider>
@@ -2153,7 +2153,7 @@ function UsersPanel() {
               placeholder="8+ characters" className="h-9" autoFocus
             />
             {pwErr && <p className="text-sm text-destructive">{pwErr}</p>}
-            {pwDone && <p className="flex items-center gap-1.5 text-sm text-emerald-600"><Check size={14} weight="bold" /> Password updated.</p>}
+            {pwDone && <p className="flex items-center gap-1.5 text-sm text-success"><Check size={14} weight="bold" /> Password updated.</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setPwFor(null)}>Cancel</Button>

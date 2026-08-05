@@ -467,7 +467,7 @@ export function PublishProductDialog({
 
         {result?.ok ? (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <div className="font-semibold text-emerald-600">{result.text}</div>
+            <div className="font-semibold text-success">{result.text}</div>
             {result.note && <p className="max-w-sm text-sm text-muted-foreground">{result.note}</p>}
             {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">View the listing →</a>}
             <Button onClick={() => onOpenChange(false)}>Done</Button>

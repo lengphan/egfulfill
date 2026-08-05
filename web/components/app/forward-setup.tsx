@@ -138,7 +138,7 @@ export function ForwardSetup() {
                   onClick={copy}
                   className="eg-tap inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-accent"
                 >
-                  {copied ? <><Check size={14} weight="bold" className="text-emerald-600" /> Copied</> : <><Copy size={14} weight="bold" /> Copy</>}
+                  {copied ? <><Check size={14} weight="bold" className="text-success" /> Copied</> : <><Copy size={14} weight="bold" /> Copy</>}
                 </button>
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">
