@@ -119,9 +119,14 @@ export function ProductsCatalog() {
   const stats = useMemo(() => {
     const list = products ?? []
     const active = list.filter((p) => (p.status ?? "Active") === "Active").length
+    // PUBLISHED is not the same flag as ACTIVE, and calling it so is what made three "Active"
+    // products look like three products on the public site when only one was there. `status`
+    // is whether we still sell the item; `inCatalog` is whether it appears on the marketing
+    // catalogue. A product can be Active and unpublished all day.
+    const published = list.filter((p) => p.inCatalog).length
     const prices = list.map(priceOf).filter((n) => n > 0)
     const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
-    return { total: list.length, cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size), active, avg }
+    return { total: list.length, cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size), active, published, avg }
   }, [products])
 
   // ── loading skeleton ──
@@ -147,7 +152,16 @@ export function ProductsCatalog() {
       <StatGrid>
         <StatCard label="Products" value={String(stats.total)} sub="in your catalog" />
         <StatCard label="Categories" value={String(stats.cats)} sub="product types" />
-        <StatCard label="Active" value={String(stats.active)} sub="published" tone="pos" />
+        <StatCard label="Active" value={String(stats.active)} sub="still sold" tone="pos" />
+        {/* The number that answers "why isn't this on our site?". It reads off inCatalog, the
+            flag the public route filters on, so this tile and the marketing catalogue can never
+            disagree about how many products are live. */}
+        <StatCard
+          label="Published"
+          value={String(stats.published)}
+          sub={stats.published === stats.total ? "all on the public site" : `of ${stats.total} on the public site`}
+          tone={stats.published ? "pos" : undefined}
+        />
         <StatCard label="Avg price" value={usd(stats.avg)} sub="across catalog" />
       </StatGrid>
 

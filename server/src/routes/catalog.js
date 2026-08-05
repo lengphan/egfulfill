@@ -87,6 +87,23 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * data->>'price' is free text — an unparseable value would abort the whole query on a cast,
    * taking every other product down with it.
    */
+  /**
+   * The product's display image, resolved the way the app resolves it.
+   *
+   * MIRRORS imageOf() in web/components/app/products-catalog.tsx — keep the order in step.
+   * Only http(s) and data URLs are returned: a bare filename or an internal storage key is
+   * not something a public page can render, and emitting one would leak an internal detail
+   * AND draw a broken image.
+   */
+  const publicImage = (d) => {
+    const cands = [d.img, d.image, d.hero, Array.isArray(d.images) ? d.images[0] : null,
+      d.colorImages && typeof d.colorImages === 'object' ? Object.values(d.colorImages)[0] : null];
+    for (const c of cands) {
+      if (typeof c === 'string' && /^(https?:\/\/|data:image\/)/i.test(c)) return c;
+    }
+    return null;
+  };
+
   app.get('/api/public/products', async () => {
     const r = await q(
       `select data, catalog_price from catalog_products
@@ -101,7 +118,15 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
           return {
             name: String(row.data.name),
             // The mockup a seller sees, if there is one. Never a supplier URL or an internal key.
-            image: typeof row.data.image === 'string' ? row.data.image : null,
+            //
+            // Reading `image` ALONE was why a published product rendered as an empty placeholder
+            // on the marketing site while showing its photo everywhere else: the product shape
+            // has never guaranteed that field. The app resolves the picture through a fallback
+            // chain (see imageOf in web/components/app/products-catalog.tsx) and the public route
+            // has to use the same one, or the two disagree about whether a product has an image.
+            // Restricted to http(s)/data URLs so an internal key or bare filename still yields
+            // null rather than a broken <img>.
+            image: publicImage(row.data),
             category: typeof row.data.category === 'string' ? row.data.category : null,
             price,
           };
@@ -516,12 +541,15 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * looks complete and half of it fails to open — the same failure that made catalogue
    * images silently blank before.
    */
-  app.get('/api/catalog/export', { preHandler: requireAuth }, async (req, reply) => {
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
-    const qy = req.query || {};
-    // Published only, unless staff explicitly ask for everything — an export that quietly
-    // included unpublished drafts would put products in front of a buyer that nobody chose.
-    const all = String(qy.all || '') === '1';
+  /**
+   * ONE definition of "a row of the catalogue", flattened to one line per variant.
+   *
+   * The CSV download and the partner-sheet builder both need exactly this, and a second
+   * copy is how the two files would come to disagree about a price. Everything downstream
+   * — including a partner template whose column names we have never seen — maps against
+   * these field names, so this list IS the vocabulary the mapping UI offers.
+   */
+  const buildExportRows = async ({ all = false } = {}) => {
     const rows = (await q(
       `select data, catalog_price from catalog_products
         ${all ? '' : 'where in_catalog = true'}
@@ -542,11 +570,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       return v;
     };
 
-    const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const head = ['sku', 'product', 'description', 'colour', 'size', 'price', 'currency', 'image', 'variant_image', 'supplier'];
-    const out = [head.map(esc).join(',')];
-
-    let variants = 0;
+    const out = [];
     for (const row of rows) {
       const d = sellerSafe(row.data) || {};
       // The catalogue price is the whole point of this file. A product included but never
@@ -560,15 +584,22 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         for (const t of tiers) {
           const colour = c && (c.name || c.color || c) || '';
           const size = t && (t.size || '') || '';
-          out.push([
-            d.sku ?? d.id ?? '', d.name ?? '', d.description ?? '',
-            typeof colour === 'string' ? colour : '', size,
-            price, 'USD',
-            img(d.image ?? d.img ?? ''),
-            img((c && (c.image ?? c.img)) || ''),
-            d.supplier ?? d.brand ?? '',
-          ].map(esc).join(','));
-          variants++;
+          out.push({
+            sku: d.sku ?? d.id ?? '',
+            product: d.name ?? '',
+            description: d.description ?? '',
+            colour: typeof colour === 'string' ? colour : '',
+            size,
+            price, currency: 'USD',
+            image: img(d.image ?? d.img ?? ''),
+            variant_image: img((c && (c.image ?? c.img)) || ''),
+            supplier: d.supplier ?? d.brand ?? '',
+            // MODEL and BRAND as a partner means them: the style number a manufacturer
+            // prints on the label ("64000") and who makes it — not our SKU, which is ours
+            // and means nothing to them.
+            brand: d.brand ?? d.supplier ?? '',
+            model: d.blank ?? d.styleId ?? d.style ?? d.sku ?? '',
+          });
         }
       }
     }
@@ -599,18 +630,59 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const sizes = (p.sizes && p.sizes.length) ? p.sizes : [''];
       for (const c of colours) {
         for (const z of sizes) {
-          out.push([p.ref, p.name || '', '', c || '', z || '', price, 'USD', img(p.image || ''), '', p.brand || 'S&S']
-            .map(esc).join(','));
-          variants++;
+          out.push({
+            sku: p.ref, product: p.name || '', description: '',
+            colour: c || '', size: z || '', price, currency: 'USD',
+            image: img(p.image || ''), variant_image: '',
+            supplier: p.brand || 'S&S',
+            brand: p.brand || 'S&S',
+            // A pick IS a style, so its ref is the model number — no guessing needed.
+            model: p.ref,
+          });
         }
       }
     }
 
-    audit(req, 'catalog.export', { entityType: 'catalog', entityId: 'export', after: { products: rows.length, picks: picks.length, variants, all } });
+    return { rows: out, products: rows.length, picks: picks.length };
+  };
+
+  /** The field names buildExportRows emits, in the order a mapping UI should offer them. */
+  const EXPORT_FIELDS = [
+    'sku', 'model', 'brand', 'product', 'description', 'colour', 'size',
+    'price', 'currency', 'image', 'variant_image', 'supplier',
+  ];
+
+  app.get('/api/catalog/export', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const qy = req.query || {};
+    // Published only, unless staff explicitly ask for everything — an export that quietly
+    // included unpublished drafts would put products in front of a buyer that nobody chose.
+    const all = String(qy.all || '') === '1';
+    const { rows, products, picks } = await buildExportRows({ all });
+
+    const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const head = ['sku', 'product', 'description', 'colour', 'size', 'price', 'currency', 'image', 'variant_image', 'supplier'];
+    const out = [head.map(esc).join(',')];
+    for (const r of rows) out.push(head.map((k) => esc(r[k])).join(','));
+
+    audit(req, 'catalog.export', { entityType: 'catalog', entityId: 'export', after: { products, picks, variants: rows.length, all } });
     const name = `catalog-${new Date().toISOString().slice(0, 10)}.csv`;
     reply.header('Content-Type', 'text/csv; charset=utf-8');
     reply.header('Content-Disposition', `attachment; filename="${name}"`);
     return out.join('\n');
+  });
+
+  /**
+   * The same rows as JSON — what a partner sheet is filled FROM.
+   *
+   * Staff-only for the same reason the CSV is: these carry the catalogue price, which is a
+   * trade price and not public. Returned as data rather than a file because the mapping
+   * happens in the browser, against real values, before anything is written.
+   */
+  app.get('/api/catalog/rows', { preHandler: requireStaff }, async (req) => {
+    const all = String((req.query || {}).all || '') === '1';
+    const { rows, products, picks } = await buildExportRows({ all });
+    return { rows, fields: EXPORT_FIELDS, products, picks };
   });
 
   /**
