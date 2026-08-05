@@ -23,6 +23,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const id = setTimeout(() => {
+      /* NO SESSION → /login, before anything else renders.
+         This shell had no such check: getUser() returning undefined fell through to the
+         seller branch, so a signed-out visitor got the whole app shell and every call
+         inside it 401'd into an empty state. "Couldn't load your orders" is not an access
+         decision — it reads as a broken product, and it showed a signed-out person the
+         shape of the app rather than asking them to sign in.
+
+         The current path rides along as `next`, so signing in returns you where you were
+         aiming. /login already validates that value against open redirects (safeNext), so
+         only a same-origin relative path is ever honoured. Mode stays "loading" so nothing
+         paints behind the redirect. */
+      if (!getToken()) {
+        const here = window.location.pathname + window.location.search
+        router.replace(`/login?next=${encodeURIComponent(here)}`)
+        return
+      }
       const role = getUser()?.role
       if (isStaffRole(role)) {
         // The seller order LIST is a different design from the production board. Staff
