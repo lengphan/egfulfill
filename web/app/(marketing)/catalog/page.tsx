@@ -7,10 +7,17 @@ export const metadata = { title: "Products — EGFULFILL" }
 export const revalidate = 300
 
 export default async function CatalogPage() {
-  // A catalogue that can't be read must not take the page down with it — an empty list
-  // renders the honest "nothing published yet" state instead of a 500.
-  const products = await getPublicProducts()
-    .then((r) => r.products ?? [])
-    .catch(() => [])
+  // A catalogue that can't be read must not take the page down with it — but it must not
+  // claim "nothing is published" either. Those are different facts and the page now says
+  // WHICH: null means the read failed, [] means the catalogue is genuinely empty.
+  //
+  // Collapsing both into [] is what let this page report an empty catalogue while the API
+  // was returning products perfectly well — the error was real, and the empty state hid it.
+  let products: Awaited<ReturnType<typeof getPublicProducts>>["products"] | null = null
+  try {
+    products = (await getPublicProducts()).products ?? []
+  } catch {
+    products = null
+  }
   return <BoldCatalog products={products} />
 }

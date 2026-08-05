@@ -19,11 +19,16 @@ import type { PublicProduct } from "@/lib/api"
  */
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-export function BoldCatalog({ products }: { products: PublicProduct[] }) {
+export function BoldCatalog({ products }: { products: PublicProduct[] | null }) {
+  // null = the catalogue could not be READ; [] = it is genuinely empty. The house rule is
+  // that those two must never look the same, so the caller distinguishes them and this
+  // renders each honestly.
+  const failed = products === null
+  const list = products ?? []
   // Group by category so a long list reads as a catalogue rather than a wall. Anything
   // without one collects under "More" instead of being dropped.
   const groups = new Map<string, PublicProduct[]>()
-  for (const p of products) {
+  for (const p of list) {
     const k = p.category?.trim() || "More"
     groups.set(k, [...(groups.get(k) ?? []), p])
   }
@@ -37,12 +42,19 @@ export function BoldCatalog({ products }: { products: PublicProduct[] }) {
       />
 
       <section className="mx-auto max-w-6xl px-6 py-16">
-        {products.length === 0 ? (
+        {failed ? (
+          <Rise className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
+            <h2 className="text-xl font-bold tracking-tight">We couldn&apos;t load the catalogue</h2>
+            <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-black/55">
+              This is a problem on our side, not an empty catalogue — please try again shortly.
+            </p>
+          </Rise>
+        ) : list.length === 0 ? (
           <Rise className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
             <h2 className="text-xl font-bold tracking-tight">The catalogue isn&apos;t published yet</h2>
             <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-black/55">
-              Products appear here as soon as they&apos;re published with a price. Nothing is hidden —
-              there is simply nothing to show yet.
+              Products appear here as soon as they&apos;re published. Nothing is hidden — there is
+              simply nothing to show yet.
             </p>
           </Rise>
         ) : (

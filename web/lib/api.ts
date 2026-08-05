@@ -5,6 +5,30 @@ import type { SiteContent } from "./site-content"
 // cross-origin dev against a running API, set NEXT_PUBLIC_API_BASE=http://localhost:3000.
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? ""
 
+/**
+ * The base a fetch should actually use — which is NOT the same on the server as in the
+ * browser.
+ *
+ * "" means "relative to the current origin", and that only has meaning in a browser. In a
+ * Server Component the fetch runs on Vercel's server, where a relative URL has no origin and
+ * `fetch` throws before any request leaves the box. The marketing catalogue is exactly that
+ * case: it rendered "the catalogue isn't published yet" permanently while the API was
+ * returning products, because the throw landed in its `.catch` and an unreadable list is
+ * indistinguishable from an empty one unless you make it distinguishable.
+ *
+ * The rewrite in next.config.ts cannot help here either — that maps /api/* for requests
+ * arriving at the app, and a server-side fetch never goes through it. So the server needs the
+ * real origin, and it is the SAME constant the rewrite targets, kept in step deliberately:
+ * two different ideas of where the API lives is how one of them ends up stale.
+ */
+const SERVER_API_ORIGIN =
+  process.env.NEXT_PUBLIC_API_BASE || process.env.API_ORIGIN || "https://egful.store"
+
+function baseFor(): string {
+  if (typeof window !== "undefined") return API_BASE
+  return SERVER_API_ORIGIN
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -67,7 +91,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json")
   if (token) headers.set("Authorization", `Bearer ${token}`)
 
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
+  const res = await fetch(`${baseFor()}${path}`, { ...init, headers })
   // Anything that isn't a GET may have changed what a cached list holds. Clearing on EVERY
   // write — rather than mapping each mutation to the lists it touches — is deliberate: that
   // map would have to be updated by every future route, and the first time someone forgot,
