@@ -1,71 +1,40 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { TrendUp, Info } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
-import { getPlanUsage, type PlanUsage, type VolumeStanding } from "@/lib/api"
+import { getPlanUsage, type PlanUsage } from "@/lib/api"
 
 /**
- * A seller's own volume standing — what they shipped, and what it earns.
+ * A seller's volume standing, as ONE rail.
  *
- * TWO PERIODS, because they answer different questions and only one of them is still
- * winnable. `earned` is last month's units, which set this month's rate and are already
- * decided; `running` is this month so far, which sets next month's. The second is the whole
- * point of showing this at all — a number you can still change is motivating, a number you
- * can't is a receipt.
+ * The first version was two stat cards plus a pill list of tiers, and it made the reader do
+ * the work: find their number in one card, find the matching rung in the list, and hold both
+ * to see how far off they were. A ladder with a position on it is a single object — where
+ * you are and what is next are the same glance.
  *
- * WHILE `applied` IS FALSE THIS PAGE MUST NOT IMPLY A DISCOUNT. Tiers are measured before
- * they are charged, so every rate here is explicitly labelled as what it *would* earn. A
- * seller told they are getting 6% off who then reads a full-price invoice has been lied to
- * by a dashboard, which is worse than not having the dashboard.
+ * The rail is also why the numbers stay small. This card answers one question — "what do I
+ * do to pay less" — so the sentence under the rail is the payload and everything else is
+ * context. A 3xl "0" was giving the most visual weight to the least useful fact.
+ *
+ * WHILE `applied` IS FALSE NOTHING HERE MAY IMPLY A LIVE DISCOUNT. That was a boxed warning
+ * row, which read as an error and explained nothing; it now sits in the description where a
+ * reader is already looking for what the card is, plus a chip for scanning. Same promise,
+ * stated where it is actually read.
  */
-const monthName = (period: string) => {
+const monthShort = (period: string) => {
   const [y, m] = period.split("-").map(Number)
   if (!y || !m) return period
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" })
 }
 
-function Standing({ s, applied, tone }: { s: VolumeStanding; applied: boolean; tone: "settled" | "live" }) {
-  const pctLabel = s.pct > 0 ? `${s.pct}%` : "—"
+function Shell({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {tone === "settled" ? `Earned in ${monthName(s.period)}` : `Running — ${monthName(s.period)} so far`}
-      </div>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="text-3xl font-extrabold tabular-nums tracking-tight">{s.units.toLocaleString()}</span>
-        <span className="text-sm text-muted-foreground">units shipped</span>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
-        <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary tabular-nums">
-          {pctLabel}
-        </span>
-        <span className="text-muted-foreground">
-          {applied ? "applies to" : "would apply to"} {monthName(s.appliesTo)}
-          {s.index > 0 ? ` · Tier ${s.index}` : " · no tier yet"}
-        </span>
-      </div>
-      {/* The distance to the next rung, and a bar for it. Only meaningful while the period is
-          still open — on a settled month it is a fact about the past, so it isn't shown. */}
-      {tone === "live" && s.next && s.unitsToNext != null && (
-        <div className="mt-4">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary transition-[width] duration-500"
-              style={{ width: `${Math.min(100, Math.round((s.units / s.next.minUnits) * 100))}%` }}
-            />
-          </div>
-          <div className="mt-2 text-[13px] text-muted-foreground">
-            <span className="font-semibold text-foreground tabular-nums">{s.unitsToNext.toLocaleString()}</span>
-            {" "}more units this month reaches{" "}
-            <span className="font-semibold text-foreground">{s.next.pct}%</span> for {monthName(s.appliesTo)}.
-          </div>
-        </div>
-      )}
-      {tone === "live" && !s.next && s.index > 0 && (
-        <div className="mt-4 text-[13px] text-muted-foreground">Top tier — nothing above this one.</div>
-      )}
-    </div>
+    <SectionCard
+      title="Volume discount"
+      description={note ?? "Ship more in a month, pay less the next."}
+    >
+      <div className="px-5 pb-5">{children}</div>
+    </SectionCard>
   )
 }
 
@@ -74,90 +43,99 @@ export function VolumeBoard() {
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      getPlanUsage().then(setData).catch((e: Error) => setErr(e.message))
-    }, 0)
+    const t = setTimeout(() => { getPlanUsage().then(setData).catch((e: Error) => setErr(e.message)) }, 0)
     return () => clearTimeout(t)
   }, [])
 
-  // An unreadable board and an empty one are different facts, and neither may impersonate
-  // the other — a seller seeing "0 units" when the request failed would believe it.
-  if (err) {
-    return (
-      <SectionCard title="Volume discount" description="What you shipped, and what it earns.">
-        <div className="px-5 pb-5 text-sm text-muted-foreground">
-          We couldn&apos;t load your volume just now — this is a problem on our side, not a zero. {err}
-        </div>
-      </SectionCard>
-    )
-  }
-  if (!data) {
-    return (
-      <SectionCard title="Volume discount" description="What you shipped, and what it earns.">
-        <div className="px-5 pb-5 text-sm text-muted-foreground">Loading…</div>
-      </SectionCard>
-    )
-  }
+  // Unreadable and empty are different facts and must never look alike — a seller shown
+  // "0 units" when the request failed would believe it.
+  if (err) return <Shell><p className="text-sm text-muted-foreground">We couldn&apos;t load your volume — that&apos;s a problem on our side, not a zero.</p></Shell>
+  if (!data) return <Shell><p className="text-sm text-muted-foreground">Loading…</p></Shell>
+  if (!data.tiers.length) return <Shell><p className="text-sm text-muted-foreground">There&apos;s no volume programme running right now.</p></Shell>
 
-  // No ladder configured is not an error and not a zero — the programme simply isn't running.
-  if (!data.tiers.length) {
-    return (
-      <SectionCard title="Volume discount" description="What you shipped, and what it earns.">
-        <div className="px-5 pb-5 text-sm text-muted-foreground">
-          There&apos;s no volume programme running at the moment. Nothing is hidden — there are no
-          tiers set up yet.
-        </div>
-      </SectionCard>
-    )
-  }
+  const running = data.running
+  const earned = data.earned
+  const tiers = data.tiers
+  const units = running?.units ?? 0
+  const top = tiers[tiers.length - 1].minUnits
+  // The rail runs to the top rung. Past it there is nothing left to earn, so the fill simply
+  // completes rather than the scale stretching and making every marker drift.
+  const pos = Math.min(100, (units / top) * 100)
 
   return (
-    <SectionCard
-      title="Volume discount"
-      description="Earned by what you ship. Volume in one month sets your rate for the next."
-    >
-      <div className="px-5 pb-5">
-        {/* The honesty line. While tiers are being measured rather than charged, this is the
-            single most important sentence on the page. */}
-        {!data.applied && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">
-            <Info size={15} weight="fill" className="mt-0.5 shrink-0" />
-            <span>
-              We&apos;re tracking volume now, but discounts aren&apos;t being applied to orders yet.
-              These are the rates your shipping <em>would</em> earn.
-            </span>
-          </div>
-        )}
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          {data.earned && <Standing s={data.earned} applied={data.applied} tone="settled" />}
-          {data.running && <Standing s={data.running} applied={data.applied} tone="live" />}
+    <Shell note={
+      data.applied
+        ? "Ship more in a month, pay less the next."
+        : "Ship more in a month, pay less the next. We're tracking this now — it isn't discounting orders yet."
+    }>
+      {!data.applied && (
+        <div className="mb-4 inline-flex rounded-full bg-muted px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Preview
         </div>
+      )}
 
-        <div className="mt-4">
-          <div className="mb-2 flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <TrendUp size={13} weight="bold" /> The ladder
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {data.tiers.map((t) => {
-              const reached = (data.running?.units ?? 0) >= t.minUnits
-              return (
-                <span
-                  key={t.minUnits}
-                  className={
-                    "rounded-lg border px-2.5 py-1 text-[13px] tabular-nums " +
-                    (reached
-                      ? "border-primary/30 bg-primary/10 font-semibold text-primary"
-                      : "border-border text-muted-foreground")
-                  }
-                >
-                  {t.minUnits.toLocaleString()}+ units → {t.pct}%
-                </span>
-              )
-            })}
-          </div>
+      {/* THE RAIL — the ladder and your place on it, in one object. */}
+      <div className="pt-1">
+        <div className="relative h-1.5 rounded-full bg-muted">
+          <div className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pos}%` }} />
+          {tiers.map((t) => {
+            const reached = units >= t.minUnits
+            return (
+              <span
+                key={t.minUnits}
+                className={"absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card " + (reached ? "bg-primary" : "bg-border")}
+                style={{ left: `${Math.min(100, (t.minUnits / top) * 100)}%` }}
+              />
+            )
+          })}
+        </div>
+        {/* Each label is anchored to ITS OWN marker. A justify-between row was tried first
+            and was quietly wrong: it pinned the first label to the far left while its dot sat
+            at 13% of the rail, so the ladder read as though the first rung were at zero.
+            Centring is clamped at both ends — translate -50% would push the first label off
+            the left edge and the last (always at 100%) off the right. */}
+        <div className="relative mt-2 h-4 text-2xs tabular-nums">
+          {tiers.map((t, i) => {
+            const left = Math.min(100, (t.minUnits / top) * 100)
+            const shift = i === 0 && left < 12 ? "0" : i === tiers.length - 1 ? "-100%" : "-50%"
+            return (
+              <span
+                key={t.minUnits}
+                className={"absolute whitespace-nowrap " + (units >= t.minUnits ? "font-semibold text-primary" : "text-muted-foreground")}
+                style={{ left: `${left}%`, transform: `translateX(${shift})` }}
+              >
+                {t.minUnits.toLocaleString()} → {t.pct}%
+              </span>
+            )
+          })}
         </div>
       </div>
-    </SectionCard>
+
+      {/* THE SENTENCE — the one thing this card exists to say. */}
+      <p className="mt-5 text-sm leading-relaxed">
+        You&apos;ve shipped <span className="font-semibold tabular-nums">{units.toLocaleString()}</span>{" "}
+        {units === 1 ? "unit" : "units"} in {running ? monthShort(running.period) : "this month"}.{" "}
+        {running?.next && running.unitsToNext != null ? (
+          <>
+            <span className="font-semibold tabular-nums">{running.unitsToNext.toLocaleString()}</span> more
+            {" "}earns <span className="font-semibold">{running.next.pct}% off</span> in{" "}
+            {monthShort(running.appliesTo)}.
+          </>
+        ) : running && running.pct > 0 ? (
+          <>That&apos;s the top tier — <span className="font-semibold">{running.pct}% off</span> in {monthShort(running.appliesTo)}.</>
+        ) : null}
+      </p>
+
+      {/* Last month, kept quiet. It is a receipt: true, occasionally useful, and nothing the
+          reader can act on. */}
+      {earned && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {monthShort(earned.period)}: {earned.units.toLocaleString()} units
+          {earned.pct > 0
+            ? <> — {earned.pct}% {data.applied ? "off" : "would apply"} this month.</>
+            : <> — no tier reached.</>}
+        </p>
+      )}
+    </Shell>
   )
 }
