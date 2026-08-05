@@ -104,10 +104,21 @@
     --primary-foreground: oklch(0.985 0 0);
     --brand: oklch(0.9320 0.1290 125.0);
     --brand-foreground: oklch(0.175 0.008 277);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.968 0.004 91);
-    --muted-foreground: oklch(0.556 0 0);
+  /* THE NEUTRALS ARE BEIGE, not grey. This is what lets the beige actually spread.
+   *
+   * Every secondary surface in the app was chroma 0 — --secondary, --input and
+   * --muted-foreground were literally colourless — so no amount of theming the accent could
+   * make the product feel warm: inputs, secondary buttons, muted wells and disabled states
+   * are most of the pixels, and they were all pure grey. They now sit on hue 91, the same
+   * warm family as the sidebar and the marketing paper.
+   *
+   * The CANVAS stays white on purpose. A tinted page behind a 700-row queue is a sheet you
+   * read THROUGH all day; the warmth belongs to the bounded surfaces, not underneath the
+   * data. */
+    --secondary: oklch(0.955 0.012 91);
+    --secondary-foreground: oklch(0.205 0.006 91);
+    --muted: oklch(0.962 0.011 91);
+    --muted-foreground: oklch(0.525 0.014 91);
     --accent: oklch(0.966 0.022 285);
     --accent-foreground: oklch(0.45 0.24 283.5);
   /* SUCCESS is a TOKEN, not a fixed Tailwind shade. `text-emerald-600` was used in 56 places
@@ -120,8 +131,8 @@
    * chip. This is the ink for "a number moved the right way". */
     --success: oklch(0.48 0.135 158);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.902 0.004 91);
-    --input: oklch(0.922 0 0);
+    --border: oklch(0.888 0.013 91);
+    --input: oklch(0.928 0.015 91);
     --ring: oklch(0.5305 0.2723 283.5);
   /* CATEGORICAL, in a FIXED order — validated, not eyeballed. Series 1 is the brand violet;
    * the rest are stepped so every ADJACENT pair survives deuteranopia and protanopia, and
