@@ -748,9 +748,10 @@ export function DesignCanvasDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        // Wider than the default xl so the stage's 64vh cap is what actually bounds the
-        // garment on a normal window, rather than the dialog's own width doing it first.
-        className="sm:max-w-2xl"
+        // Wide enough for two real columns. Capped against the VIEWPORT as well as a pixel
+        // ceiling so it can't outgrow a small laptop: 1180px is about the point where the
+        // stage stops growing (bounded by 78vh) and extra width would only add dead space.
+        className="sm:max-w-2xl lg:max-w-[min(96vw,1180px)]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -793,6 +794,17 @@ export function DesignCanvasDialog({
         <DialogHeader>
           <DialogTitle className="line-clamp-2 pr-10 leading-snug">{item.name || item.sku}</DialogTitle>
         </DialogHeader>
+        {/* TWO COLUMNS from lg up: the garment on the left, every control on the right.
+            Stacked, the stage alone ate the window and the steps, thread match and charge all
+            sat below the fold — you had to scroll away from the artwork to act on it, which
+            is backwards for a window whose whole job is judging placement.
+
+            The left column is `sticky top-0`: the right column is the taller of the two, so
+            when it does scroll the garment stays put instead of leaving the screen. Below lg
+            it collapses back to the original single stack — two columns in a phone-width
+            dialog would make both of them useless. */}
+        <div className="grid gap-5 lg:grid-cols-2 lg:items-start lg:gap-6">
+        <div className="lg:sticky lg:top-0 lg:self-start">
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {faces.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
@@ -811,14 +823,12 @@ export function DesignCanvasDialog({
             artwork will land at, so the empty state teaches placement before there is
             anything to place. Once art is on, the overlay is gone entirely and the stage
             goes back to being a stage. */}
-        {/* The stage is aspect-square, so its WIDTH sets its height — uncapped it is taller
-            than a short laptop window on its own. It is still capped against viewport height,
-            but at 42vh a 620px-tall window rendered the garment about 258px across, which is
-            too small to judge placement on — the one thing this window exists for. 64vh is
-            the compromise: still bounded by the viewport, and DialogContent already carries
-            max-h-[calc(100dvh-2rem)] with overflow-y-auto, so on a short screen the steps
-            below scroll into reach rather than being lost. */}
-        <div className="relative mx-auto w-full max-w-[min(100%,64vh)]">
+        {/* The stage is aspect-square, so its WIDTH sets its height. It fills the left column
+            and is bounded only by viewport height — 78vh leaves room for the header and the
+            dialog's own padding without the garment ever running off a short screen. At the
+            old 42vh a 620px-tall window drew it about 258px across, too small to judge
+            placement on, which is the one thing this window exists for. */}
+        <div className="relative w-full max-w-[min(100%,78vh)]">
           <DesignStage
             className="w-full" mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos}
             onRemove={() => setDesignUrl("")} picking={picking} onPickColor={onPickColor}
@@ -852,6 +862,15 @@ export function DesignCanvasDialog({
             </button>
           )}
         </div>
+        </div>
+        {/* Right column — controls, in the order you work through them: what the buyer sent,
+            the two upload steps, thread match, then the charge. */}
+        {/* self-center, not start: on a line with little to configure (no artwork yet, no
+            buyer file) these controls are much shorter than the garment beside them, and
+            top-aligning them left a tall band of dead space under the column. Centring only
+            has an effect in that case — once the column is the taller of the two it behaves
+            exactly like start. */}
+        <div className="space-y-4 lg:min-w-0 lg:self-center">
         {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
             nearest in-stock cone; saved with the design so the floor loads the right threads. */}
         {isEmb && (
@@ -1282,6 +1301,8 @@ export function DesignCanvasDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={() => void save()} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
           </div>
+        </div>
+        </div>
         </div>
         <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }} />
       </DialogContent>
