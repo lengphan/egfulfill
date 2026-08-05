@@ -84,7 +84,7 @@ function Tag({ id, label, state, title, orderId, status, files }: {
         // 12px, not the 11px this was condensed to — that read as small print you had to
         // lean in for. Still lighter than the 13px/semibold it started at, which made four
         // chips the loudest thing in a row whose job is the order number beside them.
-        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium transition-colors " + cls}
+        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " + cls}
       >
         {tl("ui", label)}
       </PopoverTrigger>
