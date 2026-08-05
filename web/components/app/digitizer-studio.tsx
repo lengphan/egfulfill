@@ -167,6 +167,27 @@ function BrowseTab() {
   )
 }
 
+
+/**
+ * PLACEMENT SIZES — the sizes a floor actually embroiders, in mm.
+ *
+ * Auto-digitize has always run at whatever size Wilcom picked, because the client never sent
+ * width/height even though the API and buildBitmapXml both accept them. That is the wrong
+ * default for embroidery specifically: a design is digitised FOR a placement, and stitch
+ * density, pull compensation and the stitch count all follow from the finished size. The same
+ * artwork at 90mm and at 280mm is not one file scaled — it is two different files.
+ */
+const PLACEMENTS: { label: string; w: number; h: number }[] = [
+  { label: "Left chest", w: 90, h: 90 },
+  { label: "Cap front", w: 120, h: 50 },
+  { label: "Sleeve", w: 70, h: 70 },
+  { label: "Full front", w: 280, h: 280 },
+]
+/** Wilcom's auto-digitize ceiling. Past it the request is refused, so warn before spending it. */
+const MAX_AREA_MM2 = 22500
+const mmToIn = (mm: number) => mm / 25.4
+const fmtIn = (mm: number) => `${mmToIn(mm).toFixed(1)}"`
+
 // ── The detail modal: original ↔ big embroidery preview + thread matching ────────
 function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem; palette: ThreadColor[]; onClose: () => void; onGenerated: () => void }) {
   const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
@@ -174,6 +195,36 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
   const [err, setErr] = useState<string | null>(null)
   const [routing, setRouting] = useState(false)
   const [routed, setRouted] = useState(false)
+  /** Target finished size in mm. Empty = let Wilcom choose, which is the old behaviour. */
+  const [size, setSize] = useState<{ w: string; h: string }>({ w: "", h: "" })
+  /** Keep the artwork's proportions: typing one dimension derives the other. Off by default
+   *  would let someone silently distort a logo, which is not recoverable from the output. */
+  const [lockRatio, setLockRatio] = useState(true)
+  const [aspect, setAspect] = useState<number | null>(null)
+
+  // The source artwork's proportions, read once, so the ratio lock has something to work from.
+  useEffect(() => {
+    let live = true
+    item.getImage()
+      .then((src) => new Promise<HTMLImageElement>((res, rej) => {
+        const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src
+      }))
+      .then((im) => { if (live && im.width && im.height) setAspect(im.width / im.height) })
+      .catch(() => {})
+    return () => { live = false }
+  }, [item])
+
+  const wNum = Number(size.w) || 0
+  const hNum = Number(size.h) || 0
+  const areaOver = wNum > 0 && hNum > 0 && wNum * hNum > MAX_AREA_MM2
+  const setW = (v: string) => {
+    const n = Number(v)
+    setSize(lockRatio && aspect && n > 0 ? { w: v, h: String(Math.round(n / aspect)) } : (p) => ({ ...p, w: v }))
+  }
+  const setH = (v: string) => {
+    const n = Number(v)
+    setSize(lockRatio && aspect && n > 0 ? { w: String(Math.round(n * aspect)), h: v } : (p) => ({ ...p, h: v }))
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
@@ -185,9 +236,12 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
     setStatus(design ? "generating" : "previewing"); setErr(null)
     try {
       const image = await item.getImage()
+      // Only send a size when one was actually chosen — an unset field must stay "Wilcom
+      // decides", not silently become 0mm.
+      const dims = wNum > 0 && hNum > 0 ? { width: wNum, height: hNum } : {}
       const r = design
-        ? await wilcomDigitize({ image, filename: item.name, name: item.name, orderRef: item.ref, source: item.source })
-        : await wilcomPreview({ image, filename: item.name })
+        ? await wilcomDigitize({ image, filename: item.name, name: item.name, orderRef: item.ref, source: item.source, ...dims })
+        : await wilcomPreview({ image, filename: item.name, ...dims })
       if (!r.ok) throw new Error(r.error || "EWA rejected the request")
       setRes(r); if (design && r.machineFile) onGenerated()
     } catch (e) { setErr(e instanceof Error ? e.message : "Failed") } finally { setStatus("idle") }
@@ -236,6 +290,71 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
               <span className="absolute left-2 top-2 rounded-md bg-background/85 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{res?.trueview ? "Embroidery" : "Original"}</span>
             </div>
 
+            {/* TARGET SIZE — the thing that was missing. Embroidery is digitised FOR a
+                placement: density and pull compensation follow the finished size, so the same
+                art at 90mm and 280mm are two different files, not one scaled. Left blank,
+                behaviour is unchanged and Wilcom picks. */}
+            <div className="rounded-lg border border-border p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Finished size</span>
+                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <input type="checkbox" checked={lockRatio} onChange={(e) => setLockRatio(e.target.checked)} className="size-3 accent-primary" disabled={!aspect} />
+                  Keep proportions
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {PLACEMENTS.map((pl) => {
+                  // A preset fills the box it has to fit INSIDE, so the art keeps its shape
+                  // rather than being stretched to the placement's own ratio.
+                  const on = wNum === pl.w || (aspect ? Math.round(Math.min(pl.w, pl.h * aspect)) === wNum : false)
+                  return (
+                    <button
+                      key={pl.label}
+                      onClick={() => {
+                        if (!aspect) { setSize({ w: String(pl.w), h: String(pl.h) }); return }
+                        const w = Math.min(pl.w, pl.h * aspect)
+                        setSize({ w: String(Math.round(w)), h: String(Math.round(w / aspect)) })
+                      }}
+                      className={"eg-tap rounded-md border px-2 py-1 text-[11px] font-medium transition-colors " +
+                        (on ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground")}
+                    >
+                      {pl.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <label className="flex flex-1 items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">W</span>
+                  <input inputMode="decimal" value={size.w} onChange={(e) => setW(e.target.value)} placeholder="auto"
+                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished width in millimetres" />
+                </label>
+                <span className="text-xs text-muted-foreground">×</span>
+                <label className="flex flex-1 items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">H</span>
+                  <input inputMode="decimal" value={size.h} onChange={(e) => setH(e.target.value)} placeholder="auto"
+                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished height in millimetres" />
+                </label>
+                <span className="shrink-0 text-xs text-muted-foreground">mm</span>
+                {(wNum > 0 || hNum > 0) && (
+                  <button onClick={() => setSize({ w: "", h: "" })} className="eg-tap shrink-0 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground hover:text-foreground" title="Back to automatic">Auto</button>
+                )}
+              </div>
+              {/* Inches beside mm, always. A US floor sizes placements in inches and a
+                  mm-only field is a conversion someone does in their head and gets wrong. */}
+              {wNum > 0 && hNum > 0 && (
+                <div className="mt-1.5 text-[11px] tabular-nums text-muted-foreground">
+                  {fmtIn(wNum)} × {fmtIn(hNum)} · {Math.round(wNum * hNum).toLocaleString()} mm²
+                </div>
+              )}
+              {areaOver && (
+                <div className="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+                  <Warning size={12} weight="fill" className="mt-0.5 shrink-0" />
+                  Over Wilcom&apos;s {MAX_AREA_MM2.toLocaleString()} mm² auto-digitize limit — it will refuse this. Reduce the size, or send the original to a digitizer below.
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2">
               {res?.machineFile ? (
                 <>
@@ -246,14 +365,14 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                   <button onClick={() => { if (res.trueview) download(`${res.machineFile!.filename.replace(/\.[^.]+$/, "")}.png`, `data:image/png;base64,${res.trueview}`) }} disabled={!res.trueview} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
                     <DownloadSimple size={14} weight="bold" /> PNG
                   </button>
-                  <button onClick={() => run(true)} disabled={busy} title="Regenerate" className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-accent disabled:opacity-50"><ArrowsClockwise size={15} /></button>
+                  <button onClick={() => run(true)} disabled={busy || areaOver} title="Regenerate" className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-accent disabled:opacity-50"><ArrowsClockwise size={15} /></button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => run(false)} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
+                  <button onClick={() => run(false)} disabled={busy || areaOver} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
                     {status === "previewing" ? <CircleNotch size={14} className="animate-spin" /> : <Eye size={14} />} Preview
                   </button>
-                  <button onClick={() => run(true)} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+                  <button onClick={() => run(true)} disabled={busy || areaOver} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
                     {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : null} Generate file
                   </button>
                 </>
@@ -295,7 +414,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <div><div className="text-xs text-muted-foreground">Stitches</div><div className="font-semibold tabular-nums">{res.stitches != null ? res.stitches.toLocaleString() : "—"}</div></div>
                   <div><div className="text-xs text-muted-foreground">Colours</div><div className="font-semibold tabular-nums">{res.colours ?? "—"}</div></div>
-                  <div><div className="text-xs text-muted-foreground">Size</div><div className="font-semibold tabular-nums">{res.width != null && res.height != null ? `${Math.round(res.width)} × ${Math.round(res.height)} mm` : "—"}</div></div>
+                  <div><div className="text-xs text-muted-foreground">Size</div><div className="font-semibold tabular-nums">{res.width != null && res.height != null ? `${Math.round(res.width)} × ${Math.round(res.height)} mm` : "—"}</div>{res.width != null && res.height != null && <div className="text-[11px] tabular-nums text-muted-foreground">{fmtIn(res.width)} × {fmtIn(res.height)}</div>}</div>
                   <div><div className="text-xs text-muted-foreground">Format</div><div className="font-semibold">{res.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : "preview"}</div></div>
                 </div>
               ) : (
