@@ -54,7 +54,13 @@ export const CSV_COLUMNS: CsvColumn[] = [
 // Template header row: optional columns are suffixed " (optional)" so a filler sees at a glance
 // what's skippable, right in the sheet (not just the in-app legend). canonHeader() strips the
 // suffix on import, so a filled-in template still maps correctly.
-export const TEMPLATE_HEADERS = CSV_COLUMNS.map((c) => (c.required ? c.header : `${c.header} (optional)`))
+// A `oneOf` column gets NO suffix: it is not required on its own, but calling it "(optional)"
+// in the sheet flatly contradicts the dialog and is how a filler ends up leaving both Item SKU
+// and Product Title empty and losing every row. Silence is the honest option — the legend
+// carries the "fill one of these" rule.
+export const TEMPLATE_HEADERS = CSV_COLUMNS.map((c) =>
+  c.required || c.oneOf ? c.header : `${c.header} (optional)`
+)
 
 // Headers only (no throwaway sample row) — the Columns legend in the dialog is the guide.
 // Used by the .xlsx download AND "Make a copy in Google Sheets".
