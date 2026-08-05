@@ -70,7 +70,7 @@ export function PermissionsMatrix() {
         <div className="mt-4 space-y-6">
           {Object.entries(groups).map(([group, list]) => (
             <div key={group}>
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group}</div>
+              <div className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>

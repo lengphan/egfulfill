@@ -288,13 +288,13 @@ export function DesignMaker() {
         {/* Left: sources + layers */}
         <aside className="hidden w-60 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-3 lg:flex">
           <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Blank</div>
+            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Blank</div>
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}><Storefront size={15} weight="bold" /> {mockup ? "Change blank" : "Pick a blank"}</Button>
           </div>
           {/* Print area — the printable rectangle scales against a 12x16 base, matching
               what production actually trims to. */}
           <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Print area (in)</div>
+            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Print area (in)</div>
             <div className="flex items-center gap-1.5">
               <Input value={paW} onChange={(e) => setPaW(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area width in inches" />
               <span className="text-xs text-muted-foreground">x</span>
@@ -305,8 +305,8 @@ export function DesignMaker() {
               copy in "Your uploads"; click any thumbnail to drop it on the design. */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Images</div>
-              <label className="flex cursor-pointer items-center gap-1 text-[11px] font-medium text-primary hover:underline">
+              <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Images</div>
+              <label className="flex cursor-pointer items-center gap-1 text-2xs font-medium text-primary hover:underline">
                 <UploadSimple size={12} weight="bold" /> Upload
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => onUploadImage(e.target.files?.[0])} />
               </label>
@@ -314,12 +314,12 @@ export function DesignMaker() {
             {imagesLoading ? (
               <div className="flex justify-center py-2"><CircleNotch size={16} className="animate-spin text-muted-foreground" /></div>
             ) : (sellerImages.length === 0 && orderUploads.length === 0) ? (
-              <p className="px-1 text-[11px] text-muted-foreground">Upload an image to reuse it — and buyer art from your connected stores shows up here automatically.</p>
+              <p className="px-1 text-2xs text-muted-foreground">Upload an image to reuse it — and buyer art from your connected stores shows up here automatically.</p>
             ) : (
               <>
                 {sellerImages.length > 0 && (
                   <>
-                    <div className="text-[10px] font-medium text-muted-foreground">Your uploads</div>
+                    <div className="text-3xs font-medium text-muted-foreground">Your uploads</div>
                     <div className="grid grid-cols-3 gap-1.5">
                       {sellerImages.map((im) => <ImageThumb key={im.id} url={im.url} name={im.name} onPlace={() => placeImage(im.url)} onDelete={() => removeImage(im.id)} />)}
                     </div>
@@ -327,7 +327,7 @@ export function DesignMaker() {
                 )}
                 {orderUploads.length > 0 && (
                   <>
-                    <div className="mt-1 text-[10px] font-medium text-muted-foreground">From your orders</div>
+                    <div className="mt-1 text-3xs font-medium text-muted-foreground">From your orders</div>
                     <div className="grid grid-cols-3 gap-1.5">
                       {orderUploads.map((im, i) => <ImageThumb key={im.url + i} url={im.url} src={canvasReadableSrc(im.url)} name={im.name} badge={im.orderRef} onPlace={() => placeImage(im.url)} />)}
                     </div>
@@ -338,11 +338,11 @@ export function DesignMaker() {
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setLibOpen(true)}><FolderOpen size={15} weight="bold" /> Saved designs</Button>
           </div>
           <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Text</div>
+            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Text</div>
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={addText}><TextT size={15} weight="bold" /> Add text</Button>
           </div>
           <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Layers</div>
+            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Layers</div>
             {designUrl && (
               <button onClick={() => setSelected("image")} className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === "image" ? "bg-primary/10 text-primary" : "hover:bg-accent")}><ImageIcon size={14} weight="duotone" /> Artwork</button>
             )}
@@ -410,7 +410,7 @@ export function DesignMaker() {
         <aside className="hidden w-72 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-4 lg:flex">
           {selText ? (
             <div className="space-y-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Text</div>
+              <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Text</div>
               <Input value={selText.text} onChange={(e) => updateText(selText.id, { text: e.target.value })} placeholder="Your text" />
               <label className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-muted-foreground">Size</span>

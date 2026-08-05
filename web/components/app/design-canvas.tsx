@@ -213,7 +213,7 @@ export function DesignStage({
           style={{ left: `${printZone.x}%`, top: `${printZone.y}%`, width: `${printZone.w}%`, height: `${printZone.h}%` }}
         >
           {printLabel && (
-            <span className="absolute -top-5 left-0 rounded bg-background/80 px-1 text-[10px] font-medium tracking-wide text-muted-foreground">
+            <span className="absolute -top-5 left-0 rounded bg-background/80 px-1 text-3xs font-medium tracking-wide text-muted-foreground">
               {printLabel}
             </span>
           )}
@@ -252,7 +252,7 @@ export function DesignStage({
             className="block rounded-full border-2 border-white shadow-lg ring-1 ring-black/20"
             style={{ width: LOUPE, height: LOUPE }}
           />
-          <div className="mt-1 flex items-center justify-center gap-1.5 rounded-md bg-foreground/90 px-1.5 py-0.5 text-[10px] font-medium text-background">
+          <div className="mt-1 flex items-center justify-center gap-1.5 rounded-md bg-foreground/90 px-1.5 py-0.5 text-3xs font-medium text-background">
             <span className="size-2.5 rounded-full border border-white/40" style={{ background: loupe.hex }} />
             <span className="font-mono">{loupe.hex}</span>
           </div>
@@ -888,7 +888,7 @@ export function DesignCanvasDialog({
                   <span key={t.code} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-0.5 pl-1 pr-2 text-xs">
                     <span className="size-4 shrink-0 rounded-full border border-black/15" style={{ background: t.hex }} />
                     <span className="font-medium">{t.name}</span>
-                    <span className="font-mono text-[10px] text-muted-foreground">{t.code}</span>
+                    <span className="font-mono text-3xs text-muted-foreground">{t.code}</span>
                   </span>
                 ))}
               </div>
@@ -897,7 +897,7 @@ export function DesignCanvasDialog({
             {/* The map. Each row is a crop of the artwork taken from where that colour
                 actually sits — the half a digitiser was previously guessing at. */}
             {pickWarn && (
-              <div className="mt-2 flex items-start gap-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">
+              <div className="mt-2 flex items-start gap-2 rounded-md bg-amber-50 px-2 py-1.5 text-2xs text-amber-800">
                 <span className="mt-0.5 size-3 shrink-0 rounded-full border border-black/15" style={{ background: pickWarn.hex }} />
                 <span>
                   You sampled <span className="font-mono font-medium">{pickWarn.hex}</span>, but the closest cone you stock is{" "}
@@ -929,8 +929,8 @@ export function DesignCanvasDialog({
                           {/* The SAMPLED colour — what's actually in the artwork. */}
                           <div className="flex items-center gap-1.5">
                             <span className="size-3 shrink-0 rounded-full border border-black/15" style={{ background: r.srcHex }} />
-                            <span className="font-mono text-[11px] font-medium">{r.srcHex}</span>
-                            <span className="ml-auto text-[10px] font-medium text-muted-foreground">{r.pct}%</span>
+                            <span className="font-mono text-2xs font-medium">{r.srcHex}</span>
+                            <span className="ml-auto text-3xs font-medium text-muted-foreground">{r.pct}%</span>
                           </div>
                           {/* -> the cone. A dropdown, not a verdict: the nearest cone by
                               maths isn't always the one you want stitched, so every close
@@ -940,12 +940,12 @@ export function DesignCanvasDialog({
                               cone presented confidently is how the floor loads red as
                               white. */}
                           {r.poor && (
-                            <div className="mt-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            <div className="mt-1 rounded bg-amber-50 px-1.5 py-0.5 text-3xs font-medium text-amber-700">
                               No close match in your thread stock — pick one below, or add this colour in Settings.
                             </div>
                           )}
                           <div className="mt-1 flex items-center gap-1.5">
-                            <span className="text-[10px] text-muted-foreground">&rarr;</span>
+                            <span className="text-3xs text-muted-foreground">&rarr;</span>
                             <span
                               className="size-3 shrink-0 rounded-full border border-black/15"
                               style={{ background: (r.options.find((o) => o.code === (picks[r.srcHex] ?? r.thread.code)) ?? r.thread).hex }}
@@ -953,7 +953,7 @@ export function DesignCanvasDialog({
                             <select
                               value={picks[r.srcHex] ?? r.thread.code}
                               onChange={(e) => chooseThread(r, e.target.value)}
-                              className="eg-select h-7 min-w-0 flex-1 rounded-md border border-border bg-card px-1.5 text-[11px]"
+                              className="eg-select h-7 min-w-0 flex-1 rounded-md border border-border bg-card px-1.5 text-2xs"
                               title="Choose the cone for this colour"
                             >
                               {r.options.map((o, i) => (
@@ -1032,12 +1032,12 @@ export function DesignCanvasDialog({
             {/* 1 — Design image */}
             <div className={cn("rounded-lg border p-2.5", designUrl ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20" : "border-dashed border-border bg-muted/20")}>
               <div className="flex items-start gap-2">
-                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold", designUrl ? "bg-emerald-600 text-white" : "border border-border bg-background text-muted-foreground")}>
+                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold", designUrl ? "bg-emerald-600 text-white" : "border border-border bg-background text-muted-foreground")}>
                   {designUrl ? <Check size={12} weight="bold" /> : "1"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">Design image</div>
-                  <div className="text-[11px] text-muted-foreground">{designUrl ? "Added — shows on the mockup" : "The artwork we print / embroider"}</div>
+                  <div className="text-2xs text-muted-foreground">{designUrl ? "Added — shows on the mockup" : "The artwork we print / embroider"}</div>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1048,12 +1048,12 @@ export function DesignCanvasDialog({
             {/* 2 — Machine file (the seller's own-file route, now discoverable) */}
             <div className={cn("rounded-lg border p-2.5", hasMachineFile ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20" : "border-dashed border-border bg-muted/20")}>
               <div className="flex items-start gap-2">
-                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold", hasMachineFile ? "bg-emerald-600 text-white" : "border border-border bg-background text-muted-foreground")}>
+                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold", hasMachineFile ? "bg-emerald-600 text-white" : "border border-border bg-background text-muted-foreground")}>
                   {hasMachineFile ? <Check size={12} weight="bold" /> : "2"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">Machine file</div>
-                  <div className="truncate text-[11px] text-muted-foreground" title={latestMachine?.name || undefined}>{hasMachineFile ? (latestMachine ? `Latest: ${latestMachine.name}` : "Added — the stitch file") : "The stitch file — .emb / .pes / .dst …"}</div>
+                  <div className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || undefined}>{hasMachineFile ? (latestMachine ? `Latest: ${latestMachine.name}` : "Added — the stitch file") : "The stitch file — .emb / .pes / .dst …"}</div>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1072,7 +1072,7 @@ export function DesignCanvasDialog({
                   </Button>
                 )}
               </div>
-              {dlErr && <div className="mt-1.5 text-[11px] text-destructive">{dlErr}</div>}
+              {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
             </div>
           </div>
           {/* Ten shirts, one file — only when there IS another line to apply to. */}
@@ -1098,9 +1098,9 @@ export function DesignCanvasDialog({
               design" three days ago and "Approved" are very different answers, and the lane
               is the one the board itself shows. */}
           {boardCard && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-[13px]">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-sm">
               <span className="font-medium text-foreground">On the design board</span>
-              <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+              <span className="rounded bg-primary/15 px-1.5 py-0.5 text-2xs font-semibold text-primary">
                 {boardCard.lane_label || boardCard.col || "Incoming"}
               </span>
               {boardCard.claimed_by && <span className="text-muted-foreground">· {boardCard.claimed_by}</span>}
@@ -1125,7 +1125,7 @@ export function DesignCanvasDialog({
               >
                 <span className="min-w-0">
                   <span className="block text-xs font-medium">Design charge</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
+                  <span className="block truncate text-2xs text-muted-foreground">
                     {tier
                       ? `${TIER_LABEL[tier]}${feeFor(tier, fees) !== null ? ` · ${usd(feeFor(tier, fees)!)}` : ""}${quote === "pending" ? " · awaiting the seller" : ""}`
                       : `Suggested: ${TIER_LABEL[suggested]}${feeFor(suggested, fees) !== null ? ` · ${usd(feeFor(suggested, fees)!)}` : ""} — not charged yet`}
@@ -1179,7 +1179,7 @@ export function DesignCanvasDialog({
                               onSaved?.()
                             } catch (e) { setErr((e as Error).message) } finally { setTierBusy(null) }
                           }}
-                          className={"relative rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-50 " +
+                          className={"relative rounded-lg border px-2 py-1.5 text-2xs font-medium transition-colors disabled:opacity-50 " +
                             (isSet ? "border-primary bg-primary/10 text-primary"
                               : isSuggested ? "border-primary/50 bg-primary/5 text-foreground"
                               : "border-border text-muted-foreground hover:bg-accent")}
@@ -1191,7 +1191,7 @@ export function DesignCanvasDialog({
                                   Standard, and a charge chosen by someone who can't see the
                                   amount is a charge made blind. Only once fees load. */}
                               {fee !== null && (
-                                <span className="block text-[10px] font-normal tabular-nums opacity-70">{usd(fee)}</span>
+                                <span className="block text-3xs font-normal tabular-nums opacity-70">{usd(fee)}</span>
                               )}
                             </>
                           )}
@@ -1201,7 +1201,7 @@ export function DesignCanvasDialog({
                   </div>
 
                   {!tier && (
-                    <p className="mt-2 text-[11px] text-muted-foreground">
+                    <p className="mt-2 text-2xs text-muted-foreground">
                       {hasMachineFile
                         ? "A machine file is already on this line, so they supplied it — we only check it."
                         : "No machine file on this line, so we cut it from their artwork."}
@@ -1210,16 +1210,16 @@ export function DesignCanvasDialog({
                   )}
                   {/* The quote's own state, in words. A "complex" chip alone can't tell
                       waiting-on-the-seller from already-paid from refused. */}
-                  {quote === "pending" && <p className="mt-2 text-[11px] text-amber-700">Waiting on the seller to accept — don&apos;t start work yet.</p>}
-                  {quote === "declined" && <p className="mt-2 text-[11px] text-rose-700">The seller declined. Cancel the line, or agree something else with them.</p>}
-                  {quote === "accepted" && <p className="mt-2 text-[11px] text-emerald-700">Accepted and paid — cleared to digitise. The tier is locked.</p>}
+                  {quote === "pending" && <p className="mt-2 text-2xs text-amber-700">Waiting on the seller to accept — don&apos;t start work yet.</p>}
+                  {quote === "declined" && <p className="mt-2 text-2xs text-rose-700">The seller declined. Cancel the line, or agree something else with them.</p>}
+                  {quote === "accepted" && <p className="mt-2 text-2xs text-emerald-700">Accepted and paid — cleared to digitise. The tier is locked.</p>}
 
                   {/* The ALTERNATIVE to uploading, not a step after it. Offering both without
                       saying so is how a line ends up with a finished file AND an open card
                       nobody closes. */}
                   {onSendToDesigner && (
                     <div className="mt-3 border-t border-border pt-3">
-                      <p className="mb-1.5 text-[11px] text-muted-foreground">Don&apos;t have the file yet?</p>
+                      <p className="mb-1.5 text-2xs text-muted-foreground">Don&apos;t have the file yet?</p>
                       {/* SAVE FIRST, then send — and only send if the save actually landed.
                           This silently did nothing before: the board builds its card from
                           the SAVED designs map, so artwork dropped here but not yet saved
@@ -1232,7 +1232,7 @@ export function DesignCanvasDialog({
                       }}>
                         {saving ? "Saving…" : "Send this line to a designer"}
                       </Button>
-                      {!designUrl && <p className="mt-1 text-[11px] text-muted-foreground">Needs artwork first — there&apos;s nothing to digitise.</p>}
+                      {!designUrl && <p className="mt-1 text-2xs text-muted-foreground">Needs artwork first — there&apos;s nothing to digitise.</p>}
                     </div>
                   )}
                 </div>

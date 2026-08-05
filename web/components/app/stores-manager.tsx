@@ -372,7 +372,7 @@ export function StoresManager() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-medium">{c.shop_name || `Shop ${c.shop_id}`}</span>
-                      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <span className="rounded-md bg-muted px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {c.platform}
                       </span>
                     </div>
@@ -393,7 +393,7 @@ export function StoresManager() {
                     {isAdmin && openScopes.has(c.shop_id) && c.scopes && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {c.scopes.split(/[\s,]+/).filter(Boolean).map((s) => (
-                          <span key={s} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{s}</span>
+                          <span key={s} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">{s}</span>
                         ))}
                       </div>
                     )}
@@ -516,12 +516,12 @@ export function StoresManager() {
                     <span className="flex items-center gap-2 font-medium">
                       {o.label}
                       {o.rec && !off && synced === null && (
-                        <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                        <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-primary">
                           Recommended
                         </span>
                       )}
                       {synced === o.days && (
-                        <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <span className="rounded-md bg-muted px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Current
                         </span>
                       )}

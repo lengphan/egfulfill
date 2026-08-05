@@ -22,8 +22,8 @@ export function SectionCard({
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
-            {title && <div className="text-[15px] font-bold">{title}</div>}
-            {description && <div className="text-[13px] text-muted-foreground">{description}</div>}
+            {title && <div className="text-base font-bold">{title}</div>}
+            {description && <div className="text-sm text-muted-foreground">{description}</div>}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>

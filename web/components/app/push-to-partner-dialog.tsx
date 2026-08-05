@@ -201,7 +201,7 @@ function PushToPartnerPanel({
             {artworkUrl
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={artworkUrl} alt="" className="size-full object-contain" />
-              : <div className="flex size-full items-center justify-center px-2 text-center text-[11px] text-muted-foreground">No artwork on this line</div>}
+              : <div className="flex size-full items-center justify-center px-2 text-center text-2xs text-muted-foreground">No artwork on this line</div>}
           </div>
           <div className="min-w-0 flex-1 space-y-1 text-sm">
             <div className="truncate font-medium">{itemName || sku || "Untitled design"}</div>

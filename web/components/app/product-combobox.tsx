@@ -178,7 +178,7 @@ export function ProductCombobox({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{p.name ?? p.sku}</span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
+                      <span className="block truncate text-2xs text-muted-foreground">
                         {[p.sku, p.type].filter(Boolean).join(" · ") || "—"}
                       </span>
                     </span>

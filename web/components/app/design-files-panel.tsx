@@ -182,7 +182,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: s
       >
         {busy ? <CircleNotch size={18} className="animate-spin text-muted-foreground" /> : <UploadSimple size={18} weight="bold" className="text-muted-foreground" />}
         <span className="text-xs font-medium">{busy ? `Uploading ${busy}…` : "Drop files here or click to browse"}</span>
-        {!compact && <span className="text-[10px] text-muted-foreground">.pes goes to the seller · .emb + images stay on the factory boards</span>}
+        {!compact && <span className="text-3xs text-muted-foreground">.pes goes to the seller · .emb + images stay on the factory boards</span>}
         <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => { if (e.target.files) upload(e.target.files); e.target.value = "" }} />
       </div>
 
@@ -191,20 +191,20 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: s
       {files === null ? (
         <div className="flex justify-center py-3 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /></div>
       ) : shown.length === 0 ? (
-        <div className="py-2 text-center text-[11px] text-muted-foreground">No files yet.</div>
+        <div className="py-2 text-center text-2xs text-muted-foreground">No files yet.</div>
       ) : (
         <div className="divide-y divide-border rounded-xl border border-border">
           {orderFiles(shown).map((f) => {
             const k = KIND_META[f.kind || "other"] ?? KIND_META.other
             return (
               <div key={f.designId} className="flex items-center gap-2 p-2">
-                <span className={"flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold " + k.cls}>{k.icon} {k.label}</span>
+                <span className={"flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-3xs font-bold " + k.cls}>{k.icon} {k.label}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-xs font-medium">{f.name}</span>
                     {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
                   </div>
-                  <div className="truncate text-[10px] text-muted-foreground">{scopeLabel(f)}{k.hint}</div>
+                  <div className="truncate text-3xs text-muted-foreground">{scopeLabel(f)}{k.hint}</div>
                 </div>
 
                 {/* Only .pes is sold, so only .pes gets a price — and only admin/warehouse
@@ -222,7 +222,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: s
                       />
                     </label>
                   ) : (
-                    <span className="shrink-0 text-[11px] font-medium tabular-nums">{f.price ? `$${f.price}` : "Free"}</span>
+                    <span className="shrink-0 text-2xs font-medium tabular-nums">{f.price ? `$${f.price}` : "Free"}</span>
                   )
                 )}
 
@@ -340,7 +340,7 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
     >
       {busy ? <CircleNotch size={18} className="animate-spin text-muted-foreground" /> : <UploadSimple size={18} weight="bold" className="text-muted-foreground" />}
       <span className="text-xs font-medium">{busy ? `Sending ${busy}…` : "Have a machine file or a design image? Drop it here"}</span>
-      <span className="text-[10px] text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>
+      <span className="text-3xs text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>
       <input ref={inputRef} type="file" multiple accept={MACHINE_ACCEPT + ",image/*"} className="hidden"
         onChange={(e) => { if (e.target.files) void send(e.target.files); e.target.value = "" }} />
     </div>

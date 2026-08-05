@@ -76,7 +76,7 @@ export function VariantField({
         "flex w-full min-w-0 items-center gap-1.5 rounded-2xl border bg-card text-left font-medium transition-colors",
         "hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border",
-        compact ? "h-7 px-2 text-[11px]" : "h-9 px-2.5 text-xs",
+        compact ? "h-7 px-2 text-2xs" : "h-9 px-2.5 text-xs",
         // Only the required-but-empty field draws attention; the rest stay quiet.
         required && unset ? "border-amber-400/70" : "border-border",
         className
@@ -113,7 +113,7 @@ export function VariantField({
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <span className="flex items-center gap-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
         {tl("field", label)}
         {required && !value && <span className="font-medium normal-case tracking-normal text-amber-600">{tl("field", "Required")}</span>}
       </span>
@@ -177,7 +177,7 @@ export function VariantStrip({
         <span
           key={c.key}
           className={cn(
-            "inline-flex max-w-[12rem] items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium",
+            "inline-flex max-w-[12rem] items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs font-medium",
             c.mono && "font-mono",
             locked
               ? "border-border/60 bg-muted/30 text-muted-foreground"
@@ -206,7 +206,7 @@ function BuyerChip({ text }: { text: string }) {
   return (
     <span
       title={`Buyer chose "${text}" on the marketplace`}
-      className="inline-flex max-w-[14rem] items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
+      className="inline-flex max-w-[14rem] items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-2xs text-muted-foreground"
     >
       <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">{tl("field", "Buyer")}</span>
       <span className="truncate">{text}</span>

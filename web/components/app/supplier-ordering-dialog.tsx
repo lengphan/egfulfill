@@ -356,8 +356,8 @@ export function SupplierOrderingDialog({
                   <h3 className="flex items-center gap-2 text-sm font-semibold">
                     S&amp;S Activewear
                     {opts.keys?.ss?.set
-                      ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">connected</span>
-                      : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">no key</span>}
+                      ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-medium text-emerald-700">connected</span>
+                      : <span className="rounded-full bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">no key</span>}
                   </h3>
                   <KeyRow label="Account number" name="SS_ACCOUNT_NUMBER" shown={opts.keys?.ss?.account ?? null}
                     isAdmin={isAdmin} editing={editKey === "SS_ACCOUNT_NUMBER"} value={keyVal} busy={keyBusy}
@@ -373,8 +373,8 @@ export function SupplierOrderingDialog({
                   <h3 className="flex items-center gap-2 text-sm font-semibold">
                     Otto Cap
                     {opts.keys?.otto?.set
-                      ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">connected</span>
-                      : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">no key</span>}
+                      ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-medium text-emerald-700">connected</span>
+                      : <span className="rounded-full bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">no key</span>}
                   </h3>
                   {/* Username/password aren't in the editable set server-side — only the
                       OAuth client pair is — so the username is shown, not offered. */}

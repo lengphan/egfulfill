@@ -184,7 +184,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
 
   return (
     <header className="sticky top-0 z-20 hidden h-16 items-center gap-3 border-b border-border bg-background px-6 md:flex">
-      <h1 className="text-[22px] font-bold tracking-tight">{title}</h1>
+      <h1 className="text-xl font-bold tracking-tight">{title}</h1>
 
       <div className="ml-auto flex items-center gap-1">
         <IconButton label={t("topbar.searchOrders")} onClick={() => setSearchOpen(true)}>
@@ -206,7 +206,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
           <IconButton label="Purchasing cart" onClick={() => router.push("/purchasing?tab=purchase")}>
             <ShoppingCart size={18} />
             {cartCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground">
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-3xs font-bold leading-none text-primary-foreground">
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}

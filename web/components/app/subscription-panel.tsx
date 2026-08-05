@@ -221,7 +221,7 @@ export function SubscriptionPanel() {
               <div className="flex items-center justify-between">
                 <div className="font-semibold">{t.name}</div>
                 {t.id === "pro" && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-3xs font-bold uppercase tracking-wide text-primary">
                     Popular
                   </span>
                 )}
@@ -292,7 +292,7 @@ export function SubscriptionPanel() {
                 <MagnifyingGlass size={16} weight="bold" />
               </span>
               <div className="font-semibold">SpyDeck research</div>
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-3xs font-bold uppercase tracking-wide text-primary">
                 Research
               </span>
             </div>

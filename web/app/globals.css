@@ -5,6 +5,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    /* Type scale. 11px and 10px were arbitrary values used 200 and 96 times — a de-facto
+       scale step that wasn't in the scale, so nothing stopped the next one being 11.5. Named
+       here so dense UI has a legitimate step to reach for instead of inventing one.
+       NOTE: the print components (label sheets, catalog print, QR captions) size text in
+       millimetres of paper and keep their own arbitrary values on purpose. */
+    --text-2xs: 0.6875rem;   /* 11px */
+    --text-3xs: 0.625rem;    /* 10px */
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
     /* Fraunces dropped 2026-08-05 — one typeface across the product. `font-display`

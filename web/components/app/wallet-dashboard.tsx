@@ -455,7 +455,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       const txCard = (
       <Card className="gap-0 overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="text-[15px] font-bold">Transaction history</div>
+          <div className="text-base font-bold">Transaction history</div>
           <Button variant="outline" size="sm">
             <DownloadSimple size={14} /> Export CSV
           </Button>

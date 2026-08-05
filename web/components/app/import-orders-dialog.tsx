@@ -253,7 +253,7 @@ export function ImportOrdersDialog({
                     </span>
                   ))}
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-2xs text-muted-foreground">
                   <span className="font-medium text-foreground">Bold + <span className="text-destructive">*</span></span> = required.
                   <span className="ml-1 rounded bg-primary/10 px-1 font-medium text-primary">Violet †</span> = fill at least one of them (<b>Item SKU</b> or <b>Product Title</b>) or the row is skipped.
                   <span className="ml-1 rounded bg-amber-50 px-1 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">Amber</span> = optional. Note <b>Order Number</b> is what groups lines: rows sharing one become a single multi-item order, and a blank one always imports as its own order. Hover a chip for details.
@@ -310,7 +310,7 @@ export function ImportOrdersDialog({
                     <Button variant="outline" size="sm" onClick={makeSheetCopy}>
                       <Table size={13} weight="bold" /> Make a copy in Google Sheets
                     </Button>
-                    <span className="text-[11px] text-muted-foreground">opens a copy already set up with the right columns</span>
+                    <span className="text-2xs text-muted-foreground">opens a copy already set up with the right columns</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Then share it as “anyone with the link can view” and paste the link above.

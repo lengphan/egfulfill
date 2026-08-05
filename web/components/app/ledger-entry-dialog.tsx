@@ -175,7 +175,7 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
               {account !== "factory" && account !== "designer" && (
                 // Naming the consequence, because crediting a seller is not an internal
                 // bookkeeping move — they can withdraw it.
-                <p className="mt-1 text-[11px] text-amber-700">
+                <p className="mt-1 text-2xs text-amber-700">
                   This changes a seller&apos;s spendable balance, not just our books.
                 </p>
               )}
@@ -194,7 +194,7 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
               </label>
               <Input id="le-ref" value={ref} onChange={(e) => setRef(e.target.value)}
                 placeholder="INV-4471" className="h-9" />
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="mt-1 text-2xs text-muted-foreground">
                 An invoice or PO number. Entering the same one twice records once, so a
                 re-entered invoice can&apos;t double-count.
               </p>

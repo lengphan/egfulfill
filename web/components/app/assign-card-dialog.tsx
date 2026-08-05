@@ -138,7 +138,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
                           >
                             <span className="min-w-0 flex-1 truncate">{it.name ?? it.sku ?? "Line"}</span>
                             <span className="shrink-0 text-xs text-muted-foreground">{variantOf(it)}</span>
-                            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{it.sku}</span>
+                            <span className="shrink-0 font-mono text-2xs text-muted-foreground">{it.sku}</span>
                           </button>
                         )
                       })}
@@ -157,7 +157,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
                     className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent">
                     <span className="shrink-0 font-mono text-xs">{numOf(o)}</span>
                     <span className="min-w-0 flex-1 truncate text-muted-foreground">{o.customer?.name ?? "—"}</span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{(o.items ?? []).length} lines</span>
+                    <span className="shrink-0 text-2xs text-muted-foreground">{(o.items ?? []).length} lines</span>
                   </button>
                 ))}
               </div>

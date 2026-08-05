@@ -749,7 +749,7 @@ export function ProductEditorDialog({
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={u} alt="" className="size-full object-cover" draggable={false} />
                     </button>
-                    {u === img && <span className="pointer-events-none absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow">Main</span>}
+                    {u === img && <span className="pointer-events-none absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-3xs font-semibold text-primary-foreground shadow">Main</span>}
                     {assigned && matchConf[assigned] === "high" && <Check size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-emerald-600" aria-label="Confident match" />}
                     {assigned && matchConf[assigned] === "low" && <Question size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-amber-500" aria-label="Guessed — verify" />}
                     {/* Colour tag overlaid on the photo. */}
@@ -762,7 +762,7 @@ export function ProductEditorDialog({
                           if (assigned) setMatchConf((m) => { const n = { ...m }; delete n[assigned]; return n })
                           if (c) setMatchConf((m) => { const n = { ...m }; delete n[c]; return n })
                         }}
-                        className={"eg-select absolute inset-x-1 bottom-1 h-6 w-[calc(100%-0.5rem)] rounded-md border px-1 text-[11px] font-medium backdrop-blur transition-colors " + (assigned ? "border-primary/40 bg-primary/90 text-primary-foreground" : "border-border bg-card/90 text-muted-foreground")}
+                        className={"eg-select absolute inset-x-1 bottom-1 h-6 w-[calc(100%-0.5rem)] rounded-md border px-1 text-2xs font-medium backdrop-blur transition-colors " + (assigned ? "border-primary/40 bg-primary/90 text-primary-foreground" : "border-border bg-card/90 text-muted-foreground")}
                         aria-label="Tag this photo's colour"
                       >
                         <option value="">— colour —</option>

@@ -90,9 +90,9 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
           </button>
         </div>
         <div className="grid grid-cols-3 gap-1.5 text-center">
-          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.listings)}</div><div className="text-[10px] text-muted-foreground">Products</div></div>
-          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.sales)}</div><div className="text-[10px] text-muted-foreground">Sales</div></div>
-          <div className="rounded-lg bg-muted/50 py-1.5"><div className="flex items-center justify-center gap-0.5 text-sm font-semibold tabular-nums">{s.rating != null ? <>{s.rating.toFixed(1)}<Star size={11} weight="fill" className="text-amber-500" /></> : "—"}</div><div className="text-[10px] text-muted-foreground">{fmtK(s.reviews)} reviews</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.listings)}</div><div className="text-3xs text-muted-foreground">Products</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.sales)}</div><div className="text-3xs text-muted-foreground">Sales</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="flex items-center justify-center gap-0.5 text-sm font-semibold tabular-nums">{s.rating != null ? <>{s.rating.toFixed(1)}<Star size={11} weight="fill" className="text-amber-500" /></> : "—"}</div><div className="text-3xs text-muted-foreground">{fmtK(s.reviews)} reviews</div></div>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => onOpen(s)} className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary/10 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
@@ -272,7 +272,7 @@ export function StoresTab(h: Handlers) {
                 ) : (
                   <span className="flex size-full items-center justify-center text-muted-foreground"><Package size={20} weight="duotone" /></span>
                 )}
-                {priceStr(l) && <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-white">{priceStr(l)}</span>}
+                {priceStr(l) && <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-2xs font-bold tabular-nums text-white">{priceStr(l)}</span>}
               </a>
             ))}
           </div>

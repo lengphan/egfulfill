@@ -90,7 +90,7 @@ export function StockSplitWarning({
               <Button size="sm" variant="outline" className="h-7" onClick={onSaveForLater}>
                 Save for later
               </Button>
-              <span className="inline-flex items-center gap-1 text-[11px] opacity-80">
+              <span className="inline-flex items-center gap-1 text-2xs opacity-80">
                 <Truck size={11} /> or order anyway and accept the split
               </span>
             </div>

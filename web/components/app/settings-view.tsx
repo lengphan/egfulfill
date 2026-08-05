@@ -425,8 +425,8 @@ function ApiKeysPanel() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium">{k.label || "Test key"}</span>
-                  <Badge variant="secondary" className="text-[10px] uppercase">{k.mode}</Badge>
-                  {k.revoked_at && <span className="text-[11px] font-medium text-red-600">revoked</span>}
+                  <Badge variant="secondary" className="text-3xs uppercase">{k.mode}</Badge>
+                  {k.revoked_at && <span className="text-2xs font-medium text-red-600">revoked</span>}
                 </div>
                 <div className="mt-0.5 font-mono text-xs text-muted-foreground">
                   {/* prefix••••last4 — the SAME shape the API Explorer shows, so a key can be
@@ -859,7 +859,7 @@ function FeeGroup({ title, hint, children }: { title: string; hint: string; chil
   if (q && !groupItself && Children.count(rows) === 0) return null
   return (
     <section className="mt-5 first:mt-0">
-      <h4 className="text-[13px] font-semibold uppercase tracking-widest text-primary">{title}</h4>
+      <h4 className="text-sm font-semibold uppercase tracking-widest text-primary">{title}</h4>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
       <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">{rows}</div>
     </section>
@@ -1196,15 +1196,15 @@ function PlatformPanel() {
             hint="USD→VND. A seller picks a dollar amount to add; this converts it to the VND their QR charges, and that exact USD credits on payment."
           >
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-medium">Base rate — VND per $1</span>
+              <span className="text-sm font-medium">Base rate — VND per $1</span>
               <Input value={vqrRate} onChange={(e) => setVqrRate(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="25400" className="h-9" />
-              <span className="text-[11px] text-muted-foreground">e.g. 25400 means $50 → 1,270,000₫</span>
+              <span className="text-2xs text-muted-foreground">e.g. 25400 means $50 → 1,270,000₫</span>
             </label>
             {/* Volume discounts — each row: at/above $usd, the seller pays this better $1 = rate₫. */}
             <div className="sm:col-span-2 space-y-2">
-              <span className="text-[13px] font-medium">Volume discounts</span>
-              <p className="text-[11px] text-muted-foreground">A better rate the more a seller adds. Lower ₫/$1 = a bigger discount. Shown in Add Funds under &ldquo;Top up more for a better rate&rdquo;.</p>
-              {vqrTiers.length === 0 && <p className="text-[11px] italic text-muted-foreground">No tiers yet — everyone gets the base rate.</p>}
+              <span className="text-sm font-medium">Volume discounts</span>
+              <p className="text-2xs text-muted-foreground">A better rate the more a seller adds. Lower ₫/$1 = a bigger discount. Shown in Add Funds under &ldquo;Top up more for a better rate&rdquo;.</p>
+              {vqrTiers.length === 0 && <p className="text-2xs italic text-muted-foreground">No tiers yet — everyone gets the base rate.</p>}
               {vqrTiers.map((t, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="relative w-24">
@@ -1228,14 +1228,14 @@ function PlatformPanel() {
           >
             <MoneyField label="Minimum top-up" hint="Smallest amount a seller can add, any method. Currently $200." value={vqrMin} onChange={setVqrMin} />
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-medium">Quick amounts</span>
+              <span className="text-sm font-medium">Quick amounts</span>
               <Input value={vqrSmall} onChange={(e) => setVqrSmall(e.target.value.replace(/[^0-9,\s]/g, ""))} inputMode="numeric" placeholder="50, 100, 200, 500, 1000" className="h-9" />
-              <span className="text-[11px] text-muted-foreground">Comma-separated. Amounts below the minimum are hidden automatically.</span>
+              <span className="text-2xs text-muted-foreground">Comma-separated. Amounts below the minimum are hidden automatically.</span>
             </label>
             <label className="flex flex-col gap-1 sm:col-span-2">
-              <span className="text-[13px] font-medium">Bulk amounts</span>
+              <span className="text-sm font-medium">Bulk amounts</span>
               <Input value={vqrBulk} onChange={(e) => setVqrBulk(e.target.value.replace(/[^0-9,\s]/g, ""))} inputMode="numeric" placeholder="2000, 5000, 10000, 20000" className="h-9" />
-              <span className="text-[11px] text-muted-foreground">The larger &ldquo;top up more&rdquo; suggestions. Comma-separated.</span>
+              <span className="text-2xs text-muted-foreground">The larger &ldquo;top up more&rdquo; suggestions. Comma-separated.</span>
             </label>
           </FeeGroup>
         )}
@@ -1330,7 +1330,7 @@ function PlatformPanel() {
               onChange={(e) => setOrderLimitDefault(e.target.value.replace(/[^0-9]/g, ""))}
               inputMode="numeric" placeholder="0" className="h-9"
             />
-            <span className="block text-[11px] text-muted-foreground">0 = no default cap. A seller&apos;s own limit always wins.</span>
+            <span className="block text-2xs text-muted-foreground">0 = no default cap. A seller&apos;s own limit always wins.</span>
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-medium">Factory daily limit (staff only)</span>
@@ -1339,7 +1339,7 @@ function PlatformPanel() {
               onChange={(e) => setFactoryDailyLimit(e.target.value.replace(/[^0-9]/g, ""))}
               inputMode="numeric" placeholder="0" className="h-9"
             />
-            <span className="block text-[11px] text-muted-foreground">Total orders/day the whole floor can take — shown in the staff header. 0 = shown as a plain count.</span>
+            <span className="block text-2xs text-muted-foreground">Total orders/day the whole floor can take — shown in the staff header. 0 = shown as a plain count.</span>
           </label>
         </div>
         <label className="mt-3 block space-y-1">
@@ -1351,7 +1351,7 @@ function PlatformPanel() {
             placeholder="Due to high order volume, orders submitted now may ship later than usual."
             className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
           />
-          <span className="block text-[11px] text-muted-foreground">Leave blank to use the default wording.</span>
+          <span className="block text-2xs text-muted-foreground">Leave blank to use the default wording.</span>
         </label>
       </Fold>
 
@@ -1365,7 +1365,7 @@ function PlatformPanel() {
         </p>
 
         <div className="mb-3 overflow-hidden rounded-lg border border-border">
-          <div className="grid grid-cols-[auto_7rem_1fr_auto] items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="grid grid-cols-[auto_7rem_1fr_auto] items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
             <span className="w-6" />
             <span>Code</span>
             <span>Name</span>
@@ -1491,7 +1491,7 @@ function PlatformPanel() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1">
-                  <span className="mr-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sides</span>
+                  <span className="mr-1 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Sides</span>
                   {ALL_SIDES.map((sd) => {
                     const on = sides.includes(sd)
                     return (
@@ -2346,7 +2346,7 @@ function freqLabel(days: number): string {
 function BackupStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-lg border bg-card px-3 py-2.5">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-lg font-semibold leading-tight tabular-nums">{value}</div>
       {sub ? <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div> : null}
     </div>

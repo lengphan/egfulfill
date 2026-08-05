@@ -147,7 +147,7 @@ export function WebhooksPanel() {
                   aria-pressed={on}
                   onClick={() => toggle(e)}
                   className={
-                    "rounded border px-2 py-0.5 font-mono text-[11px] transition-colors " +
+                    "rounded border px-2 py-0.5 font-mono text-2xs transition-colors " +
                     (on ? "border-primary bg-primary/10 font-medium text-primary" : "border-border text-muted-foreground hover:border-primary/40")
                   }
                 >
@@ -178,7 +178,7 @@ export function WebhooksPanel() {
               return (
                 <div key={w.id} className="rounded-lg border border-border p-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">#{w.id}</span>
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground">#{w.id}</span>
                     <span className="min-w-0 flex-1 truncate font-mono text-xs">{w.url}</span>
                     <Button size="sm" variant="outline" onClick={() => fire(w.id)} disabled={busy === `test:${w.id}`}>
                       {busy === `test:${w.id}` ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Send test
@@ -193,7 +193,7 @@ export function WebhooksPanel() {
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {(w.events?.length ? w.events : ["all events"]).map((e) => (
-                      <span key={e} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{e}</span>
+                      <span key={e} className="rounded bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">{e}</span>
                     ))}
                   </div>
 
@@ -223,7 +223,7 @@ export function WebhooksPanel() {
                               const o = outcomeOf(d)
                               return (
                                 <tr key={d.id} className="border-t border-border/60 first:border-0">
-                                  <td className="py-1 font-mono text-[11px]">{d.event}</td>
+                                  <td className="py-1 font-mono text-2xs">{d.event}</td>
                                   <td className={"py-1 " + (o.tone === "ok" ? "text-emerald-700" : "text-destructive")}>{o.text}</td>
                                   <td className="py-1 text-right text-muted-foreground">{d.attempts}×</td>
                                   <td className="py-1 text-right text-muted-foreground">{when(d.created_at)}</td>

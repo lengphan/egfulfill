@@ -51,7 +51,7 @@ export function StaffSidebar() {
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
       <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-5">
         <span className="font-display text-2xl font-semibold tracking-tight">egfulfill</span>
-        {role && <span className="ml-auto rounded-full bg-sidebar-primary px-2 py-0.5 text-[11px] font-medium capitalize tracking-normal text-sidebar-primary-foreground">{role}</span>}
+        {role && <span className="ml-auto rounded-full bg-sidebar-primary px-2 py-0.5 text-2xs font-medium capitalize tracking-normal text-sidebar-primary-foreground">{role}</span>}
       </div>
 
       <nav className="eg-scroll-slim flex-1 overflow-y-auto p-3">

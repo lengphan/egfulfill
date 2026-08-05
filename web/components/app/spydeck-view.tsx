@@ -95,8 +95,8 @@ function estFor(l: EtsyListing) {
 function StatBox({ label, sub, value }: { label: string; sub?: string; value: string }) {
   return (
     <div className="rounded-lg bg-muted/60 px-2 py-2 text-center leading-none">
-      <div className="truncate text-[15px] font-bold tabular-nums">{value}</div>
-      <div className="mt-1 text-[10px] font-medium text-muted-foreground">
+      <div className="truncate text-base font-bold tabular-nums">{value}</div>
+      <div className="mt-1 text-3xs font-medium text-muted-foreground">
         {label}{sub ? <span className="text-muted-foreground/60"> · {sub}</span> : null}
       </div>
     </div>
@@ -144,7 +144,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
             <div className="flex size-full items-center justify-center text-muted-foreground"><Binoculars size={22} weight="duotone" /></div>
           )}
           {trending && (
-            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 text-3xs font-bold uppercase tracking-wide text-white shadow-sm">
               <TrendUp size={11} weight="bold" /> Trending
             </span>
           )}
@@ -160,7 +160,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
               matches in the tooltip. */}
           {tmHits.length > 0 && (
             <span
-              className="absolute bottom-2 right-2 inline-flex max-w-[62%] items-center gap-1 rounded-md bg-amber-500/90 px-1.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur"
+              className="absolute bottom-2 right-2 inline-flex max-w-[62%] items-center gap-1 rounded-md bg-amber-500/90 px-1.5 py-1 text-3xs font-bold uppercase tracking-wide text-white backdrop-blur"
               title={`Possible trademark: ${tmHits.join(", ")} — heuristic check, not legal advice. A listing mentioning a known brand may risk takedown; verify before copying the idea.`}
             >
               <Warning size={11} weight="fill" className="shrink-0" />
@@ -194,8 +194,8 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
           {tags.length > 0 && (
             <div className="mt-3">
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{tags.length} keywords</span>
-                <button type="button" onClick={(ev) => { ev.preventDefault(); copyAll() }} className="text-[10px] font-medium text-primary hover:underline">
+                <span className="text-3xs font-semibold uppercase tracking-wide text-muted-foreground">{tags.length} keywords</span>
+                <button type="button" onClick={(ev) => { ev.preventDefault(); copyAll() }} className="text-3xs font-medium text-primary hover:underline">
                   {copied ? "Copied!" : "Copy all"}
                 </button>
               </div>
@@ -206,7 +206,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
                     type="button"
                     onClick={(ev) => { ev.preventDefault(); onSearchTag(t) }}
                     title={`Research "${t}"`}
-                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] leading-tight text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    className="rounded bg-muted px-1.5 py-0.5 text-3xs leading-tight text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   >
                     {t}
                   </button>
@@ -263,7 +263,7 @@ const SEED_NICHES: { text: string; weight: number }[] = [
 function FilterField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium text-muted-foreground">{label}{hint ? <span className="text-muted-foreground/60"> · {hint}</span> : null}</span>
+      <span className="text-2xs font-medium text-muted-foreground">{label}{hint ? <span className="text-muted-foreground/60"> · {hint}</span> : null}</span>
       {children}
     </label>
   )

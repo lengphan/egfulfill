@@ -222,7 +222,7 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
                       )
                     })}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">Each size is its own Etsy variant — set a different price per size, or reset them all to the base price.</p>
+                  <p className="text-2xs text-muted-foreground">Each size is its own Etsy variant — set a different price per size, or reset them all to the base price.</p>
                 </div>
               </div>
             </div>

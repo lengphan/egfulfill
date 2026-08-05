@@ -89,7 +89,7 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
       {channelsPresent.length > 1 && (
         <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           {channelsPresent.map((c) => (
-            <span key={c.name} className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+            <span key={c.name} className="inline-flex items-center gap-1.5 text-2xs font-medium text-muted-foreground">
               <span className={"size-2 rounded-[2px] " + c.cls} />
               {c.name}
             </span>
@@ -150,7 +150,7 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
 
             {/* Oldest-waiting, muted: context for the count rather than a competing number.
                 Fixed width so it never shoves the counts out of their column. */}
-            <div className="w-12 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground/70">
+            <div className="w-12 shrink-0 text-right text-2xs tabular-nums text-muted-foreground/70">
               {r.n ? ageLabel(r.oldest) : ""}
             </div>
 

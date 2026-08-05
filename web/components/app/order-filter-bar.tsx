@@ -34,7 +34,7 @@ function FilterMenu({ label, value, options, onPick }: {
     <DropdownMenu>
       <DropdownMenuTrigger
         className={
-          "inline-flex h-8 max-w-[11rem] items-center gap-1 rounded-md border px-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
+          "inline-flex h-8 max-w-[11rem] items-center gap-1 rounded-md border px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
           (on
             ? "border-primary/40 bg-primary/5 text-foreground"
             : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground")
@@ -48,12 +48,12 @@ function FilterMenu({ label, value, options, onPick }: {
             reads as the unfiltered heading the trigger falls back to, which is exactly what
             picking it does. It stays an explicit row rather than only a Clear button: a
             dropdown you can enter but not leave is the classic filter trap. */}
-        <DropdownMenuItem onClick={() => onPick("")} className="flex items-center gap-2 text-[13px]">
+        <DropdownMenuItem onClick={() => onPick("")} className="flex items-center gap-2 text-sm">
           <Check size={12} weight="bold" className={value ? "opacity-0" : "text-primary"} />
           <span className={value ? "text-muted-foreground" : "font-medium"}>{label}</span>
         </DropdownMenuItem>
         {options.map((o) => (
-          <DropdownMenuItem key={o.value} onClick={() => onPick(o.value)} className="flex items-center gap-2 text-[13px]">
+          <DropdownMenuItem key={o.value} onClick={() => onPick(o.value)} className="flex items-center gap-2 text-sm">
             <Check size={12} weight="bold" className={value === o.value ? "text-primary" : "opacity-0"} />
             <span className="truncate">{o.label}</span>
           </DropdownMenuItem>
@@ -88,7 +88,7 @@ export function OrderSearchInput({ query, onChange, className = "" }: {
         // title and the label, where it isn't clipped.
         placeholder="Search orders…"
         title="Search order number, customer, tracking, store, SKU or item name"
-        className="h-9 rounded-md pl-8 text-[13px]"
+        className="h-9 rounded-md pl-8 text-sm"
         aria-label="Search order number, customer, tracking, store, SKU or item name"
       />
     </div>
@@ -141,7 +141,7 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
           are on and turns violet while any are. */}
       <PopoverTrigger
         className={
-          "eg-tap inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
+          "eg-tap inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
           (facetCount
             ? "border-primary/40 bg-primary/5 text-foreground"
             : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground") +
@@ -151,14 +151,14 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
         <FunnelSimple size={14} weight="bold" />
         Filters
         {facetCount > 0 && (
-          <span className="rounded bg-primary px-1.5 text-[11px] font-bold leading-[1.45] text-primary-foreground">{facetCount}</span>
+          <span className="rounded bg-primary px-1.5 text-2xs font-bold leading-[1.45] text-primary-foreground">{facetCount}</span>
         )}
         <CaretDown size={11} weight="bold" className="opacity-60" />
       </PopoverTrigger>
 
       <PopoverContent align="end" className="w-72 p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[13px] font-semibold">Filters</span>
+          <span className="text-sm font-semibold">Filters</span>
           {active && (
             <button
               onClick={() => onChange({ ...EMPTY_ORDER_QUERY })}
@@ -211,7 +211,7 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
 function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-[13px] text-muted-foreground">{label}</span>
+      <span className="text-sm text-muted-foreground">{label}</span>
       {children}
     </div>
   )

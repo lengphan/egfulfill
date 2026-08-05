@@ -253,7 +253,7 @@ export function CatalogView() {
                           </div>
                           <div className="min-w-0">
                             <div className="max-w-[20rem] truncate font-medium">{p.name || id}</div>
-                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
                               <span className="font-mono">{p.sku || id}</span>
                               {p.inCatalog && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">published</span>}
                             </div>
@@ -270,12 +270,12 @@ export function CatalogView() {
                                     : <span key={c} title={c} className="size-3.5 rounded-full border border-border" style={{ background: swatchHex(c) }} />
                                 })}
                                 {colorsOf(p).length > 8 && (
-                                  <span className="text-[10px] text-muted-foreground">+{colorsOf(p).length - 8}</span>
+                                  <span className="text-3xs text-muted-foreground">+{colorsOf(p).length - 8}</span>
                                 )}
                               </div>
                             )}
                             {sizesOf(p).length > 0 && (
-                              <div className="mt-1 truncate text-[10px] text-muted-foreground">
+                              <div className="mt-1 truncate text-3xs text-muted-foreground">
                                 {sizesOf(p).join(" · ")}
                               </div>
                             )}

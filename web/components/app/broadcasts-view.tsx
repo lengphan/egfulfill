@@ -216,7 +216,7 @@ function EmailBrandingCard() {
               <p className="mb-2">Hi Alex,</p>
               <p className="text-zinc-400">Your broadcast copy appears here…</p>
             </div>
-            <div className="border-t border-zinc-200 px-5 py-3 text-[11px] leading-relaxed text-zinc-400">
+            <div className="border-t border-zinc-200 px-5 py-3 text-2xs leading-relaxed text-zinc-400">
               {b.footerNote && <p className="mb-1.5 text-zinc-500">{b.footerNote}</p>}
               <p>You&apos;re receiving this because you have an EGFULFILL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
             </div>
@@ -261,7 +261,7 @@ function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | nul
           ? paras.map((p, i) => <p key={i} className="mb-2 whitespace-pre-line">{p}</p>)
           : <p className="text-zinc-400">Your message appears here…</p>}
       </div>
-      <div className="border-t border-zinc-200 px-5 py-3 text-[11px] leading-relaxed text-zinc-400">
+      <div className="border-t border-zinc-200 px-5 py-3 text-2xs leading-relaxed text-zinc-400">
         {b.footerNote && <p className="mb-1.5 text-zinc-500">{b.footerNote}</p>}
         <p>You&apos;re receiving this because you have an EGFULFILL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
       </div>
@@ -409,7 +409,7 @@ export function BroadcastsView() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-border text-left text-2xs uppercase tracking-wide text-muted-foreground">
                   <th className="py-2 pr-3 font-medium">Subject</th>
                   <th className="py-2 pr-3 font-medium">Audience</th>
                   <th className="py-2 pr-3 font-medium">Status</th>
@@ -529,7 +529,7 @@ export function BroadcastsView() {
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">Preview</span>
-              <span className="text-[11px] text-muted-foreground">Your saved branding</span>
+              <span className="text-2xs text-muted-foreground">Your saved branding</span>
             </div>
             <div className="mb-2 truncate text-xs text-muted-foreground">Subject: <span className="font-medium text-foreground">{subject || "…"}</span></div>
             <div className="max-h-[52vh] overflow-y-auto">

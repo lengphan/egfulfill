@@ -136,7 +136,7 @@ export function ProductPickerDialog({
                     <div className="p-2.5">
                       <div className="truncate text-sm font-medium">{p.name ?? p.sku}</div>
                       <div className="mt-0.5 flex items-center justify-between">
-                        <span className="truncate font-mono text-[11px] text-muted-foreground">{p.sku}</span>
+                        <span className="truncate font-mono text-2xs text-muted-foreground">{p.sku}</span>
                         <span className="text-sm font-semibold tabular-nums">{usd(priceOf(p))}</span>
                       </div>
                     </div>

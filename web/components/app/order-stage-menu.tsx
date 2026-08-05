@@ -86,7 +86,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
               onClick={() => onStage(s)}
             >
               {s.label}
-              {s.walk && <span className="ml-auto text-[10px] text-muted-foreground">catch up</span>}
+              {s.walk && <span className="ml-auto text-3xs text-muted-foreground">catch up</span>}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>

@@ -49,7 +49,7 @@ function PickRow({ line, title, sub, right, meta, image, on, onToggle }: {
         {meta && meta.length > 0 && (
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {meta.map((m) => (
-              <span key={m.k} className="text-[11px] text-muted-foreground">
+              <span key={m.k} className="text-2xs text-muted-foreground">
                 {m.k} <span className="font-mono text-foreground/70">{m.v}</span>
               </span>
             ))}

@@ -22,8 +22,8 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
   if (editing) {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="w-28 shrink-0 truncate text-[13px] text-muted-foreground">{s.label}</span>
-        <Input type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder="Paste new value" className="h-8 flex-1 font-mono text-[13px]" autoFocus />
+        <span className="w-28 shrink-0 truncate text-sm text-muted-foreground">{s.label}</span>
+        <Input type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder="Paste new value" className="h-8 flex-1 font-mono text-sm" autoFocus />
         <Button size="sm" className="h-7 px-2" disabled={busy || !val.trim()} onClick={() => save(false)}>{busy ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />}</Button>
         {s.set && <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-red-600" title="Clear" disabled={busy} onClick={() => save(true)}>Clear</Button>}
         <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => { setEditing(false); setVal("") }}><X size={12} /></Button>
@@ -31,7 +31,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
     )
   }
   return (
-    <div className="flex items-center justify-between gap-2 text-[13px]">
+    <div className="flex items-center justify-between gap-2 text-sm">
       <span className="text-muted-foreground">{s.label}</span>
       <span className="flex items-center gap-1.5 font-mono">
         {s.set ? <span className="text-foreground">{s.masked || `••••${s.last4 ?? ""}`}</span> : <span className="text-muted-foreground">not set</span>}
@@ -336,7 +336,7 @@ export function IntegrationsPanel() {
               <Sparkle size={14} weight="fill" className="text-primary" />
               <span className="font-medium">AI Assistant (Claude)</span>
             </span>
-            <span className="shrink-0 text-[13px] text-muted-foreground">{aiSummary}</span>
+            <span className="shrink-0 text-sm text-muted-foreground">{aiSummary}</span>
           </summary>
           <div className="border-t border-border bg-muted/20 px-5 py-4">
             <AiAssistantCard onChanged={() => getAiConfig().then(setAiCfg).catch(() => {})} />
@@ -355,15 +355,15 @@ export function IntegrationsPanel() {
                   <span className="flex min-w-0 items-center gap-2">
                     <CaretRight size={13} className="shrink-0 text-muted-foreground transition-transform group-open/row:rotate-90" />
                     <span className="truncate font-medium">{i.name}</span>
-                    {idx === 0 && <span className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:inline">{group}</span>}
+                    {idx === 0 && <span className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs font-medium uppercase tracking-wide text-muted-foreground sm:inline">{group}</span>}
                   </span>
-                  <span className={"inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[11px] font-medium " + meta.pill}>
+                  <span className={"inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-2xs font-medium " + meta.pill}>
                     {meta.label}
                   </span>
                 </summary>
                 <div className="space-y-2 border-t border-border bg-muted/20 px-5 py-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] text-muted-foreground">{i.blurb}</span>
+                    <span className="text-sm text-muted-foreground">{i.blurb}</span>
                     <span className="flex items-center gap-3">
                       {i.test && (
                         <button
@@ -386,10 +386,10 @@ export function IntegrationsPanel() {
                     </span>
                   </div>
                   {res.detail && (
-                    <div className="break-all font-mono text-[12px] text-muted-foreground">{res.detail}</div>
+                    <div className="break-all font-mono text-xs text-muted-foreground">{res.detail}</div>
                   )}
                   {tests[i.key]?.result && (
-                    <div className={"break-words text-[12px] " + (tests[i.key]!.result!.ok ? "text-emerald-600" : "text-destructive")}>
+                    <div className={"break-words text-xs " + (tests[i.key]!.result!.ok ? "text-emerald-600" : "text-destructive")}>
                       {tests[i.key]!.result!.ok ? "✓ " : "✗ "}{tests[i.key]!.result!.msg}
                     </div>
                   )}
@@ -504,7 +504,7 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
             <div className="flex h-9 items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3">
               <span className="flex-1 truncate font-mono text-xs text-foreground">{cfg.masked || `••••${cfg.last4 ?? ""}`}</span>
               {cfg.fromEnv
-                ? <span className="shrink-0 text-[11px] text-muted-foreground">from env</span>
+                ? <span className="shrink-0 text-2xs text-muted-foreground">from env</span>
                 : <button type="button" onClick={() => setEditingKey(true)} className="shrink-0 text-xs font-medium text-primary hover:underline">Replace</button>}
             </div>
           ) : (

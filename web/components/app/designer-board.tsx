@@ -620,18 +620,18 @@ export function DesignerBoard() {
                           className="relative block h-48 w-full cursor-pointer overflow-hidden bg-muted"
                         >
                           <CardArt key={String(c.thumb ?? c.id)} card={c} imgClass="size-full object-cover" iconSize={26} />
-                          {isEmbCard(c) && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
+                          {isEmbCard(c) && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-3xs font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
                           {/* Top-right tag = WHO owns this card's queue. A partner card shows the
                               partner (pink). Otherwise, if someone on OUR side has claimed it, their
                               NAME shows here — VIOLET when a designer claimed it (e.g. Abdul), SLATE
                               (secondary) when it's factory (operator/warehouse/admin, e.g. Linh) —
                               so at a glance you see who's on the job. */}
                           {c.vendor ? (
-                            <span className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-pink-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{vendorLabel(c.vendor)}</span>
+                            <span className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-pink-500/90 px-1.5 py-0.5 text-3xs font-medium text-white">{vendorLabel(c.vendor)}</span>
                           ) : c.claimed_by ? (
                             <span
                               title={`Claimed by ${c.claimed_by}${c.claimed_role ? ` (${c.claimed_role})` : ""}`}
-                              className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-[10px] font-medium text-white " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary/90" : "bg-slate-600/90")}
+                              className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-3xs font-medium text-white " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary/90" : "bg-slate-600/90")}
                             >
                               <span className="truncate">{String(c.claimed_by)}</span>
                             </span>
@@ -639,7 +639,7 @@ export function DesignerBoard() {
                             // Unclaimed: show WHOSE order this is — the seller name tag, same
                             // as every other card carries an owner, so an EMB card reads as
                             // "Ambar's file" rather than a faceless "Seller file".
-                            <span title={`Seller · ${c.seller_name}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded bg-slate-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                            <span title={`Seller · ${c.seller_name}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded bg-slate-600/90 px-1.5 py-0.5 text-3xs font-medium text-white">
                               <span className="truncate">{String(c.seller_name)}</span>
                             </span>
                           ) : null}
@@ -697,7 +697,7 @@ export function DesignerBoard() {
                           {/* Order ID + file number ALWAYS show so a card is readable at a glance —
                               a card with no order says "No order" rather than going blank, and the
                               file count shows even at 0. Method/product sits between them when set. */}
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1 text-3xs text-muted-foreground">
                             <span className="rounded bg-muted px-1.5 py-0.5 font-mono" title={c.order_id ? `Order ${c.order_id}` : "Not attached to an order"}>
                               {c.order_id ? String(c.order_id).slice(0, 14) : "No order"}
                             </span>
@@ -788,7 +788,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
         )}
       </div>
       <span className="max-w-[220px] truncate font-medium">{cardLabel(c)}</span>
-      {isEmbCard(c) && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
+      {isEmbCard(c) && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-3xs font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
     </div>
   ) },
   { id: "order", label: "Order", cell: (c) => <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">{c.order_id ? String(c.order_id) : "—"}</span> },
@@ -878,7 +878,7 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 z-50 mt-1 w-72 rounded-xl border border-border bg-card p-2 shadow-xl">
-                  <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Columns — drag to reorder, toggle &amp; rename</div>
+                  <div className="px-1 pb-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Columns — drag to reorder, toggle &amp; rename</div>
                   {/* Shown columns, in display order — drag the handle to reorder. */}
                   {shown.map((col, idx) => (
                     <div
@@ -1106,7 +1106,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           >
             <CardArt key={String(card.thumb ?? card.id)} card={card} imgClass="size-full object-contain" iconSize={40} />
             {card.thumb && (
-              <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-background/80 py-1 text-[10px] font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-background/80 py-1 text-3xs font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
                 <MagnifyingGlassPlus size={11} weight="bold" /> Full size
               </span>
             )}
@@ -1221,25 +1221,25 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             <div className="flex flex-wrap gap-2">
               {card.vendor_task_id && (
                 <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Task ID</div>
+                  <div className="text-3xs font-semibold uppercase tracking-wide text-muted-foreground">Task ID</div>
                   <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_task_id)}</div>
                 </div>
               )}
               {card.vendor_ref && (
                 <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ref ID</div>
+                  <div className="text-3xs font-semibold uppercase tracking-wide text-muted-foreground">Ref ID</div>
                   <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_ref)}</div>
                 </div>
               )}
             </div>
             {card.vendor_ref && !card.vendor_task_id && (
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-3xs text-muted-foreground">
                 Pink returns only the Ref ID on push — on their test-webhook form, put this in <span className="font-semibold">both</span> the Ref ID and Task ID fields.
               </div>
             )}
           </div>
         ) : (
-          <div className="text-[11px] text-amber-600">
+          <div className="text-2xs text-amber-600">
             No Ref/Task ID was recorded for this card, so status sync is off for it. Re-push to capture it.
           </div>
         ))}

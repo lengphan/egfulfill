@@ -84,7 +84,7 @@ function Tag({ id, label, state, title, orderId, status, files }: {
         // 12px, not the 11px this was condensed to — that read as small print you had to
         // lean in for. Still lighter than the 13px/semibold it started at, which made four
         // chips the loudest thing in a row whose job is the order number beside them.
-        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " + cls}
+        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-2xs font-medium transition-colors " + cls}
       >
         {tl("ui", label)}
       </PopoverTrigger>
@@ -93,7 +93,7 @@ function Tag({ id, label, state, title, orderId, status, files }: {
           <div className="text-xs font-semibold">{tl("ui", label)}</div>
           {/* Where "Design sent" / "Pre-scanned" went. Saying it here keeps the chip's
               text stable while still answering "what state is this in?" in words. */}
-          {status && <div className="mt-0.5 text-[11px] text-muted-foreground">{status}</div>}
+          {status && <div className="mt-0.5 text-2xs text-muted-foreground">{status}</div>}
         </div>
 
         {/* Files first: the commonest reason to open a tag is to GET the thing, and making
@@ -167,7 +167,7 @@ function TagFileRow({ file }: { file: TagFile }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium">{file.name}</span>
         {(err || file.note) && (
-          <span className={"block truncate text-[11px] " + (err ? "text-destructive" : "text-muted-foreground")}>
+          <span className={"block truncate text-2xs " + (err ? "text-destructive" : "text-muted-foreground")}>
             {err ?? file.note}
           </span>
         )}

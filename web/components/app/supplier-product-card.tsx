@@ -163,7 +163,7 @@ export function SupplierProductCard({
 
       <div className="flex flex-1 flex-col p-2.5">
         {/* Fixed-height brand + 2-line title so titles align across every card (S&S + Otto). */}
-        <div className="h-4 truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{data.brand || ""}</div>
+        <div className="h-4 truncate text-3xs font-semibold uppercase tracking-wide text-muted-foreground">{data.brand || ""}</div>
         <div className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-snug">{data.title}</div>
         <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           {data.subtitle && <span className="truncate">{data.subtitle}</span>}
@@ -173,7 +173,7 @@ export function SupplierProductCard({
         {/* Colors — round swatches (split for two-tone), fixed-height row so cards align */}
         <div className={"mt-2 flex items-center gap-1.5 " + (showAllColors ? "flex-wrap" : "h-6 overflow-hidden")}>
           {colors.length === 0 ? (
-            <span className="text-[10px] text-muted-foreground/60">—</span>
+            <span className="text-3xs text-muted-foreground/60">—</span>
           ) : (
             <>
               {(showAllColors ? colors : colors.slice(0, 7)).map((c) => {
@@ -198,7 +198,7 @@ export function SupplierProductCard({
                 <button
                   onClick={() => setShowAllColors((v) => !v)}
                   title={showAllColors ? "Show fewer colours" : `Show all ${colors.length} colours`}
-                  className="shrink-0 rounded px-1 text-[10px] font-medium text-muted-foreground transition-colors hover:text-primary"
+                  className="shrink-0 rounded px-1 text-3xs font-medium text-muted-foreground transition-colors hover:text-primary"
                 >
                   {showAllColors ? "Show less" : `+${colors.length - 7}`}
                 </button>
@@ -207,7 +207,7 @@ export function SupplierProductCard({
           )}
         </div>
         {/* The picked colour's real name (codes stripped), or nothing. */}
-        <div className="mt-1 h-3.5 truncate text-[10px] text-muted-foreground">{activeColor ? prettyColorName(activeColor) : ""}</div>
+        <div className="mt-1 h-3.5 truncate text-3xs text-muted-foreground">{activeColor ? prettyColorName(activeColor) : ""}</div>
 
         {/* Sizes by NAME, not a count — "2 sizes" doesn't tell you whether it's S/M or
             3XL/4XL. This is now the ONLY size display on the card: the "Edit colours &
@@ -225,7 +225,7 @@ export function SupplierProductCard({
                 One size
               </span>
             ) : (
-              <span className="text-[10px] text-muted-foreground/60">{(data.sizesCount ?? 0) > 0 ? `${data.sizesCount} sizes` : "—"}</span>
+              <span className="text-3xs text-muted-foreground/60">{(data.sizesCount ?? 0) > 0 ? `${data.sizesCount} sizes` : "—"}</span>
             )
           ) : (
             <>
@@ -236,7 +236,7 @@ export function SupplierProductCard({
                 <button
                   onClick={() => setShowAllSizes((v) => !v)}
                   title={showAllSizes ? "Show fewer sizes" : `Show all ${sizeNames.length} sizes`}
-                  className="shrink-0 rounded px-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:text-primary"
+                  className="shrink-0 rounded px-0.5 text-3xs font-medium text-muted-foreground transition-colors hover:text-primary"
                 >
                   {showAllSizes ? "less" : `+${sizeNames.length - 6}`}
                 </button>

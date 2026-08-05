@@ -78,7 +78,7 @@ export function DesignQuoteBanner({ order, item, onAnswered }: {
             It&apos;s <strong>{money(item.design_quote_make)}</strong> to make the machine file
             {Number(item.design_quote_download) > 0 && <>, and <strong>{money(item.design_quote_download)}</strong> if you later want to download it</>}.
           </p>
-          <p className="mt-1 text-[11px] text-amber-700">
+          <p className="mt-1 text-2xs text-amber-700">
             Nothing has been charged. Declining turns down <strong>the design work only</strong> —
             your order stays exactly as it is. If you&apos;d rather cancel it, that&apos;s yours
             to do, and we won&apos;t do it for you.
@@ -94,7 +94,7 @@ export function DesignQuoteBanner({ order, item, onAnswered }: {
           </div>
 
           {err && (
-            <div className="mt-2 flex items-start gap-1.5 text-[11px] text-rose-700">
+            <div className="mt-2 flex items-start gap-1.5 text-2xs text-rose-700">
               <Warning size={12} weight="fill" className="mt-0.5 shrink-0" /> {err}
             </div>
           )}

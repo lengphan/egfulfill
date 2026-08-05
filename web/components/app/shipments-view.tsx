@@ -220,34 +220,34 @@ export function ShipmentsView() {
                     <td className="whitespace-nowrap px-5 py-2.5 font-mono text-xs">{s.num}</td>
                     <td className="px-3 py-2.5">
                       <div className="max-w-[14rem] truncate">{s.customer ?? "—"}</div>
-                      {s.state && <div className="text-[11px] text-muted-foreground">{s.state}</div>}
+                      {s.state && <div className="text-2xs text-muted-foreground">{s.state}</div>}
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="font-mono text-xs">{s.tracking}</div>
-                      {s.carrier && <div className="text-[11px] text-muted-foreground">{s.carrier}</div>}
+                      {s.carrier && <div className="text-2xs text-muted-foreground">{s.carrier}</div>}
                     </td>
                     <td className="px-3 py-2.5 text-xs">{s.method || <span className="text-muted-foreground">—</span>}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums">{s.price != null ? `$${s.price.toFixed(2)}` : <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-3 py-2.5">
                       {d ? (
-                        <span className={"rounded px-1.5 py-0.5 text-[11px] font-medium " + d.cls}>{d.label}</span>
+                        <span className={"rounded px-1.5 py-0.5 text-2xs font-medium " + d.cls}>{d.label}</span>
                       ) : (
                         // Never blank. "Not checked" and "checked, nothing yet" are
                         // different facts and the difference decides whether to chase.
-                        <span className="text-[11px] text-muted-foreground">Not checked</span>
+                        <span className="text-2xs text-muted-foreground">Not checked</span>
                       )}
                       {s.deliveryCheckedAt && (
-                        <div className="mt-0.5 text-[11px] text-muted-foreground">{when(s.deliveryCheckedAt)}</div>
+                        <div className="mt-0.5 text-2xs text-muted-foreground">{when(s.deliveryCheckedAt)}</div>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
                       {s.scannedAt ? (
                         <>
-                          <div className="text-[11px]">{when(s.scannedAt)}</div>
-                          <div className="text-[11px] text-muted-foreground">{VIA[s.scannedVia ?? ""] ?? "scanned"}</div>
+                          <div className="text-2xs">{when(s.scannedAt)}</div>
+                          <div className="text-2xs text-muted-foreground">{VIA[s.scannedVia ?? ""] ?? "scanned"}</div>
                         </>
                       ) : (
-                        <span className="text-[11px] text-muted-foreground">Not scanned</span>
+                        <span className="text-2xs text-muted-foreground">Not scanned</span>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right">
@@ -279,7 +279,7 @@ export function ShipmentsView() {
                           // The label was bought but its file wasn't stored — which is a
                           // real gap on older orders, not "no label". Saying so stops
                           // someone hunting for a button that was never going to be there.
-                          <span className="px-1.5 text-[11px] text-muted-foreground" title="This label predates storing the PDF">
+                          <span className="px-1.5 text-2xs text-muted-foreground" title="This label predates storing the PDF">
                             not stored
                           </span>
                         )}

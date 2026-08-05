@@ -62,7 +62,7 @@ export function ItemDesignActions({
       <div className="flex items-center gap-1.5">
         {sent && (
           <span
-            className={"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium " + (lane?.tone ?? "bg-muted text-muted-foreground")}
+            className={"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium " + (lane?.tone ?? "bg-muted text-muted-foreground")}
             title={`${vendorLabel(state?.vendor)}${state?.vendorRef ? ` · task ${state.vendorRef}` : ""}`}
           >
             {Icon && <Icon size={11} weight="fill" />}

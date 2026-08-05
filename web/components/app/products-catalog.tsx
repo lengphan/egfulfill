@@ -258,7 +258,7 @@ export function ProductsCatalog() {
                   )}
                   <span
                     className={
-                      "absolute left-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium backdrop-blur " +
+                      "absolute left-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-2xs font-medium backdrop-blur " +
                       (status === "Active"
                         ? "bg-emerald-500/15 text-emerald-700"
                         : status === "Draft"
@@ -301,11 +301,11 @@ export function ProductsCatalog() {
                         )
                       })}
                       {colors.length > 8 && (
-                        <span className="shrink-0 text-[11px] text-muted-foreground">+{colors.length - 8}</span>
+                        <span className="shrink-0 text-2xs text-muted-foreground">+{colors.length - 8}</span>
                       )}
-                      {colors.length === 0 && <span className="text-[11px] text-muted-foreground">No colours set</span>}
+                      {colors.length === 0 && <span className="text-2xs text-muted-foreground">No colours set</span>}
                     </div>
-                    <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">
                       {p.type || "Uncategorised"}
                     </span>
                   </div>
@@ -317,19 +317,19 @@ export function ProductsCatalog() {
                       per-size price tiers (sizesOf unions both). */}
                   <div className="mt-3 flex min-h-6 items-center gap-1 overflow-hidden">
                     {sizes.length === 0 ? (
-                      <span className="text-[11px] text-muted-foreground">No sizes set</span>
+                      <span className="text-2xs text-muted-foreground">No sizes set</span>
                     ) : (
                       <>
                         {sizes.slice(0, 7).map((s) => (
                           <span
                             key={s}
-                            className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                            className="shrink-0 rounded border border-border px-1.5 py-0.5 text-3xs font-medium text-muted-foreground"
                           >
                             {s}
                           </span>
                         ))}
                         {sizes.length > 7 && (
-                          <span className="shrink-0 text-[11px] text-muted-foreground">+{sizes.length - 7}</span>
+                          <span className="shrink-0 text-2xs text-muted-foreground">+{sizes.length - 7}</span>
                         )}
                       </>
                     )}

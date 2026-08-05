@@ -192,14 +192,14 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
                         </div>
                         <div className="min-w-0">
                           <div className="max-w-[22rem] truncate font-medium">{st.name || st.ref}</div>
-                          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
                             <span className="font-mono">{st.ref}</span>
                             {st.brand && <span>{st.brand}</span>}
                             {st.picked && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">published</span>}
                           </div>
                           {/* Counts, not the full lists. A 40-colour style would otherwise
                               own the row; the detail belongs on the printed catalogue. */}
-                          <div className="mt-0.5 text-[10px] text-muted-foreground">
+                          <div className="mt-0.5 text-3xs text-muted-foreground">
                             {st.colors.length} colour{st.colors.length === 1 ? "" : "s"} · {st.sizes.length} size{st.sizes.length === 1 ? "" : "s"}
                             {st.sizes.length > 0 && <> · {st.sizes.slice(0, 8).join(" ")}{st.sizes.length > 8 ? "…" : ""}</>}
                           </div>

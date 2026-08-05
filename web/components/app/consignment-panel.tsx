@@ -179,7 +179,7 @@ export function ConsignmentPanel() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-semibold">{s.id}</span>
-                    <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide " + (STATUS_TONE[s.status] ?? "bg-muted text-muted-foreground")}>
+                    <span className={"rounded-full px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide " + (STATUS_TONE[s.status] ?? "bg-muted text-muted-foreground")}>
                       {s.status.replace(/_/g, " ")}
                     </span>
                     {s.seller_name && <span className="text-sm text-muted-foreground">{s.seller_name}</span>}
@@ -242,10 +242,10 @@ export function ConsignmentPanel() {
                 <Package size={16} weight="duotone" className="shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{r.name || r.seller_sku || "Item"}</div>
-                  <div className="truncate font-mono text-[11px] text-muted-foreground">{r.internal_sku}</div>
+                  <div className="truncate font-mono text-2xs text-muted-foreground">{r.internal_sku}</div>
                 </div>
                 <span className="text-xs text-muted-foreground">{r.seller_name}</span>
-                <span className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium">
+                <span className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-2xs font-medium">
                   <MapPin size={11} weight="fill" className="text-muted-foreground" /> {r.location || "unassigned"}
                 </span>
                 <span className="w-20 text-right text-sm tabular-nums">
@@ -365,7 +365,7 @@ export function ConsignmentPanel() {
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
                     <div className={"h-full " + (pct > 85 ? "bg-amber-500" : "bg-primary")} style={{ width: `${pct}%` }} />
                   </div>
-                  <div className="mt-1 text-[10px] text-muted-foreground">{b.used}/{b.capacity} units</div>
+                  <div className="mt-1 text-3xs text-muted-foreground">{b.used}/{b.capacity} units</div>
                 </div>
               )
             })}

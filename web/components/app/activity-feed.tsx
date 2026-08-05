@@ -110,7 +110,7 @@ export function ActivityFeed({
               {subj != null && <> {subj}</>}
               {note && r.note ? <span className="text-muted-foreground"> · {r.note}</span> : null}
             </div>
-            {(() => { const amt = moneyOf(r); return amt != null ? <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold tabular-nums">{fmtMoney(amt)}</span> : null })()}
+            {(() => { const amt = moneyOf(r); return amt != null ? <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-2xs font-semibold tabular-nums">{fmtMoney(amt)}</span> : null })()}
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">{when}</span>
           </div>
         )

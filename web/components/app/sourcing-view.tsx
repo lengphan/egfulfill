@@ -399,7 +399,7 @@ export function SourcingView() {
                         {r.image
                           // eslint-disable-next-line @next/next/no-img-element
                           ? <img src={r.image} alt="" className="size-9 rounded border border-border object-cover" />
-                          : <span className="flex size-9 items-center justify-center rounded border border-dashed border-border text-[10px] text-muted-foreground">—</span>}
+                          : <span className="flex size-9 items-center justify-center rounded border border-dashed border-border text-3xs text-muted-foreground">—</span>}
                       </td>
                       <td className="px-4 py-2 font-medium">{r.title}</td>
                       <td className="px-4 py-2 text-muted-foreground">

@@ -75,7 +75,7 @@ export function Markdown({ children, className = "" }: { children: string; class
     <div className={"space-y-2.5 text-sm leading-relaxed " + className}>
       {blocks.map((b, i) => {
         if (b.kind === "h") {
-          const size = b.level <= 2 ? "text-[15px]" : "text-sm"
+          const size = b.level <= 2 ? "text-base" : "text-sm"
           return <div key={i} className={`${size} mt-1 font-semibold text-foreground`}>{inline(b.text, `h${i}`)}</div>
         }
         if (b.kind === "ul") {

@@ -73,7 +73,7 @@ export function ShopAnalyzer() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[15px] font-bold">{data?.shop?.shop_name || "Your shop"}</span>
+            <span className="text-base font-bold">{data?.shop?.shop_name || "Your shop"}</span>
             {data?.shop?.url && (
               <a href={data.shop.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground"><ArrowSquareOut size={13} weight="bold" /></a>
             )}
@@ -136,7 +136,7 @@ export function ShopAnalyzer() {
                 <div key={it.label} className="bg-card p-4">
                   <div className={"text-xl font-bold tabular-nums " + (it.n ? "text-amber-600" : "text-emerald-600")}>{it.n}</div>
                   <div className="text-xs font-medium">{it.label}</div>
-                  <div className="text-[11px] text-muted-foreground">{it.hint}</div>
+                  <div className="text-2xs text-muted-foreground">{it.hint}</div>
                 </div>
               ))}
             </div>

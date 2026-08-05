@@ -42,11 +42,11 @@ export function DeliveryBadge({ order, onRefreshed, className }: {
   return (
     <span className={"inline-flex items-center gap-1.5 " + (className ?? "")}>
       {s ? (
-        <span title={order.delivery_detail ?? undefined} className={"rounded px-1.5 py-0.5 text-[11px] font-medium " + s.cls}>
+        <span title={order.delivery_detail ?? undefined} className={"rounded px-1.5 py-0.5 text-2xs font-medium " + s.cls}>
           {s.label}
         </span>
       ) : (
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+        <span className="rounded bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
           No carrier update
         </span>
       )}

@@ -31,7 +31,7 @@ export function SupplierFlag({ label, className }: { label: string; className?: 
 
   if (!logo) {
     return (
-      <span className={"rounded-full bg-foreground/80 px-2 py-0.5 text-[10px] font-semibold text-background backdrop-blur " + (className ?? "")}>
+      <span className={"rounded-full bg-foreground/80 px-2 py-0.5 text-3xs font-semibold text-background backdrop-blur " + (className ?? "")}>
         {label}
       </span>
     )

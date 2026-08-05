@@ -107,7 +107,7 @@ export function SellerUploadHistory() {
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-sm font-medium">{numOf(o)}</span>
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium capitalize text-muted-foreground">{platformOf(o)}</span>
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-3xs font-medium capitalize text-muted-foreground">{platformOf(o)}</span>
                     </div>
                     {o.store && <div className="truncate text-xs text-muted-foreground">{o.store}</div>}
                   </TableCell>
@@ -127,7 +127,7 @@ export function SellerUploadHistory() {
                     {o.tracking && (
                       <a
                         href={trackUrl(o.carrier, o.tracking)} target="_blank" rel="noopener noreferrer"
-                        className="mt-0.5 flex items-center gap-1 font-mono text-[11px] text-emerald-600 hover:underline"
+                        className="mt-0.5 flex items-center gap-1 font-mono text-2xs text-emerald-600 hover:underline"
                         title={`Track ${o.tracking}`}
                       >
                         {o.tracking}<ArrowSquareOut size={9} weight="bold" className="shrink-0" />

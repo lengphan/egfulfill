@@ -127,7 +127,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
             <div className="space-y-2.5">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your payout details</div>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] text-muted-foreground">Method</span>
+                <span className="text-2xs text-muted-foreground">Method</span>
                 <select value={type} onChange={(e) => changeMethod(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                   {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}{saved[m.id] ? " · saved" : ""}</option>)}
                 </select>
@@ -141,14 +141,14 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
                     <Input placeholder="Bank name" value={info.bank_name || ""} onChange={(e) => set("bank_name", e.target.value)} className="h-9 flex-1" />
                   </div>
                   <div>
-                    <div className="mb-1 text-[11px] text-muted-foreground">Bank QR code (optional)</div>
+                    <div className="mb-1 text-2xs text-muted-foreground">Bank QR code (optional)</div>
                     {info.qr ? (
                       <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
                         {/* Click to enlarge — a QR scanned off a phone is unreadable at thumbnail size. */}
                         <button type="button" onClick={() => setZoom(true)} className="group relative overflow-hidden rounded-lg" title="Click to enlarge">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={info.qr} alt="Your bank QR code" className="size-40 rounded-lg border border-border bg-white object-contain" />
-                          <span className="absolute inset-0 flex items-center justify-center gap-1 bg-black/0 text-[11px] font-medium text-transparent transition group-hover:bg-black/45 group-hover:text-white">
+                          <span className="absolute inset-0 flex items-center justify-center gap-1 bg-black/0 text-2xs font-medium text-transparent transition group-hover:bg-black/45 group-hover:text-white">
                             <MagnifyingGlassPlus size={15} weight="bold" /> Enlarge
                           </span>
                         </button>
@@ -158,7 +158,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
                       <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent">
                         <UploadSimple size={20} weight="bold" />
                         Upload your bank QR code
-                        <span className="text-[10px]">PNG or JPG · up to 2 MB</span>
+                        <span className="text-3xs">PNG or JPG · up to 2 MB</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
                       </label>
                     )}
@@ -186,8 +186,8 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
                 <Input type="number" min={bounds.min} max={ceiling || undefined} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="h-10 pl-6 text-lg font-semibold tabular-nums" />
               </div>
-              <p className="text-[11px] text-muted-foreground">Balance {usd(bounds.balance)} · min {usd(bounds.min)}{bounds.max > 0 ? ` · max ${usd(bounds.max)}` : ""}</p>
-              {amountErr && <p className="text-[11px] font-medium text-amber-700">{amountErr}</p>}
+              <p className="text-2xs text-muted-foreground">Balance {usd(bounds.balance)} · min {usd(bounds.min)}{bounds.max > 0 ? ` · max ${usd(bounds.max)}` : ""}</p>
+              {amountErr && <p className="text-2xs font-medium text-amber-700">{amountErr}</p>}
             </div>
 
             {err && <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"><Warning size={13} weight="fill" className="mt-0.5 shrink-0" /> {err}</div>}

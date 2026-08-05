@@ -51,12 +51,12 @@ export function ZoomControl() {
         {/* Label INSIDE the Group — Base UI throws on a GroupLabel outside one, which blanks
             the page rather than misrendering a heading. */}
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="px-2 py-1 text-[11px] text-muted-foreground">Content zoom</DropdownMenuLabel>
+          <DropdownMenuLabel className="px-2 py-1 text-2xs text-muted-foreground">Content zoom</DropdownMenuLabel>
           {ZOOM_LEVELS.map((z) => (
-            <DropdownMenuItem key={z} onClick={() => pick(z)} className="flex items-center gap-2 text-[13px]">
+            <DropdownMenuItem key={z} onClick={() => pick(z)} className="flex items-center gap-2 text-sm">
               <Check size={12} weight="bold" className={z === zoom ? "text-primary" : "opacity-0"} />
               <span>{zoomLabel(z)}</span>
-              {z === DEFAULT_ZOOM && <span className="ml-auto text-[11px] text-muted-foreground">default</span>}
+              {z === DEFAULT_ZOOM && <span className="ml-auto text-2xs text-muted-foreground">default</span>}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>

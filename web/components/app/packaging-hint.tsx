@@ -19,13 +19,13 @@ export function PackagingHint({
   if (!h) return null
   if (h.billedOnSize)
     return (
-      <div className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+      <div className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-2xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
         <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
         <span>Rated on size: dim weight {h.dimLb!.toFixed(2)} lb &gt; {h.actualLb.toFixed(2)} lb actual. Use a box under {Math.round(h.maxVolumeIn3)} in³ (≈{h.suggestedCube.toFixed(1)}″ cube) to be rated on weight instead.</span>
       </div>
     )
   return (
-    <div className="flex items-start gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-[11px] text-muted-foreground">
+    <div className="flex items-start gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-2xs text-muted-foreground">
       <Package size={13} weight="fill" className="mt-0.5 shrink-0" />
       <span>Rated on weight ({h.actualLb.toFixed(2)} lb). Keep the box under {Math.round(h.maxVolumeIn3)} in³ (≈{h.suggestedCube.toFixed(1)}″ cube) so it stays that way and isn&apos;t re-rated on size.</span>
     </div>

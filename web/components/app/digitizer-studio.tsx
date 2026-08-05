@@ -150,11 +150,11 @@ function BrowseTab() {
               <button key={it.key} onClick={() => setOpen(it)} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left shadow-sm transition-shadow hover:shadow">
                 <div className="relative aspect-square overflow-hidden bg-muted">
                   <Thumb src={it.thumb} alt={it.name} className="absolute inset-0 size-full object-cover" />
-                  {done.has(it.key) && <span className="absolute left-1.5 top-1.5 z-10 rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">Generated</span>}
+                  {done.has(it.key) && <span className="absolute left-1.5 top-1.5 z-10 rounded bg-emerald-500 px-1.5 py-0.5 text-3xs font-semibold text-white">Generated</span>}
                 </div>
                 <div className="p-2.5">
                   <div className="truncate text-sm font-medium">{it.name}</div>
-                  {it.ref && <div className="truncate font-mono text-[11px] text-muted-foreground">{it.ref}</div>}
+                  {it.ref && <div className="truncate font-mono text-2xs text-muted-foreground">{it.ref}</div>}
                 </div>
               </button>
             ))}
@@ -270,7 +270,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
         <div className="flex items-center gap-2 border-b border-border px-5 py-3">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{item.name}</div>
-            {item.ref && <div className="truncate font-mono text-[11px] text-muted-foreground">{item.ref}</div>}
+            {item.ref && <div className="truncate font-mono text-2xs text-muted-foreground">{item.ref}</div>}
           </div>
           <button onClick={onClose} className="ml-auto grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent"><X size={16} /></button>
         </div>
@@ -287,7 +287,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
               ) : (
                 <Thumb src={item.thumb} alt="original" className="absolute inset-0 size-full object-contain" />
               )}
-              <span className="absolute left-2 top-2 rounded-md bg-background/85 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{res?.trueview ? "Embroidery" : "Original"}</span>
+              <span className="absolute left-2 top-2 rounded-md bg-background/85 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-muted-foreground">{res?.trueview ? "Embroidery" : "Original"}</span>
             </div>
 
             {/* TARGET SIZE — the thing that was missing. Embroidery is digitised FOR a
@@ -296,8 +296,8 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 behaviour is unchanged and Wilcom picks. */}
             <div className="rounded-lg border border-border p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Finished size</span>
-                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">Finished size</span>
+                <label className="flex cursor-pointer items-center gap-1.5 text-2xs text-muted-foreground">
                   <input type="checkbox" checked={lockRatio} onChange={(e) => setLockRatio(e.target.checked)} className="size-3 accent-primary" disabled={!aspect} />
                   Keep proportions
                 </label>
@@ -315,7 +315,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                         const w = Math.min(pl.w, pl.h * aspect)
                         setSize({ w: String(Math.round(w)), h: String(Math.round(w / aspect)) })
                       }}
-                      className={"eg-tap rounded-md border px-2 py-1 text-[11px] font-medium transition-colors " +
+                      className={"eg-tap rounded-md border px-2 py-1 text-2xs font-medium transition-colors " +
                         (on ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground")}
                     >
                       {pl.label}
@@ -337,18 +337,18 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 </label>
                 <span className="shrink-0 text-xs text-muted-foreground">mm</span>
                 {(wNum > 0 || hNum > 0) && (
-                  <button onClick={() => setSize({ w: "", h: "" })} className="eg-tap shrink-0 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground hover:text-foreground" title="Back to automatic">Auto</button>
+                  <button onClick={() => setSize({ w: "", h: "" })} className="eg-tap shrink-0 rounded-md px-1.5 py-1 text-2xs text-muted-foreground hover:text-foreground" title="Back to automatic">Auto</button>
                 )}
               </div>
               {/* Inches beside mm, always. A US floor sizes placements in inches and a
                   mm-only field is a conversion someone does in their head and gets wrong. */}
               {wNum > 0 && hNum > 0 && (
-                <div className="mt-1.5 text-[11px] tabular-nums text-muted-foreground">
+                <div className="mt-1.5 text-2xs tabular-nums text-muted-foreground">
                   {fmtIn(wNum)} × {fmtIn(hNum)} · {Math.round(wNum * hNum).toLocaleString()} mm²
                 </div>
               )}
               {areaOver && (
-                <div className="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+                <div className="mt-1.5 flex items-start gap-1.5 text-2xs text-amber-700 dark:text-amber-400">
                   <Warning size={12} weight="fill" className="mt-0.5 shrink-0" />
                   Over Wilcom&apos;s {MAX_AREA_MM2.toLocaleString()} mm² auto-digitize limit — it will refuse this. Reduce the size, or send the original to a digitizer below.
                 </div>
@@ -403,18 +403,18 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
               {routing ? <CircleNotch size={14} className="animate-spin" /> : routed ? <Check size={14} weight="bold" className="text-emerald-600" /> : <PaperPlaneTilt size={14} />}
               {routed ? "Sent to Designer board" : "Send original to Designer board"}
             </button>
-            <p className="text-[11px] leading-tight text-muted-foreground">For complex art — a person digitizes the original artwork by hand. Sends the source file, not the auto-preview.</p>
+            <p className="text-2xs leading-tight text-muted-foreground">For complex art — a person digitizes the original artwork by hand. Sends the source file, not the auto-preview.</p>
           </div>
 
           {/* RIGHT — details: facts, thread matches, original reference */}
           <div className="min-w-0 space-y-4">
             <div>
-              <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Design</div>
+              <div className="mb-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Design</div>
               {res ? (
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <div><div className="text-xs text-muted-foreground">Stitches</div><div className="font-semibold tabular-nums">{res.stitches != null ? res.stitches.toLocaleString() : "—"}</div></div>
                   <div><div className="text-xs text-muted-foreground">Colours</div><div className="font-semibold tabular-nums">{res.colours ?? "—"}</div></div>
-                  <div><div className="text-xs text-muted-foreground">Size</div><div className="font-semibold tabular-nums">{res.width != null && res.height != null ? `${Math.round(res.width)} × ${Math.round(res.height)} mm` : "—"}</div>{res.width != null && res.height != null && <div className="text-[11px] tabular-nums text-muted-foreground">{fmtIn(res.width)} × {fmtIn(res.height)}</div>}</div>
+                  <div><div className="text-xs text-muted-foreground">Size</div><div className="font-semibold tabular-nums">{res.width != null && res.height != null ? `${Math.round(res.width)} × ${Math.round(res.height)} mm` : "—"}</div>{res.width != null && res.height != null && <div className="text-2xs tabular-nums text-muted-foreground">{fmtIn(res.width)} × {fmtIn(res.height)}</div>}</div>
                   <div><div className="text-xs text-muted-foreground">Format</div><div className="font-semibold">{res.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : "preview"}</div></div>
                 </div>
               ) : (
@@ -424,7 +424,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
 
             {res && (
               <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Threads → your library</div>
+                <div className="mb-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Threads → your library</div>
                 {res.threads && res.threads.length > 0 ? (
                   <>
                     {/* Fixed columns so every row lines up: design swatch → cone swatch, name +
@@ -444,18 +444,18 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                                 <span className="size-5 shrink-0 rounded border border-border" style={{ background: m.hex }} />
                                 <span className="min-w-0 flex-1 truncate">
                                   <span className="font-medium">{m.name}</span>
-                                  <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">{m.code}</span>
+                                  <span className="ml-1.5 font-mono text-2xs text-muted-foreground">{m.code}</span>
                                 </span>
                               </>
                             ) : (
                               <span className="min-w-0 flex-1 text-muted-foreground">No close match in your library</span>
                             )}
-                            {m && poor && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">poor</span>}
+                            {m && poor && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">poor</span>}
                           </div>
                         )
                       })}
                     </div>
-                    <p className="mt-1.5 text-[11px] leading-tight text-muted-foreground">Suggested from the admin thread library — a person confirms before it&apos;s used.</p>
+                    <p className="mt-1.5 text-2xs leading-tight text-muted-foreground">Suggested from the admin thread library — a person confirms before it&apos;s used.</p>
                   </>
                 ) : (
                   <div className="text-xs text-muted-foreground">{res.colours != null ? `${res.colours} colours — per-thread list not returned.` : "No thread data."}</div>
@@ -464,7 +464,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
             )}
 
             <div>
-              <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Original artwork</div>
+              <div className="mb-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Original artwork</div>
               <div className="size-16 overflow-hidden rounded-lg border border-border bg-muted"><Thumb src={item.thumb} alt="original" className="size-full object-contain" /></div>
             </div>
           </div>
@@ -745,7 +745,7 @@ function CreateTab() {
   }, [text, alphabet, height, color, hasText])
 
   const inputCls = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
-  const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+  const labelCls = "mb-1 block text-2xs font-medium uppercase tracking-wide text-muted-foreground"
   const ext = res?.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : null
   // Live stitch estimate while arranging = sum of the layers' own previews (the generated
   // combine gives the exact figure once you Generate).
@@ -778,7 +778,7 @@ function CreateTab() {
             >
               <ImageSquare size={18} className="text-muted-foreground" />
               <span className="text-xs font-medium">{imgLayers.length ? "Add another image" : "Drop an image to embroider"}</span>
-              <span className="text-[11px] text-muted-foreground">or click to choose — optional</span>
+              <span className="text-2xs text-muted-foreground">or click to choose — optional</span>
               <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void addImages(e.target.files); e.currentTarget.value = "" }} />
             </label>
           </div>
@@ -806,7 +806,7 @@ function CreateTab() {
           <div className="mb-1 flex items-center justify-between">
             <span className={labelCls + " mb-0"}>Thread colour</span>
             {palette.length > 0 && (
-              <button onClick={() => setShowPalette((v) => !v)} className="text-[11px] font-medium text-primary hover:underline">{showPalette ? "Done" : "Change colour"}</button>
+              <button onClick={() => setShowPalette((v) => !v)} className="text-2xs font-medium text-primary hover:underline">{showPalette ? "Done" : "Change colour"}</button>
             )}
           </div>
           {palette.length ? (
@@ -815,7 +815,7 @@ function CreateTab() {
                 <span className="size-6 shrink-0 rounded-md border border-border" style={{ background: color }} />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{selCone?.name ?? "Custom colour"}</span>
-                  <span className="block font-mono text-[11px] text-muted-foreground">{selCone?.code ?? color}</span>
+                  <span className="block font-mono text-2xs text-muted-foreground">{selCone?.code ?? color}</span>
                 </span>
               </button>
               {showPalette && (
@@ -873,7 +873,7 @@ function CreateTab() {
                       <button onClick={() => removeLayer(l.id)} title="Remove layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
                     </div>
                     {openLayer === l.id && (
-                      <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-[11px] text-muted-foreground">
+                      <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-2xs text-muted-foreground">
                         <span className="min-w-0 truncate">Drag the box on the preview — corner to resize, top nub to rotate</span>
                         <button type="button" onClick={() => setLayerTf(l.id, IDENTITY_TF)} className="shrink-0 font-medium text-primary hover:underline">Reset</button>
                       </div>
@@ -887,9 +887,9 @@ function CreateTab() {
 
         {/* Live readout — stitch count, size, file format. */}
         <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-muted/30 p-3 text-center">
-          <div><div className="text-base font-semibold tabular-nums">{shownStitches != null ? shownStitches.toLocaleString() : "—"}</div><div className="text-[11px] text-muted-foreground">stitches</div></div>
-          <div><div className="text-base font-semibold tabular-nums">{res?.width != null && res?.height != null ? `${Math.round(res.width)}×${Math.round(res.height)}` : "—"}</div><div className="text-[11px] text-muted-foreground">mm</div></div>
-          <div><div className="text-base font-semibold">{ext ?? "—"}</div><div className="text-[11px] text-muted-foreground">file</div></div>
+          <div><div className="text-base font-semibold tabular-nums">{shownStitches != null ? shownStitches.toLocaleString() : "—"}</div><div className="text-2xs text-muted-foreground">stitches</div></div>
+          <div><div className="text-base font-semibold tabular-nums">{res?.width != null && res?.height != null ? `${Math.round(res.width)}×${Math.round(res.height)}` : "—"}</div><div className="text-2xs text-muted-foreground">mm</div></div>
+          <div><div className="text-base font-semibold">{ext ?? "—"}</div><div className="text-2xs text-muted-foreground">file</div></div>
         </div>
 
         {/* Two explicit generate actions, side by side — grab whichever you need. Machine file
@@ -917,7 +917,7 @@ function CreateTab() {
                 className={"size-5 rounded-full transition-transform hover:scale-110 " + (garment.toLowerCase() === g.color.toLowerCase() ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : "border border-black/15")}
                 style={{ background: g.color }} />
             ))}
-            <label className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-[10px] text-muted-foreground" title="Custom colour">
+            <label className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-3xs text-muted-foreground" title="Custom colour">
               +<input type="color" value={garment} onChange={(e) => setGarment(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
             </label>
           </div>
@@ -965,7 +965,7 @@ function CreateTab() {
                 )
               })}
             </div>
-            <div className="text-center text-[11px] text-muted-foreground">Your arrangement — drag to position. Generate merges the layers into one file.</div>
+            <div className="text-center text-2xs text-muted-foreground">Your arrangement — drag to position. Generate merges the layers into one file.</div>
           </div>
           {res?.trueview && compare && (
             <div className="space-y-1">
@@ -973,7 +973,7 @@ function CreateTab() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`data:image/png;base64,${res.trueview}`} alt="Generated stitched output" className="max-h-full max-w-full object-contain p-3" />
               </div>
-              <div className="text-center text-[11px] text-muted-foreground">Stitched result — what EWA actually generated{shownStitches ? ` · ${shownStitches.toLocaleString()} stitches` : ""}. Regenerate after moving layers.</div>
+              <div className="text-center text-2xs text-muted-foreground">Stitched result — what EWA actually generated{shownStitches ? ` · ${shownStitches.toLocaleString()} stitches` : ""}. Regenerate after moving layers.</div>
             </div>
           )}
         </div>
@@ -1008,7 +1008,7 @@ function HistoryTab() {
         <div className="overflow-x-auto rounded-2xl border border-border bg-card">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <tr className="border-b border-border text-left text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3"></th><th className="px-4 py-3">Design</th><th className="px-4 py-3">Source</th>
                 <th className="px-4 py-3 text-right">Stitches</th><th className="px-4 py-3 text-right">Colours</th>
                 <th className="px-4 py-3">Formats</th><th className="px-4 py-3">Generated</th><th className="px-4 py-3"></th>

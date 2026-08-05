@@ -153,7 +153,7 @@ export function NotificationBell() {
                   <span className={"block truncate text-sm " + (n.read_at ? "" : "font-semibold")}>{n.title}</span>
                   {n.body && <span className="block truncate text-xs text-muted-foreground">{n.body}</span>}
                 </span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">{ago(n.created_at)}</span>
+                <span className="shrink-0 text-3xs text-muted-foreground">{ago(n.created_at)}</span>
               </button>
             ))}
           </div>

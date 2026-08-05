@@ -100,7 +100,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
               <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
                 <div className="min-w-0">
                   <div className="text-sm font-medium">{m.count} {m.count === 1 ? "label" : "labels"}</div>
-                  <div className="truncate font-mono text-[11px] text-muted-foreground">{m.id}</div>
+                  <div className="truncate font-mono text-2xs text-muted-foreground">{m.id}</div>
                 </div>
                 {m.pdf ? (
                   <Button size="sm" variant="outline"
@@ -120,7 +120,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
             <div>
               <label htmlFor="scan-form-date" className="mb-1 block text-xs font-medium">Handover date</label>
               <Input id="scan-form-date" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)} className="h-9 w-44" />
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="mt-1 text-2xs text-muted-foreground">
                 The day the parcels actually go out. USPS can refuse a form dated for a day the pile didn&apos;t move.
               </p>
             </div>
@@ -146,7 +146,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
                       {skipped.length} left off:
                     </div>
                     {skipped.map((s) => (
-                      <div key={s.id} className="text-[11px] text-amber-800">
+                      <div key={s.id} className="text-2xs text-amber-800">
                         <span className="font-mono">{s.num}</span> — {s.reason}
                       </div>
                     ))}

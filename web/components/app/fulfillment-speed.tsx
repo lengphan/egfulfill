@@ -50,7 +50,7 @@ export function FulfillmentSpeed({ orders, loading }: { orders: OrderRow[]; load
                 </div>
                 <div className="ml-auto text-right">
                   <div className={"text-xl font-bold tabular-nums leading-none " + (r.stat.days === null ? "text-muted-foreground" : r.accent)}>{fmtDays(r.stat.days)}</div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">{r.stat.n ? `${r.stat.n} order${r.stat.n === 1 ? "" : "s"}` : "no data yet"}</div>
+                  <div className="mt-1 text-2xs text-muted-foreground">{r.stat.n ? `${r.stat.n} order${r.stat.n === 1 ? "" : "s"}` : "no data yet"}</div>
                 </div>
               </div>
             )
@@ -65,7 +65,7 @@ export function FulfillmentSpeed({ orders, loading }: { orders: OrderRow[]; load
             </div>
             <div className="ml-auto text-right">
               <div className={"text-xl font-bold tabular-nums leading-none " + (s.onTime.pct === null ? "text-muted-foreground" : s.onTime.pct >= 90 ? "text-emerald-600 dark:text-emerald-400" : s.onTime.pct >= 75 ? "text-amber-600" : "text-red-600")}>{s.onTime.pct === null ? "—" : `${s.onTime.pct}%`}</div>
-              <div className="mt-1 text-[11px] text-muted-foreground">{s.onTime.n ? `of ${s.onTime.n} delivered` : "collecting"}</div>
+              <div className="mt-1 text-2xs text-muted-foreground">{s.onTime.n ? `of ${s.onTime.n} delivered` : "collecting"}</div>
             </div>
           </div>
         </>

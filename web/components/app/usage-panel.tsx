@@ -33,14 +33,14 @@ function PlatformCard({ p, isAdmin, onSaved }: { p: UsagePlatform; isAdmin: bool
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{p.label}</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-2xs text-muted-foreground">
             {p.calls.toLocaleString()} call{p.calls === 1 ? "" : "s"}
             {p.errors > 0 && <span className="text-red-600 dark:text-red-400"> · {p.errors} failed</span>}
           </div>
         </div>
         <div className="text-right">
           <div className="text-sm font-semibold tabular-nums">{money(p.estDollars)}</div>
-          <div className="text-[11px] text-muted-foreground">est. this window</div>
+          <div className="text-2xs text-muted-foreground">est. this window</div>
         </div>
       </div>
 
@@ -50,7 +50,7 @@ function PlatformCard({ p, isAdmin, onSaved }: { p: UsagePlatform; isAdmin: bool
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div className={"h-full rounded-full " + (p.over ? "bg-red-500" : "bg-primary")} style={{ width: `${pct ?? 0}%` }} />
           </div>
-          <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+          <div className="mt-1 flex items-center justify-between text-2xs text-muted-foreground">
             <span>{money(p.estMonthlyDollars)}/mo projected</span>
             <span className={p.over ? "font-medium text-red-600 dark:text-red-400" : ""}>{p.pct}% of {money(p.monthlyLimitDollars)}</span>
           </div>
@@ -59,12 +59,12 @@ function PlatformCard({ p, isAdmin, onSaved }: { p: UsagePlatform; isAdmin: bool
 
       {isAdmin && (
         <div className="mt-2.5 flex items-end gap-2 border-t border-border/70 pt-2.5">
-          <label className="flex-1 text-[11px] text-muted-foreground">
+          <label className="flex-1 text-2xs text-muted-foreground">
             Est. $/call
             <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" placeholder="0.00"
               className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-sm tabular-nums outline-none focus:border-primary" />
           </label>
-          <label className="flex-1 text-[11px] text-muted-foreground">
+          <label className="flex-1 text-2xs text-muted-foreground">
             Alert at $/mo
             <input value={limit} onChange={(e) => setLimit(e.target.value)} inputMode="decimal" placeholder="none"
               className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-sm tabular-nums outline-none focus:border-primary" />
@@ -132,15 +132,15 @@ export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
           <div className="mt-4 grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-border bg-muted/30 p-3 text-center">
               <div className="text-lg font-semibold tabular-nums">{data.totals.calls.toLocaleString()}</div>
-              <div className="text-[11px] text-muted-foreground">API calls · {data.days}d</div>
+              <div className="text-2xs text-muted-foreground">API calls · {data.days}d</div>
             </div>
             <div className="rounded-xl border border-border bg-muted/30 p-3 text-center">
               <div className="text-lg font-semibold tabular-nums">{money(data.totals.estDollars)}</div>
-              <div className="text-[11px] text-muted-foreground">estimated API cost</div>
+              <div className="text-2xs text-muted-foreground">estimated API cost</div>
             </div>
             <div className="rounded-xl border border-border bg-muted/30 p-3 text-center">
               <div className="text-lg font-semibold tabular-nums">{money(data.totals.ledgeredDollars)}</div>
-              <div className="text-[11px] text-muted-foreground">real ledgered cost</div>
+              <div className="text-2xs text-muted-foreground">real ledgered cost</div>
             </div>
           </div>
 
@@ -156,11 +156,11 @@ export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
                 {data.ledgered.map((c) => (
                   <div key={c.type} className="rounded-lg border border-border bg-muted/20 p-2.5 text-center">
                     <div className="text-sm font-semibold tabular-nums">{money(c.dollars)}</div>
-                    <div className="text-[11px] text-muted-foreground">{c.label}{c.count ? ` · ${c.count}` : ""}</div>
+                    <div className="text-2xs text-muted-foreground">{c.label}{c.count ? ` · ${c.count}` : ""}</div>
                   </div>
                 ))}
               </div>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">Postage &amp; blanks bill their exact amount into the wallet ledger, so these are actual dollars — the per-platform figures above estimate API-call cost from the rate you set.</p>
+              <p className="mt-1.5 text-2xs text-muted-foreground">Postage &amp; blanks bill their exact amount into the wallet ledger, so these are actual dollars — the per-platform figures above estimate API-call cost from the rate you set.</p>
             </div>
           )}
         </>

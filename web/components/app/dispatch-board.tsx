@@ -695,7 +695,7 @@ export function DispatchBoard() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <div className={HIST_GRID + " border-b border-border py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"}>
+              <div className={HIST_GRID + " border-b border-border py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground"}>
                 <span />
                 <span>Status</span>
                 <span>Order</span>
@@ -718,7 +718,7 @@ export function DispatchBoard() {
                     {/* Row toggles the action timeline. Click the label-link separately. */}
                     <div onClick={() => toggleTimeline(o.id)} className={HIST_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
-                      <span className={"inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[11px] font-medium " + DISP_PILL[d.key]}>{d.label}</span>
+                      <span className={"inline-flex w-fit items-center rounded-md px-2 py-0.5 text-2xs font-medium " + DISP_PILL[d.key]}>{d.label}</span>
                       <span className="truncate font-mono text-sm font-semibold">{numOf(o)}</span>
                       <span className="truncate text-sm">{customerOf(o)}</span>
                       <span className="truncate text-xs text-muted-foreground">{platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}</span>
@@ -807,7 +807,7 @@ export function DispatchBoard() {
                         const label = sentOut ? "Sent to partner" : d.label
                         const pill = sentOut ? "bg-amber-100 text-amber-700" : DISP_PILL[d.key]
                         return (
-                          <span className={"inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[11px] font-medium " + pill}>{label}</span>
+                          <span className={"inline-flex w-fit items-center rounded-md px-2 py-0.5 text-2xs font-medium " + pill}>{label}</span>
                         )
                       })()}
                     </div>

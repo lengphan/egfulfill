@@ -68,11 +68,11 @@ function MinHint({ amount, minUsd }: { amount: string; minUsd: number }) {
   const n = Number(amount)
   if (n > 0 && n < minUsd)
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600">
+      <span className="inline-flex items-center gap-1 text-2xs font-medium text-amber-600">
         <Warning size={11} weight="fill" /> {usd0(n)} is below the {usd0(minUsd)} minimum — enter at least {usd0(minUsd)}.
       </span>
     )
-  return <span className="text-[11px] text-muted-foreground">Minimum top-up {usd0(minUsd)}.</span>
+  return <span className="text-2xs text-muted-foreground">Minimum top-up {usd0(minUsd)}.</span>
 }
 
 function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
@@ -185,7 +185,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
                   inside it, and that substring is what the poll reconciles on. */}
               <Detail label="Description" value={payment.content || payment.note} mono missing="Description not returned" />
               {payment.content && payment.note && payment.content !== payment.note && (
-                <p className="mt-2 text-[11px] text-muted-foreground">
+                <p className="mt-2 text-2xs text-muted-foreground">
                   Send the description exactly as shown. Our reference <span className="font-mono">{payment.note}</span>{" "}sits inside it — that&apos;s what matches the payment to your wallet.
                 </p>
               )}
@@ -211,7 +211,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
           <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary"><Sparkle size={13} weight="fill" /> Top up more, pay a better rate</span>
-              <button onClick={() => setShowBulk(false)} className="text-[11px] text-muted-foreground hover:text-foreground">Hide</button>
+              <button onClick={() => setShowBulk(false)} className="text-2xs text-muted-foreground hover:text-foreground">Hide</button>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {displayTiers.map((t) => {
@@ -251,7 +251,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
           <>
             <span className="text-muted-foreground">
               $1 = <span className="font-medium tabular-nums text-foreground">{vnd(applicableRate)}</span>
-              {discounted && <span className="ml-1 rounded bg-primary/15 px-1 py-0.5 text-[10px] font-semibold text-primary">bulk rate</span>}
+              {discounted && <span className="ml-1 rounded bg-primary/15 px-1 py-0.5 text-3xs font-semibold text-primary">bulk rate</span>}
             </span>
             <span className="tabular-nums"><span className="text-muted-foreground">You&apos;ll pay </span><span className="font-semibold">{usdAmt > 0 ? vnd(vndAmt) : "—"}</span></span>
           </>

@@ -37,13 +37,13 @@ function VariantChips({
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
           {label} ({picked.length}/{options.length})
         </span>
         <button
           type="button"
           onClick={() => onChange(allOn ? [] : options)}
-          className="text-[11px] font-medium text-primary transition-colors hover:underline"
+          className="text-2xs font-medium text-primary transition-colors hover:underline"
         >
           {allOn ? "None" : "All"}
         </button>
@@ -58,7 +58,7 @@ function VariantChips({
               aria-pressed={on}
               onClick={() => onChange(on ? picked.filter((x) => x !== o) : [...picked, o])}
               className={
-                "rounded border px-1.5 py-0.5 text-[11px] transition-colors " +
+                "rounded border px-1.5 py-0.5 text-2xs transition-colors " +
                 (on
                   ? "border-primary bg-primary/10 font-medium text-primary"
                   : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
@@ -478,7 +478,7 @@ export function PublishProductDialog({
             <div className="space-y-4">
               {/* Where this draft goes. TikTok reveals its extra required fields on the right. */}
               <div className="space-y-1.5">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Publish to</div>
+                <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Publish to</div>
                 <div className="inline-flex rounded-lg border border-border p-0.5">
                   {(["etsy", "tiktok"] as const).map((c) => (
                     <button
@@ -504,14 +504,14 @@ export function PublishProductDialog({
                       <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
                       {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-[9px] font-semibold uppercase text-primary-foreground">Primary</span>}
                       <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                        {i !== 0 && <button onClick={() => makePrimary(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-black">Primary</button>}
+                        {i !== 0 && <button onClick={() => makePrimary(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-3xs font-semibold text-black">Primary</button>}
                         <button onClick={() => removeImage(i)} aria-label="Remove photo" className="rounded bg-white/90 p-1 text-black"><Trash size={11} weight="bold" /></button>
                       </div>
                     </div>
                   ))}
                   {images.length < MAX_IMAGES && (
                     <button onClick={() => fileRef.current?.click()} className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary">
-                      <UploadSimple size={16} weight="bold" /><span className="text-[10px] font-medium">Add</span>
+                      <UploadSimple size={16} weight="bold" /><span className="text-3xs font-medium">Add</span>
                     </button>
                   )}
                 </div>
@@ -581,7 +581,7 @@ export function PublishProductDialog({
               {/* TikTok Shop needs these three; Etsy doesn't. Shown only for the TikTok channel. */}
               {channel === "tiktok" && (
                 <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">TikTok Shop requirements</div>
+                  <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">TikTok Shop requirements</div>
                   {ttLoadErr && <p className="text-xs text-destructive">{ttLoadErr}</p>}
 
                   {/* Leaf category — required. Search then pick from the tree. */}
@@ -626,7 +626,7 @@ export function PublishProductDialog({
                       </select>
                     </div>
                   </label>
-                  <p className="text-[11px] text-muted-foreground">Creates a <span className="font-medium text-foreground">draft</span> product on your TikTok Shop for you to review, then list.</p>
+                  <p className="text-2xs text-muted-foreground">Creates a <span className="font-medium text-foreground">draft</span> product on your TikTok Shop for you to review, then list.</p>
                 </div>
               )}
 
@@ -634,7 +634,7 @@ export function PublishProductDialog({
                   choosing one to represent the rest was the thing hiding the others. */}
               {blank && (
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Method</span>
+                  <span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Method</span>
                   <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                     {methodOpts.length === 0 && <option value="">Any</option>}
                     {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}

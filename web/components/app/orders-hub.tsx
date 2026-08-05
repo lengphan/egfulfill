@@ -132,7 +132,7 @@ function MatchRow({ m, similar, onUse }: { m: ReuseMatch; similar?: boolean; onU
         </div>
       </div>
       {similar && m.distance != null && (
-        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs font-medium text-muted-foreground">
           {m.distance === 0 ? "near-identical" : `${m.distance}/64 different`}
         </span>
       )}
@@ -1011,7 +1011,7 @@ export function OrdersHub() {
                   onClick={() => setQuery({ ...query, status: on ? "" : p.value })}
                   aria-pressed={on}
                   title={on && p.value ? `Showing ${p.label} only — click to clear` : undefined}
-                  className={"eg-tap h-8 rounded-md px-2.5 text-[13px] font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                  className={"eg-tap h-8 rounded-md px-2.5 text-sm font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
                 >
                   {tl("stage", p.label)}
                 </button>
@@ -1033,7 +1033,7 @@ export function OrdersHub() {
                 {/* Label INSIDE the Group — Base UI's Menu.GroupLabel throws outside one,
                     which blanks the whole page rather than misrendering a heading. */}
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-2 py-1 text-[11px] text-muted-foreground">Show these pills</DropdownMenuLabel>
+                  <DropdownMenuLabel className="px-2 py-1 text-2xs text-muted-foreground">Show these pills</DropdownMenuLabel>
                   {STATUS_PILLS.filter((p) => p.value).map((p) => {
                     const shown = !hiddenPills.includes(p.value)
                     return (
@@ -1042,7 +1042,7 @@ export function OrdersHub() {
                         // The menu closes on each pick. Re-opening between toggles is the
                         // lesser evil versus hand-rolling a popover to keep it open.
                         onClick={() => togglePill(p.value)}
-                        className="flex items-center gap-2 text-[13px]"
+                        className="flex items-center gap-2 text-sm"
                       >
                         <Check size={12} weight="bold" className={shown ? "text-primary" : "opacity-0"} />
                         <span className="truncate">{tl("stage", p.label)}</span>
@@ -1143,7 +1143,7 @@ export function OrdersHub() {
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setColsMenuOpen(false)} />
                       <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1.5 shadow-lg">
-                        <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">Show columns</div>
+                        <div className="px-2 py-1 text-2xs font-semibold text-muted-foreground">Show columns</div>
                         {FACTORY_DATA_COLS.map((cid) => {
                           const locked = isFactoryColLocked(cid)
                           const shown = !hiddenCols.includes(cid)
@@ -1500,7 +1500,7 @@ export function OrdersHub() {
                                         {tl("stage", s.label)}
                                         {/* Marked, so a catch-up is never mistaken for an
                                             ordinary one-step move before it's clicked. */}
-                                        {s.walk && <span className="ml-auto text-[10px] text-muted-foreground">{tl("ui", "catch up")}</span>}
+                                        {s.walk && <span className="ml-auto text-3xs text-muted-foreground">{tl("ui", "catch up")}</span>}
                                       </DropdownMenuItem>
                                     ))}
                                   </DropdownMenuGroup>
@@ -1554,12 +1554,12 @@ export function OrdersHub() {
                               className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                             />
                             <div className="pointer-events-none absolute bottom-2 right-2.5">
-                              {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-[11px] text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking…</span>}
-                              {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600"><CheckCircle size={12} weight="fill" /> Validated</span>}
-                              {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-[11px] font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
+                              {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking…</span>}
+                              {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-emerald-600"><CheckCircle size={12} weight="fill" /> Validated</span>}
+                              {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
                             </div>
                           </div>
-                          <p className="text-[10px] text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
+                          <p className="text-3xs text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
                         </div>
                       </div>
 
@@ -1607,7 +1607,7 @@ export function OrdersHub() {
                       {(() => {
                         const unset = orderNeedsSetup(o.items, catalog)
                         return unset > 0 ? (
-                          <div className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                          <div className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-2xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
                             <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
                             <span>{unset} item{unset === 1 ? "" : "s"} still {unset === 1 ? "needs" : "need"} a blank, colour, size &amp; method — finish setup before shipping.</span>
                           </div>
@@ -1667,7 +1667,7 @@ export function OrdersHub() {
                               {(a.street2 || a.second_line || a.line2) && <div>{a.street2 || a.second_line || a.line2}</div>}
                               <div>{[a.city, a.state, a.zip || a.postal_code].filter(Boolean).join(", ")}</div>
                               {(a.country || a.country_iso) && <div>{a.country || a.country_iso}</div>}
-                              <div className="mt-1 text-[10px] text-muted-foreground">{ADDRESS_SOURCE_LABEL[addressSource(o)]}</div>
+                              <div className="mt-1 text-3xs text-muted-foreground">{ADDRESS_SOURCE_LABEL[addressSource(o)]}</div>
                             </div>
                           ) : (
                             <div className="text-muted-foreground">Not available yet.</div>
@@ -1773,7 +1773,7 @@ export function OrdersHub() {
                               <>
                               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                 <VariantStrip sku={resolveProduct(it, catalog)?.sku || it.blank || undefined} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} />
-                                {it.qty ? <span className="text-[11px] text-muted-foreground">×{it.qty}</span> : null}
+                                {it.qty ? <span className="text-2xs text-muted-foreground">×{it.qty}</span> : null}
                               </div>
 
                               {/* What the floor needs to actually MAKE this line: how much
@@ -1804,7 +1804,7 @@ export function OrdersHub() {
                                 // px-2 py-0.5 shape, tinted by meaning. Stock is purple when
                                 // there's enough, amber when short (with the PO it's on); the
                                 // thread + file pills are neutral info, not status.
-                                const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium"
+                                const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium"
                                 return (
                                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                     {have != null && (
@@ -2093,8 +2093,8 @@ export function OrdersHub() {
                 </p>
                 <ol className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
                   {path.map((s, i) => (
-                    <li key={s || "new"} className="flex items-center gap-2 text-[13px]">
-                      <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-medium text-primary">{i + 1}</span>
+                    <li key={s || "new"} className="flex items-center gap-2 text-sm">
+                      <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary/10 text-3xs font-medium text-primary">{i + 1}</span>
                       {stageMeta(s)?.label ?? s}
                     </li>
                   ))}
