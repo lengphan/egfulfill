@@ -22,7 +22,7 @@ import { ArrowUpRight } from "@phosphor-icons/react"
 // 4.5:1 from about #4259D6 downward — at any "light periwinkle" value it sits near 1.6:1,
 // i.e. invisible. Light plate + ink type, or deep plate + cream type; there is no light plate
 // with cream type.
-export const ACCENT = "#A5B7FF"        // periwinkle — the plate/fill
+export const ACCENT = "#5C6CD6"        // periwinkle-blue — the plate/fill
 // The accent phrase is INK, like the rest of the headline — no second type colour.
 //
 // A dark purple on a light purple plate is a tint of the background wearing itself as
@@ -33,7 +33,7 @@ export const ACCENT = "#A5B7FF"        // periwinkle — the plate/fill
 //
 // The typed phrase still reads as distinct because it MOVES: it types, holds and rewrites
 // itself. Motion is the differentiator, which is a stronger one than a hue nobody can name.
-export const ACCENT_INK = "#0B0B0C"
+export const ACCENT_INK = "#FAF8F3"
 export const INK = "#0B0B0C"
 // WARM PAPER, under a cool periwinkle banner. Chosen deliberately, not by default.
 //
@@ -229,7 +229,7 @@ export function Pill({ href, children, tone = "ink", className = "" }: {
     accent: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
     // Ink on acid is 15.19:1. White on acid is 1.30:1 — never do that.
     acid: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
-    ghost: "border border-[#0B0B0C]/15 text-[#0B0B0C] hover:border-[#0B0B0C]/40 hover:bg-[#0B0B0C]/[0.03] focus-visible:ring-[#0B0B0C]",
+    ghost: "border border-[#FAF8F3]/35 text-[#FAF8F3] hover:border-[#FAF8F3]/70 hover:bg-[#FAF8F3]/10 focus-visible:ring-[#FAF8F3]",
     // The ghost outline inverted, for use ON the deep plate where ink would disappear.
     ghostLight: "border border-white/30 text-white hover:border-white/60 hover:bg-white/10 focus-visible:ring-white",
   }
@@ -279,12 +279,13 @@ export function PlateHero({ title, accent, sub, children }: {
   return (
     <section className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
       <div className="mx-auto max-w-6xl px-6 pb-28 pt-20 sm:pt-28">
-        <h1 className="mx-auto max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em] text-[#0B0B0C]" style={DISPLAY}>
+        <h1 className="mx-auto max-w-5xl text-center font-black leading-[0.92] tracking-[-0.04em]" style={{ ...DISPLAY, color: SURFACE }}>
           <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} /></> : null}
         </h1>
         {sub && (
           <motion.p
-            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed text-[#0B0B0C]/70"
+            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed"
+            style={{ color: "rgba(250,248,243,0.8)" }}
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
