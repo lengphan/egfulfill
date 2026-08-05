@@ -758,7 +758,7 @@ export function DesignCanvasDialog({
         // 380px rail, the 24px gap and the 48px of padding. A fixed 1180px gave the rail far
         // more room than it uses and the surplus read as blank around the window. max-w-fit
         // does not work here — it under-measures the grid and clips the rail off the edge.
-        className="sm:max-w-2xl lg:max-w-[min(96vw,calc(min(74vh,46vw)+452px))]"
+        className="sm:max-w-2xl lg:max-w-[min(96vw,calc(min(62vh,46vw)+452px))]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -818,7 +818,7 @@ export function DesignCanvasDialog({
         {/* Both terms are viewport units on purpose. `min(100%,78vh)` collapsed the column to
             zero: the column is `auto`, so its width comes from its content, and the content
             asked for a percentage OF that column — a circular reference resolving to nothing. */}
-        <div className="lg:sticky lg:top-0 lg:w-[min(74vh,46vw)] lg:self-start">
+        <div className="lg:sticky lg:top-0 lg:w-[min(62vh,46vw)] lg:self-start">
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {faces.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
@@ -884,11 +884,16 @@ export function DesignCanvasDialog({
             top-aligning them left a tall band of dead space under the column. Centring only
             has an effect in that case — once the column is the taller of the two it behaves
             exactly like start. */}
-        <div className="space-y-4 lg:min-w-0 lg:self-center">
+        <div className="flex flex-col gap-4 lg:min-w-0 lg:self-center">
         {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
-            nearest in-stock cone; saved with the design so the floor loads the right threads. */}
+            nearest in-stock cone; saved with the design so the floor loads the right threads.
+            `order-last` rather than moving the block: it sits first in the markup for historical
+            reasons, but it is a RESULT, not an instruction. Above the numbered steps it told a
+            seller to "upload artwork to match threads" before showing them the upload button,
+            and it competed with the two things they must actually do. Last is where a derived
+            read-out belongs. */}
         {isEmb && (
-          <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+          <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
                 Thread match {threads.length ? `· ${threads.length} cone${threads.length === 1 ? "" : "s"}` : ""}

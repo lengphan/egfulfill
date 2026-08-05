@@ -194,8 +194,29 @@ export const MIN_COLOR_SHARE = 0.03
  * Our own img-proxy re-serves those same-origin, which is exactly why it exists. Data URLs
  * (a design we stored ourselves) are already readable and pass through untouched.
  */
+/**
+ * Hosts the image proxy will actually re-serve. MIRRORS the allowlist in
+ * `/api/etsy/img-proxy` (server/src/routes/etsy.js) — change both together.
+ *
+ * This list exists because sending an unlisted host to the proxy does not degrade, it
+ * BREAKS: the route answers 403 and the browser renders a broken image. Every URL was
+ * being proxied, so Etsy artwork loaded and Shopify and TikTok artwork did not.
+ */
+const PROXY_HOSTS = /(^|\.)(etsystatic\.com|shopify\.com|shopifycdn\.net|shopifycdn\.com|tiktokcdn\.com|tiktokcdn-us\.com|ibyteimg\.com|byteimg\.com)$/i
+
+/**
+ * A same-origin URL for artwork, so a canvas reading it isn't tainted.
+ *
+ * An unproxyable host is returned UNCHANGED rather than proxied-and-broken: the image
+ * still displays, and the canvas work that needs same-origin already gives up quietly on
+ * a tainted read (see extractDominant). A visible picture with no thread match beats a
+ * broken thumbnail with no thread match either.
+ */
 export function canvasReadableSrc(url: string): string {
-  return /^https?:\/\//i.test(url) ? `/api/etsy/img-proxy?url=${encodeURIComponent(url)}` : url
+  if (!/^https?:\/\//i.test(url)) return url
+  let host = ""
+  try { host = new URL(url).hostname } catch { return url }
+  return PROXY_HOSTS.test(host) ? `/api/etsy/img-proxy?url=${encodeURIComponent(url)}` : url
 }
 
 export function extractDominant(dataUrl: string, max = 6): Promise<DominantColor[]> {

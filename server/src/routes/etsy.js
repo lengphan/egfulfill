@@ -871,7 +871,13 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     if (!url) { reply.code(400); return { error: 'url required' }; }
     let host;
     try { host = new URL(url).hostname; } catch (e) { reply.code(400); return { error: 'bad url' }; }
-    if (!/(^|\.)etsystatic\.com$/i.test(host)) { reply.code(403); return { error: 'host not allowed' }; }
+    // Etsy is not the only marketplace whose artwork lands here. This endpoint was written for
+    // Etsy and kept its Etsy-only allowlist, so a Shopify or TikTok image — routed here by
+    // canvasReadableSrc like every other URL — came back 403 and rendered as a broken thumbnail
+    // on the order line. Still an allowlist, so there is still no SSRF surface: every entry is a
+    // public marketplace image CDN. MIRRORS PROXY_HOSTS in web/lib/thread-match.ts — change both.
+    const ALLOWED = /(^|\.)(etsystatic\.com|shopify\.com|shopifycdn\.net|shopifycdn\.com|tiktokcdn\.com|tiktokcdn-us\.com|ibyteimg\.com|byteimg\.com)$/i;
+    if (!ALLOWED.test(host)) { reply.code(403); return { error: 'host not allowed' }; }
     try {
       const r = await fetch(url);
       if (!r.ok) { reply.code(502); return { error: 'upstream ' + r.status }; }
