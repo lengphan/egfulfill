@@ -46,6 +46,21 @@ export const INK = "#0B0B0C"
 // Both letterings clear it comfortably: ink 18.54:1, the accent purple 13.11:1.
 export const SURFACE = "#FAF8F3"
 
+/**
+ * PAPER LETTERING ON THE PLATE — a deliberate, decorative-only exception.
+ *
+ * Paper on #A5B7FF measures 1.83:1. That is far below the 3:1 floor for large text, so it is
+ * NOT readable type: it reads as a soft ghost of the word, the way a watermark does. Used
+ * knowingly for effect, that can be lovely; used for a word the reader actually needs, it is
+ * simply text nobody can read.
+ *
+ * So the rule is: never the only place a fact appears, and never a word the page depends on.
+ * If a phrase must be READ on the plate, it takes INK (10.13:1). If you want cream to carry
+ * real words, the plate has to come down to about #4259D6, where cream reaches 5.45:1 — light
+ * plate and readable cream cannot both be true.
+ */
+export const PLATE_GHOST = SURFACE
+
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
 export const HEADING = { fontSize: "clamp(2rem, 4.6vw, 3.6rem)" } as const
