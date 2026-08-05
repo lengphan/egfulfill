@@ -111,7 +111,7 @@ export function MaskedWords({ text, className = "", delay = 0 }: { text: string;
  */
 /** `color` overrides the ink. The hero sets it to the paper tone so the phrase reads as
  *  cut OUT of the periwinkle plate rather than printed on top of it. */
-export function TypedPhrase({ text, color = ACCENT_INK }: { text: string; color?: string }) {
+export function TypedPhrase({ text, color = ACCENT_INK, lastWordColor }: { text: string; color?: string; lastWordColor?: string }) {
   const reduce = useReducedMotion()
   const phrases = text.split("|").map((t) => t.trim()).filter(Boolean)
   const [shown, setShown] = useState(phrases[0] ?? "")
@@ -143,7 +143,24 @@ export function TypedPhrase({ text, color = ACCENT_INK }: { text: string; color?
     <span className="relative inline-grid align-bottom">
       <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre">{longest}</span>
       <span className="col-start-1 row-start-1 whitespace-pre text-left" style={{ color }}>
-        {reduce || phrases.length < 2 ? phrases[0] : shown}
+        {/* The split point comes from the FULL phrase, not from what has been typed so far.
+            Taken from the typed text, "printed" would render in the tail colour until the
+            space arrived and then snap to ink — a visible flicker on every loop. */}
+        {(() => {
+          const rendered = reduce || phrases.length < 2 ? (phrases[0] ?? "") : shown
+          if (!lastWordColor) return rendered
+          const full = phrases[idx % phrases.length] ?? phrases[0] ?? ""
+          const cut = full.lastIndexOf(" ")
+          const splitAt = cut >= 0 ? cut + 1 : 0
+          return (
+            <>
+              {rendered.slice(0, Math.min(rendered.length, splitAt))}
+              {rendered.length > splitAt && (
+                <span style={{ color: lastWordColor }}>{rendered.slice(splitAt)}</span>
+              )}
+            </>
+          )
+        })()}
         {!reduce && phrases.length > 1 && (
           <motion.span
             aria-hidden
