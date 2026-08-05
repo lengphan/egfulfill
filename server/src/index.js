@@ -372,7 +372,7 @@ shippingRoutes(app, requireAuth, requireStaff);        // EasyPost + Shippo rate
 designLibraryRoutes(app, requireAuth, requireStaff);   // per-seller "my uploads" design gallery + cross-seller duplicate detection (staff-only)
 designFilesRoutes(app, requireAuth);                   // machine deliverable files (.pes/.emb) stored server-side, access-controlled (staff any; seller own)
 sheetsRoutes(app, requireAuth);                        // Google Sheets order import (link-shared sheet → existing import pipeline)
-billingRoutes(app, requireAuth);                       // subscription plan + SpyDeck add-on, charged from the wallet (402 names the shortfall so the client can offer a top-up)
+billingRoutes(app, requireAuth, requireAdmin);                       // subscription plan + SpyDeck add-on, charged from the wallet (402 names the shortfall so the client can offer a top-up)
 planRoutes(app, requireAuth, requireStaff, requireAdmin);  // volume tiers: the admin ladder + a seller's own meter. MEASURES ONLY — quoteOrder does not import it, so a ladder cannot move a charge
 consignmentRoutes(app, requireAuth, requireStaff);     // inventory services: seller-owned stock (ASN -> count -> internal SKU + bin); kept OUT of `inventory`, which has no owner column
 mailIngestRoutes(app, requireAuth);                                // inbound Etsy sale emails -> order addresses (shared-secret URL; sender must be a known account)

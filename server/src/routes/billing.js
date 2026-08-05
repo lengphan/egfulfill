@@ -42,12 +42,36 @@ const GRACE_DAYS = 7;
  */
 export async function runRenewals() {
   const due = await q(
-    `select id, plan, spydeck_addon, plan_past_due_since, plan_auto_renew from users
+    `select id, plan, spydeck_addon, plan_past_due_since, plan_auto_renew, plan_trial_ends_at from users
       where plan_renews_at is not null
         and plan_renews_at <= now()
         and (plan <> 'starter' or spydeck_addon is true)`
   );
   for (const u of due.rows) {
+    /**
+     * A TRIAL ENDS. IT NEVER CHARGES.
+     *
+     * This branch is first on purpose — every path below it can move money, and a trial
+     * must not reach any of them. The seller agreed to try the plan, not to buy it, so the
+     * only correct action at expiry is to stop the access and ask.
+     *
+     * Nothing they made is touched: orders, designs and connected shops are untouched and
+     * they simply lose the gated features. plan_trial_used_at is stamped here rather than
+     * when the trial starts, so an admin who grants one and revokes it same-day has not
+     * silently burned the seller's only trial.
+     */
+    if (u.plan_trial_ends_at && new Date(u.plan_trial_ends_at).getTime() <= Date.now()) {
+      await q(
+        `update users set plan='starter', spydeck_addon=false, plan_renews_at=null,
+                plan_past_due_since=null, plan_paid_plan=null, plan_paid_addon=false,
+                plan_trial_ends_at=null, plan_trial_used_at=coalesce(plan_trial_used_at, now())
+          where id=$1`, [u.id]
+      ).catch(() => {});
+      notify({ userIds: [u.id], type: 'billing-trial-ended', title: 'Your free trial has ended',
+        body: 'You are back on the Starter plan. Nothing you created was removed — upgrade any time to turn the paid features back on.',
+        href: '/settings' });
+      continue;
+    }
     // Auto-renew OFF means the seller scheduled a downgrade (or cancelled): the paid month
     // they were keeping has now ended, so drop to Starter. Without this the plan never
     // actually lapsed — auto-renew-off rows were skipped entirely, so a plan stayed Pro
@@ -95,7 +119,7 @@ export async function runRenewals() {
   }
 }
 
-export function billingRoutes(app, requireAuth) {
+export function billingRoutes(app, requireAuth, requireAdmin) {
   q('alter table users add column if not exists plan_renews_at timestamptz').catch(() => {});
   q('alter table users add column if not exists plan_auto_renew boolean not null default true').catch(() => {});
   q('alter table users add column if not exists plan_past_due_since timestamptz').catch(() => {});
@@ -105,6 +129,21 @@ export function billingRoutes(app, requireAuth) {
   // Pro → Starter → Pro inside one paid month charged for Pro twice.
   q('alter table users add column if not exists plan_paid_plan text').catch(() => {});
   q('alter table users add column if not exists plan_paid_addon boolean not null default false').catch(() => {});
+  /**
+   * TRIALS. Two columns, and both are load-bearing.
+   *
+   * plan_trial_ends_at marks the current paid-looking period as a TRIAL, which is what
+   * stops runRenewals charging for it. Without this a trial is indistinguishable from a
+   * subscription: the sweep sees plan='pro' with a renewal date, finds a funded wallet, and
+   * silently takes the money from someone who never agreed to pay. That is a chargeback and
+   * a broken promise, and it is the DEFAULT behaviour unless a trial is marked.
+   *
+   * plan_trial_used_at survives the downgrade, so a trial is once per account for ever.
+   * Keyed on the user rather than the plan, or a seller cycles pro -> starter -> pro and
+   * trials indefinitely.
+   */
+  q('alter table users add column if not exists plan_trial_ends_at timestamptz').catch(() => {});
+  q('alter table users add column if not exists plan_trial_used_at timestamptz').catch(() => {});
 
   // Hourly sweep. Same single-instance pattern as the Etsy auto-sync: a globalThis guard
   // so a hot reload can't stack timers, and unref() so it never holds the process open.
@@ -118,7 +157,7 @@ export function billingRoutes(app, requireAuth) {
   // What the seller is on now + what things cost. Prices come from here, not the client,
   // so the confirm dialog can show the true amount.
   app.get('/api/billing/plan', { preHandler: requireAuth }, async (req) => {
-    const r = await q('select plan, spydeck_addon, plan_renews_at, plan_auto_renew, plan_past_due_since, plan_paid_plan, plan_paid_addon from users where id=$1', [req.user.sub]);
+    const r = await q('select plan, spydeck_addon, plan_renews_at, plan_auto_renew, plan_past_due_since, plan_paid_plan, plan_paid_addon, plan_trial_ends_at, plan_trial_used_at from users where id=$1', [req.user.sub]);
     const u = r.rows[0] || {};
     const active = u.plan_renews_at ? new Date(u.plan_renews_at).getTime() > Date.now() : false;
     // A team member inherits their leader's plan. Resolved here as well as at sign-in so
@@ -143,9 +182,59 @@ export function billingRoutes(app, requireAuth) {
       paid_plan: active ? (u.plan_paid_plan || u.plan || 'starter') : null,
       paid_addon: active ? u.plan_paid_addon === true : false,
       grace_days: GRACE_DAYS,
+      // TRIAL STATE, so the UI can count down and say plainly that nothing will be charged.
+      // `trial_ends_at` is the member's OWN row, never inherited — a team member is not on a
+      // trial because their leader is, and showing them a countdown they cannot act on would
+      // be worse than showing nothing.
+      trial_ends_at: u.plan_trial_ends_at || null,
+      on_trial: !!(u.plan_trial_ends_at && new Date(u.plan_trial_ends_at).getTime() > Date.now()),
+      trial_used: !!u.plan_trial_used_at,
       balance: await balanceOf(req.user.sub),
       prices: { plans: PLAN_PRICES, spydeck_addon: SPYDECK_ADDON_PRICE },
     };
+  });
+
+  /**
+   * ADMIN GRANTS A TRIAL. Deliberately not self-serve: this is a sales lever, and a
+   * self-serve trial on an account that can already spend from a wallet is a free-plan
+   * exploit waiting to be found.
+   *
+   * The three guards are the whole feature:
+   *   - one per account, ever (plan_trial_used_at survives the downgrade)
+   *   - never over an ACTIVE paid subscription, which would replace something they paid for
+   *     with something free and shorter
+   *   - auto_renew forced OFF, so that even if this row somehow reached the charging path,
+   *     the fallback is "lapse to Starter" rather than "take their money"
+   *
+   * body: { userId, plan?, days? }
+   */
+  app.post('/api/billing/trial', { preHandler: requireAdmin }, async (req, reply) => {
+    const b = req.body || {};
+    const userId = String(b.userId || '');
+    const plan = b.plan != null ? String(b.plan) : 'pro';
+    const days = Math.min(90, Math.max(1, Math.floor(Number(b.days) || 14)));
+    if (!userId) { reply.code(400); return { error: 'userId is required' }; }
+    if (!PLANS.includes(plan) || plan === 'starter') { reply.code(400); return { error: 'Trial plan must be pro or enterprise' }; }
+
+    const cur = (await q('select id, role, plan, plan_renews_at, plan_trial_used_at from users where id=$1', [userId])).rows[0];
+    if (!cur) { reply.code(404); return { error: 'No such account' }; }
+    if (cur.role && cur.role !== 'seller') { reply.code(400); return { error: 'Staff accounts do not have a subscription plan.' }; }
+    if (cur.plan_trial_used_at) { reply.code(409); return { error: 'This account has already had a trial.' }; }
+    if (cur.plan_renews_at && new Date(cur.plan_renews_at).getTime() > Date.now() && cur.plan !== 'starter') {
+      reply.code(409); return { error: 'This account already has a paid plan running — a trial would replace it.' };
+    }
+
+    const ends = new Date(Date.now() + days * 86400000);
+    await q(
+      `update users set plan=$1, plan_trial_ends_at=$2, plan_renews_at=$2, plan_auto_renew=false,
+              plan_past_due_since=null, plan_paid_plan=null, plan_paid_addon=false
+        where id=$3`, [plan, ends, userId]
+    );
+    audit(req, 'billing.trial_granted', { entityType: 'user', entityId: userId, after: { plan, days, ends_at: ends } });
+    notify({ userIds: [userId], type: 'billing-trial-started', title: `Your ${days}-day ${plan} trial has started`,
+      body: 'Everything on the plan is unlocked. Nothing will be charged — when the trial ends you go back to Starter unless you upgrade.',
+      href: '/settings' });
+    return { ok: true, plan, days, trial_ends_at: ends };
   });
 
   // Turn monthly renewal on/off. Off does NOT cancel now — the plan runs out the month
