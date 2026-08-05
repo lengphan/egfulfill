@@ -55,7 +55,7 @@ export function BoldHow() {
               <div className="font-display font-black leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(3rem, 6vw, 4.5rem)" }}>
                 {String(i + 1).padStart(2, "0")}
               </div>
-              <span className="mt-6 flex size-10 items-center justify-center rounded-xl" style={{ background: ACCENT }}>
+              <span className="mt-6 flex size-10 items-center justify-center rounded-xl text-[#FAF8F3]" style={{ background: ACCENT }}>
                 <s.icon size={20} weight="duotone" />
               </span>
               <h2 className="mt-5 text-xl font-bold tracking-tight">{s.title}</h2>

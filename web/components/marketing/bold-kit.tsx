@@ -22,14 +22,13 @@ import { ArrowUpRight } from "@phosphor-icons/react"
 // 4.5:1 from about #4259D6 downward — at any "light periwinkle" value it sits near 1.6:1,
 // i.e. invisible. Light plate + ink type, or deep plate + cream type; there is no light plate
 // with cream type.
-// COOLER, same lightness. #5C6CD6 sat at a violet hue that read warm at full-bleed size;
-// this is the same brightness pulled toward true blue. Held at hue 229 so it is the SAME
-// family as PLATE_DEEP (234) — an accent 17° off the plate reads as two unrelated blues on
-// one page, which is what a mixed set of hand-picked hexes always looks like.
+// ONE value with PLATE_DEEP, not a sibling of it. Every previous version kept the CTA bands
+// a step off the hero plate, and every time the plate moved the two drifted into "two blues
+// that are almost the same", which is the exact thing that reads as an unconsidered palette.
+// The bands and the plate are now the same electric violet.
 //
-// Cream measures 5.10:1 here, so the CTA bands that use this as a fill carry cream lettering
-// as real readable type, not as a ghost.
-export const ACCENT = "#4560D4"        // blue — the plate/fill
+// Paper measures 5.68:1 on it, so the bands carry cream lettering as real readable type.
+export const ACCENT = "#6633FF"        // electric violet — the plate/fill
 // The accent phrase is INK, like the rest of the headline — no second type colour.
 //
 // A dark purple on a light purple plate is a tint of the background wearing itself as
@@ -93,26 +92,29 @@ export const PLATE_ACCENT = '#1E2A78'
  * 1.83:1 and white at 1.94:1. Going deep is the only way to get white type, and it is what
  * every reference in this style actually does.
  *
- * COOLER than the first deep plate. #5B3FE8 sat at hue 250 — a violet, which at full-bleed
- * size reads warm and slightly dated. This is the same lightness and saturation rotated to
- * hue 234, a true blue-indigo: cream 5.31:1, white 5.63:1, acid 4.35:1. Every one of those
- * still clears the floor, so the type decisions below are unchanged by the rotation.
+ * ELECTRIC VIOLET, matching the reference directly — hue 283.5 at chroma 0.272, which is
+ * near the top of the sRGB gamut for this hue and is what makes it read as lit rather than
+ * printed. Paper 5.68:1, white 6.03:1, and the green accent 5.07:1: all real readable type,
+ * none of it decorative-only.
  *
- * Deliberately NOT a change to ACCENT. That token is used 21 times across the marketing
- * pages, several of them as a light band with INK text on top — swapping it wholesale would
- * silently invert those to dark-on-dark. ACCENT stays the pastel band; this is the hero
- * plate. Unifying the two is a per-page pass, not a token rename.
+ * This is the DARK ground the palette was missing. A pastel page has nowhere for a bright
+ * accent to fire — every accent has to be a mid-tone, and mid-tones are what "muted" means.
+ * The green only ever appears here, never on paper, where it measures 1.12:1 and vanishes.
  */
-export const PLATE_DEEP = '#4454EC'
+export const PLATE_DEEP = '#6633FF'
 
 /**
- * The one loud accent — acid green, the single hot colour in an otherwise two-tone page.
+ * The one loud accent — a CREAM green, not an acid one.
  *
- * 4.35:1 on the deep plate, so it reads as type rather than as a glow. As a FILL it only ever
- * takes ink: black on it is 15.19:1, white is 1.30:1 and fails outright — acid green is a
- * light colour, so the same light-plate/dark-type rule applies to it as to the pastel.
+ * #C6F24E sat at chroma 0.191, which is sports-drink territory. This is chroma 0.129 at a
+ * slightly higher lightness: the same energy on the violet with the neon sanded off, which
+ * is the "bright cream green" that was asked for twice.
+ *
+ * 5.07:1 on the plate, so it is type rather than a glow. As a FILL it only ever takes ink —
+ * black on it is 16.56:1, white fails outright. It is a LIGHT colour, so it needs the dark
+ * ground; on paper it measures 1.12:1 and disappears entirely.
  */
-export const ACID = '#C6F24E'
+export const ACID = '#D4F897'
 
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const

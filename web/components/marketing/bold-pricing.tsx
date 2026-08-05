@@ -55,7 +55,7 @@ export function BoldPricing() {
                   {/* The tick sits in an accent chip rather than being an accent-coloured
                       glyph: at 12px a lime tick on white is nearly invisible, and the accent
                       is a fill in this system, not an ink colour. */}
-                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full" style={{ background: ACCENT }}>
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[#FAF8F3]" style={{ background: ACCENT }}>
                     <Check size={12} weight="bold" />
                   </span>
                   <span className="text-black/75">{i}</span>

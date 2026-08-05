@@ -71,7 +71,7 @@ export function BoldFeatures() {
 
               <div className="min-w-0">
                 <div className="flex items-center gap-3">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl" style={{ background: ACCENT }}>
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl text-[#FAF8F3]" style={{ background: ACCENT }}>
                     <f.icon size={18} weight="duotone" />
                   </span>
                   <h2 className="text-2xl font-bold tracking-tight">{f.title}</h2>

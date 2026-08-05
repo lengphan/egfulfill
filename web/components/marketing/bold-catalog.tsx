@@ -67,7 +67,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] }) {
                           className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                         />
                       ) : (
-                        <div className="flex size-full items-center justify-center text-[#0B0B0C]/35">
+                        <div className="flex size-full items-center justify-center text-[#FAF8F3]/45">
                           <TShirt size={40} weight="duotone" />
                         </div>
                       )}
