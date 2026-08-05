@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter, Fraunces } from "next/font/google"
+import { Geist_Mono, Inter } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -11,13 +11,6 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
-})
-
-// Editorial serif for marketing display headlines (used via the `font-display`
-// utility). The app UI stays all-Inter.
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-display",
 })
 
 export const metadata: Metadata = {
@@ -42,7 +35,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, fraunces.variable)}
+      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
     >
       {/* Zoom, applied BEFORE first paint.
           Same trick next-themes uses for dark mode, and for the same reason: read from a

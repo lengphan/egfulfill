@@ -7,7 +7,11 @@
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
-    --font-display: var(--font-display);
+    /* Fraunces dropped 2026-08-05 — one typeface across the product. `font-display`
+       survives as a NAME so the 39 call sites don't all have to churn in one diff, but it
+       now resolves to the same Inter stack as everything else. A heading is distinguished
+       by weight, size and tracking, not by a second family. */
+    --font-display: var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -80,7 +84,7 @@
    */
     --primary: oklch(0.47 0.19 274);
     --primary-foreground: oklch(0.985 0 0);
-    --brand: oklch(0.5386 0.1573 277.5);
+    --brand: oklch(0.5700 0.1626 264.2);
     --brand-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
@@ -98,13 +102,13 @@
     --chart-4: oklch(0.77 0.16 70);
     --chart-5: oklch(0.65 0.22 15);
     --radius: 0.625rem;
-    --sidebar: oklch(0.5386 0.1573 277.5);
+    --sidebar: oklch(0.5700 0.1626 264.2);
     --sidebar-foreground: oklch(0.985 0 0);
     --sidebar-primary: oklch(0.985 0 0);
-    --sidebar-primary-foreground: oklch(0.28 0.12 277.5);
-    --sidebar-accent: oklch(0.475 0.150 277.5);
+    --sidebar-primary-foreground: oklch(0.30 0.13 264.2);
+    --sidebar-accent: oklch(0.505 0.155 264.2);
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.455 0.145 277.5);
+    --sidebar-border: oklch(0.485 0.150 264.2);
     --sidebar-ring: oklch(0.47 0.19 274);
 }
 
@@ -122,7 +126,7 @@
     --popover-foreground: oklch(0.985 0 0);
     --primary: oklch(0.72 0.14 274);
     --primary-foreground: oklch(0.145 0 0);
-    --brand: oklch(0.5386 0.1573 277.5);
+    --brand: oklch(0.5700 0.1626 264.2);
     --brand-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
