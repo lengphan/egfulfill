@@ -203,8 +203,22 @@
 
    Note for anything dense: media queries still read the REAL viewport, so a breakpoint will
    not fire just because zoom left the content short of room. Give wide things their own
-   overflow-x container rather than a breakpoint (see the orders table). */
-body { zoom: var(--eg-zoom, 1); }
+   overflow-x container rather than a breakpoint (see the orders table).
+
+   NOT on <body>: Base UI portals popups to document.body, and a popup positioned from a
+   zoomed trigger's rect would then have that zoom applied twice, sliding it away from the
+   control that opened it. The wrapper keeps portals outside the zoomed subtree, so their
+   coordinates land where the rect said. See app/layout.tsx. */
+.eg-zoom-root { zoom: var(--eg-zoom, 1); }
+
+/* Portalled surfaces sit outside .eg-zoom-root, so they would otherwise stay at 100% while
+   the page behind them grew. Scale the popup itself — never the positioner, whose inline
+   left/top are computed in unzoomed pixels and must stay that way. Dialogs are excluded:
+   they are centred by their own positioner and already sized to the viewport. */
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="popover-content"],
+[data-slot="tooltip-content"] { zoom: var(--eg-zoom, 1); }
 
 /* Print — only the label sheet (Inventory → Print labels, Orders → Labels).
    The sheet is portalled to <body> (see label-sheet.tsx) precisely so we can

@@ -57,7 +57,16 @@ export default function RootLayout({
       />
       <body>
         <ThemeProvider>
-          <LanguageProvider>{children}</LanguageProvider>
+          <LanguageProvider>
+            {/* The zoom lives HERE, not on <body>, and that placement is load-bearing.
+                Base UI portals every menu, popover and tooltip to document.body. A popup is
+                positioned from the trigger's getBoundingClientRect, which already reports
+                zoomed pixels — so while the zoom was on <body>, the popup applied that zoom a
+                second time and drifted further from its trigger the further right the trigger
+                sat. Keeping portals OUTSIDE the zoomed element is what makes the coordinates
+                line up. */}
+            <div className="eg-zoom-root">{children}</div>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>
