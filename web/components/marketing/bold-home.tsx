@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform, animate } from "motion/react"
 import { ArrowUpRight, PlugsConnected, Printer, Truck, Wallet } from "@phosphor-icons/react"
 import type { SiteContent } from "@/lib/site-content"
@@ -25,25 +25,66 @@ import { ACCENT, INK, SURFACE, PLATE_DEEP, ACID, MaskedWords, TypedPhrase, Pill 
  *  settling rather than a slot machine — no loop, no re-run on scroll-back. */
 function CountUp({ value, className }: { value: string; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
-  const inView = useInView(ref, { once: true, margin: "0px 0px -15% 0px" })
+  /**
+   * A small FIXED bite, not a percentage of the viewport.
+   *
+   * This was -15%, which on a 1000px window puts the trigger line at 850 — and the hero's
+   * three stat cards sit at y=867. Plainly on screen, 17px under the line, so they showed a
+   * static figure and only ever counted if you happened to scroll. A percentage scales the
+   * dead zone with the display, so the taller the monitor the more visible content silently
+   * refuses to animate. 40px means "not clipped at the very edge" at every size.
+   */
+  const inView = useInView(ref, { once: true, margin: "0px 0px -40px 0px" })
   const reduce = useReducedMotion()
   const [shown, setShown] = useState(value)
-  // Split the numeric core from whatever wraps it ("2,400+", "$1.2M", "99.9%") so the
-  // prefix/suffix survive — animating the whole string would print nonsense mid-flight.
-  const m = /^([^\d]*)([\d.,]+)(.*)$/.exec(value)
-  useEffect(() => {
-    if (!inView || reduce || !m) return
+
+  /**
+   * Split the numeric core from whatever wraps it ("2,400+", "$1.2M", "99.9%") so the
+   * prefix/suffix survive — animating the whole string would print nonsense mid-flight.
+   *
+   * MEMOISED, and that is the whole bug fix. This used to be a bare `regex.exec()` in the
+   * render body, which returns a NEW array every render, and that array was in the effect's
+   * dependency list. So: animate → onUpdate → setShown → re-render → new array → effect
+   * tears the animation down and restarts it from zero. It never got more than a frame in.
+   * Measured before the fix: three counters never moved off their final value at all, and
+   * the fourth emitted 48hrs, 4hrs, 5hrs, 0hrs, 9hrs, 8hrs — scrambled, never ascending.
+   */
+  const parts = useMemo(() => {
+    const m = /^([^\d]*)([\d.,]+)(.*)$/.exec(value)
+    if (!m) return null
     const target = Number(m[2].replace(/,/g, ""))
-    if (!Number.isFinite(target)) return
+    if (!Number.isFinite(target)) return null
     const dp = (m[2].split(".")[1] ?? "").length
+    return {
+      pre: m[1], post: m[3], target, dp,
+      /**
+       * Decimals to show WHILE counting, which is not the same as the decimals in the
+       * figure. "2hrs" counting 0 → 2 as integers is three distinct frames in 1.1s and
+       * reads as static — the second half of what was reported here. Small whole numbers
+       * borrow a decimal place in flight and land back on the integer, so the motion is
+       * legible at any magnitude. Big figures already have plenty of digits moving.
+       */
+      flightDp: dp === 0 && target < 100 ? 1 : dp,
+    }
+  }, [value])
+
+  useEffect(() => {
+    if (!inView || reduce || !parts) return
+    const { pre, post, target, dp, flightDp } = parts
+    const fmt = (v: number, d: number) =>
+      `${pre}${v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}${post}`
     const controls = animate(0, target, {
       duration: 1.1,
       ease: [0.16, 1, 0.3, 1],
-      onUpdate: (v) => setShown(`${m[1]}${v.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp })}${m[3]}`),
+      onUpdate: (v) => setShown(fmt(v, flightDp)),
+      // Land on the ORIGINAL string, not a re-formatted float — "2.4M+" must not arrive
+      // as "2.40M+" because the flight precision happened to be higher.
+      onComplete: () => setShown(value),
     })
     return () => controls.stop()
-  }, [inView, reduce, m])
-  return <span ref={ref} className={className}>{m ? shown : value}</span>
+  }, [inView, reduce, parts, value])
+
+  return <span ref={ref} className={className}>{parts ? shown : value}</span>
 }
 
 const ICONS = [PlugsConnected, Printer, Wallet, Truck]
@@ -178,7 +219,10 @@ export function BoldHome({ content }: { content: SiteContent }) {
                   transition={{ duration: 0.5, delay: 0.65 + i * 0.08, ease: [0.16, 1, 0.3, 1] }}
                 >
                   <div className="text-[11px] font-semibold uppercase tracking-widest text-black/45">{s.label}</div>
-                  <CountUp value={s.value} className="mt-1.5 block text-2xl font-display font-black tracking-tight" />
+                  {/* font-TITLE, not font-display: this panel is a picture OF THE APP, and the
+                      app's face is the sans. A serif figure here would advertise a product that
+                      doesn't look like this. */}
+                  <CountUp value={s.value} className="mt-1.5 block text-2xl font-title font-black tracking-tight" />
                 </motion.div>
               ))}
             </div>
@@ -195,7 +239,8 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 transition={{ duration: 0.7, delay: 1.05, ease: [0.16, 1, 0.3, 1] }}
               >
                 <div className="text-[10px] font-semibold uppercase tracking-widest text-black/45">{stats[3].label}</div>
-                <CountUp value={stats[3].value} className="mt-1 block text-xl font-display font-black tracking-tight" />
+                {/* Peeled off the mockup, so it stays on the mockup's face — see above. */}
+                <CountUp value={stats[3].value} className="mt-1 block text-xl font-title font-black tracking-tight" />
               </motion.div>
             )}
             {stats[0] && (

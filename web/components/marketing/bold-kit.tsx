@@ -237,7 +237,11 @@ export function Pill({ href, children, tone = "ink", className = "" }: {
 }) {
   const base = "group inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
   const tones = {
-    ink: "bg-[#0B0B0C] text-[#FAF8F3] hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]",
+    // ACID (#D4F897) lettering, not cream. The ink pill is the CTA on every marketing page,
+    // and a black-on-violet box with cream type was the one place the accent went missing —
+    // the green now carries the label and the arrow, tying the button to the plate it sits
+    // on. 16.56:1 on the ink ground, so it is louder AND more readable than the cream was.
+    ink: "bg-[#0B0B0C] text-[#D4F897] hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]",
     accent: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
     // Ink on acid is 15.19:1. White on acid is 1.30:1 — never do that.
     acid: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
