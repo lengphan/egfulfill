@@ -65,7 +65,7 @@ export function BoldFeatures() {
             <Rise key={f.title} delay={i * 0.05} className="grid gap-6 py-12 md:grid-cols-[auto_1fr_auto] md:gap-10">
               {/* The number is the ordering cue a card grid can't give. Set big and quiet —
                   it's a position, not a value, so it shouldn't compete with the heading. */}
-              <div className="font-black leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)" }}>
+              <div className="font-display font-bold leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)" }}>
                 {String(i + 1).padStart(2, "0")}
               </div>
 
@@ -94,7 +94,7 @@ export function BoldFeatures() {
 
       <section className="px-6 pb-16">
         <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
+          <h2 className="mx-auto max-w-2xl font-display font-bold leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             All of it, from the first order.
           </h2>
           <div className="mt-8 flex justify-center">

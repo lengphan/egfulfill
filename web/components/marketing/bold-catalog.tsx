@@ -48,7 +48,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] }) {
         ) : (
           [...groups.entries()].map(([cat, items], gi) => (
             <div key={cat} className={gi ? "mt-16" : ""}>
-              <h2 className="font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>{cat}</h2>
+              <h2 className="font-display font-bold leading-[0.95] tracking-[-0.035em]" style={HEADING}>{cat}</h2>
               <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {items.map((p, i) => (
                   <Rise key={`${cat}-${p.name}`} delay={Math.min(i, 6) * 0.05}
@@ -88,7 +88,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] }) {
 
       <section className="px-6 pb-16">
         <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
+          <h2 className="mx-auto max-w-2xl font-display font-bold leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             Pick a blank, upload art, ship it.
           </h2>
           <div className="mt-8 flex justify-center">

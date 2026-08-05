@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter } from "next/font/google"
+import { Geist_Mono, Inter, Space_Grotesk } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -7,6 +7,16 @@ import { LanguageProvider } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+
+// Display face for headings — marketing and app page titles alike, via `font-display`.
+// Space Grotesk tops out at 700; it has no 900, so headings use font-bold rather than
+// font-black. Asking for 900 would make the browser synthesise a fake bold, which smears
+// the very letterforms (the flat-topped a, the angular R) that it was chosen for.
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display-face",
+})
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -35,7 +45,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
+      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, spaceGrotesk.variable)}
     >
       {/* Zoom, applied BEFORE first paint.
           Same trick next-themes uses for dark mode, and for the same reason: read from a
