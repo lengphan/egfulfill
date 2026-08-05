@@ -751,7 +751,14 @@ export function DesignCanvasDialog({
         // Wide enough for two real columns. Capped against the VIEWPORT as well as a pixel
         // ceiling so it can't outgrow a small laptop: 1180px is about the point where the
         // stage stops growing (bounded by 78vh) and extra width would only add dead space.
-        className="sm:max-w-2xl lg:max-w-[min(96vw,1180px)]"
+        // Sized to its CONTENT, not to a number. A fixed 1180px gave the control rail far more
+        // width than it uses and the remainder showed up as blank around the window. With both
+        // grid tracks content-sized, the dialog is exactly garment + gap + rail.
+        // Width is the SUM of what's inside, not a round number: the garment's own cap, the
+        // 380px rail, the 24px gap and the 48px of padding. A fixed 1180px gave the rail far
+        // more room than it uses and the surplus read as blank around the window. max-w-fit
+        // does not work here — it under-measures the grid and clips the rail off the edge.
+        className="sm:max-w-2xl lg:max-w-[min(96vw,calc(min(74vh,46vw)+452px))]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -803,7 +810,7 @@ export function DesignCanvasDialog({
             when it does scroll the garment stays put instead of leaving the screen. Below lg
             it collapses back to the original single stack — two columns in a phone-width
             dialog would make both of them useless. */}
-        <div className="grid gap-5 lg:grid-cols-[auto_minmax(300px,1fr)] lg:items-start lg:gap-6">
+        <div className="grid gap-5 lg:grid-cols-[auto_380px] lg:items-start lg:gap-6">
         {/* The left column is sized to the stage itself rather than to half the dialog. An
             even 50/50 split gave the controls far more width than their cards use and stranded
             the remainder as dead space beside them; letting the garment take what it needs and
@@ -1059,7 +1066,11 @@ export function DesignCanvasDialog({
               them as two numbered slots — the image (what shows on the mockup) and the
               machine file (the stitch file) — each with its own state, so it reads as a
               two-item checklist instead of a row of same-looking buttons. */}
-          <div className="grid gap-2 sm:grid-cols-2">
+          {/* STACKED, not side by side. Two cards in a row are read as a pair of options;
+              stacked and numbered they are read as an order of work, which is what they are.
+              It also fixes the window: a tall narrow rail sits beside a big square garment
+              with no dead band, where a short wide row left one. */}
+          <div className="flex flex-col gap-2">
             {/* 1 — Design image */}
             <div className={cn("rounded-lg border p-2.5", designUrl ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20" : "border-dashed border-border bg-muted/20")}>
               <div className="flex items-start gap-2">
@@ -1295,18 +1306,23 @@ export function DesignCanvasDialog({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* The reason sits ABOVE the buttons, not beside them. Inline in a 380px rail it
+              pushed Cancel and Save onto separate lines, which read as two unrelated controls
+              rather than one choice. */}
+          <div className="space-y-2">
             {/* Say WHY Save is disabled. A machine file without an image is the common case —
                 the stitch file is saved, but there's no picture to place on the mockup yet. */}
             {!designUrl && (
-              <span className="mr-auto text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {hasMachineFile
                   ? "Add an image so your file shows in the right spot on the product mockup."
                   : "Add artwork above to save this design."}
-              </span>
+              </p>
             )}
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={() => void save()} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button onClick={() => void save()} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
+            </div>
           </div>
         </div>
         </div>
