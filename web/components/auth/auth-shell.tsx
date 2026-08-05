@@ -16,59 +16,39 @@ import { PLATE_DEEP, ACID, SURFACE } from "@/components/marketing/bold-kit"
  * violet in the system and no second value here to drift when that one moves.
  */
 /**
- * LINES, not bands. One plate colour and one accent — nothing else.
+ * THE GRADIENT IS ONE HUE. This is the whole point of it.
  *
- * The first version stacked filled paper bands over the plate, which read as several
- * different purples rather than one: each translucent fill made a new value, so the page
- * looked like it had a four-colour background instead of a violet one. Every fill is gone.
- * What is left is the green, drawn as line.
+ * Two decorated versions came before this and both were wrong in the same way — they added
+ * VALUES. Filled paper bands read as four different purples; lime waves put a second colour
+ * across the page as ornament. The depth here comes from lightening and darkening the ONE
+ * violet instead: lit at the top, sinking at the bottom, no second hue anywhere.
  *
- * The lines are grouped ABOVE and BELOW the form and never cross the middle band, so the card
- * sits in clear space rather than on top of a pattern. That is a real layout constraint, not
- * just a z-index: the card is opaque, so anything running under it would be hidden anyway —
- * the point is that nothing crowds the EDGES of the card either.
+ * The stops are derived from PLATE_DEEP with color-mix rather than written as their own hex
+ * values, so they cannot drift. Move the plate and the gradient moves with it — the same
+ * reason the plate is a single exported constant in the first place.
  *
- * `preserveAspectRatio="none"` stretches the curves to any viewport. They are a backdrop, not
- * a figure, so distorting them is correct. `aria-hidden` + `pointer-events-none` keep the
- * whole thing out of the accessibility tree and out of the form's way.
+ * `background` is set FIRST as a flat colour and the gradient rides on `backgroundImage`.
+ * That is the fallback: a browser without color-mix throws the whole gradient out as invalid
+ * and lands on the flat plate, which is the previous design rather than a broken page.
  *
- * Static on purpose: the house rule is that motion is spatial and meaningful, and a
- * perpetually drifting sign-in background is neither.
+ * Frosted glass was considered and rejected for this screen specifically. A translucent panel
+ * makes label and input contrast depend on whatever sits behind it — measured around 3:1 and
+ * varying across the card, under the 4.5:1 floor — and the blur only reads at all against
+ * foreign hues, so it would have cost the palette as well. The card here stays opaque, which
+ * is what keeps every contrast on it a fixed, checkable number.
  */
-function Waves() {
-  return (
-    <svg
-      aria-hidden
-      className="pointer-events-none absolute inset-0 h-full w-full select-none"
-      viewBox="0 0 1440 900"
-      preserveAspectRatio="none"
-    >
-      {/* Paths run from -40 to 1480 rather than 0 to 1440 so no line ENDS on screen — a
-          stroke that stops at the viewport edge reads as a broken graphic. */}
-      <g fill="none" stroke={ACID} strokeLinecap="round">
-        {/* Above the form. */}
-        <path d="M-40,110 C260,30 520,180 780,110 C1020,46 1240,140 1480,80" strokeWidth="2" opacity="0.55" />
-        <path d="M-40,185 C240,115 520,245 800,175 C1060,111 1260,200 1480,155" strokeWidth="1.5" opacity="0.28" />
-
-        {/* Below it. Three, so the eye reads a current rather than a single stray rule. */}
-        <path d="M-40,700 C260,620 520,780 780,700 C1040,626 1260,730 1480,660" strokeWidth="2" opacity="0.55" />
-        <path d="M-40,772 C240,702 520,852 800,777 C1060,708 1280,802 1480,737" strokeWidth="1.5" opacity="0.34" />
-        <path d="M-40,844 C280,784 540,912 820,847 C1080,788 1280,867 1480,812" strokeWidth="1.5" opacity="0.2" />
-      </g>
-    </svg>
-  )
-}
+const PLATE_GRADIENT =
+  `radial-gradient(125% 95% at 50% 0%,` +
+  ` color-mix(in oklab, ${PLATE_DEEP}, white 20%) 0%,` +
+  ` ${PLATE_DEEP} 46%,` +
+  ` color-mix(in oklab, ${PLATE_DEEP}, black 26%) 100%)`
 
 export function AuthShell({ subtitle, children }: { subtitle: string; children: ReactNode }) {
   return (
     <div
       className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden p-6"
-      style={{ background: PLATE_DEEP }}
+      style={{ background: PLATE_DEEP, backgroundImage: PLATE_GRADIENT }}
     >
-      <Waves />
-      {/* Everything above the waves. The stacking context is explicit rather than relying on
-          source order, because the card carries a shadow that would otherwise land under the
-          wave fills and read as a smudge. */}
       <div className="relative z-10 flex w-full flex-col items-center">
       {/* The wordmark sits ON the plate rather than inside the card. It belongs to the site,
           and lifting it out is what stops the card reading as a lone box floating in the
@@ -82,7 +62,11 @@ export function AuthShell({ subtitle, children }: { subtitle: string; children: 
       </Link>
       <p className="mt-2 text-sm" style={{ color: ACID }}>{subtitle}</p>
 
-      <Card className="mt-7 w-full max-w-sm gap-0 p-6 shadow-xl">{children}</Card>
+      {/* A LONG, SOFT, LOW-OPACITY shadow rather than shadow-xl. Tailwind's step is tuned for
+          a card on a light page; over a saturated plate it reads as a hard grey rim. This one
+          is offset far down and blurred wide, so the card looks lifted off the gradient
+          instead of stuck to it — which is the entire effect being asked for. */}
+      <Card className="mt-7 w-full max-w-sm gap-0 p-6 shadow-[0_26px_60px_-20px_rgba(0,0,0,0.5)]">{children}</Card>
 
       <Link
         href="/"
