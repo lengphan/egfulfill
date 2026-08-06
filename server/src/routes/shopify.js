@@ -71,11 +71,11 @@ async function freshToken(conn) {
   if (!stale || !conn.refresh_token) return conn.access_token;
 
   const r = await fetch(`https://${conn.shop_id}/admin/oauth/access_token`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
       client_id: API_KEY, client_secret: API_SECRET,
       grant_type: 'refresh_token', refresh_token: conn.refresh_token,
-    }),
+    }).toString(),
   });
   const t = await r.json().catch(() => ({}));
   if (!r.ok || !t.access_token) {
@@ -358,11 +358,16 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
     if (!code) { reply.code(400); return { error: 'Missing authorization code' }; }
     if (!verifyHmac(params || {})) { reply.code(400); return { error: 'HMAC verification failed — the callback could not be trusted' }; }
     try {
+      // FORM-ENCODED, and `expiring=1` as a STRING. Both matter: the token endpoint accepts
+      // a JSON body for the plain exchange, so posting JSON appears to work — it returns a
+      // perfectly good token — while silently ignoring the opt-in and handing back the
+      // non-expiring kind that every Admin API call then rejects. The failure is invisible
+      // at the exchange and only shows up as a 403 on the first real request.
       const tr = await fetch(`https://${shop}/admin/oauth/access_token`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        // `expiring: true` is the OPT-IN. Without it Shopify issues a non-expiring token
-        // that it then refuses to accept on every subsequent Admin API call.
-        body: JSON.stringify({ client_id: API_KEY, client_secret: API_SECRET, code, expiring: true })
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: API_KEY, client_secret: API_SECRET, code, expiring: '1',
+        }).toString(),
       });
       const t = await tr.json().catch(() => ({}));
       if (!tr.ok || !t.access_token) throw new Error(t.error_description || t.error || ('Shopify token error ' + tr.status));
