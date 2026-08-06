@@ -114,7 +114,7 @@ export const trackUrl = (carrier?: string | null, tracking?: string | null) => {
 /** Where an order's address came from, so a board can say whether it synced or was
  *  filled in by hand. Etsy withholds buyer addresses from the API, so "how did we get
  *  this" is genuinely useful operational information, not trivia. */
-export type AddressSource = "etsy" | "csv" | "email" | "label" | "manual" | "none"
+export type AddressSource = "sync" | "csv" | "email" | "label" | "manual" | "none"
 export const addressSource = (o: OrderRow): AddressSource => {
   const a = (o.address ?? {}) as Record<string, string>
   const has = !!(a.street || a.first_line || a.line1 || a.address1)
@@ -125,18 +125,32 @@ export const addressSource = (o: OrderRow): AddressSource => {
   // "manual": nobody typed it onto the ORDER — it is where the parcel was really sent,
   // which is worth saying, and it only exists because the order had no address at all.
   if (a.source === "label") return "label"
-  // Came straight off the marketplace sync — the Etsy shape uses line1/first_line.
-  if (a.first_line || a.line1) return "etsy"
+  // Came straight off a marketplace sync. This USED TO RETURN "etsy" and the label read
+  // "from Etsy", because when it was written Etsy was the only marketplace and line1 was
+  // its shape. Shopify and TikTok write line1 too, so every order from either announced
+  // itself as an Etsy order — on the one field whose whole job is saying where the address
+  // came from. WHICH marketplace is a property of the ORDER, never of the address shape.
+  if (a.first_line || a.line1) return "sync"
   return "manual"
 }
 
-export const ADDRESS_SOURCE_LABEL: Record<AddressSource, string> = {
-  etsy: "from Etsy",
+const STATIC_SOURCE_LABEL: Record<Exclude<AddressSource, "sync">, string> = {
   csv: "from CSV import",
   email: "from sale email",
   label: "from the label",
   manual: "entered by hand",
   none: "no address yet",
+}
+
+/** What to print under a shipping address. Takes the ORDER because the synced case has to
+ *  name the marketplace the order actually came from. */
+export const addressSourceLabel = (o: OrderRow): string => {
+  const s = addressSource(o)
+  if (s !== "sync") return STATIC_SOURCE_LABEL[s]
+  // platformOf falls back to "Manual" for anything without a marketplace prefix; a
+  // hand-typed line1 is not "from Manual".
+  const platform = platformOf(o)
+  return platform && platform !== "Manual" ? `from ${platform}` : STATIC_SOURCE_LABEL.manual
 }
 
 

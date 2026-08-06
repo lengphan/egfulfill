@@ -88,10 +88,10 @@ function ChannelMark({ channelKey, name }: { channelKey: string; name: string })
   // No tinted plate behind them either: each mark carries its own colour and several ship
   // with a white background baked in, so a coloured plate frames them badly.
   return (
-    <span className="flex h-8 items-center">
+    <span className="flex h-12 items-center">
       {step > 1 ? (
-        <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
-          <Storefront size={18} weight="duotone" className="text-muted-foreground" />
+        <span className="flex size-12 items-center justify-center rounded-lg bg-muted">
+          <Storefront size={24} weight="duotone" className="text-muted-foreground" />
         </span>
       ) : (
         // eslint-disable-next-line @next/next/no-img-element -- a static local asset with an
@@ -99,7 +99,7 @@ function ChannelMark({ channelKey, name }: { channelKey: string; name: string })
         <img
           src={src}
           alt={`${name} logo`}
-          className="max-h-8 w-auto max-w-[140px] object-contain object-left"
+          className="max-h-12 w-auto max-w-[180px] object-contain object-left"
           onError={() => setStep((s) => s + 1)}
         />
       )}
@@ -502,7 +502,7 @@ export function StoresManager() {
               className="flex flex-col rounded-2xl border border-border bg-card p-5"
             >
               <ChannelMark channelKey={ch.key} name={ch.name} />
-              <div className="mt-3 flex-1 font-semibold">{ch.name}</div>
+              <div className="flex-1" />
               {ch.key === "shopify" ? (
                 <div className="mt-4 space-y-2">
                   <Input value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} placeholder="mystore.myshopify.com" className="h-9 text-sm" />

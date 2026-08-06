@@ -22,7 +22,7 @@ import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, isFactoryColLocked, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
-import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
+import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
 import { filterOrders, matchesStatus, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
@@ -1667,7 +1667,7 @@ export function OrdersHub() {
                               {(a.street2 || a.second_line || a.line2) && <div>{a.street2 || a.second_line || a.line2}</div>}
                               <div>{[a.city, a.state, a.zip || a.postal_code].filter(Boolean).join(", ")}</div>
                               {(a.country || a.country_iso) && <div>{a.country || a.country_iso}</div>}
-                              <div className="mt-1 text-3xs text-muted-foreground">{ADDRESS_SOURCE_LABEL[addressSource(o)]}</div>
+                              <div className="mt-1 text-3xs text-muted-foreground">{addressSourceLabel(o)}</div>
                             </div>
                           ) : (
                             <div className="text-muted-foreground">Not available yet.</div>
