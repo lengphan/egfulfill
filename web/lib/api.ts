@@ -690,12 +690,33 @@ export function getSheetRows(url: string) {
 
 /** The blank catalog. Cached longer than the order list — it's reference data, and the only
  *  thing that changes it is a product edit, which is a write, which clears this. */
-export type PublicProduct = { name: string; image: string | null; category: string | null; price: number }
+/** One colourway a visitor can choose. `image` is null when we hold no renderable picture
+ *  for it — the server drops internal storage keys rather than emitting a broken URL. */
+export type PublicColor = { name: string; image: string | null }
+export type PublicProduct = {
+  /** URL handle, derived server-side from the name. The row id is never published. */
+  slug: string
+  name: string
+  image: string | null
+  category: string | null
+  /** What a SELLER pays us. Never our cost. */
+  price: number
+  methods: string[]
+  colors: PublicColor[]
+  sizes: string[]
+}
 /** Published products for the PUBLIC marketing site — no auth, allow-listed server-side to
- *  four fields. Never use this inside the app; it deliberately omits cost, supplier and
- *  variant data that the authenticated catalog carries. */
+ *  named fields. Never use this inside the app: it deliberately omits the blank SKU, cost,
+ *  margin and supplier that the authenticated catalog carries. Colourways and sizes ARE
+ *  published — they describe the finished product a buyer picks from. */
 export function getPublicProducts() {
   return api<{ products: PublicProduct[] }>(`/api/public/products`)
+}
+/** One published product by slug, for the marketing detail page. 404s for anything not
+ *  published — deliberately without distinguishing "unpublished" from "does not exist", so
+ *  the route can't be used to probe for unreleased products. */
+export function getPublicProduct(slug: string) {
+  return api<{ product: PublicProduct }>(`/api/public/products/${encodeURIComponent(slug)}`)
 }
 
 export function getCatalogProducts() {

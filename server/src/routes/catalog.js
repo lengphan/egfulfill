@@ -104,37 +104,111 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return null;
   };
 
-  app.get('/api/public/products', async () => {
+  /** Only a renderable URL survives. Same rule as publicImage, applied per colourway. */
+  const publicUrlOrNull = (v) =>
+    (typeof v === 'string' && /^(https?:\/\/|data:image\/)/i.test(v)) ? v : null;
+
+  /**
+   * A URL-safe handle for one product.
+   *
+   * Derived from the NAME rather than exposing the row id, because the id is an internal
+   * key and this is the open internet. Two products with the same name would collide, so
+   * the caller disambiguates with an index suffix — see publicProducts below. A product
+   * whose name yields nothing usable (punctuation only) gets no slug and is dropped from
+   * the public list rather than published at an unroutable address.
+   */
+  const slugify = (name) => String(name).toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+
+  /**
+   * THE PUBLIC SHAPE, in one place, used by both the list and the detail route.
+   *
+   * Still an allow-list built from named fields — never a redaction of the row — so a field
+   * added to catalog_products upstream cannot start publishing itself. What is deliberately
+   * ABSENT is as load-bearing as what is present:
+   *
+   *   blank / sku      maps to supplier stock. Publishing it tells the world who makes our
+   *                    products and lets anyone price against our supplier.
+   *   cost / margin    our buying price. `price` here is what a SELLER pays us, which is the
+   *                    number this page is quoting, and is already public-facing.
+   *   supplier, ids    internal routing detail with no meaning to a visitor.
+   *
+   * Colourways and sizes ARE safe: they describe the finished product a buyer chooses from,
+   * which is exactly what a detail page is for. Colour images are filtered to renderable
+   * URLs so a storage key can never ride out inside the colour map.
+   */
+  const publicShape = (row, slug) => {
+    const d = row.data;
+    const price = row.catalog_price == null ? Number(d.price) : Number(row.catalog_price);
+    const colorImages = d.colorImages && typeof d.colorImages === 'object' ? d.colorImages : {};
+    const colors = Object.keys(colorImages)
+      .filter((name) => typeof name === 'string' && name.trim())
+      .map((name) => ({ name, image: publicUrlOrNull(colorImages[name]) }));
+    // `method` is a single value on the product today; emitted as a list so the page can
+    // render a technique picker without the shape changing when a product carries several.
+    const methods = Array.isArray(d.methods)
+      ? d.methods.filter((m) => typeof m === 'string' && m.trim())
+      : (typeof d.method === 'string' && d.method.trim() ? [d.method] : []);
+    return {
+      slug,
+      name: String(d.name),
+      image: publicImage(d),
+      category: typeof d.category === 'string' ? d.category : null,
+      price,
+      methods,
+      colors,
+      sizes: Array.isArray(d.sizes) ? d.sizes.filter((s) => typeof s === 'string' && s.trim()) : [],
+    };
+  };
+
+  /**
+   * Every published product in public shape, slugs already disambiguated.
+   *
+   * Read once and shared by both routes so the list and the detail page can never disagree
+   * about what a slug points at — the detail route resolving slugs by its own rule is how
+   * a link from the grid ends up 404ing on a name that merely looks similar.
+   */
+  const publicProducts = async () => {
     const r = await q(
       `select data, catalog_price from catalog_products
         where in_catalog = true
         order by created_at desc limit 60`
     ).catch(() => ({ rows: [] }));
-    return {
-      products: r.rows
-        .filter((row) => row.data && row.data.name)
-        .map((row) => {
-          const price = row.catalog_price == null ? Number(row.data.price) : Number(row.catalog_price);
-          return {
-            name: String(row.data.name),
-            // The mockup a seller sees, if there is one. Never a supplier URL or an internal key.
-            //
-            // Reading `image` ALONE was why a published product rendered as an empty placeholder
-            // on the marketing site while showing its photo everywhere else: the product shape
-            // has never guaranteed that field. The app resolves the picture through a fallback
-            // chain (see imageOf in web/components/app/products-catalog.tsx) and the public route
-            // has to use the same one, or the two disagree about whether a product has an image.
-            // Restricted to http(s)/data URLs so an internal key or bare filename still yields
-            // null rather than a broken <img>.
-            image: publicImage(row.data),
-            category: typeof row.data.category === 'string' ? row.data.category : null,
-            price,
-          };
-        })
-        .filter((p) => Number.isFinite(p.price) && p.price > 0)
-        .sort((a, b) => a.price - b.price)
-        .slice(0, 24),
-    };
+    const seen = new Map();
+    return r.rows
+      .filter((row) => row.data && row.data.name)
+      .map((row) => {
+        const base = slugify(row.data.name);
+        if (!base) return null;
+        const n = (seen.get(base) ?? 0) + 1;
+        seen.set(base, n);
+        return publicShape(row, n === 1 ? base : `${base}-${n}`);
+      })
+      .filter(Boolean)
+      .filter((p) => Number.isFinite(p.price) && p.price > 0);
+  };
+
+  app.get('/api/public/products', async () => {
+    const products = await publicProducts();
+    return { products: products.sort((a, b) => a.price - b.price).slice(0, 24) };
+  });
+
+  /**
+   * One published product, for the marketing detail page.
+   *
+   * Resolved from the SAME list the grid is built from, so a slug shown on a card always
+   * resolves here — a detail route with its own slug rule is how a link from the grid 404s
+   * on a name that merely looks similar.
+   *
+   * 404 for an unpublished or unknown product, deliberately without saying which. "Exists
+   * but is not published" is a fact about our catalogue that an unauthenticated caller has
+   * no business learning, and it would turn this route into a probe for unreleased products.
+   */
+  app.get('/api/public/products/:slug', async (req, reply) => {
+    const slug = String((req.params && req.params.slug) || '').toLowerCase();
+    const product = (await publicProducts()).find((p) => p.slug === slug);
+    if (!product) { reply.code(404); return { error: 'Not found' }; }
+    return { product };
   });
 
   app.get('/api/catalog_products', { preHandler: requireAuth }, async (req) => {
