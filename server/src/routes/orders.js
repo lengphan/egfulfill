@@ -768,8 +768,36 @@ export function ordersRoutes(app, requireAuth) {
     // already references and pass through untouched. Nothing stored changes; this is purely
     // what the LIST hands back. The single-order route below still returns img inline — one
     // order's thumbnails are not a payload problem.
+    // AN EXPLICIT PROJECTION, not to_jsonb(i.*).
+    //
+    // Measured at 700 orders / 1,120 lines: the response was 1.27MB, `items` was 70% of it,
+    // and inside items the JSON KEYS outweighed the values (569KB of structure to 222KB of
+    // content). That is what `to_jsonb(i.*)` costs — it ships all 31 columns of every line
+    // whether or not anything reads them, and the column NAME is repeated per row.
+    //
+    // The eight fields left out below have ZERO readers anywhere in web/ (grepped, not
+    // assumed): listing, ship_fee, unit_cost, design_pos, design_tier_at, design_tier_by,
+    // design_quote_at, design_charged_at. unit_cost/ship_fee are the frozen price and DO
+    // matter — but they are settled server-side (pricing.js, order_refunds.js) and read by
+    // the client through /api/orders/:id/charges, never off the list.
+    //
+    // Anything a DETAIL view needs is unaffected: GET /api/orders/:id still returns whole
+    // rows. This is the list/detail split made explicit rather than every board paying
+    // detail-page weight on first paint.
+    //
+    // Adding a column to order_items no longer changes this response, which is the point —
+    // but it also means a NEW field a board needs must be added here deliberately.
     const agg = `coalesce(jsonb_agg(
-        (to_jsonb(i.*) - 'img') || jsonb_build_object(
+        jsonb_build_object(
+          'id', i.id, 'order_id', i.order_id, 'sku', i.sku, 'name', i.name,
+          'qty', i.qty, 'color', i.color, 'size', i.size, 'variant', i.variant,
+          'blank', i.blank, 'print_type', i.print_type, 'line_id', i.line_id,
+          'factory_status', i.factory_status, 'unit_price', i.unit_price,
+          'design_src', i.design_src, 'threads', i.threads,
+          'personalization', i.personalization, 'created_at', i.created_at,
+          'design_tier', i.design_tier, 'design_quote_status', i.design_quote_status,
+          'design_quote_make', i.design_quote_make, 'design_quote_download', i.design_quote_download,
+          -- img / img_ref: see the note above the query.
           'img',     case when i.img like 'data:%' then null else i.img end,
           'img_ref', case when i.img like 'data:%' then '/api/order_items/' || i.id::text || '/img' else null end
         ) order by i.id) filter (where i.id is not null), '[]'::jsonb) as items`;
