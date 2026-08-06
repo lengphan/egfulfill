@@ -138,6 +138,22 @@ export default function OrderDetailPage() {
   // the badge and menu would show stale state after a move.
   const reloadAll = () => { getOrder(String(id)).then((o) => { if (o && !o.error) setOne(o) }).catch(() => {}); reload() }
 
+  /**
+   * Refresh THIS ORDER only — for the variant pickers, which fire on every colour/size click.
+   *
+   * They used to call `reload`, which re-fetches /api/orders: the WHOLE list, every order
+   * with every line, measured at ~1.5MB on a real board. So one click on "Navy" cost a POST,
+   * then a megabyte-and-a-half download, then a re-render of the entire page — and the
+   * Summary's price could not update until all of that had landed, because the quote effect
+   * keys off `order`, which only changes when the list does.
+   *
+   * `one` is what `order` resolves from first, so refreshing it alone moves the quote (and
+   * therefore the Summary) as soon as the single-order fetch returns.
+   */
+  const reloadOne = useCallback(() => {
+    getOrder(String(id)).then((o) => { if (o && !o.error) setOne(o) }).catch(() => {})
+  }, [id])
+
   const reloadDesigns = () => {
     getOrderDesigns(id)
       .then((r) => {
@@ -437,7 +453,7 @@ export default function OrderDetailPage() {
                         {preSubmit ? (
                           // Before submit: pick the blank + variants (marketplace orders
                           // arrive unset). Saving updates the quote in Summary.
-                          <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reload} />
+                          <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reloadOne} />
                         ) : (
                           <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-2" />
                         )}

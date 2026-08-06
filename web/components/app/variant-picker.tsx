@@ -23,15 +23,20 @@ export function VariantPicker({
 
   const product = useMemo(() => resolveProduct(item, catalog), [item, catalog])
   const blankLabel = product?.name || item.blank || ""
-  const colorOpts = colorsOf(product)
-  const sizeOpts = sizesOf(product)
-  const methodOpts = methodsOf(product)
+  // MEMOISED, all four. These were plain calls in the render body, so every keystroke or
+  // parent re-render rebuilt them — and one of these pickers is mounted per LINE, on a
+  // board that can hold hundreds. colorsOf/sizesOf/methodsOf each walk the product, and
+  // blankOptions maps the ENTIRE catalog, so the cost was (lines × catalog) per render.
+  // That is what made the fields feel like they were lagging rather than responding.
+  const colorOpts = useMemo(() => colorsOf(product), [product])
+  const sizeOpts = useMemo(() => sizesOf(product), [product])
+  const methodOpts = useMemo(() => methodsOf(product), [product])
 
   // Keep a blank the catalog no longer lists so an existing line can't silently lose it.
-  const blankOptions = (() => {
+  const blankOptions = useMemo(() => {
     const names = catalog.map((p) => String(p.name ?? "")).filter(Boolean)
     return blankLabel && !names.includes(blankLabel) ? [blankLabel, ...names] : names
-  })()
+  }, [catalog, blankLabel])
 
   const key = item.line_id ? { line_id: item.line_id } : { sku: item.sku }
 
