@@ -155,15 +155,18 @@ export const isStaff = (user) => !!user && ['operator', 'admin', 'warehouse', 'd
 /**
  * Who may act ON another user's account — set a password, deactivate, promote.
  *
- * Deliberately NARROWER than isStaff, which admits operator and designer. Anything that
- * writes users.password_hash is an account takeover in one call, so it has to be gated
- * on this rather than on "is staff": /api/auth/forgot is public and will happily open a
- * pending reset row for an admin, so a resolve route open to every staff role turned the
- * lowest one into admin. Warehouse is included because it shares the day-to-day chores
- * (someone forgot a password), but callers must still refuse an admin TARGET unless the
- * caller is admin — see requireNotAdminTarget in users.js/password-reset.js.
+ * ADMIN ONLY. Deliberately narrower than isStaff (which admits operator and designer) and
+ * now narrower than canMoveMoney too. Anything that writes users.password_hash is an
+ * account takeover in one call: /api/auth/forgot is public and will happily open a pending
+ * reset row for an admin, so any role that can RESOLVE a reset can promote itself by
+ * resolving one it opened.
+ *
+ * Warehouse used to be included for the day-to-day chore of "someone forgot a password".
+ * That convenience is not worth the shape of the hole it leaves, and it is a different
+ * question from moving money — warehouse keeps canMoveMoney and loses this one. The
+ * requireNotAdminTarget guards in users.js/password-reset.js stay as defence in depth.
  */
-export const canManageUsers = (user) => !!user && (user.role === 'admin' || user.role === 'warehouse');
+export const canManageUsers = (user) => !!user && user.role === 'admin';
 
 /**
  * Who may move money — arbitrary ledger writes, transfers, refunds, pricing.

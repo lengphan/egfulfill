@@ -17,7 +17,7 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   // it used to carry requireStaff, which was a second door into password_hash around
   // every check in this file.
   const requireUserManager = async (req, reply) => {
-    if (!canManageUsers(req.user)) { reply.code(403); return reply.send({ error: 'Admin or warehouse only' }); }
+    if (!canManageUsers(req.user)) { reply.code(403); return reply.send({ error: 'Admin only' }); }
   };
   // Cosmetic profile avatar (emoji + colour). Added at route-load, not just in
   // schema.sql, because that file only runs on FIRST db init — an existing

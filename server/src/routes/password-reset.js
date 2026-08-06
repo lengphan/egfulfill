@@ -68,7 +68,7 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
   // as admin. users.js was already written to block exactly this; this file was a second
   // door around it into the same column.
   const requireUserManager = async (req, reply) => {
-    if (!canManageUsers(req.user)) { reply.code(403); return reply.send({ error: 'Admin or warehouse only' }); }
+    if (!canManageUsers(req.user)) { reply.code(403); return reply.send({ error: 'Admin only' }); }
   };
   /** Warehouse shares the chores but must not be able to take an admin account. */
   const adminTargetBlocked = async (req, reply, userId) => {

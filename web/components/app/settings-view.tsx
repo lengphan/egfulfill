@@ -2611,7 +2611,9 @@ export function SettingsView() {
             credentials (admin-only, below). One tab so keys live in one place. */}
         {canUseKeys && <TabsTrigger value="keys">API keys</TabsTrigger>}
         {canPlatform && <TabsTrigger value="platform">Platform</TabsTrigger>}
-        {canPlatform && <TabsTrigger value="users">Users</TabsTrigger>}
+        {/* ADMIN ONLY. Warehouse keeps Platform, Suppliers and Usage — this one writes
+            users.password_hash, which is account takeover in one call. */}
+        {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
         {/* Supplier ordering defaults. Warehouse/admin, matching who may spend — these
             decide how a purchase order pays and ships. */}
         {canPlatform && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
@@ -2665,7 +2667,7 @@ export function SettingsView() {
           </SectionCard>
         </TabsContent>
       )}
-      {canPlatform && (
+      {isAdmin && (
         <TabsContent value="users">
           <UsersPanel />
         </TabsContent>
