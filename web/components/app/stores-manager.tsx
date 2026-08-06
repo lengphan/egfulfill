@@ -51,13 +51,16 @@ const fmtDate = (s: string | null) => {
 // nothing had been submitted for either — a status this array invented and showed a seller as
 // fact. Both are back on the generic fallback until there is something real to report; don't
 // restore a claim about a marketplace's queue that nobody has verified.
-const CHANNELS: { key: string; name: string; blurb: string; live: boolean; soon?: string }[] = [
-  { key: "etsy", name: "Etsy", blurb: "Sync orders & push tracking back", live: true },
-  { key: "tiktok", name: "TikTok Shop", blurb: "Marketplace order sync", live: true },
-  { key: "walmart", name: "Walmart", blurb: "Marketplace order sync", live: false },
-  { key: "amazon", name: "Amazon", blurb: "Seller Central order sync", live: false },
-  { key: "shopify", name: "Shopify", blurb: "Storefront order sync", live: true },
-  { key: "woocommerce", name: "WooCommerce", blurb: "WordPress store sync", live: false },
+// ORDER IS THE MESSAGE: what a seller can connect today comes first, what they can't
+// comes last. Etsy · TikTok · Shopify are live; WooCommerce is next to be built; Amazon and
+// Walmart trail because both are gated on a marketplace approving us, not on our work.
+const CHANNELS: { key: string; name: string; live: boolean; soon?: string }[] = [
+  { key: "etsy", name: "Etsy", live: true },
+  { key: "tiktok", name: "TikTok Shop", live: true },
+  { key: "shopify", name: "Shopify", live: true },
+  { key: "woocommerce", name: "WooCommerce", live: false },
+  { key: "amazon", name: "Amazon", live: false },
+  { key: "walmart", name: "Walmart", live: false },
 ]
 // The two counters above the list read off the same array, so adding a channel can't leave a
 // hard-coded "3 live" behind.
@@ -456,8 +459,7 @@ export function StoresManager() {
               <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Storefront size={22} weight="duotone" />
               </span>
-              <div className="mt-3 font-semibold">{ch.name}</div>
-              <p className="mt-1 flex-1 text-sm text-muted-foreground">{ch.blurb}</p>
+              <div className="mt-3 flex-1 font-semibold">{ch.name}</div>
               {ch.key === "shopify" ? (
                 <div className="mt-4 space-y-2">
                   <Input value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} placeholder="mystore.myshopify.com" className="h-9 text-sm" />
