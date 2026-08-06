@@ -136,11 +136,58 @@ function parseLineProps(line) {
   return { uploadUrl, personalization, extra: vparts.join(', ') || null };
 }
 
+/**
+ * The product photo for a line item — the thing that makes an order row readable at a glance.
+ *
+ * Shopify's orders payload does NOT carry an image anywhere: a line item has product_id and
+ * variant_id and nothing else, so a Shopify order imported without this step shows a
+ * placeholder box where Etsy orders show the item. One extra call per DISTINCT product per
+ * sync, cached, which is the same shape as etsy.js listingImage().
+ *
+ * Prefers the VARIANT's own image when it has one — a buyer who ordered the black shirt
+ * should not be looking at the white one on the production floor — and falls back to the
+ * product's primary image.
+ */
+async function shopifyProductImage(conn, productId, variantId, cache) {
+  if (!productId) return null;
+  const key = String(productId);
+  if (cache.has(key)) {
+    const p = cache.get(key);
+    return p ? pickVariantImage(p, variantId) : null;
+  }
+  try {
+    const r = await fetch(
+      `https://${conn.shop_id}/admin/api/${API_VERSION}/products/${encodeURIComponent(productId)}.json?fields=id,image,images,variants`,
+      { headers: { 'X-Shopify-Access-Token': await freshToken(conn) } }
+    );
+    recordUsage('shopify', { endpoint: 'GET /products/:id', ok: r.ok });
+    const d = r.ok ? await r.json().catch(() => ({})) : {};
+    const prod = (d && d.product) || null;
+    cache.set(key, prod);
+    return prod ? pickVariantImage(prod, variantId) : null;
+  } catch (e) {
+    // A missing photo must never fail an import — the order still has to reach the floor.
+    cache.set(key, null);
+    return null;
+  }
+}
+
+function pickVariantImage(prod, variantId) {
+  const variants = Array.isArray(prod.variants) ? prod.variants : [];
+  const images = Array.isArray(prod.images) ? prod.images : [];
+  const v = variantId ? variants.find((x) => String(x.id) === String(variantId)) : null;
+  if (v && v.image_id) {
+    const hit = images.find((im) => String(im.id) === String(v.image_id));
+    if (hit && hit.src) return hit.src;
+  }
+  return (prod.image && prod.image.src) || (images[0] && images[0].src) || null;
+}
+
 // Upsert one Shopify order into `orders`. Mirrors etsy.js importReceipt: re-syncs and
 // orders/updated webhooks only refresh money + address, NEVER the internal pipeline
 // (status/factory_status) or items — otherwise a seller's in-progress order would reset
 // every time the buyer's shop pinged an update.
-async function importShopifyOrder(conn, order, isFactory) {
+async function importShopifyOrder(conn, order, isFactory, imgCache = new Map()) {
   const id = 'shopify-' + order.id;
   const cancelled = !!order.cancelled_at;
   const shipped = String(order.fulfillment_status || '').toLowerCase() === 'fulfilled';
@@ -179,10 +226,11 @@ async function importShopifyOrder(conn, order, isFactory) {
       const { uploadUrl, personalization, extra } = parseLineProps(line);
       const variant = [line.variant_title, extra].filter((s) => s && s !== 'Default Title').join(', ') || null;
       const method = /embroider|embroidered|embroidery|monogram/i.test(`${line.title || ''} ${variant || ''}`) ? 'EMB' : null;
+      const img = await shopifyProductImage(conn, line.product_id, line.variant_id, imgCache);
       await q(
-        `insert into order_items (order_id, sku, name, qty, variant, unit_price, design_src, personalization, print_type, line_id)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [id, line.sku || null, line.title || null, line.quantity || 1, variant, num(line.price), uploadUrl, personalization, method, genLineId()]
+        `insert into order_items (order_id, sku, name, qty, variant, unit_price, design_src, personalization, print_type, line_id, img)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [id, line.sku || null, line.title || null, line.quantity || 1, variant, num(line.price), uploadUrl, personalization, method, genLineId(), img]
       );
     }
   }
@@ -213,12 +261,13 @@ async function syncShopifyConnection(conn) {
     const sinceSec = windowStartSec(conn.backfill_days, connectedSec);
     if (sinceSec) url += `&created_at_min=${encodeURIComponent(new Date(sinceSec * 1000).toISOString())}`;
   }
+  const imgCache = new Map();   // one product lookup per distinct product per sync
   const r = await fetch(url, { headers: { 'X-Shopify-Access-Token': await freshToken(conn) } });
   recordUsage('shopify', { endpoint: 'GET /orders', ok: r.ok });
   if (!r.ok) throw new Error(`Shopify orders fetch failed (${r.status})`);
   const data = await r.json().catch(() => ({}));
   for (const order of (data.orders || [])) {
-    const res = await importShopifyOrder(conn, order, isFactory);
+    const res = await importShopifyOrder(conn, order, isFactory, imgCache);
     if (res === 'cancelled') cancelled++; else imported++;
   }
   await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]).catch(() => {});
