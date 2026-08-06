@@ -40,18 +40,22 @@ const fmtDate = (s: string | null) => {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-// Channels shown even when unconnected. Etsy + TikTok are granted/live and lead; Walmart and
-// Amazon sit next because their developer applications are in flight; Shopify and WooCommerce
-// follow. (Etsy + Shopify also import orders; TikTok is connect-only so far.)
+// Channels shown even when unconnected. (Etsy + Shopify also import orders; TikTok is
+// connect-only so far.)
 //
-// `live` means the connect button actually works end to end. Walmart and Amazon have no server
-// route yet — `soon` says WHY they can't be connected rather than implying a broken button,
-// because "Coming soon" and "we're waiting on the marketplace" are different facts to a seller.
+// `live` means the connect button actually works end to end. `soon` overrides the generic
+// "Coming soon" with a REASON, which is worth doing — "we're waiting on the marketplace" and
+// "we haven't built it" are different facts to a seller.
+//
+// But only when the reason is TRUE. Walmart and Amazon read "Awaiting app approval" while
+// nothing had been submitted for either — a status this array invented and showed a seller as
+// fact. Both are back on the generic fallback until there is something real to report; don't
+// restore a claim about a marketplace's queue that nobody has verified.
 const CHANNELS: { key: string; name: string; blurb: string; live: boolean; soon?: string }[] = [
   { key: "etsy", name: "Etsy", blurb: "Sync orders & push tracking back", live: true },
   { key: "tiktok", name: "TikTok Shop", blurb: "Marketplace order sync", live: true },
-  { key: "walmart", name: "Walmart", blurb: "Marketplace order sync", live: false, soon: "Awaiting app approval" },
-  { key: "amazon", name: "Amazon", blurb: "Seller Central order sync", live: false, soon: "Awaiting app approval" },
+  { key: "walmart", name: "Walmart", blurb: "Marketplace order sync", live: false },
+  { key: "amazon", name: "Amazon", blurb: "Seller Central order sync", live: false },
   { key: "shopify", name: "Shopify", blurb: "Storefront order sync", live: true },
   { key: "woocommerce", name: "WooCommerce", blurb: "WordPress store sync", live: false },
 ]
