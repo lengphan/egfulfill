@@ -22,24 +22,39 @@ export default function OAuthCallbackPage() {
   useEffect(() => {
     // finish/fail either close the popup (posting the result to the opener) or, when this
     // isn't a popup, fall back to the full-page redirect the flow used before.
-    const finish = (shop: string) => {
+    /**
+     * Tell the opener, then close.
+     *
+     * postMessage ALONE is not enough. This window navigates through the provider's domain
+     * on the way here, and a provider that sends Cross-Origin-Opener-Policy severs
+     * `window.opener` — so the popup lands back on our origin with no opener, takes the
+     * redirect fallback, and sits there as a second window showing Stores. That's the
+     * "why doesn't it close" everyone sees. BroadcastChannel reaches the opener regardless,
+     * because it's keyed on origin rather than on the window relationship.
+     */
+    const tell = (msg: { ok: boolean; shop?: string; message?: string; note?: string }) => {
+      const payload = { source: "eg-oauth", ...msg }
+      if (window.opener && window.opener !== window) {
+        try { window.opener.postMessage(payload, window.location.origin) } catch { /* ignore */ }
+      }
+      try { const ch = new BroadcastChannel("eg-oauth"); ch.postMessage(payload); ch.close() } catch { /* ignore */ }
+    }
+    const finish = (shop: string, note?: string) => {
       // Only a completed connection clears the connect-time scratch (provider marker +
       // backfill choice). Clearing it on read is what broke re-runs of this callback.
       clearOAuthProvider()
       try { localStorage.removeItem(BACKFILL_KEY) } catch { /* ignore */ }
       setState({ kind: "ok", shop })
-      if (window.opener && window.opener !== window) {
-        try { window.opener.postMessage({ source: "eg-oauth", ok: true, shop }, window.location.origin) } catch { /* ignore */ }
-        setTimeout(() => { try { window.close() } catch { /* ignore */ } }, 900)
-      } else {
-        setTimeout(() => { window.location.href = "/stores?connected=1" }, 1200)
-      }
+      tell({ ok: true, shop, note })
+      // Try to close whether or not we still have an opener — this window was script-opened,
+      // so close() is permitted even once the opener link is gone. Only if it's still here a
+      // moment later did it turn out not to be a popup at all; then take the old redirect.
+      setTimeout(() => { try { window.close() } catch { /* ignore */ } }, 700)
+      setTimeout(() => { if (!window.closed) window.location.href = "/stores?connected=1" }, 1600)
     }
     const fail = (message: string) => {
       setState({ kind: "error", message })
-      if (window.opener && window.opener !== window) {
-        try { window.opener.postMessage({ source: "eg-oauth", ok: false, message }, window.location.origin) } catch { /* ignore */ }
-      }
+      tell({ ok: false, message })
     }
     // The "how far back to import" scope the user picked in the pre-connect modal on Stores.
     // It's stashed in localStorage (same-origin, so this popup shares it with the opener) and
@@ -94,7 +109,19 @@ export default function OAuthCallbackPage() {
           const data = await exchangeShopify({ shop: shopParam.toLowerCase(), code, params: allParams, backfill_days })
           if (data.error) throw new Error(data.error)
           clearShopifyOAuth()
-          finish(data.shop_name || "your Shopify store")
+          // The connection succeeded; the FIRST IMPORT is a separate outcome and is reported
+          // separately. Saying "your orders will start syncing" over a backfill that already
+          // failed is how a broken connection passes for a working one.
+          const bf = data.backfill
+          const n = bf && Array.isArray(bf.synced) ? bf.synced.length : bf?.count
+          const note = bf?.error
+            ? `Connected, but the first order import failed: ${bf.error}`
+            : n === 0
+              ? "Connected. No orders found in the window you chose — nothing to import yet."
+              : n
+                ? `Connected. Imported ${n} order${n === 1 ? "" : "s"}.`
+                : undefined
+          finish(data.shop_name || "your Shopify store", note)
         } catch (e: unknown) {
           clearShopifyOAuth()
           fail(e instanceof Error ? e.message : "Connection failed.")

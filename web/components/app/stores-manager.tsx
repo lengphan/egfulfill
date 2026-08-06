@@ -117,16 +117,38 @@ export function StoresManager() {
   }, [])
 
   useEffect(() => {
-    const onMsg = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return
-      const d = e.data as { source?: string; ok?: boolean; shop?: string; message?: string } | null
+    type OAuthResult = { source?: string; ok?: boolean; shop?: string; message?: string; note?: string }
+    const handle = (d: OAuthResult | null) => {
       if (!d || d.source !== "eg-oauth") return
       setBusy(null)
-      if (d.ok) { setNotice({ tone: "ok", msg: `Connected ${d.shop || "your shop"}.` }); load() }
-      else setNotice({ tone: "err", msg: d.message || "Couldn't connect." })
+      if (!d.ok) { setNotice({ tone: "err", msg: d.message || "Couldn't connect." }); return }
+      // `note` is the FIRST IMPORT's outcome, which is not the same event as connecting.
+      // A backfill that failed reports as an error even though the shop is connected —
+      // "your orders will start syncing" over a sync that already failed is exactly how a
+      // store sat connected and empty with nothing on screen admitting it.
+      const failed = !!d.note && d.note.includes("import failed")
+      setNotice({
+        tone: failed ? "err" : "ok",
+        msg: d.note || `Connected ${d.shop || "your shop"}.`,
+      })
+      load()
+    }
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return
+      handle(e.data as OAuthResult)
     }
     window.addEventListener("message", onMsg)
-    return () => window.removeEventListener("message", onMsg)
+    // Same-origin fallback for when the provider's COOP severed window.opener, which is why
+    // the popup used to strand itself on /stores instead of closing.
+    let ch: BroadcastChannel | null = null
+    try {
+      ch = new BroadcastChannel("eg-oauth")
+      ch.onmessage = (e) => handle(e.data as OAuthResult)
+    } catch { /* not supported — postMessage still covers the normal path */ }
+    return () => {
+      window.removeEventListener("message", onMsg)
+      try { ch?.close() } catch { /* ignore */ }
+    }
   }, [load])
 
   const onConnect = async () => {

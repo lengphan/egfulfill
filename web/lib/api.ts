@@ -2407,8 +2407,23 @@ export function getShopifyConfig() {
 export function getShopifyConnections() {
   return api<EtsyConnection[]>(`/api/shopify/connections`)
 }
+/**
+ * The connect. The response carries MORE than the shop name and the caller needs it.
+ *
+ * The exchange registers webhooks and runs the first backfill inline, and both are
+ * best-effort — a failure there doesn't fail the connection. This type used to declare only
+ * `{shop_name, error}`, so `backfill.error` was dropped on the floor and Stores announced
+ * "your orders will start syncing" over a sync that had already failed. A store that connects
+ * and imports nothing is the failure people actually hit; it must not be reported as success.
+ */
 export function exchangeShopify(body: { shop: string; code: string; params: Record<string, string>; backfill_days?: number }) {
-  return api<{ shop_name?: string; error?: string }>(`/api/shopify/exchange`, { method: "POST", body: JSON.stringify(body) })
+  return api<{
+    shop_name?: string
+    error?: string
+    scopes?: string
+    webhooks?: { topic: string; ok: boolean; error?: string }[]
+    backfill?: { error?: string; synced?: unknown[]; count?: number } | null
+  }>(`/api/shopify/exchange`, { method: "POST", body: JSON.stringify(body) })
 }
 export function disconnectShopify(shopId: string) {
   return api<{ ok: boolean }>(`/api/shopify/connections/${encodeURIComponent(shopId)}`, { method: "DELETE" })
