@@ -461,7 +461,18 @@ export function StoresManager() {
               {ch.key === "shopify" ? (
                 <div className="mt-4 space-y-2">
                   <Input value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} placeholder="mystore.myshopify.com" className="h-9 text-sm" />
-                  <Button size="sm" className="w-full" onClick={() => setPending("shopify")} disabled={busy === "connect-shopify" || !shopDomain.trim()}>
+                  {/* NOT disabled on an empty domain. A greyed Connect is how this channel
+                      reads as unavailable — indistinguishable from Walmart's "Coming soon"
+                      to a seller who hasn't worked out that the box above it is a
+                      precondition. It stays lit and says what's missing when clicked. */}
+                  <Button size="sm" className="w-full" disabled={busy === "connect-shopify"}
+                    onClick={() => {
+                      if (!shopDomain.trim()) {
+                        setNotice({ tone: "err", msg: "Enter your store above as mystore.myshopify.com, then Connect." })
+                        return
+                      }
+                      setPending("shopify")
+                    }}>
                     <Plus size={14} weight="bold" /> {busy === "connect-shopify" ? "Connecting…" : "Connect"}
                   </Button>
                 </div>
