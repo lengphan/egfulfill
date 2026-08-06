@@ -949,9 +949,29 @@ export function ordersRoutes(app, requireAuth) {
     // the existing img per SKU and re-inherit it when an incoming item doesn't carry
     // one — otherwise an edit (e.g. picking a blank, changing qty) wipes the stored
     // picture. That wipe is the root of "the image disappears every time I edit".
-    const prev = await q('select sku, img from order_items where order_id=$1', [orderId]);
+    const prev = await q('select sku, line_id, img, unit_cost, ship_fee from order_items where order_id=$1', [orderId]);
     const imgBySku = {};
     for (const r of prev.rows) { if (r.sku != null && r.img && !(r.sku in imgBySku)) imgBySku[r.sku] = r.img; }
+    // The FROZEN price (freezeQuote stamps unit_cost/ship_fee at the moment of charge) has
+    // to survive this delete-and-reinsert too, and for a harder reason than the image.
+    //
+    // Money is settled from these columns after the fact: productionSplit (order_refunds.js)
+    // divides a production charge into product vs shipping from the stored unit_cost rather
+    // than a fresh quote. Losing them doesn't just blank a field — it scores the product part
+    // at $0 and hands the whole charge to shipping, so a per-part refund on an order a staff
+    // member had edited would pay back the wrong amounts.
+    //
+    // Keyed LINE first, then sku — same rule as everything else addressing a line, and the
+    // reason matters here: two lines of the same SKU can hold different frozen costs (a size
+    // upgrade on one of them), and keying on sku alone would copy one line's price onto its
+    // sibling. Prefixes keep the two id namespaces apart, matching the design-upsert key.
+    const costByKey = {};
+    for (const r of prev.rows) {
+      if (r.unit_cost == null && r.ship_fee == null) continue;
+      const val = { unit_cost: r.unit_cost, ship_fee: r.ship_fee };
+      if (r.line_id) costByKey['L:' + r.line_id] = val;
+      if (r.sku != null && !('S:' + r.sku in costByKey)) costByKey['S:' + r.sku] = val;
+    }
     await q('delete from order_items where order_id=$1', [orderId]);
     // Auto-resolve a missing blank from the SKU (imports often carry a SKU but no Blank
     // column) so lines come in production-ready instead of "not set up". Built once per save;
@@ -969,12 +989,16 @@ export function ordersRoutes(app, requireAuth) {
       // line_id here when the client didn't send one and there's no sku to key on. The client
       // reads it back and echoes it on later edits, so it stays stable.
       const lineId = it.lineId || (it.sku ? null : `FFL-${Date.now().toString(36)}${(li++).toString(36)}${Math.random().toString(36).slice(2, 6)}`);
+      // Re-inherit the frozen price for this line. Never taken from the request body: the
+      // client has no business naming what an order already cost, and the only legitimate
+      // writer of these columns is freezeQuote at charge time.
+      const frozen = (lineId && costByKey['L:' + lineId]) || (it.sku != null && costByKey['S:' + it.sku]) || null;
       await q(
-        `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant, unit_price, design_src, img, blank, design_pos, line_id)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant, unit_price, design_src, img, blank, design_pos, line_id, unit_cost, ship_fee)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
         [orderId, it.sku || null, it.name || null, it.printType || it.tech || null, it.qty || 1,
          it.color || null, it.size || null, it.variant || null, it.unitPrice || 0, it.designSrc || null,
-         img, blank, designPos, lineId]
+         img, blank, designPos, lineId, frozen ? frozen.unit_cost : null, frozen ? frozen.ship_fee : null]
       );
     }
   }
@@ -1270,8 +1294,18 @@ export function ordersRoutes(app, requireAuth) {
     // Editable only before production. A charged order's variants are settled — changing
     // them would desync order_items.unit_cost/ship_fee (frozen at submit). Cheapest guard:
     // block once anything on the order has been charged.
+    // NB the lock is PERMANENT, and the message has to say so. chargedAmount reads the
+    // charge leg of an append-only ledger, and a refund writes a different type entirely
+    // ('order-refund'), so cancelling never brings this back below zero. Nor should it:
+    // a cancelled order can't be resubmitted either (the submit guard refuses any
+    // factory_status outside ''/new/draft), so there is no second charge for edited
+    // variants to be priced into. The old wording promised "cancel it first to change
+    // variants", which reads as a way out and is one the code has never had.
     const charged = await chargedAmount(req.params.id);
-    if (charged > 0) { reply.code(409); return { error: 'This order is already submitted — its items are locked. Cancel it first to change variants.' }; }
+    if (charged > 0) {
+      reply.code(409);
+      return { error: 'This order has been submitted and paid for, so its variants are locked — changing them now would stop matching the price charged. Ask the factory to amend the line, or cancel this order for a refund and place a new one.' };
+    }
     // Only the fields the picker owns; undefined = leave as-is.
     const sets = [], vals = []; let n = 1;
     for (const [key, col] of [['blank', 'blank'], ['color', 'color'], ['size', 'size'], ['printType', 'print_type'], ['variant', 'variant']]) {
