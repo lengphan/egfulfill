@@ -48,7 +48,14 @@ services:
       # Register the redirect URL as https://egful.store/oauth-callback.html
       SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:-}
       SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:-}
-      SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:-read_orders,write_orders,read_products}
+      # EMPTY default on purpose — the scope list lives in shopify.js and nowhere else.
+      # This line used to carry its own literal default, so when the fulfillment-order
+      # scopes were added to the code, compose kept injecting the older three and the `||`
+      # fallback never ran. A store connected in that window authorises three scopes, imports
+      # orders perfectly, and then 403s the moment it tries to push tracking back — and the
+      # only fix is disconnect and reconnect, because scopes are granted at authorize time.
+      # An override in .env still wins; the default must not live in two places.
+      SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:-}
       # S&S Activewear (blanks supplier) — HTTP Basic: account number = user, API key = pass.
       SS_ACCOUNT_NUMBER: ${SS_ACCOUNT_NUMBER:-}
       SS_API_KEY: ${SS_API_KEY:-}
