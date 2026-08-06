@@ -1141,14 +1141,68 @@ export function ordersRoutes(app, requireAuth) {
       if (!isStaff(req.user)) { where += ` and seller_id=$${n + 1}`; vals.push(sel.id); }
       await q(`update orders set ${sets.join(',')} where ${where}`, vals);
     }
+    // Replacing the lines REWRITES RECORDED HISTORY, so it has to leave a trail that says
+    // what it rewrote. This used to audit `{items: 'replaced'}` against a null `before` —
+    // the verb with none of the fact. Nobody reading the log afterwards could tell whether
+    // a size had been corrected or the whole order swapped out, which is the same as not
+    // logging it. Snapshot both sides and store the difference.
+    //
+    // Deliberately narrow: the identifying + PRICED fields only, never img/design_src.
+    // Those are base64 payloads that would bloat every audit row, and they aren't what
+    // anyone is trying to reconstruct when they ask what changed.
+    const lineSnap = (rows) => rows.map((r) => ({
+      line_id: r.line_id, sku: r.sku, name: r.name, qty: r.qty, color: r.color, size: r.size,
+      variant: r.variant, print_type: r.print_type, blank: r.blank,
+      unit_price: r.unit_price, unit_cost: r.unit_cost, ship_fee: r.ship_fee,
+    }));
+    const ITEM_COLS = 'line_id, sku, name, qty, color, size, variant, print_type, blank, unit_price, unit_cost, ship_fee';
+    let itemsBefore = null;
+    if (wantsItems) {
+      itemsBefore = await q(`select ${ITEM_COLS} from order_items where order_id=$1 order by id`, [req.params.id])
+        .then((r) => lineSnap(r.rows)).catch(() => null);
+    }
     if (wantsItems) await replaceItems(req.params.id, body.items);
+    let itemsAfter = null;
+    if (wantsItems) {
+      itemsAfter = await q(`select ${ITEM_COLS} from order_items where order_id=$1 order by id`, [req.params.id])
+        .then((r) => lineSnap(r.rows)).catch(() => null);
+    }
     // Record only the changed scalar fields (not the heavy items array).
     const after = {}; for (const k in body) if (map[k]) after[k] = body[k];
     if (Object.keys(after).length || wantsItems) {
-      audit(req, 'order.updated', { entityType: 'order', entityId: req.params.id, before, after: Object.keys(after).length ? after : { items: 'replaced' } });
+      const beforeEntry = wantsItems ? { ...(before || {}), items: itemsBefore } : before;
+      const afterEntry = wantsItems ? { ...after, items: itemsAfter } : after;
+      audit(req, 'order.updated', { entityType: 'order', entityId: req.params.id, before: beforeEntry, after: afterEntry });
     }
     if (_charged) audit(req, 'order.charged', { entityType: 'order', entityId: req.params.id, after: { amount: _charged } });
     if (_refunded) audit(req, 'order.refunded', { entityType: 'order', entityId: req.params.id, after: { amount: _refunded } });
+    // ── Somebody else changed the lines on an order you have already paid for ──────
+    // Tell the seller. A settled order is a record they're entitled to consider fixed, so
+    // a staff edit to it can't be something they only discover by re-reading the page.
+    //
+    // Gated on the CHARGE, not on staff-ness, and that's the whole judgement: before the
+    // money moves, staff edits are ordinary setup work (picking a blank for a marketplace
+    // line that arrived with no variants) and notifying on each one would be noise nobody
+    // reads. After it, the same edit alters a record with a price attached to it.
+    //
+    // Best-effort and last: a notification failing must never fail an edit that has
+    // already been written.
+    if (wantsItems && isStaff(req.user)) {
+      (async () => {
+        const row = (await q('select seller_id, seq from orders where id=$1', [req.params.id])).rows[0];
+        if (!row || !row.seller_id) return;
+        if (await chargedAmount(req.params.id) <= 0) return;
+        const num = row.seq ? `#${row.seq}` : req.params.id;
+        notify({
+          userIds: [String(row.seller_id)],
+          type: 'order-edited',
+          title: `Order ${num} was changed`,
+          body: 'The factory updated the items on this order after it was submitted. Open it to see what changed.',
+          href: `/orders/${encodeURIComponent(req.params.id)}`,
+          entityId: req.params.id,
+        });
+      })().catch(() => {});
+    }
     egBroadcast({ type: 'orders' });
     if (_charged || _refunded) egBroadcast({ type: 'wallet' });
     // Tracking arriving IS the shipment as far as a partner is concerned — a label
