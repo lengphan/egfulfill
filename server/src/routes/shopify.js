@@ -23,6 +23,75 @@ const API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-07';
 const SHOP_RE = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/i;
 function validShop(s) { return typeof s === 'string' && SHOP_RE.test(s); }
 
+/**
+ * EXPIRING OFFLINE TOKENS — not optional any more.
+ *
+ * Shopify stopped accepting non-expiring offline tokens for apps created from 2026-04-01,
+ * and every public app follows on 2027-01-01. This integration stored `refresh_token: null,
+ * token_expires_at: null` and every Admin API call began failing with "Non-expiring access
+ * tokens are no longer accepted" — a whole-integration outage that looks, from the UI, like
+ * a store that connects fine and imports nothing.
+ *
+ * The opt-in is `expiring: true` on the code exchange. What comes back is a PAIR: an access
+ * token good for ~60 minutes and a refresh token good for 90 days. Both rotate — a refresh
+ * returns a NEW refresh token and immediately invalidates the one used, and Shopify keeps
+ * only one live refreshable token per app per store. So the new pair must be persisted
+ * before it's used; dropping it strands the store until the seller reconnects by hand.
+ */
+const TOKEN_SKEW_MS = 5 * 60 * 1000;   // refresh this far before expiry, not at it
+
+/** Persist a token response against a connection. Returns the access token. */
+async function storeTokens(shopId, t) {
+  // expires_in is seconds and only present on expiring tokens. Absent → legacy non-expiring
+  // token; store null so freshToken() can tell "no expiry known" from "expires at T".
+  const expiresAt = Number.isFinite(Number(t.expires_in))
+    ? new Date(Date.now() + Number(t.expires_in) * 1000)
+    : null;
+  await q(
+    `update platform_connections
+        set access_token=$2, refresh_token=coalesce($3, refresh_token),
+            token_expires_at=$4, updated_at=now()
+      where platform='shopify' and shop_id=$1`,
+    [shopId, t.access_token, t.refresh_token || null, expiresAt]
+  ).catch(() => {});
+  return t.access_token;
+}
+
+/**
+ * The access token to use RIGHT NOW, refreshing first if it's about to lapse.
+ *
+ * Every Admin API call goes through this. A connection with no refresh token is a legacy
+ * one: nothing can be done for it here, so its existing token is returned and Shopify's own
+ * error is allowed to surface — which is the honest outcome, because the fix is a reconnect
+ * and no amount of retrying here produces one.
+ */
+async function freshToken(conn) {
+  const exp = conn.token_expires_at ? new Date(conn.token_expires_at).getTime() : 0;
+  const stale = exp > 0 && exp - Date.now() < TOKEN_SKEW_MS;
+  if (!stale || !conn.refresh_token) return conn.access_token;
+
+  const r = await fetch(`https://${conn.shop_id}/admin/oauth/access_token`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: API_KEY, client_secret: API_SECRET,
+      grant_type: 'refresh_token', refresh_token: conn.refresh_token,
+    }),
+  });
+  const t = await r.json().catch(() => ({}));
+  if (!r.ok || !t.access_token) {
+    // Say which failure this is. A lapsed 90-day refresh token needs the seller to
+    // reconnect; anything else is worth reading literally.
+    throw new Error(
+      `Shopify token refresh failed (${r.status}). ${t.error_description || t.error || ''} `
+      + `Reconnect ${conn.shop_id} from Stores to re-authorise.`
+    );
+  }
+  const token = await storeTokens(conn.shop_id, t);
+  conn.access_token = token;                       // callers reuse the row in-process
+  if (t.refresh_token) conn.refresh_token = t.refresh_token;
+  return token;
+}
+
 // Verify Shopify's HMAC over the callback params — proves the request is genuinely from
 // Shopify signed with OUR app secret (drop hmac/signature, sort, join k=v with &).
 function verifyHmac(params) {
@@ -144,7 +213,7 @@ async function syncShopifyConnection(conn) {
     const sinceSec = windowStartSec(conn.backfill_days, connectedSec);
     if (sinceSec) url += `&created_at_min=${encodeURIComponent(new Date(sinceSec * 1000).toISOString())}`;
   }
-  const r = await fetch(url, { headers: { 'X-Shopify-Access-Token': conn.access_token } });
+  const r = await fetch(url, { headers: { 'X-Shopify-Access-Token': await freshToken(conn) } });
   recordUsage('shopify', { endpoint: 'GET /orders', ok: r.ok });
   if (!r.ok) throw new Error(`Shopify orders fetch failed (${r.status})`);
   const data = await r.json().catch(() => ({}));
@@ -208,7 +277,7 @@ export async function shopifyPushTracking(order, tracking, carrier) {
     || null;
   if (!conn) throw new Error("Couldn't tell which connected Shopify store this order belongs to");
   const base = `https://${conn.shop_id}/admin/api/${API_VERSION}`;
-  const headers = { 'X-Shopify-Access-Token': conn.access_token, 'Content-Type': 'application/json' };
+  const headers = { 'X-Shopify-Access-Token': await freshToken(conn), 'Content-Type': 'application/json' };
   const foRes = await fetch(`${base}/orders/${encodeURIComponent(orderNumId)}/fulfillment_orders.json`, { headers });
   const foData = await foRes.json().catch(() => ({}));
   if (!foRes.ok) throw new Error(`Shopify fulfillment_orders ${foRes.status}`);
@@ -291,7 +360,9 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
     try {
       const tr = await fetch(`https://${shop}/admin/oauth/access_token`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: API_KEY, client_secret: API_SECRET, code })
+        // `expiring: true` is the OPT-IN. Without it Shopify issues a non-expiring token
+        // that it then refuses to accept on every subsequent Admin API call.
+        body: JSON.stringify({ client_id: API_KEY, client_secret: API_SECRET, code, expiring: true })
       });
       const t = await tr.json().catch(() => ({}));
       if (!tr.ok || !t.access_token) throw new Error(t.error_description || t.error || ('Shopify token error ' + tr.status));
@@ -305,15 +376,20 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
       // Offline token → no expiry; refresh_token stays null.
       await q(
         `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by, backfill_days)
-         values ('shopify',$1,$2,$3,null,null,$4,$5,$6)
+         values ('shopify',$1,$2,$3,$4,$5,$6,$7,$8)
          on conflict (platform, shop_id) do update set
            shop_name=excluded.shop_name, access_token=excluded.access_token,
+           -- The PAIR rotates together. Keeping a stale refresh token beside a new access
+           -- token is how a reconnect appears to work and then dies an hour later.
+           refresh_token=excluded.refresh_token, token_expires_at=excluded.token_expires_at,
            scopes=excluded.scopes, connected_by=excluded.connected_by,
            -- Ratchets: widen only, never narrow (see backfill.js). GREATEST ignores nulls,
            -- so a reconnect with no choice keeps whatever the seller originally picked.
            backfill_days=greatest(platform_connections.backfill_days, excluded.backfill_days),
            updated_at=now()`,
-        [shop, shopName, t.access_token, t.scope || SCOPES, req.user.sub, bd]
+        [shop, shopName, t.access_token, t.refresh_token || null,
+         Number.isFinite(Number(t.expires_in)) ? new Date(Date.now() + Number(t.expires_in) * 1000) : null,
+         t.scope || SCOPES, req.user.sub, bd]
       );
       // Register order webhooks now, so real-time sync works without manual setup.
       // Best-effort: a failure here doesn't block the connection (the backfill sync
@@ -349,7 +425,15 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
       try { synced.push(await syncShopifyConnection(conn)); }
       catch (e) { synced.push({ shop: conn.shop_id, error: e.message }); }
     }
-    return { ok: true, synced };
+    // `ok` used to be the literal true regardless of what happened, so a sync where EVERY
+    // shop failed returned 200 {ok:true} and the button reported success over an error it
+    // was already holding. It now means what it says.
+    const failed = synced.filter((s) => s.error);
+    return {
+      ok: failed.length < synced.length,
+      synced,
+      error: failed.length === synced.length && failed.length ? failed[0].error : undefined,
+    };
   });
 
   // ── Webhook receiver. ONE public endpoint for every Shopify topic (order events +
@@ -429,7 +513,7 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
     try {
       const conn = (await q(`select * from platform_connections where platform='shopify' order by created_at limit 1`)).rows[0];
       if (!conn) { reply.code(400); return { error: 'No Shopify store connected' }; }
-      const sr = await fetch(`https://${conn.shop_id}/admin/api/${API_VERSION}/shop.json`, { headers: { 'X-Shopify-Access-Token': conn.access_token } });
+      const sr = await fetch(`https://${conn.shop_id}/admin/api/${API_VERSION}/shop.json`, { headers: { 'X-Shopify-Access-Token': await freshToken(conn) } });
       const sd = await sr.json().catch(() => ({}));
       return { shop_id: conn.shop_id, shop_name: conn.shop_name, scopes: conn.scopes, api_ok: sr.ok, http: sr.status, store_name: sd && sd.shop && sd.shop.name };
     } catch (e) { reply.code(400); return { error: e.message }; }
