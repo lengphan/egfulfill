@@ -33,7 +33,9 @@ function Shell({ children, note }: { children: React.ReactNode; note?: string })
       title="Volume discount"
       description={note ?? "Ship more in a month, pay less the next."}
     >
-      <div className="px-5 pb-5">{children}</div>
+      {/* pt-5, not pt-0: the first element is a pill, and it was landing directly on
+          the header rule with nothing between them. */}
+      <div className="px-5 pb-5 pt-5">{children}</div>
     </SectionCard>
   )
 }
@@ -64,37 +66,59 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
         </div>
       )}
 
-      {/* THE RAIL — the ladder and your place on it, in one object. */}
-      <div className="pt-1">
-        <div className="relative h-1.5 rounded-full bg-muted">
+      {/* THE RAIL — the ladder and your place on it.
+          The current position is marked explicitly rather than left to be inferred from
+          where the fill stops. At zero units the fill has no width at all, so there was
+          nothing on screen saying "you are here" — the one thing the rail exists to show. */}
+      <div className="relative pt-7">
+        <div
+          className="absolute top-0 whitespace-nowrap text-xs font-semibold text-primary"
+          style={{ left: `${pos}%`, transform: pos < 8 ? "translateX(0)" : pos > 92 ? "translateX(-100%)" : "translateX(-50%)" }}
+        >
+          {units.toLocaleString()} {units === 1 ? "unit" : "units"}
+        </div>
+
+        <div className="relative h-2 rounded-full bg-muted">
           <div className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pos}%` }} />
           {tiers.map((t) => {
             const reached = units >= t.minUnits
             return (
               <span
                 key={t.minUnits}
-                className={"absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card " + (reached ? "bg-primary" : "bg-border")}
+                className={"absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card " + (reached ? "bg-primary" : "bg-border")}
                 style={{ left: `${Math.min(100, (t.minUnits / top) * 100)}%` }}
               />
             )
           })}
+          {/* The marker for NOW — a bar rather than another dot, so it cannot be mistaken for
+              a rung. Hidden at 0 where it would collide with the rail's own end cap. */}
+          {pos > 0 && (
+            <span
+              className="absolute top-1/2 h-5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground ring-2 ring-card"
+              style={{ left: `${pos}%` }}
+            />
+          )}
         </div>
-        {/* Each label is anchored to ITS OWN marker. A justify-between row was tried first
-            and was quietly wrong: it pinned the first label to the far left while its dot sat
-            at 13% of the rail, so the ladder read as though the first rung were at zero.
-            Centring is clamped at both ends — translate -50% would push the first label off
-            the left edge and the last (always at 100%) off the right. */}
-        <div className="relative mt-2 h-4 text-2xs tabular-nums">
+
+        {/* Percentage first and larger — it is the thing being earned; the threshold is the
+            condition. The arrow between them was doing no work and read as clutter. */}
+        <div className="relative mt-2.5 h-9">
           {tiers.map((t, i) => {
             const left = Math.min(100, (t.minUnits / top) * 100)
             const shift = i === 0 && left < 12 ? "0" : i === tiers.length - 1 ? "-100%" : "-50%"
+            const reached = units >= t.minUnits
             return (
               <span
                 key={t.minUnits}
-                className={"absolute whitespace-nowrap " + (units >= t.minUnits ? "font-semibold text-primary" : "text-muted-foreground")}
+                className="absolute whitespace-nowrap leading-tight"
                 style={{ left: `${left}%`, transform: `translateX(${shift})` }}
               >
-                {t.minUnits.toLocaleString()} → {t.pct}%
+                <span className={"block text-sm font-semibold tabular-nums " + (reached ? "text-primary" : "text-muted-foreground")}>
+                  {t.pct}%
+                </span>
+                <span className="block text-xs tabular-nums text-muted-foreground">
+                  {t.minUnits.toLocaleString()} units
+                </span>
               </span>
             )
           })}
