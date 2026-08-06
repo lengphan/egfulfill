@@ -78,7 +78,12 @@ export function VariantField({
         "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border",
         compact ? "h-7 px-2 text-2xs" : "h-9 px-2.5 text-xs",
         // Only the required-but-empty field draws attention; the rest stay quiet.
-        required && unset ? "border-amber-400/70" : "border-border",
+        // --primary, NOT amber. Amber is a RESERVED floor status (warning / on hold), and
+        // borrowing it for form validation put "this field is blank" in the same colour as
+        // "this order is held" — on the order boards those sit inches apart. The app's own
+        // accent is the right way to say "look here", and it measures 6.03:1 on white
+        // against amber-600's 3.13:1, which was below AA for the label below anyway.
+        required && unset ? "border-primary/60" : "border-border",
         className
       )}
     >
@@ -115,7 +120,7 @@ export function VariantField({
     <div className="flex min-w-0 flex-col gap-1">
       <span className="flex items-center gap-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
         {tl("field", label)}
-        {required && !value && <span className="font-medium normal-case tracking-normal text-amber-600">{tl("field", "Required")}</span>}
+        {required && !value && <span className="font-medium normal-case tracking-normal text-primary">{tl("field", "Required")}</span>}
       </span>
       {control}
     </div>

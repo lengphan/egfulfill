@@ -698,7 +698,13 @@ export default function OrderDetailPage() {
                   )}
                   <div className="flex justify-between border-t border-border pt-2 font-semibold">
                     <dt>You paid</dt>
-                    <dd className="tabular-nums">{usd(netCost ?? 0)}</dd>
+                    {/* "$0.00" would claim this order was produced free. Nothing has been
+                        charged because it hasn't been submitted — a different fact, and the
+                        one the seller needs before they read a profit figure below. */}
+                    <dd className="tabular-nums">
+                      {netCost != null ? usd(netCost)
+                        : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
+                    </dd>
                   </div>
 
                   {/* The buyer's side, kept visually apart from ours. Two different pots of
