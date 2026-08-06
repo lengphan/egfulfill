@@ -440,6 +440,20 @@ export function ordersRoutes(app, requireAuth) {
   // Free-form editable order info (notes, priority, gift message, …) kept on the
   // seller's order-detail panel. One jsonb bag so new fields don't need migrations.
   q(`alter table orders add column if not exists meta jsonb default '{}'`).catch(() => {});
+
+  /**
+   * RUSH — a human saying "this one jumps the queue", with their name on it.
+   *
+   * Deliberately separate from `overdue`, which is computed from age. Late is a fact about
+   * the clock; rush is a DECISION, and a decision nobody can trace is one nobody trusts —
+   * so who set it and when are stored beside it. Clearing it is a decision too, so the
+   * columns are nulled rather than the row rewritten silently.
+   */
+  q('alter table orders add column if not exists rush boolean not null default false').catch(() => {});
+  q('alter table orders add column if not exists rushed_by uuid').catch(() => {});
+  q('alter table orders add column if not exists rushed_at timestamptz').catch(() => {});
+  // Overdue and rush are both list-wide filters on every board, so they get an index.
+  q('create index if not exists orders_rush_idx on orders (rush) where rush = true').catch(() => {});
   // Classify factory_order by OWNER ROLE, not by id: an Etsy order is factory-owned
   // ONLY when its connection owner is staff (the admin/factory shop). A seller's own
   // Etsy shop → factory_order=false so it shows on their dashboard (seller-managed
@@ -1281,6 +1295,28 @@ export function ordersRoutes(app, requireAuth) {
     await q('update orders set label_printed_at=$1 where id=$2', [undo ? null : new Date(), req.params.id]);
     audit(req, undo ? 'label.unprinted' : 'label.printed', { entityType: 'order', entityId: req.params.id });
     return { ok: true, label_printed_at: undo ? null : new Date().toISOString() };
+  });
+
+  /**
+   * Flag or clear a rush. ANY staff, operators included.
+   *
+   * This is the andon cord: the person who notices a job is urgent is usually the one
+   * standing at the machine, and an operator's zone ending at scan is about custody and
+   * money, not about being unable to raise a hand. Nothing here moves a stage or touches a
+   * balance — it reorders a queue — so gating it to warehouse would only mean the operator
+   * tells someone else to click it.
+   */
+  app.post('/api/orders/:id/rush', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const on = (req.body || {}).rush !== false;
+    const r = await q(
+      `update orders set rush=$1, rushed_by=$2, rushed_at=$3 where id=$4
+        returning id, rush, rushed_at`,
+      [on, on ? req.user.sub : null, on ? new Date() : null, String(req.params.id)]
+    ).catch(() => ({ rows: [] }));
+    if (!r.rows[0]) { reply.code(404); return { error: 'No such order.' }; }
+    audit(req, on ? 'order.rush' : 'order.rush_cleared', { entityType: 'order', entityId: String(req.params.id) });
+    return { ok: true, rush: r.rows[0].rush, rushed_at: r.rows[0].rushed_at };
   });
 
   app.post('/api/orders/:id/item-status', { preHandler: requireAuth }, async (req, reply) => {

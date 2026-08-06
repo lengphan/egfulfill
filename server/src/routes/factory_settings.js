@@ -37,6 +37,10 @@ const KEYS = [
   'base_markup',
   // Expedited dispatch: what the seller pays vs what the partner costs us.
   'expedite_fee', 'expedite_cost', 'design_partner_cost',
+  // How many days an OPEN order may sit before the boards call it overdue. Not a promise
+  // date — no marketplace ship-by is captured yet — so it is an age threshold the factory
+  // sets for itself, and the UI must not call it a customer commitment.
+  'overdue_days',
   // What a seller pays on a TIKTOK-SHIPPED order — one where TikTok produced the label and
   // we only fetch and print it. It is NOT a shipping charge: a seller-shipped TikTok order
   // buys a real label through the normal shipping path and must never be charged both.
@@ -89,6 +93,7 @@ export const SETTING_DEFAULTS = {
   ship_first: 5,       // first unit — one order is one parcel
   ship_extra: 2,       // every additional UNIT in that same parcel
   designer_payout: 2.5, // paid TO a designer per approved design (legacy eg_designer_fee_rate)
+  overdue_days: 10,    // an open order older than this is flagged on the boards
   emb_price: 0,        // what a SELLER pays to download an embroidery file; per-file overrides
   // Placeholders, not policy. Every one of these is a real charge to a real seller, so
   // they start at values that are obviously provisional rather than plausible — a wrong
