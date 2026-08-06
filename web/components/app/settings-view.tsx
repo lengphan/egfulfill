@@ -11,6 +11,7 @@ import { PermissionsMatrix } from "@/components/app/permissions-matrix"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -1905,7 +1906,7 @@ function UsersPanel() {
       <SectionCard title="New staff / user" description="Create an account with a role (username or email login)">
         <div className="flex flex-wrap items-end gap-2 p-5">
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Email / username</span><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="ops@egful.store" className="h-9" /></label>
-          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Password</span><Input type="password" value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="8+ characters" className="h-9" /></label>
+          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Password</span><PasswordInput value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="8+ characters" className="h-9" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Role</span>
             <select value={nu.role} onChange={(e) => setNu({ ...nu, role: e.target.value })} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
           </label>
