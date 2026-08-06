@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { getToken, getUser, setSession, getRememberedIdentifier, setRememberedIdentifier } from "@/lib/auth"
 import { API_BASE } from "@/lib/api"
 import { landingFor } from "@/lib/staff-nav"
@@ -113,8 +114,7 @@ export default function LoginPage() {
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">Password</span>
-            <Input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"

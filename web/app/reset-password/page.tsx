@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { resetPassword } from "@/lib/api"
 
 function ResetForm() {
@@ -43,7 +43,7 @@ function ResetForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">New password</span>
-        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete="new-password" required />
+        <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete="new-password" required />
       </label>
       {error && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
       <Button type="submit" className="w-full" disabled={loading}>

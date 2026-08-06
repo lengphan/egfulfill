@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
 import { signupUser } from "@/lib/api"
@@ -101,7 +102,7 @@ export default function SignupPage() {
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Password</span>
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" required />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" required />
         </label>
         {error && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
         <Button type="submit" className="w-full" disabled={loading}>
