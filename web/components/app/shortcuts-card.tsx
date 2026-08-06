@@ -129,7 +129,7 @@ export function ShortcutsCard({
             onDrop: () => onDrop(i),
             onDragEnd: () => { dragFrom.current = null; setDragOver(null) },
           } : {}
-          const tileCls = "group relative flex min-h-[76px] flex-col items-start justify-center gap-2 rounded-lg border p-3 transition-colors " +
+          const tileCls = "group relative flex min-h-[96px] flex-col items-start justify-center gap-2.5 rounded-lg border p-4 transition-colors " +
             (dragOver === i ? "border-primary bg-primary/5 " : "border-border ") +
             (editing ? "cursor-grab bg-card active:cursor-grabbing" : "hover:border-primary/40 hover:bg-accent")
           const inner = (
@@ -138,10 +138,15 @@ export function ShortcutsCard({
                   violet chip meant the eye met four identical coloured squares before it read a
                   single word — the icon was slowing recognition down rather than speeding it up.
                   The accent is kept for things that need you, not for every tile. */}
-              <span className="flex size-8 items-center justify-center text-muted-foreground transition-colors group-hover:text-foreground"><Icon size={18} /></span>
+              <span className="flex items-center justify-center text-muted-foreground transition-colors group-hover:text-foreground"><Icon size={22} /></span>
               <span className="min-w-0">
-                <span className="block text-sm font-medium leading-tight">{q.label}</span>
-                {q.desc && <span className="mt-0.5 block truncate text-xs text-muted-foreground leading-tight">{q.desc}</span>}
+                <span className="block text-[15px] font-semibold leading-tight tracking-tight">{q.label}</span>
+                {/* NOT truncated. The description is the whole reason the tile isn't just a
+                    word — clipping "Dispatch + shipments" to "Dispatch + ship…" costs the
+                    reader the distinction it was added to make, and a mid-word ellipsis is
+                    most of what made this grid look unfinished. It wraps to a second line
+                    instead, which the taller tile now has room for. */}
+                {q.desc && <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">{q.desc}</span>}
               </span>
             </>
           )
@@ -169,10 +174,10 @@ export function ShortcutsCard({
           <button
             ref={addBtnRef}
             onClick={toggleAdd}
-            className="eg-tap flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+            className="eg-tap flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
           >
-            <Plus size={18} weight="bold" />
-            <span className="text-xs font-medium">Add shortcut</span>
+            <Plus size={20} weight="bold" />
+            <span className="text-[13px] font-medium">Add shortcut</span>
           </button>
         )}
         {addOpen && menuPos && (

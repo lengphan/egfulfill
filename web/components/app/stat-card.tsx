@@ -31,32 +31,37 @@ export function StatCard({
   /** That slice is the one currently on screen. */
   active?: boolean
 }) {
+  // Type carries the hierarchy; nothing else needs to. The label was 11.5px and the sub
+  // 12.5px — below comfortable reading size for a figure someone checks in passing, which
+  // is what made these tiles feel cramped rather than calm. Both go up, the value grows,
+  // and the row it sits in gets room to breathe (p-6).
   const body = (
     <>
-      <div className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-2 text-3xl font-extrabold tracking-tight tabular-nums">{value}</div>
-      {sub && <div className={"mt-1.5 text-[12.5px] font-medium " + toneClass[tone]}>{sub}</div>}
+      <div className="flex items-center gap-1.5 text-[12.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+        {/* Monochrome and inline, not a tinted plate floating in the corner. A coloured
+            chip on every card meant a row of four met the eye as four identical stickers
+            before a single word was read — the same reasoning that already de-tinted the
+            shortcut tiles. The accent is for things that need you, not for decoration. */}
+        {Icon && <Icon size={14} className="shrink-0 opacity-70" />}
+        <span className="min-w-0 truncate">{label}</span>
+      </div>
+      <div className="mt-2.5 text-[2.125rem] font-black leading-none tracking-tight tabular-nums">{value}</div>
+      {sub && <div className={"mt-2 text-[13.5px] font-medium " + toneClass[tone]}>{sub}</div>}
     </>
-  )
-  const badge = Icon && (
-    <span className="absolute right-4 top-4 z-10 flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-      <Icon size={16} weight="duotone" />
-    </span>
   )
 
   if (!onClick) {
-    return <Card className="relative gap-0 overflow-hidden p-5">{badge}{body}</Card>
+    return <Card className="relative gap-0 overflow-hidden p-6">{body}</Card>
   }
   // A real <button>, not a div with onClick — keyboard and screen readers get it for free,
   // and Base UI has no asChild to lean on here.
   return (
     <Card className={"relative gap-0 overflow-hidden p-0 transition-shadow " + (active ? "ring-2 ring-primary/40" : "")}>
-      {badge}
       <button
         type="button"
         onClick={onClick}
         aria-pressed={active}
-        className="eg-tap w-full cursor-pointer p-5 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+        className="eg-tap w-full cursor-pointer p-6 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
       >
         {body}
       </button>
