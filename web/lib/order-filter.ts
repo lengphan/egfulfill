@@ -55,6 +55,8 @@ export const activeFilterCount = (q: OrderQuery) =>
  *  stage added to factory-status.ts is named here without being listed twice. */
 export const statusLabel = (v: string) =>
   v === "open" ? "Open"
+  : v === "overdue" ? "Overdue"
+  : v === "rush" ? "Rush"
   : v === "draft" ? "Draft"
   : v === "issues" ? "Issues"
   : ALL_STATUSES.find((s) => s.id === v)?.label ?? v
@@ -72,6 +74,10 @@ export const STATUS_PILLS: { value: string; label: string }[] = [
   // this answers "is anyone still waiting on us", which is what the stat cards count and
   // what a floor means by "my queue".
   { value: "open", label: "Open" },
+  // Late and flagged sit next to Open because they answer the same question — "what should
+  // I be doing" — rather than "where is it", which is what every stage pill below answers.
+  { value: "rush", label: "Rush" },
+  { value: "overdue", label: "Overdue" },
   { value: "draft", label: "Draft" },
   ...FACTORY_STAGES.map((s) => ({ value: s.id, label: s.label })),
   { value: "issues", label: "Issues" },
@@ -108,8 +114,12 @@ export function saveHiddenStatusPills(ids: string[]) {
 }
 
 /** Does an order sit at this Status filter value? */
-export function matchesStatus(o: OrderRow, value: string): boolean {
+export function matchesStatus(o: OrderRow, value: string, ctx: FilterContext = {}): boolean {
   if (!value) return true
+  // These two sit OUTSIDE the pipeline: an order is late, or flagged, at whatever stage it
+  // happens to be in. Handled before orderStage so they never collide with a stage id.
+  if (value === "overdue") return isOverdue(o, ctx.overdueDays)
+  if (value === "rush") return isRush(o)
   const stage = orderStage(o.items ?? [])
   if (value === "open") return !isException(stage) && stage !== "shipped"
   if (value === "draft") return stage === ""
@@ -141,7 +151,36 @@ export const readyLabel = (v: string) => READY_OPTIONS.find((o) => o.value === v
 
 /** What the stock half of the List filter needs to answer at all: stock is held against the
  *  BLANK sku, so a line has to be resolved through the catalog before it can be looked up. */
-export type FilterContext = { catalog?: CatalogProduct[]; stock?: Record<string, number> }
+export type FilterContext = {
+  catalog?: CatalogProduct[]
+  stock?: Record<string, number>
+  /** Age in days past which an OPEN order counts as overdue — factory_settings.overdue_days,
+   *  set by an admin. Not a promise date: no marketplace ship-by is captured yet, so nothing
+   *  built on this may describe it to a seller as a commitment. */
+  overdueDays?: number
+}
+
+/** Default when settings haven't loaded. Matches SETTING_DEFAULTS.overdue_days on the server. */
+export const DEFAULT_OVERDUE_DAYS = 10
+
+/**
+ * Is this order late, and is anyone able to do anything about it?
+ *
+ * Two questions, deliberately answered separately. Late-and-workable belongs at the front of
+ * the production queue. Late-and-blocked does NOT — it is a purchasing problem, and pinning
+ * it above the print queue only teaches the floor to scroll past overdue orders, which
+ * costs you the signal for the ones they COULD have started.
+ */
+export function isOverdue(o: OrderRow, days = DEFAULT_OVERDUE_DAYS): boolean {
+  if (!matchesStatus(o, "open")) return false          // shipped or excepted is not late
+  const created = o.created_at ? new Date(o.created_at).getTime() : NaN
+  if (!Number.isFinite(created)) return false          // no date is not evidence of lateness
+  return Date.now() - created > days * 86400_000
+}
+
+/** A rush is a DECISION someone made; overdue is a fact about the clock. Both jump the
+ *  queue, but only one of them can be argued with. */
+export const isRush = (o: OrderRow): boolean => !!(o as { rush?: boolean }).rush
 
 /**
  * Does an order match a List filter value?
@@ -238,7 +277,7 @@ function cutoffFor(days: number): number {
 }
 
 export function matchesOrderQuery(o: OrderRow, q: OrderQuery, cutoff?: number, ctx: FilterContext = {}): boolean {
-  if (q.status && !matchesStatus(o, q.status)) return false
+  if (q.status && !matchesStatus(o, q.status, ctx)) return false
   if (q.ready && !matchesReady(o, q.ready, ctx)) return false
   if (q.platform && platformOf(o) !== q.platform) return false
   if (q.store && (o.store || "").trim() !== q.store) return false

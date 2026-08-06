@@ -1284,6 +1284,16 @@ export type OrderRow = {
    *  before it (on the board, being checked) the chip stays amber. Staff list query only. */
   design_approved?: boolean
   /** When the label was actually put on paper — distinct from having bought one. */
+  /** Row last changed. NOT a true ship timestamp — `shipped_at` has no writer in the
+   *  status-transition paths (pii_retention.js backfills it from this), so "shipped today"
+   *  is really "moved to shipped and not touched since". Good enough for throughput, wrong
+   *  for anything that needs the actual moment. */
+  updated_at?: string | null
+  shipped_at?: string | null
+  /** Someone on the floor flagged this to jump the queue. A DECISION, unlike overdue,
+   *  which is computed from age — so it carries who and when. */
+  rush?: boolean
+  rushed_at?: string | null
   label_printed_at?: string | null
   /** Pre-scanned at dispatch — tracking is LIVE for the buyer even though the parcel may
    *  still be in production. Separate from factory_status on purpose; see orders.js. */
@@ -1374,6 +1384,15 @@ export function refreshTracking(id: string) {
   return api<{ ok?: boolean; status?: string | null; carrier_status?: string; detail?: string; error?: string }>(
     `/api/orders/${encodeURIComponent(id)}/refresh-tracking`, { method: "POST" })
 }
+/** Flag or clear a rush. Any factory staff — the person who notices a job is urgent is
+ *  usually the one at the machine. Sellers are refused server-side. */
+export function setOrderRush(id: string, rush: boolean) {
+  return api<{ ok?: boolean; rush?: boolean; rushed_at?: string | null; error?: string }>(
+    `/api/orders/${encodeURIComponent(id)}/rush`,
+    { method: "POST", body: JSON.stringify({ rush }) }
+  )
+}
+
 export function markLabelPrinted(id: string, undo = false) {
   return api<{ ok?: boolean; label_printed_at?: string | null }>(`/api/orders/${encodeURIComponent(id)}/label-printed`, {
     method: "POST", body: JSON.stringify({ undo }),

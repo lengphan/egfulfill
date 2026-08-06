@@ -25,7 +25,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
-import { filterOrders, matchesStatus, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
+import { filterOrders, matchesStatus, isRush, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
@@ -194,6 +194,7 @@ export function OrdersHub() {
   // which meant "Shipped" and a Status dropdown could hold contradictory answers, and the
   // empty-state sentence could only ever name one of them.
   const [query, setQuery] = useState<OrderQuery>(EMPTY_ORDER_QUERY)
+  const [overdueDays, setOverdueDays] = useState<number>(DEFAULT_OVERDUE_DAYS)
   // Which stage pills this browser keeps on the row. Read after mount (localStorage), so the
   // first paint is the default set rather than a flash of everything.
   const [hiddenPills, setHiddenPills] = useState<string[]>([])
@@ -390,6 +391,10 @@ export function OrdersHub() {
       try { const raw = localStorage.getItem(FROM_STORE); if (raw) setFrom({ ...BLANK_ADDR, ...JSON.parse(raw) }) } catch {}
       // Server wins over the local cache — it's what the label routes will actually use.
       getFactorySettings().then((s) => {
+        // Admin-set age threshold. Falls back to the shared default so a settings failure
+        // shows a plausible Overdue count rather than none at all.
+        const d = Number((s as { overdue_days?: number } | null)?.overdue_days)
+        if (Number.isFinite(d) && d > 0) setOverdueDays(d)
         if (s?.ship_from && s.ship_from.street) {
           const a = { ...BLANK_ADDR, ...s.ship_from } as ShipAddress
           setFrom(a)
@@ -656,17 +661,43 @@ export function OrdersHub() {
     // clicking it have to be the same set. Counting "open orders needing design" while the
     // click filtered on "any order needing design" is how a card says 4 and shows you 8.
     const open = list.filter((o) => matchesStatus(o, "open"))
+    const ctx = { overdueDays }
+    const overdue = list.filter((o) => matchesStatus(o, "overdue", ctx))
+    // Late-and-blocked is split out because it is a DIFFERENT PERSON'S problem. The floor
+    // can't start an order with no blanks, so counting it in the number they act on trains
+    // them to ignore the number. Purchasing is the audience that can move it.
+    const blocked = catalog.length
+      ? overdue.filter((o) => orderStock(o.items ?? [], catalog, stock).state === "out").length
+      : 0
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0)
     return {
-      pending: list.filter((o) => matchesStatus(o, "in_review")).length,
-      design: open.filter((o) => orderReadiness(o).design.state !== "done").length,
+      // "New" = arrived, nothing started. The one number where a rise means work to pick up
+      // rather than work going wrong.
+      fresh: list.filter((o) => matchesStatus(o, "draft")).length,
+      overdue: overdue.length,
+      overdueBlocked: blocked,
+      // TODAY, not ever. A lifetime shipped count is a number nobody acts on; today's is
+      // throughput, and it resets, so it can be read as good or bad at a glance.
+      //
+      // Dated by shipped_at, falling back to updated_at. Neither is a true ship moment —
+      // shipped_at has no writer in the status paths and is backfilled FROM updated_at — so
+      // this is really "moved to shipped and not touched since". An order edited after it
+      // shipped counts again today. Fine for throughput; don't build a KPI on it.
+      shippedToday: list.filter((o) => {
+        if (orderStage(o.items ?? []) !== "shipped") return false
+        const raw = o.shipped_at ?? o.updated_at
+        const t = raw ? new Date(raw).getTime() : NaN
+        return Number.isFinite(t) && t >= midnight.getTime()
+      }).length,
       // NULL, not 0, until the catalog is in: stock resolves through it, so before it loads
       // "0 short" would be a claim we can't back. The card says which.
       short: catalog.length
         ? open.filter((o) => orderStock(o.items ?? [], catalog, stock).state === "out").length
         : null,
-      scan: list.filter((o) => matchesStatus(o, "awaiting_scan")).length,
     }
-  }, [orders, catalog, stock])
+  }, [orders, catalog, stock, overdueDays])
+
+  const rushCount = useMemo(() => (orders ?? []).filter(isRush).length, [orders])
 
   /** Jump the list to what a stat card counted — and clicking the lit one clears it, the
    *  same toggle the pills use. Replaces the whole query rather than merging: a stat means
@@ -916,30 +947,33 @@ export function OrdersHub() {
 
       <StatGrid>
         <StatCard
-          label={tl("stat", "To approve")} value={String(stats.pending)}
-          sub={tl("stat", stats.pending ? "seller paid, waiting on you" : "nothing waiting")}
-          tone={stats.pending ? "neg" : undefined}
-          onClick={() => jumpTo({ status: "in_review" })} active={jumpedTo({ status: "in_review" })}
+          label={tl("stat", "New")} value={String(stats.fresh)}
+          sub={tl("stat", stats.fresh ? "arrived, not started" : "nothing waiting to start")}
+          onClick={() => jumpTo({ status: "draft" })} active={jumpedTo({ status: "draft" })}
+        />
+        {/* The only card whose number SHOULD be small. `sub` names how many of them are
+            blocked on stock, because that share isn't the floor's to fix — pretending one
+            number covers both audiences is how an overdue count gets ignored. */}
+        <StatCard
+          label={tl("stat", `Overdue (${overdueDays}d+)`)} value={String(stats.overdue)}
+          sub={tl("stat", stats.overdue
+            ? (stats.overdueBlocked ? `${stats.overdueBlocked} waiting on stock` : "all workable now")
+            : "nothing late")}
+          tone={stats.overdue ? "neg" : undefined}
+          onClick={() => jumpTo({ status: "overdue" })} active={jumpedTo({ status: "overdue" })}
         />
         <StatCard
-          label={tl("stat", "Need design")} value={String(stats.design)}
-          sub={tl("stat", stats.design ? "no approved file yet" : "all designs approved")}
-          tone={stats.design ? "neg" : undefined}
-          onClick={() => jumpTo({ status: "open", ready: "design:todo" })} active={jumpedTo({ status: "open", ready: "design:todo" })}
+          label={tl("stat", "Shipped today")} value={String(stats.shippedToday)}
+          sub={tl("stat", "since midnight")}
         />
         <StatCard
           // "—" while the catalog is still loading. A 0 here would read as "nothing is
           // short", which is a different claim from "we can't tell yet".
-          label={tl("stat", "Short on stock")} value={stats.short === null ? "—" : String(stats.short)}
+          label={tl("stat", "Out of stock")} value={stats.short === null ? "—" : String(stats.short)}
           sub={tl("stat", stats.short === null ? "stock not loaded" : stats.short ? "can't be made yet" : "blanks on hand")}
           tone={stats.short ? "neg" : undefined}
           onClick={stats.short === null ? undefined : () => jumpTo({ status: "open", ready: "stock:out" })}
           active={jumpedTo({ status: "open", ready: "stock:out" })}
-        />
-        <StatCard
-          label={tl("stat", "Awaiting scan")} value={String(stats.scan)}
-          sub={tl("stat", stats.scan ? "labels made, not scanned" : "scan queue clear")}
-          onClick={() => jumpTo({ status: "awaiting_scan" })} active={jumpedTo({ status: "awaiting_scan" })}
         />
       </StatGrid>
 
@@ -1014,6 +1048,18 @@ export function OrdersHub() {
                   className={"eg-tap h-8 rounded-md px-2.5 text-sm font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
                 >
                   {tl("stage", p.label)}
+                  {/* A COUNT, so you know whether it's worth going in. Only on the two pills
+                      where the number is the point — a badge on every pill is a row of
+                      numbers nobody reads, and "Overdue 0" is as useful as "Overdue 12". */}
+                  {(p.value === "overdue" || p.value === "rush") && (
+                    <span className={"ml-1.5 rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums " + (
+                      on ? "bg-primary-foreground/20"
+                        : p.value === "overdue" && stats.overdue ? "bg-destructive/10 text-destructive"
+                        : "bg-muted text-muted-foreground"
+                    )}>
+                      {p.value === "overdue" ? stats.overdue : rushCount}
+                    </span>
+                  )}
                 </button>
               )
             })}
