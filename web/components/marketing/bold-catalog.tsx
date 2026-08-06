@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import Link from "next/link"
 import { TShirt } from "@phosphor-icons/react"
 import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import type { PublicProduct } from "@/lib/api"
@@ -63,8 +64,12 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
               <h2 className="font-display font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>{cat}</h2>
               <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {items.map((p, i) => (
-                  <Rise key={`${cat}-${p.name}`} delay={Math.min(i, 6) * 0.05}
-                        className="group overflow-hidden rounded-2xl border border-black/[0.09] bg-white">
+                  /* Keyed by SLUG, not name. The server already disambiguated duplicate names
+                     with an index suffix, so the slug is the unique one — two products sharing
+                     a name collided on this key and React reconciled them as one card. */
+                  <Rise key={p.slug} delay={Math.min(i, 6) * 0.05}
+                        className="group overflow-hidden rounded-2xl border border-black/[0.09] bg-white transition-colors hover:border-black/30">
+                  <Link href={`/catalog/${p.slug}`} className="block">
                     {/* Square well, so a mixed catalogue (tees, mugs, caps) lines up. The
                         placeholder is the accent rather than a grey box — a product without a
                         photo should look unfinished, not broken. */}
@@ -90,6 +95,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                         from <span className="font-bold text-[#0B0B0C]">{usd(p.price)}</span>
                       </div>
                     </div>
+                  </Link>
                   </Rise>
                 ))}
               </div>
