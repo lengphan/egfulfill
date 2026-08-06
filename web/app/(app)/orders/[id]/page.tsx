@@ -421,7 +421,7 @@ export default function OrderDetailPage() {
                                 signal was an order-wide chip that lit for every item the
                                 moment one of them was sent. */}
                             {card && (
-                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-1.5 py-0.5 text-2xs font-medium text-primary">
                                 On design board
                                 <span className="font-semibold">{card.lane_label || card.col || "Incoming"}</span>
                               </span>
@@ -531,7 +531,7 @@ export default function OrderDetailPage() {
                               a plain human message stays verbatim with its line breaks. */}
                           {m.text ? (hasMarkdown(m.text) ? <Markdown>{m.text}</Markdown> : <span className="whitespace-pre-wrap">{m.text}</span>) : null}
                         </div>
-                        <span className="mt-0.5 text-[10px] text-muted-foreground">
+                        <span className="mt-0.5 text-3xs text-muted-foreground">
                           {m.by ? `${m.by} · ` : m.role && m.role !== "seller" ? `${m.role} · ` : ""}
                           {fmtMsgTime(m.ts)}
                         </span>
@@ -605,7 +605,7 @@ export default function OrderDetailPage() {
                       : "bg-amber-100 text-amber-800"
                     return (
                       <div className="mb-1.5">
-                        <span className={"inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold " + tone}>
+                        <span className={"inline-flex items-center rounded-md px-1.5 py-0.5 text-2xs font-semibold " + tone}>
                           {ship.label}
                         </span>
                         <div className="mt-1 text-xs text-muted-foreground">{ship.hint}</div>

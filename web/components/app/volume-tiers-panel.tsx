@@ -87,7 +87,7 @@ export function VolumeTiersPanel() {
       <div className="space-y-4 px-5 pb-5">
         {/* Nothing here can move money today, and saying so is what stops an admin believing
             a saved ladder just repriced every open order. */}
-        <div className="flex items-start gap-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">
+        <div className="flex items-start gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
           <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
           <span>
             Saving a ladder does not change any charge. Order pricing does not read these yet —
@@ -138,7 +138,7 @@ export function VolumeTiersPanel() {
         {/* WHO THIS WOULD ACTUALLY HIT. */}
         <div className="border-t border-border pt-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
               Who lands where
             </span>
             <Input
@@ -161,7 +161,7 @@ export function VolumeTiersPanel() {
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[26rem] text-sm">
                 <thead>
-                  <tr className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                  <tr className="text-2xs uppercase tracking-wider text-muted-foreground">
                     <th className="py-1.5 pr-3 text-left font-semibold">Seller</th>
                     <th className="py-1.5 pr-3 text-right font-semibold">Orders</th>
                     <th className="py-1.5 pr-3 text-right font-semibold">Units</th>
@@ -205,7 +205,7 @@ export function VolumeTiersPanel() {
               preview implementation would be free to disagree with the real thing. */}
           {preview && (
             <div className="mt-4 rounded-xl border border-border bg-card p-4">
-              <div className="mb-3 text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="mb-3 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Seller&apos;s view · <span className="font-mono normal-case">{preview.slice(0, 8)}…</span>
               </div>
               {previewData

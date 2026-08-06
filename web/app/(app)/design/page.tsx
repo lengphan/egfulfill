@@ -157,7 +157,7 @@ function DesignLab() {
                       <button
                         onClick={() => { navigator.clipboard?.writeText(`DSN-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
                         title="Copy this design's ID for an import sheet"
-                        className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 font-mono text-[13px] font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                        className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 font-mono text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                       >
                         {copied === String(d.id) ? "Copied ✓" : `DSN-${d.id}`}
                       </button>

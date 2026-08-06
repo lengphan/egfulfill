@@ -224,7 +224,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
                     onClick={() => setAmount(String(t.usd))}
                     className={"relative flex flex-col gap-2 overflow-hidden rounded-xl border p-4 text-left transition-colors " + (active ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}
                   >
-                    {best && <span className="absolute right-0 top-0 rounded-bl-lg bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground">Best rate</span>}
+                    {best && <span className="absolute right-0 top-0 rounded-bl-lg bg-primary px-2 py-0.5 text-3xs font-bold uppercase tracking-wide text-primary-foreground">Best rate</span>}
                     <span className="text-lg font-semibold tabular-nums">{usd0(t.usd)}</span>
                     <span className="w-fit rounded-lg bg-muted px-2.5 py-1.5 text-xs tabular-nums text-muted-foreground">$1 = <span className="font-semibold text-foreground">{vnd(t.rate)}</span></span>
                     {saveVnd > 0 && <span className="w-fit rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">save {vnd(saveVnd)}</span>}

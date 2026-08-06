@@ -83,7 +83,7 @@ function ImageThumb({ url, src, name, badge, onPlace, onDelete }: {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src ?? url} alt={name || ""} className="size-full object-cover" />
       </button>
-      {badge && <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1 text-[9px] font-medium text-white">{badge}</span>}
+      {badge && <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1 text-3xs font-medium text-white">{badge}</span>}
       {onDelete && (
         <button
           type="button" onClick={onDelete} title="Remove from your library"

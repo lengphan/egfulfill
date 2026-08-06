@@ -49,7 +49,7 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
               <ol key={i} className="space-y-2">
                 {b.items.map((it, j) => (
                   <li key={j} className="flex gap-3 text-sm leading-relaxed">
-                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">{j + 1}</span>
+                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-2xs font-semibold text-primary">{j + 1}</span>
                     <span className="text-foreground/90">{it}</span>
                   </li>
                 ))}

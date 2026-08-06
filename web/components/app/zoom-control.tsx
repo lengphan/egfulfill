@@ -42,7 +42,7 @@ export function ZoomControl() {
       >
         <MagnifyingGlassPlus size={18} />
         {on && (
-          <span className="absolute -bottom-0.5 -right-0.5 rounded bg-primary px-1 text-[9px] font-bold leading-[1.4] text-primary-foreground">
+          <span className="absolute -bottom-0.5 -right-0.5 rounded bg-primary px-1 text-3xs font-bold leading-[1.4] text-primary-foreground">
             {Math.round(zoom * 100)}
           </span>
         )}

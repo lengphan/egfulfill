@@ -73,7 +73,7 @@ export function Sidebar() {
         {sections.map((section, i) => (
           <div key={i} className="mb-1">
             {section.heading && (
-              <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
+              <div className="px-3 pb-2 pt-5 text-2xs font-semibold uppercase tracking-wider text-sidebar-foreground/70">
                 {nl("nav", section.heading)}
               </div>
             )}

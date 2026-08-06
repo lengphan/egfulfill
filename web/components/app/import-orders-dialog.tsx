@@ -347,7 +347,7 @@ export function ImportOrdersDialog({
                     readOnly
                     onFocus={(e) => e.currentTarget.select()}
                     value={copyFallback}
-                    className="mt-2 h-16 w-full resize-none rounded-md border border-border bg-background p-2 font-mono text-[11px] text-foreground"
+                    className="mt-2 h-16 w-full resize-none rounded-md border border-border bg-background p-2 font-mono text-2xs text-foreground"
                   />
                 )}
               </div>

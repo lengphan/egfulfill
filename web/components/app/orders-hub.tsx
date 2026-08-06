@@ -1150,7 +1150,7 @@ export function OrdersHub() {
                           return (
                             <button key={cid} type="button" disabled={locked} onClick={() => toggleCol(cid)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs normal-case tracking-normal text-foreground transition-colors hover:bg-accent disabled:opacity-40">
                               <span className={"flex size-4 items-center justify-center rounded border " + (shown ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{shown && <Check size={11} weight="bold" />}</span>
-                              {tl("col", FACTORY_COLS[cid].label)}{locked && <span className="ml-auto text-[9px] text-muted-foreground">locked</span>}
+                              {tl("col", FACTORY_COLS[cid].label)}{locked && <span className="ml-auto text-3xs text-muted-foreground">locked</span>}
                             </button>
                           )
                         })}

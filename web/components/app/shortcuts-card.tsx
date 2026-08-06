@@ -140,13 +140,13 @@ export function ShortcutsCard({
                   The accent is kept for things that need you, not for every tile. */}
               <span className="flex items-center justify-center text-muted-foreground transition-colors group-hover:text-foreground"><Icon size={22} /></span>
               <span className="min-w-0">
-                <span className="block text-[15px] font-semibold leading-tight tracking-tight">{q.label}</span>
+                <span className="block text-base font-semibold leading-tight tracking-tight">{q.label}</span>
                 {/* NOT truncated. The description is the whole reason the tile isn't just a
                     word — clipping "Dispatch + shipments" to "Dispatch + ship…" costs the
                     reader the distinction it was added to make, and a mid-word ellipsis is
                     most of what made this grid look unfinished. It wraps to a second line
                     instead, which the taller tile now has room for. */}
-                {q.desc && <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">{q.desc}</span>}
+                {q.desc && <span className="mt-1 block text-sm leading-snug text-muted-foreground">{q.desc}</span>}
               </span>
             </>
           )
@@ -177,7 +177,7 @@ export function ShortcutsCard({
             className="eg-tap flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
           >
             <Plus size={20} weight="bold" />
-            <span className="text-[13px] font-medium">Add shortcut</span>
+            <span className="text-sm font-medium">Add shortcut</span>
           </button>
         )}
         {addOpen && menuPos && (

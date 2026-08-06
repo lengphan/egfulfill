@@ -430,13 +430,13 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (
           <Card key={k.label} className="gap-0 p-5">
-            <div className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
               {k.label}
             </div>
             <div className="mt-2 text-3xl font-extrabold tracking-tight tabular-nums">{k.value}</div>
             <div
               className={
-                "mt-1.5 text-[12.5px] font-medium " +
+                "mt-1.5 text-xs font-medium " +
                 (k.tone === "pos" ? "text-success" : k.tone === "neg" ? "text-red-600" : "text-muted-foreground")
               }
             >

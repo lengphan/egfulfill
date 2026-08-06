@@ -156,7 +156,7 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-2">
               <span
                 className={
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium " +
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-medium " +
                   (status === "Active" ? "bg-emerald-500/15 text-emerald-700" : "bg-muted text-muted-foreground")
                 }
               >
@@ -164,7 +164,7 @@ export default function ProductDetailPage() {
                 {status}
               </span>
               {product.type && (
-                <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{product.type}</span>
+                <span className="rounded-md bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">{product.type}</span>
               )}
             </div>
             <h1 className="mt-2 font-title text-3xl font-semibold tracking-tight">{product.name ?? "Untitled"}</h1>

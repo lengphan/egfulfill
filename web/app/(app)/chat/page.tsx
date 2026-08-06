@@ -454,7 +454,7 @@ export default function ChatPage() {
               status, click to view/edit. Matches the inbox carve-out above. */}
           {isStaffUser && !isDesigner && (
             <button onClick={() => setHoursOpen(true)} title="Support hours"
-              className={"inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors hover:bg-accent " +
+              className={"inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-2xs font-medium transition-colors hover:bg-accent " +
                 (office ? (office.open ? "border-emerald-300 text-emerald-700 dark:text-emerald-300" : "border-amber-300 text-amber-700 dark:text-amber-300") : "border-border text-muted-foreground")}>
               <span className={"size-1.5 rounded-full " + (office ? (office.open ? "bg-emerald-500" : "bg-amber-500") : "bg-muted-foreground/50")} />
               {office ? (office.open ? "Open" : "Closed") : "Hours"}
@@ -491,7 +491,7 @@ export default function ChatPage() {
                   <span className="flex items-center gap-1.5">
                     <span className="truncate text-sm font-semibold">{c.title}</span>
                     {c.escalated && (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">
+                      <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-3xs font-bold uppercase tracking-wide text-amber-700">
                         Needs a human
                       </span>
                     )}
@@ -506,7 +506,7 @@ export default function ChatPage() {
               so the same person never appears twice. */}
           {!signedOut && found.filter((s) => !shown.some((c) => c.id === s.channel)).length > 0 && (
             <>
-              <div className="border-b border-border bg-muted/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="border-b border-border bg-muted/40 px-4 py-1.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Start a conversation
               </div>
               {found.filter((s) => !shown.some((c) => c.id === s.channel)).map((s) => (
@@ -622,7 +622,7 @@ export default function ChatPage() {
                 // seller can see.
                 if (m.internal) return (
                   <div key={String(m.id)} className="rounded-xl border border-dashed border-primary/40 bg-primary/[0.04] p-3">
-                    <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                    <div className="mb-1.5 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-primary">
                       <Sparkle size={12} weight="fill" />
                       {m.by || "Order brief"}
                       <span className="ml-auto font-normal normal-case tracking-normal text-muted-foreground">Staff only — not shown to the seller</span>
@@ -633,7 +633,7 @@ export default function ChatPage() {
                 return (
                   <Fragment key={String(m.id)}>
                     {joined && (
-                      <div className="my-1.5 flex items-center gap-2 px-1 text-[11px] font-medium text-muted-foreground">
+                      <div className="my-1.5 flex items-center gap-2 px-1 text-2xs font-medium text-muted-foreground">
                         <span className="h-px flex-1 bg-border" />
                         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
                           <Headset size={12} weight="fill" /> {joined} joined the conversation
@@ -667,7 +667,7 @@ export default function ChatPage() {
                           )
                         })()}
                       </div>
-                      <span className="mt-0.5 flex items-center gap-1.5 px-1 text-[10px] text-muted-foreground">
+                      <span className="mt-0.5 flex items-center gap-1.5 px-1 text-3xs text-muted-foreground">
                         {m.orderRef && (
                           // Which order this is about — the context the per-order
                           // channels used to carry in their name.
@@ -773,7 +773,7 @@ export default function ChatPage() {
                 Keyboard-navigable, dropped in above the box. */}
             {mention && mentionMatches.length > 0 && (
               <div className="absolute bottom-full left-0 z-20 mb-1 w-full max-w-md overflow-hidden rounded-lg border border-border bg-card shadow-lg">
-                <div className="border-b border-border px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Mention a teammate or tag an order</div>
+                <div className="border-b border-border px-3 py-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Mention a teammate or tag an order</div>
                 {mentionMatches.map((it, i) => (
                   <button
                     key={it.kind === "person" ? `p-${it.p.id}` : `o-${it.o.id}`}
@@ -788,14 +788,14 @@ export default function ChatPage() {
                       <>
                         <User size={13} weight="duotone" className="shrink-0 text-primary" />
                         <span className="font-medium">{it.p.name}</span>
-                        <span className="ml-auto shrink-0 text-[11px] capitalize text-muted-foreground">{it.p.role}</span>
+                        <span className="ml-auto shrink-0 text-2xs capitalize text-muted-foreground">{it.p.role}</span>
                       </>
                     ) : (
                       <>
                         <Package size={13} weight="duotone" className="shrink-0 text-muted-foreground" />
                         <span className="font-medium tabular-nums">#{it.o.seq ?? it.o.id}</span>
                         <span className="truncate text-xs text-muted-foreground">{it.o.customer?.name || it.o.store || it.o.source || ""}</span>
-                        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{it.o.factory_status || it.o.status || ""}</span>
+                        <span className="ml-auto shrink-0 text-2xs text-muted-foreground">{it.o.factory_status || it.o.status || ""}</span>
                       </>
                     )}
                   </button>

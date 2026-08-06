@@ -189,7 +189,7 @@ export function SupplierProductCard({
                 }
                 return (
                   <button key={c.name} onClick={() => pickColor(c.name)} title={prettyColorName(c.name)} style={bg ? { background: bg } : undefined}
-                    className={"size-5 shrink-0 rounded-full border transition-transform hover:scale-110 " + ring + (bg ? "border-black/15" : "flex items-center justify-center border-dashed border-border bg-muted text-[8px] text-muted-foreground")}>
+                    className={"size-5 shrink-0 rounded-full border transition-transform hover:scale-110 " + ring + (bg ? "border-black/15" : "flex items-center justify-center border-dashed border-border bg-muted text-3xs text-muted-foreground")}>
                     {!bg && "?"}
                   </button>
                 )
@@ -221,7 +221,7 @@ export function SupplierProductCard({
             // gave us (OSFM); a bare count is names-missing; "—" is genuinely unknown, which
             // for S&S means the sizes just haven't loaded — never dressed up as one-size.
             data.oneSize ? (
-              <span className="rounded border border-border px-1 py-0.5 text-[9px] font-medium text-muted-foreground" title="One size fits most — this product isn't broken out by size">
+              <span className="rounded border border-border px-1 py-0.5 text-3xs font-medium text-muted-foreground" title="One size fits most — this product isn't broken out by size">
                 One size
               </span>
             ) : (
@@ -230,7 +230,7 @@ export function SupplierProductCard({
           ) : (
             <>
               {(showAllSizes ? sizeNames : sizeNames.slice(0, 6)).map((sz) => (
-                <span key={sz} className="shrink-0 rounded border border-border px-1 py-0.5 text-[9px] font-medium text-muted-foreground">{sz}</span>
+                <span key={sz} className="shrink-0 rounded border border-border px-1 py-0.5 text-3xs font-medium text-muted-foreground">{sz}</span>
               ))}
               {sizeNames.length > 6 && (
                 <button

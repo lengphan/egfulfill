@@ -37,7 +37,7 @@ export function StatCard({
   // and the row it sits in gets room to breathe (p-6).
   const body = (
     <>
-      <div className="flex items-center gap-1.5 text-[12.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.07em] text-muted-foreground">
         {/* Monochrome and inline, not a tinted plate floating in the corner. A coloured
             chip on every card meant a row of four met the eye as four identical stickers
             before a single word was read — the same reasoning that already de-tinted the
@@ -46,7 +46,7 @@ export function StatCard({
         <span className="min-w-0 truncate">{label}</span>
       </div>
       <div className="mt-2.5 text-[2.125rem] font-black leading-none tracking-tight tabular-nums">{value}</div>
-      {sub && <div className={"mt-2 text-[13.5px] font-medium " + toneClass[tone]}>{sub}</div>}
+      {sub && <div className={"mt-2 text-sm font-medium " + toneClass[tone]}>{sub}</div>}
     </>
   )
 

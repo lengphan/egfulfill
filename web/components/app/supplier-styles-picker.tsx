@@ -187,7 +187,7 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={st.image} alt="" className="size-full object-contain" />
                           ) : (
-                            <div className="flex size-full items-center justify-center text-[9px] text-muted-foreground">no image</div>
+                            <div className="flex size-full items-center justify-center text-3xs text-muted-foreground">no image</div>
                           )}
                         </div>
                         <div className="min-w-0">

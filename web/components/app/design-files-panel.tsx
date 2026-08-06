@@ -202,7 +202,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: s
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-xs font-medium">{f.name}</span>
-                    {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+                    {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-3xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
                   </div>
                   <div className="truncate text-3xs text-muted-foreground">{scopeLabel(f)}{k.hint}</div>
                 </div>
@@ -401,7 +401,7 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-sm font-medium">{f.name}</span>
-              {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+              {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-3xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
             </div>
             <div className="text-xs text-muted-foreground">
               {f.sku ? `Item ${f.sku} · ` : ""}

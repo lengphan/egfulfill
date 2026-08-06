@@ -502,7 +502,7 @@ export function PublishProductDialog({
                     <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
-                      {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-[9px] font-semibold uppercase text-primary-foreground">Primary</span>}
+                      {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-3xs font-semibold uppercase text-primary-foreground">Primary</span>}
                       <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
                         {i !== 0 && <button onClick={() => makePrimary(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-3xs font-semibold text-black">Primary</button>}
                         <button onClick={() => removeImage(i)} aria-label="Remove photo" className="rounded bg-white/90 p-1 text-black"><Trash size={11} weight="bold" /></button>

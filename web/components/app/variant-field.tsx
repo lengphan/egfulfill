@@ -213,7 +213,7 @@ function BuyerChip({ text }: { text: string }) {
       title={`Buyer chose "${text}" on the marketplace`}
       className="inline-flex max-w-[14rem] items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-2xs text-muted-foreground"
     >
-      <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">{tl("field", "Buyer")}</span>
+      <span className="text-3xs font-semibold uppercase tracking-wide opacity-70">{tl("field", "Buyer")}</span>
       <span className="truncate">{text}</span>
     </span>
   )
