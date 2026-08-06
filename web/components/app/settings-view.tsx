@@ -472,6 +472,12 @@ const SHAREABLE = [
   { id: "spydeck", label: "SpyDeck" },
   { id: "reports", label: "Reports" },
   { id: "wallet", label: "Wallet" },
+  // Not a page — a figure. Separate from Wallet on purpose: someone running the order
+  // queue often needs to see what a job cost without being shown the account balance,
+  // and the two were one toggle only because no one had needed to split them. Enforced
+  // in the API (GET /api/orders/:id/charges returns `gated` with no amounts), so turning
+  // it off withholds the numbers rather than merely hiding the panel.
+  { id: "order_fees", label: "Order fees" },
   { id: "design", label: "Design Lab" },
   { id: "files", label: "Design files" },
   { id: "chat", label: "Chat" },

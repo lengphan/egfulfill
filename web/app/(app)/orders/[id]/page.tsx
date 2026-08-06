@@ -28,6 +28,7 @@ import {
   getOrderDesigns,
   getOrderMessages,
   getOrderQuote,
+  getOrderCharges,
   getCatalogProducts,
   postOrderMessage,
   updateOrder,
@@ -36,6 +37,7 @@ import {
   type OrderDesign,
   type ChatEntry,
   type OrderQuote,
+  type OrderCharges,
   type CatalogProduct,
   type ShipAddress,
 } from "@/lib/api"
@@ -109,6 +111,7 @@ export default function OrderDetailPage() {
   useEffect(() => { const t = setTimeout(loadDesignStatus, 0); return () => clearTimeout(t) }, [loadDesignStatus])
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   const [quote, setQuote] = useState<OrderQuote | null>(null)
+  const [charges, setCharges] = useState<OrderCharges | null>(null)
 
   // Staff processing controls (stage moves + labels). Gated exactly like the boards:
   // canFulfill = warehouse/admin; the ⋯ menu itself is per-stage/role-gated inside.
@@ -218,6 +221,21 @@ export default function OrderDetailPage() {
     return () => { live = false; clearTimeout(id) }
   }, [order, submittable])
 
+  // What was ACTUALLY charged, from the ledger — the only complete source. The quote
+  // above covers production + shipping and is the right thing to show BEFORE submit
+  // (it's a forecast). After submit it is the wrong shape twice over: it can't see
+  // expedited shipping, express, or design files, and the page's old fallback read
+  // `order.total`, which is the BUYER's grandtotal on a marketplace order, not the
+  // factory charge. Sellers were shown their own revenue labelled as costs.
+  useEffect(() => {
+    let live = true
+    const t = setTimeout(() => {
+      if (!live || !order) return
+      getOrderCharges(order.id).then((c) => { if (live) setCharges(c) }).catch(() => { if (live) setCharges(null) })
+    }, 0)
+    return () => { live = false; clearTimeout(t) }
+  }, [order])
+
   if (orders === null) {
     return (
       <div className="space-y-4">
@@ -254,12 +272,40 @@ export default function OrderDetailPage() {
   const addr = (order.address ?? {}) as Addr
   const cust = order.customer ?? {}
   const timeline = (Array.isArray(order.timeline) ? order.timeline : []) as TimelineEntry[]
-  const itemsTotal = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.qty) || 1), 0)
-  const total = Number(order.total ?? 0) || 0
+  // (itemsTotal / total were removed with the old Summary fallback. Both were REVENUE —
+  // unit_price is the seller's listing price and orders.total the buyer's grandtotal —
+  // and the card presented them as production costs. `revenue` below is the same figure,
+  // now labelled as what it is.)
   // Design/check fees shown in the Summary. Complex fees under review are `amount: null`
   // ("To Be Determined") and are NOT added to the number, only listed.
   const designFees = quote?.designFees
   const dfTotal = designFees?.total ?? 0
+
+  // ── Cost, revenue, and the gap between them ──────────────────────────────────
+  // Three numbers that must never be conflated, which is exactly what the page used to
+  // do. Each has a different origin, so each is derived separately here.
+  //
+  // REVENUE is the buyer's money and reaches us only from a marketplace: etsy.js sets
+  // orders.total from the receipt grandtotal. A MANUAL order (FF-*) has no buyer of ours,
+  // so `total` is 0 or whatever someone typed — hence `hasRevenue` rather than treating
+  // 0 as "sold for nothing". An order with no retail price recorded and one genuinely
+  // sold at $0 look identical in the column and mean opposite things.
+  const revenue = Number(order.total ?? 0) || 0
+  const hasRevenue = revenue > 0
+  // COST is what the seller paid US, read off the ledger — every part, including the ones
+  // the quote can't see. Falls back to the quote before submit, when nothing is charged yet.
+  const feesGated = !!charges?.gated
+  const chargedParts = charges?.parts ?? []
+  const cost = charges && charges.charged > 0 ? charges.charged : null
+  const refundedTotal = charges?.refunded ?? 0
+  // What they actually bear once refunds are returned — refunding $9 of shipping makes the
+  // order cost $9 less, and a margin computed off the gross charge would understate it.
+  const netCost = cost != null ? Math.max(0, cost - refundedTotal) : null
+  // ESTIMATED PROFIT, and estimated is the operative word: marketplace fees (Etsy's
+  // transaction + listing + payment processing, ~10% all in) are taken before the money
+  // ever reaches us, so they cannot appear here. Named and hinted accordingly rather than
+  // presented as take-home.
+  const estProfit = hasRevenue && netCost != null ? revenue - netCost : null
 
   return (
     <div className="space-y-5">
@@ -625,32 +671,60 @@ export default function OrderDetailPage() {
                   </div>
                   <p className="pt-1 text-xs text-muted-foreground">Charged when you submit to production. Design &amp; check fees are listed above; a design still under review shows “To Be Determined” until we confirm it.</p>
                 </>
+              ) : feesGated ? (
+                /* A team member whose leader hasn't shared order fees. The server sent no
+                   amounts at all, so there is nothing here to hide — and this says which,
+                   rather than rendering an empty card that reads as a broken page. */
+                <p className="text-xs text-muted-foreground">
+                  Order costs aren&apos;t shared with you. Your team leader can turn this on
+                  under Settings › Team.
+                </p>
               ) : (
                 <>
-                  {/* Submitted → the price is frozen. Show the SAME breakdown, not just a
-                      lump total: production, then whatever else was charged (shipping +
-                      any extra-item/expedite fees) as the difference to the total. */}
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Production</dt>
-                    <dd className="tabular-nums">{usd(itemsTotal)}</dd>
-                  </div>
-                  {total - itemsTotal > 0.005 && (
-                    <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Shipping &amp; fees</dt>
-                      <dd className="tabular-nums">{usd(total - itemsTotal)}</dd>
-                    </div>
-                  )}
-                  {designFees?.items?.map((f, i) => (
-                    <div key={i} className="flex justify-between">
-                      <dt className="text-muted-foreground">{f.label}{f.name ? <span className="opacity-70"> · {f.name}</span> : null}</dt>
-                      <dd className="tabular-nums">{f.amount == null ? <span className="italic text-muted-foreground">To Be Determined</span> : usd(f.amount)}</dd>
+                  {/* Submitted → the price is frozen and the LEDGER is the record of it.
+                      Every part it charged, itemised: production, shipping, and the fees
+                      the quote can't see (expedited shipping, express, design, files). */}
+                  {chargedParts.map((p) => (
+                    <div key={p.key} className="flex justify-between">
+                      <dt className="text-muted-foreground">{p.label}</dt>
+                      <dd className="tabular-nums">{usd(p.charged)}</dd>
                     </div>
                   ))}
+                  {refundedTotal > 0.005 && (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Refunded</dt>
+                      <dd className="tabular-nums text-success">−{usd(refundedTotal)}</dd>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                    <dt>Total</dt>
-                    <dd className="tabular-nums">{usd(total + dfTotal)}</dd>
+                    <dt>You paid</dt>
+                    <dd className="tabular-nums">{usd(netCost ?? 0)}</dd>
                   </div>
-                  <p className="pt-1 text-xs text-muted-foreground">Design &amp; check fees are listed above; a design still under review shows “To Be Determined” until we confirm it.</p>
+
+                  {/* The buyer's side, kept visually apart from ours. Two different pots of
+                      money on one card is only safe if the reader can never mistake one
+                      for the other — which is the bug this replaced. */}
+                  <div className="mt-3 space-y-2 border-t border-border pt-3">
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Customer paid</dt>
+                      <dd className="tabular-nums">
+                        {hasRevenue ? usd(revenue)
+                          : <span className="italic text-muted-foreground">not recorded</span>}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <dt>Estimated profit</dt>
+                      <dd className={"tabular-nums " + (estProfit != null && estProfit < 0 ? "text-destructive" : "")}>
+                        {estProfit != null ? usd(estProfit) : <span className="font-normal italic text-muted-foreground">—</span>}
+                      </dd>
+                    </div>
+                  </div>
+
+                  <p className="pt-1 text-xs text-muted-foreground">
+                    {hasRevenue
+                      ? "Estimated — marketplace fees (listing, transaction, payment processing) are taken by the store before the money reaches us, so they aren't included here."
+                      : "No retail price recorded for this order, so profit can't be worked out. Marketplace orders carry the buyer's total automatically."}
+                  </p>
                 </>
               )}
               {quote?.unpriced?.length ? (

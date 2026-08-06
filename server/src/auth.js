@@ -177,6 +177,42 @@ export const canManageUsers = (user) => !!user && (user.role === 'admin' || user
 export const canMoveMoney = (user) => !!user && (user.role === 'admin' || user.role === 'warehouse');
 
 /**
+ * Which SELLER account a request acts under, and what that person may see of it.
+ *
+ * A team member acts under their leader: their own user id owns nothing, so every read
+ * and write has to resolve to `owner_id` first. Returns
+ * `{ id, perms, member }` — `perms` is null for a full owner (unrestricted) and an array
+ * for a member, which is what makes `canSurface` below a hide-only rule.
+ *
+ * Lives here because this exact query had already been written twice — privately in
+ * orders.js (resolveSeller) and again in wallet.js (ownerWalletFor) — and the same
+ * comment above canMoveMoney records how that pattern ends: three copies, drifted, one
+ * of them gating on the wrong thing. A third copy was about to be added for order fees.
+ *
+ * FAILS CLOSED on a read error: an unreadable membership is reported as "no membership",
+ * never as an unrestricted owner.
+ */
+export async function resolveSeller(user, q) {
+  if (!user) return { id: null, perms: null, member: false };
+  if (isStaff(user)) return { id: user.sub, perms: null, member: false };
+  try {
+    const r = await q("select owner_id, permissions from team_members where lower(email)=lower($1) and status='active' limit 1", [user.email || '']);
+    const row = r.rows[0];
+    if (row && row.owner_id) return { id: row.owner_id, perms: Array.isArray(row.permissions) ? row.permissions : [], member: true };
+  } catch (e) { /* fall through to "not a member" */ }
+  return { id: user.sub, perms: null, member: false };
+}
+
+/**
+ * HIDE-ONLY. A full owner (perms === null) always passes; a team member passes only for
+ * the surfaces their leader granted. Never the other way round — this can hide something
+ * from a member, and can never reveal something to someone who wasn't already entitled.
+ */
+export function canSurface(sel, surface) {
+  return !(sel && sel.member && sel.perms && sel.perms.indexOf(surface) < 0);
+}
+
+/**
  * Entitlements a user actually has, INCLUDING ones inherited from their team leader.
  *
  * A team member's own row is always 'starter' with no add-ons — they never buy anything;

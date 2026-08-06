@@ -2806,6 +2806,11 @@ export type OrderCharges = {
   refunds: { amount: number; part: string | null; note?: string | null; at: string; by?: string | null }[]
   charged: number; refunded: number; refundable: number
   canRefund?: boolean
+  /** True when the caller is a team member whose leader has NOT granted 'order_fees'.
+   *  The server withholds the amounts rather than the client hiding them, so everything
+   *  above arrives empty — treat this as "not allowed to see", never as "nothing was
+   *  charged". Those two look identical in the data and mean opposite things. */
+  gated?: boolean
 }
 export function getOrderCharges(id: string) {
   return api<OrderCharges>(`/api/orders/${encodeURIComponent(id)}/charges`)

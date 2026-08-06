@@ -4,7 +4,7 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { hashOf, isPhash } from '../fingerprint.js';
-import { isStaff } from '../auth.js';
+import { isStaff, resolveSeller as _resolveSeller, canSurface } from '../auth.js';
 import { egBroadcast } from '../events.js';
 import { notify } from './notifications.js';
 import { aiComplete } from './support_ai.js';
@@ -1972,18 +1972,12 @@ export function ordersRoutes(app, requireAuth) {
   // seller id (owner for a member, else self) + the member's permission surfaces (perms=null means a
   // full owner, not a team member). Staff → own id, not a member. This is what enforces the "team
   // members see their owner's orders" exception server-side, not just in the UI.
-  async function resolveSeller(user) {
-    if (!user) return { id: null, perms: null, member: false };
-    if (isStaff(user)) return { id: user.sub, perms: null, member: false };
-    try {
-      const r = await q("select owner_id, permissions from team_members where lower(email)=lower($1) and status='active' limit 1", [user.email || '']);
-      const row = r.rows[0];
-      if (row && row.owner_id) return { id: row.owner_id, perms: Array.isArray(row.permissions) ? row.permissions : [], member: true };
-    } catch (e) {}
-    return { id: user.sub, perms: null, member: false };
-  }
-  // A team member is limited to their granted surfaces (hide/unhide). A full owner (perms=null) passes.
-  function _canSurface(sel, surface) { return !(sel && sel.member && sel.perms && sel.perms.indexOf(surface) < 0); }
+  // Both of these now live in auth.js — this file kept the original private copies, and
+  // wallet.js kept a second one, which is exactly the drift the canMoveMoney comment
+  // warns about. These thin wrappers keep every existing call site in this file unchanged
+  // while there is only ONE definition of the rule.
+  const resolveSeller = (user) => _resolveSeller(user, q);
+  const _canSurface = canSurface;
 
   // Chat-channel access. Deliberately SEPARATE from canSeeOrder: that one also gates
   // design uploads/threads the designer board needs, so narrowing it would break the

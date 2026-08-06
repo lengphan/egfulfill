@@ -61,7 +61,7 @@ async function reverseExpediteOnCancel(order, by) {
   if (order.seller_id) {
     try {
       const res = await refundOrder({ orderId: order.id, select: ['expedite'], full: true,
-        note: `Expedited dispatch cancelled · order ${order.id}`, by, clientId: `expedite-cancel-${order.id}` });
+        note: `Expedited Shipping cancelled · order ${order.id}`, by, clientId: `expedite-cancel-${order.id}` });
       if (res && res.ok) out.feeRefunded = res.refunded || 0;
     } catch { /* leave feeRefunded 0 */ }
   }
@@ -189,7 +189,10 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       const bal = await balanceOf(order.seller_id).catch(() => 0);
       if (bal >= fee) {
         await moveFunds({ from: order.seller_id, to: 'factory', amount: fee, type: 'expedite',
-          ref, note: `Expedited dispatch · order ${order.id}` }).catch(() => {});
+          // Note text the SELLER reads on their wallet ledger, so it matches the fee's
+          // label in the order summary. Only new rows carry it — rows already written
+          // keep the wording they were written with, which is the point of a ledger.
+          ref, note: `Expedited Shipping · order ${order.id}` }).catch(() => {});
         out.charged = true;
       } else {
         out.owed = fee;   // surfaced on the order; the parcel still goes

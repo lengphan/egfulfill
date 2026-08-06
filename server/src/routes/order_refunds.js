@@ -13,7 +13,7 @@
 import { q, withLock } from '../db.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { audit } from '../audit.js';
-import { canMoveMoney } from '../auth.js';
+import { canMoveMoney, resolveSeller, canSurface } from '../auth.js';
 
 // Which part of an order a refund row paid back. Added idempotently at load, like the
 // other late columns in this codebase — schema.sql only runs on a first DB init, so an
@@ -36,7 +36,7 @@ const canRefund = canMoveMoney;
  */
 const CHARGE_KINDS = [
   { type: 'order-charge', label: 'Production',         ref: (id) => id },
-  { type: 'expedite',     label: 'Expedited dispatch', ref: (id) => `expedite-${id}` },
+  { type: 'expedite',     label: 'Expedited Shipping', ref: (id) => `expedite-${id}` },
   { type: 'express-ship', label: 'Express shipping',   ref: (id) => `express-${id}` },
   { type: 'design-fee',   label: 'Design service',     ref: (id) => `design-${id}` },
 ];
@@ -65,7 +65,12 @@ export const PART_ORDER = ['product', 'shipping', 'expedite', 'express', 'design
 const PART_LABELS = {
   product: 'Product cost',
   shipping: 'Shipping',
-  expedite: 'Expedited dispatch',
+  // NB these two read alike but are different money. `expedite` is the DISPATCH-partner
+  // fee — charged per label when one is pushed to the partner's pre-scan queue — while
+  // `express` is a faster carrier service on the parcel itself. The labels were
+  // 'Expedited dispatch' / 'Express shipping'; renamed on request. If anyone later
+  // mistakes one for the other, that pair of names is why.
+  expedite: 'Expedited Shipping',
   express: 'Express shipping',
   design: 'Design service',
   files: 'Design files',
@@ -322,10 +327,39 @@ export function orderRefundRoutes(app, requireAuth) {
     };
   });
 
-  // Itemised charges for one order. Staff-readable — an operator seeing what an order
-  // cost is harmless and useful; only ISSUING money is restricted.
+  /**
+   * Itemised charges for one order.
+   *
+   * Staff read any order — an operator seeing what one cost is harmless and useful; only
+   * ISSUING money is restricted (canRefund).
+   *
+   * A SELLER reads their OWN order. This used to be flat "Staff only", which made the
+   * person who actually paid the one party who couldn't see the itemisation — every fee
+   * beyond production and shipping (expedited shipping, express, design service, design
+   * files) was invisible to them anywhere in the app.
+   *
+   * A TEAM MEMBER sees it only if the leader granted 'order_fees'. That check is HERE, in
+   * the response, not in the client: a member can call this endpoint directly, so hiding
+   * the panel in React would be decoration rather than a gate. Without the grant the
+   * amounts are never serialised at all — the reply carries `gated: true` and nothing to
+   * add up, so there is no figure on the wire to read off.
+   */
   app.get('/api/orders/:id/charges', { preHandler: requireAuth }, async (req, reply) => {
-    if (!req.user || req.user.role === 'seller') { reply.code(403); return { error: 'Staff only' }; }
+    if (!req.user) { reply.code(401); return { error: 'Sign in required' }; }
+    const staff = req.user.role !== 'seller';
+    if (!staff) {
+      const sel = await resolveSeller(req.user, q);
+      const own = await q('select seller_id from orders where id=$1', [req.params.id]);
+      if (!own.rows[0]) { reply.code(404); return { error: 'Order not found' }; }
+      if (String(own.rows[0].seller_id || '') !== String(sel.id || '')) {
+        reply.code(403); return { error: 'forbidden' };
+      }
+      // The leader's switch. Owners (perms === null) always pass; members need the grant.
+      if (!canSurface(sel, 'order_fees')) {
+        return { gated: true, canRefund: false, lines: [], parts: [], refunds: [],
+                 charged: 0, refunded: 0, refundable: 0 };
+      }
+    }
     const state = await orderCharges(req.params.id);
     return { ...state, canRefund: canRefund(req.user) };
   });
