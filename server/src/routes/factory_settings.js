@@ -78,6 +78,13 @@ const TEXT_KEYS = ['ss_shipping_method', 'otto_payment_method', 'otto_shipping_m
                    // Editable delay notice shown to a seller ONLY once they've crossed their
                    // order limit — e.g. "orders submitted now may ship later than usual".
                    'capacity_notice',
+                   // LOOKBOOK BRANDING. The printed catalogue goes to buyers, so the name on
+                   // its cover, the accent it prints in, and the line under the wordmark all
+                   // have to be editable without a deploy — a catalogue is exactly the thing
+                   // someone wants to re-skin for a trade show or a private-label buyer.
+                   // Blank means "use the house default", so an untouched install still
+                   // prints something finished rather than something empty.
+                   'lookbook_title', 'lookbook_tagline', 'lookbook_accent', 'lookbook_contact',
                    // Default Pink Design product type: most shops send one type, so it's set
                    // once here and applied to every push — the picker needn't appear per card.
                    'pink_product_type'];
