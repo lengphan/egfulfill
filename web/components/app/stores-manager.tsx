@@ -80,17 +80,26 @@ function ChannelMark({ channelKey, name }: { channelKey: string; name: string })
   // which; public/suppliers already stores PNGs (otto.png, ss.png), so both must work.
   const [step, setStep] = useState(0)
   const src = step === 0 ? `/channels/${channelKey}.svg` : `/channels/${channelKey}.png`
+  // CONSTRAINED BY HEIGHT, NOT BOXED. These are wordmarks — WooCommerce's is 3.8:1 and
+  // Amazon's 2.3:1 — so a square plate shrinks them to a 24×6 smear. A fixed height with
+  // free width is the only arrangement in which marks of different aspect ratios read as
+  // the same size, and it's how the brands' own guidelines size them.
+  //
+  // No tinted plate behind them either: each mark carries its own colour and several ship
+  // with a white background baked in, so a coloured plate frames them badly.
   return (
-    <span className="flex size-11 items-center justify-center rounded-xl bg-muted">
+    <span className="flex h-8 items-center">
       {step > 1 ? (
-        <Storefront size={22} weight="duotone" className="text-muted-foreground" />
+        <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
+          <Storefront size={18} weight="duotone" className="text-muted-foreground" />
+        </span>
       ) : (
         // eslint-disable-next-line @next/next/no-img-element -- a static local asset with an
         // onError fallback; next/image gives no benefit and swallows the 404 we rely on.
         <img
           src={src}
           alt={`${name} logo`}
-          className="size-6 object-contain"
+          className="max-h-8 w-auto max-w-[140px] object-contain object-left"
           onError={() => setStep((s) => s + 1)}
         />
       )}
