@@ -50,7 +50,7 @@ export const INK = "#0B0B0C"
 // purple hero as well; now the purple has its own plate and the paper is only ever the page.
 //
 // Both letterings clear it comfortably: ink 18.54:1, the accent purple 13.11:1.
-export const SURFACE = "#FAF8F3"
+export const SURFACE = "#F2F1EC"
 
 /**
  * PAPER LETTERING ON THE PLATE — a deliberate, decorative-only exception.
@@ -140,7 +140,7 @@ export const ACID = '#D4F897'
  * the 3:1 boundary floor, at 3.26:1; the softer #9C9789 measures 2.58:1 and fails. Do not
  * lighten it to calm the page down — the fields stop being findable.
  */
-export const AUTH_GROUND = '#F2F1EC'
+export const AUTH_GROUND = SURFACE
 export const AUTH_FIELD = '#FFFFFF'
 export const AUTH_EDGE = '#8A8577'
 /** Secondary type on AUTH_GROUND — 5.06:1, so it stays real text rather than a hint. */
@@ -284,10 +284,15 @@ export function Pill({ href, children, tone = "ink", className = "" }: {
     // the green now carries the label and the arrow, tying the button to the plate it sits
     // on. 16.56:1 on the ink ground, so it is louder AND more readable than the cream was.
     ink: "bg-[#0B0B0C] text-[#D4F897] hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]",
-    accent: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
+    // Violet fill, LIME label — the same action pair as the app's default button and the
+    // selected nav item. It used to be violet with INK on it, which measures 2.75:1 and
+    // fails outright; the tone was unused, so it shipped broken rather than being noticed.
+    accent: "text-[#D4F897] hover:brightness-110 focus-visible:ring-[#0B0B0C]",
     // Ink on acid is 15.19:1. White on acid is 1.30:1 — never do that.
     acid: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
-    ghost: "border border-[#FAF8F3]/35 text-[#FAF8F3] hover:border-[#FAF8F3]/70 hover:bg-[#FAF8F3]/10 focus-visible:ring-[#FAF8F3]",
+    // The secondary on a LIGHT ground: an ink outline. This was a copy of ghostLight —
+    // cream on cream — which is only ever right over a dark plate.
+    ghost: "border border-[#0B0B0C]/25 text-[#0B0B0C] hover:border-[#0B0B0C]/60 hover:bg-[#0B0B0C]/[0.04] focus-visible:ring-[#0B0B0C]",
     // The ghost outline inverted, for use ON the deep plate where ink would disappear.
     ghostLight: "border border-[#FAF8F3]/30 text-[#FAF8F3] hover:border-[#FAF8F3]/60 hover:bg-[#FAF8F3]/10 focus-visible:ring-[#FAF8F3]",
   }
@@ -330,26 +335,26 @@ export function PlateHero({ title, accent, sub, children }: {
   title: string; accent?: string; sub?: string; children?: React.ReactNode
 }) {
   const reduce = useReducedMotion()
-  // THE DEEP PLATE, carrying cream lettering — the same banner the home hero uses, so an
-  // interior page reads as the same site rather than a different one.
+  // PAPER, not a plate. The full-bleed violet was 76% of the viewport at chroma 0.272 —
+  // near the maximum sRGB can express at that hue — which is why it read as "too bright"
+  // whichever bright colour it was. The login page uses the SAME violet at 0.9% coverage and
+  // reads as calm, so the fix is area, not hue.
   //
-  // This previously set the section background to SURFACE while leaving the h1 at
-  // `color: SURFACE`, i.e. cream lettering on cream paper. Every interior hero rendered as a
-  // ~380px band of nothing — not a subtle contrast failure but literally invisible type, and
-  // the reason all four pages looked like they had blank space at the top. A colour pair is
-  // only safe when both halves move together; changing one is what produced this.
+  // This is a return to the documented style rather than a new direction: ink and paper carry
+  // the page, type does the work decoration usually does, and there is ONE accent
+  // (CLAUDE.md 4). The full-bleed plate was the drift.
   //
-  // Cream on #4454EC is 5.31:1 and the acid accent is 4.35:1 — both real readable type.
+  // Measured on this ground: ink 17.40:1, the violet accent phrase 5.33:1.
   return (
-    <section className="relative -mt-16 pt-16" style={{ background: PLATE_DEEP }}>
+    <section className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
       <div className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pt-20">
-        <h1 className="mx-auto max-w-5xl text-center font-display font-black leading-[0.92] tracking-[-0.04em]" style={{ ...DISPLAY, color: SURFACE }}>
-          <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} color={ACID} /></> : null}
+        <h1 className="mx-auto max-w-5xl text-center font-display font-black leading-[0.92] tracking-[-0.04em]" style={{ ...DISPLAY, color: INK }}>
+          <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} color={ACCENT} /></> : null}
         </h1>
         {sub && (
           <motion.p
             className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed"
-            style={{ color: "rgba(250,248,243,0.8)" }}
+            style={{ color: "rgba(11,11,12,0.62)" }}
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: EASE }}

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform, animate } from "motion/react"
 import { ArrowUpRight, PlugsConnected, Printer, Truck, Wallet } from "@phosphor-icons/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, INK, SURFACE, PLATE_DEEP, ACID, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
+import { ACCENT, INK, SURFACE, ACID, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -123,32 +123,32 @@ export function BoldHome({ content }: { content: SiteContent }) {
           at the top of the window instead of under a white bar. The header itself goes
           transparent on this route (site-header.tsx) — between them, the hero reads as one
           full-bleed plate with the nav sitting on it. */}
-      {/* DEEP plate, not the pastel. Light lettering needs a dark ground — on the old
-          #A5B7FF (L* 75.5) cream was 1.83:1 and white 1.94:1, so the headline had to be ink
-          and every "make it pop" attempt fought the background. At L* 41 the same cream is
-          5.96:1 and the acid accent 4.88:1. See PLATE_DEEP. */}
-      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: PLATE_DEEP }}>
-        {/* The diagonal returns the page to the cool off-white below the plate — one shape
-            doing the job a whole illustration usually does. */}
-        <div style={{ background: SURFACE }} className="absolute inset-x-0 -bottom-px h-24 [clip-path:polygon(0_100%,100%_0,100%_100%)]" aria-hidden />
-        {/* The plate is cut on a diagonal rather than a straight edge — one shape doing the
-            job a whole illustration usually does. */}
+      {/* PAPER, not a plate. Measured: the full-bleed violet covered 76% of the viewport at
+          chroma 0.272 — near the top of what sRGB can express at that hue — against 0.9% on
+          the sign-in page, which nobody has ever called too bright. It was the AREA, not the
+          hue, so re-picking the purple would only have produced a differently bright wall.
+          The violet is unchanged; it now appears on the accent phrase, the button and the
+          chart, which is what "ONE accent" in CLAUDE.md 4 has always meant.
+
+          The diagonal went with it: it existed to return the page to paper below the plate,
+          and there is no plate to return from. */}
+      <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
         <div className="mx-auto max-w-6xl px-6 pb-32 pt-16 sm:pt-24">
           <h1 className="max-w-5xl text-center font-display font-black leading-[0.92] tracking-[-0.04em] mx-auto"
-              // Cream, not pure white: 5.96:1 on the plate, and it ties the hero to the paper
-              // page below instead of introducing a third neutral.
-              style={{ color: SURFACE }}
-              // eslint-disable-next-line react/jsx-props-no-multi-spaces
+              // Ink on paper — 17.40:1. The headline is the page; the colour is one phrase.
+              style={{ color: INK }}
               >
             <span style={{ fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" }}>
             <MaskedWords text={hero.headline} />{" "}
-            {/* The one hot colour on the page. 4.88:1 on the plate — real type, not a glow. */}
-            <TypedPhrase text={hero.accent} color={SURFACE} lastWordColor={ACID} />
+            {/* The one hot colour on the page, and now the ONLY place it appears at display
+                size. Violet on paper is 5.33:1 — real type. Lime cannot be used here: on
+                paper it is 1.05:1 and simply disappears. */}
+            <TypedPhrase text={hero.accent} color={INK} lastWordColor={ACCENT} />
             </span>
           </h1>
 
           <motion.p
-            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed text-[#FAF8F3]/75"
+            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed text-[#0B0B0C]/62"
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
@@ -162,10 +162,11 @@ export function BoldHome({ content }: { content: SiteContent }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
           >
-            {/* Acid fill + ink label (15.19:1) is the reference's primary; the secondary
-                inverts to a light outline because ink would vanish on the deep plate. */}
-            <Pill href="/signup" tone="acid">{hero.ctaPrimary}</Pill>
-            <Pill href="/how-it-works" tone="ghostLight">{hero.ctaSecondary}</Pill>
+            {/* Violet fill + lime label is the primary everywhere now — the same pair as the
+                app's default button. The secondary is an ink outline, because a light one
+                only works over a dark plate and there isn't one. */}
+            <Pill href="/signup" tone="accent">{hero.ctaPrimary}</Pill>
+            <Pill href="/how-it-works" tone="ghost">{hero.ctaSecondary}</Pill>
           </motion.div>
         </div>
 

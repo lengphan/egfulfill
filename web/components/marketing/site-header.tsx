@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 
-import { PLATE_DEEP, ACID } from "@/components/marketing/bold-kit"
+import { SURFACE, ACCENT, ACID } from "@/components/marketing/bold-kit"
 
 const nav = [
   { label: "Products", href: "/catalog" },
@@ -27,25 +27,23 @@ const nav = [
  */
 export function SiteHeader() {
   /**
-   * ONE appearance, on every marketing route: the deep plate, opaque, at every scroll
-   * position, with light lettering.
+   * ONE appearance, on every marketing route: PAPER, opaque, with ink lettering.
    *
-   * This used to fork on `pathname === "/"` — deep plate for home, the pastel ACCENT band
-   * everywhere else. That check silently went wrong the moment PlateHero moved the interior
-   * heroes onto the deep plate too: the four inner pages rendered a lighter blue bar with
-   * DARK ink sitting directly above a deep plate carrying cream, which is both a visible
-   * seam between two near-identical blues and a legibility drop on the links.
+   * It used to be the deep violet plate, which was correct while the hero was a full-bleed
+   * plate — the bar and the hero had to be one value or the seam showed. The hero is paper
+   * now, so the bar follows it, and there is still exactly one value between them.
    *
-   * The lesson is the reason there's no route list here now. A hardcoded set of "pages with
-   * a plate" is a second source of truth about what the pages render, and it drifts the
-   * first time someone changes a hero. One appearance everywhere can't drift.
+   * There is no route fork here and there must not be one. A hardcoded list of "pages with a
+   * plate" is a second source of truth about what the pages render, and it went stale the
+   * last time a hero changed — pricing, features, how-it-works and catalog each drew a
+   * lighter bar with dark ink above a deep plate. One appearance everywhere cannot drift.
    */
-  const ink = "text-[#FAF8F3]"
-  const muted = "text-[#FAF8F3]/75 hover:bg-[#FAF8F3]/10 hover:text-[#FAF8F3]"
+  const ink = "text-[#0B0B0C]"
+  const muted = "text-[#0B0B0C]/65 hover:bg-[#0B0B0C]/[0.05] hover:text-[#0B0B0C]"
   return (
     <header
       className="sticky top-0 z-30"
-      style={{ background: PLATE_DEEP }}
+      style={{ background: SURFACE }}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
         <Link href="/" className={"font-display text-2xl font-semibold tracking-tight " + ink}>
@@ -71,9 +69,11 @@ export function SiteHeader() {
               </Link>
               <Link
                 href="/login"
-                // Acid pill, ink label — 15.19:1, and the one loud thing in the bar.
-                className="rounded-full px-5 py-2 text-sm font-semibold text-[#0B0B0C] transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FAF8F3] focus-visible:ring-offset-2"
-                style={{ background: ACID }}
+                // Violet fill, lime label — the one loud thing in the bar, and the same pair
+                // the app's primary button uses. Acid alone cannot work here: on paper it is
+                // 1.05:1 and the button would have no shape at all.
+                className="rounded-full px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B0B0C] focus-visible:ring-offset-2"
+                style={{ background: ACCENT, color: ACID }}
               >
                 Start free
               </Link>
