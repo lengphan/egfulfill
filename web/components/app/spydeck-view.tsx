@@ -880,7 +880,13 @@ export function SpyDeckView() {
           // Prefer the USD-converted price so the seller starts from a comparable number.
           price: makeListing.price_usd ?? makeListing.price,
           tags: makeListing.tags ?? [],
-          images: ((makeDetail?.images?.length ? makeDetail.images : makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []) as string[]).filter(Boolean),
+          // The publishable set starts EMPTY. A listing made from a competitor has none of
+          // its own photos yet, and pretending otherwise is what put a seller's shop one
+          // click from an IP takedown.
+          images: [],
+          // Their photos come through as reference so the seller can see what they're
+          // making. The dialog shows them in a separate strip and never publishes them.
+          referenceImages: ((makeDetail?.images?.length ? makeDetail.images : makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []) as string[]).filter(Boolean),
         } : null}
         onPublished={(url, img) => { if (makeListing) onPublishedFrom(makeListing, url, img) }}
         title="Make product"

@@ -80,6 +80,11 @@ export type PublishPrefill = {
   price?: number | string | null
   tags?: string[]
   images?: string[]
+  /** LOOK-AT-ONLY photos — the competitor's own shots behind a SpyDeck listing. Shown so a
+   *  seller can see what they're making; NEVER published. Kept out of `images` on purpose:
+   *  anything in `images` goes to the marketplace, and a set you can see but that silently
+   *  doesn't ship is the most misleading arrangement of the three. */
+  referenceImages?: string[]
   /** Catalog product to produce this on. Sets the cost side of the margin. */
   blank?: CatalogProduct | null
   /** The ARTWORK, not the composite in `images`. This is what gets attached to the order
@@ -139,8 +144,6 @@ export function PublishProductDialog({
   const [sizeRetail, setSizeRetail] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string; url?: string; note?: string } | null>(null)
-  // One-time acknowledgement that competitor-sourced photos are about to go on the shop.
-  const [ipConfirmed, setIpConfirmed] = useState(false)
   // Which marketplace this draft goes to. Etsy takes photos + tags + variants directly;
   // TikTok additionally needs a LEAF category, a warehouse (per-SKU inventory) and a
   // package weight, so those fields appear only when TikTok is the target.
@@ -176,7 +179,6 @@ export function PublishProductDialog({
       setBlank(prefill?.blank ?? null)
       setBlankText(prefill?.blank?.name ?? "")
       setResult(null)
-      setIpConfirmed(false)
       getSpydeckTrending().then((r) => setSuggested((r.keywords ?? []).slice(0, 12))).catch(() => {})
       getCatalogProducts().then((rows) => { catalogRef.current = rows ?? [] }).catch(() => {})
     }, 0)
@@ -318,12 +320,20 @@ export function PublishProductDialog({
   const makePrimary = (i: number) => { imgTouched.current = true; setImages((p) => [p[i], ...p.filter((_, x) => x !== i)]) }
   const removeImage = (i: number) => { imgTouched.current = true; setImages((p) => p.filter((_, x) => x !== i)) }
 
-  // Remote (http) images are the source's OWN photos — a SpyDeck competitor's Etsy-CDN
-  // shots. Locally-added photos are data: URLs, which are yours. Publishing someone
-  // else's photos to your shop is an Etsy IP-policy risk, so we make it a deliberate,
-  // acknowledged choice rather than something that just happens.
-  const borrowedPhotos = useMemo(() => images.filter((u) => /^https?:\/\//i.test(u)), [images])
-  const removeBorrowedPhotos = () => { imgTouched.current = true; setImages((p) => p.filter((u) => !/^https?:\/\//i.test(u))); setIpConfirmed(false) }
+  /**
+   * The competitor's own photos, for LOOKING AT. They never enter `images`.
+   *
+   * This used to be an amber warning with an "attach anyway" button. A checkbox only moves
+   * the blame — it doesn't stop the DMCA notice, and the shop that gets suspended is the
+   * SELLER's, not ours. CLAUDE.md's first rule is that nothing may put a connected account
+   * at risk, and a one-click path from someone else's photo to a live listing did exactly
+   * that. So there is no path any more, only a reference strip.
+   *
+   * They stay VISIBLE because the seller has to see what they're making. What must not
+   * happen is showing them among the publishable photos and dropping them at upload — a set
+   * you can see but that silently doesn't ship is the most misleading of the three options.
+   */
+  const referencePhotos = useMemo(() => (prefill?.referenceImages ?? []).filter(Boolean), [prefill])
 
   // Leaf categories that match what the seller typed. Capped so a 5,000-node tree can't
   // render at once; the search box is how you reach the rest.
@@ -389,10 +399,18 @@ export function PublishProductDialog({
       setResult({ ok: false, text: msg })
       return
     }
-    // Gate on the FIRST attempt when the listing carries the competitor's own photos:
-    // surface the IP warning and make the seller choose. The warning panel renders while
-    // `!ipConfirmed`, so this returns and waits rather than silently attaching.
-    if (borrowedPhotos.length > 0 && !ipConfirmed) { setResult(null); return }
+    // A listing needs a photo, and since the competitor's are reference-only there may now
+    // be none. Say so HERE — the alternative is Etsy rejecting it with a message about
+    // image requirements that reads like our bug rather than a missing step.
+    if (!images.length) {
+      setResult({
+        ok: false,
+        text: referencePhotos.length
+          ? "Add at least one photo of your own. The reference shots below belong to the seller who took them and aren't published."
+          : "Add at least one photo.",
+      })
+      return
+    }
     if (channel === "tiktok") { publishToTiktok(); return }
     setBusy(true); setResult(null)
     try {
@@ -776,41 +794,31 @@ export function PublishProductDialog({
               {/* IP warning — only for the competitor's OWN photos, and only until the
                   seller acknowledges it. Publishing someone else's images to your shop can
                   get a listing pulled and, repeated, put the shop at risk. */}
-              {borrowedPhotos.length > 0 && !ipConfirmed && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-                  <p className="font-semibold">
-                    {borrowedPhotos.length} of these photos {borrowedPhotos.length === 1 ? "is the competitor's" : "are the competitor's"} own image{borrowedPhotos.length === 1 ? "" : "s"}.
-                  </p>
-                  <p className="mt-1 text-amber-800">
-                    Publishing them to your {channel === "tiktok" ? "TikTok" : "Etsy"} shop may breach the
-                    marketplace&apos;s intellectual-property policy and put the shop at risk. Swap in your
-                    own artwork, or attach them anyway.
+              {/* REFERENCE ONLY — the competitor's own photos, shown so the seller can see
+                  what they're making, in their own strip so they can't be mistaken for the
+                  images above. There is no "attach anyway": these never enter `images`, so
+                  nothing here can reach a marketplace. */}
+              {referencePhotos.length > 0 && (
+                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    What you&apos;re copying — reference only, not published
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      onClick={removeBorrowedPhotos}
-                      className="rounded-md border border-amber-400 bg-white px-2.5 py-1 font-medium text-amber-900 transition-colors hover:bg-amber-100"
-                    >
-                      Remove their photos
-                    </button>
-                    <button
-                      onClick={() => setIpConfirmed(true)}
-                      className="rounded-md bg-amber-600 px-2.5 py-1 font-medium text-white transition-colors hover:bg-amber-700"
-                    >
-                      Attach anyway
-                    </button>
+                    {referencePhotos.slice(0, 6).map((u, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={i} src={u} alt="" className="size-16 rounded border border-border object-cover opacity-75" />
+                    ))}
                   </div>
+                  <p className="mt-2 text-2xs text-muted-foreground">
+                    These belong to the seller who took them. Publishing them can get the listing pulled
+                    and the shop suspended, so add your own photo above.
+                  </p>
                 </div>
-              )}
-              {borrowedPhotos.length > 0 && ipConfirmed && (
-                <p className="text-xs text-amber-700">
-                  Attaching {borrowedPhotos.length} competitor photo{borrowedPhotos.length === 1 ? "" : "s"} — replace {borrowedPhotos.length === 1 ? "it" : "them"} with your own before this draft goes live.
-                </p>
               )}
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                <Button onClick={publish} disabled={busy || (borrowedPhotos.length > 0 && !ipConfirmed)}>
+                <Button onClick={publish} disabled={busy}>
                   {busy ? <CircleNotch size={15} className="animate-spin" /> : <><Storefront size={14} weight="bold" /> Publish draft</>}
                 </Button>
               </div>
