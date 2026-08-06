@@ -38,7 +38,54 @@ and nothing should be built on them.
 
 **Check which we hold before writing any code.** The portal it came from decides it (§1).
 
-## 3. The flow, which is the same shape as Etsy/Shopify/TikTok
+## 3. Getting listed — the part that isn't code
+
+**The seller Developer Portal (`developer.walmart.com/generateKey`) is the wrong place for
+us.** It issues keys scoped to one seller account. A Solution Provider registers an APP, in
+the **Solution Provider Center**, and the credentials fall out of that registration.
+
+New Solution Providers **must** use OAuth 2.0 — Delegated Access is only honoured for
+providers with pre-existing contracts, and it dies anyway (§2).
+
+**Walmart quotes three to five weeks** for the whole approval-and-publication process.
+
+| # | Step | Where |
+|---|---|---|
+| 1 | Submit the application | channel partner prospect portal |
+| 2 | Approval email → consultation | Walmart Partnerships team |
+| 3 | Register for **sandbox** access | Solution Provider Center |
+| 4 | Build the OAuth 2.0 flow (§4) against `sandbox.walmartapis.com` | us |
+| 5 | Register the app for the Seller Center App Store | Solution Provider Center |
+| 6 | Kickoff call, **1–2 days** after submitting | Walmart |
+| 7 | App sits **In Review** | Walmart |
+| 8 | **Demo call** — show it working | Walmart |
+| 9 | Approved → **Ready to Publish** | Walmart |
+| 10 | We press publish; sellers can now Connect | us |
+
+### What app registration asks for
+
+Credentials are issued **after** the marketing details are filled in, not before — so the
+listing copy is on the critical path, not an afterthought.
+
+**Technical**
+- **App Login URL** — the page a seller sees after clicking Connect
+- **App Callback / redirect URL(s)** — where sellers land post-authentication (one or more)
+- **Client URL** — the app's website. *Not* the OAuth redirect; easy to conflate
+- **API scopes** — these get listed verbatim in the seller-facing data-privacy notice
+
+**Listing**
+- name, description, contact email
+- square logo (SVG or PNG, ≤1MB); banner 1920×400 (≤5MB)
+- 200-character description, up to 5 feature bullets, pricing, support contact + URL
+
+### The decision this forces on us
+
+The **App Login URL** and **Auth Callback URL** get registered with Walmart, so they land in
+the same bucket as the Etsy and Shopify redirect URIs: changing them later means
+re-registering in *their* system. That has to be settled before step 5, not after — see
+CLAUDE.md §3 on why the apex is load-bearing and why `oauth-callback.html` still exists.
+
+## 4. The flow, which is the same shape as Etsy/Shopify/TikTok
 
 Authorization-code OAuth, so the existing popup-OAuth pattern ports rather than being
 redesigned. Two URLs must be registered with Walmart at app-registration time — an **App
@@ -75,7 +122,7 @@ business call then needs `Authorization: Bearer …` plus `WM_PARTNER.ID`, `WM_M
   and Shopify callbacks: changing host means re-registration with the provider, in their
   system, not ours. See CLAUDE.md §3.
 
-## 4. Base URLs
+## 5. Base URLs
 
 | | |
 |---|---|
@@ -86,25 +133,25 @@ A sandbox exists — worth confirming it covers orders and not only fulfilment s
 the supplier integrations here have repeatedly had unvalidated payloads (S&S, Otto, SanMar,
 TikTok publish) and this one should not join them.
 
-## 5. NOT yet verified
+## 6. NOT yet verified
 
 Honest gaps, so nobody builds on a guess:
 
 - **Exact Orders endpoint paths.** The reference pages don't render for a plain fetch, so the
   paths for get-released-orders, acknowledge and ship-with-tracking are unconfirmed. They do
   not change the plan; pin them down against the reference guide when building.
-- **Whether the App Store listing needs review/approval before sellers can Connect**, and how
-  long that takes. `stores-manager.tsx` already says "Awaiting app approval", which suggests
-  something is in flight — worth reconciling with what's actually pending.
+- **Where we actually are in the §3 table.** `stores-manager.tsx` shows "Awaiting app
+  approval", but that is a HARDCODED literal in the `CHANNELS` array — it reflects no real
+  status and should not be read as evidence that anything was submitted.
 - **Whether `WM_CONSUMER.CHANNEL.TYPE` is required for us.** Documented as optional channel
   tracking; Walmart has historically issued one per solution.
 
-## 6. Suggested order of work
+## 7. Suggested order of work
 
-1. **Identify the credential we hold** (§1). Everything else depends on it.
-2. Confirm the App Store listing's status and get the App Log-in + Auth Callback URLs
-   registered. Note that neither can be `app.egful.store` without deciding the same
-   single-origin question the Etsy/Shopify callbacks already answered — see CLAUDE.md §3.
+1. **Establish where we actually are in the §3 table** — applied? approved? sandbox issued?
+   The UI string proves nothing. Everything else depends on this.
+2. Settle the App Login URL and Auth Callback URL before registering the app (§3), because
+   changing them afterwards means re-registering with Walmart.
 3. `server/src/routes/walmart.js` copying `shopify.js`'s shape: connect → callback → token
    exchange → store `sellerId`+`refresh_token`, then order import.
 4. Tracking push back, which is what makes it fulfilment rather than a read-only feed.
