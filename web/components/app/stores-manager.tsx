@@ -62,6 +62,42 @@ const CHANNELS: { key: string; name: string; live: boolean; soon?: string }[] = 
   { key: "amazon", name: "Amazon", live: false },
   { key: "walmart", name: "Walmart", live: false },
 ]
+/**
+ * A channel's own logo, UNALTERED, from `public/channels/<key>.svg`.
+ *
+ * Not tinted and not redrawn. Etsy, Shopify, TikTok, Amazon and Walmart all require their
+ * mark in its own colours and forbid recolouring, and two of those will be reviewing us —
+ * an altered logo is a routine flag in app review. So the tile carries a neutral plate and
+ * the real mark sits on it, which is also the only version that is actually recognisable.
+ *
+ * Falls back to the generic storefront icon when the file isn't there, so a channel without
+ * an approved asset yet renders as an interface icon rather than a broken image. Defined at
+ * module scope — a component declared inside render violates react-hooks/static-components
+ * and remounts on every parent render, which would re-trigger the error state.
+ */
+function ChannelMark({ channelKey, name }: { channelKey: string; name: string }) {
+  // svg → png → icon. Brand press kits give one or the other and it's not worth caring
+  // which; public/suppliers already stores PNGs (otto.png, ss.png), so both must work.
+  const [step, setStep] = useState(0)
+  const src = step === 0 ? `/channels/${channelKey}.svg` : `/channels/${channelKey}.png`
+  return (
+    <span className="flex size-11 items-center justify-center rounded-xl bg-muted">
+      {step > 1 ? (
+        <Storefront size={22} weight="duotone" className="text-muted-foreground" />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- a static local asset with an
+        // onError fallback; next/image gives no benefit and swallows the 404 we rely on.
+        <img
+          src={src}
+          alt={`${name} logo`}
+          className="size-6 object-contain"
+          onError={() => setStep((s) => s + 1)}
+        />
+      )}
+    </span>
+  )
+}
+
 // The two counters above the list read off the same array, so adding a channel can't leave a
 // hard-coded "3 live" behind.
 const liveChannels = CHANNELS.filter((c) => c.live)
@@ -456,9 +492,7 @@ export function StoresManager() {
               transition={{ duration: 0.35, delay: i * 0.05 }}
               className="flex flex-col rounded-2xl border border-border bg-card p-5"
             >
-              <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Storefront size={22} weight="duotone" />
-              </span>
+              <ChannelMark channelKey={ch.key} name={ch.name} />
               <div className="mt-3 flex-1 font-semibold">{ch.name}</div>
               {ch.key === "shopify" ? (
                 <div className="mt-4 space-y-2">
