@@ -14,20 +14,49 @@ import {
   CSV_COLUMNS,
   TEMPLATE_HEADERS,
   TEMPLATE_TSV,
+  COLUMN_OPTIONS,
+  GROUP_LABEL,
+  columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getSheetsConfig, getSheetRows } from "@/lib/api"
+import { createOrder, getOrders, getSheetsConfig, getSheetRows, createSheet } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
 
 // Build + download the .xlsx template. Lazy-imports the (already-installed) xlsx lib so it
 // never weighs down the app's main bundle — only loads when someone clicks the button.
+//
+// Carries the SAME two-row header as the Google Sheet: a merged band banner over the column
+// names, so both templates read identically and findHeaderRow() handles both the same way.
+//
+// It cannot carry the colours or the dropdowns. Cell styling and data validation are
+// SheetJS Pro features; the community build we ship writes neither, and silently — it does
+// not throw, it just emits a plain sheet. So the bands are spelled out in the banner text
+// instead of being conveyed by fill alone, which is the part that actually has to survive.
+// An "Options" tab lists the accepted values so they are at least discoverable here.
 async function downloadXlsxTemplate() {
   const XLSX = await import("xlsx")
-  const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS])
+  const bands = columnBands()
+  // Banner row: the label sits in the band's first cell and the merge spans the rest.
+  const banner = TEMPLATE_HEADERS.map(() => "")
+  bands.forEach((b) => { banner[b.start] = GROUP_LABEL[b.group] })
+  const ws = XLSX.utils.aoa_to_sheet([banner, TEMPLATE_HEADERS])
+  ws["!merges"] = bands
+    .filter((b) => b.count > 1)
+    .map((b) => ({ s: { r: 0, c: b.start }, e: { r: 0, c: b.start + b.count - 1 } }))
   ws["!cols"] = TEMPLATE_HEADERS.map((h) => ({ wch: Math.max(12, h.length + 2) }))
+  ws["!freeze"] = { xSplit: "0", ySplit: "2" }
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, "Orders")
+  // Accepted values, one column per constrained field — the .xlsx equivalent of the
+  // Sheet's dropdowns.
+  const optCols = Object.entries(COLUMN_OPTIONS)
+  const optHeader = optCols.map(([key]) => CSV_COLUMNS.find((c) => c.key === key)?.header ?? key)
+  const depth = Math.max(...optCols.map(([, v]) => v.length))
+  const optRows = Array.from({ length: depth }, (_, i) => optCols.map(([, v]) => v[i] ?? ""))
+  const wsOpts = XLSX.utils.aoa_to_sheet([optHeader, ...optRows])
+  wsOpts["!cols"] = optHeader.map((h) => ({ wch: Math.max(14, h.length + 2) }))
+  XLSX.utils.book_append_sheet(wb, wsOpts, "Accepted values")
   XLSX.writeFile(wb, "EGFULFILL Order Import.xlsx")
 }
 
@@ -50,6 +79,10 @@ export function ImportOrdersDialog({
   const [copyFallback, setCopyFallback] = useState<string | null>(null)
   const [sheetLoading, setSheetLoading] = useState(false)
   const [sheetsEnabled, setSheetsEnabled] = useState(false)
+  // Whether the server can build a formatted sheet for us (service account present), vs
+  // only being able to READ one — which decides which of the two button flows we offer.
+  const [sheetsCanCreate, setSheetsCanCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState<{ imported: number } | null>(null)
 
@@ -58,7 +91,10 @@ export function ImportOrdersDialog({
     // Reset per open, and see whether Google Sheets is configured server-side.
     const id = setTimeout(() => {
       setRecords(null); setError(null); setPaste(""); setSheetUrl(""); setDone(null)
-      getSheetsConfig().then((c) => setSheetsEnabled(!!c.enabled)).catch(() => setSheetsEnabled(false))
+      setNotice(null); setCopyFallback(null)
+      getSheetsConfig()
+        .then((c) => { setSheetsEnabled(!!c.enabled); setSheetsCanCreate(!!c.canCreate) })
+        .catch(() => { setSheetsEnabled(false); setSheetsCanCreate(false) })
     }, 0)
     return () => clearTimeout(id)
   }, [open])
@@ -118,14 +154,38 @@ export function ImportOrdersDialog({
   }
 
   /**
-   * Open a new Google Sheet pre-filled with our template.
+   * Get the seller a Google Sheet with our template already in it.
    *
-   * Google has no "create a sheet from this CSV" URL, so this uses the documented
-   * create-and-import flow: a blank sheet opens and the template lands on the clipboard
-   * for a single paste. Better than telling someone to build the columns themselves,
-   * which is where most import failures start.
+   * PREFERRED: the server builds a real sheet — banded header, colours, frozen rows,
+   * dropdowns — and shares it link-editable. That is the only path that can carry
+   * formatting and data validation, since Google has no "create a sheet from this CSV" URL
+   * and a clipboard paste carries text and nothing else.
+   *
+   * FALLBACK (no service account configured): the old open-blank-and-paste flow. It gives
+   * plain headers in the right order, which still imports correctly — just without the
+   * colour bands and dropdowns.
    */
   const makeSheetCopy = async () => {
+    setError(null); setCopyFallback(null)
+    if (sheetsCanCreate) {
+      setCreating(true)
+      try {
+        const r = await createSheet()
+        if (r.url) {
+          window.open(r.url, "_blank", "noopener")
+          setSheetUrl(r.url)
+          setNotice("Your sheet is open in a new tab — required columns are grouped and coloured at the front, with dropdowns where we know the options. Fill it in, then press Load.")
+          return
+        }
+        // Fall through to the clipboard path rather than dead-ending: a sheet they can
+        // paste into beats an error message.
+        setError(r.error || "Couldn't create the sheet — falling back to a blank one.")
+      } catch {
+        setError("Couldn't reach the server to create a sheet — falling back to a blank one.")
+      } finally {
+        setCreating(false)
+      }
+    }
     // Whether the copy ACTUALLY happened decides what we tell them. navigator.clipboard is
     // undefined outside a secure context, and `await undefined` resolves happily — so the old
     // optional-chained call could no-op without throwing, and we would still promise the
@@ -140,7 +200,6 @@ export function ImportOrdersDialog({
     } catch { copied = false }
     setCopyFallback(copied ? null : TEMPLATE_TSV)
     window.open("https://sheets.new", "_blank", "noopener")
-    setError(null)
     setNotice(
       copied
         ? "A blank Google Sheet is opening — the header row is on your clipboard. Click cell A1 and press ⌘V / Ctrl+V."
@@ -241,40 +300,47 @@ export function ImportOrdersDialog({
               </Button>
             </div>
 
-            {/* Columns reference — REQUIRED are solid, OPTIONAL are highlighted amber so a filler
-                sees at a glance what they can skip. Hover any chip for what it does. */}
-            <details className="rounded-xl border border-border bg-muted/20">
+            {/* Columns reference, GROUPED into the same three bands the sheet uses and in the
+                same order. Previously this was one undifferentiated run of 21 chips where the
+                required ones were scattered through the optional ones, so working out what you
+                actually had to fill meant reading every chip and its colour. Now the answer is
+                the first block, and the rest can be ignored. */}
+            <details className="rounded-xl border border-border bg-muted/20" open>
               <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
-                Columns — <span className="text-muted-foreground">what’s required vs optional</span>
+                Columns — <span className="text-muted-foreground">required first, then optional</span>
               </summary>
-              <div className="space-y-2 px-3 pb-3">
-                <div className="flex flex-wrap gap-1.5">
-                  {CSV_COLUMNS.map((c) => (
-                    <span
-                      key={c.header}
-                      title={c.help}
-                      className={
-                        "inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs " +
-                        (c.required
-                          ? "border-border bg-foreground/5 font-medium text-foreground"
-                          : c.oneOf
-                            ? "border-primary/40 bg-primary/10 font-medium text-primary"
-                            : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300")
-                      }
-                    >
-                      {c.header}
-                      {c.required && <span className="text-destructive">*</span>}
-                      {/* Conditionally-required chips carry their own marker. Amber next to a
-                          footnote was read as "skippable" — which is how a sheet with neither
-                          Item SKU nor Product Title got filled in and every row skipped. */}
-                      {!c.required && c.oneOf && <span className="opacity-70">†</span>}
-                    </span>
-                  ))}
-                </div>
+              <div className="space-y-2.5 px-3 pb-3">
+                {columnBands().map((band) => (
+                  <div key={`${band.group}-${band.start}`} className="space-y-1">
+                    <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {GROUP_LABEL[band.group]}
+                      {band.group === "oneOf" && <span className="ml-1 font-normal normal-case opacity-80">— a row with neither is skipped</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CSV_COLUMNS.slice(band.start, band.start + band.count).map((c) => (
+                        <span
+                          key={c.header}
+                          title={c.help}
+                          className={
+                            "inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs " +
+                            (band.group === "required"
+                              ? "border-primary/40 bg-primary/10 font-medium text-primary"
+                              : band.group === "oneOf"
+                                ? "border-amber-300 bg-amber-50 font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+                                : "border-border bg-background text-muted-foreground")
+                          }
+                        >
+                          {c.header}
+                          {c.required && <span className="text-destructive">*</span>}
+                          {c.oneOf && <span className="opacity-70">†</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
                 <p className="text-2xs text-muted-foreground">
-                  <span className="font-medium text-foreground">Bold + <span className="text-destructive">*</span></span> = required.
-                  <span className="ml-1 rounded bg-primary/10 px-1 font-medium text-primary">Violet †</span> = fill at least one of them (<b>Item SKU</b> or <b>Product Title</b>) or the row is skipped.
-                  <span className="ml-1 rounded bg-amber-50 px-1 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">Amber</span> = optional. Note <b>Order Number</b> is what groups lines: rows sharing one become a single multi-item order, and a blank one always imports as its own order. Hover a chip for details.
+                  <b>Order Number</b> is what groups lines — give every line of one order the same
+                  number, or each line imports as a separate order. Hover any column for what it does.
                 </p>
               </div>
             </details>
@@ -325,13 +391,21 @@ export function ImportOrdersDialog({
                       named something we don't recognise. */}
                   <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
                     <span className="text-xs text-muted-foreground">No sheet yet?</span>
-                    <Button variant="outline" size="sm" onClick={makeSheetCopy}>
-                      <Table size={13} weight="bold" /> Make a copy in Google Sheets
+                    <Button variant="outline" size="sm" onClick={makeSheetCopy} disabled={creating}>
+                      {creating
+                        ? <><CircleNotch size={13} className="animate-spin" /> Building your sheet…</>
+                        : <><Table size={13} weight="bold" /> {sheetsCanCreate ? "Create my order sheet" : "Make a copy in Google Sheets"}</>}
                     </Button>
-                    <span className="text-2xs text-muted-foreground">opens a copy already set up with the right columns</span>
+                    <span className="text-2xs text-muted-foreground">
+                      {sheetsCanCreate
+                        ? "opens a formatted sheet — required columns first, dropdowns filled in"
+                        : "opens a blank sheet with the header row on your clipboard"}
+                    </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Then share it as “anyone with the link can view” and paste the link above.
+                    {sheetsCanCreate
+                      ? "The sheet is already shared and its link is filled in above — fill it in, then press Load."
+                      : "Then share it as “anyone with the link can view” and paste the link above."}
                   </p>
                 </TabsContent>
               )}

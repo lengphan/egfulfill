@@ -687,6 +687,11 @@ export function getSheetsConfig() {
 export function getSheetRows(url: string) {
   return api<{ rows?: string[][]; title?: string; tab?: string; error?: string }>(`/api/sheets?url=${encodeURIComponent(url)}`)
 }
+/** Create a ready-formatted Orders sheet in the service account's Drive, shared
+ *  anyone-with-link → editor. Only available when `canCreate` is true. */
+export function createSheet() {
+  return api<{ ok?: boolean; id?: string; url?: string; error?: string }>(`/api/sheets/create`, { method: "POST" })
+}
 
 /** The blank catalog. Cached longer than the order list — it's reference data, and the only
  *  thing that changes it is a product edit, which is a write, which clears this. */

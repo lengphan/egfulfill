@@ -5,19 +5,16 @@
 // exports work unrenamed), required-field validation, template-sample skipping,
 // and grouping multiple line rows into one order by Order Number.
 
-// ── Canonical template headers (the downloadable .csv) ──────────────────────
-export const CSV_HEADERS = [
-  "Order Number", "Ship Name", "Ship Email",
-  "Ship Address 1", "Ship Address 2", "Ship City", "Ship State", "Ship Zip",
-  "Store Name",
-  "Product Title", "Image Link/ID", "Item SKU", "Blank", "Template ID",
-  "Item Quantity", "Print Type",
-  "Item Color", "Item Size", "Item Price",
-  "Shipping Service", "Internal Notes",
-]
+import { PRODUCT_METHODS } from "@/lib/print-method"
 
 // Required columns — a row missing any of these is flagged invalid.
-export const REQUIRED_COLS = ["ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
+//
+// `order_number` is required as of 2026-08. It is what groups lines into one order, so a
+// blank one silently splits a 3-line order into 3 separate orders — a wrong result that
+// looks like a successful import. Rejecting the row surfaces it instead. groupToOrders
+// still carries its AUTO_KEY fallback, which now only ever sees rows from a legacy
+// marketplace export that never had the column at all.
+export const REQUIRED_COLS = ["order_number", "ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
 
 // Per-column reference for the import dialog: which headers are required vs optional, and what
 // each does. Drives the legend so a filler knows exactly what they can skip. `key` is the
@@ -27,19 +24,27 @@ export const REQUIRED_COLS = ["ship_name", "ship_address_1", "ship_city", "ship_
 // exists today. Without this the two of them render as plain "optional", which is a promise the
 // validator then breaks — the chip says safe to skip, the row comes back "No item (SKU or name)".
 export type CsvColumn = { header: string; key: string; required: boolean; oneOf?: string; help: string }
+
+// ORDER IS THE CONTRACT. Columns are listed required → fill-one-of → optional, and the
+// template, the .xlsx, the Google Sheet and the dialog's chip guide all render in this
+// order. That is the whole point: a filler works left to right and can stop at the first
+// grey column, instead of hunting a legend to find which of 21 scattered columns matter.
+// Moving a column between groups here moves it everywhere, in step.
 export const CSV_COLUMNS: CsvColumn[] = [
-  { header: "Order Number", key: "order_number", required: false, help: "The BUYER's order number — kept as the order's reference, not as its ID (we always mint our own FF- number). It is also what groups rows: give every line of one order the same number, or each line imports as a SEPARATE order. Safe to leave blank only for single-line orders." },
+  // ── REQUIRED ──────────────────────────────────────────────────────────────
+  { header: "Order Number", key: "order_number", required: true, help: "The BUYER's order number — kept as the order's reference, not as its ID (we always mint our own FF- number). It is also what GROUPS rows: give every line of one order the same number. Two lines of one order with different numbers import as two separate orders." },
   { header: "Ship Name", key: "ship_name", required: true, help: "Recipient's full name." },
-  { header: "Ship Email", key: "ship_email", required: false, help: "Buyer email, kept for your records." },
   { header: "Ship Address 1", key: "ship_address_1", required: true, help: "Street address." },
-  { header: "Ship Address 2", key: "ship_address_2", required: false, help: "Apt / suite / unit." },
   { header: "Ship City", key: "ship_city", required: true, help: "Destination city." },
-  { header: "Ship State", key: "ship_state", required: true, help: "State / province." },
+  { header: "Ship State", key: "ship_state", required: true, help: "State / province. Two-letter code for US destinations." },
   { header: "Ship Zip", key: "ship_zip", required: true, help: "Postal code." },
-  { header: "Store Name", key: "store_name", required: false, help: "Which shop the order came from." },
-  { header: "Product Title", key: "item_name", required: false, oneOf: "item", help: "Item name on the board. Fill this OR Item SKU — a row with neither is skipped." },
-  { header: "Image Link/ID", key: "hero_image", required: false, help: "URL of the listing photo shown on the card." },
+  // ── FILL ONE OF THESE ─────────────────────────────────────────────────────
   { header: "Item SKU", key: "item_sku", required: false, oneOf: "item", help: "Your listing SKU. Fill this OR Product Title — a row with neither is skipped. Left blank, it's derived from the title." },
+  { header: "Product Title", key: "item_name", required: false, oneOf: "item", help: "Item name on the board. Fill this OR Item SKU — a row with neither is skipped." },
+  // ── OPTIONAL ──────────────────────────────────────────────────────────────
+  { header: "Ship Address 2", key: "ship_address_2", required: false, help: "Apt / suite / unit." },
+  { header: "Ship Email", key: "ship_email", required: false, help: "Buyer email, kept for your records." },
+  { header: "Store Name", key: "store_name", required: false, help: "Which shop the order came from." },
   { header: "Blank", key: "blank", required: false, help: "The catalog blank you produce on — needed to cost & barcode the line; without it it reads “not set up for production”." },
   { header: "Template ID", key: "template_id", required: false, help: "A saved design template to apply (fills blank + artwork + placement + method)." },
   { header: "Item Quantity", key: "item_quantity", required: false, help: "Defaults to 1 if blank." },
@@ -47,29 +52,73 @@ export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Item Color", key: "item_color", required: false, help: "Garment colour." },
   { header: "Item Size", key: "item_size", required: false, help: "Garment size." },
   { header: "Item Price", key: "item_price", required: false, help: "What the BUYER paid per unit (your sale price). Records only — it does NOT set the fulfilment charge, which comes from the blank's pricing at submit." },
+  { header: "Image Link/ID", key: "hero_image", required: false, help: "URL of the listing photo shown on the card." },
   { header: "Shipping Service", key: "shipping_service", required: false, help: "Requested method (e.g. Standard). Saved with the order." },
   { header: "Internal Notes", key: "internal_notes", required: false, help: "Private note for your team. Saved with the order." },
 ]
 
-// Template header row: optional columns are suffixed " (optional)" so a filler sees at a glance
-// what's skippable, right in the sheet (not just the in-app legend). canonHeader() strips the
-// suffix on import, so a filled-in template still maps correctly.
-// A `oneOf` column gets NO suffix: it is not required on its own, but calling it "(optional)"
-// in the sheet flatly contradicts the dialog and is how a filler ends up leaving both Item SKU
-// and Product Title empty and losing every row. Silence is the honest option — the legend
-// carries the "fill one of these" rule.
-export const TEMPLATE_HEADERS = CSV_COLUMNS.map((c) =>
-  c.required || c.oneOf ? c.header : `${c.header} (optional)`
-)
+// Which band a column sits in. Derived rather than stored so `required`/`oneOf` stay the
+// single fact and a column can never claim one band while validating as another.
+export type CsvGroup = "required" | "oneOf" | "optional"
+export const groupOf = (c: CsvColumn): CsvGroup => (c.required ? "required" : c.oneOf ? "oneOf" : "optional")
 
-// Headers only (no throwaway sample row) — the Columns legend in the dialog is the guide.
-// Used by the .xlsx download AND "Make a copy in Google Sheets".
-export const CSV_TEMPLATE = TEMPLATE_HEADERS.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
+export const GROUP_LABEL: Record<CsvGroup, string> = {
+  required: "REQUIRED — every row",
+  oneOf: "FILL ONE OF THESE",
+  optional: "OPTIONAL",
+}
 
-// The same headers as TAB-separated text, which is what a spreadsheet paste actually wants.
-// Built from the array rather than by replacing commas in CSV_TEMPLATE: that left every CSV
-// quote in place, so a paste produced cells reading `"Ship Name"` — quotes and all — and any
-// header that ever contains a comma would have been split into two columns.
+/**
+ * The contiguous run of columns per band, in CSV_COLUMNS order — what the sheet's top
+ * banner row merges across and what the chip guide groups by.
+ *
+ * Computed by walking the list rather than by filtering per band, so it describes the
+ * columns as they ACTUALLY sit. A filter would happily report one tidy block per band even
+ * if the array had a required column stranded among the optional ones, and the banner would
+ * then span cells whose contents contradict it.
+ */
+export function columnBands(): { group: CsvGroup; start: number; count: number }[] {
+  const bands: { group: CsvGroup; start: number; count: number }[] = []
+  CSV_COLUMNS.forEach((c, i) => {
+    const g = groupOf(c)
+    const last = bands[bands.length - 1]
+    if (last && last.group === g) last.count++
+    else bands.push({ group: g, start: i, count: 1 })
+  })
+  return bands
+}
+
+// Values offered as an in-sheet dropdown. Keyed by canonical column key; a key absent here
+// is free text. Print Type comes from PRODUCT_METHODS — the single source the pickers,
+// pricing and the detail page already share — so a method added there appears in the import
+// template automatically instead of drifting into a private list.
+export const US_STATES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
+  "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM",
+  "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA",
+  "WV", "WI", "WY",
+]
+export const ITEM_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "One Size"]
+export const SHIPPING_SERVICES = [
+  "USPS Ground Advantage", "USPS Priority Mail", "USPS Priority Mail Express",
+  "UPS Ground", "UPS 2nd Day Air", "FedEx Ground", "FedEx 2Day",
+]
+
+export const COLUMN_OPTIONS: Record<string, string[]> = {
+  print_type: PRODUCT_METHODS.map((m) => m.key.toUpperCase()),
+  ship_state: US_STATES,
+  item_size: ITEM_SIZES,
+  shipping_service: SHIPPING_SERVICES,
+}
+
+// Template header row. Bands are carried by the sheet's banner row and by colour, so the
+// header text is now just the column name — no " (optional)" suffix. canonHeader() still
+// strips that suffix on the way in, so every template already in a seller's Drive keeps
+// importing correctly.
+export const TEMPLATE_HEADERS = CSV_COLUMNS.map((c) => c.header)
+
+// The headers as TAB-separated text, which is what a spreadsheet paste actually wants.
+// Used by the clipboard fallback when the server can't create a sheet for us.
 export const TEMPLATE_TSV = TEMPLATE_HEADERS.join("\t")
 
 // Header aliases → canonical key. Lets a generic marketplace export import as-is.
@@ -77,10 +126,13 @@ const COL_ALIASES: Record<string, string[]> = {
   order_number: ["order", "order_id", "order_no", "order_number", "order_num"],
   ship_name: ["ship_name", "name", "customer", "customer_name", "recipient", "recipient_name", "ship_to", "shipping_name", "deliver_to", "buyer", "buyer_name", "full_name"],
   ship_email: ["ship_email", "email", "customer_email", "buyer_email"],
-  ship_address_1: ["ship_address_1", "address", "address1", "address_1", "street", "street_address", "shipping_address", "shipping_address_1", "ship_address", "address_line_1"],
-  ship_address_2: ["ship_address_2", "address2", "address_2", "apt", "suite", "unit", "address_line_2"],
+  // "shipping_address1"/"shipping_province" (no separator before the digit, and Shopify's
+  // word for state) are the literal headers in a Shopify order export — they were missing,
+  // so a raw export dropped its street and state and every row failed validation.
+  ship_address_1: ["ship_address_1", "address", "address1", "address_1", "street", "street_address", "shipping_address", "shipping_address_1", "shipping_address1", "ship_address", "address_line_1"],
+  ship_address_2: ["ship_address_2", "address2", "address_2", "shipping_address_2", "shipping_address2", "apt", "suite", "unit", "address_line_2"],
   ship_city: ["ship_city", "city", "town", "shipping_city"],
-  ship_state: ["ship_state", "state", "province", "region", "state_province", "shipping_state"],
+  ship_state: ["ship_state", "state", "province", "region", "state_province", "shipping_state", "shipping_province", "shipping_province_name"],
   ship_zip: ["ship_zip", "zip", "zipcode", "zip_code", "postal", "postal_code", "postcode", "shipping_zip"],
   store_name: ["store_name", "store", "shop", "shop_name"],
   item_sku: ["item_sku", "sku", "lineitem_sku", "line_item_sku", "product_sku", "variant_sku"],
@@ -164,12 +216,71 @@ export type ImportRecord = {
 // Read a data field as a plain string (index values are a union incl. the meta fields).
 const S = (v: string | number | boolean | undefined): string => (v == null ? "" : String(v))
 
+/**
+ * Resolve the one header whose meaning depends on its NEIGHBOURS rather than its own text.
+ *
+ * A Shopify order export labels the order "Name" (#1002) and the recipient "Shipping Name".
+ * Bare `name` is an alias for ship_name, so it was swallowed there and the order number was
+ * lost — harmless while the column was optional, fatal now that it's required, and it would
+ * have rejected every row of a raw Shopify export with "Missing: order number".
+ *
+ * Reassigned ONLY when both guards hold: no other column supplies an order number, and some
+ * other column already supplies the recipient name. Either one failing means a bare "Name"
+ * really is the recipient — which is what it means in most non-Shopify files — so the
+ * ordinary case is untouched.
+ */
+function disambiguateHeaders(raw: string[], mapped: string[]): string[] {
+  const out = [...mapped]
+  const bare = raw.findIndex((h, i) => /^name$/i.test(String(h ?? "").trim()) && out[i] === "ship_name")
+  if (bare < 0) return out
+  const hasOrderNum = out.includes("order_number")
+  const shipNameElsewhere = out.some((h, i) => h === "ship_name" && i !== bare)
+  if (!hasOrderNum && shipNameElsewhere) out[bare] = "order_number"
+  return out
+}
+
+// How many of a row's cells map to a column we know. The header row is whichever of the
+// first few rows scores highest — see findHeaderRow.
+function headerScore(row: string[]): number {
+  const keys = new Set(CSV_COLUMNS.map((c) => c.key))
+  return row.map(canonHeader).filter((h) => keys.has(h)).length
+}
+
+/**
+ * Index of the real header row.
+ *
+ * The template now opens with a merged BANNER row ("REQUIRED — every row" / "OPTIONAL"),
+ * so row 0 is no longer the headers. Rather than hardcode "skip one row" — which would
+ * break every sheet already in a seller's Drive, and every raw Shopify/Etsy export — this
+ * scores the first few rows and takes the best match. A banner row scores 0 (its words are
+ * not column names); a header row scores near the column count.
+ *
+ * Capped at the first 5 rows so a large sheet doesn't get scanned end to end, and falls
+ * back to row 0 when nothing scores, which keeps the old "unrecognised headers" error
+ * message rather than inventing a new failure mode.
+ */
+function findHeaderRow(rows: string[][]): number {
+  let best = 0, bestScore = 0
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const s = headerScore(rows[i])
+    if (s > bestScore) { best = i; bestScore = s }
+  }
+  return bestScore > 0 ? best : 0
+}
+
 // Canonicalize headers, apply sensible defaults, validate, and drop the sample row.
 export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; error?: string } {
   if (!rows || rows.length < 2) return { records: [], error: "File must have a header row and at least one data row." }
-  const headers = rows[0].map(canonHeader)
+  const hdrIdx = findHeaderRow(rows)
+  // Everything above the header row is decoration (the banner) — drop it, then treat the
+  // sheet exactly as before so the rest of the pipeline is unchanged.
+  if (hdrIdx > 0) rows = rows.slice(hdrIdx)
+  if (rows.length < 2) return { records: [], error: "That sheet has a header row but no order rows under it." }
+  const headers = disambiguateHeaders(rows[0], rows[0].map(canonHeader))
   const records = rows.slice(1).map((row, i) => {
-    const rec: ImportRecord = { _rowNum: i + 2, _valid: false, _errors: "" }
+    // +hdrIdx so a rejected row is reported at its number in the SHEET the seller is looking
+    // at, not its offset within the slice — off-by-one here sends them to edit the wrong row.
+    const rec: ImportRecord = { _rowNum: i + 2 + hdrIdx, _valid: false, _errors: "" }
     headers.forEach((h, j) => { if (h && rec[h] === undefined) rec[h] = row[j] != null ? String(row[j]).trim() : "" })
     if (!rec.item_quantity) rec.item_quantity = "1"
     if (!rec.print_type) rec.print_type = "DTG"
