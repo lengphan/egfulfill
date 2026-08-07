@@ -39,6 +39,20 @@ api.egful.store {
 	}
 
 
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /vqr/* {
+		reverse_proxy api:3000
+	}
+	handle {
+		respond 404
+	}
+}
+
+egful.store {
+	encode gzip
+
 	# SECURITY HEADERS. There were none — verified against the live site: no HSTS, no
 	# X-Frame-Options, no X-Content-Type-Options, no Referrer-Policy.
 	#
@@ -59,19 +73,6 @@ api.egful.store {
 		-Server
 	}
 
-	handle /api/* {
-		reverse_proxy api:3000
-	}
-	handle /vqr/* {
-		reverse_proxy api:3000
-	}
-	handle {
-		respond 404
-	}
-}
-
-egful.store {
-	encode gzip
 
 	# API → the Node app
 	handle /api/* {
