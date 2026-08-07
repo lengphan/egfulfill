@@ -9,7 +9,13 @@
 // hold, the one remaining stop.) An order's overall stage = its least-advanced item (only
 // "Shipped" when every line is), unless any item is in an exception state.
 
-export type FactoryTone = "new" | "review" | "neutral" | "prod" | "qc" | "packed" | "shipped" | "hold" | "alert" | "backorder" | "closed"
+// Only the tones a REAL stage carries. qc / packed / backorder / alert were left behind by
+// the retired stage model: nothing can reach them, because every id folds through
+// normalizeStage() onto the seven stages below before a tone is looked up. `alert` had
+// exactly one mention in the whole codebase — this line. Two of the dead entries were also
+// near-identical ambers (qc 700, hold 800) for unrelated meanings, which is the kind of
+// thing that only stays harmless while it stays unreachable.
+export type FactoryTone = "new" | "review" | "neutral" | "prod" | "shipped" | "hold" | "closed"
 export type FactoryStage = { id: string; label: string; tone: FactoryTone }
 
 // The linear production flow (in order) — the warehouse scan flow.
@@ -208,11 +214,7 @@ export const TONE_CLASS: Record<FactoryTone, string> = {
   review: "bg-indigo-100 text-indigo-700",
   neutral: "bg-slate-100 text-slate-700",
   prod: "bg-violet-100 text-violet-700",
-  qc: "bg-amber-100 text-amber-700",
-  packed: "bg-sky-100 text-sky-700",
   shipped: "bg-emerald-100 text-emerald-700",
   hold: "bg-amber-100 text-amber-800",
-  alert: "bg-red-100 text-red-700",
-  backorder: "bg-orange-100 text-orange-700",
   closed: "bg-muted text-muted-foreground line-through",
 }
