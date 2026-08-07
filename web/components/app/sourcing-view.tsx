@@ -5,6 +5,7 @@ import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, B
 import { SectionCard } from "@/components/app/section-card"
 import { Loading } from "@/components/app/loading"
 import { AlibabaStatus } from "@/components/app/alibaba-status"
+import { AlibabaBrowse } from "@/components/app/alibaba-browse"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSourcing, saveSourcing, deleteSourcing, fetchSourcingPrice, getSpydeckSaves,
@@ -221,6 +222,10 @@ export function SourcingView() {
 
   return (
     <div className="space-y-4">
+      {/* Search first, then the table of what you kept — the order you actually work in.
+          Renders nothing unless Alibaba is connected AND you're an admin, so it never shows
+          a search box that can't search. */}
+      <AlibabaBrowse />
       <SectionCard>
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
           <div className="flex-1">
