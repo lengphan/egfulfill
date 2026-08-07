@@ -116,9 +116,21 @@ async function call(apiPath, businessParams = {}, { accessToken, method = 'GET' 
     const e = new Error(`Alibaba HTTP ${r.status}`);
     e.status = r.status; e.body = body; throw e;
   }
-  // The gateway returns 200 with an error payload for auth/signature problems, so a 200 is
-  // not success on its own — surface their code/message rather than reporting a silent pass.
-  const err = body && (body.error_code || body.code) && String(body.code || '') !== '200'
+  /**
+   * The gateway answers 200 with an error payload for auth and signature problems, so a 200
+   * is not success on its own. But `code` is not one vocabulary across their endpoints:
+   *
+   *   /auth/token/create  success -> code "0"
+   *   REST gateway        success -> no `code` at all; errors carry a STRING like
+   *                                  "InsufficientPermission" plus type "ISV"
+   *
+   * Treating only "200" as success rejected a token exchange that had actually worked and
+   * reported it as `Alibaba: 0` — an error message consisting of the success code. The code
+   * was spent, so the only recovery was to authorise again.
+   */
+  const codeStr = String((body && body.code) ?? '');
+  const codeOk = codeStr === '' || codeStr === '0' || codeStr === '200';
+  const err = body && (body.error_code || !codeOk)
     ? (body.error_message || body.message || body.error_code || body.code) : null;
   if (err && !body.result) { const e = new Error(`Alibaba: ${err}`); e.body = body; throw e; }
   return body;
