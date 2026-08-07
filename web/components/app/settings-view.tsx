@@ -2530,9 +2530,11 @@ function PiiRetentionPanel() {
       <div>
         <h3 className="text-sm font-semibold">Buyer data retention</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Marketplaces require buyer personal data to be deleted after an order ships — Amazon
-          caps it at 30 days, and Etsy, TikTok and Shopify expect the same. This is what you show
-          them when they ask.
+          <b className="text-foreground">Amazon</b> contractually requires buyer data to be deleted
+          within 30 days of shipping — that is its Data Protection Policy, not a general privacy
+          law, and Etsy, Shopify and TikTok do not impose it. Retaining records to settle a late
+          dispute is normal and lawful. Turn this on when Amazon goes live; until then, access
+          control does the work.
         </p>
       </div>
 
@@ -2541,7 +2543,7 @@ function PiiRetentionPanel() {
         <BackupStat
           label="Past the window"
           value={String(due)}
-          sub={due ? "would be redacted now" : "nothing is overdue"}
+          sub={due ? "a purge would redact these" : "none past the window"}
         />
         <BackupStat
           label="Oldest still held"
@@ -2555,15 +2557,19 @@ function PiiRetentionPanel() {
         />
       </div>
 
+      {/* NOT a warning. Retaining order records is the deliberate position here — a customer
+          who complains at month six has to be checkable — and buyer details are already
+          withheld from sellers by maskBuyerPII(). A standing amber alert would nag toward
+          deleting exactly what that decision keeps, and an alert you are meant to ignore
+          teaches you to ignore alerts. It states the position instead. */}
       {!state?.enabled && due > 0 && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-          <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
-          <span>
-            {due} shipped {due === 1 ? "order is" : "orders are"} holding buyer name and address
-            past the {state?.days ?? 30}-day window
-            {oldestDays != null && <> — the oldest for <b>{oldestDays} days</b></>}. Nothing is
-            deleted until you turn this on or purge manually.
-          </span>
+        <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+          <b className="text-foreground">Retained on purpose.</b>{" "}
+          {due} shipped {due === 1 ? "order holds" : "orders hold"} buyer name and address beyond
+          {" "}{state?.days ?? 30} days
+          {oldestDays != null && <> — the oldest for <b className="text-foreground">{oldestDays} days</b></>}.
+          Sellers only ever see the buyer&rsquo;s name and city; the street, postcode, phone and email
+          are staff-only. Nothing is deleted unless you turn the purge on or run it by hand.
         </div>
       )}
 
