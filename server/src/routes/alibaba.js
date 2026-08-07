@@ -35,6 +35,11 @@ import { recordUsage } from '../usage.js';
 // the documented IOP gateway host, overridable without a code change if it differs per app.
 const DEFAULT_BASE = 'https://openapi-api.alibaba.com/rest';
 
+// Registered as the app's Callback URL on the Alibaba console. Changing it means changing
+// it THERE too — same category as the Etsy/Shopify redirect URIs (see CLAUDE.md §3).
+const ALIBABA_REDIRECT_URI = (process.env.ALIBABA_REDIRECT_URI
+  || 'https://app.egful.store/oauth-callback').trim();
+
 // Read at CALL time, never at module load, so a key saved in Settings applies without a
 // restart — the same rule the other integrations follow.
 function cfg() {
@@ -147,6 +152,25 @@ export function alibabaRoutes(app, requireAdmin) {
       connected: !!(row && row.access_token),
       account: row?.account || null,
       expiresAt: row?.expires_at || null,
+      /**
+       * Where a human goes to authorise. Built HERE, not in the browser, because it needs
+       * the app key and the key belongs on the server.
+       *
+       * `sp=ICBU` selects Alibaba.com International — the same gateway family also serves
+       * Taobao and AliExpress, and without it the consent screen can authorise against the
+       * wrong marketplace, which fails later at the token exchange rather than here.
+       * The redirect_uri must match the Callback URL registered on the app exactly.
+       */
+      authorizeUrl: alibabaConfigured()
+        ? 'https://oauth.alibaba.com/authorize?' + new URLSearchParams({
+            response_type: 'code',
+            client_id: c.key,
+            redirect_uri: ALIBABA_REDIRECT_URI,
+            sp: 'ICBU',
+            view: 'web',
+          }).toString()
+        : null,
+      redirectUri: ALIBABA_REDIRECT_URI,
     };
   });
 

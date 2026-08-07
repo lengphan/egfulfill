@@ -35,7 +35,7 @@ export type OAuthMessage = { source: "eg-oauth"; ok: boolean; shop?: string; mes
 // twice — a reload, a re-mounted effect, reopening the window — lost the routing on the
 // second pass and produced the same misleading "Lost the security key" card.
 export const OAUTH_PROVIDER_KEY = "eg_oauth_provider"
-export type OAuthProvider = "etsy" | "shopify" | "tiktok"
+export type OAuthProvider = "etsy" | "shopify" | "tiktok" | "alibaba"
 export type OAuthMarker = { provider: OAuthProvider; state?: string; at?: number }
 
 /** Stash which provider (and the `state` we sent it) started this connect. */

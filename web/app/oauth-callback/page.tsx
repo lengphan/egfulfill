@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { CheckCircle, XCircle, CircleNotch } from "@phosphor-icons/react"
-import { exchangeEtsy, exchangeShopify, exchangeTiktok } from "@/lib/api"
+import { exchangeEtsy, exchangeShopify, exchangeTiktok, exchangeAlibaba } from "@/lib/api"
 import { readPkce, clearPkce } from "@/lib/etsy-oauth"
 import { getToken } from "@/lib/auth"
 import { clearShopifyOAuth } from "@/lib/shopify-oauth"
@@ -97,6 +97,27 @@ export default function OAuthCallbackPage() {
       }
       if (!code) {
         fail("No authorization code returned.")
+        return
+      }
+
+      /**
+       * Alibaba — sourcing, and the odd one out: this authorises OUR OWN buyer account, not
+       * a seller's shop. So there is nothing per-seller to record and the whole exchange is
+       * admin-gated server-side; a non-admin who somehow lands here gets a 403 with the
+       * reason rather than a silent no-op.
+       *
+       * Matched on the marker alone. Alibaba returns a bare `code` with no distinguishing
+       * param, which is exactly the shape TikTok's US flow returns — guessing from params
+       * is what misrouted TikTok into the Etsy branch, so this one never guesses.
+       */
+      if (provider === "alibaba") {
+        try {
+          const data = await exchangeAlibaba(code)
+          if (data.error) throw new Error(data.error)
+          finish(data.account ? `Alibaba (${data.account})` : "Alibaba")
+        } catch (e: unknown) {
+          fail(e instanceof Error ? e.message : "Couldn't connect Alibaba.")
+        }
         return
       }
 
