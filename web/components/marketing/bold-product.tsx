@@ -188,7 +188,11 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
             checking a file spec has already decided they're interested, and squeezing a
             multi-column table into the right rail would make both harder to read. */}
         {(specNames.length > 0 || product.methods.length > 0) && (
-          <div className="mt-16 grid gap-12 lg:grid-cols-2">
+          /* Two columns ONLY when there are two things to put in them. Most products have
+             no supplier size chart — S&S is the only feed that provides one — so a fixed
+             two-column grid left the guidelines stranded in the left half with a dead right
+             half beside them, which is what made the section look broken rather than short. */
+          <div className={"mt-16 grid gap-12 " + (specNames.length > 0 && product.methods.length > 0 ? "lg:grid-cols-2" : "max-w-2xl")}>
             {specNames.length > 0 && (
               <Rise>
                 <h2 className="font-display text-2xl font-black tracking-tight">Size chart</h2>
