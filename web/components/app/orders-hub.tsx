@@ -1274,26 +1274,7 @@ export function OrdersHub() {
               // below (pinned last), so its large action logic is untouched.
               const cell: Record<FactoryColId, ReactNode> = {
                 status: <span className="justify-self-start"><StageBadge status={stage} /></span>,
-                order: (
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    {/* A SOLID GLYPH, not a coloured chip. The status palette is spoken for
-                        — violet is working, indigo is pending — and a purple badge here
-                        would read as another stage. A filled bookmark is a different kind of
-                        object, so it sits beside the stage badge without competing with it.
-                        rushed_at earns its keep as the tooltip: "flagged" with no when is
-                        the sort of flag that stays on an order for a fortnight. */}
-                    {isRush(o) && (
-                      <span
-                        className="flex shrink-0 items-center text-primary"
-                        title={o.rushed_at ? `Rush — flagged ${fmtDate(o.rushed_at)}` : "Rush"}
-                        aria-label="Rush"
-                      >
-                        <BookmarkSimple size={13} weight="fill" />
-                      </span>
-                    )}
-                    <span className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</span>
-                  </div>
-                ),
+                order: <div className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</div>,
                 tracking: (
                   <div className="flex min-w-0 items-center gap-1.5">
                     {track ? (
@@ -1380,13 +1361,26 @@ export function OrdersHub() {
                       table has been a real table all along; this is the same idea, driven
                       from the same lib/order-columns.ts. */}
                   <div
-                    // The bar down the left edge is the half that works at speed: the glyph
-                    // tells you once you're reading the row, this tells you while you scroll
-                    // past it. Negative margin so it sits on the row's edge without shifting
-                    // any column.
-                    className={"mb-3 grid items-center gap-x-3 gap-y-1" + (isRush(o) ? " -ml-3 border-l-2 border-primary pl-2.5" : "")}
+                    className="relative mb-3 grid items-center gap-x-3 gap-y-1"
                     style={{ gridTemplateColumns: gridTmpl }}
                   >
+                    {/* A BOOKMARK CLIPPED TO THE ROW, hanging from its top edge — absolutely
+                        positioned, so it costs no layout. The first version put the glyph in
+                        the Order cell, which pushed the number out of its column and left a
+                        flagged row's id misaligned with every id below it. A marker that
+                        moves the data it marks is the wrong marker.
+                        Solid fill rather than a coloured chip: the status palette is spoken
+                        for (violet is working, indigo is pending) and a purple badge would
+                        read as another stage. */}
+                    {isRush(o) && (
+                      <span
+                        className="pointer-events-none absolute -top-1.5 left-[-14px] text-primary"
+                        title={o.rushed_at ? `Rush — flagged ${fmtDate(o.rushed_at)}` : "Rush"}
+                        aria-label="Rush"
+                      >
+                        <BookmarkSimple size={18} weight="fill" />
+                      </span>
+                    )}
                     {/* A box on EVERY row, disabled where it can't be used. Rendering it
                         only on dispatchable rows reads as a half-built feature: most orders
                         have no label yet, so most rows had no box, and a column that appears
