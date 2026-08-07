@@ -2169,7 +2169,14 @@ export function ordersRoutes(app, requireAuth) {
              max(m.created_at) as last_at,
              count(*)::int as n,
              (select body from order_messages x where x.order_id = m.order_id order by created_at desc, id desc limit 1) as last_body,
-             (select coalesce(nullif(u.name,''), u.email) from users u where u.id::text = replace(m.order_id, 'support-', '')) as seller_name,
+             -- A WEBSITE enquiry has no user row — its id is 'support-web-ps_…', so the
+             -- users lookup finds nothing and the rail fell back to showing the raw id.
+             -- Fall through to the name/email the visitor gave in the bubble.
+             coalesce(
+               (select coalesce(nullif(u.name,''), u.email) from users u where u.id::text = replace(m.order_id, 'support-', '')),
+               (select coalesce(nullif(ps.name,''), ps.email) from public_support ps
+                 where 'support-web-' || ps.id = m.order_id)
+             ) as seller_name,
              -- Open escalation = the seller asked for a human and no HUMAN has replied since.
              -- That's what sorts a thread to the top of the inbox. The AI assistant and its
              -- auto-acknowledgments (both role 'assistant') deliberately do NOT clear it —

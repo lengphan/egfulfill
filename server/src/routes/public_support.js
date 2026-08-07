@@ -198,6 +198,39 @@ export function publicSupportRoutes(app) {
 
     await q('update public_support set escalated=true, updated_at=now() where id=$1', [id]).catch(() => {});
 
+    /**
+     * PUT IT WHERE STAFF ALREADY LOOK.
+     *
+     * The Conversations rail is built from order_messages rows whose order_id is like
+     * 'support-%' — nothing more. So an escalation copied in under 'support-web-<id>'
+     * appears in that list AND opens through the existing message path, with no second
+     * inbox to build and no chance of the two disagreeing about what was said.
+     *
+     * Idempotent on the channel: escalating twice must not duplicate the transcript.
+     * `escalated` on the meta of the last row is what sorts it to the top of the rail as
+     * an unanswered request for a human — the same flag a seller's own escalation sets.
+     */
+    const channel = `support-web-${id}`;
+    const already = await q('select 1 from order_messages where order_id=$1 limit 1', [channel])
+      .then((r) => r.rowCount > 0).catch(() => false);
+    if (!already) {
+      const who = row.name || row.email || 'Website visitor';
+      for (const m of (Array.isArray(row.messages) ? row.messages : [])) {
+        await q(
+          `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+           values ($1, null, $2, $3, $4)`,
+          [channel, m.role === 'assistant' ? 'assistant' : 'seller', String(m.text || ''),
+           JSON.stringify({ web: true, name: row.name || null, email: row.email || null })]
+        ).catch(() => {});
+      }
+      await q(
+        `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+         values ($1, null, 'assistant', $2, $3)`,
+        [channel, `${who} asked to speak to a person. Reply here — they'll get it at ${row.email || 'no address given'}.`,
+         JSON.stringify({ web: true, escalated: true, name: row.name || null, email: row.email || null })]
+      ).catch(() => {});
+    }
+
     const lines = (Array.isArray(row.messages) ? row.messages : [])
       .map((m) => `${m.role === 'assistant' ? 'EGFULFILL' : (row.name || 'You')}: ${m.text}`).join('\n\n');
 
