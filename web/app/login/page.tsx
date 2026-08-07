@@ -34,6 +34,19 @@ export default function LoginPage() {
   // Defaults ON, which is exactly today's behaviour — nobody who ignores this box is
   // signed out by its arrival.
   const [remember, setRemember] = useState(true)
+  /**
+   * Has the session check run yet?
+   *
+   * The redirect below is correct but ORDERED WRONG for the eye: the form renders, then the
+   * deferred effect reads localStorage, then it replaces the route — so someone who is
+   * already signed in sees a frame of a login form they don't need. There is no server-side
+   * fix available: the session lives in localStorage/sessionStorage (that is what makes
+   * "remember me" work), so the server cannot see it and middleware cannot gate it.
+   *
+   * So the form waits. A signed-out visitor loses roughly one frame before it appears; a
+   * signed-in one never sees it at all, which is the trade worth making.
+   */
+  const [sessionChecked, setSessionChecked] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -49,6 +62,7 @@ export default function LoginPage() {
         router.replace(want ?? landingFor(typeof role === "string" ? role : null))
         return
       }
+      setSessionChecked(true)
       // Fill in who you are, so the only thing left to type is the secret. Deferred with
       // the rest: reading localStorage at useState-init time would make the server and
       // client markup disagree.
@@ -91,6 +105,10 @@ export default function LoginPage() {
       setLoading(false)
     }
   }
+
+  // Nothing until we know. Rendering the shell but not the form would still flash a
+  // heading at someone who is on their way to the app.
+  if (!sessionChecked) return null
 
   return (
     // AuthShell, not a private copy of it. This page had its own inline card+wordmark that

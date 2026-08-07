@@ -25,6 +25,20 @@ export default function SignupPage() {
 
   // Carry an intended destination through signup too, and don't show a signup form to
   // someone who already has a session.
+  /**
+   * Has the session check run yet?
+   *
+   * The redirect below is correct but ORDERED WRONG for the eye: the form renders, then the
+   * deferred effect reads localStorage, then it replaces the route — so someone who is
+   * already signed in sees a frame of a login form they don't need. There is no server-side
+   * fix available: the session lives in localStorage/sessionStorage (that is what makes
+   * "remember me" work), so the server cannot see it and middleware cannot gate it.
+   *
+   * So the form waits. A signed-out visitor loses roughly one frame before it appears; a
+   * signed-in one never sees it at all, which is the trade worth making.
+   */
+  const [sessionChecked, setSessionChecked] = useState(false)
+
   useEffect(() => {
     const id = setTimeout(() => {
       const want = safeNext(new URLSearchParams(window.location.search).get("next"))
@@ -32,7 +46,9 @@ export default function SignupPage() {
       if (getToken()) {
         const role = getUser()?.role
         router.replace(want ?? landingFor(typeof role === "string" ? role : null))
+        return
       }
+      setSessionChecked(true)
     }, 0)
     return () => clearTimeout(id)
   }, [router])
@@ -77,6 +93,10 @@ export default function SignupPage() {
       setLoading(false)
     }
   }
+
+  // Nothing until we know. Rendering the shell but not the form would still flash a
+  // heading at someone who is on their way to the app.
+  if (!sessionChecked) return null
 
   return (
     <AuthShell subtitle="Create your seller account">
