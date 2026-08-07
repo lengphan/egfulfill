@@ -87,6 +87,7 @@ export function StaffDashboard() {
   const now = new Date()
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening"
   const todayLabel = now.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+  const nowMs = now.getTime()
 
   const stats = useMemo(() => {
     const list = orders ?? []
@@ -136,6 +137,39 @@ export function StaffDashboard() {
     const count = inRange.length
     return { revenue, count, aov: count ? revenue / count : 0 }
   }, [orders, rangeMeta])
+
+  /**
+   * The three figures that QUALIFY the headline, at a third its weight. Hierarchy is the
+   * whole point of the panel: GMV is the number you glance at, these are what it means.
+   */
+  const moneySide = useMemo(() => ([
+    { label: "Our revenue", value: pnl ? usd(pnl.income) : "—", sub: pnl?.known ? "we earned" : "nothing booked" },
+    { label: "Profit", value: pnl?.known ? usd(pnl.profit) : "—", sub: pnl?.known ? `after ${usd(Math.abs(pnl.cost))} costs` : "nothing booked" },
+    { label: "Avg order", value: orders === null ? "—" : usd(money.aov), sub: "per order" },
+  ]), [pnl, orders, money.aov])
+
+  /**
+   * GMV per day across the window, scaled 0..1 — the shape of the run, nothing more.
+   * Built here rather than reusing revenueSeries because that returns labelled buckets with
+   * a previous-period series for the full chart, and this needs neither.
+   */
+  const gmvBars = useMemo(() => {
+    const list = orders ?? []
+    if (!list.length) return [] as number[]
+    // `now` is captured once (repo lint: no impure calls during render), so the buckets
+    // can't shift under a re-render mid-interaction.
+    const since = rangeMeta.since() || nowMs - 30 * DAY
+    const span = Math.max(1, Math.min(30, Math.ceil((nowMs - since) / DAY)))
+    const buckets = new Array(span).fill(0)
+    for (const o of list) {
+      const t = orderTs(o)
+      if (isNaN(t) || t < since) continue
+      const i = span - 1 - Math.floor((nowMs - t) / DAY)
+      if (i >= 0 && i < span) buckets[i] += orderTotalOf(o)
+    }
+    const max = Math.max(...buckets, 1)
+    return buckets.map((v) => v / max)
+  }, [orders, rangeMeta, nowMs])
 
   const recent = useMemo(() => (orders ?? []).slice(0, 8), [orders])
 
@@ -236,12 +270,68 @@ export function StaffDashboard() {
         </div>
       )}
 
-      <StatGrid>
-        {cards.map((c) => (
-          // orders===null means "not read yet / failed", so show — rather than 0.
-          <StatCard key={c.label} label={c.label} value={orders === null ? "—" : String(c.value)} sub={c.sub} icon={c.icon} tone={c.pos ? "pos" : c.neg && c.value ? "neg" : undefined} />
-        ))}
-      </StatGrid>
+      {/**
+        * ONE MONEY PANEL, not five equal cards.
+        *
+        * Five twins in a row say nothing is more important than anything else — and a fifth
+        * one simply wrapped, which is what a grid of equals does when it grows. So the money
+        * becomes a single bounded block with a hierarchy inside it: GMV leads at display
+        * size, the three figures that qualify it sit beside it at a third the weight.
+        *
+        * A TINT, not a fill. --brand is oklch(0.5305 0.2723 283.5) — a saturated violet,
+        * not the #A5B7FF plate CLAUDE.md still describes; the token moved and the doc
+        * didn't. At full strength it swamps the page and argues with the sidebar, which is
+        * already carrying purple. At 7% over white it groups the money without competing,
+        * which is the job — and ordinary foreground text stays legible on it, so nothing
+        * needs a bespoke contrast pairing.
+        *
+        * It sits ABOVE the data, never behind it. The queue below stays on white paper,
+        * which is the rule that matters — a tinted sheet under 700 rows is one you read
+        * through all day.
+        */}
+      {isAdmin ? (
+        <div className="rounded-2xl border border-brand/15 bg-brand/[0.07] p-5 sm:p-6">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-10">
+            <div>
+              <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                GMV · {rangeMeta.sub}
+              </div>
+              <div className="mt-1 font-title text-5xl font-semibold tracking-tight tabular-nums sm:text-6xl">
+                {orders === null ? "—" : usd(money.revenue)}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                what buyers paid, through the platform
+              </div>
+              {/* The SHAPE, not the axis. Bars are the one form that reads at this size with
+                  no labels at all, and it is the only chart the panel needs. */}
+              {gmvBars.length > 0 && (
+                <div className="mt-4 flex h-12 items-end gap-1" aria-hidden>
+                  {gmvBars.map((h, i) => (
+                    <span key={i} className="flex-1 rounded-sm bg-brand/35" style={{ height: `${Math.max(4, h * 100)}%` }} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 self-center border-brand/20 lg:border-l lg:pl-10">
+              {moneySide.map((c) => (
+                <div key={c.label}>
+                  <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{c.label}</div>
+                  <div className="mt-1 text-2xl font-semibold tabular-nums">{c.value}</div>
+                  <div className="mt-0.5 text-2xs text-muted-foreground">{c.sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <StatGrid>
+          {cards.map((c) => (
+            // orders===null means "not read yet / failed", so show — rather than 0.
+            <StatCard key={c.label} label={c.label} value={orders === null ? "—" : String(c.value)} sub={c.sub} icon={c.icon} tone={c.pos ? "pos" : c.neg && c.value ? "neg" : undefined} />
+          ))}
+        </StatGrid>
+      )}
 
       {/* Production line narrowed to two thirds so the fulfilment-speed card fills the
           space it was wasting — the chart is only a handful of bars wide. */}
