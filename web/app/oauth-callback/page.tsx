@@ -39,7 +39,10 @@ export default function OAuthCallbackPage() {
       }
       try { const ch = new BroadcastChannel("eg-oauth"); ch.postMessage(payload); ch.close() } catch { /* ignore */ }
     }
-    const finish = (shop: string, note?: string) => {
+    // WHERE a connect lands is per-provider. Alibaba is sourcing, not a sales channel:
+    // sending it to Stores under "your orders will start syncing" described a shop that
+    // doesn't exist and a sync that will never happen.
+    const finish = (shop: string, note?: string, dest = "/stores?connected=1") => {
       // Only a completed connection clears the connect-time scratch (provider marker +
       // backfill choice). Clearing it on read is what broke re-runs of this callback.
       clearOAuthProvider()
@@ -50,7 +53,7 @@ export default function OAuthCallbackPage() {
       // so close() is permitted even once the opener link is gone. Only if it's still here a
       // moment later did it turn out not to be a popup at all; then take the old redirect.
       setTimeout(() => { try { window.close() } catch { /* ignore */ } }, 700)
-      setTimeout(() => { if (!window.closed) window.location.href = "/stores?connected=1" }, 1600)
+      setTimeout(() => { if (!window.closed) window.location.href = dest }, 1600)
     }
     const fail = (message: string) => {
       setState({ kind: "error", message })
@@ -114,7 +117,11 @@ export default function OAuthCallbackPage() {
         try {
           const data = await exchangeAlibaba(code)
           if (data.error) throw new Error(data.error)
-          finish(data.account ? `Alibaba (${data.account})` : "Alibaba")
+          finish(
+            data.account ? `Alibaba (${data.account})` : "Alibaba",
+            "Alibaba connected. Search suppliers from Sourcing.",
+            "/sourcing?connected=alibaba",
+          )
         } catch (e: unknown) {
           fail(e instanceof Error ? e.message : "Couldn't connect Alibaba.")
         }

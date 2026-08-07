@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, Binoculars, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Loading } from "@/components/app/loading"
+import { AlibabaStatus } from "@/components/app/alibaba-status"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSourcing, saveSourcing, deleteSourcing, fetchSourcingPrice, getSpydeckSaves,
@@ -228,6 +229,10 @@ export function SourcingView() {
               Where each product comes from and what it lands at, once freight is spread over the MOQ.
             </p>
           </div>
+          {/* ONE LINE, not a panel. Whether Alibaba is connected is a fact about this page,
+              and the only action it ever needs is Connect — which is nobody's job but an
+              admin's, and only once. A card for it would out-weigh the search it enables. */}
+          <AlibabaStatus />
           {rows.length > 0 && (
             <Button size="sm" variant="outline" onClick={exportCsv}>
               <DownloadSimple size={14} weight="bold" /> Export
