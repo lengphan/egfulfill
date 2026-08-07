@@ -161,8 +161,11 @@ export function alibabaRoutes(app, requireAdmin) {
        * wrong marketplace, which fails later at the token exchange rather than here.
        * The redirect_uri must match the Callback URL registered on the app exactly.
        */
+      // openapi-AUTH, matching the openapi-API gateway. `oauth.alibaba.com` is a DIFFERENT
+      // platform and answers `param-appkey.not.exists` for a key that is perfectly valid
+      // here — an error that reads like a bad key and is actually a bad host.
       authorizeUrl: alibabaConfigured()
-        ? 'https://oauth.alibaba.com/authorize?' + new URLSearchParams({
+        ? 'https://openapi-auth.alibaba.com/oauth/authorize?' + new URLSearchParams({
             response_type: 'code',
             client_id: c.key,
             redirect_uri: ALIBABA_REDIRECT_URI,
