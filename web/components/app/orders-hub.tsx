@@ -13,7 +13,7 @@ import { PackagingHint } from "@/components/app/packaging-hint"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
-import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, validateAddress, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
+import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, validateAddress, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
@@ -25,7 +25,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
-import { filterOrders, matchesStatus, isRush, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
+import { filterOrders, matchesStatus, isRush, isOverdue, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
@@ -699,6 +699,25 @@ export function OrdersHub() {
 
   const rushCount = useMemo(() => (orders ?? []).filter(isRush).length, [orders])
 
+  /**
+   * Flag or clear a rush. Optimistic, because this is a queue hint rather than a state
+   * change — waiting on a round trip to reorder a list makes people click twice, and the
+   * server is idempotent so a double-click costs nothing. Reverted on failure so the row
+   * never keeps a flag the server refused.
+   */
+  const toggleRush = async (o: OrderRow) => {
+    const next = !isRush(o)
+    setOrders((prev) => (prev ?? []).map((x) => (x.id === o.id ? { ...x, rush: next } : x)))
+    try {
+      const r = await setOrderRush(String(o.id), next)
+      if (r.error) throw new Error(r.error)
+      setNote(next ? `${numOf(o)} marked as rush.` : `Rush cleared on ${numOf(o)}.`)
+    } catch (e) {
+      setOrders((prev) => (prev ?? []).map((x) => (x.id === o.id ? { ...x, rush: !next } : x)))
+      setActionErr(e instanceof Error ? e.message : "Couldn't change the rush flag.")
+    }
+  }
+
   /** Jump the list to what a stat card counted — and clicking the lit one clears it, the
    *  same toggle the pills use. Replaces the whole query rather than merging: a stat means
    *  "show me these", and leaving an unrelated search on would show a subset of them. */
@@ -712,12 +731,34 @@ export function OrdersHub() {
   // The catalog + stock map are what let the Ready filter answer its stock half: stock is
   // held against the resolved BLANK sku, not the listing's. Both are page-level (loaded for
   // every order, not per row), so filtering on them can't make rows appear as you scroll.
-  const filterCtx = useMemo(() => ({ catalog, stock }), [catalog, stock])
+  const filterCtx = useMemo(() => ({ catalog, stock, overdueDays }), [catalog, stock, overdueDays])
 
-  const filtered = useMemo(
-    () => filterOrders(orders ?? [], query, filterCtx),
-    [orders, query, filterCtx],
-  )
+  /**
+   * What floats to the top, and what deliberately doesn't.
+   *
+   * 1. RUSH — a human decided. It jumps whatever its stock state, because the decision was
+   *    made with more context than this sort has.
+   * 2. OVERDUE **AND WORKABLE** — late work that is only waiting on sequencing. This is the
+   *    whole point of surfacing overdue at all.
+   * 3. Everything else, untouched.
+   *
+   * Overdue-and-BLOCKED is not promoted. It is late, and it is on the Overdue pill where
+   * purchasing can find it, but it cannot be started — and pinning unstartable work above
+   * the print queue is how a floor learns to scroll past the top of its own list. Losing
+   * that habit costs you the orders they COULD have picked up.
+   *
+   * A stable sort: equal ranks keep the server's created_at ordering.
+   */
+  const filtered = useMemo(() => {
+    const list = filterOrders(orders ?? [], query, filterCtx)
+    const rank = (o: OrderRow) => {
+      if (isRush(o)) return 0
+      if (!isOverdue(o, overdueDays)) return 2
+      const blocked = catalog.length && orderStock(o.items ?? [], catalog, stock).state === "out"
+      return blocked ? 2 : 1
+    }
+    return [...list].sort((a, b) => rank(a) - rank(b))
+  }, [orders, query, filterCtx, overdueDays, catalog, stock])
 
   const paged = usePaged(filtered, 25)
 
@@ -1557,6 +1598,15 @@ export function OrdersHub() {
                                   <DropdownMenuSeparator />
                                   <DropdownMenuGroup>
                                     <DropdownMenuLabel>{tl("ui", "Flag / hold")}</DropdownMenuLabel>
+                                    {/* RUSH sits above the hold states because it is the
+                                        opposite action and the most reachable one: the person
+                                        who notices a job is urgent is usually mid-task, and a
+                                        flag two menus deep is a flag nobody sets. */}
+                                    <DropdownMenuItem onClick={() => toggleRush(o)}>
+                                      {isRush(o)
+                                        ? tl("ui", "Clear rush")
+                                        : tl("ui", "Mark as rush")}
+                                    </DropdownMenuItem>
                                     {exc.map((s) => (
                                       <DropdownMenuItem
                                         key={s.id}
