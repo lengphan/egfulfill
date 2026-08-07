@@ -171,6 +171,11 @@ export function alibabaRoutes(app, requireAdmin) {
             redirect_uri: ALIBABA_REDIRECT_URI,
             sp: 'ICBU',
             view: 'web',
+            // REQUIRED here, unlike most OAuth providers where it's an optional CSRF nonce.
+            // Omitting it gets you past the consent screen and then "Missing parameter"
+            // AFTER login, which reads like a broken app rather than a missing field.
+            // Random per call so it also does the job it exists for.
+            state: crypto.randomBytes(8).toString('hex'),
           }).toString()
         : null,
       redirectUri: ALIBABA_REDIRECT_URI,
