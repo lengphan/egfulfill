@@ -253,12 +253,12 @@ export function SourcingView() {
           connected, or for a non-admin, this is just the prospect table as it always was. */}
       {canBrowse && (
         <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
-          {([["prospects", "My prospects"], ["find", "Find suppliers"]] as const).map(([id, label]) => (
+          {([["prospects", "Suppliers"], ["find", "Search"]] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
               aria-pressed={tab === id}
-              className={"rounded-md px-3 py-1.5 text-xs font-medium transition-colors " + (tab === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+              className={"rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors " + (tab === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
             >
               {label}
               {id === "prospects" && rows.length > 0 && (
@@ -276,7 +276,7 @@ export function SourcingView() {
           canBrowse stayed false, so the toggle never appeared, so nothing could ever set tab
           to "find". The search was still there and simply could not be reached. */}
       <div className={tab === "find" ? undefined : "hidden"}>
-        <AlibabaBrowse onConnectedChange={setCanBrowse} initialQuery={incoming} />
+        <AlibabaBrowse onConnectedChange={setCanBrowse} initialQuery={incoming} onSaved={load} />
       </div>
 
       <div className={canBrowse && tab === "find" ? "hidden" : undefined}>

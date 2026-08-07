@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { MagnifyingGlass, CircleNotch, Plus, Check, ArrowSquareOut, ChatCircleDots } from "@phosphor-icons/react"
+import { MagnifyingGlass, CircleNotch, Plus, Check } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
@@ -36,10 +36,13 @@ const SEEDS = [
 const cleanTitle = (t?: string | null) =>
   String(t || "").replace(/\\(["'\\])/g, "$1").trim()
 
-export function AlibabaBrowse({ onConnectedChange, initialQuery }: {
+export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
   onConnectedChange?: (v: boolean) => void
   /** Handed in from a SpyDeck query, so the search is already running when you arrive. */
   initialQuery?: string
+  /** Fired after a prospect is saved, so the other tab's list is current the moment you
+   *  switch to it — otherwise you add three things and find an empty table. */
+  onSaved?: () => void
 } = {}) {
   const [connected, setConnected] = useState<boolean | null>(null)
   const [q, setQ] = useState(initialQuery ?? "")
@@ -128,6 +131,7 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery }: {
         stage: "prospect",
       })
       setSaved((s) => new Set(s).add(id))
+      onSaved?.()   // the prospect table is on the other tab; refresh it now, not on next mount
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save that as a prospect.")
     } finally { setSavingId(null) }
@@ -203,7 +207,7 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery }: {
                     <p className="line-clamp-2 text-xs leading-snug">{cleanTitle(p.title)}</p>
                     <div className="mt-auto flex items-center gap-1.5">
                       <Button
-                        size="sm" variant={isSaved ? "outline" : "default"} className="h-7 flex-1 text-2xs"
+                        size="sm" variant={isSaved ? "outline" : "default"} className="h-7 flex-1 text-xs"
                         onClick={() => addProspect(p)} disabled={isSaved || savingId === id}
                       >
                         {savingId === id ? <CircleNotch size={12} className="animate-spin" />
@@ -219,11 +223,14 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery }: {
                            the ISV set, and this endpoint returns no supplier or company id,
                            so even a deep link into their messenger cannot be constructed.
                            The product page is where Contact Supplier lives. */
+                        /* No icons, and the SAME box as Add — h-7 flex-1, so the pair reads as
+                           two equal choices rather than a button beside a decorated link.
+                           The speech bubble was actively misleading: it suggested an in-app
+                           chat, and this only opens a product page. */
                         <a href={p.url} target="_blank" rel="noopener noreferrer"
                            title="Opens the product on Alibaba, where Contact Supplier is"
-                           className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-2xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary">
-                          <ChatCircleDots size={12} weight="bold" /> Contact
-                          <ArrowSquareOut size={10} weight="bold" className="opacity-60" />
+                           className="inline-flex h-7 flex-1 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary">
+                          Contact
                         </a>
                       )}
                     </div>
