@@ -683,6 +683,56 @@ export function ordersRoutes(app, requireAuth) {
   // ONE order. The detail page used to fetch every order and search it, so an order the
   // list happened to exclude read as "not found" even though it existed. Staff may read
   // any order; a seller only their own.
+
+  /**
+   * Hide a MARKETPLACE buyer's contact details from the seller side.
+   *
+   * The seller is not the risk here — the surface is. Buyer names and street addresses on a
+   * marketplace order are that marketplace's data held under our API terms, and the fewer
+   * accounts that can read them the smaller the incident is when one is compromised. Staff see
+   * everything, because someone has to answer a "this never arrived" claim months later; a
+   * seller sees enough to recognise the order and no more.
+   *
+   * This is ACCESS CONTROL, not retention: nothing is destroyed, so a dispute at month six is
+   * still answerable. (Amazon's Data Protection Policy separately requires actual DELETION
+   * within 30 days of shipment for Amazon orders — masking does not satisfy it. Nothing is
+   * connected to Amazon yet; when it is, the pii_retention purge has to come back on for that
+   * channel.)
+   *
+   * MUST run server-side. Hiding these in the client still ships them in the JSON, where any
+   * seller can read them out of devtools — which is not a restriction, it is a decoration.
+   *
+   * Leaves a MANUAL order alone: its address was typed into our own form by the seller's side,
+   * so they already hold it, and hiding back what someone just entered reads as a bug.
+   *
+   * `masked: true` travels with the row on purpose. Without it the client cannot tell "hidden
+   * from you" from "never arrived" — and those two look identical while meaning opposite
+   * things, which is the whole reason Etsy's redacted addresses were mistaken for our bug.
+   */
+  function maskBuyerPII(row) {
+    if (!row) return row;
+    if (String(row.source || '').toLowerCase() === 'manual') return row;
+    const a = row.address && typeof row.address === 'object' ? row.address : null;
+    const c = row.customer && typeof row.customer === 'object' ? row.customer : null;
+    return {
+      ...row,
+      customer: c ? { name: c.name ?? null, masked: true } : c,
+      address: a ? {
+        masked: true,
+        name: a.name ?? null,
+        city: a.city ?? null,
+        state: a.state ?? null,
+        country: a.country ?? a.country_iso ?? null,
+        // The buyer's OWN order reference is not contact data, and a seller needs it to match
+        // the order against their marketplace.
+        ref: a.ref ?? null,
+      } : a,
+      // The full address is PRINTED on the label PDF, so leaving this link reachable would
+      // make every line above cosmetic.
+      tracking_label_url: null,
+    };
+  }
+
   app.get('/api/orders/:id', { preHandler: requireAuth }, async (req, reply) => {
     const agg = `coalesce(json_agg(i.* order by i.id) filter (where i.id is not null), '[]') as items`;
     const r = await q(
@@ -704,6 +754,7 @@ export function ordersRoutes(app, requireAuth) {
       if (!mine || !_canSurface(sel, 'orders') || row.factory_order) {
         reply.code(404); return { error: 'Order not found' };
       }
+      return maskBuyerPII(await healOrphanLines(row));
     }
     return healOrphanLines(row);
   });
@@ -852,7 +903,7 @@ export function ordersRoutes(app, requireAuth) {
       [sel.id]
     );
     await Promise.all(r.rows.map(healOrphanLines));
-    return r.rows;
+    return r.rows.map(maskBuyerPII);
   });
 
   /**

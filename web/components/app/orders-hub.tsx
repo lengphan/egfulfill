@@ -1804,14 +1804,34 @@ export function OrdersHub() {
                   {!isCollapsed && (() => {
                     const a = (o.address ?? {}) as Record<string, string>
                     const street = a.street || a.first_line || a.line1 || a.address1 || ""
+                    // The server hides a marketplace buyer's street/ZIP/phone/email from the
+                    // seller side and stamps `masked`. Without reading that flag this panel
+                    // would say "Not available yet" — which is the OPPOSITE of true and the
+                    // exact confusion Etsy's redacted addresses already caused once.
+                    const masked = !!(o.address as { masked?: boolean } | null)?.masked
                     const notes = (o as { notes?: string | null }).notes
                     const personal = (o.items ?? []).map((it) => (it as { personalization?: string | null }).personalization).filter(Boolean)
-                    if (!street && !notes && !personal.length) return null
+                    if (!street && !masked && !notes && !personal.length) return null
                     return (
                       <div className="mb-3 grid gap-3 rounded-lg border border-border bg-muted/30 p-3 text-xs sm:grid-cols-2">
                         <div>
                           <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
-                          {street ? (
+                          {masked ? (
+                            // Say WHICH it is: the address exists and is being withheld, not
+                            // missing. Region is kept so a seller can still recognise the
+                            // order and answer "did it go to the right place?".
+                            <div className="leading-relaxed">
+                              {(o.customer?.name || a.name) && (
+                                <div className="font-medium text-foreground">{o.customer?.name || a.name}</div>
+                              )}
+                              <div className="select-none tracking-widest text-muted-foreground">••••••••••</div>
+                              <div>{[a.city, a.state].filter(Boolean).join(", ")}</div>
+                              {a.country && <div>{a.country}</div>}
+                              <div className="mt-1 text-3xs text-muted-foreground">
+                                Street and postcode are held by the factory — ask support if an order needs checking.
+                              </div>
+                            </div>
+                          ) : street ? (
                             <div className="leading-relaxed">
                               {o.customer?.name && <div className="font-medium text-foreground">{o.customer.name}</div>}
                               <div>{street}</div>
