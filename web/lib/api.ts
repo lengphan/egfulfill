@@ -2209,7 +2209,10 @@ export type EtsyConfig = {
  * anonymous — priced only by luck (variant sku match) and unable to reach the Design
  * board at all, because a line with no artwork can't be sent to a designer.
  */
-export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string }) {
+/** Etsy's own declaration of who physically made the item. The seller's statement about
+ *  their shop — always send it explicitly rather than letting the server fall back. */
+export type EtsyWhoMade = "i_did" | "someone_else" | "collective"
+export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string; who_made?: EtsyWhoMade }) {
   return api<{ listing_id?: number; url?: string; error?: string; variants_applied?: number; variant_skus?: string[]; variants_error?: string | null }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
 }
 export function getEtsyConnections() {

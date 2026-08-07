@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { CircleNotch, Storefront, UploadSimple, Trash, Package } from "@phosphor-icons/react"
+import { CircleNotch, Storefront, UploadSimple, Trash, Package, WarningCircle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,12 +9,22 @@ import { ProductCombobox } from "@/components/app/product-combobox"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
-import { getSpecQuote, publishEtsy, publishTiktok, getTiktokCategories, getTiktokWarehouses, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse } from "@/lib/api"
+import { getSpecQuote, publishEtsy, publishTiktok, getTiktokCategories, getTiktokWarehouses, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade } from "@/lib/api"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const MAX_TAGS = 13
 const MAX_IMAGES = 10 // Etsy's hard limit — an 11th slot silently never publishes.
+
+// Etsy's who_made enum, with what each answer commits the seller to. Ordered with
+// "someone else" first because that is the truthful answer for anything WE produce, which
+// is every listing this dialog creates off a blank — but it stays a choice, because a
+// seller who genuinely makes their own is entitled to say so.
+const WHO_MADE_OPTIONS: { value: EtsyWhoMade; label: string; help: string }[] = [
+  { value: "someone_else", label: "Another company or person", help: "We print and ship it — the honest answer for anything produced on one of our blanks. Needs a production partner declared on Etsy." },
+  { value: "i_did", label: "I made it", help: "Only if you personally make this item. Do not pick this for print-on-demand." },
+  { value: "collective", label: "A member of my shop", help: "Someone in your own registered shop collective makes it." },
+]
 const cleanTag = (raw: string) => raw.replace(/[^\p{L}\p{N} '-]/gu, "").trim().slice(0, 20)
 
 /**
@@ -125,6 +135,9 @@ export function PublishProductDialog({
   const [retail, setRetail] = useState("")
   const [qty, setQty] = useState("999")
   const [tags, setTags] = useState<string[]>([])
+  // Defaults to the truthful answer for a POD listing rather than to Etsy's own default of
+  // "I made it" — a seller who skips this field should land on the safe side of it.
+  const [whoMade, setWhoMade] = useState<EtsyWhoMade>("someone_else")
   const [tagDraft, setTagDraft] = useState("")
   const [suggested, setSuggested] = useState<string[]>([])
   const [images, setImages] = useState<string[]>([])
@@ -175,6 +188,8 @@ export function PublishProductDialog({
       setDesc(prefill?.description ?? "")
       setRetail(prefill?.price != null ? String(prefill.price) : "")
       setTags((prefill?.tags ?? []).slice(0, MAX_TAGS))
+      // Reset per open — a declaration must not carry over from the last product.
+      setWhoMade("someone_else")
       setImages((prefill?.images ?? []).filter(Boolean).slice(0, MAX_IMAGES))
       setBlank(prefill?.blank ?? null)
       setBlankText(prefill?.blank?.name ?? "")
@@ -446,6 +461,9 @@ export function PublishProductDialog({
         size_prices: Object.fromEntries(
           sizeRows.filter((r) => r.price > 0).map((r) => [r.size, r.price])
         ),
+        // The seller's own declaration — always sent explicitly. Never let the server's
+        // backward-compat fallback decide this on their behalf.
+        who_made: whoMade,
       })
       if (r.error) throw new Error(r.error)
 
@@ -595,6 +613,55 @@ export function PublishProductDialog({
                   Sets what we produce, and the cost behind your margin.
                 </p>
               </div>
+
+              {/* Etsy asks every listing who physically made the item, and the answer goes
+                  into the seller's shop under their name. We used to answer "I made it
+                  myself" for them on every publish — untrue for anything we produce, and a
+                  Handmade Policy misstatement is suspension-class rather than warning-class.
+                  So it's a choice now, and the consequence of each answer is stated next to
+                  it rather than left to be discovered from Etsy. */}
+              {channel === "etsy" && (
+                <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+                  <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Etsy requires: who made it</div>
+                  <div className="grid gap-1.5">
+                    {WHO_MADE_OPTIONS.map((o) => (
+                      <label
+                        key={o.value}
+                        className={
+                          "flex cursor-pointer items-start gap-2 rounded-md border p-2 text-xs " +
+                          (whoMade === o.value ? "border-primary/50 bg-primary/5" : "border-border")
+                        }
+                      >
+                        <input
+                          type="radio"
+                          name="who-made"
+                          className="mt-0.5"
+                          checked={whoMade === o.value}
+                          onChange={() => setWhoMade(o.value)}
+                        />
+                        <span>
+                          <span className="font-medium">{o.label}</span>
+                          <span className="block text-muted-foreground">{o.help}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {/* The heads-up, not a block: plenty of shops have no partner registered
+                      yet, and stopping the publish would strand them. Etsy is where the
+                      partner is declared — we can't do it from here. */}
+                  {whoMade !== "i_did" && (
+                    <div className="flex items-start gap-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                      <WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
+                      <span>
+                        Etsy expects a <b>production partner</b> on file when someone else makes the
+                        item. Add EGFULFILL in <b>Shop Manager → Settings → Production partners</b>,
+                        then attach it to this listing. Etsy can suspend a shop for selling made-for-you
+                        items without one declared.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* TikTok Shop needs these three; Etsy doesn't. Shown only for the TikTok channel. */}
               {channel === "tiktok" && (

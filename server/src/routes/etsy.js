@@ -1482,13 +1482,25 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       if (!taxId)  { reply.code(400); return { error: 'No category (taxonomy_id) available — publish one listing manually on Etsy first so we can reuse its category, or pass taxonomy_id.' }; }
       if (!shipId) { reply.code(400); return { error: 'No Etsy shipping profile found — create one in your Etsy Shop Manager → Settings → Shipping (or pass shipping_profile_id).' }; }
 
+      // WHO MADE IT is the seller's declaration about their own shop, and it is not ours
+      // to make for them. This was hardcoded to 'i_did' — "I made it myself" — on every
+      // listing we published, which for print-on-demand we produce is a statement we know
+      // to be untrue, written into their shop under their name. Misrepresenting this is a
+      // Handmade Policy matter, and Handmade Policy matters get shops suspended rather than
+      // warned; see the "never risk a connected account" rule.
+      //
+      // The client now always sends an explicit choice. The 'i_did' fallback survives only
+      // so an older client can't 400, and it is the value Etsy itself defaults to.
+      const WHO_MADE = ['i_did', 'someone_else', 'collective'];
+      const whoMade = WHO_MADE.includes(String(b.who_made)) ? String(b.who_made) : 'i_did';
+
       // Create the DRAFT listing.
       const form = new URLSearchParams({
         quantity: String(b.quantity || 999),
         title: title.slice(0, 140),
         description: String(b.description || title),
         price: String(price),
-        who_made: 'i_did', when_made: 'made_to_order', type: 'physical', state: 'draft',
+        who_made: whoMade, when_made: 'made_to_order', type: 'physical', state: 'draft',
         taxonomy_id: String(taxId), shipping_profile_id: String(shipId)
       });
       if (readinessId) form.append('readiness_state_id', String(readinessId));
