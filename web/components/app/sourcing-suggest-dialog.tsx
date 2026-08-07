@@ -150,8 +150,12 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
             )}
 
             <div>
+              {/* Says what the CLICK does. "full width, and paginated" was the reason this
+                  hands off rather than searching here — a note about our own implementation,
+                  which is no use to the person reading it. The reasoning belongs in the
+                  comment below, where it already is. */}
               <div className="mb-1.5 text-xs text-muted-foreground">
-                Search these on Sourcing — full width, and paginated
+                Open one on the Sourcing page to search it
               </div>
               <div className="space-y-1.5">
                 {/* HANDS OFF rather than searching here. This dialog is a narrow modal over
