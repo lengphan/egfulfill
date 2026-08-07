@@ -1,4 +1,6 @@
 // EGFULFILL API — Fastify entry point.
+import crypto from 'node:crypto';
+import { limited } from './ratelimit.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn, renewIfStale } from './auth.js';
@@ -266,8 +268,49 @@ app.post('/api/auth/signup', async (req, reply) => {
     return res;
   } catch (e) { reply.code(400); return { error: e.message }; }
 });
+
+/**
+ * BRUTE-FORCE GUARD on the credential routes.
+ *
+ * ratelimit.js existed but its own header says what it is for: "per-API-key rate limiting
+ * for the public API". It is keyed to partner keys and wired into sandbox.js, so nothing
+ * throttled login at all — verified against production: eight rapid attempts, no delay.
+ *
+ * That matters more here than usual because sign-in accepts an EMAIL OR A USERNAME, so an
+ * attacker does not need to know an address to spray.
+ *
+ * TWO counters, because they stop different attacks and either alone leaves a hole:
+ *   per IP       one host trying many accounts (spray / enumeration)
+ *   per identity many hosts trying one account (distributed guess at a known user)
+ * The identity is lower-cased so casing cannot mint a fresh budget, and hashed so an
+ * in-memory key never holds a plaintext address.
+ *
+ * Counted on EVERY attempt rather than only on failures. Counting failures lets someone
+ * interleave a known-good login to keep their budget topped up, and a legitimate person
+ * does not sign in ten times a minute.
+ *
+ * Honest limits: in-process and per-container, so these reset on deploy — the same caveat
+ * ratelimit.js already documents. It raises the cost of a spray by orders of magnitude; it
+ * is not a substitute for a real WAF if this ever runs behind one.
+ */
+const AUTH_IP_MAX = 20;        // per IP, per 10 min
+const AUTH_ID_MAX = 8;         // per account, per 10 min
+const AUTH_WINDOW = 10 * 60 * 1000;
+function authThrottled(req, reply, identity) {
+  const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim() || 'unknown';
+  const byIp = limited(reply, `auth-ip:${ip}`, AUTH_IP_MAX, AUTH_WINDOW);
+  if (byIp) return byIp;
+  const id = String(identity || '').trim().toLowerCase();
+  if (!id) return null;
+  const key = crypto.createHash('sha256').update(id).digest('hex').slice(0, 24);
+  return limited(reply, `auth-id:${key}`, AUTH_ID_MAX, AUTH_WINDOW);
+}
+
 app.post('/api/auth/login', async (req, reply) => {
-  try { return await login(req.body || {}); }
+  const b = req.body || {};
+  const stop = authThrottled(req, reply, b.username || b.email);
+  if (stop) return stop;
+  try { return await login(b); }
   catch (e) { reply.code(400); return { error: e.message }; }
 });
 app.get('/api/me', { preHandler: requireAuth }, async (req) => req.user);

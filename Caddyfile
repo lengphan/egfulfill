@@ -17,6 +17,48 @@ www.egful.store {
 # Safe to deploy now: it's additive and doesn't touch the egful.store block below.
 api.egful.store {
 	encode gzip
+
+	# SECURITY HEADERS. There were none — verified against the live site: no HSTS, no
+	# X-Frame-Options, no X-Content-Type-Options, no Referrer-Policy.
+	#
+	# Deliberately NO Content-Security-Policy here. The app is Next.js with inline
+	# hydration and a theme script, and shipping a CSP that has not been walked through
+	# every page is how a site goes blank in production for a header nobody can see. That
+	# is its own task, done with the app in front of you.
+	#
+	# HSTS carries no preload directive on purpose: preload is a one-way door — submitting
+	# the domain makes every current and future subdomain https-only in shipped browsers,
+	# and it is slow to undo.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# The apex serves the OAuth popup, so framing must stay same-origin rather than DENY.
+		-Server
+	}
+
+
+	# SECURITY HEADERS. There were none — verified against the live site: no HSTS, no
+	# X-Frame-Options, no X-Content-Type-Options, no Referrer-Policy.
+	#
+	# Deliberately NO Content-Security-Policy here. The app is Next.js with inline
+	# hydration and a theme script, and shipping a CSP that has not been walked through
+	# every page is how a site goes blank in production for a header nobody can see. That
+	# is its own task, done with the app in front of you.
+	#
+	# HSTS carries no preload directive on purpose: preload is a one-way door — submitting
+	# the domain makes every current and future subdomain https-only in shipped browsers,
+	# and it is slow to undo.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# The apex serves the OAuth popup, so framing must stay same-origin rather than DENY.
+		-Server
+	}
+
 	handle /api/* {
 		reverse_proxy api:3000
 	}

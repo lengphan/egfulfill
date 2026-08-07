@@ -16,6 +16,7 @@
 import crypto from 'crypto';
 import { q } from '../db.js';
 import { hashPassword, canManageUsers } from '../auth.js';
+import { limited } from '../ratelimit.js';
 import { sendMail } from '../mailer.js';
 
 // The REACT app — email links must land where the /reset-password route exists.
@@ -85,6 +86,16 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
   app.post('/api/auth/forgot', async (req, reply) => {
     const email = String((req.body || {}).email || '').trim().toLowerCase();
     if (!email || email.indexOf('@') < 0) { reply.code(400); return { error: 'Invalid email' }; }
+    // Same brute-force guard as login. This route answers identically whether or not the
+    // address exists — which is right — but unthrottled it is still a free way to spray
+    // reset mail at a list of addresses, and every hit that DOES match sends a real email
+    // from our sender reputation.
+    {
+      const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim() || 'unknown';
+      const stop = limited(reply, `auth-ip:${ip}`, 20, 10 * 60 * 1000)
+        || limited(reply, `auth-id:${crypto.createHash('sha256').update(email).digest('hex').slice(0, 24)}`, 5, 10 * 60 * 1000);
+      if (stop) return stop;
+    }
     try {
       const u = await q('select id, email from users where lower(email)=$1 limit 1', [email]);
       const user = u.rows[0];
