@@ -61,29 +61,30 @@ async function getServiceToken() {
 // against it drifting again — if you add or reorder a column in CSV_COLUMNS, edit this list
 // in the same commit.
 const T_COLUMNS = [
-  // group: 'asg' (fill it or we mint one) | 'req' (blocks the row) | 'one' | 'opt'
-  { h: 'Order Number', g: 'asg', sample: 'SAMPLE-1001' },
-  { h: 'Ship Name', g: 'req', sample: 'Jane Sample — delete this row' },
-  { h: 'Ship Address 1', g: 'req', sample: '42 Maple Street' },
-  { h: 'Ship City', g: 'req', sample: 'Portland' },
-  { h: 'Ship State', g: 'req', sample: 'OR', opts: 'states' },
-  { h: 'Ship Zip', g: 'req', sample: '97201' },
-  { h: 'Product Title', g: 'req', sample: 'Custom Embroidered Tee with Name' },
-  { h: 'Ship Address 2', g: 'opt', sample: 'Apt 3B' },
-  { h: 'Ship Email', g: 'opt', sample: 'jane@example.com' },
-  { h: 'Store Name', g: 'opt', sample: 'Main Store' },
-  // Two DIFFERENT skus: the seller's listing vs our catalog blank. Named apart on purpose.
-  { h: 'Listing SKU', g: 'opt', sample: 'TEE-EMB-NAME-01' },
-  { h: 'Blank SKU', g: 'opt', sample: 'G5000' },
-  { h: 'Template ID', g: 'opt', sample: '' },
-  { h: 'Item Quantity', g: 'opt', sample: '1' },
-  { h: 'Print Type', g: 'opt', sample: 'DTG', opts: 'methods' },
-  { h: 'Item Color', g: 'opt', sample: 'White' },
-  { h: 'Item Size', g: 'opt', sample: 'L', opts: 'sizes' },
-  { h: 'Item Price', g: 'opt', sample: '24.00' },
-  { h: 'Image Link/ID', g: 'opt', sample: '' },
-  { h: 'Shipping Service', g: 'opt', sample: 'USPS Priority Mail', opts: 'services' },
-  { h: 'Internal Notes', g: 'opt', sample: 'Example row — safe to delete' },
+  // g = SECTION, not obligation. Sorting by required-vs-optional pushed 'Ship Address 2'
+  // four columns from the street it continues; obligation now rides on `duty` instead.
+  // duty: 'req' (blocks the row) | 'asg' (fill it or we mint one) | '' (optional)
+  { h: 'Order Number', g: 'order', duty: 'asg', sample: 'SAMPLE-1001' },
+  { h: 'Ship Name', g: 'ship', duty: 'req', sample: 'Jane Sample — delete this row' },
+  { h: 'Ship Address 1', g: 'ship', duty: 'req', sample: '42 Maple Street' },
+  { h: 'Ship Address 2', g: 'ship', duty: '', sample: 'Apt 3B' },
+  { h: 'Ship City', g: 'ship', duty: 'req', sample: 'Portland' },
+  { h: 'Ship State', g: 'ship', duty: 'req', sample: 'OR', opts: 'states' },
+  { h: 'Ship Zip', g: 'ship', duty: 'req', sample: '97201' },
+  { h: 'Ship Email', g: 'ship', duty: '', sample: 'jane@example.com' },
+  { h: 'Product Title', g: 'product', duty: 'req', sample: 'Custom Embroidered Tee with Name' },
+  { h: 'Listing SKU', g: 'product', duty: '', sample: 'TEE-EMB-NAME-01' },
+  { h: 'Blank SKU', g: 'product', duty: '', sample: 'G5000' },
+  { h: 'Template ID', g: 'product', duty: '', sample: '' },
+  { h: 'Item Quantity', g: 'product', duty: '', sample: '1' },
+  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG', opts: 'methods' },
+  { h: 'Item Color', g: 'product', duty: '', sample: 'White' },
+  { h: 'Item Size', g: 'product', duty: '', sample: 'L', opts: 'sizes' },
+  { h: 'Item Price', g: 'product', duty: '', sample: '24.00' },
+  { h: 'Image Link/ID', g: 'product', duty: '', sample: '' },
+  { h: 'Store Name', g: 'extras', duty: '', sample: 'Main Store' },
+  { h: 'Shipping Service', g: 'extras', duty: '', sample: 'USPS Priority Mail', opts: 'services' },
+  { h: 'Internal Notes', g: 'extras', duty: '', sample: 'Example row — safe to delete' },
 ];
 
 // Dropdown value lists. Mirrors COLUMN_OPTIONS in web/lib/order-import.ts; `methods` mirrors
@@ -99,11 +100,16 @@ const T_OPTS = {
 // fill behind live text is the "tinted canvas under a 700-row queue" mistake. The banner row
 // carries the strong tone; the header row a wash of it; the data cells nothing at all.
 const BAND = {
-  asg: { label: 'FILL, OR WE ASSIGN ONE', banner: { red: 0.88, green: 0.94, blue: 0.90 }, header: { red: 0.95, green: 0.98, blue: 0.96 } },
-  req: { label: 'REQUIRED — fill every row', banner: { red: 0.86, green: 0.90, blue: 1.0 }, header: { red: 0.94, green: 0.96, blue: 1.0 } },
-  one: { label: 'FILL ONE OF THESE', banner: { red: 0.91, green: 0.87, blue: 1.0 }, header: { red: 0.96, green: 0.94, blue: 1.0 } },
-  opt: { label: 'OPTIONAL', banner: { red: 0.94, green: 0.94, blue: 0.94 }, header: { red: 0.98, green: 0.98, blue: 0.98 } },
+  order:   { label: 'ORDER',    banner: { red: 0.88, green: 0.94, blue: 0.90 }, header: { red: 0.95, green: 0.98, blue: 0.96 } },
+  ship:    { label: 'SHIP TO',  banner: { red: 0.86, green: 0.90, blue: 1.0 },  header: { red: 0.94, green: 0.96, blue: 1.0 } },
+  product: { label: 'PRODUCT',  banner: { red: 0.91, green: 0.87, blue: 1.0 },  header: { red: 0.96, green: 0.94, blue: 1.0 } },
+  extras:  { label: 'EXTRAS',   banner: { red: 0.94, green: 0.94, blue: 0.94 }, header: { red: 0.98, green: 0.98, blue: 0.98 } },
 };
+
+// Obligation is per COLUMN now, so it rides on the header text as a mark rather than being
+// implied by which band the column sits in. Required cells also carry bold red lettering, so
+// the mark is not the only signal.
+const DUTY_MARK = { req: ' *', asg: ' ~', '': '' };
 
 // Contiguous runs of one band, in column order — what the banner row merges across.
 // Walks the list rather than filtering per band, so the banner can only ever span columns
@@ -144,9 +150,14 @@ export function buildTemplate(title) {
       textFormat: { bold: true, fontSize: 10 },
     });
   }) };
-  const headerRow = { values: T_COLUMNS.map((c) => cell(c.h, {
+  const headerRow = { values: T_COLUMNS.map((c) => cell(c.h + DUTY_MARK[c.duty], {
     backgroundColor: BAND[c.g].header,
-    textFormat: { bold: true },
+    textFormat: {
+      bold: true,
+      // Required reads in red as well as carrying the asterisk — colour alone fails for a
+      // colour-blind filler, an asterisk alone is easy to miss in a wide header row.
+      ...(c.duty === 'req' ? { foregroundColor: { red: 0.62, green: 0.09, blue: 0.13 } } : {}),
+    },
     wrapStrategy: 'CLIP',
   })) };
   // Sample row in grey italic so it reads as an example, not as data to keep. isSampleRow()

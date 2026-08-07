@@ -27,67 +27,95 @@ export const REQUIRED_COLS = ["item_name", "ship_name", "ship_address_1", "ship_
 // `assigned` = fill it, or we mint one for you. Distinct from both required (blocks the
 // row) and optional (nothing happens if you skip it): skipping this one is allowed but has
 // a consequence worth stating, so it gets its own band rather than a footnote on another.
-export type CsvColumn = { header: string; key: string; required: boolean; oneOf?: string; assigned?: boolean; help: string }
+export type CsvColumn = { header: string; key: string; required: boolean; oneOf?: string; assigned?: boolean; section: CsvSection; help: string }
 
-// ORDER IS THE CONTRACT. Columns are listed required → fill-one-of → optional, and the
-// template, the .xlsx, the Google Sheet and the dialog's chip guide all render in this
-// order. That is the whole point: a filler works left to right and can stop at the first
-// grey column, instead of hunting a legend to find which of 21 scattered columns matter.
-// Moving a column between groups here moves it everywhere, in step.
+/** What the column is ABOUT. Bands group by this, not by obligation — see CSV_COLUMNS. */
+export type CsvSection = "order" | "shipTo" | "product" | "extras"
+
+// GROUPED BY SUBJECT, NOT BY OBLIGATION.
+//
+// This list was once sorted required-first, optional-last. That reads well in a legend and
+// badly in a spreadsheet: Ship Address 2 is optional while City/State/Zip are required, so
+// sorting by obligation pushed the apartment line FOUR columns past the street it belongs
+// to, with the city, state, postcode and a product column in between. Nobody writes an
+// address that way, and no marketplace template asks them to.
+//
+// So the bands are subjects — ORDER, SHIP TO, PRODUCT, EXTRAS — and each column carries its
+// own obligation, marked per column (a * and a tinted header) rather than by where it sits.
+// Within SHIP TO the order is the order you'd write an envelope in.
+//
+// The order here is still the contract: the .xlsx, the Google Sheet and the dialog's chip
+// guide all render from it, so moving a column moves it everywhere, in step.
 export const CSV_COLUMNS: CsvColumn[] = [
-  // ── FILL, OR WE ASSIGN ONE ────────────────────────────────────────────────
-  { header: "Order Number", key: "order_number", required: false, assigned: true, help: "The BUYER's order number. Leave it blank and the order still imports under the platform number we mint for it (FF-…) — but it is also what GROUPS rows, so a multi-line order MUST carry one. Without it, each line becomes its own separate order." },
-  // ── REQUIRED ──────────────────────────────────────────────────────────────
-  { header: "Ship Name", key: "ship_name", required: true, help: "Recipient's full name." },
-  { header: "Ship Address 1", key: "ship_address_1", required: true, help: "Street address." },
-  { header: "Ship City", key: "ship_city", required: true, help: "Destination city." },
-  { header: "Ship State", key: "ship_state", required: true, help: "State / province. Two-letter code for US destinations." },
-  { header: "Ship Zip", key: "ship_zip", required: true, help: "Postal code." },
+  // ── ORDER ─────────────────────────────────────────────────────────────────
+  { header: "Order Number", key: "order_number", required: false, assigned: true, section: "order", help: "The BUYER's order number. Leave it blank and the order still imports under the platform number we mint for it (FF-…) — but it is also what GROUPS rows, so a multi-line order MUST carry one. Without it, each line becomes its own separate order." },
+  // ── SHIP TO — envelope order: name, street, unit, city, state, postcode ────
+  { header: "Ship Name", key: "ship_name", required: true, section: "shipTo", help: "Recipient's full name." },
+  { header: "Ship Address 1", key: "ship_address_1", required: true, section: "shipTo", help: "Street address." },
+  { header: "Ship Address 2", key: "ship_address_2", required: false, section: "shipTo", help: "Apt / suite / unit. Sits directly after the street because that is where it belongs on an envelope — it is optional, not unrelated." },
+  { header: "Ship City", key: "ship_city", required: true, section: "shipTo", help: "Destination city." },
+  { header: "Ship State", key: "ship_state", required: true, section: "shipTo", help: "State / province. Two-letter code for US destinations." },
+  { header: "Ship Zip", key: "ship_zip", required: true, section: "shipTo", help: "Postal code." },
+  { header: "Ship Email", key: "ship_email", required: false, section: "shipTo", help: "Buyer email, kept for your records." },
+  // ── PRODUCT ───────────────────────────────────────────────────────────────
   // The line's NAME, and the only product field a marketplace export always carries. It is
   // what the boards read, so a row without one arrives as the literal word "Item".
-  { header: "Product Title", key: "item_name", required: true, help: "What the line is called on the board — the listing's title. Everything else about the product (blank, colour, size, method) can be filled in afterwards." },
-  // ── OPTIONAL ──────────────────────────────────────────────────────────────
-  { header: "Ship Address 2", key: "ship_address_2", required: false, help: "Apt / suite / unit." },
-  { header: "Ship Email", key: "ship_email", required: false, help: "Buyer email, kept for your records." },
-  { header: "Store Name", key: "store_name", required: false, help: "Which shop the order came from." },
+  { header: "Product Title", key: "item_name", required: true, section: "product", help: "What the line is called on the board — the listing's title. Everything else about the product (blank, colour, size, method) can be filled in afterwards." },
   // TWO different SKUs, and confusing them is the whole reason they are named this way.
   // "Listing SKU" belongs to the SELLER's marketplace listing; "Blank SKU" is OUR catalog
-  // product, and it is the one production and pricing key on. They were "Item SKU" and
-  // "Blank", which read as the same thing said twice.
-  { header: "Listing SKU", key: "item_sku", required: false, help: "The SELLER's own SKU on their marketplace listing. Records only — it does not decide what we make. Safe to leave blank." },
-  { header: "Blank SKU", key: "blank", required: false, help: "OUR catalog product — the garment we print on. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
-  { header: "Template ID", key: "template_id", required: false, help: "A saved design template to apply (fills blank + artwork + placement + method)." },
-  { header: "Item Quantity", key: "item_quantity", required: false, help: "Defaults to 1 if blank." },
-  { header: "Print Type", key: "print_type", required: false, help: "DTG / DTF / EMB / … Defaults to DTG if blank." },
-  { header: "Item Color", key: "item_color", required: false, help: "Garment colour." },
-  { header: "Item Size", key: "item_size", required: false, help: "Garment size." },
-  { header: "Item Price", key: "item_price", required: false, help: "What the BUYER paid per unit (your sale price). Records only — it does NOT set the fulfilment charge, which comes from the blank's pricing at submit." },
-  { header: "Image Link/ID", key: "hero_image", required: false, help: "URL of the listing photo shown on the card." },
-  { header: "Shipping Service", key: "shipping_service", required: false, help: "Requested method (e.g. Standard). Saved with the order." },
-  { header: "Internal Notes", key: "internal_notes", required: false, help: "Private note for your team. Saved with the order." },
+  // product, and it is the one production and pricing key on.
+  { header: "Listing SKU", key: "item_sku", required: false, section: "product", help: "The SELLER's own SKU on their marketplace listing. Records only — it does not decide what we make. Safe to leave blank." },
+  { header: "Blank SKU", key: "blank", required: false, section: "product", help: "OUR catalog product — the garment we print on. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
+  { header: "Template ID", key: "template_id", required: false, section: "product", help: "A saved design template to apply (fills blank + artwork + placement + method)." },
+  { header: "Item Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
+  { header: "Print Type", key: "print_type", required: false, section: "product", help: "DTG / DTF / EMB / … Defaults to DTG if blank." },
+  { header: "Item Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
+  { header: "Item Size", key: "item_size", required: false, section: "product", help: "Garment size." },
+  { header: "Item Price", key: "item_price", required: false, section: "product", help: "What the BUYER paid per unit (your sale price). Records only — it does NOT set the fulfilment charge, which comes from the blank's pricing at submit." },
+  { header: "Image Link/ID", key: "hero_image", required: false, section: "product", help: "URL of the listing photo shown on the card." },
+  // ── EXTRAS ────────────────────────────────────────────────────────────────
+  { header: "Store Name", key: "store_name", required: false, section: "extras", help: "Which shop the order came from." },
+  { header: "Shipping Service", key: "shipping_service", required: false, section: "extras", help: "Requested method (e.g. Standard). Saved with the order." },
+  { header: "Internal Notes", key: "internal_notes", required: false, section: "extras", help: "Private note for your team. Saved with the order." },
 ]
 
-// Which band a column sits in. Derived rather than stored so `required`/`oneOf` stay the
-// single fact and a column can never claim one band while validating as another.
-export type CsvGroup = "assigned" | "required" | "oneOf" | "optional"
-export const groupOf = (c: CsvColumn): CsvGroup =>
-  c.required ? "required" : c.assigned ? "assigned" : c.oneOf ? "oneOf" : "optional"
+// Bands group by SUBJECT. Obligation is a property of each column, shown on the column
+// itself, because the two do not nest: Ship Address 2 is optional and belongs beside the
+// street it continues, and no band that sorts by obligation can express both.
+export type CsvGroup = CsvSection
+export const groupOf = (c: CsvColumn): CsvGroup => c.section
 
 export const GROUP_LABEL: Record<CsvGroup, string> = {
-  assigned: "FILL, OR WE ASSIGN ONE",
-  required: "REQUIRED — every row",
-  oneOf: "FILL ONE OF THESE",
-  optional: "OPTIONAL",
+  order: "ORDER",
+  shipTo: "SHIP TO",
+  product: "PRODUCT",
+  extras: "EXTRAS",
+}
+
+/** How a column is obliged, for the per-column marker. Derived, never stored twice. */
+export type CsvDuty = "required" | "assigned" | "oneOf" | "optional"
+export const dutyOf = (c: CsvColumn): CsvDuty =>
+  c.required ? "required" : c.assigned ? "assigned" : c.oneOf ? "oneOf" : "optional"
+
+/** The marker that rides on the column header: `*` required, `~` we'll assign one. */
+export const DUTY_MARK: Record<CsvDuty, string> = {
+  required: "*", assigned: "~", oneOf: "†", optional: "",
+}
+export const DUTY_LABEL: Record<CsvDuty, string> = {
+  required: "Required on every row",
+  assigned: "Fill it, or we assign one",
+  oneOf: "Fill at least one of these",
+  optional: "Optional",
 }
 
 /**
  * The contiguous run of columns per band, in CSV_COLUMNS order — what the sheet's top
  * banner row merges across and what the chip guide groups by.
  *
- * Computed by walking the list rather than by filtering per band, so it describes the
- * columns as they ACTUALLY sit. A filter would happily report one tidy block per band even
- * if the array had a required column stranded among the optional ones, and the banner would
- * then span cells whose contents contradict it.
+ * Computed by walking the list rather than by filtering per section, so it describes the
+ * columns as they ACTUALLY sit. A filter would happily report one tidy block per section
+ * even if the array had a SHIP TO column stranded among the product ones, and the banner
+ * would then span cells whose contents contradict it.
  */
 export function columnBands(): { group: CsvGroup; start: number; count: number }[] {
   const bands: { group: CsvGroup; start: number; count: number }[] = []

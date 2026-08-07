@@ -16,6 +16,8 @@ import {
   TEMPLATE_TSV,
   COLUMN_OPTIONS,
   GROUP_LABEL,
+  DUTY_LABEL,
+  dutyOf,
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
@@ -309,45 +311,53 @@ export function ImportOrdersDialog({
                 the first block, and the rest can be ignored. */}
             <details className="rounded-xl border border-border bg-muted/20" open>
               <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
-                Columns — <span className="text-muted-foreground">required first, then optional</span>
+                Columns — <span className="text-muted-foreground">grouped the way you fill them</span>
               </summary>
               <div className="space-y-2.5 px-3 pb-3">
+                {/* Bands are SUBJECTS now, and obligation rides on each chip. Grouping by
+                    required-vs-optional read well here and badly in the sheet: it pushed
+                    Ship Address 2 four columns from the street it continues. */}
                 {columnBands().map((band) => (
                   <div key={`${band.group}-${band.start}`} className="space-y-1">
                     <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {GROUP_LABEL[band.group]}
-                      {band.group === "oneOf" && <span className="ml-1 font-normal normal-case opacity-80">— a row with neither is skipped</span>}
-                      {band.group === "assigned" && <span className="ml-1 font-normal normal-case opacity-80">— but lines of one order must share it</span>}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {CSV_COLUMNS.slice(band.start, band.start + band.count).map((c) => (
-                        <span
-                          key={c.header}
-                          title={c.help}
-                          className={
-                            "inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs " +
-                            (band.group === "required"
-                              ? "border-primary/40 bg-primary/10 font-medium text-primary"
-                              // A softer form of the required treatment — dashed outline, no
-                              // fill — rather than a new hue. The status palette (emerald
-                              // shipped, amber hold, …) carries meaning on the floor and a
-                              // fourth band colour here would start crowding it.
-                              : band.group === "assigned"
-                                ? "border-dashed border-primary/50 bg-transparent font-medium text-primary"
-                                : band.group === "oneOf"
-                                  ? "border-amber-300 bg-amber-50 font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
-                                  : "border-border bg-background text-muted-foreground")
-                          }
-                        >
-                          {c.header}
-                          {c.required && <span className="text-destructive">*</span>}
-                          {c.oneOf && <span className="opacity-70">†</span>}
-                        </span>
-                      ))}
+                      {CSV_COLUMNS.slice(band.start, band.start + band.count).map((c) => {
+                        const duty = dutyOf(c)
+                        return (
+                          <span
+                            key={c.header}
+                            title={`${DUTY_LABEL[duty]} — ${c.help}`}
+                            className={
+                              "inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs " +
+                              (duty === "required"
+                                ? "border-primary/40 bg-primary/10 font-medium text-primary"
+                                // A softer form of the required treatment — dashed outline,
+                                // no fill — rather than a new hue. The status palette
+                                // (emerald shipped, amber hold, …) carries meaning on the
+                                // floor and another band colour here would crowd it.
+                                : duty === "assigned"
+                                  ? "border-dashed border-primary/50 bg-transparent font-medium text-primary"
+                                  : duty === "oneOf"
+                                    ? "border-amber-300 bg-amber-50 font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+                                    : "border-border bg-background text-muted-foreground")
+                            }
+                          >
+                            {c.header}
+                            {duty === "required" && <span className="text-destructive">*</span>}
+                            {duty === "assigned" && <span className="opacity-70">~</span>}
+                            {duty === "oneOf" && <span className="opacity-70">†</span>}
+                          </span>
+                        )
+                      })}
                     </div>
                   </div>
                 ))}
                 <p className="text-2xs text-muted-foreground">
+                  <span className="font-medium text-primary">Blue *</span> = required on every row.
+                  <span className="ml-1 font-medium text-primary">Dashed ~</span> = fill it, or we assign one.
+                  Everything else is optional and can be completed after import.{" "}
                   <b>Order Number</b> is what groups lines — give every line of one order the same
                   number, or each line imports as a separate order. Hover any column for what it does.
                 </p>
