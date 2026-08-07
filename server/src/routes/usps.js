@@ -13,9 +13,10 @@
 //   USPS_CRID=...   USPS_MID=...   USPS_ACCOUNT_NUMBER=...   (EPS account)
 //   USPS_ACCOUNT_TYPE=EPS
 import { q } from '../db.js';
+import { audit } from '../audit.js';
 import { recordUsage } from '../usage.js';
 import { recordCost } from '../costs.js';
-import { readShipFrom } from './factory_settings.js';
+import { shipFromForOrder } from './factory_settings.js';
 import { shippingEnabled, aggregatorBuyCheapest, aggregatorBuyRate, aggregatorVerifyAddress } from './shipping.js';
 import { missingArtwork } from './orders.js';
 
@@ -297,8 +298,16 @@ const PRE_SCAN = ['', 'new', 'draft', 'in_review', 'approved', 'ready_print', 'i
 q('alter table orders add column if not exists label_cost numeric').catch(() => {});
 q('alter table orders add column if not exists ship_service text').catch(() => {});
 
-async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) {
+async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, req) {
   if (!orderId) return { shipped: false };
+  // WHO bought postage against WHICH order, and what it cost. The one chokepoint every
+  // buy path goes through, so auditing here covers the aggregator, the direct-USPS and
+  // the rate-token routes without three near-identical calls. Fire-and-forget.
+  audit(req, 'shipping.label_bought', {
+    entityType: 'order', entityId: orderId,
+    after: { tracking, carrier: carrier || 'USPS', cost: cost ?? null, to_zip: (to && (to.zip || to.postal_code)) || null },
+    note: `Label bought · ${carrier || 'USPS'} · ${tracking || 'no tracking'}`,
+  });
   // Book the postage as it's bought. The carrier tells us the price exactly once, in the
   // buy response — if we don't write it down here it's gone, and no report can recover
   // what a label cost. Idempotent on the order, so a re-buy doesn't double-count.
@@ -368,7 +377,10 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) 
       const to = b.to || {};
       // The floor sets its ship-from once in settings; the client no longer has to carry
       // it on every buy. An explicit body.from still wins (multi-site / drop-ship).
-      const saved = await readShipFrom();
+      // Blind shipping: the seller's shop name at our address, resolved from the order.
+      // An explicit body.from still wins, and a missing/unknown order falls back to the
+      // configured address unchanged — a label must never fail to buy over the name line.
+      const saved = await shipFromForOrder(b.orderId);
       const from = (b.from && b.from.street) ? b.from : (saved || {});
       if (!to.zip || !to.street) { reply.code(400); return { error: 'Recipient street + ZIP are required' }; }
       if (!from.zip || !from.street) { reply.code(400); return { error: 'No warehouse ship-from address set — add it in Settings → Shipping' }; }
@@ -379,7 +391,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) 
         try {
           const buy = await aggregatorBuyRate(b.rateToken, b.rate || {});
           if (buy && buy.tracking) {
-            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy, b.to);
+            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy, b.to, req);
             return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
           }
           reply.code(502); return { error: 'The shipping provider returned no label for that rate. Nothing was charged.' };
@@ -398,7 +410,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) 
             { carrierPref: 'usps', servicePref: _svcPref(b.mailClass),
               extra: { signature: !!b.signature, insurance: Number(b.insurance) || 0 } });
           if (buy && buy.tracking) {
-            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy, b.to);
+            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy, b.to, req);
             return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
           }
           reply.code(502);
@@ -434,7 +446,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) 
           + '<div style="text-align:center;font-family:monospace;font-weight:700;font-size:15px;margin-top:4px">' + t + '</div>'
           + ((b.refNo || b.refNo2 || b.contents) ? '<div style="border-top:1px dashed #bbb;margin-top:10px;padding-top:6px;font-size:10px;color:#555;line-height:1.5">' + [b.refNo ? 'Ref 1: ' + e(b.refNo) : '', b.refNo2 ? 'Ref 2: ' + e(b.refNo2) : '', b.contents ? e(b.contents) : ''].filter(Boolean).join('<br>') + '</div>' : '')
           + '<div style="text-align:center;font-size:10px;color:#999;margin-top:10px">NOT VALID FOR POSTAGE · TEST LABEL</div></div>';
-        const rec = await recordLabel(b.orderId, t, 'USPS', null, null, null, b.to);
+        const rec = await recordLabel(b.orderId, t, 'USPS', null, null, null, b.to, req);
         return { ok: true, mock: true, trackingNumber: t, imageType: 'HTML', labelHtml: html };
       }
       const oauth = await oauthToken();
@@ -486,7 +498,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) 
       // cost is recorded (Price column + ledger) instead of being parsed then thrown away —
       // this path had it in `cost` but was storing null.
       if (b.orderId && tracking) {
-        await recordLabel(b.orderId, tracking, 'USPS', null, cost, null, b.to);
+        await recordLabel(b.orderId, tracking, 'USPS', null, cost, null, b.to, req);
       }
       return { ok: true, trackingNumber: tracking, imageType: imgType, labelImage, cost, contentType: ct };
     } catch (e) { reply.code(400); return { error: e.message }; }

@@ -1624,6 +1624,27 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         }
       }
 
+      // WHO published WHAT, WHEN, and what they DECLARED. Without this row a seller whose
+      // shop is actioned can only be answered from memory: published_listings records what
+      // was sent but not who sent it, when, or which who_made they chose. Fire-and-forget —
+      // audit() never throws, and a publish that reached Etsy must not fail over a log.
+      audit(req, 'etsy.publish', {
+        entityType: 'listing',
+        entityId: listingId,
+        after: {
+          listing_id: listingId,
+          shop: conn.shop_name || conn.shop_id,
+          title: title.slice(0, 140),
+          who_made: whoMade,
+          when_made: 'made_to_order',
+          state: listing.state || 'draft',
+          price,
+          blank: b.blank || null,
+          variant_skus: variantSkus,
+        },
+        note: `Published as draft, declared who_made=${whoMade}`,
+      });
+
       return {
         ok: true, listing_id: listingId, state: listing.state || 'draft', images_uploaded: uploaded,
         tags_applied: uniqueTags.length,

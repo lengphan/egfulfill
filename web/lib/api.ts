@@ -704,6 +704,12 @@ export type PublicProduct = {
   name: string
   image: string | null
   category: string | null
+  /** Supplier prose, tags stripped and capped server-side. */
+  description: string | null
+  /** The GARMENT's brand — null when the stored value was the supplier's own name, which
+   *  the SanMar import uses as a fallback. Publishing that would name our supplier on a
+   *  public page (CLAUDE.md 2.8), so the server filters it rather than trusting it. */
+  brand: string | null
   /** What a SELLER pays us. Never our cost. */
   price: number
   methods: string[]
@@ -3330,6 +3336,28 @@ export type BackupsState = {
   config: BackupConfig
   summary: BackupSummary
 }
+/** Buyer-PII retention. `due` is how many shipped orders are already past the window —
+ *  i.e. exactly what a purge would redact right now. Redaction is irreversible. */
+export type PiiRetention = {
+  enabled: boolean
+  days: number
+  due: number
+  oldest: string | null
+  stamped?: number
+  error?: string
+}
+export function getPiiRetention() {
+  return api<PiiRetention>(`/api/pii-retention`)
+}
+export function setPiiRetention(c: { enabled: boolean; days: number }) {
+  return api<{ enabled?: boolean; days?: number; error?: string }>(`/api/pii-retention`, {
+    method: "PUT", body: JSON.stringify(c),
+  })
+}
+export function runPiiPurge() {
+  return api<{ purged?: number; error?: string }>(`/api/pii-retention/run`, { method: "POST" })
+}
+
 export function listBackups() {
   return api<BackupsState>(`/api/backups`)
 }

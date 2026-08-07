@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useContext, createContext, isValidElement, Children } from "react"
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
+import { useConfirm } from "@/components/app/confirm-dialog"
 import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight, X, DownloadSimple, Database } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -61,6 +62,10 @@ import {
   type FactorySettings,
   type AdminUser,
   type AuditRow,
+  getPiiRetention,
+  setPiiRetention,
+  runPiiPurge,
+  type PiiRetention,
   listBackups,
   runBackup,
   backupDownloadUrl,
@@ -2388,6 +2393,156 @@ function ActivityPanel() {
   )
 }
 
+// ─────────────────────── Buyer-PII retention (admin) ───────────────────────
+// Amazon's Data Protection Policy requires buyer PII to be deleted within 30 days of
+// shipment; Etsy, TikTok and Shopify impose comparable duties. The job is written and
+// ships DISABLED, because redaction is irreversible and must never start on a deploy.
+//
+// So this screen leads with the PREVIEW — how many orders are already past the window and
+// how old the oldest is — and only then offers the switch. "Purge now" states the number it
+// is about to redact in the confirm, because the number is the whole decision.
+function PiiRetentionPanel() {
+  const [state, setState] = useState<PiiRetention | null>(null)
+  // Age of the oldest still-held order, in days. Computed WHEN THE DATA ARRIVES, not during
+  // render: reading the clock while rendering is impure and re-renders would shift it
+  // (repo lint rule react-hooks/purity).
+  const [oldestDays, setOldestDays] = useState<number | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [days, setDays] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const confirm = useConfirm()
+
+  const load = useCallback(() => {
+    getPiiRetention()
+      .then((s) => {
+        setState(s); setLoaded(true); setDays((p) => p || String(s.days ?? 30))
+        setOldestDays(s.oldest ? Math.floor((Date.now() - new Date(s.oldest).getTime()) / 86400000) : null)
+      })
+      .catch((e) => { setErr(e instanceof Error ? e.message : "Couldn't read the retention policy"); setLoaded(true) })
+  }, [])
+  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+
+  const save = async (enabled: boolean) => {
+    setBusy(true); setErr(null); setMsg(null)
+    try {
+      const n = Math.min(30, Math.max(1, parseInt(days, 10) || 30))
+      const r = await setPiiRetention({ enabled, days: n })
+      if (r.error) throw new Error(r.error)
+      setMsg(enabled ? `On — orders are redacted ${n} days after they ship.` : "Off — nothing is redacted automatically.")
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't save the policy")
+    } finally { setBusy(false) }
+  }
+
+  const purgeNow = async () => {
+    const due = state?.due ?? 0
+    const ok = await confirm({
+      title: `Redact ${due} ${due === 1 ? "order" : "orders"}?`,
+      body: "Buyer name, address, email, phone and the label PDF are permanently removed from these orders. This cannot be undone — the only way back is a database restore. Order id, totals, SKUs, tracking and dates are kept, so reporting is unaffected.",
+      confirmLabel: `Redact ${due}`,
+      destructive: true,
+    })
+    if (!ok) return
+    setBusy(true); setErr(null); setMsg(null)
+    try {
+      const r = await runPiiPurge()
+      if (r.error) throw new Error(r.error)
+      setMsg(`Redacted ${r.purged ?? 0} ${r.purged === 1 ? "order" : "orders"}.`)
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Purge failed")
+    } finally { setBusy(false) }
+  }
+
+  if (!loaded) return <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
+
+  const due = state?.due ?? 0
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold">Buyer data retention</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Marketplaces require buyer personal data to be deleted after an order ships — Amazon
+          caps it at 30 days, and Etsy, TikTok and Shopify expect the same. This is what you show
+          them when they ask.
+        </p>
+      </div>
+
+      {/* The preview. This is the point of the screen: see the number before deciding. */}
+      <div className="grid gap-2 sm:grid-cols-3">
+        <BackupStat
+          label="Past the window"
+          value={String(due)}
+          sub={due ? "would be redacted now" : "nothing is overdue"}
+        />
+        <BackupStat
+          label="Oldest still held"
+          value={oldestDays == null ? "—" : `${oldestDays}d`}
+          sub={oldestDays == null ? "no shipped orders holding data" : "since it shipped"}
+        />
+        <BackupStat
+          label="Automatic purge"
+          value={state?.enabled ? "On" : "Off"}
+          sub={state?.enabled ? `${state?.days ?? 30} days after shipping` : "nothing runs by itself"}
+        />
+      </div>
+
+      {!state?.enabled && due > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
+          <span>
+            {due} shipped {due === 1 ? "order is" : "orders are"} holding buyer name and address
+            past the {state?.days ?? 30}-day window
+            {oldestDays != null && <> — the oldest for <b>{oldestDays} days</b></>}. Nothing is
+            deleted until you turn this on or purge manually.
+          </span>
+        </div>
+      )}
+
+      <div className="space-y-3 rounded-lg border bg-card p-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <label className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">Delete after</label>
+            <div className="flex items-center gap-1.5">
+              <Input
+                value={days}
+                onChange={(e) => setDays(e.target.value.replace(/[^0-9]/g, ""))}
+                className="h-8 w-20 text-sm"
+                inputMode="numeric"
+              />
+              <span className="text-xs text-muted-foreground">days after shipping</span>
+            </div>
+            {/* The cap is a compliance floor, not a preference — say why it won't go higher. */}
+            <p className="text-2xs text-muted-foreground">Max 30 — Amazon&rsquo;s policy ceiling.</p>
+          </div>
+          <Button size="sm" disabled={busy} onClick={() => save(true)}>
+            {state?.enabled ? "Save" : "Turn on"}
+          </Button>
+          {state?.enabled && (
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => save(false)}>Turn off</Button>
+          )}
+          <Button size="sm" variant="outline" disabled={busy || !due} onClick={purgeNow}>
+            Purge {due} now
+          </Button>
+        </div>
+        <p className="text-2xs text-muted-foreground">
+          What survives a purge: order id, totals, SKUs, tracking number and dates — revenue and
+          growth reporting are unaffected. What goes: buyer name, street, city, postcode, email,
+          phone and the label PDF. Orders still in production are never purged, whatever their age.
+        </p>
+      </div>
+
+      {msg && <p className="text-xs text-success">{msg}</p>}
+      {err && <p className="text-xs text-destructive">{err}</p>}
+      {state?.error && <p className="text-xs text-destructive">{state.error}</p>}
+    </div>
+  )
+}
+
 // ─────────────────────────── Backups (admin) ───────────────────────────
 // Database backups to R2 — on-demand + nightly, download, delete, with a summary strip and
 // an editable schedule. The live database is never touched here; these are point-in-time
@@ -2690,6 +2845,9 @@ export function SettingsView() {
         {/* Backups — admin-only. Restoring a lost database is the least reversible thing on
             the platform, so who can trigger/delete a backup matches who can touch money. */}
         {isAdmin && <TabsTrigger value="backups">Backups</TabsTrigger>}
+        {/* Privacy — buyer-PII retention. Admin-only for the same reason as Backups: the
+            purge is irreversible, so it sits with the people who can touch money. */}
+        {isAdmin && <TabsTrigger value="privacy">Privacy</TabsTrigger>}
         {/* Permissions — admin-only, HIDE-only nav visibility per role. */}
         {isAdmin && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         {/* Team is a SELLER's own staff (and their permissions). Factory roles are managed
@@ -2750,6 +2908,11 @@ export function SettingsView() {
       {isAdmin && (
         <TabsContent value="backups">
           <BackupsPanel />
+        </TabsContent>
+      )}
+      {isAdmin && (
+        <TabsContent value="privacy">
+          <PiiRetentionPanel />
         </TabsContent>
       )}
       {isAdmin && (

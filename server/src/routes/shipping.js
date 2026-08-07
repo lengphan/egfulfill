@@ -13,7 +13,7 @@
 //   GET  /api/shipping/track?provider=&carrier=&tracking=  → status
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
-import { readShipFrom } from './factory_settings.js';
+import { shipFromForOrder } from './factory_settings.js';
 
 // Read at CALL time, not import time. Saving a credential in Settings › Integrations
 // writes it to the DB and applies it to process.env immediately (see secrets.js), but a
@@ -363,7 +363,7 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
   app.post('/api/shipping/rates', guard, async (req, reply) => {
     if (!epKey() && !shToken()) { reply.code(400); return { error: 'No shipping provider configured (set EASYPOST_API_KEY or SHIPPO_API_TOKEN)' }; }
     const b = req.body || {};
-    const to = addr(b.to), from = addr((b.from && b.from.street) ? b.from : (await readShipFrom()) || {}, true), pc = parcel(b.parcel || b);
+    const to = addr(b.to), from = addr((b.from && b.from.street) ? b.from : (await shipFromForOrder(b.orderId)) || {}, true), pc = parcel(b.parcel || b);
     if (!to.zip || !to.street1) { reply.code(400); return { error: 'Recipient street + ZIP required' }; }
     if (!from.zip || !from.street1) { reply.code(400); return { error: 'Sender street + ZIP required' }; }
     const jobs = [];
@@ -384,7 +384,7 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
       if (!t) {
         // No token → rate-shop and pick the cheapest.
         if (!epKey() && !shToken()) { reply.code(400); return { error: 'No shipping provider configured' }; }
-        const to = addr(b.to), from = addr((b.from && b.from.street) ? b.from : (await readShipFrom()) || {}, true), pc = parcel(b.parcel || b);
+        const to = addr(b.to), from = addr((b.from && b.from.street) ? b.from : (await shipFromForOrder(b.orderId)) || {}, true), pc = parcel(b.parcel || b);
         if (!to.zip || !to.street1 || !from.zip || !from.street1) { reply.code(400); return { error: 'Sender + recipient street + ZIP required' }; }
         const jobs = [];
         if (epKey()) jobs.push(epRates(to, from, pc).catch(() => []));

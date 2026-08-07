@@ -273,6 +273,31 @@ export function shipFromComplete(a) {
   return !!(a && a.street && a.city && a.state && a.zip);
 }
 
+/**
+ * BLIND SHIPPING — the parcel goes out under the SELLER's shop name, at OUR address.
+ *
+ * Only the name line changes. Carriers route on the ADDRESS, so an undeliverable parcel
+ * still comes back to the same dock it always did; what changes is that receiving sees the
+ * seller's shop name on it rather than one uniform name.
+ *
+ * Why it matters: every label previously carried one shared sender name for every seller,
+ * so a buyer could see their seller doesn't make the item, and anyone comparing two
+ * parcels from two shops could tell the shops share a factory.
+ *
+ * Falls back to the configured name whenever there is nothing better — a manual order with
+ * no store, an unknown order id, or `blind: false` in settings. A label must never fail to
+ * buy because of this.
+ */
+export async function shipFromForOrder(orderId) {
+  const base = await readShipFrom();
+  if (!base || base.blind === false || !orderId) return base;
+  try {
+    const r = await q('select store from orders where id=$1', [String(orderId)]);
+    const store = String((r.rows[0] && r.rows[0].store) || '').trim();
+    return store ? { ...base, name: store } : base;
+  } catch { return base; }
+}
+
 let _ready = null;
 function ensure() {
   if (_ready) return _ready;
@@ -374,6 +399,10 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       const addr = {};
       for (const f of SHIP_FROM_FIELDS) addr[f] = String(b.ship_from[f] ?? '').trim();
       addr.country = addr.country || 'US';
+      // Blind shipping is a BOOLEAN and must not go through the String() loop above —
+      // String(false) is "false", which is truthy, so the off switch would never turn off.
+      // Defaults ON: the name above is then a fallback, not what every buyer sees.
+      addr.blind = b.ship_from.blind !== false;
       await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [SHIP_FROM_KEY, JSON.stringify(addr)]);
     }
     if (Array.isArray(b.product_types)) {
