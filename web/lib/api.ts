@@ -1400,6 +1400,25 @@ export function refreshTracking(id: string) {
   return api<{ ok?: boolean; status?: string | null; carrier_status?: string; detail?: string; error?: string }>(
     `/api/orders/${encodeURIComponent(id)}/refresh-tracking`, { method: "POST" })
 }
+/**
+ * The factory's own P&L from the append-only ledger — what WE earned and spent.
+ *
+ * Deliberately not derived from `orders.total`: that is what buyers paid sellers on their
+ * marketplaces (GMV through the platform), not money that reaches us.
+ */
+export type FactoryPnl = {
+  days: number
+  income: number
+  cost: number      // negative
+  profit: number
+  /** False when nothing is booked in the window — "nothing yet", never a profit of zero. */
+  known: boolean
+  byType: { type: string; income: number; cost: number; n: number }[]
+}
+export function getFactoryPnl(days = 30) {
+  return api<FactoryPnl>(`/api/reports/pnl?days=${days}`)
+}
+
 // ─────────────────────────── Alibaba (sourcing) ───────────────────────────
 // Admin-only. One connection for the whole factory — this is OUR buyer account, not a
 // per-seller one, so there is no seller scoping anywhere in here.

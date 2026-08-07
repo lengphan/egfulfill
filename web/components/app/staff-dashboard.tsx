@@ -9,12 +9,12 @@ import { StageBadge } from "@/components/app/stage-badge"
 import { ProductionLine } from "@/components/app/production-line"
 import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
 import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
-import { getOrders, type OrderRow } from "@/lib/api"
+import { getOrders, getFactoryPnl, type OrderRow, type FactoryPnl } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
 import { getToken, getUser } from "@/lib/auth"
 import { staffNav, staffTools } from "@/lib/staff-nav"
 import { orderStage } from "@/lib/factory-status"
-import { orderTotalOf, orderProfitOf, orderTs } from "@/lib/analytics"
+import { orderTotalOf, orderTs } from "@/lib/analytics"
 
 // Whole-dollar KPI money — cents are noise at this size.
 const usd = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`
@@ -114,30 +114,27 @@ export function StaffDashboard() {
   // average order. All live off total/profit/created_at; nothing modelled. An order with
   // no created_at (orderTs → NaN) falls out of every window rather than landing in "today".
   const rangeMeta = RANGES.find((r) => r.id === range) ?? RANGES[2]
+
+  /**
+   * Real profit, from the ledger — not orders.total minus anything.
+   *
+   * `orders.total` is GMV: what a buyer paid a seller on their own marketplace. Our income
+   * and our costs both land on the `factory` account as they happen, so that account IS the
+   * P&L. Admin/warehouse only server-side; anyone else simply gets no card.
+   */
+  const [pnl, setPnl] = useState<FactoryPnl | null>(null)
+  useEffect(() => {
+    if (!isAdmin) return
+    const days = rangeMeta.id === "today" ? 1 : rangeMeta.id === "7d" ? 7 : rangeMeta.id === "all" ? 365 : 30
+    const t = setTimeout(() => { getFactoryPnl(days).then(setPnl).catch(() => setPnl(null)) }, 0)
+    return () => clearTimeout(t)
+  }, [isAdmin, rangeMeta])
   const money = useMemo(() => {
     const since = rangeMeta.since()
     const inRange = (orders ?? []).filter((o) => orderTs(o) >= since)
     const revenue = inRange.reduce((s, o) => s + orderTotalOf(o), 0)
-    const profit = inRange.reduce((s, o) => s + orderProfitOf(o), 0)
     const count = inRange.length
-    /**
-     * IS PROFIT KNOWN AT ALL?
-     *
-     * `orders.profit` is only ever written from a manual save (`o.profit || 0` in
-     * orders.js) — the Etsy/Shopify/TikTok importers never send it, so every synced order
-     * stores a literal 0. Measured on the live database: 4 of 782 orders carry a non-zero
-     * profit, and 0 of the 257 in the last 30 days.
-     *
-     * So summing the column produced $0 beside $15,104 of revenue, which reads as "you
-     * made nothing" when the truth is "nobody computed this". Those are different claims
-     * and this dashboard already refuses to conflate them elsewhere — the revenue chart
-     * won't draw a flat line when the read failed, for exactly this reason.
-     *
-     * If not one order in the window has a non-zero profit we cannot tell "all zero" from
-     * "never calculated", so we say we don't know rather than pick the flattering reading.
-     */
-    const profitKnown = inRange.some((o) => orderProfitOf(o) !== 0)
-    return { revenue, profit, profitKnown, count, aov: count ? revenue / count : 0 }
+    return { revenue, count, aov: count ? revenue / count : 0 }
   }, [orders, rangeMeta])
 
   const recent = useMemo(() => (orders ?? []).slice(0, 8), [orders])
@@ -160,12 +157,19 @@ export function StaffDashboard() {
   // below. Warehouse/operator keep the production tiles (a bit less than admin).
   const cards: { label: string; value: string | number; sub: string; icon: typeof Package; pos?: boolean; neg?: boolean }[] = isAdmin
     ? [
-      { label: "Revenue", value: usd(money.revenue), sub: rangeMeta.sub, icon: CurrencyDollar, pos: true },
-      // "—", not "$0". A zero here is indistinguishable from an uncomputed one, and the
-      // wrong one of those is a lie about the business rather than a gap in a chart.
-      { label: "Profit", value: money.profitKnown ? usd(money.profit) : "—",
-        sub: money.profitKnown ? rangeMeta.sub : "not calculated yet",
-        icon: TrendUp, pos: money.profitKnown },
+      // GMV, NOT REVENUE. This is orders.total — what buyers paid SELLERS on their own
+      // marketplaces. It flows through the platform; it is not money we receive, and
+      // calling it revenue is what made a $0 profit beside it look like a catastrophe
+      // rather than a missing calculation.
+      { label: "GMV", value: usd(money.revenue), sub: `${rangeMeta.sub} · through the platform`, icon: CurrencyDollar, pos: true },
+      // OUR income, from the ledger — order charges and subscriptions booked to `factory`.
+      { label: "Our revenue", value: pnl ? usd(pnl.income) : "—",
+        sub: pnl ? (pnl.known ? rangeMeta.sub : "nothing booked yet") : "loading", icon: Receipt, pos: true },
+      // Income minus cost over the same window. Both sides are real ledger rows: a label
+      // cost is booked when a label is bought, an order charge when a seller is charged.
+      { label: "Profit", value: pnl && pnl.known ? usd(pnl.profit) : "—",
+        sub: pnl && pnl.known ? `after ${usd(Math.abs(pnl.cost))} costs` : "nothing booked yet",
+        icon: TrendUp, pos: !!(pnl && pnl.profit > 0), neg: !!(pnl && pnl.profit < 0) },
       { label: "Orders", value: money.count, sub: rangeMeta.sub, icon: Package },
       { label: "Avg order", value: usd(money.aov), sub: "per order", icon: Receipt },
     ]

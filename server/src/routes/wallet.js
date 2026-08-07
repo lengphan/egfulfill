@@ -376,6 +376,57 @@ export function walletRoutes(app, requireAuth) {
     return { types: Object.entries(MANUAL_TYPES).map(([id, label]) => ({ id, label })) };
   });
 
+  /**
+   * THE FACTORY'S OWN P&L, from the append-only ledger.
+   *
+   * Not from `orders.total`. That column is what the BUYER paid on a seller's marketplace —
+   * gross merchandise value flowing through the platform, not money that ever reaches us.
+   * The dashboard has been calling it "Revenue", and subtracting our costs from someone
+   * else's turnover would produce a number that means nothing.
+   *
+   * What we actually earn lands on the `factory` account as it is earned, and what we spend
+   * lands there as it is incurred, so income minus cost over a window IS the P&L. Every row
+   * is real: a label cost is booked when a label is bought, an order charge when a seller is
+   * charged. Nothing here is modelled.
+   *
+   * Signs are already correct in the ledger (income positive, cost negative), so the split
+   * is on the sign rather than on a list of type names — a new cost type starts counting the
+   * day it is introduced instead of the day someone remembers to add it here.
+   */
+  app.get('/api/reports/pnl', { preHandler: requireAuth }, async (req, reply) => {
+    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
+    const days = Math.max(1, Math.min(365, parseInt(req.query?.days, 10) || 30));
+    const r = await q(
+      `select type,
+              sum(delta) filter (where delta > 0) as income,
+              sum(delta) filter (where delta < 0) as cost,
+              count(*) as n
+         from wallet_ledger
+        where account = 'factory' and created_at >= now() - ($1 || ' days')::interval
+        group by type`,
+      [String(days)]
+    ).catch(() => ({ rows: [] }));
+
+    const num = (v) => Number(v || 0);
+    let income = 0, cost = 0;
+    const byType = r.rows.map((x) => {
+      income += num(x.income);
+      cost += num(x.cost);           // already negative
+      return { type: x.type, income: num(x.income), cost: num(x.cost), n: Number(x.n) };
+    }).sort((a, b) => (b.income - b.cost) - (a.income - a.cost));
+
+    return {
+      days,
+      income: Math.round(income * 100) / 100,
+      cost: Math.round(cost * 100) / 100,            // negative
+      profit: Math.round((income + cost) * 100) / 100,
+      // Whether there is anything to report at all. A window with no factory rows must read
+      // as "nothing booked yet", never as a profit of zero.
+      known: r.rows.length > 0,
+      byType,
+    };
+  });
+
   app.post('/api/wallet/ledger', { preHandler: requireAuth }, async (req, reply) => {
     // canMoveMoney, not isStaff: isStaff admits operator and designer, so this route let
     // either write an arbitrary delta onto ANY account — the seller-credits-themselves
