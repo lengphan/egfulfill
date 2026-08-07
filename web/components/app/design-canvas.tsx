@@ -48,6 +48,40 @@ export function DesignStage({
   emptyHint?: React.ReactNode
 }) {
   const stageRef = useRef<HTMLDivElement>(null)
+  /**
+   * The artwork's natural width ÷ height, learned when it loads.
+   *
+   * The stage is aspect-square, so a design placed at `pos.w` percent of its width renders
+   * `pos.w / aspect` percent TALL. That is what decides whether it fits: a landscape image
+   * (aspect > 1) is always shorter than it is wide and can never overflow, while a portrait
+   * one (aspect < 1) overflows as soon as pos.w passes 100 × aspect.
+   *
+   * 1 until the image loads, which is the safe assumption — it caps at 100 and the real
+   * ratio only ever tightens it.
+   */
+  // Stored WITH the url it was measured from, so swapping the artwork can't leave the
+  // previous image's ratio gating the new one — and so no effect is needed to reset it,
+  // which would be a setState-in-effect this codebase's lint rule rejects.
+  const [ar, setAr] = useState<{ url: string; a: number } | null>(null)
+  const aspect = ar && ar.url === designUrl ? ar.a : 1
+  const setAspect = (a: number) => setAr({ url: designUrl || "", a })
+  // The widest this artwork may be drawn before its own height would run off the bed. A
+  // small floor keeps a very tall, thin design from being clamped to something unusable.
+  const maxW = aspect >= 1 ? 100 : Math.max(15, Math.round(100 * aspect))
+  /**
+   * The width actually DRAWN, capped at what fits.
+   *
+   * Clamping the resize handle alone isn't enough: artwork arrives at DEFAULT_POS.w (45%),
+   * and a tall enough image is already over the bed before anyone touches a handle — which
+   * is how a portrait design ended up hanging off the top and bottom of the frame the
+   * moment it was added.
+   *
+   * Capped at render rather than by writing pos back in an effect. Correcting state on load
+   * means a component that edits its own props on mount (the set-state-in-effect rule this
+   * codebase enforces), and it would silently rewrite a saved placement the first time
+   * someone merely OPENED an order. This changes what is drawn and nothing else.
+   */
+  const drawW = Math.min(pos.w, maxW)
   // Hidden canvas holding the design at natural resolution, so the eyedropper can read a
   // pixel. Redrawn whenever the artwork changes.
   const sampleRef = useRef<{ canvas: HTMLCanvasElement; w: number; h: number } | null>(null)
@@ -166,7 +200,9 @@ export function DesignStage({
         const rad = (-startR * Math.PI) / 180
         const localX = vx * Math.cos(rad) - vy * Math.sin(rad)
         const wPct = (2 * Math.abs(localX) / rect.width) * 100
-        apply(isText ? { size: clamp(wPct / 3, 2, 40) } : { w: clamp(wPct, 8, 100) })
+        // maxW, not a flat 100: the ceiling is whatever keeps the artwork's own height
+        // inside the bed, so dragging the handle stops at the edge instead of past it.
+        apply(isText ? { size: clamp(wPct / 3, 2, 40) } : { w: clamp(wPct, 8, maxW) })
       } else {
         const ang = (Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180) / Math.PI + 90
         apply({ r: Math.round(ang) })
@@ -226,11 +262,27 @@ export function DesignStage({
           onClick={picking ? (e) => sampleAt(e, e.currentTarget) : undefined}
           onMouseMove={picking ? (e) => moveLoupe(e, e.currentTarget) : undefined}
           onMouseLeave={picking ? () => setLoupe(null) : undefined}
-          style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${pos.w}%`, transform: `translate(-50%,-50%) rotate(${pos.r}deg)` }}
+          style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${drawW}%`, transform: `translate(-50%,-50%) rotate(${pos.r}deg)` }}
           className={"absolute touch-none " + (picking ? "cursor-crosshair" : "cursor-move")}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={designUrl} alt="" className="pointer-events-none block w-full select-none" draggable={false} />
+          <img
+            src={designUrl}
+            alt=""
+            className="pointer-events-none block w-full select-none"
+            draggable={false}
+            // The artwork's HEIGHT was never bounded. Only width is set (pos.w% of the
+            // stage) and the image keeps its own ratio, so a PORTRAIT design rendered at
+            // w × (naturalH / naturalW) — a 2:3 photo at the default 45% came out 67% tall,
+            // and anything taller spilled past the top and bottom of the bed entirely.
+            // Learning the ratio here lets the resize clamp below cap the width at the
+            // point where the height would reach the edge, so the drag simply stops instead
+            // of the design escaping the frame.
+            onLoad={(e) => {
+              const el = e.currentTarget
+              if (el.naturalWidth > 0 && el.naturalHeight > 0) setAspect(el.naturalWidth / el.naturalHeight)
+            }}
+          />
           {!picking && (selected == null || selected === "image") && handles("image")}
           {onRemove && (selected == null || selected === "image") && (
             <button onPointerDown={(e) => e.stopPropagation()} onClick={onRemove} className="absolute -right-2.5 -top-2.5 flex size-6 items-center justify-center rounded-full bg-foreground text-background shadow" aria-label="Remove artwork"><X size={12} weight="bold" /></button>
