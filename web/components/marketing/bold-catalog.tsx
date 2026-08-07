@@ -18,6 +18,17 @@ import type { PublicProduct } from "@/lib/api"
  * looks like a broken query. That distinction is the house rule: a thing that can't be read
  * must not look like a thing that doesn't exist.
  */
+/** A colour name to a swatch, for colourways with no photo of their own. Unknown names get
+ *  a neutral rather than a guess — a wrong colour chip is worse than a plain one. */
+const SWATCH: Record<string, string> = {
+  black: "#191918", white: "#f4f2ef", navy: "#25314d", grey: "#9ca3af", gray: "#9ca3af",
+  "sport grey": "#b7b7b3", heather: "#b9b6b0", sand: "#d8cbb4", natural: "#e8e0cf",
+  maroon: "#6d2233", red: "#c0392b", royal: "#2f4bf0", blue: "#3457d5", green: "#3f7d4e",
+  forest: "#2f5540", pink: "#e59bb4", khaki: "#c3b091", gold: "#d4a017", purple: "#6d4aec",
+  charcoal: "#36454f", cream: "#fffdd0", olive: "#708238", tan: "#d2b48c",
+}
+const swatchOf = (name: string) => SWATCH[name.toLowerCase().trim()] ?? "#c7c4bd"
+
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export function BoldCatalog({ products }: { products: PublicProduct[] | null }) {
@@ -70,7 +81,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
           sections.map(([cat, items], gi) => (
             <div key={cat || "all"} className={gi ? "mt-16" : ""}>
               {cat && <h2 className="font-display font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>{cat}</h2>}
-              <div className={(cat ? "mt-8" : "") + " grid gap-4 sm:grid-cols-2 lg:grid-cols-4"}>
+              <div className={(cat ? "mt-8" : "") + " grid gap-5 sm:grid-cols-2 lg:grid-cols-3"}>
                 {items.map((p, i) => (
                   /* Keyed by SLUG, not name. The server already disambiguated duplicate names
                      with an index suffix, so the slug is the unique one — two products sharing
@@ -105,9 +116,30 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                         <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">{p.category}</div>
                       )}
                       <div className="line-clamp-2 text-[15px] font-semibold leading-snug">{p.name}</div>
-                      <div className="mt-1.5 text-[13px] text-black/50">
-                        from <span className="font-bold text-[#0B0B0C]">{usd(p.price)}</span>
+                      <div className="mt-2 flex items-baseline gap-1.5">
+                        <span className="text-lg font-black tabular-nums">{usd(p.price)}</span>
+                        <span className="text-[13px] text-black/45">per item</span>
                       </div>
+                      {/* Colour chips. The count alone ("6 colourways") is a fact you have to
+                          imagine; the swatches are the thing a buyer actually shops by, and
+                          they were only on the detail page. Capped at five so a 30-colour
+                          style doesn't turn the card into a palette, with the remainder
+                          stated rather than silently dropped. */}
+                      {p.colors.length > 0 && (
+                        <div className="mt-3 flex items-center gap-1.5">
+                          {p.colors.slice(0, 5).map((c) => (
+                            <span
+                              key={c.name}
+                              title={c.name}
+                              className="size-4 rounded-full border border-black/15 bg-cover bg-center"
+                              style={c.image ? { backgroundImage: `url(${c.image})` } : { background: swatchOf(c.name) }}
+                            />
+                          ))}
+                          {p.colors.length > 5 && (
+                            <span className="text-[12px] font-medium text-black/45">+{p.colors.length - 5}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </Link>
                   </Rise>

@@ -7,7 +7,7 @@ import { isStaff } from '../auth.js';
 import { quoteSpec } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
-import { ssImgUrl, ssStyleDescriptions, ssSpecs } from './ss.js';
+import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
 
 // Roles that OWN pricing. A change by anyone else is legitimate — operators build
 // products, and that is the point — but it should not happen unseen, because a base
@@ -121,6 +121,16 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
   const renderable = (v) =>
     typeof v === 'string' && (/^(https?:\/\/|data:image\/)/i.test(v) || v.startsWith('/api/ss/img'));
 
+  /** Rewrite a proxied S&S image to their LARGE variant. The size lives in the filename
+   *  suffix, and the url we hold is url-encoded inside ?u=, so it is decoded, swapped and
+   *  re-encoded rather than pattern-matched through the encoding. */
+  const upsizeSupplierImg = (v) => {
+    const m = /^\/api\/ss\/img\?u=(.+)$/.exec(String(v || ''));
+    if (!m) return v;
+    try { return '/api/ss/img?u=' + encodeURIComponent(ssImgSize(decodeURIComponent(m[1]), 'fl')); }
+    catch { return v; }
+  };
+
   /**
    * A URL-safe handle for one product.
    *
@@ -207,6 +217,29 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       .filter((p) => Number.isFinite(p.price) && p.price > 0);
   };
 
+
+  /**
+   * The stored row behind a public slug, un-shaped. Both the detail route (for the style id
+   * a size chart is keyed by) and the image route (for the real image address) need what
+   * the public shape deliberately drops, and re-deriving the slug in two places is how the
+   * two would eventually disagree about which product a slug points at.
+   */
+  const rawRowFor = async (slug) => {
+    const r = await q(
+      `select data from catalog_products where in_catalog = true order by created_at desc limit 60`
+    ).catch(() => ({ rows: [] }));
+    const seen = new Map();
+    for (const row of r.rows) {
+      if (!row.data || !row.data.name) continue;
+      const base = slugify(row.data.name);
+      if (!base) continue;
+      const n = (seen.get(base) ?? 0) + 1;
+      seen.set(base, n);
+      if ((n === 1 ? base : `${base}-${n}`) === slug) return row.data;
+    }
+    return null;
+  };
+
   app.get('/api/public/products', async () => {
     const products = await publicProducts();
     return { products: products.sort((a, b) => a.price - b.price).slice(0, 24) };
@@ -227,7 +260,35 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const slug = String((req.params && req.params.slug) || '').toLowerCase();
     const product = (await publicProducts()).find((p) => p.slug === slug);
     if (!product) { reply.code(404); return { error: 'Not found' }; }
-    return { product };
+    /**
+     * THE SIZE CHART, straight from the supplier — on the DETAIL route only.
+     *
+     * ssSpecs() calls S&S's /specs?styleid=N and caches the answer in ss_style_specs, so a
+     * settled catalogue costs nothing after the first read. The lookbook has printed these
+     * for a while; the public page simply never asked for them.
+     *
+     * Deliberately NOT in publicProducts(), which the LIST also uses — putting it there
+     * would mean one supplier call per product on a page that shows none of it.
+     *
+     * Best-effort: a garment we have no chart for (or a supplier hiccup) publishes without
+     * one rather than failing the page. Generic {size, spec, value} rows, not named columns
+     * — the measurements differ per garment ("Chest Width", "Bill/ Brim Length"), which is
+     * why this is pivoted at render instead of read off fixed fields.
+     *
+     * The style id comes from the RAW row, not from `product` — the public shape withholds
+     * sku precisely because it maps to supplier stock, so it is read here and used only to
+     * look the chart up. It never goes out in the response.
+     */
+    const styleId = String((await rawRowFor(slug))?.sku || '').replace(/^(?:SS|OTTO)-/i, '').trim();
+    const specs = styleId ? await ssSpecs(styleId).catch(() => []) : [];
+    return {
+      product: {
+        ...product,
+        specs: (specs || [])
+          .filter((s) => s && s.sizeName && s.specName)
+          .map((s) => ({ size: String(s.sizeName), spec: String(s.specName), value: String(s.value ?? '') })),
+      },
+    };
   });
 
   /**
@@ -262,22 +323,9 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
 
     // Re-read the ROW, not the public shape — the shape has already replaced the address
     // with the opaque url we are currently answering.
-    const r = await q(
-      `select data from catalog_products where in_catalog = true order by created_at desc limit 60`
-    ).catch(() => ({ rows: [] }));
-    const seen = new Map();
-    let raw = null;
-    for (const row of r.rows) {
-      if (!row.data || !row.data.name) continue;
-      const base = slugify(row.data.name);
-      if (!base) continue;
-      const n = (seen.get(base) ?? 0) + 1;
-      seen.set(base, n);
-      if ((n === 1 ? base : `${base}-${n}`) !== slug) continue;
-      const ci = row.data.colorImages && typeof row.data.colorImages === 'object' ? row.data.colorImages : {};
-      raw = want ? ci[want] : publicImage(row.data);
-      break;
-    }
+    const d = await rawRowFor(slug);
+    const ci = d && d.colorImages && typeof d.colorImages === 'object' ? d.colorImages : {};
+    const raw = !d ? null : (want ? ci[want] : publicImage(d));
     if (!renderable(raw)) { reply.code(404); return { error: 'Not found' }; }
 
     // A plain picture — hand back the address, there is nothing to hide in it.
@@ -289,7 +337,13 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       reply.header('Cache-Control', 'public, max-age=604800, immutable');
       return Buffer.from(m[2], 'base64');
     }
-    const res = await app.inject({ method: 'GET', url: raw });
+    // ASK FOR THE LARGE ONE. S&S serve three sizes behind a filename suffix — _fs small,
+    // _fm medium, _fl large — and the sync stores whatever their feed returned, which is
+    // _fm. A medium file drawn at 600px on a product page is exactly the softness that
+    // reads as "low quality images". ssImgSize() has existed for this the whole time and
+    // was called from nowhere. Nothing needs re-syncing: it is a suffix swap at request
+    // time, and a style with no suffix is returned untouched.
+    const res = await app.inject({ method: 'GET', url: upsizeSupplierImg(raw) });
     reply.code(res.statusCode);
     const ct = res.headers['content-type'];
     if (ct) reply.header('Content-Type', ct);

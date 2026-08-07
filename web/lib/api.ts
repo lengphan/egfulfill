@@ -704,6 +704,11 @@ export type PublicProduct = {
   methods: string[]
   colors: PublicColor[]
   sizes: string[]
+  /** Garment measurements, straight from the supplier's /specs feed and cached server-side.
+   *  Generic {size, spec, value} rows because the measurements differ per garment
+   *  ("Chest Width", "Bill/ Brim Length"), so a chart is PIVOTED from these rather than read
+   *  off fixed columns. Detail route only — the grid never asks for it. */
+  specs?: { size: string; spec: string; value: string }[]
 }
 /** Published products for the PUBLIC marketing site — no auth, allow-listed server-side to
  *  named fields. Never use this inside the app: it deliberately omits the blank SKU, cost,
