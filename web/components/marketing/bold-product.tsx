@@ -217,20 +217,14 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
           <div className={"mt-16 grid gap-12 " + (product.methods.length > 0 ? "lg:grid-cols-2" : "max-w-2xl")}>
             <Rise>
                 <h2 className="font-display text-2xl font-black tracking-tight">Size chart</h2>
+                {/* One line, not a paragraph. Only some manufacturers publish a measurement
+                    feed, so the no-chart case is the state MOST of the catalogue is in — it
+                    should read as a normal answer, not as an apology for a missing section. */}
                 <p className="mt-1.5 text-sm text-black/50">
                   {specNames.length > 0
                     ? "Garment measurements from the manufacturer, in inches."
-                    : "We don't hold measurements for this garment yet."}
+                    : <a href="mailto:orders@egful.store" className="font-semibold text-black/70 underline underline-offset-4">Contact support for detailed measurements</a>}
                 </p>
-                {specNames.length === 0 && (
-                  /* Says what to DO, rather than leaving a heading over nothing. Only some
-                     manufacturers publish a measurement feed, so this is the honest state
-                     for most of the catalogue — not a placeholder waiting on a fix. */
-                  <p className="mt-4 text-[15px] leading-relaxed text-black/65">
-                    Ask us and we&apos;ll send the manufacturer&apos;s size chart for this
-                    style — <a href="mailto:orders@egful.store" className="font-semibold underline underline-offset-4">orders@egful.store</a>.
-                  </p>
-                )}
                 {specNames.length > 0 && (<>
                 {/* PIVOTED, not read off named fields: the supplier returns one row per
                     (size, measurement) and the measurements differ per garment — a polo has
