@@ -13,7 +13,7 @@
 //   GET  /api/shipping/track?provider=&carrier=&tracking=  → status
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
-import { shipFromForOrder } from './factory_settings.js';
+import { shipFromForOrder, readReturnAddress } from './factory_settings.js';
 
 // Read at CALL time, not import time. Saving a credential in Settings › Integrations
 // writes it to the DB and applies it to process.env immediately (see secrets.js), but a
@@ -57,10 +57,16 @@ function parcel(p) {
 
 // ── EasyPost ──────────────────────────────────────────────────────────────────
 async function epRates(to, from, pc) {
+  // Where an undeliverable parcel goes back to. Read here rather than threaded through
+  // every caller: this function is the single place EasyPost shipments are created, so a
+  // caller can't forget it. Unset → omitted → EasyPost falls back to from_address, which
+  // is exactly the behaviour before a separate return address existed.
+  const ret = await readReturnAddress();
   const body = { shipment: {
     to_address: { name: to.name, street1: to.street1, street2: to.street2, city: to.city, state: to.state, zip: to.zip, country: to.country, phone: to.phone },
     from_address: { name: from.name, street1: from.street1, street2: from.street2, city: from.city, state: from.state, zip: from.zip, country: from.country, phone: from.phone },
-    parcel: { length: pc.length, width: pc.width, height: pc.height, weight: pc.weightOz }
+    parcel: { length: pc.length, width: pc.width, height: pc.height, weight: pc.weightOz },
+    ...(ret ? { return_address: { name: ret.name, company: ret.company, street1: ret.street, street2: ret.street2, city: ret.city, state: ret.state, zip: ret.zip, country: ret.country || 'US', phone: ret.phone } } : {})
   } };
   const r = await fetch(EP_BASE + '/shipments', { method: 'POST', headers: { Authorization: epAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
@@ -96,10 +102,14 @@ async function epBuy(shipmentId, rateId) {
 
 // ── Shippo ────────────────────────────────────────────────────────────────────
 async function shRates(to, from, pc, extra) {
+  // Same as EasyPost: resolved at the one place Shippo shipments are built. Shippo falls
+  // back to address_from when address_return is absent.
+  const ret = await readReturnAddress();
   const body = {
     address_from: { name: from.name, street1: from.street1, street2: from.street2, city: from.city, state: from.state, zip: from.zip, country: from.country, phone: from.phone, email: from.email },
     address_to: { name: to.name, street1: to.street1, street2: to.street2, city: to.city, state: to.state, zip: to.zip, country: to.country, phone: to.phone, email: to.email },
     parcels: [{ length: String(pc.length), width: String(pc.width), height: String(pc.height), distance_unit: 'in', weight: String(pc.weightOz), mass_unit: 'oz' }],
+    ...(ret ? { address_return: { name: ret.name, company: ret.company, street1: ret.street, street2: ret.street2, city: ret.city, state: ret.state, zip: ret.zip, country: ret.country || 'US', phone: ret.phone, email: ret.email } } : {}),
     async: false
   };
   // Optional add-ons. Shippo carries `extra` on the SHIPMENT through to the bought

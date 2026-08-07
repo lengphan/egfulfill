@@ -997,6 +997,9 @@ function PlatformPanel() {
   // against. Lives here rather than in the ship dialog because it's set once for the
   // whole team, not per shipment.
   const [shipFrom, setShipFrom] = useState<ShipFromAddress>({})
+  // Where returns go, when that isn't where we ship from. Blank street = unset, and the
+  // carrier falls back to the sender — which is what happened before this field existed.
+  const [returnAddr, setReturnAddr] = useState<ShipFromAddress>({})
   // Product types + the mockup that stands in for the whole category.
   const [types, setTypes] = useState<ProductType[]>([])
   const [newType, setNewType] = useState("")
@@ -1006,6 +1009,7 @@ function PlatformPanel() {
   const [threads, setThreads] = useState<ThreadColor[]>([])
   const [newThread, setNewThread] = useState<ThreadColor>({ code: "", name: "", hex: "#000000" })
   const setFromField = (k: keyof ShipFromAddress, v: string) => setShipFrom((p) => ({ ...p, [k]: v }))
+  const setReturnField = (k: keyof ShipFromAddress, v: string) => setReturnAddr((p) => ({ ...p, [k]: v }))
   const setBand = (k: string, v: string) => setBands((p) => ({ ...p, [k]: v.replace(/[^0-9.]/g, "") }))
 
   const load = useCallback(() => {
@@ -1036,6 +1040,8 @@ function PlatformPanel() {
       setPayoutMin(r.payout_min != null ? String(r.payout_min) : "")
       setPayoutMax(r.payout_max != null ? String(r.payout_max) : "")
       setShipFrom(r.ship_from ?? {})
+      setReturnAddr(r.return_address ?? {})
+      setReturnAddr(r.return_address ?? {})
       getVietqrRate().then((v) => {
         setVqrRate(v.rate ? String(v.rate) : "")
         setVqrTiers((v.tiers || []).map((t) => ({ usd: String(t.usd), rate: String(t.rate) })))
@@ -1102,6 +1108,7 @@ function PlatformPanel() {
         payout_max: payoutMax === "" ? undefined : Number(payoutMax),
         ...Object.fromEntries(Object.entries(bands).map(([k, v]) => [k, v === "" ? undefined : Number(v)])),
         ship_from: shipFrom,
+        return_address: returnAddr,
         product_types: types,
         thread_palette: threads,
       })
@@ -1156,10 +1163,11 @@ function PlatformPanel() {
           )}
         </div>
       </div>
-      <Fold title="Warehouse ship-from address" hint="the return address on every label">
+      <Fold title="Warehouse ship-from address" hint="the sender on every label">
 
         <p className="mb-3 text-xs text-muted-foreground">
-          The return address printed on every label. Set once for the whole team.
+          Where parcels are tendered from. Set once for the whole team. If returns come back
+          somewhere else, set that separately below.
         </p>
         {!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip) && (
           <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
@@ -1178,6 +1186,62 @@ function PlatformPanel() {
             <TextField label="ZIP" value={shipFrom.zip ?? ""} onChange={(v) => setFromField("zip", v)} />
           </div>
         </div>
+
+        {/* BLIND SHIPPING. The switch is here rather than buried in the API, because the
+            thing it changes — what a buyer reads on the parcel — is exactly the thing
+            someone will want to undo in a hurry if it looks wrong. */}
+        <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-muted/30 p-3">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={shipFrom.blind !== false}
+            onChange={(e) => setShipFrom((p) => ({ ...p, blind: e.target.checked }))}
+          />
+          <span className="text-xs">
+            <span className="font-medium">Ship under each seller&rsquo;s shop name</span>
+            <span className="block text-muted-foreground">
+              The sender name becomes the seller&rsquo;s own shop, at the address above — so a buyer
+              sees the shop they bought from, and two parcels from two shops don&rsquo;t advertise a
+              shared factory. Only the name changes; carriers route on the address, so returns
+              still come here. Turn this off and every label reverts to
+              &ldquo;{shipFrom.name || "the name above"}&rdquo;.
+            </span>
+          </span>
+        </label>
+      </Fold>
+
+      {/* A SEPARATE return address. Once the sender name is the seller's shop, the sender
+          block can no longer double as "send it back to us under our own name" — so this is
+          its own address, with its own name, sent to the carrier as address_return
+          (Shippo) / return_address (EasyPost). Left blank, the carrier falls back to the
+          sender, which is what happened before this field existed. */}
+      <Fold title="Return address" hint="where undeliverable parcels come back to">
+        <p className="mb-3 text-xs text-muted-foreground">
+          Only needed if returns come back to a <b>different address</b> than the one you ship
+          from. Leave it blank and returns follow the ship-from address above. The name here is
+          yours — it is never replaced by the seller&rsquo;s shop name.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextField label="Name / company" value={returnAddr.name ?? ""} onChange={(v) => setReturnField("name", v)} />
+          <TextField label="Phone" value={returnAddr.phone ?? ""} onChange={(v) => setReturnField("phone", v)} />
+          <TextField label="Street" value={returnAddr.street ?? ""} onChange={(v) => setReturnField("street", v)} />
+          <TextField label="Suite / unit" value={returnAddr.street2 ?? ""} onChange={(v) => setReturnField("street2", v)} />
+          <TextField label="City" value={returnAddr.city ?? ""} onChange={(v) => setReturnField("city", v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <TextField label="State" value={returnAddr.state ?? ""} onChange={(v) => setReturnField("state", v)} />
+            <TextField label="ZIP" value={returnAddr.zip ?? ""} onChange={(v) => setReturnField("zip", v)} />
+          </div>
+        </div>
+        {/* Half an address is worse than none: the carrier may accept it and print something
+            undeliverable. Say so while it's still being typed. */}
+        {!!(returnAddr.street || returnAddr.city || returnAddr.zip)
+          && !(returnAddr.street && returnAddr.city && returnAddr.state && returnAddr.zip) && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+            Incomplete return address — street, city, state and ZIP are all needed. Until then
+            returns fall back to the ship-from address.
+          </div>
+        )}
       </Fold>
       <Fold title="Fees" hint="design charges, payout, file price, default shipping">
         {/* MONEY OUT first, then money in, and the direction is written into every hint.

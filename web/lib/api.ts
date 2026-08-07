@@ -1400,6 +1400,43 @@ export function refreshTracking(id: string) {
   return api<{ ok?: boolean; status?: string | null; carrier_status?: string; detail?: string; error?: string }>(
     `/api/orders/${encodeURIComponent(id)}/refresh-tracking`, { method: "POST" })
 }
+// ─────────────────────────── Alibaba (sourcing) ───────────────────────────
+// Admin-only. One connection for the whole factory — this is OUR buyer account, not a
+// per-seller one, so there is no seller scoping anywhere in here.
+export type AlibabaConfig = {
+  configured: boolean
+  connected: boolean
+  base: string
+  account: string | null
+  expiresAt: string | null
+  /** Where an admin goes to authorise. Built server-side because it carries the app key. */
+  authorizeUrl: string | null
+  redirectUri: string
+}
+export function getAlibabaConfig() {
+  return api<AlibabaConfig>(`/api/alibaba/config`)
+}
+/** One signed call, returning Alibaba's own reply verbatim — a signature or permission
+ *  error is readable from their message and guessable from nothing else. */
+export function testAlibaba(keyword?: string) {
+  const qs = keyword ? `?keyword=${encodeURIComponent(keyword)}` : ""
+  return api<{ ok?: boolean; signatureAccepted?: boolean; returned?: number; sample?: unknown; error?: string; detail?: unknown }>(
+    `/api/alibaba/test${qs}`
+  )
+}
+export function exchangeAlibaba(code: string) {
+  return api<{ ok?: boolean; account?: string | null; error?: string; detail?: unknown }>(
+    `/api/alibaba/exchange`, { method: "POST", body: JSON.stringify({ code }) }
+  )
+}
+export type AlibabaProduct = { id?: string; title?: string; image?: string; url?: string; price?: string; moq?: string | number; supplier?: string }
+export function searchAlibaba(p: { keyword: string; page?: number; pageSize?: number }) {
+  const qs = new URLSearchParams({ keyword: p.keyword })
+  if (p.page) qs.set("page", String(p.page))
+  if (p.pageSize) qs.set("pageSize", String(p.pageSize))
+  return api<{ products?: AlibabaProduct[]; pagination?: unknown; error?: string }>(`/api/alibaba/search?${qs}`)
+}
+
 /** Flag or clear a rush. Any factory staff — the person who notices a job is urgent is
  *  usually the one at the machine. Sellers are refused server-side. */
 export function setOrderRush(id: string, rush: boolean) {
@@ -1729,6 +1766,9 @@ export type FactorySettings = {
 } & {
   ship_from?: ShipFromAddress | null
   ship_from_complete?: boolean
+  /** Where undeliverable parcels go back to, when that isn't the address we ship from.
+   *  Null/streetless = unset, and the carrier falls back to the sender. */
+  return_address?: ShipFromAddress | null
   /** Carriers the rate picker offers (comma-separated substrings, e.g. "usps,ups"). Empty = all. */
   enabled_carriers?: string
   /** Default Pink Design product type, applied to every push so the picker needn't appear per card. */
@@ -1764,6 +1804,11 @@ export type ShipFromAddress = {
   name?: string; company?: string; street?: string; street2?: string
   city?: string; state?: string; zip?: string; country?: string
   phone?: string; email?: string
+  /** BLIND SHIPPING. When true (the default) the label's sender NAME is the seller's own
+   *  shop name instead of `name` above — so a buyer sees the shop they bought from, and two
+   *  parcels from two shops don't advertise a shared factory. The address is unaffected.
+   *  Only on `ship_from`; a return address is always under our own name. */
+  blind?: boolean
 }
 /** Types + category mockups, readable by any signed-in user (the seller Design Maker
  *  needs them to resolve a blank). Distinct from getFactorySettings, which is staff-only. */
@@ -1781,7 +1826,7 @@ export function getDesignFees() {
 }
 /** The numeric keys are addressed by name from the settings form, so the body stays
  *  loosely keyed — but the values are narrowed to what the route actually accepts. */
-export function setFactorySettings(body: Record<string, string | number | ShipFromAddress | ProductType[] | ThreadColor[] | undefined>) {
+export function setFactorySettings(body: Record<string, string | number | boolean | ShipFromAddress | ProductType[] | ThreadColor[] | undefined>) {
   return api<FactorySettings & { ok?: boolean; error?: string }>(`/api/factory/settings`, { method: "PUT", body: JSON.stringify(body) })
 }
 

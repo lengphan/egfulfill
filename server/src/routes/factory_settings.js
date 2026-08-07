@@ -167,6 +167,9 @@ export function shippingBandOf(typeOrName) {
 // were previously bought with whatever `from` the client happened to send, which meant no
 // address at all; this is the single place the floor sets it once.
 export const SHIP_FROM_KEY = 'ship_from';
+// Where returns go. Separate row so it can be set, cleared and read independently of the
+// sender address — they are two different buildings under two different names.
+export const RETURN_ADDRESS_KEY = 'return_address';
 
 /**
  * Product types, managed rather than hardcoded — they were a literal array in the product
@@ -288,6 +291,24 @@ export function shipFromComplete(a) {
  * no store, an unknown order id, or `blind: false` in settings. A label must never fail to
  * buy because of this.
  */
+/**
+ * The RETURN address — where an undeliverable parcel goes back to.
+ *
+ * Separate from ship-from on purpose. The sender block carries the SELLER's shop name at
+ * the address we tender from (blind shipping); returns go to our own depot under our own
+ * name. One address could not do both jobs once the sender name stopped being ours.
+ *
+ * Optional. Unset, both providers fall back to the from address — the behaviour before
+ * this existed — so a half-filled setting can never break a label.
+ */
+export async function readReturnAddress() {
+  try {
+    const r = await q('select value from settings where key=$1', [RETURN_ADDRESS_KEY]);
+    const v = r.rows[0] && r.rows[0].value;
+    return v && typeof v === 'object' && v.street ? v : null;
+  } catch { return null; }
+}
+
 export async function shipFromForOrder(orderId) {
   const base = await readShipFrom();
   if (!base || base.blind === false || !orderId) return base;
@@ -373,8 +394,8 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
 
   app.get('/api/factory/settings', { preHandler: requireStaff }, async () => {
     await ensure();
-    const [nums, shipFrom, types, threads] = await Promise.all([readAll(), readShipFrom(), readProductTypes(), readThreadPalette()]);
-    return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: types, thread_palette: threads };
+    const [nums, shipFrom, retAddr, types, threads] = await Promise.all([readAll(), readShipFrom(), readReturnAddress(), readProductTypes(), readThreadPalette()]);
+    return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), return_address: retAddr, product_types: types, thread_palette: threads };
   });
 
   app.put('/api/factory/settings', { preHandler: requireAdmin }, async (req, reply) => {
@@ -404,6 +425,15 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       // Defaults ON: the name above is then a fallback, not what every buyer sees.
       addr.blind = b.ship_from.blind !== false;
       await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [SHIP_FROM_KEY, JSON.stringify(addr)]);
+    }
+    if (b.return_address && typeof b.return_address === 'object') {
+      const ret = {};
+      for (const f of SHIP_FROM_FIELDS) ret[f] = String(b.return_address[f] ?? '').trim();
+      ret.country = ret.country || 'US';
+      // A blank street means "no separate return address" — store it anyway so clearing the
+      // form actually clears it; readReturnAddress() treats a streetless row as unset and
+      // the providers then fall back to the sender, which is the pre-existing behaviour.
+      await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [RETURN_ADDRESS_KEY, JSON.stringify(ret)]);
     }
     if (Array.isArray(b.product_types)) {
       // Normalised on the way in: a blank name would create an unselectable type, and
