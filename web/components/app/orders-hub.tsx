@@ -1331,7 +1331,29 @@ export function OrdersHub() {
                 action: null, // rendered inline below, pinned last
               }
               return (
-                <div key={o.id} className="p-5">
+                <div key={o.id} className="relative p-5">
+                  {/* A BOOKMARK CLIPPED OVER THE SEPARATOR. top-0 puts its top edge on the
+                      row's dividing line so it hangs DOWN from it, the way a bookmark sits
+                      over the edge of a page — floating it above the line reads as a stray
+                      icon belonging to neither row.
+
+                      Absolutely positioned, so it costs no layout: an earlier version put
+                      the glyph in the Order cell and pushed a flagged row's number out of
+                      its column, misaligned with every number below it. A marker that moves
+                      the data it marks is the wrong marker.
+
+                      Solid fill, not a coloured chip — the status palette is spoken for
+                      (violet is working, indigo is pending) and a purple badge here would
+                      read as another stage. */}
+                  {isRush(o) && (
+                    <span
+                      className="pointer-events-none absolute left-3 top-0 text-primary"
+                      title={o.rushed_at ? `Rush — flagged ${fmtDate(o.rushed_at)}` : "Rush"}
+                      aria-label="Rush"
+                    >
+                      <BookmarkSimple size={18} weight="fill" />
+                    </span>
+                  )}
                   {/* Growing the identity block to fill the row was the first fix for the
                       dead middle, and it is not enough on a wide screen: justify-between
                       still spends every spare pixel BETWEEN the two children, so at 1920 the
@@ -1361,26 +1383,9 @@ export function OrdersHub() {
                       table has been a real table all along; this is the same idea, driven
                       from the same lib/order-columns.ts. */}
                   <div
-                    className="relative mb-3 grid items-center gap-x-3 gap-y-1"
+                    className="mb-3 grid items-center gap-x-3 gap-y-1"
                     style={{ gridTemplateColumns: gridTmpl }}
                   >
-                    {/* A BOOKMARK CLIPPED TO THE ROW, hanging from its top edge — absolutely
-                        positioned, so it costs no layout. The first version put the glyph in
-                        the Order cell, which pushed the number out of its column and left a
-                        flagged row's id misaligned with every id below it. A marker that
-                        moves the data it marks is the wrong marker.
-                        Solid fill rather than a coloured chip: the status palette is spoken
-                        for (violet is working, indigo is pending) and a purple badge would
-                        read as another stage. */}
-                    {isRush(o) && (
-                      <span
-                        className="pointer-events-none absolute -top-1.5 left-[-14px] text-primary"
-                        title={o.rushed_at ? `Rush — flagged ${fmtDate(o.rushed_at)}` : "Rush"}
-                        aria-label="Rush"
-                      >
-                        <BookmarkSimple size={18} weight="fill" />
-                      </span>
-                    )}
                     {/* A box on EVERY row, disabled where it can't be used. Rendering it
                         only on dispatchable rows reads as a half-built feature: most orders
                         have no label yet, so most rows had no box, and a column that appears
