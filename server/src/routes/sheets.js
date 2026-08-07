@@ -61,8 +61,8 @@ async function getServiceToken() {
 // against it drifting again — if you add or reorder a column in CSV_COLUMNS, edit this list
 // in the same commit.
 const T_COLUMNS = [
-  // group: 'req' | 'one' | 'opt'
-  { h: 'Order Number', g: 'req', sample: 'SAMPLE-1001' },
+  // group: 'asg' (fill it or we mint one) | 'req' (blocks the row) | 'one' | 'opt'
+  { h: 'Order Number', g: 'asg', sample: 'SAMPLE-1001' },
   { h: 'Ship Name', g: 'req', sample: 'Jane Sample — delete this row' },
   { h: 'Ship Address 1', g: 'req', sample: '42 Maple Street' },
   { h: 'Ship City', g: 'req', sample: 'Portland' },
@@ -98,6 +98,7 @@ const T_OPTS = {
 // fill behind live text is the "tinted canvas under a 700-row queue" mistake. The banner row
 // carries the strong tone; the header row a wash of it; the data cells nothing at all.
 const BAND = {
+  asg: { label: 'FILL, OR WE ASSIGN ONE', banner: { red: 0.88, green: 0.94, blue: 0.90 }, header: { red: 0.95, green: 0.98, blue: 0.96 } },
   req: { label: 'REQUIRED — fill every row', banner: { red: 0.86, green: 0.90, blue: 1.0 }, header: { red: 0.94, green: 0.96, blue: 1.0 } },
   one: { label: 'FILL ONE OF THESE', banner: { red: 0.91, green: 0.87, blue: 1.0 }, header: { red: 0.96, green: 0.94, blue: 1.0 } },
   opt: { label: 'OPTIONAL', banner: { red: 0.94, green: 0.94, blue: 0.94 }, header: { red: 0.98, green: 0.98, blue: 0.98 } },
@@ -119,8 +120,80 @@ function bands() {
 function cell(v, fmt) {
   return { userEnteredValue: { stringValue: String(v) }, ...(fmt ? { userEnteredFormat: fmt } : {}) };
 }
-function rowData(arr, bold) {
-  return { values: arr.map((v) => cell(v, bold ? { textFormat: { bold: true } } : null)) };
+
+/**
+ * Build the two Google payloads for the template, with NO network call.
+ *
+ * Split out from the route so the exact bytes we would send can be inspected — see
+ * GET /api/sheets/template-preview. A structural mistake here (a merge that runs off the
+ * grid, validation landing on the header row) otherwise only ever shows up as a 400 from
+ * Google with the whole sheet already created.
+ *
+ * `gid` is only known after the spreadsheet exists, so requests() takes it.
+ */
+export function buildTemplate(title) {
+  const NCOL = T_COLUMNS.length;
+  const BANDS = bands();
+  // Row 0 = merged band banner, row 1 = column headers, row 2 = the deletable sample.
+  const bannerRow = { values: T_COLUMNS.map((c, i) => {
+    const b = BANDS.find((x) => x.start === i);
+    return cell(b ? BAND[c.g].label : '', {
+      backgroundColor: BAND[c.g].banner,
+      horizontalAlignment: 'CENTER',
+      textFormat: { bold: true, fontSize: 10 },
+    });
+  }) };
+  const headerRow = { values: T_COLUMNS.map((c) => cell(c.h, {
+    backgroundColor: BAND[c.g].header,
+    textFormat: { bold: true },
+    wrapStrategy: 'CLIP',
+  })) };
+  // Sample row in grey italic so it reads as an example, not as data to keep. isSampleRow()
+  // on the client keys off "delete this row" in Ship Name, so it is dropped on import even
+  // if the seller leaves it in.
+  const sampleRow = { values: T_COLUMNS.map((c) => cell(c.sample || '', {
+    textFormat: { italic: true, foregroundColor: { red: 0.55, green: 0.55, blue: 0.55 } },
+  })) };
+
+  const createBody = {
+    properties: { title },
+    sheets: [{
+      properties: { title: 'Orders', gridProperties: { frozenRowCount: 2, columnCount: Math.max(NCOL, 26), rowCount: 1000 } },
+      data: [{ startRow: 0, startColumn: 0, rowData: [bannerRow, headerRow, sampleRow] }],
+    }],
+  };
+
+  const requests = (gid) => {
+    const out = [];
+    for (const b of BANDS) {
+      if (b.count > 1) out.push({ mergeCells: { mergeType: 'MERGE_ALL', range: { sheetId: gid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: b.start, endColumnIndex: b.start + b.count } } });
+    }
+    T_COLUMNS.forEach((c, i) => {
+      out.push({ updateDimensionProperties: {
+        range: { sheetId: gid, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 },
+        properties: { pixelSize: Math.min(260, Math.max(110, c.h.length * 9 + 40)) },
+        fields: 'pixelSize',
+      } });
+      // Dropdown over the data rows only (row 3 down) — never over the header rows, which
+      // would flag our own header text as an invalid value.
+      if (c.opts && T_OPTS[c.opts]) {
+        out.push({ setDataValidation: {
+          range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
+          rule: {
+            condition: { type: 'ONE_OF_LIST', values: T_OPTS[c.opts].map((v) => ({ userEnteredValue: v })) },
+            showCustomUi: true,
+            // NOT strict: a rejected paste is worse than an odd value. The importer
+            // normalises these anyway (print type upper-cases, quantity defaults), and a
+            // seller shipping to a non-US state must not be blocked by a US-state list.
+            strict: false,
+          },
+        } });
+      }
+    });
+    return out;
+  };
+
+  return { createBody, requests, columns: T_COLUMNS.map((c) => c.h), bands: BANDS };
 }
 
 // Pull a spreadsheet ID out of a full URL or accept a bare ID.
@@ -218,6 +291,31 @@ export function sheetsRoutes(app, requireAuth) {
     }
   });
 
+  // Dry run: the EXACT payloads /api/sheets/create would send, without creating anything
+  // and without needing a service account. Lets the template be checked in one pass —
+  // column order, band merges, dropdown ranges — instead of discovering a bad range as a
+  // 400 from Google with a half-built sheet already in someone's Drive.
+  app.get('/api/sheets/template-preview', { preHandler: requireAuth }, async () => {
+    const tpl = buildTemplate('EGFULFILL Orders — preview');
+    const reqs = tpl.requests(0);
+    const kind = (r) => Object.keys(r)[0];
+    return {
+      ok: true,
+      columns: tpl.columns,
+      bands: tpl.bands.map((b) => ({ band: b.g, label: BAND[b.g].label, from: tpl.columns[b.start], span: b.count })),
+      frozenRows: tpl.createBody.sheets[0].properties.gridProperties.frozenRowCount,
+      rowsSeeded: tpl.createBody.sheets[0].data[0].rowData.length,
+      merges: reqs.filter((r) => kind(r) === 'mergeCells').map((r) => r.mergeCells.range),
+      dropdowns: reqs.filter((r) => kind(r) === 'setDataValidation').map((r) => ({
+        column: tpl.columns[r.setDataValidation.range.startColumnIndex],
+        startRowIndex: r.setDataValidation.range.startRowIndex,
+        values: r.setDataValidation.rule.condition.values.length,
+        strict: r.setDataValidation.rule.strict,
+      })),
+      requestCount: reqs.length,
+    };
+  });
+
   // Create a ready-to-fill Google Sheet (Orders + Options tabs) and share it
   // "anyone with the link → editor" so the seller can fill it. Returns its URL.
   app.post('/api/sheets/create', { preHandler: requireAuth }, async (req, reply) => {
@@ -225,41 +323,8 @@ export function sheetsRoutes(app, requireAuth) {
     try { token = await getServiceToken(); }
     catch (e) { reply.code(e.message === 'no_service_account' ? 503 : 502); return { error: e.message === 'no_service_account' ? 'Auto-create is not configured (no service account).' : ('Service account auth failed: ' + e.message) }; }
     const who = (req.user && (req.user.name || req.user.email)) || 'Seller';
-    const NCOL = T_COLUMNS.length;
-    const BANDS = bands();
-
-    // Row 0 = merged band banner, row 1 = column headers, row 2 = the deletable sample.
-    // Both header rows are frozen so they stay put on a long sheet.
-    const bannerRow = { values: T_COLUMNS.map((c, i) => {
-      const b = BANDS.find((x) => x.start === i);
-      return cell(b ? BAND[c.g].label : '', {
-        backgroundColor: BAND[c.g].banner,
-        horizontalAlignment: 'CENTER',
-        textFormat: { bold: true, fontSize: 10 },
-      });
-    }) };
-    const headerRow = { values: T_COLUMNS.map((c) => cell(c.h, {
-      backgroundColor: BAND[c.g].header,
-      textFormat: { bold: true },
-      wrapStrategy: 'CLIP',
-    })) };
-    // Sample row in grey italic so it reads as an example, not as data to keep. isSampleRow()
-    // on the client keys off "delete this row" in Ship Name, so it is dropped on import even
-    // if the seller leaves it in.
-    const sampleRow = { values: T_COLUMNS.map((c) => cell(c.sample || '', {
-      textFormat: { italic: true, foregroundColor: { red: 0.55, green: 0.55, blue: 0.55 } },
-    })) };
-
-    const body = {
-      properties: { title: 'EGFULFILL Orders — ' + who },
-      sheets: [
-        {
-          properties: { title: 'Orders', gridProperties: { frozenRowCount: 2, columnCount: Math.max(NCOL, 26), rowCount: 1000 } },
-          data: [{ startRow: 0, startColumn: 0, rowData: [bannerRow, headerRow, sampleRow] }],
-        },
-      ],
-    };
-    const cr = await fetch('https://sheets.googleapis.com/v4/spreadsheets', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const tpl = buildTemplate('EGFULFILL Orders — ' + who);
+    const cr = await fetch('https://sheets.googleapis.com/v4/spreadsheets', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(tpl.createBody) });
     const cd = await cr.json().catch(() => ({}));
     if (!cr.ok || !cd.spreadsheetId) { reply.code(502); return { error: 'Could not create sheet: ' + ((cd.error && cd.error.message) || cr.status) }; }
     const id = cd.spreadsheetId;
@@ -267,32 +332,7 @@ export function sheetsRoutes(app, requireAuth) {
 
     // Merges, column widths and dropdowns can't be expressed on create — they need a
     // batchUpdate against the now-known sheetId.
-    const requests = [];
-    for (const b of BANDS) {
-      if (b.count > 1) requests.push({ mergeCells: { mergeType: 'MERGE_ALL', range: { sheetId: gid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: b.start, endColumnIndex: b.start + b.count } } });
-    }
-    T_COLUMNS.forEach((c, i) => {
-      requests.push({ updateDimensionProperties: {
-        range: { sheetId: gid, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 },
-        properties: { pixelSize: Math.min(260, Math.max(110, c.h.length * 9 + 40)) },
-        fields: 'pixelSize',
-      } });
-      // Dropdown over the data rows only (row 3 down) — never over the header rows, which
-      // would flag our own header text as an invalid value.
-      if (c.opts && T_OPTS[c.opts]) {
-        requests.push({ setDataValidation: {
-          range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
-          rule: {
-            condition: { type: 'ONE_OF_LIST', values: T_OPTS[c.opts].map((v) => ({ userEnteredValue: v })) },
-            showCustomUi: true,
-            // NOT strict: a rejected paste is worse than an odd value. The importer
-            // normalises these anyway (print type upper-cases, quantity defaults), and a
-            // seller shipping to a non-US state must not be blocked by a US-state list.
-            strict: false,
-          },
-        } });
-      }
-    });
+    const requests = tpl.requests(gid);
     if (requests.length) {
       const br = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + id + ':batchUpdate', {
         method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },

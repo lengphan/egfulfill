@@ -9,12 +9,13 @@ import { PRODUCT_METHODS } from "@/lib/print-method"
 
 // Required columns — a row missing any of these is flagged invalid.
 //
-// `order_number` is required as of 2026-08. It is what groups lines into one order, so a
-// blank one silently splits a 3-line order into 3 separate orders — a wrong result that
-// looks like a successful import. Rejecting the row surfaces it instead. groupToOrders
-// still carries its AUTO_KEY fallback, which now only ever sees rows from a legacy
-// marketplace export that never had the column at all.
-export const REQUIRED_COLS = ["order_number", "ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
+// `order_number` is deliberately NOT here. It is what groups lines into one order, so a
+// blank one splits a 3-line order into 3 — but rejecting the row over it is too blunt: a
+// single-line order genuinely doesn't need one, and a marketplace export that never had
+// the column would fail wholesale. The rule instead is FILL IT OR WE ASSIGN ONE — the row
+// imports, the order takes its platform-assigned FF- number, and rowsToRecords raises a
+// WARNING so the split is stated up front rather than discovered afterwards.
+export const REQUIRED_COLS = ["ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
 
 // Per-column reference for the import dialog: which headers are required vs optional, and what
 // each does. Drives the legend so a filler knows exactly what they can skip. `key` is the
@@ -23,7 +24,10 @@ export const REQUIRED_COLS = ["order_number", "ship_name", "ship_address_1", "sh
 // the row is rejected, fill any one and it passes. Item SKU / Product Title are the case that
 // exists today. Without this the two of them render as plain "optional", which is a promise the
 // validator then breaks — the chip says safe to skip, the row comes back "No item (SKU or name)".
-export type CsvColumn = { header: string; key: string; required: boolean; oneOf?: string; help: string }
+// `assigned` = fill it, or we mint one for you. Distinct from both required (blocks the
+// row) and optional (nothing happens if you skip it): skipping this one is allowed but has
+// a consequence worth stating, so it gets its own band rather than a footnote on another.
+export type CsvColumn = { header: string; key: string; required: boolean; oneOf?: string; assigned?: boolean; help: string }
 
 // ORDER IS THE CONTRACT. Columns are listed required → fill-one-of → optional, and the
 // template, the .xlsx, the Google Sheet and the dialog's chip guide all render in this
@@ -31,8 +35,9 @@ export type CsvColumn = { header: string; key: string; required: boolean; oneOf?
 // grey column, instead of hunting a legend to find which of 21 scattered columns matter.
 // Moving a column between groups here moves it everywhere, in step.
 export const CSV_COLUMNS: CsvColumn[] = [
+  // ── FILL, OR WE ASSIGN ONE ────────────────────────────────────────────────
+  { header: "Order Number", key: "order_number", required: false, assigned: true, help: "The BUYER's order number. Leave it blank and the order still imports under the platform number we mint for it (FF-…) — but it is also what GROUPS rows, so a multi-line order MUST carry one. Without it, each line becomes its own separate order." },
   // ── REQUIRED ──────────────────────────────────────────────────────────────
-  { header: "Order Number", key: "order_number", required: true, help: "The BUYER's order number — kept as the order's reference, not as its ID (we always mint our own FF- number). It is also what GROUPS rows: give every line of one order the same number. Two lines of one order with different numbers import as two separate orders." },
   { header: "Ship Name", key: "ship_name", required: true, help: "Recipient's full name." },
   { header: "Ship Address 1", key: "ship_address_1", required: true, help: "Street address." },
   { header: "Ship City", key: "ship_city", required: true, help: "Destination city." },
@@ -59,10 +64,12 @@ export const CSV_COLUMNS: CsvColumn[] = [
 
 // Which band a column sits in. Derived rather than stored so `required`/`oneOf` stay the
 // single fact and a column can never claim one band while validating as another.
-export type CsvGroup = "required" | "oneOf" | "optional"
-export const groupOf = (c: CsvColumn): CsvGroup => (c.required ? "required" : c.oneOf ? "oneOf" : "optional")
+export type CsvGroup = "assigned" | "required" | "oneOf" | "optional"
+export const groupOf = (c: CsvColumn): CsvGroup =>
+  c.required ? "required" : c.assigned ? "assigned" : c.oneOf ? "oneOf" : "optional"
 
 export const GROUP_LABEL: Record<CsvGroup, string> = {
+  assigned: "FILL, OR WE ASSIGN ONE",
   required: "REQUIRED — every row",
   oneOf: "FILL ONE OF THESE",
   optional: "OPTIONAL",
@@ -212,6 +219,10 @@ export type ImportRecord = {
   _rowNum: number
   _valid: boolean
   _errors: string
+  /** Non-blocking: the row imports, but something about it is worth saying first.
+   *  Kept separate from _errors so "will import differently than you expect" can never be
+   *  mistaken for "will not import". */
+  _warnings: string
 }
 // Read a data field as a plain string (index values are a union incl. the meta fields).
 const S = (v: string | number | boolean | undefined): string => (v == null ? "" : String(v))
@@ -280,7 +291,7 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
   const records = rows.slice(1).map((row, i) => {
     // +hdrIdx so a rejected row is reported at its number in the SHEET the seller is looking
     // at, not its offset within the slice — off-by-one here sends them to edit the wrong row.
-    const rec: ImportRecord = { _rowNum: i + 2 + hdrIdx, _valid: false, _errors: "" }
+    const rec: ImportRecord = { _rowNum: i + 2 + hdrIdx, _valid: false, _errors: "", _warnings: "" }
     headers.forEach((h, j) => { if (h && rec[h] === undefined) rec[h] = row[j] != null ? String(row[j]).trim() : "" })
     if (!rec.item_quantity) rec.item_quantity = "1"
     if (!rec.print_type) rec.print_type = "DTG"
@@ -292,6 +303,10 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
     if (noItem) errs.push("No item (SKU or name)")
     rec._valid = !errs.length
     rec._errors = errs.join("; ")
+    // Blank order number imports fine — it just can't be grouped, so it becomes its own
+    // order under the platform number. Said here so the preview can state it BEFORE the
+    // import, which is the only point at which it is still cheap to fix.
+    if (rec._valid && !rec.order_number) rec._warnings = "No Order Number — imports as its own order under a platform number"
     return rec
   }).filter((r) => !isSampleRow(r as unknown as Record<string, string>))
   if (!records.length) return { records: [], error: "No order rows found — only a header (and maybe the sample row)." }

@@ -102,7 +102,9 @@ export function ImportOrdersDialog({
   const summary = useMemo(() => {
     const list = records ?? []
     const valid = list.filter((r) => r._valid).length
-    return { total: list.length, valid, invalid: list.length - valid, orders: valid ? groupToOrders(list).length : 0 }
+    // Rows that will import but split, because they carry no Order Number to group by.
+    const ungrouped = list.filter((r) => r._valid && !r.order_number).length
+    return { total: list.length, valid, invalid: list.length - valid, ungrouped, orders: valid ? groupToOrders(list).length : 0 }
   }, [records])
 
   const ingest = (rows: string[][]) => {
@@ -315,6 +317,7 @@ export function ImportOrdersDialog({
                     <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {GROUP_LABEL[band.group]}
                       {band.group === "oneOf" && <span className="ml-1 font-normal normal-case opacity-80">— a row with neither is skipped</span>}
+                      {band.group === "assigned" && <span className="ml-1 font-normal normal-case opacity-80">— but lines of one order must share it</span>}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {CSV_COLUMNS.slice(band.start, band.start + band.count).map((c) => (
@@ -325,9 +328,15 @@ export function ImportOrdersDialog({
                             "inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs " +
                             (band.group === "required"
                               ? "border-primary/40 bg-primary/10 font-medium text-primary"
-                              : band.group === "oneOf"
-                                ? "border-amber-300 bg-amber-50 font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
-                                : "border-border bg-background text-muted-foreground")
+                              // A softer form of the required treatment — dashed outline, no
+                              // fill — rather than a new hue. The status palette (emerald
+                              // shipped, amber hold, …) carries meaning on the floor and a
+                              // fourth band colour here would start crowding it.
+                              : band.group === "assigned"
+                                ? "border-dashed border-primary/50 bg-transparent font-medium text-primary"
+                                : band.group === "oneOf"
+                                  ? "border-amber-300 bg-amber-50 font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+                                  : "border-border bg-background text-muted-foreground")
                           }
                         >
                           {c.header}
@@ -439,6 +448,19 @@ export function ImportOrdersDialog({
                   <span className="inline-flex items-center gap-1.5 text-success"><CheckCircle size={14} weight="fill" /> {summary.valid} valid</span>
                   {summary.invalid > 0 && <span className="inline-flex items-center gap-1.5 text-amber-600"><WarningCircle size={14} weight="fill" /> {summary.invalid} skipped</span>}
                 </div>
+                {/* Stated BEFORE the import, because afterwards the only fix is deleting
+                    orders. A blank Order Number is allowed — it just can't be grouped, so
+                    the lines can't be recognised as belonging together. */}
+                {summary.ungrouped > 0 && (
+                  <div className="flex items-start gap-2 border-b border-border bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                    <WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
+                    <span>
+                      {summary.ungrouped} {summary.ungrouped === 1 ? "row has" : "rows have"} no Order Number — each imports as
+                      its OWN order under a platform number (FF-…). If any of them are lines of the
+                      same order, give them a shared Order Number first.
+                    </span>
+                  </div>
+                )}
                 <div className="max-h-64 overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-muted/60 text-left text-xs text-muted-foreground">
@@ -454,7 +476,11 @@ export function ImportOrdersDialog({
                       {records.map((r) => (
                         <tr key={r._rowNum} className="border-t border-border">
                           <td className="px-3 py-1.5 text-muted-foreground">{r._rowNum}</td>
-                          <td className="px-3 py-1.5 font-mono text-xs">{r.order_number || "—"}</td>
+                          {/* "assigned" rather than an em-dash: the row isn't missing
+                              something, it's getting a platform number instead. */}
+                          <td className="px-3 py-1.5 font-mono text-xs">
+                            {r.order_number || <span className="not-italic text-muted-foreground">assigned</span>}
+                          </td>
                           <td className="max-w-[140px] truncate px-3 py-1.5">{r.ship_name || "—"}</td>
                           <td className="max-w-[160px] truncate px-3 py-1.5 text-muted-foreground">{r.product_title || r.item_name || r.item_sku || "—"}</td>
                           <td className="px-3 py-1.5">
