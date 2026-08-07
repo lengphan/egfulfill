@@ -131,8 +131,21 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                             <span
                               key={c.name}
                               title={c.name}
-                              className="size-4 rounded-full border border-black/15 bg-cover bg-center"
-                              style={c.image ? { backgroundImage: `url(${c.image})` } : { background: swatchOf(c.name) }}
+                              className="size-4 rounded-full border border-black/15 bg-center"
+                              /* A CLOSE CROP, not the whole photo. bg-cover scaled an entire
+                                 garment-on-white shot into a 16px circle, so the chip showed a
+                                 tiny shirt silhouette — mostly background — instead of the
+                                 colour it exists to communicate. 340% centred lands inside the
+                                 body of the garment, which is fabric on every product shot we
+                                 hold, so the chip reads as a colour. A named colour still wins
+                                 where we know the hex: it is exact, while a crop is a sample. */
+                              style={
+                                SWATCH[c.name.toLowerCase().trim()]
+                                  ? { background: swatchOf(c.name) }
+                                  : c.image
+                                    ? { backgroundImage: `url(${c.image})`, backgroundSize: "340%" }
+                                    : { background: swatchOf(c.name) }
+                              }
                             />
                           ))}
                           {p.colors.length > 5 && (
