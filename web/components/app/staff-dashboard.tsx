@@ -120,7 +120,24 @@ export function StaffDashboard() {
     const revenue = inRange.reduce((s, o) => s + orderTotalOf(o), 0)
     const profit = inRange.reduce((s, o) => s + orderProfitOf(o), 0)
     const count = inRange.length
-    return { revenue, profit, count, aov: count ? revenue / count : 0 }
+    /**
+     * IS PROFIT KNOWN AT ALL?
+     *
+     * `orders.profit` is only ever written from a manual save (`o.profit || 0` in
+     * orders.js) — the Etsy/Shopify/TikTok importers never send it, so every synced order
+     * stores a literal 0. Measured on the live database: 4 of 782 orders carry a non-zero
+     * profit, and 0 of the 257 in the last 30 days.
+     *
+     * So summing the column produced $0 beside $15,104 of revenue, which reads as "you
+     * made nothing" when the truth is "nobody computed this". Those are different claims
+     * and this dashboard already refuses to conflate them elsewhere — the revenue chart
+     * won't draw a flat line when the read failed, for exactly this reason.
+     *
+     * If not one order in the window has a non-zero profit we cannot tell "all zero" from
+     * "never calculated", so we say we don't know rather than pick the flattering reading.
+     */
+    const profitKnown = inRange.some((o) => orderProfitOf(o) !== 0)
+    return { revenue, profit, profitKnown, count, aov: count ? revenue / count : 0 }
   }, [orders, rangeMeta])
 
   const recent = useMemo(() => (orders ?? []).slice(0, 8), [orders])
@@ -144,7 +161,11 @@ export function StaffDashboard() {
   const cards: { label: string; value: string | number; sub: string; icon: typeof Package; pos?: boolean; neg?: boolean }[] = isAdmin
     ? [
       { label: "Revenue", value: usd(money.revenue), sub: rangeMeta.sub, icon: CurrencyDollar, pos: true },
-      { label: "Profit", value: usd(money.profit), sub: rangeMeta.sub, icon: TrendUp, pos: true },
+      // "—", not "$0". A zero here is indistinguishable from an uncomputed one, and the
+      // wrong one of those is a lie about the business rather than a gap in a chart.
+      { label: "Profit", value: money.profitKnown ? usd(money.profit) : "—",
+        sub: money.profitKnown ? rangeMeta.sub : "not calculated yet",
+        icon: TrendUp, pos: money.profitKnown },
       { label: "Orders", value: money.count, sub: rangeMeta.sub, icon: Package },
       { label: "Avg order", value: usd(money.aov), sub: "per order", icon: Receipt },
     ]
