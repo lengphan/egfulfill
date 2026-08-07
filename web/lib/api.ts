@@ -1743,7 +1743,7 @@ export function requestAiReply() {
   // `escalated: true` means the thread has an OPEN human handoff — the assistant deliberately
   // stays quiet until a teammate replies, so there's no `reply`. `office` says whether the
   // team is in hours, so the client can show the right "in queue" vs "we're offline" copy.
-  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; escalated?: boolean; office?: SupportAvailability; error?: string }>(`/api/support/ai-reply`, {
+  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; empty?: boolean; reason?: string; escalated?: boolean; office?: SupportAvailability; error?: string }>(`/api/support/ai-reply`, {
     method: "POST",
     body: "{}",
   })
@@ -1751,7 +1751,7 @@ export function requestAiReply() {
 // Private Workbench: ask the personal AI. Reads ONLY the caller's own desk channel +
 // their pinned notes. Same disabled/skipped/error shape as the support reply.
 export function deskAiReply() {
-  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; error?: string }>(`/api/desk/ai-reply`, {
+  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; empty?: boolean; reason?: string; error?: string }>(`/api/desk/ai-reply`, {
     method: "POST",
     body: "{}",
   })

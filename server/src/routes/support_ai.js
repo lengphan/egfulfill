@@ -503,8 +503,15 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
            and not coalesce((meta->>'internal')::boolean, false)
          order by created_at asc, id asc limit 20`, [threadId]);
     const messages = toMessages(hist.rows);
-    if (!messages.length) return { ok: false, empty: true };
-    if (messages[messages.length - 1].role !== 'user') return { ok: true, skipped: true };
+    // SAY WHY. Both of these are deliberate no-ops, and both used to return a bare flag the
+    // client rendered as nothing — so "the assistant declined to answer" and "the assistant is
+    // broken" looked identical on screen, which is exactly how this became undiagnosable.
+    // `reason` is for a human: toMessages() drops bodiless rows, so an image posted with no
+    // caption disappears from the model's view and the last turn it can see is our own reply.
+    if (!messages.length) return { ok: false, empty: true, reason: 'no readable messages in this thread yet' };
+    if (messages[messages.length - 1].role !== 'user') {
+      return { ok: true, skipped: true, reason: 'the last thing in this thread is my own reply — attachments without a caption are not readable, so add a line of text' };
+    }
 
     let text = '';
     try {
@@ -542,8 +549,15 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
          where order_id=$1 and not coalesce((meta->>'note')::boolean, false)
          order by created_at asc, id asc limit 20`, [threadId]);
     const messages = toMessages(hist.rows);
-    if (!messages.length) return { ok: false, empty: true };
-    if (messages[messages.length - 1].role !== 'user') return { ok: true, skipped: true };
+    // SAY WHY. Both of these are deliberate no-ops, and both used to return a bare flag the
+    // client rendered as nothing — so "the assistant declined to answer" and "the assistant is
+    // broken" looked identical on screen, which is exactly how this became undiagnosable.
+    // `reason` is for a human: toMessages() drops bodiless rows, so an image posted with no
+    // caption disappears from the model's view and the last turn it can see is our own reply.
+    if (!messages.length) return { ok: false, empty: true, reason: 'no readable messages in this thread yet' };
+    if (messages[messages.length - 1].role !== 'user') {
+      return { ok: true, skipped: true, reason: 'the last thing in this thread is my own reply — attachments without a caption are not readable, so add a line of text' };
+    }
     const notes = noteRows.rows.map((r) => String(r.body || '').trim()).filter(Boolean);
     const system = DESK_SYSTEM + (notes.length
       ? '\n\nSAVED NOTES (the user pinned these):\n' + notes.map((n) => '- ' + n).join('\n')

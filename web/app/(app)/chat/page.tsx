@@ -393,10 +393,14 @@ export default function ChatPage() {
             setStreaming("")
             setAiNote(null)
           }
-          else if (r.ok && r.skipped) { await load(); setAiNote(null) }
+          // A deliberate no-op still has to SAY so. These two branches rendered nothing at
+          // all, which is indistinguishable from a broken assistant — and that is precisely
+          // why "it doesn't work" was undiagnosable. The server now sends a human reason.
+          else if (r.ok && r.skipped) { await load(); setAiNote(r.reason ? `Nothing to answer yet — ${r.reason}.` : "Nothing new to answer yet.") }
           else if (r.ok && r.escalated) { if (r.office) setOffice(r.office); await load(); setAiNote(queueNote(r.office ?? office)) }
           else if (r.disabled) setAiNote("The assistant is off — an admin can add the AI key in Settings → Integrations. A teammate will follow up.")
           else if (r.error) setAiNote(`Assistant couldn't reply (${r.error}). A teammate will follow up.`)
+          else if (r.empty) setAiNote(r.reason ? `Nothing to answer yet — ${r.reason}.` : "Nothing to answer yet.")
           else setAiNote(null)
         } catch {
           setAiNote("Assistant is unavailable right now — a teammate will follow up here.")
