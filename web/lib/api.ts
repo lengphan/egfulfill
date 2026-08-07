@@ -1429,12 +1429,15 @@ export function exchangeAlibaba(code: string) {
     `/api/alibaba/exchange`, { method: "POST", body: JSON.stringify({ code }) }
   )
 }
-export type AlibabaProduct = { id?: string; title?: string; image?: string; url?: string; price?: string; moq?: string | number; supplier?: string }
+/** What the live search actually returns — no MOQ and no supplier name are in the payload,
+ *  so they aren't here either. `price` is a RANGE string like "$0.88-1.05" (Alibaba prices
+ *  by quantity band), not a number. */
+export type AlibabaProduct = { id?: string | null; title?: string | null; image?: string | null; url?: string | null; price?: string | null }
 export function searchAlibaba(p: { keyword: string; page?: number; pageSize?: number }) {
   const qs = new URLSearchParams({ keyword: p.keyword })
   if (p.page) qs.set("page", String(p.page))
   if (p.pageSize) qs.set("pageSize", String(p.pageSize))
-  return api<{ products?: AlibabaProduct[]; pagination?: unknown; error?: string }>(`/api/alibaba/search?${qs}`)
+  return api<{ products?: AlibabaProduct[]; page?: number; error?: string }>(`/api/alibaba/search?${qs}`)
 }
 
 /** Flag or clear a rush. Any factory staff — the person who notices a job is urgent is

@@ -276,18 +276,30 @@ export function alibabaRoutes(app, requireAdmin) {
     if (!keyword) { reply.code(400); return { error: 'A keyword is required.' }; }
     const page = Math.max(1, parseInt(req.query?.page, 10) || 1);
     try {
+      /**
+       * param0 IS {index, size, keyword} — confirmed against the live account 2026-08-07.
+       *
+       * Not page/pageSize, which is what the collapsed docs suggested and what this sent.
+       * The gateway names one missing field at a time, so it took four probes: `index` alone
+       * asks for param0, param0 alone asks for index, index BESIDE param0 still asks for
+       * index (it has to be INSIDE it), and index+keyword then asks for `size`.
+       */
       const body = await call('/eco/buyer/product/search',
-        { param0: JSON.stringify({ keyword, page, pageSize: 20 }) },
+        { param0: JSON.stringify({ index: page, size: 20, keyword }) },
         { accessToken: row.access_token });
       const d = body?.result?.data || {};
       return {
-        total: Number(d?.pagination?.total_product_count) || 0,
-        page: Number(d?.pagination?.current) || page,
-        items: (Array.isArray(d.products) ? d.products : []).map((p) => ({
-          productId: p.product_id != null ? String(p.product_id) : null,
+        page,
+        products: (Array.isArray(d.products) ? d.products : []).map((p) => ({
+          id: p.product_id != null ? String(p.product_id) : null,
+          title: p.title || null,
           image: p.image?.main_image || null,
+          // A live product carries "$0.88-1.05" — a RANGE, as a string, because Alibaba
+          // prices by quantity band. Don't parse it to a number; there isn't one.
           price: p.price != null ? String(p.price) : null,
-          raw: p,   // kept until the response shape is confirmed against a live account
+          // permalink comes back protocol-relative ("//www.alibaba.com/..."), which is a
+          // dead link in an href on its own.
+          url: p.permalink ? (String(p.permalink).startsWith('//') ? 'https:' + p.permalink : String(p.permalink)) : null,
         })),
       };
     } catch (e) {
