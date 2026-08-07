@@ -38,6 +38,16 @@ const numOrNull = (v: string): number | null => {
   return Number.isFinite(n) ? n : null
 }
 
+/**
+ * Alibaba's CDN bakes the size into the filename ("…U.png_220x220.png"), so a row saved
+ * before the search started asking for full resolution still holds a 220px thumbnail —
+ * blurry in anything bigger than a stamp. Stripping the suffix returns the stored original
+ * (522x522 on the sample measured) at the same request count, and upgrades rows we already
+ * have rather than only new ones. A url without a suffix is returned untouched.
+ */
+const fullImg = (u?: string | null): string =>
+  typeof u === "string" ? u.replace(/_\d+x\d+\.(?:png|jpe?g|webp)$/i, "") : ""
+
 export function SourcingView() {
   const confirm = useConfirm()
   // Which view is showing, and whether the second one exists at all.
@@ -259,7 +269,15 @@ export function SourcingView() {
         </div>
       )}
 
-      {tab === "find" && <AlibabaBrowse onConnectedChange={setCanBrowse} initialQuery={incoming} />}
+      {/* MOUNTED ALWAYS, hidden when it isn't the current view — not conditionally rendered.
+          It is what reports whether Alibaba is connected (onConnectedChange), and the toggle
+          that reaches it only appears once that has been reported. Mounting it only for
+          tab === "find" made those two depend on each other: the component never ran, so
+          canBrowse stayed false, so the toggle never appeared, so nothing could ever set tab
+          to "find". The search was still there and simply could not be reached. */}
+      <div className={tab === "find" ? undefined : "hidden"}>
+        <AlibabaBrowse onConnectedChange={setCanBrowse} initialQuery={incoming} />
+      </div>
 
       <div className={canBrowse && tab === "find" ? "hidden" : undefined}>
       <SectionCard>
@@ -322,7 +340,7 @@ export function SourcingView() {
                             className="flex items-center gap-2 rounded-lg border border-border p-2 text-left transition-colors hover:border-primary/50 hover:bg-accent">
                       {(l.thumb || l.image)
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={l.thumb || l.image || ""} alt="" className="size-10 shrink-0 rounded object-cover" />
+                        ? <img src={fullImg(l.thumb || l.image)} alt="" className="size-10 shrink-0 rounded object-cover" />
                         : <span className="size-10 shrink-0 rounded bg-muted" />}
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-xs font-medium">{l.title}</span>
@@ -392,7 +410,7 @@ export function SourcingView() {
                        onChange={(e) => setDraft({ ...draft, image: e.target.value || null })} />
                 {draft.image && /^https?:\/\//i.test(draft.image) && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={draft.image} alt="" className="size-9 shrink-0 rounded border border-border object-cover" />
+                  <img src={fullImg(draft.image)} alt="" className="size-9 shrink-0 rounded border border-border object-cover" />
                 )}
               </div>
             </label>
@@ -444,7 +462,7 @@ export function SourcingView() {
                       <td className="py-2 pl-4 pr-0">
                         {r.image
                           // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={r.image} alt="" className="size-9 rounded border border-border object-cover" />
+                          ? <img src={fullImg(r.image)} alt="" className="size-9 rounded border border-border object-cover" />
                           : <span className="flex size-9 items-center justify-center rounded border border-dashed border-border text-3xs text-muted-foreground">—</span>}
                       </td>
                       <td className="px-4 py-2 font-medium">{r.title}</td>

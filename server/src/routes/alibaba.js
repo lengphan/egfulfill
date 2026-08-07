@@ -31,6 +31,25 @@ import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 
+/**
+ * Alibaba's CDN bakes the requested size into the filename: the search returns
+ * "…U.png_220x220.png" — the ORIGINAL name ("…U.png") with "_220x220.png" appended. So the
+ * full-size url is the original with that whole suffix removed, NOT a swapped extension:
+ * capturing and re-appending the trailing ".png" yields "…U.png.png", which 404s.
+ *
+ * Asking for a bigger suffix (_720x720) does not upscale — the CDN caps at the stored
+ * original — so stripping is both the simplest and the best available.
+ *
+ * This was CALLED at the mapper below and never defined anywhere: a ReferenceError thrown
+ * on the first product of every search, which took the whole search down.
+ */
+function fullSizeImage(u) {
+  const v = String(u || '').trim();
+  if (!v) return null;
+  return v.replace(/_\d+x\d+\.(?:png|jpe?g|webp)$/i, '');
+}
+
+
 // Host is configurable because the docs render it as a literal "url +" placeholder; this is
 // the documented IOP gateway host, overridable without a code change if it differs per app.
 const DEFAULT_BASE = 'https://openapi-api.alibaba.com/rest';
