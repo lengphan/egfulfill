@@ -375,7 +375,14 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     const threadId = String((req.body && req.body.threadId) || '');
     if (threadId.indexOf('support-') !== 0) { reply.code(400); return { error: 'threadId must be a support-* thread' }; }
     const sellerId = threadId.slice('support-'.length);
-    const hist = await q(`select sender_role, body from order_messages where order_id=$1 order by created_at asc, id asc limit 20`, [threadId]);
+    // NEWEST 20, re-ordered oldest-first for the model. `order by created_at asc limit 20`
+    // takes the OLDEST 20 — see the note on the auto-reply query below.
+    const hist = await q(
+      `select sender_role, body from (
+         select sender_role, body, created_at, id from order_messages
+          where order_id=$1
+          order by created_at desc, id desc limit 20
+       ) t order by t.created_at asc, t.id asc`, [threadId]);
     const messages = toMessages(hist.rows);
     if (!messages.length) return { ok: false, empty: true };
     try {
@@ -497,11 +504,20 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // human in the loop, so a brief in the model's context could bleed factory-internal
     // state into a seller-facing answer. Mirrors the seller read filter in orders.js.
     // (ai-draft deliberately does NOT filter: a human reviews that draft before sending.)
+    // THE NEWEST 20, NOT THE OLDEST. `order by created_at asc ... limit 20` takes the first
+    // 20 rows the thread ever had — so once a conversation passed 20 messages the model's
+    // view froze on its opening, and the newest turn it could see was whatever was said 20
+    // messages ago. When that turn was one of OUR replies, the last-turn-must-be-user check
+    // below skipped every request from then on: the assistant went silent permanently and
+    // nothing said why. Order desc to take the recent window, then restore chronological
+    // order, because toMessages() builds the transcript in sequence.
     const hist = await q(
-      `select sender_role, body from order_messages
-         where order_id=$1
-           and not coalesce((meta->>'internal')::boolean, false)
-         order by created_at asc, id asc limit 20`, [threadId]);
+      `select sender_role, body from (
+         select sender_role, body, created_at, id from order_messages
+          where order_id=$1
+            and not coalesce((meta->>'internal')::boolean, false)
+          order by created_at desc, id desc limit 20
+       ) t order by t.created_at asc, t.id asc`, [threadId]);
     const messages = toMessages(hist.rows);
     // SAY WHY. Both of these are deliberate no-ops, and both used to return a bare flag the
     // client rendered as nothing — so "the assistant declined to answer" and "the assistant is
@@ -541,13 +557,17 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     const threadId = 'desk-' + req.user.sub;
     // Pinned notes (meta.note) become durable context; everything else is recent chat.
     const noteRows = await q(
-      `select body from order_messages
-         where order_id=$1 and coalesce((meta->>'note')::boolean, false)
-         order by created_at asc, id asc limit 50`, [threadId]);
+      `select body from (
+         select body, created_at, id from order_messages
+          where order_id=$1 and coalesce((meta->>'note')::boolean, false)
+          order by created_at desc, id desc limit 50
+       ) t order by t.created_at asc, t.id asc`, [threadId]);
     const hist = await q(
-      `select sender_role, body from order_messages
-         where order_id=$1 and not coalesce((meta->>'note')::boolean, false)
-         order by created_at asc, id asc limit 20`, [threadId]);
+      `select sender_role, body from (
+         select sender_role, body, created_at, id from order_messages
+          where order_id=$1 and not coalesce((meta->>'note')::boolean, false)
+          order by created_at desc, id desc limit 20
+       ) t order by t.created_at asc, t.id asc`, [threadId]);
     const messages = toMessages(hist.rows);
     // SAY WHY. Both of these are deliberate no-ops, and both used to return a bare flag the
     // client rendered as nothing — so "the assistant declined to answer" and "the assistant is
