@@ -99,14 +99,27 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const cands = [d.img, d.image, d.hero, Array.isArray(d.images) ? d.images[0] : null,
       d.colorImages && typeof d.colorImages === 'object' ? Object.values(d.colorImages)[0] : null];
     for (const c of cands) {
-      if (typeof c === 'string' && /^(https?:\/\/|data:image\/)/i.test(c)) return c;
+      if (renderable(c)) return c;
     }
     return null;
   };
 
-  /** Only a renderable URL survives. Same rule as publicImage, applied per colourway. */
-  const publicUrlOrNull = (v) =>
-    (typeof v === 'string' && /^(https?:\/\/|data:image\/)/i.test(v)) ? v : null;
+  /**
+   * Is there an image here we could actually serve?
+   *
+   * Three shapes reach this, and ALL THREE are real:
+   *   https://… / data:image/…   a plain picture someone attached
+   *   /api/ss/img?u=…            a SUPPLIER image. ss.js's ssImg() stores the proxy path,
+   *                              not the origin URL, because S&S's CDN 403s a cross-origin
+   *                              browser load. Its own comment says "returns a RELATIVE url".
+   *
+   * The third was rejected, and that is why the public catalogue had no photographs at all:
+   * every supplier-published style — which is most of them — stores exactly that shape, so
+   * `image` came out null for the product AND for all of its colourways. Live check on the
+   * published catalogue: 1 product, 0 images, 4 colourways, 0 with an image.
+   */
+  const renderable = (v) =>
+    typeof v === 'string' && (/^(https?:\/\/|data:image\/)/i.test(v) || v.startsWith('/api/ss/img'));
 
   /**
    * A URL-safe handle for one product.
@@ -143,7 +156,13 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const colorImages = d.colorImages && typeof d.colorImages === 'object' ? d.colorImages : {};
     const colors = Object.keys(colorImages)
       .filter((name) => typeof name === 'string' && name.trim())
-      .map((name) => ({ name, image: publicUrlOrNull(colorImages[name]) }));
+      // OUR url, not the supplier's — see publicImageUrl below.
+      .map((name) => ({
+        name,
+        image: renderable(colorImages[name])
+          ? `/api/public/products/${slug}/img?c=${encodeURIComponent(name)}`
+          : null,
+      }));
     // `method` is a single value on the product today; emitted as a list so the page can
     // render a technique picker without the shape changing when a product carries several.
     const methods = Array.isArray(d.methods)
@@ -152,7 +171,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return {
       slug,
       name: String(d.name),
-      image: publicImage(d),
+      image: publicImage(d) ? `/api/public/products/${slug}/img` : null,
       category: typeof d.category === 'string' ? d.category : null,
       price,
       methods,
@@ -209,6 +228,73 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const product = (await publicProducts()).find((p) => p.slug === slug);
     if (!product) { reply.code(404); return { error: 'Not found' }; }
     return { product };
+  });
+
+  /**
+   * The picture for one published product, or one of its colourways.
+   *
+   * WHY THIS EXISTS RATHER THAN PUBLISHING THE IMAGE URL.
+   *
+   * Supplier images are stored as `/api/ss/img?u=https://cdn.ssactivewear.com/…`. Putting
+   * that in the public JSON would work — the proxy is already unauthenticated — but the
+   * query string NAMES OUR SUPPLIER, on the open internet, which is the one thing the
+   * public shape is built to withhold ("publishing it tells the world who makes our
+   * products and lets anyone price against our supplier"). Whitelisting the proxy path
+   * would have fixed the missing photos by leaking exactly what the allow-list protects.
+   *
+   * So the public URL is OURS and says nothing: /api/public/products/<slug>/img. For a
+   * proxied supplier image the bytes are re-dispatched INTERNALLY through /api/ss/img —
+   * a 302 would defeat the point, since the Location header would carry the supplier URL.
+   * Reusing that route rather than re-implementing the fetch keeps the caching, the host
+   * allow-list and the content-type handling in one place.
+   *
+   * WHERE THIS STOPS, stated because it would otherwise read as a stronger promise than it
+   * is: a plain https value IS still 302'd to wherever it points, so a product whose image
+   * was stored as a bare supplier CDN address (cdnm.sanmar.com, say) still reveals that
+   * host in the redirect. Streaming those instead would mean fetching an arbitrary
+   * attacker-influenceable URL from our own network, which is the request-forgery hole the
+   * /api/ss/img allow-list exists to prevent — so the fix is to widen THAT allow-list and
+   * route the host through it, not to make this endpoint fetch anything it is handed.
+   */
+  app.get('/api/public/products/:slug/img', async (req, reply) => {
+    const slug = String((req.params && req.params.slug) || '').toLowerCase();
+    const want = req.query && req.query.c ? String(req.query.c) : null;
+
+    // Re-read the ROW, not the public shape — the shape has already replaced the address
+    // with the opaque url we are currently answering.
+    const r = await q(
+      `select data from catalog_products where in_catalog = true order by created_at desc limit 60`
+    ).catch(() => ({ rows: [] }));
+    const seen = new Map();
+    let raw = null;
+    for (const row of r.rows) {
+      if (!row.data || !row.data.name) continue;
+      const base = slugify(row.data.name);
+      if (!base) continue;
+      const n = (seen.get(base) ?? 0) + 1;
+      seen.set(base, n);
+      if ((n === 1 ? base : `${base}-${n}`) !== slug) continue;
+      const ci = row.data.colorImages && typeof row.data.colorImages === 'object' ? row.data.colorImages : {};
+      raw = want ? ci[want] : publicImage(row.data);
+      break;
+    }
+    if (!renderable(raw)) { reply.code(404); return { error: 'Not found' }; }
+
+    // A plain picture — hand back the address, there is nothing to hide in it.
+    if (/^https?:\/\//i.test(raw)) { reply.redirect(raw); return; }
+    if (/^data:image\//i.test(raw)) {
+      const m = /^data:([^;]+);base64,(.*)$/i.exec(raw);
+      if (!m) { reply.code(404); return { error: 'Not found' }; }
+      reply.header('Content-Type', m[1]);
+      reply.header('Cache-Control', 'public, max-age=604800, immutable');
+      return Buffer.from(m[2], 'base64');
+    }
+    const res = await app.inject({ method: 'GET', url: raw });
+    reply.code(res.statusCode);
+    const ct = res.headers['content-type'];
+    if (ct) reply.header('Content-Type', ct);
+    reply.header('Cache-Control', 'public, max-age=604800, immutable');
+    return res.rawPayload;
   });
 
   app.get('/api/catalog_products', { preHandler: requireAuth }, async (req) => {

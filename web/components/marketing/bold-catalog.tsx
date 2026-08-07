@@ -33,6 +33,14 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
     const k = p.category?.trim() || "More"
     groups.set(k, [...(groups.get(k) ?? []), p])
   }
+  // GROUPING HAS TO EARN ITS KEEP. Each heading is display-sized, so a category holding one
+  // product produced a giant title above a single card with three empty cells beside it —
+  // four of those in a row made a young catalogue look broken rather than small. Below the
+  // threshold everything renders as one dense grid, which reads as deliberate at four
+  // products and still scales, because the headings return the moment there is enough to
+  // sort. Category is not lost: it stays on the card.
+  const grouped = list.length >= 8 && [...groups.values()].filter((g) => g.length > 1).length >= 2
+  const sections: [string, PublicProduct[]][] = grouped ? [...groups.entries()] : [["", list]]
 
   return (
     <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
@@ -59,10 +67,10 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
             </p>
           </Rise>
         ) : (
-          [...groups.entries()].map(([cat, items], gi) => (
-            <div key={cat} className={gi ? "mt-16" : ""}>
-              <h2 className="font-display font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>{cat}</h2>
-              <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          sections.map(([cat, items], gi) => (
+            <div key={cat || "all"} className={gi ? "mt-16" : ""}>
+              {cat && <h2 className="font-display font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>{cat}</h2>}
+              <div className={(cat ? "mt-8" : "") + " grid gap-4 sm:grid-cols-2 lg:grid-cols-4"}>
                 {items.map((p, i) => (
                   /* Keyed by SLUG, not name. The server already disambiguated duplicate names
                      with an index suffix, so the slug is the unique one — two products sharing
@@ -90,6 +98,12 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                       )}
                     </div>
                     <div className="p-4">
+                      {/* When the page ISN'T split into category sections, the category
+                          moves onto the card — so a single grid still tells you what each
+                          thing is, and nothing is lost by dropping the headings. */}
+                      {!grouped && p.category && (
+                        <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">{p.category}</div>
+                      )}
                       <div className="line-clamp-2 text-[15px] font-semibold leading-snug">{p.name}</div>
                       <div className="mt-1.5 text-[13px] text-black/50">
                         from <span className="font-bold text-[#0B0B0C]">{usd(p.price)}</span>
