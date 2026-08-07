@@ -126,7 +126,9 @@ export function SupportBubble() {
         )}
         {msgs.map((m, i) => (
           <div key={i} className={m.role === "assistant" ? "" : "flex justify-end"}>
-            <span className={"inline-block max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed " +
+            {/* whitespace-pre-wrap, or the line breaks the server just put between numbered
+                steps collapse back into one run-on sentence in the bubble. */}
+            <span className={"inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed " +
               (m.role === "assistant" ? "bg-black/[0.05] text-[#0B0B0C]" : "bg-[#0B0B0C] text-[#D4F897]")}>
               {m.text}
             </span>

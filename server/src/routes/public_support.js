@@ -61,7 +61,32 @@ NEVER do any of the following:
 - Invent a policy, a lead time, a discount, or a product we do not list.
 - Ask for a password, card number or any credential.
 
-If you do not know, say so and offer to pass it to a person. That is always a good answer.`;
+If you do not know, say so and offer to pass it to a person. That is always a good answer.
+
+FORMAT — this is a small chat bubble, not a document:
+- Write PLAIN TEXT. No markdown at all: no **bold**, no *italics*, no #headings, no backticks.
+  Asterisks are rendered literally here, so they arrive as visible clutter.
+- Keep it to two or three short sentences where you can.
+- If you must list steps, put each on its OWN LINE starting with "1." "2." "3." — a real line
+  break between them, never a run-on sentence.
+- Reply in the language the visitor wrote in.`;
+
+/**
+ * Strip markdown the model emitted anyway.
+ *
+ * The prompt says plain text, but a prompt is a request and this is a guarantee. Asterisks
+ * render literally in the bubble, so **bold** arrived as visible clutter. Also forces a real
+ * line break before "2." style steps, which is the other half of what made a numbered list
+ * come out as one run-on sentence.
+ */
+const deMarkdown = (t) => String(t || '')
+  .replace(/\*\*(.+?)\*\*/g, '$1')          // **bold**
+  .replace(/(^|\s)\*(\S[^*]*?)\*/g, '$1$2')  // *italic*, not a bare bullet asterisk
+  .replace(/`{1,3}([^`]*)`{1,3}/g, '$1')      // `code`
+  .replace(/^#{1,6}\s+/gm, '')                // # headings
+  .replace(/(?<!\n)\s+(\d\.)\s/g, '\n$1 ')   // run-on "1. x 2. y" -> its own line
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
 
 const clean = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const validEmail = (e) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(String(e || '').trim());
@@ -147,10 +172,11 @@ export function publicSupportRoutes(app) {
                notice: 'I couldn\'t answer that one — a person will follow up by email.' };
     }
 
-    const withReply = [...messages, { role: 'assistant', text: String(answer), at: new Date().toISOString() }];
+    const shaped = deMarkdown(answer);
+    const withReply = [...messages, { role: 'assistant', text: shaped, at: new Date().toISOString() }];
     await q('update public_support set messages=$2::jsonb, updated_at=now() where id=$1',
       [id, JSON.stringify(withReply)]).catch(() => {});
-    return { conversationId: id, messages: withReply, reply: String(answer) };
+    return { conversationId: id, messages: withReply, reply: shaped };
   });
 
   /**
