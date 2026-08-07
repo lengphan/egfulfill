@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, ArrowUUpLeft } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, ArrowUUpLeft, BookmarkSimple } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -1274,7 +1274,26 @@ export function OrdersHub() {
               // below (pinned last), so its large action logic is untouched.
               const cell: Record<FactoryColId, ReactNode> = {
                 status: <span className="justify-self-start"><StageBadge status={stage} /></span>,
-                order: <div className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</div>,
+                order: (
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {/* A SOLID GLYPH, not a coloured chip. The status palette is spoken for
+                        — violet is working, indigo is pending — and a purple badge here
+                        would read as another stage. A filled bookmark is a different kind of
+                        object, so it sits beside the stage badge without competing with it.
+                        rushed_at earns its keep as the tooltip: "flagged" with no when is
+                        the sort of flag that stays on an order for a fortnight. */}
+                    {isRush(o) && (
+                      <span
+                        className="flex shrink-0 items-center text-primary"
+                        title={o.rushed_at ? `Rush — flagged ${fmtDate(o.rushed_at)}` : "Rush"}
+                        aria-label="Rush"
+                      >
+                        <BookmarkSimple size={13} weight="fill" />
+                      </span>
+                    )}
+                    <span className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</span>
+                  </div>
+                ),
                 tracking: (
                   <div className="flex min-w-0 items-center gap-1.5">
                     {track ? (
@@ -1360,7 +1379,14 @@ export function OrdersHub() {
                       flex-1 — and each was a refinement of the wrong shape. The seller
                       table has been a real table all along; this is the same idea, driven
                       from the same lib/order-columns.ts. */}
-                  <div className="mb-3 grid items-center gap-x-3 gap-y-1" style={{ gridTemplateColumns: gridTmpl }}>
+                  <div
+                    // The bar down the left edge is the half that works at speed: the glyph
+                    // tells you once you're reading the row, this tells you while you scroll
+                    // past it. Negative margin so it sits on the row's edge without shifting
+                    // any column.
+                    className={"mb-3 grid items-center gap-x-3 gap-y-1" + (isRush(o) ? " -ml-3 border-l-2 border-primary pl-2.5" : "")}
+                    style={{ gridTemplateColumns: gridTmpl }}
+                  >
                     {/* A box on EVERY row, disabled where it can't be used. Rendering it
                         only on dispatchable rows reads as a half-built feature: most orders
                         have no label yet, so most rows had no box, and a column that appears
@@ -1603,9 +1629,7 @@ export function OrdersHub() {
                                         who notices a job is urgent is usually mid-task, and a
                                         flag two menus deep is a flag nobody sets. */}
                                     <DropdownMenuItem onClick={() => toggleRush(o)}>
-                                      {isRush(o)
-                                        ? tl("ui", "Clear rush")
-                                        : tl("ui", "Mark as rush")}
+                                      {isRush(o) ? tl("ui", "Clear rush") : tl("ui", "Rush")}
                                     </DropdownMenuItem>
                                     {exc.map((s) => (
                                       <DropdownMenuItem
