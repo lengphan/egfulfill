@@ -54,13 +54,25 @@ const fmtDate = (s: string | null) => {
 // ORDER IS THE MESSAGE: what a seller can connect today comes first, what they can't
 // comes last. Etsy · TikTok · Shopify are live; WooCommerce is next to be built; Amazon and
 // Walmart trail because both are gated on a marketplace approving us, not on our work.
-const CHANNELS: { key: string; name: string; live: boolean; soon?: string }[] = [
-  { key: "etsy", name: "Etsy", live: true },
-  { key: "tiktok", name: "TikTok Shop", live: true },
-  { key: "shopify", name: "Shopify", live: true },
-  { key: "woocommerce", name: "WooCommerce", live: false },
-  { key: "amazon", name: "Amazon", live: false },
-  { key: "walmart", name: "Walmart", live: false },
+//
+// `markH` is the rendered height of that brand's file, in px, and it is DELIBERATELY
+// different for every one. A single height across all six looked wrong because these files
+// are not comparable: measuring the visible ink inside each asset gives
+//
+//   woocommerce  98% of its canvas is ink      amazon   52% — half the file is padding
+//   tiktok      100%, and it is a STACKED lockup (icon over "TikTok Shop"), not a wordmark
+//
+// so at a shared 48px, Woo showed 47px of ink and Amazon showed 25px. These heights
+// normalise the INK instead of the file: ~28-30px of mark for the single-line wordmarks,
+// more for Amazon to cancel its padding, more again for TikTok so the word under its icon
+// stays legible. Re-measure before changing one; don't eyeball it.
+const CHANNELS: { key: string; name: string; live: boolean; soon?: string; markH: number }[] = [
+  { key: "etsy", name: "Etsy", live: true, markH: 32 },
+  { key: "tiktok", name: "TikTok Shop", live: true, markH: 46 },
+  { key: "shopify", name: "Shopify", live: true, markH: 28 },
+  { key: "woocommerce", name: "WooCommerce", live: false, markH: 27 },
+  { key: "amazon", name: "Amazon", live: false, markH: 58 },
+  { key: "walmart", name: "Walmart", live: false, markH: 28 },
 ]
 /**
  * A channel's own logo, UNALTERED, from `public/channels/<key>.svg`.
@@ -75,31 +87,41 @@ const CHANNELS: { key: string; name: string; live: boolean; soon?: string }[] = 
  * module scope — a component declared inside render violates react-hooks/static-components
  * and remounts on every parent render, which would re-trigger the error state.
  */
-function ChannelMark({ channelKey, name }: { channelKey: string; name: string }) {
+function ChannelMark({ channelKey, name, markH }: { channelKey: string; name: string; markH: number }) {
   // svg → png → icon. Brand press kits give one or the other and it's not worth caring
   // which; public/suppliers already stores PNGs (otto.png, ss.png), so both must work.
   const [step, setStep] = useState(0)
   const src = step === 0 ? `/channels/${channelKey}.svg` : `/channels/${channelKey}.png`
   // CONSTRAINED BY HEIGHT, NOT BOXED. These are wordmarks — WooCommerce's is 3.8:1 and
-  // Amazon's 2.3:1 — so a square plate shrinks them to a 24×6 smear. A fixed height with
-  // free width is the only arrangement in which marks of different aspect ratios read as
-  // the same size, and it's how the brands' own guidelines size them.
+  // Amazon's 2.3:1 — so a square plate shrinks them to a 24×6 smear. Height with free width
+  // is the only arrangement in which marks of different aspect ratios read alike, and it's
+  // how the brands' own guidelines size them.
+  //
+  // The height is PER BRAND (see markH on CHANNELS) because equal file heights do not give
+  // equal-looking marks — the files differ in how much of themselves is ink.
+  //
+  // The row is taller than any mark so the tallest file (Amazon, mostly padding) is not
+  // clipped and every mark centres on one baseline regardless of its own height.
   //
   // No tinted plate behind them either: each mark carries its own colour and several ship
   // with a white background baked in, so a coloured plate frames them badly.
   return (
-    <span className="flex h-12 items-center">
+    <span className="flex h-[60px] items-center">
       {step > 1 ? (
         <span className="flex size-12 items-center justify-center rounded-lg bg-muted">
           <Storefront size={24} weight="duotone" className="text-muted-foreground" />
         </span>
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- a static local asset with an
-        // onError fallback; next/image gives no benefit and swallows the 404 we rely on.
+        // A static local asset with an onError fallback; next/image gives no benefit and
+        // swallows the 404 we rely on. (The directive must sit on the line IMMEDIATELY
+        // before the element — with the explanation above it, "next line" was this comment,
+        // so the disable did nothing and the rule fired anyway.)
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
           alt={`${name} logo`}
-          className="max-h-12 w-auto max-w-[180px] object-contain object-left"
+          style={{ height: markH }}
+          className="w-auto max-w-[180px] object-contain object-left"
           onError={() => setStep((s) => s + 1)}
         />
       )}
@@ -501,7 +523,7 @@ export function StoresManager() {
               transition={{ duration: 0.35, delay: i * 0.05 }}
               className="flex flex-col rounded-2xl border border-border bg-card p-5"
             >
-              <ChannelMark channelKey={ch.key} name={ch.name} />
+              <ChannelMark channelKey={ch.key} name={ch.name} markH={ch.markH} />
               <div className="flex-1" />
               {ch.key === "shopify" ? (
                 <div className="mt-4 space-y-2">
