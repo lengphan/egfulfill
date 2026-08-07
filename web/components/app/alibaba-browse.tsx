@@ -21,6 +21,21 @@ import { getUser } from "@/lib/auth"
  * no supplier name, no order volume. Inventing a "score" from four fields would be the
  * dishonest version of the SpyDeck card rather than the equivalent of it.
  */
+/** Starting points, not a ranking. Broad enough that each returns a full grid, and skewed
+ *  to what this factory actually decorates. */
+const SEEDS = [
+  "blank t-shirt cotton", "canvas tote bag", "ceramic mug", "embroidered cap",
+  "hoodie fleece blank", "apron canvas", "pet accessories", "phone case blank",
+]
+
+/**
+ * Alibaba returns titles with the quotes escaped — `28\" Modern Cat Tree` — and React
+ * renders the backslash literally, so the grid showed `28\" Modern…`. Unescape rather than
+ * strip: the inch mark is part of the product name and dropping it changes the size.
+ */
+const cleanTitle = (t?: string | null) =>
+  String(t || "").replace(/\\(["'\\])/g, "$1").trim()
+
 export function AlibabaBrowse({ onConnectedChange, initialQuery }: {
   onConnectedChange?: (v: boolean) => void
   /** Handed in from a SpyDeck query, so the search is already running when you arrive. */
@@ -73,13 +88,34 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery }: {
     return () => clearTimeout(t)
   }, [initialQuery, connected, run])
 
+  /**
+   * SOMETHING TO LOOK AT BEFORE ANYONE TYPES.
+   *
+   * An empty grid behind a search box asks you to already know what you want, which is the
+   * opposite of what sourcing is for. So one seed category runs on arrival.
+   *
+   * It is NOT called trending, and it shows no counts or rankings — we have no sales data
+   * from Alibaba, and a "popular" badge over an arbitrary keyword search would be a
+   * fabricated stat. It is a starting point, and it says so.
+   *
+   * The seed rotates by day-of-year so the page isn't the same wall every morning, while
+   * staying stable within a day — a grid that reshuffles on every visit makes it impossible
+   * to go back to something you just saw.
+   */
+  useEffect(() => {
+    if (initialQuery || connected !== true) return
+    const seed = SEEDS[Math.floor(Date.now() / 864e5) % SEEDS.length]
+    const t = setTimeout(() => run(seed, 1), 0)
+    return () => clearTimeout(t)
+  }, [initialQuery, connected, run])
+
   const addProspect = async (p: AlibabaProduct) => {
     const id = String(p.id ?? p.url ?? "")
     if (!id || saved.has(id)) return
     setSavingId(id); setErr(null)
     try {
       await saveSourcing({
-        title: (p.title || "Alibaba product").slice(0, 120),
+        title: (cleanTitle(p.title) || "Alibaba product").slice(0, 120),
         url: p.url || "",
         image: p.image || null,
         // Alibaba quotes a RANGE ("$0.88-1.05") because it prices by quantity band. There is
@@ -135,6 +171,15 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery }: {
 
         {rows !== null && rows.length > 0 && (
           <>
+          {/* Say WHOSE search this is. A grid the reader didn't ask for, with no label,
+              reads as a result they somehow triggered. "Starting points" is also the
+              honest word: we have no sales data from Alibaba, so it is not trending and
+              carries no counts — it is a seeded category, and the reader can tell. */}
+          {!q.trim() && (
+            <p className="mb-3 text-xs text-muted-foreground">
+              Starting points while you decide what to look for — search above for anything specific.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {rows.map((p) => {
               const id = String(p.id ?? p.url ?? "")
@@ -155,7 +200,7 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery }: {
                     )}
                   </div>
                   <div className="flex flex-1 flex-col gap-2 p-3">
-                    <p className="line-clamp-2 text-xs leading-snug">{p.title}</p>
+                    <p className="line-clamp-2 text-xs leading-snug">{cleanTitle(p.title)}</p>
                     <div className="mt-auto flex items-center gap-1.5">
                       <Button
                         size="sm" variant={isSaved ? "outline" : "default"} className="h-7 flex-1 text-2xs"
