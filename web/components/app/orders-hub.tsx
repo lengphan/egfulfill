@@ -1357,7 +1357,9 @@ export function OrdersHub() {
                   {/* A BOOKMARK CLIPPED OVER THE SEPARATOR. top-0 puts its top edge on the
                       row's dividing line so it hangs DOWN from it, the way a bookmark sits
                       over the edge of a page — floating it above the line reads as a stray
-                      icon belonging to neither row.
+                      icon belonging to neither row. The -2.3px is MEASURED, not nudged:
+                      Phosphor pads that much inside its viewBox, so top-0 put the SVG's box
+                      on the line and left the painted glyph below it.
 
                       Absolutely positioned, so it costs no layout: an earlier version put
                       the glyph in the Order cell and pushed a flagged row's number out of
@@ -1369,7 +1371,7 @@ export function OrdersHub() {
                       read as another stage. */}
                   {isRush(o) && (
                     <span
-                      className="pointer-events-none absolute left-3 top-0 text-primary"
+                      className="pointer-events-none absolute left-3 top-[-2.3px] text-primary"
                       title={o.rushed_at ? `Rush — flagged ${fmtDate(o.rushed_at)}` : "Rush"}
                       aria-label="Rush"
                     >
@@ -1649,9 +1651,17 @@ export function OrdersHub() {
                                         opposite action and the most reachable one: the person
                                         who notices a job is urgent is usually mid-task, and a
                                         flag two menus deep is a flag nobody sets. */}
-                                    <DropdownMenuItem onClick={() => toggleRush(o)}>
-                                      {isRush(o) ? tl("ui", "Clear rush") : tl("ui", "Rush")}
-                                    </DropdownMenuItem>
+                                    {/* Offered at every stage EXCEPT the ones where the
+                                        order is finished. A rush is "move this up the
+                                        queue", and a shipped or cancelled order has no
+                                        queue left to move up. Clearing stays available on a
+                                        shipped order only if one is somehow still flagged,
+                                        so a stuck flag is never unremovable. */}
+                                    {(stage !== "shipped" && stage !== "cancelled") || isRush(o) ? (
+                                      <DropdownMenuItem onClick={() => toggleRush(o)}>
+                                        {isRush(o) ? tl("ui", "Clear rush") : tl("ui", "Rush")}
+                                      </DropdownMenuItem>
+                                    ) : null}
                                     {exc.map((s) => (
                                       <DropdownMenuItem
                                         key={s.id}

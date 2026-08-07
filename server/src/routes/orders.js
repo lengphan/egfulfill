@@ -1375,6 +1375,28 @@ export function ordersRoutes(app, requireAuth) {
       [status || '', req.params.id, val]);
     audit(req, 'item.status', { entityType: 'order', entityId: req.params.id,
       before: { sku, status: (pre.rows[0] && pre.rows[0].factory_status) || '' }, after: { sku, status: status || '' } });
+    /**
+     * A rush ENDS when the order does — and only then.
+     *
+     * It deliberately survives every other stage change: the whole point is that it stays
+     * visible from wherever it was raised until the parcel leaves, and a flag that cleared
+     * on the next stage would have to be re-raised at each step by someone who no longer
+     * remembers why. But a shipped order pinned to the top of the queue forever is the
+     * wallpaper problem the Overdue count already showed us, so shipped clears it.
+     *
+     * Only when EVERY line is shipped: one line of a three-line order going out is not the
+     * order going out.
+     */
+    if (normalizeStage(status) === 'shipped') {
+      const left = await q(
+        `select 1 from order_items where order_id=$1 and coalesce(factory_status,'') <> 'shipped' limit 1`,
+        [req.params.id]
+      ).catch(() => ({ rowCount: 1 }));
+      if (!left.rowCount) {
+        await q('update orders set rush=false, rushed_by=null, rushed_at=null where id=$1 and rush=true',
+          [req.params.id]).catch(() => {});
+      }
+    }
     // Tell whoever pushed this order that it moved. Fire and forget — a partner's
     // endpoint being down must never fail the floor's status write.
     notifyOrderEvent(req.params.id, normalizeStage(status) === 'shipped' ? 'order.shipped' : 'order.status_changed',
