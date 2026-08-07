@@ -44,6 +44,7 @@ import { adminSecretsRoutes } from './routes/admin_secrets.js';
 import { wilcomRoutes } from './routes/wilcom.js';
 import { usageRoutes } from './routes/usage.js';
 import { auditRoutes } from './audit.js';
+import { publicSupportRoutes } from './routes/public_support.js';
 import { supportAiRoutes } from './routes/support_ai.js';
 import { factorySettingsRoutes } from './routes/factory_settings.js';
 import { navVisibilityRoutes } from './routes/nav_visibility.js';
@@ -443,7 +444,8 @@ adminSecretsRoutes(app, requireAdmin);                 // ADMIN: masked last-4 o
 wilcomRoutes(app, requireDesignStaff);                  // Wilcom EWA digitising — operator/designer/admin, NOT warehouse: every call bills
 usageRoutes(app, requireAdmin, requireAdmin);          // ADMIN: what the integrations COST us per platform + threshold config — not needed to pick, print or ship
 auditRoutes(app, requireAdmin, requireAuth);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
-supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
+supportAiRoutes(app, requireAuth, requireStaff);
+publicSupportRoutes(app);                              // UNAUTHENTICATED marketing-site chat bubble — rate-limited and identity-gated because every message is a paid model call       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
 factorySettingsRoutes(app, requireAuth, requireStaff, requireAdmin); // staff READ the fee/shipping (the factory needs it); ADMIN writes them — they are pricing levers
 navVisibilityRoutes(app, requireAuth);                 // role → hidden nav pages/tabs (admin-editable, HIDE-only; never grants access)
 purchaseRoutes(app, requireAuth, requireAdmin, requireAdmin);            // ADMIN: purchase orders — commits company money + exposes unit cost across every blank. Receiving stock stays warehouse (inventory.js)

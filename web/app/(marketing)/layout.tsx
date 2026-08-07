@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { SiteHeader } from "@/components/marketing/site-header"
+import { SupportBubble } from "@/components/marketing/support-bubble"
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   // The header moved to components/marketing/site-header.tsx so it can read the route and
@@ -37,6 +38,10 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           </span>
         </div>
       </footer>
+
+      {/* On every marketing page, because the question a visitor wants to ask arrives while
+          they are reading pricing or a product — not after they have found a contact page. */}
+      <SupportBubble />
     </div>
   )
 }
