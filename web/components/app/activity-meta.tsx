@@ -2,6 +2,7 @@ import type { ComponentType } from "react"
 import {
   X, Plus, LinkSimple, CurrencyDollar, ArrowRight, PencilSimple, Printer,
   Barcode, Truck, PaperPlaneTilt, CheckCircle, File, ArrowUUpLeft, Stack,
+  Storefront, ShieldCheck,
 } from "@phosphor-icons/react"
 import type { AuditRow } from "@/lib/api"
 
@@ -29,6 +30,14 @@ export type ActionMeta = {
 }
 
 const REGISTRY: Record<string, { label: string; verb: string; icon: ActionMeta["icon"] }> = {
+  // Channels — what we did inside someone's marketplace account.
+  "etsy.publish":             { label: "Listing published", verb: "published a listing to Etsy",        icon: Storefront },
+  "etsy.import_addresses":    { label: "Addresses imported", verb: "imported buyer addresses from Etsy", icon: File },
+  "etsy.address_sheet":       { label: "Address sheet set", verb: "set the Etsy address sheet",         icon: File },
+  // Buying postage, as distinct from printing the label that was already bought.
+  "shipping.label_bought":    { label: "Label bought",      verb: "bought a shipping label",            icon: Truck },
+  // Buyer-data retention — who changed the policy, and when.
+  "pii.retention.configured": { label: "Retention changed", verb: "changed the buyer-data retention policy", icon: ShieldCheck },
   // Dispatch / labels / scanning
   "label.printed":       { label: "Label printed", verb: "printed the label",        icon: Printer },
   "label.unprinted":     { label: "Print undone",  verb: "reverted the label print", icon: ArrowUUpLeft },
@@ -64,14 +73,21 @@ const REGISTRY: Record<string, { label: string; verb: string; icon: ActionMeta["
 export type ActionCategory = { key: string; label: string; prefixes: string[] }
 export const ACTION_CATEGORIES: ActionCategory[] = [
   { key: "orders",     label: "Orders",      prefixes: ["order.", "item."] },
-  { key: "fulfilment", label: "Fulfilment",  prefixes: ["label.", "dispatch.", "manifest", "consignment."] },
+  // "shipping." covers buying postage. It was missing, so every label PURCHASE was
+  // invisible to this filter while label PRINTS ("label.") showed — two halves of the same
+  // job, one of them unfindable.
+  { key: "fulfilment", label: "Fulfilment",  prefixes: ["label.", "shipping.", "dispatch.", "manifest", "consignment."] },
   { key: "design",     label: "Design",      prefixes: ["design"] },
   { key: "money",      label: "Money",       prefixes: ["wallet.", "billing.", "topup"] },
   { key: "users",      label: "Users & team", prefixes: ["user.", "seller.", "team"] },
   { key: "catalog",    label: "Catalog",     prefixes: ["catalog"] },
   { key: "email",      label: "Email",       prefixes: ["broadcast.", "email_branding"] },
   { key: "suppliers",  label: "Suppliers",   prefixes: ["purchase", "manual_supplier", "ss.", "otto"] },
-  { key: "system",     label: "System",      prefixes: ["backup.", "capacity.", "factory", "nav"] },
+  { key: "system",     label: "System",      prefixes: ["backup.", "capacity.", "factory", "nav", "pii."] },
+  // Anything done to a connected marketplace on a seller's behalf. These actions existed
+  // with no category at all, so publishing a listing — the thing most likely to be asked
+  // about after a shop is actioned — could not be filtered for.
+  { key: "channels",   label: "Channels",    prefixes: ["etsy.", "tiktok.", "shopify."] },
 ]
 
 export function actionMeta(action: string): ActionMeta {
