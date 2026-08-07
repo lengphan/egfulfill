@@ -294,9 +294,17 @@ export function OrdersHub() {
   // defined, since a label for an unchosen blank is a mislabelled box.
   const [barcodeOrder, setBarcodeOrder] = useState<OrderRow | null>(null)
 
+  // A read that FAILED is not an empty board. Both used to end at setOrders([]), so a dead
+  // API — or a deploy mid-flight — rendered as "Nothing here / no orders yet", which is the
+  // one thing this codebase's own rule forbids: if a thing can't be READ versus doesn't
+  // EXIST, say which. Someone then goes looking for their missing orders instead of for the
+  // outage.
+  const [loadErr, setLoadErr] = useState<string | null>(null)
   const load = useCallback(() => {
-    if (!getToken()) { setOrders([]); return }
-    getOrders().then((rows) => setOrders(rows ?? [])).catch(() => setOrders([]))
+    if (!getToken()) { setOrders([]); setLoadErr(null); return }
+    getOrders()
+      .then((rows) => { setOrders(rows ?? []); setLoadErr(null) })
+      .catch((e) => { setOrders([]); setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.") })
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
   // Live refresh. Without this the readiness tags read whatever the page loaded with, so
@@ -1154,6 +1162,20 @@ export function OrdersHub() {
 
         {orders === null ? (
           <div className="space-y-3 p-5">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />)}</div>
+        ) : loadErr ? (
+          /* Reported, never silently empty — and it says the count is UNKNOWN rather than
+             zero, because the stat cards above are reading the same failed list. */
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <Warning size={24} weight="fill" className="text-amber-500" />
+            <div className="font-medium text-foreground">{tl("ui", "Couldn't load your orders")}</div>
+            <div className="max-w-sm text-sm text-muted-foreground">
+              This is a problem reaching the server, not an empty queue — the counts above are
+              unknown rather than zero. {loadErr}
+            </div>
+            <button onClick={load} className="eg-tap mt-1 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent">
+              Try again
+            </button>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
             <Package size={24} weight="duotone" />
