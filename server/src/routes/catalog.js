@@ -118,6 +118,15 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * `image` came out null for the product AND for all of its colourways. Live check on the
    * published catalogue: 1 product, 0 images, 4 colourways, 0 with an image.
    */
+  /** Supplier names, so a `brand || 'SanMar'` style fallback can never be published. */
+  const SUPPLIER_NAMES = new Set(['sanmar', 's&s', 'ss', 'ssactivewear', 's&s activewear', 'otto', 'ottocap', 'otto cap']);
+  /** Plain text for a public page: tags stripped, whitespace collapsed, length capped.
+   *  Returns null rather than an empty string so the client can test one thing. */
+  const publicText = (v, max) => {
+    const t = String(v ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    return t ? t.slice(0, max) : null;
+  };
+
   const renderable = (v) =>
     typeof v === 'string' && (/^(https?:\/\/|data:image\/)/i.test(v) || v.startsWith('/api/ss/img'));
 
@@ -183,6 +192,18 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       name: String(d.name),
       image: publicImage(d) ? `/api/public/products/${slug}/img` : null,
       category: typeof d.category === 'string' ? d.category : null,
+      // Real prose from the supplier feed, already synced and never published. Capped and
+      // tag-stripped: S&S descriptions arrive as messy HTML, and a public page should not
+      // be rendering markup we did not author.
+      description: publicText(d.description, 900),
+      // BRAND, but only when it is genuinely the garment's brand.
+      //
+      // The SanMar import does `brand || 'SanMar'`, so publishing this blind prints OUR
+      // SUPPLIER on a public page in exactly the case where the real brand is missing —
+      // see CLAUDE.md 2.8. The supplier names are filtered out rather than trusted, so a
+      // future import that adopts the same fallback cannot quietly start leaking.
+      brand: SUPPLIER_NAMES.has(String(d.brand || '').trim().toLowerCase())
+        ? null : publicText(d.brand, 60),
       price,
       methods,
       colors,

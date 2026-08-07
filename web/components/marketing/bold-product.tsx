@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { TShirt, ArrowLeft } from "@phosphor-icons/react"
+import { TShirt, ArrowLeft, Check } from "@phosphor-icons/react"
 import { ACCENT, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
 import type { PublicProduct } from "@/lib/api"
 
@@ -32,6 +32,19 @@ import type { PublicProduct } from "@/lib/api"
  * shop needs to receive. `methods: []` means it applies to every method. Kept deliberately
  * short: this is the answer to "what do I send you", not a prepress manual.
  */
+/**
+ * Where a decoration can physically go, by method. OURS — a supplier feed describes the
+ * garment, not our machines. Embroidery is shorter than print because a hoop has to reach
+ * the area: a hooped chest or cuff is routine, a full back on a finished garment is not.
+ */
+const PLACEMENTS: Record<string, string[]> = {
+  EMB: ["Left chest", "Right chest", "Centre chest", "Left sleeve", "Right sleeve", "Cap front"],
+  DTG: ["Front print", "Back print", "Left sleeve", "Right sleeve", "Inside label"],
+  DTF: ["Front print", "Back print", "Left sleeve", "Right sleeve", "Inside label"],
+  SUB: ["All-over print", "Front print", "Back print"],
+  DEFAULT: ["Front print", "Back print"],
+}
+
 const FILE_GUIDES: { label: string; body: string; methods: string[] }[] = [
   { label: "File type", methods: [], body: "PNG with a transparent background, or a vector PDF/SVG/AI. JPGs work but cannot hold transparency." },
   { label: "Resolution", methods: [], body: "300 DPI at the size it will be printed. A 1000px image blown up to 12 inches will look soft on the garment." },
@@ -124,8 +137,10 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
 
           {/* ── The facts ────────────────────────────────────────────────── */}
           <Rise delay={0.08}>
-            {product.category && (
-              <div className="text-xs font-bold uppercase tracking-[0.18em] text-black/45">{product.category}</div>
+            {(product.category || product.brand) && (
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-black/45">
+                {[product.brand, product.category].filter(Boolean).join(" · ")}
+              </div>
             )}
             <h1 className="mt-3 font-display font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>
               {product.name}
@@ -143,6 +158,13 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
                 What you pay us to make and ship one, before your own retail markup.
               </p>
             </div>
+
+            {/* The garment described in the manufacturer's own words. It was synced all
+                along and simply never published, and it is most of what the page was
+                missing — everything else here is a chip. */}
+            {product.description && (
+              <p className="mt-6 text-[15px] leading-relaxed text-black/70">{product.description}</p>
+            )}
 
             {product.methods.length > 0 && <Spec label="Print method" items={product.methods} />}
             {product.colors.length > 0 && (
@@ -192,7 +214,7 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
              no supplier size chart — S&S is the only feed that provides one — so a fixed
              two-column grid left the guidelines stranded in the left half with a dead right
              half beside them, which is what made the section look broken rather than short. */
-          <div className={"mt-16 grid gap-12 " + (specNames.length > 0 && product.methods.length > 0 ? "lg:grid-cols-2" : "max-w-2xl")}>
+          <div className={"mt-16 grid gap-12 " + ([specNames.length > 0, product.methods.length > 0].filter(Boolean).length > 1 ? "lg:grid-cols-2" : "max-w-2xl")}>
             {specNames.length > 0 && (
               <Rise>
                 <h2 className="font-display text-2xl font-black tracking-tight">Size chart</h2>
@@ -224,6 +246,36 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </Rise>
+            )}
+
+            {product.methods.length > 0 && (
+              <Rise delay={0.04}>
+                <h2 className="font-display text-2xl font-black tracking-tight">Where we can print</h2>
+                <p className="mt-1.5 text-sm text-black/50">
+                  Placements available on this garment.
+                </p>
+                {/* OURS, not the supplier's. A manufacturer's feed describes the blank; where
+                    a decoration can go is a fact about OUR machines and jigs, so it is stated
+                    per method here rather than pulled from anywhere. */}
+                <div className="mt-5 space-y-5">
+                  {product.methods.map((m) => {
+                    const key = Object.keys(PLACEMENTS).find((k) => m.toUpperCase().includes(k))
+                    const spots = key ? PLACEMENTS[key] : PLACEMENTS.DEFAULT
+                    return (
+                      <div key={m}>
+                        <div className="text-sm font-bold">{m}</div>
+                        <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+                          {spots.map((sp) => (
+                            <li key={sp} className="flex items-center gap-1.5 text-sm text-black/65">
+                              <Check size={13} weight="bold" className="shrink-0 text-black/35" />{sp}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )
+                  })}
                 </div>
               </Rise>
             )}
