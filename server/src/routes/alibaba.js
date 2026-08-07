@@ -4,9 +4,10 @@
 // Java sample constructs an `IopClient`). Two things about it are easy to get wrong and are
 // pinned here from the documented CURL sample rather than from memory:
 //
-//   1. THE COMMON PARAMS RIDE IN HEADERS, not the query string:
+//   1. THE COMMON PARAMS GO IN THE QUERY STRING, alongside the business params:
 //        app_key, timestamp, access_token, sign_method, sign
-//      Business params stay in the query string (e.g. ?param0=...).
+//      The docs' curl sample sends them as HEADERS. It does not work — the live gateway
+//      answers MissingParameter for app_key, i.e. it never reads the headers at all.
 //   2. `timestamp` is MILLISECONDS since epoch, and `sign` is UPPERCASE hex HMAC-SHA256.
 //
 // Documented sample this was written against:
@@ -15,11 +16,13 @@
 //     -H 'access_token=37c6...dbd0' -H 'sign_method=sha256' \
 //     -H 'sign=D13F2A03BE94D9AAE9F933FFA7B13E0A5AD84A3DAEBC62A458A3C382EC2E91EC'
 //
-// ⚠️ THE SIGNATURE IS UNVERIFIED. It follows the standard IOP construction (API path +
-// every param as key+value, sorted by key, HMAC-SHA256 with the app secret), but no call has
-// been made against a live account — the app is still in review. `GET /api/alibaba/test`
-// exists to settle that in one click, and deliberately surfaces Alibaba's raw error body:
-// a signature mismatch is diagnosable from their message and guessable from nothing else.
+// ✅ THE SIGNATURE IS VERIFIED (2026-08-06, app 503552). API path + every param as
+// key+value sorted by key, HMAC-SHA256 with the app secret, uppercase hex. Proven by the
+// error CHANGING from MissingParameter to InsufficientPermission: the gateway only reports
+// a permission problem once it has read the key and accepted the signature.
+//
+// REMAINING BLOCKER IS PERMISSION, NOT CODE. The app must be granted access to each API in
+// the Alibaba console (App Console → Apply process), and App Status must leave "Test".
 //
 // AUTH IS OAUTH, NOT A STATIC KEY. /auth/token/create exchanges a `code` (obtained by a
 // human authorising in a browser) for an access_token + refresh_token. So this behaves like
@@ -78,16 +81,23 @@ async function call(apiPath, businessParams = {}, { accessToken, method = 'GET' 
   };
   const signature = sign(apiPath, { ...common, ...businessParams }, c.secret);
 
+  // EVERYTHING IN THE QUERY STRING — common params included.
+  //
+  // This was written from the docs' curl sample, which sends app_key/timestamp/sign as
+  // HEADERS. Against the live gateway that returns:
+  //   MissingParameter — "the input parameter app_key ... is not supplied"
+  // i.e. the headers are ignored outright. Moving the common params into the query string
+  // changed the reply to InsufficientPermission, which is the gateway telling us it read
+  // the key AND accepted the signature. Verified against the live account 2026-08-06.
   const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(businessParams)) {
+  for (const [k, v] of Object.entries({ ...common, ...businessParams, sign: signature })) {
     if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
   }
-  const url = `${c.base}${apiPath}${qs.toString() ? '?' + qs.toString() : ''}`;
-  const headers = { ...common, sign: signature };
+  const url = `${c.base}${apiPath}?${qs.toString()}`;
 
   let r, text;
   try {
-    r = await fetch(url, { method, headers, signal: AbortSignal.timeout(20000) });
+    r = await fetch(url, { method, signal: AbortSignal.timeout(20000) });
     text = await r.text();
   } catch (e) {
     recordUsage('alibaba', { endpoint: apiPath, ok: false });
