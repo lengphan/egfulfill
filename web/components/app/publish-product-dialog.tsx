@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { CircleNotch, Storefront, UploadSimple, Trash, Package, WarningCircle } from "@phosphor-icons/react"
+import { CircleNotch, Storefront, UploadSimple, Trash, Package } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -16,15 +16,6 @@ const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLo
 const MAX_TAGS = 13
 const MAX_IMAGES = 10 // Etsy's hard limit — an 11th slot silently never publishes.
 
-// Etsy's who_made enum, with what each answer commits the seller to. Ordered with
-// "someone else" first because that is the truthful answer for anything WE produce, which
-// is every listing this dialog creates off a blank — but it stays a choice, because a
-// seller who genuinely makes their own is entitled to say so.
-const WHO_MADE_OPTIONS: { value: EtsyWhoMade; label: string; help: string }[] = [
-  { value: "someone_else", label: "Another company or person", help: "We print and ship it — the honest answer for anything produced on one of our blanks. Needs a production partner declared on Etsy." },
-  { value: "i_did", label: "I made it", help: "Only if you personally make this item. Do not pick this for print-on-demand." },
-  { value: "collective", label: "A member of my shop", help: "Someone in your own registered shop collective makes it." },
-]
 const cleanTag = (raw: string) => raw.replace(/[^\p{L}\p{N} '-]/gu, "").trim().slice(0, 20)
 
 /**
@@ -135,9 +126,16 @@ export function PublishProductDialog({
   const [retail, setRetail] = useState("")
   const [qty, setQty] = useState("999")
   const [tags, setTags] = useState<string[]>([])
-  // Defaults to the truthful answer for a POD listing rather than to Etsy's own default of
-  // "I made it" — a seller who skips this field should land on the safe side of it.
-  const [whoMade, setWhoMade] = useState<EtsyWhoMade>("someone_else")
+  /**
+   * NOT a picker any more — the listing publishes as a DRAFT, so the seller sets this on
+   * Etsy's own form before it goes live, and asking twice was the wrong amount of care.
+   *
+   * But it is still SENT, fixed at the truthful answer for anything we produce. The server
+   * used to default to `i_did` when nothing arrived, which declared on the seller's behalf
+   * that they personally made it — a Handmade Policy misstatement, and suspension-class
+   * rather than warning-class. Dropping the field without this would restore that.
+   */
+  const whoMade: EtsyWhoMade = "someone_else"
   const [tagDraft, setTagDraft] = useState("")
   const [suggested, setSuggested] = useState<string[]>([])
   const [images, setImages] = useState<string[]>([])
@@ -188,8 +186,6 @@ export function PublishProductDialog({
       setDesc(prefill?.description ?? "")
       setRetail(prefill?.price != null ? String(prefill.price) : "")
       setTags((prefill?.tags ?? []).slice(0, MAX_TAGS))
-      // Reset per open — a declaration must not carry over from the last product.
-      setWhoMade("someone_else")
       setImages((prefill?.images ?? []).filter(Boolean).slice(0, MAX_IMAGES))
       setBlank(prefill?.blank ?? null)
       setBlankText(prefill?.blank?.name ?? "")
@@ -532,7 +528,15 @@ export function PublishProductDialog({
                 </div>
               </div>
               <div className="space-y-1.5">
-                <div className="text-sm font-medium">Photos <span className="text-muted-foreground">({images.length}/{MAX_IMAGES})</span></div>
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="text-sm font-medium">Photos</span>
+                  <span className="text-sm text-muted-foreground">({images.length}/{MAX_IMAGES})</span>
+                  {referencePhotos.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      · {referencePhotos.length} reference {referencePhotos.length === 1 ? "photo" : "photos"} shown, none published
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-4 gap-2">
                   {images.map((src, i) => (
                     <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
@@ -550,6 +554,25 @@ export function PublishProductDialog({
                       <UploadSimple size={16} weight="bold" /><span className="text-3xs font-medium">Add</span>
                     </button>
                   )}
+                  {/* THE COMPETITOR'S PHOTOS, IN THE SAME GRID BUT MARKED ON THE IMAGE.
+                      They are not in `images`, so nothing here can reach a marketplace — the
+                      watermark is what makes that legible rather than something the seller has
+                      to remember. Sitting them in a separate panel was the previous answer and
+                      it read as a second, publishable set; a caption ON the photo cannot be
+                      scrolled away from.
+                      Dashed border, dimmed, no hover controls: everything says "not yours". */}
+                  {referencePhotos.map((src, i) => (
+                    <div key={`ref-${i}`} className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-border bg-muted/40">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" className="size-full object-cover opacity-55" />
+                      <span className="absolute inset-x-0 top-0 bg-foreground/75 px-1 py-0.5 text-center text-3xs font-semibold uppercase leading-tight text-background">
+                        Reference
+                      </span>
+                      <span className="absolute inset-x-0 bottom-0 bg-foreground/75 px-1 py-0.5 text-center text-3xs font-medium leading-tight text-background">
+                        not uploaded
+                      </span>
+                    </div>
+                  ))}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addImages(e.target.files); e.target.value = "" }} />
               </div>
@@ -614,54 +637,6 @@ export function PublishProductDialog({
                 </p>
               </div>
 
-              {/* Etsy asks every listing who physically made the item, and the answer goes
-                  into the seller's shop under their name. We used to answer "I made it
-                  myself" for them on every publish — untrue for anything we produce, and a
-                  Handmade Policy misstatement is suspension-class rather than warning-class.
-                  So it's a choice now, and the consequence of each answer is stated next to
-                  it rather than left to be discovered from Etsy. */}
-              {channel === "etsy" && (
-                <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
-                  <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Etsy requires: who made it</div>
-                  <div className="grid gap-1.5">
-                    {WHO_MADE_OPTIONS.map((o) => (
-                      <label
-                        key={o.value}
-                        className={
-                          "flex cursor-pointer items-start gap-2 rounded-md border p-2 text-xs " +
-                          (whoMade === o.value ? "border-primary/50 bg-primary/5" : "border-border")
-                        }
-                      >
-                        <input
-                          type="radio"
-                          name="who-made"
-                          className="mt-0.5"
-                          checked={whoMade === o.value}
-                          onChange={() => setWhoMade(o.value)}
-                        />
-                        <span>
-                          <span className="font-medium">{o.label}</span>
-                          <span className="block text-muted-foreground">{o.help}</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  {/* The heads-up, not a block: plenty of shops have no partner registered
-                      yet, and stopping the publish would strand them. Etsy is where the
-                      partner is declared — we can't do it from here. */}
-                  {whoMade !== "i_did" && (
-                    <div className="flex items-start gap-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                      <WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
-                      <span>
-                        Etsy expects a <b>production partner</b> on file when someone else makes the
-                        item. Add EGFULFILL in <b>Shop Manager → Settings → Production partners</b>,
-                        then attach it to this listing. Etsy can suspend a shop for selling made-for-you
-                        items without one declared.
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* TikTok Shop needs these three; Etsy doesn't. Shown only for the TikTok channel. */}
               {channel === "tiktok" && (
@@ -861,28 +836,6 @@ export function PublishProductDialog({
               {/* IP warning — only for the competitor's OWN photos, and only until the
                   seller acknowledges it. Publishing someone else's images to your shop can
                   get a listing pulled and, repeated, put the shop at risk. */}
-              {/* REFERENCE ONLY — the competitor's own photos, shown so the seller can see
-                  what they're making, in their own strip so they can't be mistaken for the
-                  images above. There is no "attach anyway": these never enter `images`, so
-                  nothing here can reach a marketplace. */}
-              {referencePhotos.length > 0 && (
-                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    What you&apos;re copying — reference only, not published
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {referencePhotos.slice(0, 6).map((u, i) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={i} src={u} alt="" className="size-16 rounded border border-border object-cover opacity-75" />
-                    ))}
-                  </div>
-                  <p className="mt-2 text-2xs text-muted-foreground">
-                    These belong to the seller who took them. Publishing them can get the listing pulled
-                    and the shop suspended, so add your own photo above.
-                  </p>
-                </div>
-              )}
-
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                 <Button onClick={publish} disabled={busy}>

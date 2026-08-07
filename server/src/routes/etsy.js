@@ -1489,10 +1489,16 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // Handmade Policy matter, and Handmade Policy matters get shops suspended rather than
       // warned; see the "never risk a connected account" rule.
       //
-      // The client now always sends an explicit choice. The 'i_did' fallback survives only
-      // so an older client can't 400, and it is the value Etsy itself defaults to.
+      // THE FALLBACK IS 'someone_else', NOT 'i_did'. Etsy's own default is i_did, and
+      // copying it meant a caller that omitted the field silently declared handmade. The
+      // publish dialog no longer asks — the listing is a DRAFT, so the seller answers on
+      // Etsy's form before it goes live — which makes this fallback the value nearly every
+      // listing now carries. It has to be the one that is true for what we produce.
+      //
+      // A seller who genuinely makes their own can still change it on the draft, and any
+      // caller that sends an explicit value is honoured unchanged.
       const WHO_MADE = ['i_did', 'someone_else', 'collective'];
-      const whoMade = WHO_MADE.includes(String(b.who_made)) ? String(b.who_made) : 'i_did';
+      const whoMade = WHO_MADE.includes(String(b.who_made)) ? String(b.who_made) : 'someone_else';
 
       // Create the DRAFT listing.
       const form = new URLSearchParams({
