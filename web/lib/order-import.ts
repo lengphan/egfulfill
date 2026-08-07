@@ -15,7 +15,7 @@ import { PRODUCT_METHODS } from "@/lib/print-method"
 // the column would fail wholesale. The rule instead is FILL IT OR WE ASSIGN ONE — the row
 // imports, the order takes its platform-assigned FF- number, and rowsToRecords raises a
 // WARNING so the split is stated up front rather than discovered afterwards.
-export const REQUIRED_COLS = ["ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
+export const REQUIRED_COLS = ["item_name", "ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
 
 // Per-column reference for the import dialog: which headers are required vs optional, and what
 // each does. Drives the legend so a filler knows exactly what they can skip. `key` is the
@@ -43,14 +43,19 @@ export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Ship City", key: "ship_city", required: true, help: "Destination city." },
   { header: "Ship State", key: "ship_state", required: true, help: "State / province. Two-letter code for US destinations." },
   { header: "Ship Zip", key: "ship_zip", required: true, help: "Postal code." },
-  // ── FILL ONE OF THESE ─────────────────────────────────────────────────────
-  { header: "Item SKU", key: "item_sku", required: false, oneOf: "item", help: "Your listing SKU. Fill this OR Product Title — a row with neither is skipped. Left blank, it's derived from the title." },
-  { header: "Product Title", key: "item_name", required: false, oneOf: "item", help: "Item name on the board. Fill this OR Item SKU — a row with neither is skipped." },
+  // The line's NAME, and the only product field a marketplace export always carries. It is
+  // what the boards read, so a row without one arrives as the literal word "Item".
+  { header: "Product Title", key: "item_name", required: true, help: "What the line is called on the board — the listing's title. Everything else about the product (blank, colour, size, method) can be filled in afterwards." },
   // ── OPTIONAL ──────────────────────────────────────────────────────────────
   { header: "Ship Address 2", key: "ship_address_2", required: false, help: "Apt / suite / unit." },
   { header: "Ship Email", key: "ship_email", required: false, help: "Buyer email, kept for your records." },
   { header: "Store Name", key: "store_name", required: false, help: "Which shop the order came from." },
-  { header: "Blank", key: "blank", required: false, help: "The catalog blank you produce on — needed to cost & barcode the line; without it it reads “not set up for production”." },
+  // TWO different SKUs, and confusing them is the whole reason they are named this way.
+  // "Listing SKU" belongs to the SELLER's marketplace listing; "Blank SKU" is OUR catalog
+  // product, and it is the one production and pricing key on. They were "Item SKU" and
+  // "Blank", which read as the same thing said twice.
+  { header: "Listing SKU", key: "item_sku", required: false, help: "The SELLER's own SKU on their marketplace listing. Records only — it does not decide what we make. Safe to leave blank." },
+  { header: "Blank SKU", key: "blank", required: false, help: "OUR catalog product — the garment we print on. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
   { header: "Template ID", key: "template_id", required: false, help: "A saved design template to apply (fills blank + artwork + placement + method)." },
   { header: "Item Quantity", key: "item_quantity", required: false, help: "Defaults to 1 if blank." },
   { header: "Print Type", key: "print_type", required: false, help: "DTG / DTF / EMB / … Defaults to DTG if blank." },
@@ -142,7 +147,9 @@ const COL_ALIASES: Record<string, string[]> = {
   ship_state: ["ship_state", "state", "province", "region", "state_province", "shipping_state", "shipping_province", "shipping_province_name"],
   ship_zip: ["ship_zip", "zip", "zipcode", "zip_code", "postal", "postal_code", "postcode", "shipping_zip"],
   store_name: ["store_name", "store", "shop", "shop_name"],
-  item_sku: ["item_sku", "sku", "lineitem_sku", "line_item_sku", "product_sku", "variant_sku"],
+  // "listing_sku" is this template's OWN header — without it the file we hand out would not
+  // import itself, which is the worst possible bug in a template.
+  item_sku: ["item_sku", "listing_sku", "sku", "lineitem_sku", "line_item_sku", "product_sku", "variant_sku"],
   // The BLANK we produce on. Without it an imported line can't be costed (pricing matches
   // on the blank), can't be barcoded (the barcode is the stock code), and lands on the
   // board reading "not set up for production yet".
@@ -295,12 +302,15 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
     headers.forEach((h, j) => { if (h && rec[h] === undefined) rec[h] = row[j] != null ? String(row[j]).trim() : "" })
     if (!rec.item_quantity) rec.item_quantity = "1"
     if (!rec.print_type) rec.print_type = "DTG"
-    if (!rec.item_sku && rec.item_name) rec.item_sku = S(rec.item_name).replace(/\s+/g, "-").toUpperCase().slice(0, 40)
+    // NO derived SKU. This used to slug the title into item_sku, which manufactured a value
+    // that is neither a real listing SKU nor a catalog blank — it matches nothing in the
+    // catalog, and it makes a field that was meant to be completed later look already filled.
+    // Line addressability does not depend on it: orders.js mints line_id centrally.
     const missing = REQUIRED_COLS.filter((c) => !rec[c])
-    const noItem = !rec.item_sku && !rec.item_name
     const errs: string[] = []
-    if (missing.length) errs.push("Missing: " + missing.map((m) => m.replace(/_/g, " ")).join(", "))
-    if (noItem) errs.push("No item (SKU or name)")
+    // item_name reads as "item name" from the key; say the column's own header instead, or the
+    // error names a field the seller cannot find in their sheet.
+    if (missing.length) errs.push("Missing: " + missing.map((m) => (m === "item_name" ? "product title" : m.replace(/_/g, " "))).join(", "))
     rec._valid = !errs.length
     rec._errors = errs.join("; ")
     // Blank order number imports fine — it just can't be grouped, so it becomes its own
