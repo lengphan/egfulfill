@@ -1,13 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CircleNotch, ArrowSquareOut, Warning, Plus, Check, MagnifyingGlass } from "@phosphor-icons/react"
+import { CircleNotch, Warning, Plus, Check, MagnifyingGlass } from "@phosphor-icons/react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getAlibabaConfig, searchAlibaba, type AlibabaProduct } from "@/lib/api"
 import { suggestSuppliers, saveSourcing, fetchSourcingPrice, type EtsyListing } from "@/lib/api"
 
 /**
@@ -19,12 +18,13 @@ import { suggestSuppliers, saveSourcing, fetchSourcingPrice, type EtsyListing } 
  * actually hard — turning a marketing title into queries a B2B marketplace understands —
  * and then hand you a one-click search plus somewhere to bring the result back.
  *
- * So the flow is: read the product -> click a query -> pick a supplier on Alibaba -> paste
- * its link here -> it lands in Sourcing as a Prospect with the name, image and price read
- * off the page. Presenting a fake in-app supplier list would be the dishonest version.
+ * So the flow is: read the product -> click a query -> it opens Sourcing with that keyword
+ * already searching, against the buyer API. The API is a different door from /trade/ and the
+ * robots rule does not apply to it, which is what finally made a real in-app result list
+ * possible — but it lives on Sourcing, which has the width and the pagination for it, not in
+ * this modal. Pasting a link by hand still works and still lands as a Prospect.
  */
 
-const ALIBABA_SEARCH = "https://www.alibaba.com/trade/search?SearchText="
 
 type Suggestion = Awaited<ReturnType<typeof suggestSuppliers>>
 
@@ -36,36 +36,8 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
   const [data, setData] = useState<Suggestion | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [url, setUrl] = useState("")
-  // Whether the buyer API is usable. Null while unknown, so the dialog shows the old
-  // new-tab links rather than briefly promising an in-page search it can't do.
-  const [apiOn, setApiOn] = useState(false)
-  const [hits, setHits] = useState<AlibabaProduct[] | null>(null)
-  const [busyQ, setBusyQ] = useState<string | null>(null)
-  const [searchErr, setSearchErr] = useState<string | null>(null)
 
-  // Ask once whether the buyer API is connected. Admin-only server-side, so a non-admin
-  // simply keeps the new-tab links — which still work, and are what everyone had before.
-  useEffect(() => {
-    if (!listing) return
-    const t = setTimeout(() => {
-      getAlibabaConfig().then((c) => setApiOn(!!(c.configured && c.connected))).catch(() => setApiOn(false))
-    }, 0)
-    return () => clearTimeout(t)
-  }, [listing])
 
-  const runSearch = async (keyword: string) => {
-    setBusyQ(keyword); setSearchErr(null)
-    try {
-      const r = await searchAlibaba({ keyword, pageSize: 12 })
-      if (r.error) throw new Error(r.error)
-      setHits(r.products ?? [])
-    } catch (e) {
-      // Verbatim. Alibaba's messages name the failing field or the missing entitlement,
-      // and "search failed" throws away the only thing that says what to fix.
-      setSearchErr(e instanceof Error ? e.message : "Search failed.")
-      setHits(null)
-    } finally { setBusyQ(null) }
-  }
   const [saving, setSaving] = useState(false)
   const [savedCount, setSavedCount] = useState(0)
   const [note, setNote] = useState<string | null>(null)
@@ -179,59 +151,23 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
 
             <div>
               <div className="mb-1.5 text-xs text-muted-foreground">
-                {apiOn
-                  ? "Search Alibaba — results appear here"
-                  : "Search Alibaba — opens in a new tab, where you're already signed in"}
+                Search these on Sourcing — full width, and paginated
               </div>
               <div className="space-y-1.5">
+                {/* HANDS OFF rather than searching here. This dialog is a narrow modal over
+                    a grid; Sourcing has the whole page, 24 results at a time and Previous /
+                    Next. Running the search in both places meant the cramped one was the one
+                    people used. The genuinely hard part — turning a marketing title into
+                    queries a B2B marketplace understands — still happens here, and that is
+                    the only part that ever needed a dialog. */}
                 {(data.queries ?? []).map((qy) => (
-                  apiOn ? (
-                    // CONNECTED: the query runs here. The constraint that forced a new tab
-                    // was that Alibaba's robots.txt disallows /trade/, so the results page
-                    // can't be fetched — the buyer API is a different door and that
-                    // constraint doesn't apply to it.
-                    <button key={qy} onClick={() => runSearch(qy)}
-                      className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:border-primary/50 hover:bg-accent">
-                      <span className="flex-1">{qy}</span>
-                      {busyQ === qy
-                        ? <CircleNotch size={14} className="shrink-0 animate-spin text-muted-foreground" />
-                        : <MagnifyingGlass size={14} className="shrink-0 text-muted-foreground" />}
-                    </button>
-                  ) : (
-                    <a key={qy} href={ALIBABA_SEARCH + encodeURIComponent(qy)} target="_blank" rel="noopener noreferrer"
-                       className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:border-primary/50 hover:bg-accent">
-                      <span className="flex-1">{qy}</span>
-                      <ArrowSquareOut size={14} className="shrink-0 text-muted-foreground" />
-                    </a>
-                  )
+                  <a key={qy} href={`/sourcing?q=${encodeURIComponent(qy)}`}
+                     className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:border-primary/50 hover:bg-accent">
+                    <span className="flex-1">{qy}</span>
+                    <MagnifyingGlass size={14} className="shrink-0 text-muted-foreground" />
+                  </a>
                 ))}
               </div>
-
-              {/* Results, when the API answered. Clicking one fills the paste box below
-                  rather than saving directly — the box is where the seller confirms what
-                  they picked, and skipping it would make a single mis-click a saved row. */}
-              {hits !== null && (
-                <div className="mt-2 space-y-1">
-                  {hits.length === 0 && <p className="text-xs text-muted-foreground">Nothing came back for that one.</p>}
-                  {hits.map((h) => (
-                    <button key={h.id ?? h.url ?? h.title} onClick={() => { if (h.url) setUrl(h.url) }}
-                      className="flex w-full items-center gap-2 rounded-lg border border-border p-2 text-left transition-colors hover:border-primary/50 hover:bg-accent">
-                      {h.image && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={h.image} alt="" className="size-10 shrink-0 rounded border border-border object-cover" />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="line-clamp-2 text-xs">{h.title}</span>
-                        {/* A RANGE, not a number — Alibaba prices by quantity band. */}
-                        {h.price && <span className="block text-2xs text-muted-foreground">{h.price}</span>}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {searchErr && (
-                <p className="mt-2 text-xs text-amber-700">{searchErr}</p>
-              )}
             </div>
 
             <div className="rounded-lg border border-border p-3">

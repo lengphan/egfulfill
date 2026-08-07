@@ -40,6 +40,19 @@ const numOrNull = (v: string): number | null => {
 
 export function SourcingView() {
   const confirm = useConfirm()
+  // Which view is showing, and whether the second one exists at all.
+  const [tab, setTab] = useState<"prospects" | "find">("prospects")
+  const [canBrowse, setCanBrowse] = useState(false)
+  // A keyword handed over from SpyDeck's Find-suppliers dialog. Read once, deferred —
+  // window doesn't exist during the prerender.
+  const [incoming, setIncoming] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const kw = new URLSearchParams(window.location.search).get("q")
+      if (kw) { setIncoming(kw); setTab("find") }
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
   const [rows, setRows] = useState<SourcingRow[] | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [saving, setSaving] = useState(false)
@@ -222,10 +235,33 @@ export function SourcingView() {
 
   return (
     <div className="space-y-4">
-      {/* Search first, then the table of what you kept — the order you actually work in.
-          Renders nothing unless Alibaba is connected AND you're an admin, so it never shows
-          a search box that can't search. */}
-      <AlibabaBrowse />
+      {/* TWO VIEWS, ONE AT A TIME — not stacked. Stacking pushed the prospect table below a
+          grid of 24 cards, so the list you came to read was off-screen. They answer different
+          questions ("what could we buy" vs "what are we already talking to"), and only one is
+          ever the current one.
+          The toggle only appears when there is a second view to reach: without Alibaba
+          connected, or for a non-admin, this is just the prospect table as it always was. */}
+      {canBrowse && (
+        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
+          {([["prospects", "My prospects"], ["find", "Find suppliers"]] as const).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              aria-pressed={tab === id}
+              className={"rounded-md px-3 py-1.5 text-xs font-medium transition-colors " + (tab === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              {label}
+              {id === "prospects" && rows.length > 0 && (
+                <span className={"ml-1.5 tabular-nums " + (tab === id ? "text-primary-foreground/70" : "text-muted-foreground/70")}>{rows.length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "find" && <AlibabaBrowse onConnectedChange={setCanBrowse} initialQuery={incoming} />}
+
+      <div className={canBrowse && tab === "find" ? "hidden" : undefined}>
       <SectionCard>
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
           <div className="flex-1">
@@ -450,6 +486,7 @@ export function SourcingView() {
           </div>
         )}
       </SectionCard>
+      </div>
 
       {active && result && (
         <SectionCard>

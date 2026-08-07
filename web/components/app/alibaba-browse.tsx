@@ -21,9 +21,16 @@ import { getUser } from "@/lib/auth"
  * no supplier name, no order volume. Inventing a "score" from four fields would be the
  * dishonest version of the SpyDeck card rather than the equivalent of it.
  */
-export function AlibabaBrowse() {
+export function AlibabaBrowse({ onConnectedChange, initialQuery }: {
+  onConnectedChange?: (v: boolean) => void
+  /** Handed in from a SpyDeck query, so the search is already running when you arrive. */
+  initialQuery?: string
+} = {}) {
   const [connected, setConnected] = useState<boolean | null>(null)
-  const [q, setQ] = useState("")
+  const [q, setQ] = useState(initialQuery ?? "")
+  // Alibaba pages server-side (param0.index), so this is a real page cursor, not a slice of
+  // one fetched list — 24 at a time, and "Next" costs one call.
+  const [page, setPage] = useState(1)
   const [rows, setRows] = useState<AlibabaProduct[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -34,29 +41,37 @@ export function AlibabaBrowse() {
   const load = useCallback(() => {
     if (!isAdmin) return
     getAlibabaConfig()
-      .then((c) => setConnected(!!(c.configured && c.connected)))
-      .catch(() => setConnected(false))
-  }, [isAdmin])
+      .then((c) => { const ok = !!(c.configured && c.connected); setConnected(ok); onConnectedChange?.(ok) })
+      .catch(() => { setConnected(false); onConnectedChange?.(false) })
+  }, [isAdmin, onConnectedChange])
   useEffect(() => {
     const t = setTimeout(load, 0)
     return () => clearTimeout(t)
   }, [load])
 
-  const run = async () => {
-    const keyword = q.trim()
-    if (!keyword) return
+  const run = useCallback(async (keyword: string, p = 1) => {
+    if (!keyword.trim()) return
     setBusy(true); setErr(null)
     try {
-      const r = await searchAlibaba({ keyword, pageSize: 24 })
+      const r = await searchAlibaba({ keyword: keyword.trim(), page: p, pageSize: 24 })
       if (r.error) throw new Error(r.error)
       setRows(r.products ?? [])
+      setPage(p)
     } catch (e) {
       // Verbatim: Alibaba names the failing field or the missing entitlement, and
       // "search failed" throws away the only part that says what to do about it.
       setErr(e instanceof Error ? e.message : "Search failed.")
       setRows(null)
     } finally { setBusy(false) }
-  }
+  }, [])
+
+  // A keyword handed in from SpyDeck searches itself on arrival — the point of the handoff
+  // is not having to retype what you just clicked.
+  useEffect(() => {
+    if (!initialQuery || connected !== true) return
+    const t = setTimeout(() => run(initialQuery, 1), 0)
+    return () => clearTimeout(t)
+  }, [initialQuery, connected, run])
 
   const addProspect = async (p: AlibabaProduct) => {
     const id = String(p.id ?? p.url ?? "")
@@ -101,11 +116,11 @@ export function AlibabaBrowse() {
             <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={q} onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") run() }}
+              onKeyDown={(e) => { if (e.key === "Enter") run(q, 1) }}
               placeholder="e.g. blank cotton tote bag" className="h-9 pl-8"
             />
           </div>
-          <Button size="sm" onClick={run} disabled={busy || !q.trim()}>
+          <Button size="sm" onClick={() => run(q, 1)} disabled={busy || !q.trim()}>
             {busy ? <CircleNotch size={14} className="animate-spin" /> : <MagnifyingGlass size={14} weight="bold" />} Search
           </Button>
         </div>
@@ -119,6 +134,7 @@ export function AlibabaBrowse() {
         )}
 
         {rows !== null && rows.length > 0 && (
+          <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {rows.map((p) => {
               const id = String(p.id ?? p.url ?? "")
@@ -150,23 +166,20 @@ export function AlibabaBrowse() {
                         {isSaved ? "Prospect" : "Add"}
                       </Button>
                       {p.url && (
-                        <>
-                          {/* CONTACT is a link, not a chat. Alibaba's messaging is
-                              TradeManager/Messenger — a first-party product with no buyer
-                              messaging API in the ISV set — so the honest version sends you
-                              to the product page where Contact Supplier lives, rather than
-                              a chat box in here that could never send anything. */}
-                          <a href={p.url} target="_blank" rel="noopener noreferrer"
-                             title="Open on Alibaba to message the supplier"
-                             className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary">
-                            <ChatCircleDots size={13} weight="bold" />
-                          </a>
-                          <a href={p.url} target="_blank" rel="noopener noreferrer"
-                             title="Open on Alibaba"
-                             className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary">
-                            <ArrowSquareOut size={13} weight="bold" />
-                          </a>
-                        </>
+                        /* ONE button, and it says what it does. There were two — a speech
+                           bubble and an external-link arrow — pointing at the same URL, so
+                           the bubble read as an in-app chat and opened a product page.
+                           There is no chat to open: Alibaba's messaging is TradeManager /
+                           Messenger, a first-party product with no buyer-messaging API in
+                           the ISV set, and this endpoint returns no supplier or company id,
+                           so even a deep link into their messenger cannot be constructed.
+                           The product page is where Contact Supplier lives. */
+                        <a href={p.url} target="_blank" rel="noopener noreferrer"
+                           title="Opens the product on Alibaba, where Contact Supplier is"
+                           className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-2xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary">
+                          <ChatCircleDots size={12} weight="bold" /> Contact
+                          <ArrowSquareOut size={10} weight="bold" className="opacity-60" />
+                        </a>
                       )}
                     </div>
                   </div>
@@ -174,6 +187,16 @@ export function AlibabaBrowse() {
               )
             })}
           </div>
+          {/* No total count comes back from the search, so this can't say "page 2 of 9".
+              Next is offered while a full page came back — a short page is the last one. */}
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-2xs text-muted-foreground">Page {page} · {rows.length} results</span>
+            <div className="flex gap-1.5">
+              <Button size="sm" variant="outline" disabled={busy || page <= 1} onClick={() => run(q, page - 1)}>Previous</Button>
+              <Button size="sm" variant="outline" disabled={busy || rows.length < 24} onClick={() => run(q, page + 1)}>Next</Button>
+            </div>
+          </div>
+          </>
         )}
       </div>
     </SectionCard>

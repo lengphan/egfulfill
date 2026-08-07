@@ -293,7 +293,14 @@ export function alibabaRoutes(app, requireAdmin) {
         products: (Array.isArray(d.products) ? d.products : []).map((p) => ({
           id: p.product_id != null ? String(p.product_id) : null,
           title: p.title || null,
-          image: p.image?.main_image || null,
+          // FULL RESOLUTION. Alibaba's CDN bakes the size into the filename — the search
+          // returns "...U.png_220x220.png", which is a 220px thumbnail and looks blurry in
+          // any card bigger than a stamp. Stripping the suffix returns the original: 522x522
+          // on the sample measured, 5.6x the pixels, same request count.
+          //
+          // Asking for a LARGER suffix (_720x720) does not upscale — the CDN caps at the
+          // stored original — so removing it is both the simplest and the best available.
+          image: fullSizeImage(p.image?.main_image) || null,
           // A live product carries "$0.88-1.05" — a RANGE, as a string, because Alibaba
           // prices by quantity band. Don't parse it to a number; there isn't one.
           price: p.price != null ? String(p.price) : null,
