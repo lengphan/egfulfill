@@ -307,6 +307,24 @@ export function alibabaRoutes(app, requireAdmin) {
         { param0: JSON.stringify({ index: page, size: 20, keyword }) },
         { accessToken: row.access_token });
       const d = body?.result?.data || {};
+      /**
+       * WHAT DOES A PRODUCT ACTUALLY CARRY? ?raw=1 returns the first product verbatim.
+       *
+       * The mapper below keeps five fields, and a comment elsewhere in this app asserts that
+       * this endpoint exposes no supplier or company id — which is why "Contact" opens the
+       * product page rather than a chat. That assertion came from reading, not from a
+       * response, and it is the thing standing between a prospect row and a direct line to
+       * the seller. This settles it from data: if a company_id or company_name is in here,
+       * the chat link is buildable and the comment is wrong.
+       *
+       * Admin-only (the whole route is), returns ONE product, and only when explicitly
+       * asked — a debug switch that changes the normal shape is a debug switch that
+       * eventually ships to a consumer expecting the normal shape.
+       */
+      if (String(req.query?.raw || '') === '1') {
+        const first = (Array.isArray(d.products) ? d.products : [])[0] || null;
+        return { raw: true, keys: first ? Object.keys(first) : [], sample: first };
+      }
       return {
         page,
         products: (Array.isArray(d.products) ? d.products : []).map((p) => ({
