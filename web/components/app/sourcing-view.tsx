@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, Binoculars, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Loading } from "@/components/app/loading"
@@ -456,8 +456,8 @@ export function SourcingView() {
                   const landed = (r.cost ?? 0) + (r.decorationCost ?? 0) + freightUnit
                   const isSel = r.id === selected
                   return (
-                    <tr key={r.id}
-                        onClick={() => setSelected(isSel ? null : r.id)}
+                    <Fragment key={r.id}>
+                    <tr onClick={() => setSelected(isSel ? null : r.id)}
                         className={`cursor-pointer border-b border-border/60 transition-colors hover:bg-accent/50 ${isSel ? "bg-accent" : ""}`}>
                       <td className="py-2 pl-4 pr-0">
                         {r.image
@@ -497,6 +497,101 @@ export function SourcingView() {
                         </div>
                       </td>
                     </tr>
+                    {/* THE DETAIL SITS UNDER ITS OWN ROW. It used to render after the whole
+                        table, so opening the first of three prospects put its panel below
+                        the third — the reader had to work out which row it belonged to. A
+                        second <tr> spanning every column keeps it adjacent to the thing it
+                        describes.
+                        Rendered inside the map rather than lifted into its own component:
+                        it reads a dozen pieces of this component's state (sell price, ship
+                        charged, outbound, fee, and the derived result), and threading all of
+                        that through props would be a far larger change than moving it. It
+                        only ever renders for the selected row, so nothing is duplicated. */}
+                    {isSel && active && result && (
+                      <tr className="border-b border-border/60">
+                        <td colSpan={10} className="bg-accent/30 p-3">
+              <SectionCard>
+                {/* The supplier belongs in this heading, not just the product name. The core use of
+                    this page is the SAME product from two sources — without it, two rows called
+                    "Cat mom hoodie" produce two different answers and nothing says which is which. */}
+                <div className="flex flex-wrap items-center gap-2 border-b border-border p-4">
+                  <Calculator size={16} weight="bold" className="text-primary" />
+                  <h2 className="text-sm font-semibold">{active.title}</h2>
+                  <span className="text-sm text-muted-foreground">from</span>
+                  {active.supplierRef
+                    ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">{active.supplierRef}</span>
+                    : <span className="text-sm font-medium">{active.shop || "an unnamed supplier"}</span>}
+                  {rival && (
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      vs {rival.supplierRef || rival.shop}: landed{" "}
+                      <strong className="text-foreground">{money(rivalLanded)}</strong>
+                      {rivalLanded > 0 && (
+                        <> · {rivalLanded < activeLanded
+                          ? <span className="text-destructive">{money(activeLanded - rivalLanded)} cheaper there</span>
+                          : <span>{money(rivalLanded - activeLanded)} dearer there</span>}</>
+                      )}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <label className="text-xs">
+                    <span className="text-muted-foreground">Sell price</span>
+                    <Input className="mt-1 h-9" inputMode="decimal" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} />
+                  </label>
+                  <label className="text-xs">
+                    <span className="text-muted-foreground">Shipping charged</span>
+                    <Input className="mt-1 h-9" inputMode="decimal" value={shipCharged} placeholder="0.00" onChange={(e) => setShipCharged(e.target.value)} />
+                  </label>
+                  <label className="text-xs">
+                    <span className="text-muted-foreground">Your outbound shipping</span>
+                    <Input className="mt-1 h-9" inputMode="decimal" value={outbound} onChange={(e) => setOutbound(e.target.value)} />
+                  </label>
+                  <label className="text-xs">
+                    <span className="text-muted-foreground">Channel</span>
+                    <select value={feeId} onChange={(e) => setFeeId(e.target.value)}
+                            className="eg-select mt-1 h-9 w-full rounded-md border border-border bg-card px-2 text-sm">
+                      {FEE_MODELS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+
+                {missing.length > 0 && (
+                  // Honesty rule: an empty state must not look like a working feature. Without a
+                  // unit price the "profit" is just fees on nothing, so say what's missing rather
+                  // than render a confident number.
+                  <div className="border-b border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+                    Add {missing.join(" and ")} to see profit. Everything below is incomplete until then.
+                  </div>
+                )}
+
+                <div className={`grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4 ${missing.length ? "opacity-40" : ""}`}>
+                  <Stat label="Landed cost / unit" value={missing.includes("a unit price") ? "—" : money(result.landedUnitCost)}
+                        sub={result.freightPerUnit ? `incl. ${money(result.freightPerUnit)} freight` : "no freight"} />
+                  <Stat label="Fees" value={money(result.fees)} sub={`${fee.label} ${fee.pct}% + card ${PAYMENT_DEFAULT.pct}%`} />
+                  <Stat label="Profit / unit" value={missing.length ? "—" : money(result.profit)}
+                        sub={missing.length ? "not enough entered" : pct(result.marginPct) + " margin"}
+                        tone={missing.length ? undefined : result.profit >= 0 ? "good" : "bad"} />
+                  <Stat label={`Profit at MOQ ${(active.moq ?? 1).toLocaleString()}`}
+                        value={missing.length ? "—" : money(result.profitAtMoq)}
+                        sub={active.leadDays != null ? `${active.leadDays} day lead time` : undefined}
+                        tone={missing.length ? undefined : result.profitAtMoq >= 0 ? "good" : "bad"} />
+                </div>
+
+                <div className={`p-4 text-xs text-muted-foreground ${missing.includes("a unit price") ? "hidden" : ""}`}>
+                  Break-even sell price is <strong className="text-foreground">{money(result.breakEvenPrice)}</strong>
+                  {result.unitsToCoverFreight != null && <> · {result.unitsToCoverFreight} units cover the freight</>}
+                  {(active.moq ?? 1) > 1 && (
+                    <> · you commit <strong className="text-foreground">
+                      {money((active.cost ?? 0) * (active.moq ?? 1) + (active.shipTotal ?? 0))}
+                    </strong> up front</>
+                  )}
+                </div>
+              </SectionCard>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   )
                 })}
               </tbody>
@@ -506,86 +601,6 @@ export function SourcingView() {
       </SectionCard>
       </div>
 
-      {active && result && (
-        <SectionCard>
-          {/* The supplier belongs in this heading, not just the product name. The core use of
-              this page is the SAME product from two sources — without it, two rows called
-              "Cat mom hoodie" produce two different answers and nothing says which is which. */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-border p-4">
-            <Calculator size={16} weight="bold" className="text-primary" />
-            <h2 className="text-sm font-semibold">{active.title}</h2>
-            <span className="text-sm text-muted-foreground">from</span>
-            {active.supplierRef
-              ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">{active.supplierRef}</span>
-              : <span className="text-sm font-medium">{active.shop || "an unnamed supplier"}</span>}
-            {rival && (
-              <span className="ml-auto text-xs text-muted-foreground">
-                vs {rival.supplierRef || rival.shop}: landed{" "}
-                <strong className="text-foreground">{money(rivalLanded)}</strong>
-                {rivalLanded > 0 && (
-                  <> · {rivalLanded < activeLanded
-                    ? <span className="text-destructive">{money(activeLanded - rivalLanded)} cheaper there</span>
-                    : <span>{money(rivalLanded - activeLanded)} dearer there</span>}</>
-                )}
-              </span>
-            )}
-          </div>
-
-          <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="text-xs">
-              <span className="text-muted-foreground">Sell price</span>
-              <Input className="mt-1 h-9" inputMode="decimal" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} />
-            </label>
-            <label className="text-xs">
-              <span className="text-muted-foreground">Shipping charged</span>
-              <Input className="mt-1 h-9" inputMode="decimal" value={shipCharged} placeholder="0.00" onChange={(e) => setShipCharged(e.target.value)} />
-            </label>
-            <label className="text-xs">
-              <span className="text-muted-foreground">Your outbound shipping</span>
-              <Input className="mt-1 h-9" inputMode="decimal" value={outbound} onChange={(e) => setOutbound(e.target.value)} />
-            </label>
-            <label className="text-xs">
-              <span className="text-muted-foreground">Channel</span>
-              <select value={feeId} onChange={(e) => setFeeId(e.target.value)}
-                      className="eg-select mt-1 h-9 w-full rounded-md border border-border bg-card px-2 text-sm">
-                {FEE_MODELS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-              </select>
-            </label>
-          </div>
-
-          {missing.length > 0 && (
-            // Honesty rule: an empty state must not look like a working feature. Without a
-            // unit price the "profit" is just fees on nothing, so say what's missing rather
-            // than render a confident number.
-            <div className="border-b border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
-              Add {missing.join(" and ")} to see profit. Everything below is incomplete until then.
-            </div>
-          )}
-
-          <div className={`grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4 ${missing.length ? "opacity-40" : ""}`}>
-            <Stat label="Landed cost / unit" value={missing.includes("a unit price") ? "—" : money(result.landedUnitCost)}
-                  sub={result.freightPerUnit ? `incl. ${money(result.freightPerUnit)} freight` : "no freight"} />
-            <Stat label="Fees" value={money(result.fees)} sub={`${fee.label} ${fee.pct}% + card ${PAYMENT_DEFAULT.pct}%`} />
-            <Stat label="Profit / unit" value={missing.length ? "—" : money(result.profit)}
-                  sub={missing.length ? "not enough entered" : pct(result.marginPct) + " margin"}
-                  tone={missing.length ? undefined : result.profit >= 0 ? "good" : "bad"} />
-            <Stat label={`Profit at MOQ ${(active.moq ?? 1).toLocaleString()}`}
-                  value={missing.length ? "—" : money(result.profitAtMoq)}
-                  sub={active.leadDays != null ? `${active.leadDays} day lead time` : undefined}
-                  tone={missing.length ? undefined : result.profitAtMoq >= 0 ? "good" : "bad"} />
-          </div>
-
-          <div className={`p-4 text-xs text-muted-foreground ${missing.includes("a unit price") ? "hidden" : ""}`}>
-            Break-even sell price is <strong className="text-foreground">{money(result.breakEvenPrice)}</strong>
-            {result.unitsToCoverFreight != null && <> · {result.unitsToCoverFreight} units cover the freight</>}
-            {(active.moq ?? 1) > 1 && (
-              <> · you commit <strong className="text-foreground">
-                {money((active.cost ?? 0) * (active.moq ?? 1) + (active.shipTotal ?? 0))}
-              </strong> up front</>
-            )}
-          </div>
-        </SectionCard>
-      )}
     </div>
   )
 }
