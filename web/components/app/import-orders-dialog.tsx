@@ -184,8 +184,17 @@ export function ImportOrdersDialog({
         // Fall through to the clipboard path rather than dead-ending: a sheet they can
         // paste into beats an error message.
         setError(r.error || "Couldn't create the sheet — falling back to a blank one.")
-      } catch {
-        setError("Couldn't reach the server to create a sheet — falling back to a blank one.")
+      } catch (e) {
+        // SURFACE THE REAL REASON. api() THROWS on any non-2xx, with `message` set to the
+        // server's own `error` field — so a 502 carrying "Could not create sheet: Google
+        // Drive API has not been used in project …" arrived here and was thrown away,
+        // reported as "couldn't reach the server". That is the wrong diagnosis and an
+        // unactionable one: the server was reached, Google refused, and the fix is one
+        // click in the Cloud Console. Only a genuine transport failure has no message.
+        const msg = e instanceof Error ? e.message.trim() : ""
+        setError(msg
+          ? `Couldn't create the sheet — ${msg}. Falling back to a blank one.`
+          : "Couldn't reach the server to create a sheet — falling back to a blank one.")
       } finally {
         setCreating(false)
       }
