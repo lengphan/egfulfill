@@ -439,7 +439,7 @@ export function SourcingView() {
                 <tr>
                   <th className="w-12 px-4 py-2" />
                   <th className="px-4 py-2 text-left font-medium">Product</th>
-                  <th className="px-4 py-2 text-left font-medium">Supplier</th>
+                  <th className="px-4 py-2 text-left font-medium">Source</th>
                   <th className="px-4 py-2 text-right font-medium">Unit</th>
                   <th className="px-4 py-2 text-right font-medium">MOQ</th>
                   <th className="px-4 py-2 text-right font-medium">Freight/unit</th>
@@ -485,7 +485,13 @@ export function SourcingView() {
                           {r.url && (
                             <a href={r.url} target="_blank" rel="noopener noreferrer"
                                onClick={(e) => e.stopPropagation()}
-                               className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-accent" title="Open listing">
+                               className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-accent" /* "Open listing", not a chat. Confirmed from a live response rather than the
+                                 docs: an Alibaba product carries exactly five fields — image, price,
+                                 product_id, permalink, title. There is no company id or company name,
+                                 so no supplier chat or store link can be constructed, and we genuinely
+                                 cannot say which seller it is. Their "Contact Supplier" lives on the
+                                 product page, which is where this goes. */
+                              title="Open the listing on Alibaba — their Contact Supplier is there. The search API returns no seller name.">
                               <ArrowSquareOut size={14} />
                             </a>
                           )}
