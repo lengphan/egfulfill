@@ -347,7 +347,24 @@ export function sheetsRoutes(app, requireAuth) {
     const tpl = buildTemplate('EGFULFILL Orders — ' + who);
     const cr = await fetch('https://sheets.googleapis.com/v4/spreadsheets', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(tpl.createBody) });
     const cd = await cr.json().catch(() => ({}));
-    if (!cr.ok || !cd.spreadsheetId) { reply.code(502); return { error: 'Could not create sheet: ' + ((cd.error && cd.error.message) || cr.status) }; }
+    if (!cr.ok || !cd.spreadsheetId) {
+      // Google's `message` alone is often too terse to act on — "The caller does not have
+      // permission" says nothing about WHICH permission. `status` and `details` carry the
+      // reason (a disabled API arrives as SERVICE_DISABLED with an activation URL), and the
+      // service account's own project is what you'd check first, so all three ride along.
+      const g = cd.error || {};
+      const detail = Array.isArray(g.details)
+        ? g.details.map((d) => d.reason || d.metadata?.service || d['@type']).filter(Boolean).join(', ')
+        : '';
+      const sa = loadSA() || {};
+      reply.code(502);
+      return {
+        error: 'Could not create sheet: ' + (g.message || cr.status)
+          + (g.status ? ` [${g.status}]` : '')
+          + (detail ? ` (${detail})` : '')
+          + (sa.project_id ? ` — service account project: ${sa.project_id}` : ''),
+      };
+    }
     const id = cd.spreadsheetId;
     const gid = (cd.sheets && cd.sheets[0] && cd.sheets[0].properties && cd.sheets[0].properties.sheetId) || 0;
 
