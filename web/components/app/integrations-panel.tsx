@@ -234,6 +234,17 @@ const INTEGRATIONS: Integration[] = [
     key: "wilcom", name: "Wilcom EWA", blurb: "Embroidery digitizing engine", group: "Embroidery",
     check: configOnly("/api/wilcom/config", "configured"),
   },
+  // Alibaba was the one integration with no card here, so its app key and secret could only
+  // be rotated by editing the .env on the box and restarting. `key` must match the server's
+  // SECRET_DEFS `integration` value or the edit fields attach to nothing.
+  //
+  // configOnly reports whether the KEYS are present — not whether the OAuth token is still
+  // valid. Those are different facts and this panel is about credentials; the connection
+  // itself is on the Sourcing page.
+  {
+    key: "alibaba", name: "Alibaba", blurb: "Supplier sourcing + buyer search", group: "Suppliers",
+    check: configOnly("/api/alibaba/config", "configured"),
+  },
 ]
 
 const GROUPS = ["Channels", "Ads", "Payments", "Shipping", "Suppliers", "Embroidery", "Other"]

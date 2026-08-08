@@ -40,6 +40,8 @@ const SECRET_DEFS = [
   { name: 'GOOGLE_ADS_CLIENT_SECRET', label: 'Client secret',    integration: 'google_ads' },
   { name: 'GOOGLE_ADS_DEVELOPER_TOKEN', label: 'Developer token', integration: 'google_ads' },
   { name: 'GOOGLE_ADS_LOGIN_CUSTOMER_ID', label: 'Manager (MCC) ID', integration: 'google_ads' },
+  { name: 'ALIBABA_APP_KEY',       label: 'App key',          integration: 'alibaba' },
+  { name: 'ALIBABA_APP_SECRET',    label: 'App secret',       integration: 'alibaba' },
   { name: 'WILCOM_APP_ID',         label: 'Application ID',   integration: 'wilcom' },
   { name: 'WILCOM_APP_KEY',        label: 'Application key',  integration: 'wilcom' },
 ];

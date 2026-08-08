@@ -25,6 +25,12 @@ export const SECRET_NAMES = [
   'GOOGLE_SHEETS_API_KEY', 'ANTHROPIC_API_KEY',
   'BYEASTSIDE_API_KEY', 'PINKDESIGN_API_KEY', 'PINKDESIGN_BOARD_ID', 'PINKDESIGN_WEBHOOK_SECRET',
   'WILCOM_APP_ID', 'WILCOM_APP_KEY',
+  // Alibaba was the only integration whose credentials lived exclusively in the .env file,
+  // so rotating them meant editing the box and restarting — while every other supplier and
+  // channel could be rotated from Settings. alibaba.js already reads both inside creds()
+  // at CALL time rather than at module load, so a rotation here takes effect on the next
+  // request with no deploy (see the note in CLAUDE.md §3 about module-level env snapshots).
+  'ALIBABA_APP_KEY', 'ALIBABA_APP_SECRET',
 ];
 const ALLOWED = new Set(SECRET_NAMES);
 
