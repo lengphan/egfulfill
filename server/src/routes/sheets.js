@@ -100,15 +100,23 @@ const T_OPTS = {
 // fill behind live text is the "tinted canvas under a 700-row queue" mistake. The banner row
 // carries the strong tone; the header row a wash of it; the data cells nothing at all.
 const BAND = {
-  order:   { label: 'ORDER',    banner: { red: 0.88, green: 0.94, blue: 0.90 }, header: { red: 0.95, green: 0.98, blue: 0.96 } },
-  ship:    { label: 'SHIP TO',  banner: { red: 0.86, green: 0.90, blue: 1.0 },  header: { red: 0.94, green: 0.96, blue: 1.0 } },
-  product: { label: 'PRODUCT',  banner: { red: 0.91, green: 0.87, blue: 1.0 },  header: { red: 0.96, green: 0.94, blue: 1.0 } },
-  extras:  { label: 'EXTRAS',   banner: { red: 0.94, green: 0.94, blue: 0.94 }, header: { red: 0.98, green: 0.98, blue: 0.98 } },
+  order:   { label: 'ORDER',    banner: { red: 0.88, green: 0.94, blue: 0.90 } },
+  ship:    { label: 'SHIP TO',  banner: { red: 0.86, green: 0.90, blue: 1.0 } },
+  product: { label: 'PRODUCT',  banner: { red: 0.91, green: 0.87, blue: 1.0 } },
+  extras:  { label: 'EXTRAS',   banner: { red: 0.94, green: 0.94, blue: 0.94 } },
 };
 
-// Obligation is per COLUMN now, so it rides on the header text as a mark rather than being
-// implied by which band the column sits in. Required cells also carry bold red lettering, so
-// the mark is not the only signal.
+// TWO colours on the header row, and they encode OBLIGATION — the one question a filler
+// actually asks of a column. The banner above already says what the column is ABOUT, so
+// tinting the header by section too said the same thing twice and left "must I fill this?"
+// carried by an asterisk alone. These are stronger than the old per-section washes, which
+// were pale enough (0.94–0.98) to read as plain white on screen.
+const DUTY_FILL = {
+  req: { red: 0.78, green: 0.85, blue: 1.0 },    // must fill — clearly blue
+  asg: { red: 0.90, green: 0.92, blue: 0.94 },   // optional, but consequential (see mark)
+  '':  { red: 0.90, green: 0.92, blue: 0.94 },   // optional
+};
+
 const DUTY_MARK = { req: ' *', asg: ' ~', '': '' };
 
 // Contiguous runs of one band, in column order — what the banner row merges across.
@@ -151,7 +159,7 @@ export function buildTemplate(title) {
     });
   }) };
   const headerRow = { values: T_COLUMNS.map((c) => cell(c.h + DUTY_MARK[c.duty], {
-    backgroundColor: BAND[c.g].header,
+    backgroundColor: DUTY_FILL[c.duty],
     textFormat: {
       bold: true,
       // Required reads in red as well as carrying the asterisk — colour alone fails for a
@@ -205,7 +213,7 @@ export function buildTemplate(title) {
     return out;
   };
 
-  return { createBody, requests, columns: T_COLUMNS.map((c) => c.h), bands: BANDS };
+  return { createBody, requests, columns: T_COLUMNS.map((c) => c.h), duties: T_COLUMNS.map((c) => c.duty), bands: BANDS };
 }
 
 // Pull a spreadsheet ID out of a full URL or accept a bare ID.
@@ -315,6 +323,7 @@ export function sheetsRoutes(app, requireAuth) {
       ok: true,
       columns: tpl.columns,
       bands: tpl.bands.map((b) => ({ band: b.g, label: BAND[b.g].label, from: tpl.columns[b.start], span: b.count })),
+      headerFills: tpl.duties.map((d, i) => ({ column: tpl.columns[i], duty: d || 'optional' })),
       frozenRows: tpl.createBody.sheets[0].properties.gridProperties.frozenRowCount,
       rowsSeeded: tpl.createBody.sheets[0].data[0].rowData.length,
       merges: reqs.filter((r) => kind(r) === 'mergeCells').map((r) => r.mergeCells.range),
@@ -344,6 +353,7 @@ export function sheetsRoutes(app, requireAuth) {
 
     // Merges, column widths and dropdowns can't be expressed on create — they need a
     // batchUpdate against the now-known sheetId.
+    let formattingError = null;
     const requests = tpl.requests(gid);
     if (requests.length) {
       const br = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + id + ':batchUpdate', {
@@ -354,13 +364,17 @@ export function sheetsRoutes(app, requireAuth) {
       // Surfaced so "my dropdowns are missing" is answerable rather than a mystery.
       if (!br.ok) {
         const bd = await br.json().catch(() => ({}));
-        app.log.warn({ err: (bd.error && bd.error.message) || br.status }, 'sheet template formatting failed');
+        // RETURN it, don't just log it. The sheet is created and usable either way, so this
+        // must not fail the request — but a caller who gets {ok:true} and a plain sheet with
+        // no dropdowns has no way to learn why, and the log is on a box they aren't reading.
+        formattingError = (bd.error && bd.error.message) || ('HTTP ' + br.status);
+        app.log.warn({ err: formattingError }, 'sheet template formatting failed');
       }
     }
 
     // Share anyone-with-link → writer so the seller can fill it (needs Drive API).
     await fetch('https://www.googleapis.com/drive/v3/files/' + id + '/permissions', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'writer', type: 'anyone' }) }).catch(() => {});
-    return { ok: true, id, url: 'https://docs.google.com/spreadsheets/d/' + id + '/edit' };
+    return { ok: true, id, url: 'https://docs.google.com/spreadsheets/d/' + id + '/edit', formattingError };
   });
 
   // Read a sheet → { rows, title, tab }. Any seller may import into their own orders.

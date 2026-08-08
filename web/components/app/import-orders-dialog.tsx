@@ -178,7 +178,16 @@ export function ImportOrdersDialog({
         if (r.url) {
           window.open(r.url, "_blank", "noopener")
           setSheetUrl(r.url)
-          setNotice("Your sheet is open in a new tab — required columns are grouped and coloured at the front, with dropdowns where we know the options. Fill it in, then press Load.")
+          // The sheet is created by one call and FORMATTED by a second. The second can fail
+          // on its own — leaving a real, usable sheet with no colours, merges or dropdowns.
+          // Saying "coloured, with dropdowns" regardless is how "my dropdowns are missing"
+          // became unanswerable: the app asserted a state it hadn't checked.
+          if (r.formattingError) {
+            setNotice(null)
+            setError(`Sheet created, but Google rejected the formatting — ${r.formattingError}. The columns are correct and it will still import; the colours and dropdowns are missing.`)
+          } else {
+            setNotice("Your sheet is open in a new tab — required columns are blue, optional grey, with dropdowns where we know the options. Fill it in, then press Load.")
+          }
           return
         }
         // Fall through to the clipboard path rather than dead-ending: a sheet they can
@@ -426,7 +435,7 @@ export function ImportOrdersDialog({
                     </Button>
                     <span className="text-2xs text-muted-foreground">
                       {sheetsCanCreate
-                        ? "opens a formatted sheet — required columns first, dropdowns filled in"
+                        ? "opens a formatted sheet — required columns blue, optional grey, dropdowns filled in"
                         : "opens a blank sheet with the header row on your clipboard"}
                     </span>
                   </div>

@@ -690,7 +690,7 @@ export function getSheetRows(url: string) {
 /** Create a ready-formatted Orders sheet in the service account's Drive, shared
  *  anyone-with-link → editor. Only available when `canCreate` is true. */
 export function createSheet() {
-  return api<{ ok?: boolean; id?: string; url?: string; error?: string }>(`/api/sheets/create`, { method: "POST" })
+  return api<{ ok?: boolean; id?: string; url?: string; error?: string; formattingError?: string | null }>(`/api/sheets/create`, { method: "POST" })
 }
 
 /** The blank catalog. Cached longer than the order list — it's reference data, and the only
