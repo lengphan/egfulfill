@@ -97,6 +97,16 @@ export type CsvDuty = "required" | "assigned" | "oneOf" | "optional"
 export const dutyOf = (c: CsvColumn): CsvDuty =>
   c.required ? "required" : c.assigned ? "assigned" : c.oneOf ? "oneOf" : "optional"
 
+/** Fills for the .xlsx template, ARGB. The Google Sheet builds its own from float RGB in
+ *  sheets.js; these are the same intent in Excel's colour format. Section tints go on the
+ *  banner row, duty fills on the header row — the two rows answer different questions. */
+export const SECTION_FILL: Record<CsvSection, string> = {
+  order: "FFE0F1E7", shipTo: "FFDBE6FF", product: "FFE8DEFF", extras: "FFF0F0F0",
+}
+export const DUTY_FILL: Record<CsvDuty, string> = {
+  required: "FFC7D9FF", assigned: "FFE6EAEF", oneOf: "FFE6EAEF", optional: "FFE6EAEF",
+}
+
 /** The marker that rides on the column header: `*` required, `~` we'll assign one. */
 export const DUTY_MARK: Record<CsvDuty, string> = {
   required: "*", assigned: "~", oneOf: "†", optional: "",

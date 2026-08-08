@@ -12,11 +12,13 @@ import {
   rowsToRecords,
   groupToOrders,
   CSV_COLUMNS,
-  TEMPLATE_HEADERS,
   TEMPLATE_TSV,
   COLUMN_OPTIONS,
   GROUP_LABEL,
   DUTY_LABEL,
+  DUTY_MARK,
+  SECTION_FILL,
+  DUTY_FILL,
   dutyOf,
   columnBands,
   type ImportRecord,
@@ -25,41 +27,81 @@ import { createOrder, getOrders, getSheetsConfig, getSheetRows, createSheet } fr
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
 
-// Build + download the .xlsx template. Lazy-imports the (already-installed) xlsx lib so it
-// never weighs down the app's main bundle — only loads when someone clicks the button.
+// Build + download the .xlsx template, with the SAME shape as the Google Sheet: a merged
+// section banner, a header row coloured by obligation, frozen panes, and real dropdowns.
 //
-// Carries the SAME two-row header as the Google Sheet: a merged band banner over the column
-// names, so both templates read identically and findHeaderRow() handles both the same way.
+// Written with ExcelJS, not SheetJS. SheetJS's community build cannot write cell fills or
+// data validation — it emits a plain sheet and does not throw, which is why this download
+// silently had neither while the Google Sheet had both. ExcelJS writes real
+// <dataValidation type="list"> entries. Reading an uploaded .xlsx stays on SheetJS: that
+// path works and is battle-tested, and swapping it would risk the import to fix the export.
 //
-// It cannot carry the colours or the dropdowns. Cell styling and data validation are
-// SheetJS Pro features; the community build we ship writes neither, and silently — it does
-// not throw, it just emits a plain sheet. So the bands are spelled out in the banner text
-// instead of being conveyed by fill alone, which is the part that actually has to survive.
-// An "Options" tab lists the accepted values so they are at least discoverable here.
+// Both libraries are lazy-imported, so neither reaches the main bundle.
 async function downloadXlsxTemplate() {
-  const XLSX = await import("xlsx")
+  const ExcelJS = (await import("exceljs")).default
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet("Orders")
   const bands = columnBands()
-  // Banner row: the label sits in the band's first cell and the merge spans the rest.
-  const banner = TEMPLATE_HEADERS.map(() => "")
+
+  // Row 1 — section banner, one merged run per band.
+  const banner = CSV_COLUMNS.map(() => "")
   bands.forEach((b) => { banner[b.start] = GROUP_LABEL[b.group] })
-  const ws = XLSX.utils.aoa_to_sheet([banner, TEMPLATE_HEADERS])
-  ws["!merges"] = bands
-    .filter((b) => b.count > 1)
-    .map((b) => ({ s: { r: 0, c: b.start }, e: { r: 0, c: b.start + b.count - 1 } }))
-  ws["!cols"] = TEMPLATE_HEADERS.map((h) => ({ wch: Math.max(12, h.length + 2) }))
-  ws["!freeze"] = { xSplit: "0", ySplit: "2" }
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, "Orders")
-  // Accepted values, one column per constrained field — the .xlsx equivalent of the
-  // Sheet's dropdowns.
-  const optCols = Object.entries(COLUMN_OPTIONS)
-  const optHeader = optCols.map(([key]) => CSV_COLUMNS.find((c) => c.key === key)?.header ?? key)
-  const depth = Math.max(...optCols.map(([, v]) => v.length))
-  const optRows = Array.from({ length: depth }, (_, i) => optCols.map(([, v]) => v[i] ?? ""))
-  const wsOpts = XLSX.utils.aoa_to_sheet([optHeader, ...optRows])
-  wsOpts["!cols"] = optHeader.map((h) => ({ wch: Math.max(14, h.length + 2) }))
-  XLSX.utils.book_append_sheet(wb, wsOpts, "Accepted values")
-  XLSX.writeFile(wb, "EGFULFILL Order Import.xlsx")
+  ws.addRow(banner)
+  bands.forEach((b) => {
+    if (b.count > 1) ws.mergeCells(1, b.start + 1, 1, b.start + b.count)
+    for (let i = b.start; i < b.start + b.count; i++) {
+      const cell = ws.getCell(1, i + 1)
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: SECTION_FILL[b.group] } }
+      cell.font = { bold: true, size: 10 }
+      cell.alignment = { horizontal: "center" }
+    }
+  })
+
+  // Row 2 — headers carrying their obligation mark, filled by obligation.
+  ws.addRow(CSV_COLUMNS.map((c) => c.header + DUTY_MARK[dutyOf(c)]))
+  CSV_COLUMNS.forEach((c, i) => {
+    const duty = dutyOf(c)
+    const cell = ws.getCell(2, i + 1)
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DUTY_FILL[duty] } }
+    // Required reads in red as well as being filled and asterisked — colour alone fails a
+    // colour-blind filler, and an asterisk alone is easy to miss across 21 columns.
+    cell.font = { bold: true, color: { argb: duty === "required" ? "FF9E1721" : "FF1A1A1A" } }
+  })
+
+  ws.views = [{ state: "frozen", ySplit: 2 }]
+  ws.columns.forEach((col, i) => { col.width = Math.min(28, Math.max(13, CSV_COLUMNS[i].header.length + 4)) })
+
+  // Real dropdowns over the data rows. NOT strict (showErrorMessage false): a rejected paste
+  // is worse than an odd value, and the importer normalises these anyway — the same call the
+  // Google Sheet makes. Excel caps an inline list at 255 characters; every list here is well
+  // under (US states, the longest, is ~152).
+  const DATA_ROWS = 500
+  Object.entries(COLUMN_OPTIONS).forEach(([key, values]) => {
+    const idx = CSV_COLUMNS.findIndex((c) => c.key === key)
+    if (idx < 0) return
+    const letter = ws.getColumn(idx + 1).letter
+    // The RANGE api, via a narrow cast — ExcelJS ships it but leaves it off the Worksheet
+    // type. It is worth the cast: assigning per cell instead (the typed path) makes ExcelJS
+    // emit the same rule twice under split, wrong ranges (C3:C500 *and* C10:C500) and a
+    // larger file, where this writes exactly one correct <dataValidation sqref="C3:C500">.
+    const validations = (ws as unknown as {
+      dataValidations: { add: (range: string, rule: Record<string, unknown>) => void }
+    }).dataValidations
+    validations.add(`${letter}3:${letter}${DATA_ROWS}`, {
+      type: "list",
+      allowBlank: true,
+      formulae: [`"${values.join(",")}"`],
+      showErrorMessage: false,
+    })
+  })
+
+  const buf = await wb.xlsx.writeBuffer()
+  const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "EGFULFILL Order Import.xlsx"
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export function ImportOrdersDialog({
