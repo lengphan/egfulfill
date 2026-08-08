@@ -1,13 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CircleNotch, Warning, Plus, Check, MagnifyingGlass } from "@phosphor-icons/react"
+import { CircleNotch, Warning, Plus, Check } from "@phosphor-icons/react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { suggestSuppliers, saveSourcing, fetchSourcingPrice, type EtsyListing } from "@/lib/api"
+import { suggestSuppliers, saveSourcing, searchAlibaba, type EtsyListing, type AlibabaProduct } from "@/lib/api"
 
 /**
  * "Find suppliers" — the bridge from a SpyDeck listing to the sourcing pipeline.
@@ -35,19 +34,68 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
 }) {
   const [data, setData] = useState<Suggestion | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const [url, setUrl] = useState("")
 
 
-  const [saving, setSaving] = useState(false)
-  const [savedCount, setSavedCount] = useState(0)
+  /**
+   * The supplier products themselves. null = still looking, [] = nothing came back — the
+   * two must not look the same, or a dead search reads as "no such supplier exists".
+   */
+  const [hits, setHits] = useState<AlibabaProduct[] | null>(null)
+  const [hitErr, setHitErr] = useState<string | null>(null)
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [savedCount, setSavedCount] = useState(0)   // read by the footer line below
   const [note, setNote] = useState<string | null>(null)
+
+  /**
+   * Run the FIRST query the moment the analysis arrives — one call, not one per query.
+   * The queries are ordered best-first by the model, and three searches to fill one dialog
+   * would spend three Alibaba calls every time someone glances at a listing.
+   */
+  useEffect(() => {
+    const first = (data?.queries ?? [])[0]
+    if (!first) return
+    let alive = true
+    const t = setTimeout(() => {
+      searchAlibaba({ keyword: first, page: 1, pageSize: 12 })
+        .then((r) => {
+          if (!alive) return
+          if (r.error) { setHitErr(r.error); setHits([]) } else { setHits(r.products ?? []); setHitErr(null) }
+        })
+        .catch((e) => { if (alive) { setHitErr(e instanceof Error ? e.message : "search failed"); setHits([]) } })
+    }, 0)
+    return () => { alive = false; clearTimeout(t) }
+  }, [data])
+
+  /** Save one result straight to Sourcing as a Prospect — the paste-a-link step this replaces. */
+  const saveHit = async (h: AlibabaProduct) => {
+    const id = String(h.id ?? h.url ?? "")
+    if (!id || savedIds.has(id)) return
+    setSavingId(id)
+    try {
+      await saveSourcing({
+        title: (h.title || "Alibaba product").slice(0, 120),
+        url: h.url || "", image: h.image || null,
+        // Alibaba quotes a RANGE by quantity band ("$6.06-8.07"); there is no single number
+        // to store, so cost stays null rather than guessing an end of it.
+        cost: null, sellPrice: null, moq: 1, stage: "prospect",
+      })
+      setSavedIds((p) => new Set(p).add(id))
+      setSavedCount((n) => n + 1)
+      // The parent shows a toast naming what landed — pass the title, not a bare ping.
+      onSaved?.(h.title || "Supplier product")
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Couldn't save that one.")
+    } finally { setSavingId(null) }
+  }
 
   // Reset per listing rather than on close, so reopening a different product never shows the
   // previous one's answer for a frame.
   useEffect(() => {
     if (!listing) return
     const t = setTimeout(() => {
-      setData(null); setErr(null); setUrl(""); setSavedCount(0); setNote(null)
+      setData(null); setErr(null); setSavedCount(0); setNote(null)
+      setHits(null); setHitErr(null); setSavedIds(new Set()); setSavingId(null)
       suggestSuppliers({
         listingId: String(listing.listing_id),
         title: listing.title,
@@ -61,38 +109,9 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
 
   if (!listing) return null
 
-  const sell = listing.price_usd ?? listing.price ?? null
-
   // Save a supplier link as a Prospect. The competitor's price becomes the sell price — it's
   // the market rate — and the supplier's own cost is left blank because only the supplier
   // page knows it, and guessing would produce a margin built on nothing.
-  const saveProspect = async () => {
-    if (!url.trim()) return
-    setSaving(true); setNote(null)
-    try {
-      const read = await fetchSourcingPrice(url.trim()).catch(() => null)
-      const r = await saveSourcing({
-        title: (data?.productType || listing.title).slice(0, 120),
-        url: url.trim(),
-        image: read?.image || listing.thumb || listing.image || null,
-        cost: read?.price ?? null,
-        sellPrice: sell,
-        moq: 1,
-        stage: "prospect",
-        productId: String(listing.listing_id),
-        note: `From SpyDeck — ${listing.title.slice(0, 80)}`,
-      })
-      if (r.error) throw new Error(r.error)
-      setSavedCount((n) => n + 1)
-      setUrl("")
-      setNote(read?.price != null
-        ? `Saved as a Prospect, with $${read.price} read off the page.`
-        : "Saved as a Prospect. Add the unit price in Sourcing to see profit.")
-      onSaved?.(data?.productType || listing.title)
-    } catch (e) {
-      setNote(e instanceof Error ? e.message : "Couldn't save that link.")
-    } finally { setSaving(false) }
-  }
 
   return (
     <Dialog open={!!listing} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -157,38 +176,67 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
               <div className="mb-1.5 text-xs text-muted-foreground">
                 Open one on the Sourcing page to search it
               </div>
-              <div className="space-y-1.5">
-                {/* HANDS OFF rather than searching here. This dialog is a narrow modal over
-                    a grid; Sourcing has the whole page, 24 results at a time and Previous /
-                    Next. Running the search in both places meant the cramped one was the one
-                    people used. The genuinely hard part — turning a marketing title into
-                    queries a B2B marketplace understands — still happens here, and that is
-                    the only part that ever needed a dialog. */}
-                {(data.queries ?? []).map((qy) => (
-                  <a key={qy} href={`/sourcing?q=${encodeURIComponent(qy)}`}
-                     className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:border-primary/50 hover:bg-accent">
-                    <span className="flex-1">{qy}</span>
-                    <MagnifyingGlass size={14} className="shrink-0 text-muted-foreground" />
-                  </a>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-border p-3">
-              <div className="text-xs font-medium">Found one? Paste its link</div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                It lands in Sourcing as a <strong>Prospect</strong>. Save a few and compare them there
-                before you message anyone.
-              </p>
-              <div className="mt-2 flex gap-2">
-                <Input value={url} onChange={(e) => setUrl(e.target.value)} className="h-9"
-                       placeholder="https://www.alibaba.com/product-detail/…"
-                       onKeyDown={(e) => { if (e.key === "Enter") saveProspect() }} />
-                <Button size="sm" onClick={saveProspect} disabled={!url.trim() || saving}>
-                  {saving ? <CircleNotch size={14} className="animate-spin" /> : <Plus size={14} weight="bold" />}
-                  Save as Prospect
-                </Button>
-              </div>
+              {/* THE PRODUCTS THEMSELVES, not more keywords.
+                  This listed the AI's suggested queries and asked you to go and run one,
+                  then offered a box to paste a link back. Three steps to see a photograph.
+                  Someone opening "Find suppliers" on a listing already knows what the thing
+                  is — what they don't have is a picture of who can make it. So the best
+                  query runs on arrival and the results land here. The queries still do the
+                  hard part (turning a marketing title into something a B2B marketplace
+                  understands); they just don't need to be read to be useful. */}
+              {hits === null && !hitErr && (
+                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                  <CircleNotch size={14} className="animate-spin" /> Finding suppliers…
+                </div>
+              )}
+              {hitErr && (
+                <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
+                  Couldn&apos;t reach Alibaba just now — {hitErr}
+                </p>
+              )}
+              {hits !== null && hits.length === 0 && !hitErr && (
+                <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
+                  Nothing came back for this one. Sourcing has the full search if you want to widen it.
+                </p>
+              )}
+              {hits !== null && hits.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {hits.slice(0, 9).map((h) => {
+                    const id = String(h.id ?? h.url ?? "")
+                    const isSaved = savedIds.has(id)
+                    return (
+                      <div key={id} className="flex flex-col overflow-hidden rounded-xl border border-border">
+                        <a href={h.url || "#"} target="_blank" rel="noopener noreferrer"
+                           className="relative block aspect-square bg-muted">
+                          {h.image
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={h.image} alt="" className="size-full object-cover" />
+                            : <span className="flex size-full items-center justify-center text-2xs text-muted-foreground">no image</span>}
+                          {h.price && (
+                            <span className="absolute bottom-1 left-1 rounded bg-foreground/80 px-1.5 py-0.5 text-2xs font-semibold text-background">
+                              {h.price}
+                            </span>
+                          )}
+                        </a>
+                        <div className="flex flex-1 flex-col gap-1.5 p-2">
+                          <p className="line-clamp-2 text-2xs leading-snug">{h.title}</p>
+                          <Button size="sm" variant={isSaved ? "outline" : "default"}
+                                  className="mt-auto h-7 w-full text-2xs"
+                                  disabled={isSaved || savingId === id}
+                                  onClick={() => saveHit(h)}>
+                            {savingId === id ? <CircleNotch size={12} className="animate-spin" />
+                              : isSaved ? <Check size={12} weight="bold" /> : <Plus size={12} weight="bold" />}
+                            {isSaved ? "Saved" : "Add"}
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              {/* Confirmation stays after the grid: adding from here sends the product to a
+                  page you are not looking at, so without a line saying so the button looks
+                  like it did nothing. */}
               {note && <p className="mt-2 text-xs text-muted-foreground">{note}</p>}
               {savedCount > 0 && (
                 <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
