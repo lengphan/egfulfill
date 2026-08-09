@@ -32,11 +32,14 @@ const cleanTag = (raw: string) => raw.replace(/[^\p{L}\p{N} '-]/gu, "").trim().s
  */
 const WATERMARK_TILE = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="156" height="100">` +
-    `<g transform="rotate(-24 78 50)" font-family="Helvetica,Arial,sans-serif" font-size="10" font-weight="600" letter-spacing="2.2">` +
-      `<text x="4" y="33" fill="rgba(0,0,0,.34)">REFERENCE</text>` +
-      `<text x="3" y="32" fill="rgba(255,255,255,.62)">REFERENCE</text>` +
-      `<text x="-46" y="83" fill="rgba(0,0,0,.34)">NOT PUBLISHED</text>` +
-      `<text x="-47" y="82" fill="rgba(255,255,255,.62)">NOT PUBLISHED</text>` +
+    // Both lines CENTRED on the tile. Anchored anywhere else, the rotation swings the ends
+    // of the longer line past the tile edge and the background repeat clips them — which is
+    // how "NOT PUBLISHED" came out as "· ISHED" across the whole lightbox.
+    `<g transform="rotate(-24 78 50)" font-family="Helvetica,Arial,sans-serif" font-weight="600" text-anchor="middle">` +
+      `<text x="79" y="46" font-size="10" letter-spacing="2.2" fill="rgba(0,0,0,.34)">REFERENCE</text>` +
+      `<text x="78" y="45" font-size="10" letter-spacing="2.2" fill="rgba(255,255,255,.62)">REFERENCE</text>` +
+      `<text x="79" y="63" font-size="7.5" letter-spacing="1.6" fill="rgba(0,0,0,.34)">NOT PUBLISHED</text>` +
+      `<text x="78" y="62" font-size="7.5" letter-spacing="1.6" fill="rgba(255,255,255,.62)">NOT PUBLISHED</text>` +
     `</g>` +
   `</svg>`
 )
