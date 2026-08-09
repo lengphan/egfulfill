@@ -26,9 +26,11 @@ const cleanTag = (raw: string) => raw.replace(/[^\p{L}\p{N} '-]/gu, "").trim().s
  * on the lightbox (and vice versa). A repeating tile has the same absolute spacing at every
  * size, so one `backgroundSize` sets the density.
  *
- * The dark copy under each white one is the text-shadow. These are product photos shot on
- * white and cream, and unshadowed white simply vanishes on them — the shadow is what keeps
- * a faint mark honest rather than decorative.
+ * Plain white, no shadow behind it. The shadowed version read as a hard label stamped over
+ * the photo rather than a watermark. The cost is on white and cream backgrounds, where a
+ * faint white mark is genuinely hard to see — the count line above the grid ("N reference
+ * photos shown, none published") and the lightbox caption are what carry that fact now, so
+ * the mark itself doesn't have to shout it.
  */
 const WATERMARK_TILE = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="156" height="100">` +
@@ -36,10 +38,8 @@ const WATERMARK_TILE = encodeURIComponent(
     // of the longer line past the tile edge and the background repeat clips them — which is
     // how "NOT PUBLISHED" came out as "· ISHED" across the whole lightbox.
     `<g transform="rotate(-24 78 50)" font-family="Helvetica,Arial,sans-serif" font-weight="600" text-anchor="middle">` +
-      `<text x="79" y="46" font-size="10" letter-spacing="2.2" fill="rgba(0,0,0,.34)">REFERENCE</text>` +
-      `<text x="78" y="45" font-size="10" letter-spacing="2.2" fill="rgba(255,255,255,.62)">REFERENCE</text>` +
-      `<text x="79" y="63" font-size="7.5" letter-spacing="1.6" fill="rgba(0,0,0,.34)">NOT PUBLISHED</text>` +
-      `<text x="78" y="62" font-size="7.5" letter-spacing="1.6" fill="rgba(255,255,255,.62)">NOT PUBLISHED</text>` +
+      `<text x="78" y="45" font-size="10" letter-spacing="2.2" fill="rgba(255,255,255,.34)">REFERENCE</text>` +
+      `<text x="78" y="62" font-size="7.5" letter-spacing="1.6" fill="rgba(255,255,255,.34)">NOT PUBLISHED</text>` +
     `</g>` +
   `</svg>`
 )
@@ -55,10 +55,8 @@ const WATERMARK_TILE = encodeURIComponent(
 const WATERMARK_FIT = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">` +
     `<g transform="rotate(-24 50 50)" font-family="Helvetica,Arial,sans-serif" font-weight="600" text-anchor="middle">` +
-      `<text x="50" y="48" font-size="11" letter-spacing="1.6" fill="rgba(0,0,0,.34)">REFERENCE</text>` +
-      `<text x="49" y="47" font-size="11" letter-spacing="1.6" fill="rgba(255,255,255,.62)">REFERENCE</text>` +
-      `<text x="50" y="63" font-size="7.5" letter-spacing="1.2" fill="rgba(0,0,0,.34)">NOT PUBLISHED</text>` +
-      `<text x="49" y="62" font-size="7.5" letter-spacing="1.2" fill="rgba(255,255,255,.62)">NOT PUBLISHED</text>` +
+      `<text x="50" y="47" font-size="11" letter-spacing="1.6" fill="rgba(255,255,255,.34)">REFERENCE</text>` +
+      `<text x="50" y="62" font-size="7.5" letter-spacing="1.2" fill="rgba(255,255,255,.34)">NOT PUBLISHED</text>` +
     `</g>` +
   `</svg>`
 )
