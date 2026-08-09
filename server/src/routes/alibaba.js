@@ -350,6 +350,44 @@ export function alibabaRoutes(app, requireAdmin) {
     }
   });
 
+
+  /**
+   * CAN WE READ THE ORDERS THIS ACCOUNT ALREADY HAS?
+   *
+   * Search works, so the app is entitled to SOMETHING — but entitlement is per-endpoint and
+   * we have never asked for the trade side. Rather than assume either way (this integration
+   * has already cost four probes to find one parameter shape, and a supplier-id claim that
+   * was true only by luck), ask the gateway and report exactly what it says.
+   *
+   * Tries the documented ICBU buyer order endpoints in turn and returns each one's verbatim
+   * answer. A gateway that says "no permission" is a DIFFERENT answer from one that says
+   * "unknown method", and the distinction decides whether this is an approval request or a
+   * dead end — so nothing here collapses them into a boolean.
+   *
+   * Read-only, admin-only, and it never writes. Safe to run against the live account.
+   */
+  app.get('/api/alibaba/probe-orders', { preHandler: requireAdmin }, async (req, reply) => {
+    const row = await tokenRow();
+    if (!row?.access_token) { reply.code(400); return { error: 'Connect Alibaba first.' }; }
+    const auth = await refreshIfDue(row);
+    const CANDIDATES = [
+      ['/eco/buyer/order/list',        { param0: JSON.stringify({ index: 1, size: 10 }) }],
+      ['/eco/buyer/trade/order/list',  { param0: JSON.stringify({ index: 1, size: 10 }) }],
+      ['/eco/buyer/order/get',         { param0: JSON.stringify({ index: 1, size: 10 }) }],
+      ['/eco/buyer/order/search',      { param0: JSON.stringify({ index: 1, size: 10 }) }],
+    ];
+    const out = [];
+    for (const [path, params] of CANDIDATES) {
+      try {
+        const body = await call(path, params, { accessToken: auth.access_token });
+        out.push({ path, ok: true, keys: body && typeof body === 'object' ? Object.keys(body) : [], body });
+      } catch (e) {
+        out.push({ path, ok: false, error: String(e?.message || e), detail: e?.body || null });
+      }
+    }
+    return { tried: out.length, results: out };
+  });
+
   /**
    * Product search — the endpoint the Sourcing panel will call once the app is approved.
    * Returns a flattened shape so the UI never has to know about result.data.products.
