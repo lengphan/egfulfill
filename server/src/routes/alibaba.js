@@ -32,6 +32,62 @@ import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 
 /**
+ * KEEP THE TOKEN ALIVE — the fix for "the specified access token is invalid or expired".
+ *
+ * The exchange stored refresh_token, expires_at and refresh_expires_at from day one, with a
+ * comment saying instants are stored "so a restart can't lose track of when a refresh is
+ * due" — and then nothing ever refreshed. So every connection died on Alibaba's schedule and
+ * stayed dead until someone re-authorised by hand, which is exactly what kept happening.
+ *
+ * Two things now keep it alive:
+ *   · refreshIfDue() runs before a call and renews inside a 10-minute window of expiry, so
+ *     the common case never reaches an expired token at all;
+ *   · a call that fails ANYWAY on an expiry error refreshes once and retries — clocks drift,
+ *     a token can be revoked early, and expires_at is only ever our estimate of their state.
+ *
+ * DEFENSIVE ABOUT THE PARAM SHAPE. This integration's own history is four probes to find
+ * that search wanted {index,size,keyword} inside param0 — their docs were wrong. So both
+ * documented spellings of the grant are sent together; the gateway ignores what it does not
+ * recognise, and this costs one field rather than another day of probing.
+ *
+ * Failure is NOT fatal here: if the refresh cannot be done (no refresh_token, or the refresh
+ * window itself has passed) the caller proceeds with the old token and gets the real error,
+ * which the UI turns into "reconnect". Throwing here would replace a precise message with a
+ * vaguer one.
+ */
+async function refreshIfDue(row, { force = false } = {}) {
+  if (!row?.refresh_token) return row;
+  const due = force
+    || !row.expires_at
+    || new Date(row.expires_at).getTime() - Date.now() < 10 * 60 * 1000;
+  if (!due) return row;
+  // Past the refresh window there is nothing to renew with — only a human re-auth helps.
+  if (row.refresh_expires_at && new Date(row.refresh_expires_at).getTime() < Date.now()) return row;
+  try {
+    const body = await call('/auth/token/refresh',
+      { refresh_token: row.refresh_token, refreshToken: row.refresh_token }, { method: 'POST' });
+    const t = body?.access_token ? body : (body?.result || body);
+    if (!t?.access_token) return row;
+    const secs = (v) => (Number(v) > 0 ? Number(v) : null);
+    const next = {
+      access_token: t.access_token,
+      refresh_token: t.refresh_token || row.refresh_token,
+      expires_at: secs(t.expires_in) ? new Date(Date.now() + secs(t.expires_in) * 1000) : null,
+      refresh_expires_at: secs(t.refresh_expires_in)
+        ? new Date(Date.now() + secs(t.refresh_expires_in) * 1000) : row.refresh_expires_at,
+    };
+    await q(`update alibaba_auth set access_token=$1, refresh_token=$2, expires_at=$3,
+               refresh_expires_at=$4, updated_at=now() where id=1`,
+      [next.access_token, next.refresh_token, next.expires_at, next.refresh_expires_at]).catch(() => {});
+    return { ...row, ...next };
+  } catch { return row; }
+}
+
+/** Is this the gateway telling us the access token is finished? */
+const isExpiredTokenError = (e) => /invalid or expired|token.*expired|expired.*token/i.test(String(e?.message || e));
+
+
+/**
  * Alibaba's CDN bakes the requested size into the filename: the search returns
  * "…U.png_220x220.png" — the ORIGINAL name ("…U.png") with "_220x220.png" appended. So the
  * full-size url is the original with that whole suffix removed, NOT a swapped extension:
@@ -303,9 +359,21 @@ export function alibabaRoutes(app, requireAdmin) {
        * asks for param0, param0 alone asks for index, index BESIDE param0 still asks for
        * index (it has to be INSIDE it), and index+keyword then asks for `size`.
        */
-      const body = await call('/eco/buyer/product/search',
+      // Renew first if it is close to expiry, then — if the gateway rejects it anyway —
+      // force one refresh and retry. Clocks drift and tokens can be revoked early, so
+      // expires_at is our estimate of their state, never a guarantee.
+      let auth = await refreshIfDue(row);
+      const search = (tok) => call('/eco/buyer/product/search',
         { param0: JSON.stringify({ index: page, size: 20, keyword }) },
-        { accessToken: row.access_token });
+        { accessToken: tok });
+      let body;
+      try {
+        body = await search(auth.access_token);
+      } catch (e) {
+        if (!isExpiredTokenError(e)) throw e;
+        auth = await refreshIfDue(auth, { force: true });
+        body = await search(auth.access_token);   // still fails -> the real error reaches the UI
+      }
       const d = body?.result?.data || {};
       /**
        * WHAT DOES A PRODUCT ACTUALLY CARRY? ?raw=1 returns the first product verbatim.

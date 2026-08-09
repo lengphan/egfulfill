@@ -174,7 +174,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
                   which is no use to the person reading it. The reasoning belongs in the
                   comment below, where it already is. */}
               <div className="mb-1.5 text-xs text-muted-foreground">
-                Open one on the Sourcing page to search it
+                Suppliers who can make this
               </div>
               {/* THE PRODUCTS THEMSELVES, not more keywords.
                   This listed the AI's suggested queries and asked you to go and run one,
@@ -191,7 +191,9 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
               )}
               {hitErr && (
                 <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
-                  Couldn&apos;t reach Alibaba just now — {hitErr}
+                  {/^.*(token is invalid|expired)/i.test(hitErr)
+                    ? "Alibaba needs reconnecting — open Sourcing and click Reconnect, then try again."
+                    : `Couldn't reach Alibaba just now — ${hitErr}`}
                 </p>
               )}
               {hits !== null && hits.length === 0 && !hitErr && (
