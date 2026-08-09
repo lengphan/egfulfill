@@ -108,9 +108,28 @@ async function etsyFetch(conn, path, opts = {}) {
   const token = await validToken(conn);
   await rateLimit();
   const res = await fetch(API + path, { method: opts.method || 'GET', headers: Object.assign({ 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' }, opts.headers || {}), body: opts.body });
-  const data = await res.json().catch(() => ({}));
+  // Read the body as TEXT first, then parse. `res.json().catch(() => ({}))` silently
+  // discarded any non-JSON error body — and Etsy answers a rejected listing with prose or
+  // an `errors` array, not always an `error` string. That is how a 400 that says exactly
+  // which field it hated arrived as the bare "Etsy API 400 @ /shops/…/listings", which
+  // names the endpoint we already knew and nothing we could act on.
+  const raw = await res.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch { /* non-JSON body — `raw` carries it */ }
   recordUsage('etsy', { endpoint: path, ok: res.ok });
-  if (!res.ok) throw new Error(((data && (data.error || data.message)) || ('Etsy API ' + res.status)) + ' @ ' + path);
+  if (!res.ok) {
+    const listed = Array.isArray(data && data.errors)
+      ? data.errors.map((x) => (typeof x === 'string' ? x : (x && (x.message || x.error)) || '')).filter(Boolean).join('; ')
+      : '';
+    const why = (data && (data.error || data.message || data.error_description))
+      || listed
+      // Last resort: the raw body, trimmed. Better a truncated sentence in Etsy's own words
+      // than a status code with no cause.
+      || (raw ? raw.replace(/\s+/g, ' ').trim().slice(0, 300) : '');
+    const e = new Error('Etsy API ' + res.status + ' @ ' + path + (why ? ' — ' + why : ''));
+    e.status = res.status;
+    throw e;
+  }
   return data;
 }
 
