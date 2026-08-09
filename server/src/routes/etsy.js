@@ -1517,7 +1517,11 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // A seller who genuinely makes their own can still change it on the draft, and any
       // caller that sends an explicit value is honoured unchanged.
       const WHO_MADE = ['i_did', 'someone_else', 'collective'];
-      const whoMade = WHO_MADE.includes(String(b.who_made)) ? String(b.who_made) : 'someone_else';
+      // Fallback is 'i_did' again, per the owner (2026-08-09) — 'someone_else' coincided
+      // with Etsy rejecting new drafts. An explicit value from the caller still wins, so a
+      // seller who registers a production partner can send 'someone_else' without a deploy.
+      // The trade-off is written up at the whoMade constant in publish-product-dialog.tsx.
+      const whoMade = WHO_MADE.includes(String(b.who_made)) ? String(b.who_made) : 'i_did';
 
       // Create the DRAFT listing.
       const form = new URLSearchParams({

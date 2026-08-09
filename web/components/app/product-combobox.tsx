@@ -5,6 +5,7 @@ import Image from "next/image"
 import { CaretDown, Package } from "@phosphor-icons/react"
 import { Input } from "@/components/ui/input"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { getToken } from "@/lib/auth"
 import { DEMO, toPickedProduct, productImage, productPrice, type PickedProduct } from "@/components/app/product-picker-dialog"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -38,6 +39,9 @@ export function ProductCombobox({
   placeholder?: string
 }) {
   const [products, setProducts] = useState<CatalogProduct[]>(cache ?? [])
+  // Which of three states the list is in. Without this, "your catalogue is empty" and
+  // "the catalogue failed to load" were both rendered as a list of five invented products.
+  const [load, setLoad] = useState<"loading" | "ok" | "empty" | "error">(cache ? "ok" : "loading")
   const [open, setOpen] = useState(false)
   const [cursor, setCursor] = useState(0)
   const boxRef = useRef<HTMLDivElement>(null)
@@ -46,9 +50,23 @@ export function ProductCombobox({
   useEffect(() => {
     if (cache) return
     const id = setTimeout(() => {
+      // DEMO IS FOR A SIGNED-OUT DEMO, NOT FOR A REAL SESSION.
+      //
+      // This used to substitute five invented products — Heavyweight Hoodie, Classic Tee,
+      // Embroidered Cap … — whenever the real catalogue came back empty OR the request
+      // failed. They render identically to real ones, so a seller could pick one, publish a
+      // listing against it, and the resulting order would name a blank that does not exist.
+      // An empty catalogue and a broken request also need opposite responses, and both were
+      // shown as a confident list of stock that isn't there.
+      //
+      // Signed out (marketing / demo), DEMO is still the right thing to show.
+      if (!getToken()) { cache = DEMO; setProducts(DEMO); setLoad("ok"); return }
       getCatalogProducts()
-        .then((rows) => { cache = rows?.length ? rows : DEMO; setProducts(cache) })
-        .catch(() => { cache = DEMO; setProducts(DEMO) })
+        .then((rows) => {
+          if (rows?.length) { cache = rows; setProducts(rows); setLoad("ok") }
+          else { setProducts([]); setLoad("empty") }
+        })
+        .catch(() => { setProducts([]); setLoad("error") })
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -148,8 +166,14 @@ export function ProductCombobox({
         <div className="absolute left-0 top-[calc(100%+4px)] z-30 w-[320px] max-w-[80vw] overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
           <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
             {matches.length === 0 ? (
+              // Say WHICH of the three it is. A failed load and an empty catalogue lead to
+              // different actions, and neither is "no match for what you typed".
               <div className="px-3 py-2.5 text-xs text-muted-foreground">
-                {value.trim() ? `No catalog match — "${value.trim()}" stays a custom item.` : "No catalog products yet."}
+                {load === "loading" ? "Loading your catalogue…"
+                  : load === "error" ? "Couldn't load your catalogue — check the connection and reopen. Nothing is missing from it; we just can't read it right now."
+                  : load === "empty" ? "No products in your catalogue yet. Add one in Products, then reopen this."
+                  : value.trim() ? `No catalog match — "${value.trim()}" stays a custom item.`
+                  : "No catalog products yet."}
               </div>
             ) : (
               matches.map((p, i) => {

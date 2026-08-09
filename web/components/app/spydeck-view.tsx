@@ -330,7 +330,11 @@ export function SpyDeckView() {
   // description + images are NOT in the grid payload — they'd be ~5x the response for
   // data no card shows. Fetched here for the one listing being turned into a product,
   // from the server's cached pool (no extra Etsy call).
-  const [makeDetail, setMakeDetail] = useState<{ description?: string; images?: string[] } | null>(null)
+  // Carries the listing id it belongs to. Without that stamp the detail of the PREVIOUSLY
+  // opened card stays in state for the render in which a new card opens — and the publish
+  // dialog seeds itself from a setTimeout closure captured on exactly that render, so the
+  // new card's title arrived beside the old card's description.
+  const [makeDetail, setMakeDetail] = useState<{ forId?: string; description?: string; images?: string[] } | null>(null)
   useEffect(() => {
     if (!makeListing) return
     let alive = true
@@ -338,7 +342,7 @@ export function SpyDeckView() {
     const id = setTimeout(() => {
       setMakeDetail(null)
       getSpydeckListingDetail(makeListing.listing_id)
-        .then((d) => { if (alive) setMakeDetail(d) })
+        .then((d) => { if (alive) setMakeDetail({ ...d, forId: String(makeListing.listing_id) }) })
         .catch(() => { if (alive) setMakeDetail(null) })   // publish still works, just without a prefilled body
     }, 0)
     return () => { alive = false; clearTimeout(id) }
@@ -872,11 +876,15 @@ export function SpyDeckView() {
       <SourcingSuggestDialog listing={sourceListing} onClose={() => setSourceListing(null)} />
 
       <PublishProductDialog
+        // Remount per listing. The dialog seeds its fields once per open; keying it means a
+        // different card gets genuinely fresh state rather than a reset effect racing the
+        // prefill (the repo's reset-by-remounting rule).
+        key={makeListing ? String(makeListing.listing_id) : "none"}
         open={!!makeListing}
         onOpenChange={(v) => !v && setMakeListing(null)}
-        prefill={makeListing ? {
+        prefill={makeListing ? ((detail) => ({
           title: makeListing.title,
-          description: makeDetail?.description ?? makeListing.description ?? "",
+          description: detail?.description ?? makeListing.description ?? "",
           // Prefer the USD-converted price so the seller starts from a comparable number.
           price: makeListing.price_usd ?? makeListing.price,
           tags: makeListing.tags ?? [],
@@ -886,8 +894,8 @@ export function SpyDeckView() {
           images: [],
           // Their photos come through as reference so the seller can see what they're
           // making. The dialog shows them in a separate strip and never publishes them.
-          referenceImages: ((makeDetail?.images?.length ? makeDetail.images : makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []) as string[]).filter(Boolean),
-        } : null}
+          referenceImages: ((detail?.images?.length ? detail.images : makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []) as string[]).filter(Boolean),
+        }))(makeDetail && makeDetail.forId === String(makeListing.listing_id) ? makeDetail : null) : null}
         onPublished={(url, img) => { if (makeListing) onPublishedFrom(makeListing, url, img) }}
         title="Make product"
       />
