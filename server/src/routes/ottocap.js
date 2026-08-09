@@ -470,8 +470,25 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
         }
         card = { name: String(raw.name), card_number: number, cvv, exp_date: exp };
       }
-      // else: card stays null. payment_method is still "Credit Card", card_details is
-      // omitted from the payload, and Otto charges the card on file.
+      // else: no card typed. The comment above assumed Otto would then bill the card held
+      // on the account — Otto's live API says otherwise:
+      //
+      //   400  card_details: Card details required for credit card transactions.
+      //
+      // So a Credit Card order with no card is rejected EVERY time. Sending it anyway
+      // spends a round trip to be told that, and the rejection reads as a bug in us. Fail
+      // here instead, and name the two things that actually work: a payment method with
+      // terms (no PCI exposure at all), or the deliberate card gate.
+      if (!cardSupplied) {
+        reply.code(400);
+        return {
+          error: 'Otto reject a credit-card order with no card on it — they do not bill a card held on your account.',
+          code: 'card_required',
+          detail: String(process.env.OTTO_CARD_ORDERS || '') === '1'
+            ? 'Enter the card on this order, or choose a payment method with terms (e.g. Net 30) in Order settings › Payment.'
+            : 'Either ask Otto to enable payment terms (e.g. Net 30) on your account and pick that in Order settings › Payment — no card ever touches this server — or set OTTO_CARD_ORDERS=1 to type one here, which puts this server in PCI DSS scope.',
+        };
+      }
     }
 
     if (!b.payment_method) {
