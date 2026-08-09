@@ -1424,7 +1424,12 @@ export function getFactoryPnl(days = 30) {
 // per-seller one, so there is no seller scoping anywhere in here.
 export type AlibabaConfig = {
   configured: boolean
+  /** A token exists AND is not past its expiry. Not a live probe — a token revoked early at
+   *  Alibaba's end still reads connected until the next call. */
   connected: boolean
+  /** A token exists but has aged out. Distinct from never-connected: one needs renewing, the
+   *  other setting up, and they are different sentences to a reader. */
+  expired: boolean
   base: string
   account: string | null
   expiresAt: string | null

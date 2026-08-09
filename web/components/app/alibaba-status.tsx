@@ -55,26 +55,25 @@ export function AlibabaStatus() {
         setTimeout(() => clearInterval(iv), 300000)
   }
 
+  /**
+   * Working = a tick and nothing else. There is no action to offer when nothing is wrong,
+   * and "Alibaba connected" spelled out on a page about sourcing is a label for a state the
+   * reader already assumes. The tick carries it.
+   */
   if (cfg.connected) {
     return (
-      <span className="inline-flex items-center gap-2 text-xs text-muted-foreground" title={cfg.account ?? undefined}>
-        <span className="inline-flex items-center gap-1.5">
-          <CheckCircle size={13} weight="fill" className="text-success" />
-          Alibaba connected
-        </span>
-        {/* Quiet, because most of the time nothing is wrong — but present, because when the
-            token has expired this is the only way back and the green tick above is lying. */}
-        <button onClick={connect} disabled={!cfg.authorizeUrl}
-                className="underline underline-offset-2 transition-colors hover:text-foreground disabled:opacity-50">
-          Reconnect
-        </button>
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" title={cfg.account ?? undefined}>
+        <CheckCircle size={13} weight="fill" className="text-success" /> Connected
       </span>
     )
   }
 
+  /* Expired and never-connected are DIFFERENT sentences: one needs renewing, the other
+     setting up. Both land on the same button, but the reader should not have to guess
+     which situation they are in — and neither may show a green tick. */
   return (
     <Button size="sm" variant="outline" disabled={!cfg.authorizeUrl} onClick={connect}>
-      <Plug size={14} weight="bold" /> Connect Alibaba
+      <Plug size={14} weight="bold" /> {cfg.expired ? "Reconnect Alibaba" : "Connect Alibaba"}
     </Button>
   )
 }

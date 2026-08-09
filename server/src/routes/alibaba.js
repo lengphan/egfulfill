@@ -236,7 +236,21 @@ export function alibabaRoutes(app, requireAdmin) {
     return {
       configured: alibabaConfigured(),
       base: c.base,
-      connected: !!(row && row.access_token),
+      /**
+       * CONNECTED MEANS USABLE, not "a row exists".
+       *
+       * This reported true for any stored token, so an expired one showed a green tick while
+       * every call failed — the status asserted something it had never checked. It now also
+       * requires the token not to be past its expiry, and reports `expired` separately so the
+       * UI can distinguish "never connected" from "needs reconnecting", which are different
+       * sentences to a reader.
+       *
+       * Still a claim about the RECORD, not a live probe: a token revoked early at Alibaba's
+       * end looks valid here until the next call. Refreshing on use (refreshIfDue) is what
+       * covers that; this only stops us stating a connection we can already see is stale.
+       */
+      connected: !!(row && row.access_token) && !(row?.expires_at && new Date(row.expires_at).getTime() < Date.now()),
+      expired: !!(row?.access_token && row?.expires_at && new Date(row.expires_at).getTime() < Date.now()),
       account: row?.account || null,
       expiresAt: row?.expires_at || null,
       /**
