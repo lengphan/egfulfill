@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { CircleNotch, Storefront, UploadSimple, Trash, Package } from "@phosphor-icons/react"
+import { CircleNotch, Storefront, UploadSimple, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -17,6 +17,72 @@ const MAX_TAGS = 13
 const MAX_IMAGES = 10 // Etsy's hard limit — an 11th slot silently never publishes.
 
 const cleanTag = (raw: string) => raw.replace(/[^\p{L}\p{N} '-]/gu, "").trim().slice(0, 20)
+
+/**
+ * One tile of the watermark, repeated as a background image.
+ *
+ * A background tile rather than a stack of rotated <span>s: the stack has to be sized to
+ * the element it covers, and a band tall enough for a 115px thumbnail leaves bare corners
+ * on the lightbox (and vice versa). A repeating tile has the same absolute spacing at every
+ * size, so one `backgroundSize` sets the density.
+ *
+ * The dark copy under each white one is the text-shadow. These are product photos shot on
+ * white and cream, and unshadowed white simply vanishes on them — the shadow is what keeps
+ * a faint mark honest rather than decorative.
+ */
+const WATERMARK_TILE = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="156" height="100">` +
+    `<g transform="rotate(-24 78 50)" font-family="Helvetica,Arial,sans-serif" font-size="10" font-weight="600" letter-spacing="2.2">` +
+      `<text x="4" y="33" fill="rgba(0,0,0,.34)">REFERENCE</text>` +
+      `<text x="3" y="32" fill="rgba(255,255,255,.62)">REFERENCE</text>` +
+      `<text x="-46" y="83" fill="rgba(0,0,0,.34)">NOT PUBLISHED</text>` +
+      `<text x="-47" y="82" fill="rgba(255,255,255,.62)">NOT PUBLISHED</text>` +
+    `</g>` +
+  `</svg>`
+)
+
+/**
+ * The thumbnail version: ONE mark stretched to fit, not a repeat.
+ *
+ * A 115px tile is smaller than one tile of the pattern above, so repeating it there only
+ * ever produced a single word and a clipped fragment of the next — which reads as a
+ * rendering fault rather than a watermark. Fitted to the square instead, both words land
+ * whole and the mark still crosses the middle of the shot.
+ */
+const WATERMARK_FIT = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">` +
+    `<g transform="rotate(-24 50 50)" font-family="Helvetica,Arial,sans-serif" font-weight="600" text-anchor="middle">` +
+      `<text x="50" y="48" font-size="11" letter-spacing="1.6" fill="rgba(0,0,0,.34)">REFERENCE</text>` +
+      `<text x="49" y="47" font-size="11" letter-spacing="1.6" fill="rgba(255,255,255,.62)">REFERENCE</text>` +
+      `<text x="50" y="63" font-size="7.5" letter-spacing="1.2" fill="rgba(0,0,0,.34)">NOT PUBLISHED</text>` +
+      `<text x="49" y="62" font-size="7.5" letter-spacing="1.2" fill="rgba(255,255,255,.62)">NOT PUBLISHED</text>` +
+    `</g>` +
+  `</svg>`
+)
+
+/**
+ * The "this one isn't yours" mark, laid diagonally ACROSS the photo.
+ *
+ * It replaced two solid bars pinned to the top and bottom edges. Those were legible but
+ * they covered the part of the shot you actually came to look at, and on a 115px tile that
+ * was most of it. A tiled diagonal is the standard stock-photo idiom for the same reason:
+ * it can't be cropped out, it reads at any size, and it leaves the subject visible.
+ *
+ * Module scope: a component declared during render remounts every keystroke
+ * (react-hooks/static-components).
+ */
+function ReferenceWatermark({ big = false }: { big?: boolean }) {
+  return (
+    <div
+      aria-hidden
+      className={"pointer-events-none absolute inset-0 " + (big ? "bg-repeat" : "bg-center bg-no-repeat")}
+      style={{
+        backgroundImage: `url("data:image/svg+xml,${big ? WATERMARK_TILE : WATERMARK_FIT}")`,
+        backgroundSize: big ? "230px 148px" : "100% 100%",
+      }}
+    />
+  )
+}
 
 /**
  * A toggleable set of variant options with All / None.
@@ -127,15 +193,20 @@ export function PublishProductDialog({
   const [qty, setQty] = useState("999")
   const [tags, setTags] = useState<string[]>([])
   /**
-   * NOT a picker any more — the listing publishes as a DRAFT, so the seller sets this on
-   * Etsy's own form before it goes live, and asking twice was the wrong amount of care.
+   * Sent on every publish, fixed. Not a picker: the listing is created as a DRAFT, so the
+   * seller answers this on Etsy's own form before anything goes live, and asking twice was
+   * the wrong amount of care.
    *
-   * But it is still SENT, fixed at the truthful answer for anything we produce. The server
-   * used to default to `i_did` when nothing arrived, which declared on the seller's behalf
-   * that they personally made it — a Handmade Policy misstatement, and suspension-class
-   * rather than warning-class. Dropping the field without this would restore that.
+   * SET BACK TO 'i_did' ON THE OWNER'S INSTRUCTION (2026-08-09), after 'someone_else'
+   * coincided with Etsy rejecting new drafts. Recording the trade-off rather than the
+   * decision: for print-on-demand WE make the item, so 'i_did' is not true of us, and
+   * misstating who made an item is a Handmade Policy matter — the class of thing Etsy
+   * suspends a shop for rather than warning about. What makes it defensible is the draft:
+   * nothing reaches a buyer until the seller reviews and activates it, and they can change
+   * this on that form. If Etsy ever accepts 'someone_else' from a shop with a production
+   * partner registered, that is the value to send.
    */
-  const whoMade: EtsyWhoMade = "someone_else"
+  const whoMade: EtsyWhoMade = "i_did"
   const [tagDraft, setTagDraft] = useState("")
   const [suggested, setSuggested] = useState<string[]>([])
   const [images, setImages] = useState<string[]>([])
@@ -346,6 +417,26 @@ export function PublishProductDialog({
    */
   const referencePhotos = useMemo(() => (prefill?.referenceImages ?? []).filter(Boolean), [prefill])
 
+  // Which reference photo the lightbox is showing, or null for closed. A thumbnail this
+  // small is not enough to judge a competitor's shot by, which is the entire reason these
+  // are on screen — so the tile opens one full size. The watermark comes with it.
+  const [zoom, setZoom] = useState<number | null>(null)
+  const zoomSrc = zoom === null ? null : referencePhotos[zoom]
+  useEffect(() => {
+    if (zoom === null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+      e.preventDefault()
+      const step = e.key === "ArrowRight" ? 1 : -1
+      setZoom((i) => (i === null ? i : (i + step + referencePhotos.length) % referencePhotos.length))
+    }
+    // CAPTURE. A bubble-phase listener here never fires — something between the popup and
+    // the window stops arrow keys on the way up (verified: a capture listener sees the same
+    // keypress a bubble one misses), so the gallery simply didn't respond to the keyboard.
+    window.addEventListener("keydown", onKey, true)
+    return () => window.removeEventListener("keydown", onKey, true)
+  }, [zoom, referencePhotos.length])
+
   // Leaf categories that match what the seller typed. Capped so a 5,000-node tree can't
   // render at once; the search box is how you reach the rest.
   const ttCatMatches = useMemo(() => {
@@ -493,6 +584,7 @@ export function PublishProductDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-5xl">
         <DialogHeader><DialogTitle>{dialogTitle}</DialogTitle></DialogHeader>
@@ -560,18 +652,23 @@ export function PublishProductDialog({
                       to remember. Sitting them in a separate panel was the previous answer and
                       it read as a second, publishable set; a caption ON the photo cannot be
                       scrolled away from.
-                      Dashed border, dimmed, no hover controls: everything says "not yours". */}
+                      Dashed border, no hover controls, watermark: everything says "not yours". */}
                   {referencePhotos.map((src, i) => (
-                    <div key={`ref-${i}`} className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-border bg-muted/40">
+                    <button
+                      key={`ref-${i}`}
+                      type="button"
+                      onClick={() => setZoom(i)}
+                      title="View larger"
+                      aria-label={`View reference photo ${i + 1} larger`}
+                      className="group relative aspect-square cursor-zoom-in overflow-hidden rounded-lg border border-dashed border-border bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt="" className="size-full object-cover opacity-55" />
-                      <span className="absolute inset-x-0 top-0 bg-foreground/75 px-1 py-0.5 text-center text-3xs font-semibold uppercase leading-tight text-background">
-                        Reference
+                      <img src={src} alt="" className="size-full object-cover" />
+                      <ReferenceWatermark />
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover:opacity-100">
+                        <MagnifyingGlassPlus size={16} weight="bold" className="text-white drop-shadow" />
                       </span>
-                      <span className="absolute inset-x-0 bottom-0 bg-foreground/75 px-1 py-0.5 text-center text-3xs font-medium leading-tight text-background">
-                        not uploaded
-                      </span>
-                    </div>
+                    </button>
                   ))}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addImages(e.target.files); e.target.value = "" }} />
@@ -850,8 +947,46 @@ export function PublishProductDialog({
             </div>
           </div>
         )}
+
       </DialogContent>
     </Dialog>
+
+      {/* THE LIGHTBOX.
+          A sibling of the publish dialog, not a child of it: a second Base UI dialog mounted
+          INSIDE the first one's popup opens and shuts again in the same frame (verified —
+          state went 0 → null with no other input), because the parent's dismiss logic counts
+          the newly mounted child as an outside press. As a sibling both stay open and closing
+          this one returns to a form with every field still filled in.
+
+          The watermark is drawn again at the larger size. The mark has to survive the zoom,
+          or the zoom is simply the way to get a clean copy of someone else's photo. */}
+      <Dialog open={zoomSrc != null} onOpenChange={(o) => { if (!o) setZoom(null) }}>
+        <DialogContent className="w-auto max-w-[calc(100vw-2rem)] gap-3 p-3 sm:max-w-[min(92vw,900px)]">
+          <DialogTitle className="pr-10 text-xs font-medium text-muted-foreground">
+            Reference photo {(zoom ?? 0) + 1} of {referencePhotos.length} — the competitor’s own shot, not published with your listing
+          </DialogTitle>
+          <div className="relative flex max-h-[72dvh] justify-center overflow-hidden rounded-lg bg-muted/40">
+            {zoomSrc && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={zoomSrc} alt="" className="max-h-[72dvh] w-auto max-w-full object-contain" />
+                <ReferenceWatermark big />
+              </>
+            )}
+          </div>
+          {referencePhotos.length > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setZoom((i) => (i === null ? i : (i - 1 + referencePhotos.length) % referencePhotos.length))}>
+                <CaretLeft size={13} weight="bold" /> Prev
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setZoom((i) => (i === null ? i : (i + 1) % referencePhotos.length))}>
+                Next <CaretRight size={13} weight="bold" />
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
