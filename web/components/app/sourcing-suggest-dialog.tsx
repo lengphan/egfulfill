@@ -48,21 +48,38 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
   const [note, setNote] = useState<string | null>(null)
 
   /**
-   * Run the FIRST query the moment the analysis arrives — one call, not one per query.
-   * The queries are ordered best-first by the model, and three searches to fill one dialog
-   * would spend three Alibaba calls every time someone glances at a listing.
+   * TRY THE QUERIES UNTIL ONE ANSWERS, then fall back to a shorter phrase.
+   *
+   * Running only the first returned nothing on every listing tested. The model writes
+   * long-tail B2B phrases — "custom engraved nameplate pendant necklace wholesale", six
+   * words — and Alibaba's search matches those poorly; the same endpoint returns a full
+   * grid for "necklace". So a single attempt made the whole panel look broken when the
+   * search was working perfectly.
+   *
+   * Extra calls happen ONLY on an empty result, never on a hit, so the common case is
+   * still one request. Capped at four attempts total: three queries plus one trimmed to
+   * its last two words, which is the shape that actually matches a marketplace listing.
    */
   useEffect(() => {
-    const first = (data?.queries ?? [])[0]
-    if (!first) return
+    const queries = (data?.queries ?? []).filter(Boolean)
+    if (!queries.length) return
     let alive = true
-    const t = setTimeout(() => {
-      searchAlibaba({ keyword: first, page: 1, pageSize: 12 })
-        .then((r) => {
+    const shorten = (q: string) => q.split(/\s+/).filter((w) => !/^(wholesale|supplier|bulk|custom|blank)$/i.test(w)).slice(-2).join(" ")
+    const attempts = [...queries.slice(0, 3), shorten(queries[0])].filter((v, i, a) => v && a.indexOf(v) === i)
+    const t = setTimeout(async () => {
+      for (const kw of attempts) {
+        if (!alive) return
+        try {
+          const r = await searchAlibaba({ keyword: kw, page: 1, pageSize: 12 })
           if (!alive) return
-          if (r.error) { setHitErr(r.error); setHits([]) } else { setHits(r.products ?? []); setHitErr(null) }
-        })
-        .catch((e) => { if (alive) { setHitErr(e instanceof Error ? e.message : "search failed"); setHits([]) } })
+          if (r.error) { setHitErr(r.error); setHits([]); return }   // an error is not "no suppliers"
+          if ((r.products ?? []).length) { setHits(r.products ?? []); setHitErr(null); return }
+        } catch (e) {
+          if (!alive) return
+          setHitErr(e instanceof Error ? e.message : "search failed"); setHits([]); return
+        }
+      }
+      if (alive) { setHits([]); setHitErr(null) }   // genuinely nothing, after trying every angle
     }, 0)
     return () => { alive = false; clearTimeout(t) }
   }, [data])
@@ -198,7 +215,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
               )}
               {hits !== null && hits.length === 0 && !hitErr && (
                 <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
-                  Nothing came back for this one. Sourcing has the full search if you want to widen it.
+                  No supplier matches on any of the search angles we tried. Sourcing has the full search if you want to widen it.
                 </p>
               )}
               {hits !== null && hits.length > 0 && (
