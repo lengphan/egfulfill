@@ -390,7 +390,13 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
               from orders o left join users u on u.id = o.seller_id
               where o.id = design_cards.order_id) as seller_name,
            (select count(*)::int from design_file_data f
-              where f.order_id = design_cards.order_id) as file_count
+              where f.order_id = design_cards.order_id) as file_count,
+           -- WHO SENT IT. created_by holds a user id and nothing ever resolved it, so the
+           -- only name a card could show was the seller's — and an unclaimed card therefore
+           -- carried the CUSTOMER's name in the same slot a claimer's name uses, which reads
+           -- as "this person is working on it". Resolved here like claimed_role above.
+           (select coalesce(u3.name, u3.email) from users u3
+             where u3.id::text = design_cards.created_by) as created_by_name
            from design_cards order by id`);
       // Manual cards keep their artwork in object storage, and a signed URL expires — so it
       // is minted per read rather than stored. `thumb` is what every client already renders,

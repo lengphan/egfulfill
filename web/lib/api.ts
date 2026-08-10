@@ -2043,6 +2043,10 @@ export type DesignCard = {
   /** The card's seller (store, else name/email), resolved server-side from the order —
    *  shown as the name tag, and the reason an EMB card needn't read "Seller file". */
   seller_name?: string | null
+  /** WHO PUT IT ON THE BOARD, resolved from created_by. Distinct from both of the above:
+   *  seller_name is whose order it is, claimed_by is who is working it, this is who sent
+   *  it. All three used to be one nameless badge. */
+  created_by_name?: string | null
   /** Where the design work happens. null/absent = our own designers. A value means it's
    *  OUTSOURCED to a partner (e.g. "pinkdesign") — our designers do embroidery, so DTG/DTF
    *  goes out. Outsourced cards can't be claimed by a designer and never pay one. */

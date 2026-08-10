@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, XCircle, Clock, FilePdf, Barcode, CaretDown, CaretRight, Package, Tag, type Icon } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, UploadSimple, X, XCircle, Clock, FilePdf, Barcode, CaretDown, CaretRight, Package, Tag, type Icon } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -116,6 +116,26 @@ type HistRow =
   | { kind: "order"; id: string; at: string; disp: { key: DispKey; label: string }; o: OrderRow }
   | { kind: "external"; id: string; at: string; disp: { key: DispKey; label: string }; u: DispatchUpload }
 
+/**
+ * How this label reached the dispatch queue. Four answers, and they are mutually exclusive:
+ *
+ *   Drop zone     — dropped in as an external label; belongs to no order.
+ *   byeastside    — pushed to the partner from the queue (or picked by them).
+ *   Scanned here  — someone scanned it on our own bench.
+ *   Carrier       — the carrier's acceptance scan came back through tracking. The only one
+ *                   of the four nobody here asserted, which is exactly why it is named.
+ *
+ * A label bought but not yet moved has no method yet, and says so with a dash rather than
+ * guessing at one.
+ */
+function methodOf(o: OrderRow): { label: string; icon: Icon } | null {
+  const via = (o as { scanned_via?: string | null }).scanned_via
+  if (via === "partner" || o.dispatch_pdf_id) return { label: "byeastside", icon: TrayArrowDown }
+  if (via === "in-house") return { label: "Scanned here", icon: Barcode }
+  if (via === "carrier") return { label: "Carrier", icon: Truck }
+  return null
+}
+
 /** Status as an icon plus a word. Module scope, not defined inside the board — a component
  *  declared during render is remounted every frame and the lint rule that forbids it exists
  *  because that has bitten this codebase before. */
@@ -132,7 +152,19 @@ function DispStatus({ k, label }: { k: DispKey; label: string }) {
 
 // Shared column template for the history table — the header and every row use it so the
 // columns line up. Scrolls horizontally inside the card rather than cramming on narrow.
-const HIST_GRID = "grid items-center gap-3 px-5 grid-cols-[1rem_9.5rem_12rem_minmax(7rem,1fr)_9rem_10rem_2rem]"
+/**
+ * HOW THE LABEL GOT HERE — a column, because the row could not say it.
+ *
+ * "Channel" answers where the ORDER came from (Etsy, Shopify, Manual). It cannot answer
+ * how the LABEL reached the queue, and those are different questions with the same-shaped
+ * answer, which is why one column could not carry both: an order pushed to byeastside and
+ * one scanned on our own bench were indistinguishable on the row, and the only place the
+ * difference existed was inside the expanded timeline.
+ *
+ * Widths come out of `when` (10rem -> 9rem — a date needs less than it had) and the
+ * customer floor (7rem -> 6rem), so the row's minimum grows by ~1.5rem rather than 7.5.
+ */
+const HIST_GRID = "grid items-center gap-3 px-5 grid-cols-[1rem_9.5rem_12rem_minmax(6rem,1fr)_8rem_7.5rem_9rem_2rem]"
 // The per-label timeline shows DISPATCH actions only — scans, hand-offs to byeastside,
 // pull-backs, label prints/voids, manifests. Order-level noise (order saved/updated, design
 // files, charges) belongs on the order page, not the scan floor.
@@ -783,6 +815,7 @@ export function DispatchBoard() {
                 <span>Order / file</span>
                 <span>Customer</span>
                 <span>Channel</span>
+                <span>Method</span>
                 <span>When</span>
                 <span />
               </div>
@@ -818,6 +851,10 @@ export function DispatchBoard() {
                           {u.total_pages ? `${u.total_pages} page${u.total_pages === 1 ? "" : "s"}` : "—"}
                         </span>
                         <span className="truncate text-xs text-muted-foreground">External label</span>
+                        <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                          <UploadSimple size={12} className="shrink-0 opacity-70" />
+                          <span className="truncate">Drop zone</span>
+                        </span>
                         <span className="truncate text-xs text-muted-foreground" title={u.created_by ? `Sent by ${u.created_by}` : undefined}>{when}</span>
                         {u.public_url ? (
                           <a
@@ -858,7 +895,6 @@ export function DispatchBoard() {
 
                 const o = row.o
                 const d = row.disp
-                const via = (o as { scanned_via?: string | null }).scanned_via
                 const events = auditByOrder[o.id]
                 return (
                   <div key={row.id}>
@@ -869,7 +905,18 @@ export function DispatchBoard() {
                       <span className="truncate font-mono text-sm font-semibold">{numOf(o)}</span>
                       <span className="truncate text-sm">{customerOf(o)}</span>
                       <span className="truncate text-xs text-muted-foreground">{platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}</span>
-                      <span className="truncate text-xs text-muted-foreground" title={o.label_scanned_at ? `Scanned${via ? ` · ${via === "byeastside" ? "byeastside" : "in-house"}` : ""}` : "Labelled"}>
+                      {(() => {
+                        const m = methodOf(o)
+                        if (!m) return <span className="text-xs text-muted-foreground">—</span>
+                        const I = m.icon
+                        return (
+                          <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                            <I size={12} className="shrink-0 opacity-70" />
+                            <span className="truncate">{m.label}</span>
+                          </span>
+                        )
+                      })()}
+                      <span className="truncate text-xs text-muted-foreground" title={o.label_scanned_at ? "Scanned" : "Labelled"}>
                         {when}
                       </span>
                       {o.tracking_label_url ? (

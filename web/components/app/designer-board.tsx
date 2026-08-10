@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash, DotsSixVertical } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Storefront, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash, DotsSixVertical } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -636,10 +636,17 @@ export function DesignerBoard() {
                               <span className="truncate">{String(c.claimed_by)}</span>
                             </span>
                           ) : c.seller_name ? (
-                            // Unclaimed: show WHOSE order this is — the seller name tag, same
-                            // as every other card carries an owner, so an EMB card reads as
-                            // "Ambar's file" rather than a faceless "Seller file".
-                            <span title={`Seller · ${c.seller_name}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded bg-slate-600/90 px-1.5 py-0.5 text-3xs font-medium text-white">
+                            /* Unclaimed: show WHOSE order this is.
+                               ─────────────────────────────────────
+                               WITH A SHOPFRONT MARK, because without one this was the same
+                               slate badge carrying the same bare name as a factory claim —
+                               so a card sent by Linh for Hai Anh's order showed "Hai Anh"
+                               in the exact slot that means "this person is on the job", and
+                               only the tooltip said otherwise. Two different facts cannot
+                               share one appearance; the icon is the cheapest way to say
+                               which of the two you are looking at. */
+                            <span title={`Seller · ${c.seller_name}${c.created_by_name ? ` · sent by ${c.created_by_name}` : ""}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-slate-600/90 px-1.5 py-0.5 text-3xs font-medium text-white">
+                              <Storefront size={9} weight="fill" className="shrink-0 opacity-80" />
                               <span className="truncate">{String(c.seller_name)}</span>
                             </span>
                           ) : null}
