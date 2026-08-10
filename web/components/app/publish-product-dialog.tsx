@@ -142,6 +142,21 @@ function VariantChips({
 }
 
 /** Everything a source can prefill. Whatever it can't fill stays empty and editable. */
+/**
+ * ONE SENTENCE FOR THE SAME EVENT, whichever channel it went to.
+ *
+ * The three publishers had grown three phrasings — "Published as a draft with 6 variants",
+ * "Created a draft product on TikTok (#123)", "Created a draft product on Shopify with 2
+ * variants" — which made the same outcome read as three different things, and spent the
+ * headline on a number nobody needs at the moment it succeeds. The variant count is
+ * visible on the card afterwards; what you want here is to know it worked.
+ *
+ * Anything that QUALIFIES the success (variants rejected, only some photos uploaded, a
+ * dry run that sent nothing) still shows — demoted to the note line beneath, where a
+ * caveat belongs, rather than deleted.
+ */
+const PUBLISH_OK = "Listing uploaded successfully!"
+
 export type PublishPrefill = {
   title?: string
   description?: string
@@ -493,7 +508,7 @@ export function PublishProductDialog({
       }
       setResult({
         ok: true,
-        text: r.product_id ? `Created a draft product on TikTok (#${r.product_id}).` : "Created a draft product on TikTok.",
+        text: PUBLISH_OK,
         note: r.warnings?.length ? r.warnings.map((w) => w.message).filter(Boolean).join(" ") : undefined,
       })
       onPublished?.(undefined, images[0], {
@@ -533,7 +548,7 @@ export function PublishProductDialog({
       if (r.error) throw new Error(r.error)
       setResult({
         ok: true,
-        text: `Created a draft product on Shopify${r.variants_applied ? ` with ${r.variants_applied} variant${r.variants_applied === 1 ? "" : "s"}` : ""}.`,
+        text: PUBLISH_OK,
         // Say when photos didn't all land. The product exists either way — the server
         // deliberately doesn't fail a publish over an image — so silence here would leave a
         // draft with missing photos and no hint why.
@@ -641,11 +656,12 @@ export function PublishProductDialog({
 
       setResult({
         ok: true,
-        text: r.variants_error
-          ? `Published as a draft — but variants failed (${r.variants_error}). It's a flat listing.`
-          : r.variants_applied
-            ? `Published as a draft with ${r.variants_applied} variants`
-            : "Published as a draft listing",
+        text: PUBLISH_OK,
+        // The one thing worth interrupting for: the listing exists but has no variants, so
+        // it is a flat listing and somebody has to decide whether that will do.
+        note: r.variants_error
+          ? `Variants were rejected (${r.variants_error}), so it listed flat.`
+          : undefined,
         url: r.url,
       })
       // Etsy's hosted url for the cover, falling back to what we sent. The fallback is only
