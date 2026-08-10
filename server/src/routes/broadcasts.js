@@ -106,6 +106,12 @@ function audienceSql(aud) {
   return { sql: where.join(' and '), vals };
 }
 
+// Deliberately loose — this is a "could this possibly be delivered" check, not RFC 5322.
+// It exists to catch the address that makes Brevo answer "email is not valid in to", which
+// costs a send and reads as a broadcast failure. Anything plausible passes; the transport
+// remains the real judge.
+const validEmail = (e) => /^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/.test(String(e || '').trim());
+
 async function resolveRecipients(aud) {
   const { sql, vals } = audienceSql(aud);
   const r = await q(`select id, email, name from users where ${sql} order by created_at asc`, vals);
@@ -309,8 +315,19 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
   app.post('/api/broadcasts/preview', { preHandler: requireDraft }, async (req) => {
     await ensureTables();
     const rows = await resolveRecipients((req.body || {}).audience);
+    // Shown BEFORE sending, because that is the only point at which it is cheap to fix.
+    const invalid = rows.filter((r) => !validEmail(r.email)).map((r) => ({ id: r.id, email: r.email || '' }));
     const optedOut = await q('select count(*)::int as n from users where role = $1 and coalesce(marketing_opt_out,false) = true', ['seller']);
-    return { count: rows.length, optedOut: optedOut.rows[0] ? optedOut.rows[0].n : 0, sample: rows.slice(0, 5).map((x) => x.email) };
+    return {
+      count: rows.length,
+      optedOut: optedOut.rows[0] ? optedOut.rows[0].n : 0,
+      sample: rows.slice(0, 5).map((x) => x.email),
+      // The full list, so the confirm screen can show who is actually being mailed rather
+      // than "first few" — and the malformed ones separately, since those are the only
+      // recipients a send cannot reach and the only ones still cheap to fix.
+      recipients: rows.map((x) => ({ id: x.id, email: x.email, name: x.name || null })),
+      invalid,
+    };
   });
 
   // ── Global email branding — logo / accent / preset / footer, applied to every send ──
@@ -420,9 +437,17 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
     // what the board polls — nothing here can reject into an unhandled rejection.
     (async () => {
       let ok = 0, bad = 0;
+      let firstBad = null;
       // Read the branding ONCE for the whole send, not per recipient.
       const brand = await getEmailBranding();
       for (const r of recipients) {
+        // Don't spend a send on an address that cannot be delivered. Counted as failed —
+        // it IS a person who didn't get the mail — but with a reason that names the fix.
+        if (!validEmail(r.email)) {
+          bad++;
+          if (!firstBad) firstBad = { email: r.email || '(blank)', why: 'not a valid email address — fix it on the seller record' };
+          continue;
+        }
         const unsubUrl = `${publicOrigin()}/api/broadcasts/unsubscribe?t=${unsubToken(r.id)}`;
         const sent = await sendMail({
           to: r.email,
@@ -443,7 +468,15 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
             'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
           },
         }).catch(() => false);
-        if (sent) ok++; else bad++;
+        if (sent) ok++;
+        else {
+          bad++;
+          // NAME THE RECIPIENT. "email is not valid in to" is Brevo telling us one address
+          // is malformed — useless without knowing WHICH, since the fix is editing that
+          // user's record and the list can be hundreds long. Keep the first failure's
+          // address and reason; later ones are almost always the same fault.
+          if (!firstBad) firstBad = { email: r.email, why: lastMailError() || 'unknown reason' };
+        }
         // Live counters, so a long send shows progress instead of looking hung.
         if ((ok + bad) % 10 === 0) {
           await q('update broadcasts set sent_count = $2, failed_count = $3 where id = $1::bigint', [id, ok, bad]).catch(() => {});
@@ -452,7 +485,14 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
         // would otherwise have gone.
         await new Promise((res) => setTimeout(res, 120));
       }
-      const why = bad ? (lastMailError() || 'send failed for an unknown reason') : null;
+      // Lead with the count so a partial failure reads as one — the row shows "17 / 18"
+      // beside this, and an unqualified transport error under it looked like the whole
+      // send had failed when 17 people had the mail in hand.
+      const why = bad
+        ? (firstBad
+            ? `${bad} of ${recipients.length} failed — first was ${firstBad.email}: ${firstBad.why}`
+            : `${bad} of ${recipients.length} failed — ${lastMailError() || 'unknown reason'}`)
+        : null;
       await q(
         `update broadcasts set sent_count = $2, failed_count = $3, sent_at = now(),
                 last_error = $4,
