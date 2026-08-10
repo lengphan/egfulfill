@@ -295,6 +295,17 @@ const SANMAR_CSV_FIELDS = {
   // 302s to Image404ErrorHandler.jsp which SERVES A PLACEHOLDER JPEG, so `curl -L` reports
   // 200 for everything. Test without following redirects.
   image:        ['frontmodelimageurl', 'productimage', 'frontmodelimage'],
+  // PRODUCT_IMAGE kept SEPARATELY, not just as a fallback for `image`. It is the same photo
+  // at 300x450 and ~7KB where FRONT_MODEL_IMAGE_URL is 1200x1800 and ~230KB — measured on
+  // the live CDN — and the browse grid draws it into a ~180px tile. Serving the big one
+  // there was ~33x the bytes for pixels nobody sees: a 24-card page pulled about 5.5MB of
+  // photography instead of 170KB.
+  //
+  // Taken from the column rather than derived from the style. It IS `<STYLE>.jpg` for 4,063
+  // of the 4,071 styles in the file, but 8 are not (CP82b.jpg, DM1170L-2.jpg, F222red.jpg …)
+  // and a wrong name does not 404 — it 302s to Image404ErrorHandler.jsp, which serves a
+  // placeholder JPEG with a 200. Those eight would have silently shown "no image".
+  cardImage:    ['productimage'],
   swatch:       ['colorswatchimageurl', 'colorswatchimage', 'swatchimage'],
   thumbnail:    ['thumbnailimage', 'thumbnailimageurl'],
 };
@@ -341,7 +352,8 @@ function rowToVariant(r, idx) {
     inventoryKey: cell('inventoryKey'), status: cell('status'), keywords: cell('keywords'),
     piecePrice: num(cell('piecePrice')), casePrice: num(cell('casePrice')), msrp: num(cell('msrp')),
     qty: idx.qty != null ? (parseInt(cell('qty').replace(/[^0-9-]/g, ''), 10) || 0) : null,
-    image: absolutizeImg(cell('image')), swatch: absolutizeImg(cell('swatch')),
+    image: absolutizeImg(cell('image')), cardImage: absolutizeImg(cell('cardImage')),
+    swatch: absolutizeImg(cell('swatch')),
     thumbnail: absolutizeImg(cell('thumbnail')),
   };
 }
@@ -424,13 +436,16 @@ function makeStyleAggregator() {
       if (!s) {
         s = { style: key, title: '', description: '', brand: '', category: '',
               priceMin: null, priceMax: null, msrp: null,
-              image: null, swatch: null, thumbnail: null,
+              image: null, cardImage: null, swatch: null, thumbnail: null,
               colors: new Set(), sizes: new Set(), statuses: new Set(), variants: [] };
         byStyle.set(key, s);
       }
       s.title = best(s.title, v.title); s.description = best(s.description, v.description);
       s.brand = best(s.brand, v.brand); s.category = best(s.category, v.category);
       s.image = s.image || v.image || v.thumbnail || v.swatch;
+      // The small grid photo. Falls back to the big one so a style whose row has no
+      // PRODUCT_IMAGE still renders — heavier, but never blank.
+      s.cardImage = s.cardImage || v.cardImage;
       s.swatch = s.swatch || v.swatch; s.thumbnail = s.thumbnail || v.thumbnail;
       if (v.piecePrice != null) {
         s.priceMin = s.priceMin == null ? v.piecePrice : Math.min(s.priceMin, v.piecePrice);
@@ -450,7 +465,7 @@ function makeStyleAggregator() {
         style: s.style, title: s.title || s.style, description: s.description || null,
         brand: s.brand || 'SanMar', category: s.category || null,
         priceMin: s.priceMin, priceMax: s.priceMax, msrp: s.msrp,
-        image: s.image, swatch: s.swatch, thumbnail: s.thumbnail,
+        image: s.image, cardImage: s.cardImage, swatch: s.swatch, thumbnail: s.thumbnail,
         colors: [...s.colors].sort(),
         sizes: [...s.sizes].sort(bySize),
         // A style counts as discontinued only when EVERY variant is. A style whose 2XL was
@@ -546,6 +561,7 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
        variant_count integer, variants jsonb,
        synced_at timestamptz default now())`).catch(() => {});
   q(`alter table sanmar_styles add column if not exists status text`).catch(() => {});
+  q(`alter table sanmar_styles add column if not exists card_image text`).catch(() => {});
   q(`alter table sanmar_styles add column if not exists discontinued boolean default false`).catch(() => {});
   q(`create index if not exists sanmar_styles_search
        on sanmar_styles using gin (to_tsvector('simple',
@@ -739,13 +755,13 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
 
   // ── Bulk catalog import + browse ───────────────────────────────────────────
   // One STYLE row of the upsert, as a parameter array.
-  const STYLE_COLS = 16;
+  const STYLE_COLS = 17;
   const styleParams = (s) => [
     s.style, s.title || null, s.description || null, s.brand || null, s.category || null,
     s.priceMin != null ? Number(s.priceMin) : null,
     s.priceMax != null ? Number(s.priceMax) : null,
     s.msrp != null ? Number(s.msrp) : null,
-    s.image || null, s.swatch || null, s.thumbnail || null,
+    s.image || null, s.cardImage || null, s.swatch || null, s.thumbnail || null,
     s.colors || [], s.sizes || [], s.status || null, !!s.discontinued,
     JSON.stringify(s.variants || []),
   ];
@@ -823,14 +839,14 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
   async function upsertSanmarStyles(styles) {
     const SQL_HEAD = `insert into sanmar_styles
            (style, title, description, brand, category, price_min, price_max, msrp,
-            image, swatch, thumbnail, colors, sizes, status, discontinued,
+            image, card_image, swatch, thumbnail, colors, sizes, status, discontinued,
             variants, variant_count, synced_at)
          values `;
     const SQL_TAIL = `
          on conflict (style) do update set
            title=excluded.title, description=excluded.description, brand=excluded.brand,
            category=excluded.category, price_min=excluded.price_min, price_max=excluded.price_max,
-           msrp=excluded.msrp, image=excluded.image, swatch=excluded.swatch,
+           msrp=excluded.msrp, image=excluded.image, card_image=excluded.card_image, swatch=excluded.swatch,
            thumbnail=excluded.thumbnail, colors=excluded.colors, sizes=excluded.sizes,
            status=excluded.status, discontinued=excluded.discontinued,
            variants=excluded.variants, variant_count=excluded.variant_count, synced_at=now()`;
@@ -960,14 +976,22 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
       const total = await q(`select count(*)::int as n from sanmar_styles ${filter}`, params);
       const r = await q(
         `select style, brand, title as name, description, category,
-                price_min as price, price_max, image, colors, sizes,
+                price_min as price, price_max, image, card_image, colors, sizes,
                 status, discontinued, variant_count, 0 as qty
            from sanmar_styles ${filter}
           order by style
           limit ${limit} offset ${offset}`, params);
       let favs = new Set();
       try { const fr = await q('select style from sanmar_favorites'); favs = new Set(fr.rows.map((x) => String(x.style))); } catch { /* no favorites table yet */ }
-      const items = r.rows.map((row) => ({ ...row, image: sanmarImg(row.image), favorited: favs.has(String(row.style)) }));
+      // BROWSE SERVES THE SMALL PHOTO. The grid draws a ~180px tile; card_image is the
+      // same shot at 300x450 / ~7KB against image's 1200x1800 / ~230KB. `image` still rides
+      // along for the detail and quick-order views, which want the big one.
+      const items = r.rows.map((row) => ({
+        ...row,
+        image: sanmarImg(row.card_image || row.image),
+        fullImage: sanmarImg(row.image),
+        favorited: favs.has(String(row.style)),
+      }));
       return { total: total.rows[0]?.n || 0, items };
     } catch (e) { reply.code(500); return { error: String((e && e.message) || e), total: 0, items: [] }; }
   });

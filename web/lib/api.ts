@@ -911,7 +911,9 @@ export function sanmarOrder(lines: SanmarOrderLine[], shipTo: SanmarShipTo, extr
 // ── SanMar bulk catalog (imported SDL/EPDD file) — browsable/searchable like Otto ──
 // One card per style; same field vocabulary as OttoStyle so the supplier feed renders it
 // with the shared SupplierProductCard.
-export type SanmarCatalogStyle = { style: string; brand?: string | null; name: string | null; description?: string | null; category?: string | null; price: number | string | null; price_max?: number | string | null; image: string | null; colors: string[] | null; sizes: string[] | null; qty?: number | null; favorited?: boolean }
+/** `image` is the SMALL grid photo (~7KB) — browse serves card_image here on purpose.
+ *  `fullImage` is the 1200x1800 original, for anything that keeps or enlarges the photo. */
+export type SanmarCatalogStyle = { style: string; brand?: string | null; name: string | null; description?: string | null; category?: string | null; price: number | string | null; price_max?: number | string | null; image: string | null; fullImage?: string | null; colors: string[] | null; sizes: string[] | null; qty?: number | null; favorited?: boolean }
 export type SanmarCatalogVariant = { color: string | null; size: string | null; sku: string; inventoryKey: string | null; sizeIndex: string | null; price: number | null; image: string | null }
 export type SanmarCatalogDetail = { style: string; name: string | null; brand?: string | null; category?: string | null; description?: string | null; price: number | null; image: string | null; colors: string[]; sizes: string[]; colorImages: Record<string, string>; variants: SanmarCatalogVariant[]; skus: string[]; error?: string }
 export function getSanmarCatalog(p: { search?: string; limit?: number; offset?: number }) {

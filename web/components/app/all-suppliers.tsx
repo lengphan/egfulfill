@@ -253,7 +253,7 @@ export function AllSuppliers() {
         ? await ssCatalogProduct(it.id, { title: it.ss.title, price: it.ss.price, image: it.ss.image, colors: colorNames(it.ss.colors) })
         : it.supplier === "otto"
           ? await ottoCatalogProduct(it.id, { name: it.otto.name, price: it.otto.price, image: it.otto.image, colors: it.otto.colors })
-          : await sanmarCatalogProduct(it.id, { name: it.sanmar.name, price: it.sanmar.price, image: it.sanmar.image, colors: it.sanmar.colors ?? [] })
+          : await sanmarCatalogProduct(it.id, { name: it.sanmar.name, price: it.sanmar.price, image: it.sanmar.fullImage || it.sanmar.image, colors: it.sanmar.colors ?? [] })
       setPreview(product); setPreviewKey(keyOf(it))
     } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't load that product.") } finally { setAddingId(null) }
   }
@@ -275,7 +275,7 @@ export function AllSuppliers() {
   const favorite = (it: Item, on: boolean) => {
     if (it.supplier === "ss") toggleSsFavorite(it.ss, on).catch(() => {})
     else if (it.supplier === "otto") toggleOttoFavorite({ style: it.otto.style, name: it.otto.name, image: it.otto.image, price: it.otto.price }, on).catch(() => {})
-    else toggleSanmarFavorite({ style: it.sanmar.style, name: it.sanmar.name ?? undefined, image: it.sanmar.image, price: typeof it.sanmar.price === "number" ? it.sanmar.price : Number(it.sanmar.price) || null }, on).catch(() => {})
+    else toggleSanmarFavorite({ style: it.sanmar.style, name: it.sanmar.name ?? undefined, image: it.sanmar.fullImage || it.sanmar.image, price: typeof it.sanmar.price === "number" ? it.sanmar.price : Number(it.sanmar.price) || null }, on).catch(() => {})
   }
 
   const loadColors = (it: Item): (() => Promise<Record<string, string>>) => {
