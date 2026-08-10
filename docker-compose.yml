@@ -76,6 +76,11 @@ services:
       # payloads are unverified against a real account. Set to 1 deliberately, one
       # supplier at a time, and place a single cheap line first.
       OTTOCAP_ORDER_LIVE: ${OTTOCAP_ORDER_LIVE:-}
+      # Otto reject a credit-card order that carries no card — they do not bill one held on
+      # the account — so the server only forwards a typed card when this is set. It was in
+      # .env and NOT in this list, which passes vars through one by one, so it never reached
+      # the container and the card was stripped on every order.
+      OTTO_CARD_ORDERS: ${OTTO_CARD_ORDERS:-}
       SS_ORDER_LIVE: ${SS_ORDER_LIVE:-}
       # Marketplace tracking auto-push on ship (Etsy receipt shipped + buyer email). Absent =
       # DRY RUN, the intended default while the app runs on a limited/test keystring: the
