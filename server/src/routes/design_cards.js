@@ -183,10 +183,58 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     const b = req.body || {};
     const title = String(b.title || '').trim();
     if (!title) { reply.code(400); return { error: 'Give the card a name — an untitled card is unfindable the moment there are two.' }; }
-    const data = b.data ? String(b.data) : null;
+    let data = b.data ? String(b.data).trim() : null;
 
-    let artKey = null, artHash = null, artData = null;
-    if (data) {
+    /**
+     * BYTES OR A REFERENCE — and telling them apart matters more than it looks.
+     *
+     * This used to hand `data` straight to fromDataUrl(), whose fallback base64-DECODES any
+     * string that isn't a data: URL. A card pushed from an order line carries the line's
+     * artwork URL, not its bytes — so an ~86-character marketplace image URL was decoded
+     * into 64 bytes of noise, uploaded under a key with no extension (the mime came back
+     * `application/octet-stream`, so extFromMime returned ''), and served back as 64 bytes
+     * of octet-stream. The card looked created, the board showed the empty-artwork
+     * placeholder, and nothing anywhere said the artwork had been destroyed in transit.
+     * Observed on card 59 / order etsy-4140837805 before this fix.
+     *
+     * So a URL is now FETCHED rather than mangled: the real bytes get stored, which also
+     * makes the card outlive the marketplace's own link. If the fetch fails the URL is kept
+     * as the thumbnail — a card that renders someone else's copy beats a card that renders
+     * nothing — and anything that is neither bytes nor a URL is refused out loud.
+     */
+    let artKey = null, artHash = null, artData = null, thumbUrl = null;
+    if (data && !/^data:/i.test(data)) {
+      const remote = /^https?:\/\//i.test(data);
+      const sameOrigin = data.startsWith('/');
+      if (!remote && !sameOrigin) {
+        reply.code(400);
+        return { error: "That artwork isn't a file or a link, so there's nothing to put on the card." };
+      }
+      thumbUrl = data;
+      if (remote) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 15000);
+          const rf = await fetch(data, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
+          const type = String(rf.headers.get('content-type') || '').split(';')[0].trim();
+          if (rf.ok && /^image\//i.test(type)) {
+            const ab = await rf.arrayBuffer();
+            // 25MB ceiling. Artwork this big is a scan nobody meant to push, and the row it
+            // would land in is read by every board.
+            if (ab.byteLength && ab.byteLength <= 25 * 1024 * 1024) {
+              data = `data:${type};base64,${Buffer.from(ab).toString('base64')}`;
+              thumbUrl = null;   // we have the bytes now; store them, not the borrowed link
+            }
+          }
+        } catch (e) {
+          // Keep the link. Logged rather than swallowed: "the artwork is the marketplace's
+          // copy, not ours" is a fact worth being able to find later.
+          req.log?.warn?.({ err: e, url: data }, 'design card artwork fetch failed - keeping the URL');
+        }
+      }
+    }
+
+    if (data && /^data:/i.test(data)) {
       artHash = hashOf(data);
       if (storageEnabled()) {
         try {
@@ -212,7 +260,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
        values ($1,$2,'incoming',$3,null,null,$4,$5,$6,$7,$8)
        returning *`,
       [title, b.type ? String(b.type) : null, b.sku ? String(b.sku) : null,
-       artKey, artHash, artData, artKey ? null : artData, String((req.user && req.user.sub) || '')]
+       artKey, artHash, artData, artKey ? null : (artData || thumbUrl), String((req.user && req.user.sub) || '')]
     ).catch((e) => { reply.code(500); return { error: e.message }; });
     if (!r || r.error) return r || { error: 'Could not create the card.' };
 
@@ -265,7 +313,14 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
        on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind) do update set
          data=excluded.data, storage_key=excluded.storage_key, name=excluded.name,
          art_hash=excluded.art_hash, updated_at=now()`,
-      [orderId, sku, card.art_data || null, card.art_key || null, card.title || null, card.art_hash || null, lineId]
+      // `card.thumb` as the last resort for `data`. The guard above already accepted a card
+      // whose only artwork is a thumbnail (the degraded case where a remote image couldn't
+      // be fetched at create time), and passing null here would have written an EMPTY
+      // order_design behind a passing guard — the board claiming done while the order shows
+      // nothing, which is the precise failure the guard exists to prevent. Both columns hold
+      // something an <img> can render, so a URL is a valid value for either.
+      [orderId, sku, card.art_data || card.thumb || null, card.art_key || null,
+       card.title || null, card.art_hash || null, lineId]
     );
 
     await q('update design_cards set order_id=$2, line_id=$3, sku=$4 where id=$1::bigint',
