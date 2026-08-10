@@ -323,7 +323,6 @@ export function IntegrationsPanel() {
   return (
     <SectionCard
       title="Connected services"
-      description="The platform's own credentials — Claude, channels, shipping, payments. Click a row to view or set its key."
       actions={
         <Button size="sm" variant="outline" onClick={runChecks} disabled={checking}>
           <ArrowsClockwise size={14} weight="bold" className={checking ? "animate-spin" : ""} />

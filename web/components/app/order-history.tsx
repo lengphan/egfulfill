@@ -47,7 +47,6 @@ export function OrderHistory({ orderId }: { orderId: string }) {
   return (
     <SectionCard
       title="Order history"
-      description="Internal — who changed what, and when. Never shown to the seller."
     >
       <div className="max-h-72 overflow-y-auto p-3">
         <ActivityFeed

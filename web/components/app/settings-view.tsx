@@ -157,7 +157,7 @@ function ProfilePanel() {
   }
 
   return (
-    <SectionCard title="Profile" description="Your account details">
+    <SectionCard title="Profile">
       {!user && (
         <div className="flex items-center gap-2 border-b border-border bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-700">
           <Warning size={14} weight="fill" /> Sign in to see your account details.
@@ -338,9 +338,6 @@ function ApiKeysPanel() {
   return (
     <SectionCard
       title="API keys"
-      description={mode === "live"
-        ? "Live keys hit the real API (/api/v1/*) — calls create real orders"
-        : "Test keys hit the sandbox (/api/test/*) — no real orders, labels or charges"}
       actions={
         // Same test/live switch as the API Playground — the two must agree, or you
         // generate a key in one place that the other can't use.
@@ -607,7 +604,7 @@ function TeamPanel() {
   }
 
   return (
-    <SectionCard title="Team" description="Members and their access">
+    <SectionCard title="Team">
       {/* MY side of things. An invite has to be accepted before any sharing limits take
           effect — until then the membership is 'invited' and the member sees everything,
           which looked exactly like "the toggles don't work". */}
@@ -1138,7 +1135,7 @@ function PlatformPanel() {
   if (loaded === null) return <SectionCard title="Platform"><div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div></SectionCard>
 
   return (
-    <SectionCard title="Platform" description="Factory-wide defaults (warehouse & admin)">
+    <SectionCard title="Platform">
       <SettingsSearch.Provider value={settingsQ.trim().toLowerCase()}>
       {/* Sticky, because the point is to type a word and watch the page below it shrink —
           scrolling away from the box you're filtering with defeats that. */}
@@ -2037,7 +2034,7 @@ function UsersPanel() {
 
   return (
     <div className="space-y-4">
-      <SectionCard title="New staff / user" description="Create an account with a role (username or email login)">
+      <SectionCard title="New staff / user">
         <div className="flex flex-wrap items-end gap-2 p-5">
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Email / username</span><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="ops@egful.store" className="h-9" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Password</span><PasswordInput value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="8+ characters" className="h-9" /></label>
@@ -2048,7 +2045,7 @@ function UsersPanel() {
           {nuErr && <span className="w-full text-sm text-destructive">{nuErr}</span>}
         </div>
       </SectionCard>
-      <SectionCard title="Users" description={`${users.length} account${users.length === 1 ? "" : "s"} — search, change a role, reset a password, or deactivate`}>
+      <SectionCard title="Users">
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
           <div className="relative min-w-[220px] flex-1">
             <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -2394,7 +2391,7 @@ function ActivityPanel() {
   const filtered = cats.length > 0 || query.trim() !== "" || range !== "all"
 
   return (
-    <SectionCard title="Activity log" description="Audited actions across the platform" bodyClassName="p-5">
+    <SectionCard title="Activity log" bodyClassName="p-5">
       {/* Filter bar: category toggles + free-text + time range. */}
       <div className="space-y-2.5">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -2724,7 +2721,7 @@ function BackupsPanel() {
   const cfg = state?.config
 
   return (
-    <SectionCard title="Backups" description="Point-in-time copies of the database, stored in R2 alongside your artwork." bodyClassName="p-5">
+    <SectionCard title="Backups" bodyClassName="p-5">
       {/* Prerequisite warnings — name what's missing and how to fix it, rather than a dead button. */}
       {!state?.storageConfigured && (
         <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm">
@@ -2954,7 +2951,6 @@ export function SettingsView() {
         <TabsContent value="suppliers">
           <SectionCard
             title="Supplier ordering"
-            description="How purchase orders pay and ship, set once instead of on every order."
           >
             <SupplierOrderingSettings />
           </SectionCard>

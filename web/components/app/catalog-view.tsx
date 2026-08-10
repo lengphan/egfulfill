@@ -121,7 +121,6 @@ export function CatalogView() {
   return (
     <SectionCard
       title="Published catalogue"
-      description="What appears in the shop window, and what it costs there. Nothing on this page changes what a seller is billed."
       actions={
         <div className="flex items-center gap-2">
           {/* TWO FORMATS, because they are two jobs. The PDF is what you show a buyer —

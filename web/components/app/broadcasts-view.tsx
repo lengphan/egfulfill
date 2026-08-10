@@ -423,7 +423,6 @@ export function BroadcastsView() {
     <div className="space-y-4">
       <SectionCard
         title="Broadcasts"
-        description="Email every seller, or a filtered set. Separate from Campaigns, which is ad spend."
         actions={
           <div className="flex items-center gap-2">
             {/* Branding is a one-time setup behind this button (admin-only), not a panel. */}

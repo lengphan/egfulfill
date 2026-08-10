@@ -273,7 +273,7 @@ export default function ProductDetailPage() {
 
           {/* File guidelines — the artwork requirements from the old HTML PDP, shown per
               method the product actually supports. */}
-          <SectionCard title="File guidelines" description="Min resolution 150 DPI · 300 DPI preferred">
+          <SectionCard title="File guidelines">
             <div className="space-y-4 p-5">
               {hasPrint && (
                 <div>

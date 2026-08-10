@@ -31,7 +31,6 @@ function Shell({ children, note }: { children: React.ReactNode; note?: string })
   return (
     <SectionCard
       title="Volume discount"
-      description={note ?? "Ship more in a month, pay less the next."}
     >
       {/* pt-5, not pt-0: the first element is a pill, and it was landing directly on
           the header rule with nothing between them. */}

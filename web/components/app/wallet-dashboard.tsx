@@ -58,7 +58,7 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
   }
   if (!canReview || topups === null || topups.length === 0) return null
   return (
-    <SectionCard title={`Pending top-ups (${topups.length})`} description="Confirm to credit the seller's wallet; reject leaves it untouched">
+    <SectionCard title={`Pending top-ups (${topups.length})`}>
       <div className="divide-y divide-border">
         {topups.map((t) => (
           <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -98,7 +98,7 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
   }
   if (!canPay || rows === null || rows.length === 0) return null
   return (
-    <SectionCard title={`Pending payouts (${rows.length})`} description="Pay the seller with the details shown, then Mark paid to debit their wallet">
+    <SectionCard title={`Pending payouts (${rows.length})`}>
       {err && <div className="mx-4 mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">{err}</div>}
       <div className="divide-y divide-border">
         {rows.map((p) => {

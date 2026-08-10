@@ -164,7 +164,7 @@ export function SubscriptionPanel() {
   return (
     <div className="space-y-4">
       {/* Current plan */}
-      <SectionCard title="Your plan" description="Plan changes are charged to your wallet balance.">
+      <SectionCard title="Your plan">
         <div className="p-5">
           <div className="flex items-end justify-between gap-4 rounded-xl border border-border bg-muted/40 p-5">
             <div>

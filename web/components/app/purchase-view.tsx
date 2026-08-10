@@ -1307,7 +1307,6 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
             is a list of what's short, which is the only honest description of it. */}
         <SectionCard
           title="To order"
-          description="Everything short or set aside, grouped by the supplier it comes from"
           actions={
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
@@ -1479,7 +1478,7 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
         </SectionCard>
 
           {placed.length > 0 && (
-            <SectionCard title="On order" description="Placed and waiting on the supplier — open one for its tracking, lines and invoice">
+            <SectionCard title="On order">
               <div className="divide-y divide-border">{placed.map(poRow)}</div>
             </SectionCard>
           )}
@@ -1494,7 +1493,7 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
 
         {/* HISTORY — settled: received or cancelled. Nothing further is expected. */}
         <TabsContent value="history" className="mt-4 space-y-4">
-          <SectionCard title="Purchase history" description="Received and cancelled POs — open one to see its items, or reorder it onto a new draft">
+          <SectionCard title="Purchase history">
             {pos === null ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
             ) : history.length === 0 ? (

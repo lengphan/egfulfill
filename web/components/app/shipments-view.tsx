@@ -130,7 +130,6 @@ export function ShipmentsView() {
     <>
     <SectionCard
       title="Shipments"
-      description="Every parcel with a tracking number. Search by tracking, order, customer or carrier."
       actions={
         <div className="flex items-center gap-3">
           {busy && <CircleNotch size={14} className="animate-spin text-muted-foreground" />}

@@ -54,7 +54,6 @@ export function SellerUploadHistory() {
   return (
     <SectionCard
       title="Upload history"
-      description="Everything you've uploaded, newest first — track where each order is at a glance."
     >
       <div className="flex flex-col gap-3 border-b border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1.5">

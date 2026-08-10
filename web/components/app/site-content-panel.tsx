@@ -198,7 +198,6 @@ export function SiteContentPanel() {
   return (
     <SectionCard
       title="Site content"
-      description="The public marketing homepage copy. Edits appear on the live site within a minute."
       bodyClassName="p-5"
       actions={
         <a href="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">

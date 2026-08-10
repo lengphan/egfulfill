@@ -67,7 +67,6 @@ function DesignLab() {
       {tab === "library" ? (
         <SectionCard
           title="Your designs"
-          description="Artwork you've uploaded — drop any of it onto an order"
           actions={
             <Button size="sm" onClick={() => setStudioOpen(true)} disabled={signedOut}>
               <Plus size={14} weight="bold" /> Add artwork

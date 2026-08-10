@@ -503,7 +503,7 @@ export default function OrderDetailPage() {
           {/* Design deliverables — the seller's .pes files. Factory .emb/mockups are
               filtered out server-side and the bytes are paywalled there too, so this
               renders nothing when there's nothing they can buy. */}
-          <SectionCard title="Design files" description="Machine files for this order — download once purchased">
+          <SectionCard title="Design files">
             <div className="p-5"><SellerDesignFiles orderId={String(id)} /></div>
           </SectionCard>
 

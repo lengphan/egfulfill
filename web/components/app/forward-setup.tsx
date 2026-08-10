@@ -114,7 +114,6 @@ export function ForwardSetup() {
   return (
     <SectionCard
       title="Get buyer addresses automatically"
-      description="Etsy hides addresses from its API but includes them in your sale emails — forward those once and we do the rest"
     >
       <div className="space-y-4 p-5">
         {loading ? (

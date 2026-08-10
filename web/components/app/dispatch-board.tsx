@@ -568,9 +568,6 @@ export function DispatchBoard() {
 
       <SectionCard
         title="Dispatch"
-        description={canScanOut
-          ? "Labelled and waiting to be scanned. Print the batch, scan it, then move it into production."
-          : "Labelled and waiting to be scanned. You can print and pull labels back; warehouse and admin scan the batch out."}
         actions={view === "history" ? undefined : (
           <div className="flex flex-wrap items-center gap-2">
             {/* PRINT / documents — grouped: manifest, labels, and (when scanning out) the

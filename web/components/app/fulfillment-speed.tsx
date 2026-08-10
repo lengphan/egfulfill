@@ -31,7 +31,6 @@ export function FulfillmentSpeed({ orders, loading }: { orders: OrderRow[]; load
   return (
     <SectionCard
       title="Fulfillment speed"
-      description="Median times from real carrier data"
       className="h-full"
       bodyClassName="flex h-full flex-col divide-y divide-border"
     >

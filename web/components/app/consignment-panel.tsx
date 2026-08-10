@@ -232,7 +232,7 @@ export function ConsignmentPanel() {
       </SectionCard>
 
       {/* 2. On hand — whose stock, where. */}
-      <SectionCard title="Seller stock on hand" description="Reserved for that seller's orders only">
+      <SectionCard title="Seller stock on hand">
         {stock.length === 0 ? (
           <div className="p-5 text-sm text-muted-foreground">No consigned stock yet.</div>
         ) : (
@@ -342,7 +342,6 @@ export function ConsignmentPanel() {
              matters is capacity and the scan that binds SKU to location. */}
       <SectionCard
         title="Bins"
-        description="Aisle-bay-shelf, e.g. A-03-2. Any SKU may live in any bin."
         actions={
           <div className="flex items-center gap-2">
             <Input value={newBin} onChange={(e) => setNewBin(e.target.value.toUpperCase())} placeholder="A-03-2" className="h-8 w-28 text-xs" />

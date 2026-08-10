@@ -96,7 +96,6 @@ export function WebhooksPanel() {
   return (
     <SectionCard
       title="Webhooks"
-      description="We POST to your URL when an order moves. Signed with HMAC-SHA256 so you can prove it came from us."
     >
       <div className="space-y-4 p-5">
         {/* One-time secret. Loud on purpose: there is no second chance to read it. */}

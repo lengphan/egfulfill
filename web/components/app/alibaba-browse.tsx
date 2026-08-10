@@ -144,9 +144,6 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
       <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
         <div className="flex-1">
           <h2 className="text-sm font-semibold">Find suppliers</h2>
-          <p className="text-xs text-muted-foreground">
-            Search Alibaba and keep what&apos;s worth quoting. Prices are per-unit ranges by quantity band.
-          </p>
         </div>
       </div>
 

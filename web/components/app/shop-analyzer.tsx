@@ -154,7 +154,7 @@ export function ShopAnalyzer() {
           )}
 
           {sales && sales.topSellers.length > 0 && (
-            <SectionCard title="Best sellers" description={`Real units sold, last ${sales.windowDays} days`}>
+            <SectionCard title="Best sellers">
               <div className="divide-y divide-border">
                 {sales.topSellers.map((t, i) => (
                   <div key={i} className="flex items-center gap-3 px-4 py-2.5">

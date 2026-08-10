@@ -58,7 +58,6 @@ export function TemplatesPanel() {
   return (
     <SectionCard
       title="Product templates"
-      description="A saved blank + artwork setup — reopen it instead of starting over"
       actions={
         <Button size="sm" onClick={() => router.push("/design/maker")}>
           <Plus size={14} weight="bold" /> Make a template

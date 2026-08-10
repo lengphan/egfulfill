@@ -119,7 +119,6 @@ export function BillingView() {
 
       <SectionCard
         title="Ledger"
-        description="Signed from our side — negative means we paid out or owe it"
         actions={
           <div className="flex items-center gap-2">
             {/* Manual entry lives HERE, next to the ledger it writes into, rather than in

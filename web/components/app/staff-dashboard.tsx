@@ -66,11 +66,10 @@ const SHORTCUT_DESC: Record<string, string> = {
  * exception lives here and can't leak onto the queue boards.
  */
 function MiniStat({
-  label, value, sub, icon: Icon, tone,
+  label, value, icon: Icon,
 }: {
   label: string
   value: string
-  sub?: string
   icon: ElementType
   tone?: "pos" | "neg"
 }) {
@@ -83,15 +82,10 @@ function MiniStat({
         <div className="min-w-0">
           <div className="text-2xl font-black leading-none tracking-tight tabular-nums">{value}</div>
           <div className="mt-2 truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
-          {/* Only NEGATIVE gets a colour. A green sub on a standing label ("last 30 days",
-              "nothing booked yet") reads as good news about the number above it, which it
-              isn't — it's just a caption. Red still earns attention because it means a real
-              loss. */}
-          {sub && (
-            <div className={"mt-0.5 text-2xs leading-snug " + (tone === "neg" ? "text-destructive" : "text-muted-foreground")}>
-              {sub}
-            </div>
-          )}
+          {/* NO CAPTION. These read as explanations of the figure above them ("we earned",
+              "after $73 costs", "per order") and the owner's call is that the figure and its
+              label carry it. Dropped here rather than at each call site so nothing can
+              reintroduce one by passing `sub`. */}
         </div>
       </div>
     </div>
@@ -371,9 +365,7 @@ export function StaffDashboard() {
             key={c.label}
             label={c.label}
             value={orders === null ? "—" : String(c.value)}
-            sub={c.sub}
             icon={c.icon}
-            tone={c.pos ? "pos" : c.neg && c.value ? "neg" : undefined}
           />
         ))}
       </div>
@@ -385,7 +377,6 @@ export function StaffDashboard() {
             <SectionCard
               className="h-full"
               title="GMV"
-              description="What buyers paid, through the platform"
               bodyClassName="flex flex-1 flex-col gap-5 p-5"
             >
               <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
@@ -421,7 +412,6 @@ export function StaffDashboard() {
           <SectionCard
             className="h-full"
             title="Shipped"
-            description="Share of all orders now shipped"
             bodyClassName="flex h-full flex-col items-center justify-center gap-5 p-5"
           >
             <Gauge pct={orders === null ? null : shippedPct} caption="of all orders" />
@@ -449,7 +439,6 @@ export function StaffDashboard() {
           <SectionCard
             className="h-full"
             title="Production line"
-            description={windowed ? `Orders from the ${rangeMeta.sub}, by current stage` : "Where the work is right now — every order by stage"}
             actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">Open queue <ArrowRight size={13} weight="bold" /></Link>}
             /* flex-1 so the body actually receives the card's stretched height — without it
                the chart sized to its content and left a third of the card empty. */

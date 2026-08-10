@@ -77,7 +77,6 @@ export function VolumeTiersPanel() {
   return (
     <SectionCard
       title="Volume tiers"
-      description="Units shipped in one month set a seller's rate for the next. Measuring only — these do not change what an order is charged yet."
       actions={
         <Button size="sm" onClick={save} disabled={busy}>
           <FloppyDisk size={14} weight="bold" /> Save ladder

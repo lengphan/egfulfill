@@ -116,7 +116,6 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
   return (
     <SectionCard
       title="Refund"
-      description="Send part or all of this order back to the seller's wallet"
       actions={<span className="text-xs text-muted-foreground">{usd(state.refundable)} refundable</span>}
     >
       <div className="divide-y divide-border">
