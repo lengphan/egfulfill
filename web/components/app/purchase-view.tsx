@@ -283,9 +283,15 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
 
   // Persist the shared saved-for-later list. Optimistic: the UI moves immediately,
   // the blob is replaced wholesale (that's the factory_lists contract).
+  //
+  // RETURNS THE WRITE, so a caller that is about to reload can wait for it. `load()`
+  // re-GETs this same list, and an un-awaited PUT races that GET: the stale read lands
+  // last, the lines that were just ordered reappear in the pool, and the obvious next
+  // click sends them to the supplier a SECOND time. A duplicate purchase order is the
+  // one mistake here that costs real money, so the ordering is not optional.
   const putSaved = (next: SavedPOLine[]) => {
     setSaved(next)
-    saveFactoryList("po_saved", next).catch(() => {})
+    return saveFactoryList("po_saved", next).catch(() => {})
   }
   /** Pull a line OUT of the draft but keep it — the common "not this order, next one" case. */
   const saveForLater = (po: PurchaseOrder, l: POLine) => {
@@ -477,9 +483,11 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
    * the supplier call without a word and cancelled our record alone, which is exactly
    * the failure the warning text was trying to prevent.
    */
-  const supplierOrderNo = (po: PurchaseOrder): string | null => {
-    const m = (po.meta || {}) as Record<string, unknown>
-    const r = (m.response ?? {}) as Record<string, unknown>
+  /** The same read, against a response we are HOLDING rather than one already stored on a
+   *  PO — so the message shown at placement can name the order number the supplier just
+   *  gave us, without waiting for the reload that persists it. */
+  const supplierOrderNoOf = (resp: unknown): string | null => {
+    const r = (resp ?? {}) as Record<string, unknown>
     const pick = (o: unknown): string | null => {
       if (!o || typeof o !== "object") return null
       // Their responses are arrays as often as objects — one entry per warehouse.
@@ -490,6 +498,8 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
     }
     return pick(r.orders) ?? pick(r.ssResponse) ?? pick(r.ottoResponse) ?? pick(r)
   }
+  const supplierOrderNo = (po: PurchaseOrder): string | null =>
+    supplierOrderNoOf(((po.meta || {}) as Record<string, unknown>).response)
   const trackingOf = (po: PurchaseOrder): string =>
     String(((po.meta || {}) as Record<string, string>).tracking ?? "")
 
@@ -767,12 +777,21 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
     setBusy("place-all"); setMsg(null)
     const results: string[] = []
     const placedSkus = new Set<string>()
-    let deferOttoForCard = false
+    // The Otto lines held back for a card — the SKUs themselves, not a flag. A flag can
+    // only say "something was deferred"; what has to be true before re-opening the card
+    // dialog is that those particular lines are still unplaced.
+    const deferredForCard = new Set<string>()
     try {
       for (const g of toOrderGroups) {
         // Otto's blockers are Otto's alone — skip the Otto group (leave it in the pool) but
         // never stop S&S/manual from going out.
-        if (g.api === "otto" && ottoNeedsCard) { deferOttoForCard = true; continue }
+        if (g.api === "otto" && ottoNeedsCard) {
+          // Only lines that would ACTUALLY be ordered. A group sitting entirely at qty 0
+          // places nothing, and asking for a card number to pay for nothing is how the
+          // dialog kept re-appearing with no order behind it.
+          for (const l of g.lines) if (num(l.qty) > 0) deferredForCard.add(l.sku)
+          continue
+        }
         if (g.api === "otto" && ottoMissingParty) {
           results.push(`${g.supplier ?? "Otto"}: needs a customer + contact (Order settings › Payment) — left in the pool`)
           continue
@@ -852,15 +871,29 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
           if (Array.isArray(os)) for (const o of os) { const n = (o as { orderNumber?: unknown })?.orderNumber; if (n) return String(n) }
           return null
         })()
+        const ottoNo = supplierOrderNoOf(resp)
+        // A SANDBOX order is a real order — placed, numbered, answerable — against Otto's
+        // test environment. It will never appear in the live account, so "order placed
+        // successfully" on its own sends someone looking for it in a portal that has never
+        // heard of it. Named here for the same reason a dry run is.
+        const sandbox = rr.sandbox === true
+        // The service was substituted because the saved one isn't one Otto will run. Said
+        // here, on the placement, because it changes the freight and the arrival date.
+        const fb = rr.shippingFallback as { used?: string; why?: string } | null | undefined
+        const shipNote = fb?.used ? ` · shipping on ${fb.used}${fb.why ? ` — ${fb.why}` : ""}` : ""
         results.push(ok
           ? (g.api
               ? (dry
-                  ? `${g.supplier}: dry run — not sent to ${g.api === "ss" ? "S&S" : "Otto"} (live ordering off)`
-                  : `${g.supplier}: order placed successfully${ssNo ? ` — order #${ssNo}` : ""}`)
+                  ? `${g.supplier}: dry run — not sent to ${g.api === "ss" ? "S&S" : "Otto"} (live ordering off)${shipNote}`
+                  : sandbox
+                    ? `${g.supplier}: placed in Otto's SANDBOX${ottoNo ? ` — test order ${ottoNo}` : ""} — it will not appear in your live Otto account${shipNote}`
+                    : `${g.supplier}: order placed successfully${ssNo || ottoNo ? ` — order #${ssNo ?? ottoNo}` : ""}${shipNote}`)
               : `${g.supplier ?? "Unassigned"}: recorded — order it by hand`)
           : `${g.supplier ?? "Unassigned"}: failed — ${clarified}`)
       }
-      if (placedSkus.size) putSaved(saved.filter((l) => !placedSkus.has(l.sku)))
+      // AWAITED, and before load(). See putSaved: the reload re-reads this list, so an
+      // un-awaited write here can be overtaken and put the ordered lines back in the pool.
+      if (placedSkus.size) await putSaved(saved.filter((l) => !placedSkus.has(l.sku)))
       const anyFailed = results.some((r) => r.includes("failed"))
       if (results.length) {
         setMsg({ ok: !anyFailed, tone: anyFailed && placedSkus.size ? "warn" : undefined,
@@ -869,7 +902,11 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
       load()
       // Everything that could place now has. If the only thing left to do is enter Otto's
       // card, open that dialog — the S&S/manual orders already went without waiting on it.
-      if (deferOttoForCard) setNeedCard(true)
+      //
+      // Asked line by line rather than on a flag: the dialog may only re-open for lines
+      // that are STILL unplaced. Re-opening after an order that went through reads as
+      // "that failed, pay again", and the honest response to that is a second Otto order.
+      if ([...deferredForCard].some((sku) => !placedSkus.has(sku))) setNeedCard(true)
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place these orders." })
     } finally { setBusy(null) }
@@ -896,6 +933,22 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
     // re-render, which is exactly when it would be wrong.
     const ms = now - new Date(at).getTime()
     return isFinite(ms) ? Math.floor(ms / 60000) : null
+  }
+
+  /**
+   * Placed against the supplier's SANDBOX rather than the live account.
+   *
+   * Distinct from `reallySent` on purpose: this DID leave the building, Otto answered it,
+   * and it carries a real order number — so treating it as "not sent" would be wrong in
+   * the other direction. What is untrue about it is only that the goods are coming.
+   *
+   * Two gates gate a real Otto order and only one of them is OTTOCAP_ORDER_LIVE; the
+   * other is OTTOCAP_API_BASE still pointing at sandbox-api.ottocap.com. Opening the first
+   * without the second is what produced an order nobody could find in their account.
+   */
+  const isSandboxOrder = (po: PurchaseOrder) => {
+    const r = (((po.meta || {}) as Record<string, unknown>).response ?? {}) as Record<string, unknown>
+    return r.sandbox === true && r.dryRun !== true && !r.error
   }
 
   const reallySent = (po: PurchaseOrder) => {
@@ -1051,6 +1104,16 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
                       ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
                               title="Built and recorded, but never transmitted — the supplier's live-order gate is off">
                           Not sent
+                        </span>
+                      // A SANDBOX order really was placed — it has an order number and Otto
+                      // answered for it — but against their TEST environment, so it will
+                      // never appear in the live account and no blanks are coming. Reading
+                      // "Placed" for that is the same lie as reading it for a dry run, and
+                      // costs someone a search through a portal that has never seen it.
+                      : po.status === "placed" && isSandboxOrder(po)
+                      ? <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700"
+                              title="Placed against the supplier's SANDBOX environment, not the live account. No blanks are on their way — switch OTTOCAP_API_BASE to Otto's production host to order for real.">
+                          Sandbox
                         </span>
                       : po.status === "placed" ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">Placed</span>
                       : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>

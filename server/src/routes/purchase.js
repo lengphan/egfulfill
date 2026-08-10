@@ -17,6 +17,36 @@ function ensure() {
 }
 
 /**
+ * What the supplier ACTUALLY CHARGED for this PO, out of the response they returned when
+ * it was placed. `null` when their reply carries no total — never 0, because "they billed
+ * nothing" and "we can't read what they billed" must not book the same number.
+ *
+ * Only fields seen coming back from a live call are read:
+ *   Otto  `ottoResponse[].grand_total` — goods + freight + tax, the figure on the card.
+ *         Their `sub_total` is the goods alone and is exactly what our line sum already is.
+ *   S&S   `orders[].total` — one order per warehouse on a split, so they SUM.
+ * Anything else falls through to null and the caller uses the line total, which is the
+ * behaviour that was there before.
+ *
+ * A dry run or a rejection is skipped: no money moved, so there is nothing to prefer over
+ * the line sum.
+ */
+function supplierCharged(meta) {
+  const r = (meta && typeof meta === 'object' && meta.response) || null;
+  if (!r || typeof r !== 'object' || r.dryRun === true || r.error) return null;
+  const sum = (rows, field) => {
+    const list = Array.isArray(rows) ? rows : (rows ? [rows] : []);
+    let t = 0, seen = false;
+    for (const x of list) {
+      const v = Number(x && x[field]);
+      if (isFinite(v) && v > 0) { t += v; seen = true; }
+    }
+    return seen ? t : null;
+  };
+  return sum(r.ottoResponse, 'grand_total') ?? sum(r.orders, 'total') ?? null;
+}
+
+/**
  * A credential preview — enough to tell WHICH key is configured, never enough to use it.
  * Short values are masked entirely: revealing half of a 12-character secret is most of it.
  */
@@ -332,9 +362,25 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
     //
     // Idempotent on the PO number, so re-saving a received PO (editing a line, pasting a
     // tracking number) books once and only once.
-    if (String(b.status || '') === 'received' && total > 0) {
-      await recordCost('blanks', total, `po-${num}`,
-        `Blanks · ${b.supplier || 'unassigned supplier'} · PO ${num}`);
+    //
+    // What is booked is what the SUPPLIER CHARGED, not what the lines add up to. Otto bill
+    // freight on top of the goods: a real order of one cap came back sub_total 3.60,
+    // shipping_total 17.75, grand_total 21.35 — so the line sum understated that PO by 83%
+    // of it, and every Otto order in the P&L was short by its whole shipping cost. Freight
+    // on inbound stock is part of what the stock cost; it does not become free by arriving
+    // on a different line of their invoice.
+    if (String(b.status || '') === 'received') {
+      const charged = supplierCharged(b.meta);
+      const amount = charged ?? total;
+      if (amount > 0) {
+        await recordCost('blanks', amount, `po-${num}`,
+          `Blanks · ${b.supplier || 'unassigned supplier'} · PO ${num}`
+          // Say which figure this is. "$21.35 against a $3.60 PO" is a discrepancy someone
+          // will otherwise have to open the supplier's invoice to explain.
+          + (charged != null && Math.abs(charged - total) >= 0.01
+              ? ` · supplier charged ${charged.toFixed(2)} (goods ${total.toFixed(2)} + freight/tax)`
+              : ''));
+      }
     }
     return { ok: true, num };
   });

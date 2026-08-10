@@ -23,6 +23,22 @@ const OC_SUPPLIER = '00ceb24d-9b6f-4ba1-91c8-aa375ab96651';
 function ocConfigured() { return !!(OC_USER && OC_PASS && OC_CID && OC_SEC); }
 const isSandbox = () => /sandbox/i.test(OC_BASE);
 
+/**
+ * The services Otto will actually RUN, as named in their own rejection.
+ *
+ * Their /shipping_methods endpoint offers more than this — USPS entries among them — and
+ * then refuses the order if you pick one. These eight came back in the `options` list of
+ * a live 400, so they are Otto's answer rather than our guess:
+ *
+ *   FEDEX Priority Overnight® · Standard Overnight® · Ground · 2Day®, each also as a
+ *   "Third Party" variant.
+ *
+ * The ® and the Third Party suffix are why this matches a PREFIX rather than a fixed set.
+ * Mirrored in purchase.js (OTTO_OK), which uses it to filter the settings picker — change
+ * both, or the picker offers a service the order route then replaces.
+ */
+const OTTO_SHIPPABLE = /^fedex\s+(priority overnight|standard overnight|ground|2day)/i;
+
 // Cached bearer token (Otto's expires_in is ~10h; we refresh a minute early).
 let _tok = { value: null, exp: 0 };
 async function ocToken() {
@@ -411,13 +427,49 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
     // customer and contact are REQUIRED by their doc and come from GET /customers. Without
     // them Otto rejects the order, so say which is missing rather than letting it fail
     // there with no explanation.
-    let shipMethod = b.shipping_method || '';
-    if (!shipMethod) {
-      // Required. Fall back to Otto's own first listed method so a missing setting
-      // doesn't fail the order — and say which was chosen in the response.
+    // ── Shipping method ───────────────────────────────────────────────────
+    // Otto's /shipping_methods lists MORE services than they will actually run. A USPS
+    // entry is offered by the same endpoint and then refused at order time — "The USPS
+    // service is not available" — which is how a whole pool of blanks failed to go out
+    // with nothing on this page having asked a wrong question. The eight they accept all
+    // begin FEDEX, so the saved setting is checked against the LIVE list and replaced when
+    // it names a service they won't ship.
+    //
+    // NEVER over a valid pick: an id that resolves to one of the eight is sent exactly as
+    // chosen. And never blind — the substitution comes back in `shippingFallback` so the
+    // person placing the order is told a different service is carrying it, rather than
+    // finding out from the freight line on the invoice.
+    let shipMethod = String(b.shipping_method || '').trim();
+    let shippingFallback = null;
+    {
       const sm = await ocGet('/shipping_methods').catch(() => null);
-      const first = sm && sm.ok && Array.isArray(sm.data) ? sm.data.find((x) => x && x.id) : null;
-      if (first) shipMethod = String(first.id);
+      const rows = sm && sm.ok && Array.isArray(sm.data) ? sm.data.filter(Boolean) : [];
+      const idOf = (m) => String((m && (m.id ?? m.code ?? m.value)) ?? '');
+      const nameOf = (m) => String((m && (m.label ?? m.name ?? m.description ?? m.value)) ?? '').trim();
+      // If their list is unreadable we cannot judge the saved method, so we send it
+      // unchanged. Substituting on a failed lookup would override a correct pick because
+      // of a network blip, which is worse than letting Otto answer for themselves.
+      if (rows.length) {
+        const chosen = shipMethod ? rows.find((m) => idOf(m) === shipMethod) : null;
+        if (!chosen || !OTTO_SHIPPABLE.test(nameOf(chosen))) {
+          // Ground, specifically. It is the cheapest of the eight, and a substitution made
+          // without anyone present must not quietly put the order on overnight freight.
+          const ground = rows.find((m) => /^fedex\s+ground$/i.test(nameOf(m)))
+            || rows.find((m) => OTTO_SHIPPABLE.test(nameOf(m)));
+          if (ground) {
+            shippingFallback = {
+              used: nameOf(ground) || 'FEDEX Ground',
+              replaced: chosen ? nameOf(chosen) : (shipMethod || null),
+              why: !shipMethod
+                ? 'no shipping method is set in Order settings › Delivery'
+                : !chosen
+                  ? 'the saved shipping method is no longer on Otto\'s list'
+                  : `Otto do not run ${nameOf(chosen)}`,
+            };
+            shipMethod = idOf(ground);
+          }
+        }
+      }
     }
     if (!shipMethod) {
       reply.code(400);
@@ -516,7 +568,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
       card_details: card || undefined
     };
     if (String(process.env.OTTOCAP_ORDER_LIVE || '') !== '1') {
-      return { dryRun: true, sandbox: isSandbox(), note: 'OTTOCAP_ORDER_LIVE!=1 → NOT sent to Otto. Review the payload; set OTTOCAP_ORDER_LIVE=1 (with the sandbox base) to place a real SANDBOX test order.', payload: safePayload(payload) };
+      return { dryRun: true, sandbox: isSandbox(), shippingFallback, note: 'OTTOCAP_ORDER_LIVE!=1 → NOT sent to Otto. Review the payload; set OTTOCAP_ORDER_LIVE=1 (with the sandbox base) to place a real SANDBOX test order.', payload: safePayload(payload) };
     }
     try {
       const r = await ocPost('/orders/', payload);
@@ -528,7 +580,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
         const why = describeOttoError(d);
         return { error: `Otto rejected the order (${r.status}): ${why}`, status: r.status, detail: d, payload: safePayload(payload) };
       }
-      return { ok: true, sandbox: isSandbox(), ottoResponse: r.data };
+      return { ok: true, sandbox: isSandbox(), shippingFallback, ottoResponse: r.data };
     }
     catch (e) { reply.code(502); return { error: String((e && e.message) || e) }; }
   });

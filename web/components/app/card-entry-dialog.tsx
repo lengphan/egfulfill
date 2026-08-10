@@ -79,7 +79,14 @@ export function CardEntryDialog({
           <DialogTitle className="flex items-center gap-2"><CreditCard size={18} weight="fill" /> Card details</DialogTitle>
           <DialogDescription>
             Otto require the card on every order — they have no saved-card API.
-            {amount ? ` This order is $${amount.toFixed(2)}.` : ""}
+            {/* The figure we hold is the PRODUCT subtotal, and Otto bill freight on top of
+                it: a $3.60 order of caps came back charged at $21.35. Presenting the
+                subtotal as "this order is $3.60" understates the card by the whole of the
+                shipping, so it is named as the products and the rest is declared rather
+                than left to be discovered on the statement. */}
+            {amount
+              ? ` Products $${amount.toFixed(2)} — Otto bill freight on top, charged to this card.`
+              : ""}
           </DialogDescription>
         </DialogHeader>
 
