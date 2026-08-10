@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash } from "@phosphor-icons/react"
+import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -12,7 +12,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { CARD_ACTION_PRIMARY, CARD_ACTION_SECONDARY, CARD_ACTION_ICON } from "@/lib/card-actions"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, deleteSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, type PublishedRecord, getSpydeckListingDetail } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, deleteSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, type PublishedRecord, getSpydeckListingDetail, getEtsyListingImages } from "@/lib/api"
 import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
@@ -125,6 +125,15 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedLi
   // "What did I actually upload?" is a question the 300px tile can't answer — the cover is
   // cropped square and scaled down, so a misplaced design or the wrong file looks fine.
   const [zoom, setZoom] = useState(false)
+  /**
+   * THE WHOLE PHOTO SET, not just the cover.
+   *
+   * The record stores one image and a count, so this dialog could say "Photos 2" while
+   * showing one — asserting there was more and then not showing it. Fetched on open (never
+   * with the grid: that would be one Etsy call per tile), and only for our own listings.
+   */
+  const [shots, setShots] = useState<string[] | null>(null)
+  const [shot, setShot] = useState(0)
   const p = l.published
   // published_listings (joined server-side) is authoritative for the build spec — it was
   // written by the publish route itself, so it survives rows the dialog never described.
@@ -132,6 +141,34 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedLi
   const printType = l.product?.print_type || p?.print_type
   const platform = (p?.platform || l.product?.platform || "etsy") as string
   const cover = p?.image || l.thumb || l.image
+  const [shotsErr, setShotsErr] = useState<string | null>(null)
+  /**
+   * Fetch once per open, and only for OUR listing. `our_listing_id` is the id on our shop;
+   * `listing_id` is the competitor's, and asking Etsy for that one's images would both fail
+   * the ownership check and be the wrong photos entirely.
+   */
+  const ourId = l.our_listing_id ?? p?.listing_id
+  useEffect(() => {
+    if (!zoom || shots !== null || !ourId) return
+    const t = setTimeout(() => {
+      getEtsyListingImages(String(ourId))
+        .then((r) => {
+          if (r.error) { setShots([]); setShotsErr(r.error); return }
+          setShots(r.images ?? [])
+          // A record that claims more photos than Etsy returns is worth saying out loud —
+          // it means an upload silently failed, which is exactly what this dialog is for.
+          const n = r.images?.length ?? 0
+          if (p?.images_uploaded != null && n < p.images_uploaded) {
+            setShotsErr(`The record says ${p.images_uploaded} photos, Etsy has ${n}.`)
+          }
+        })
+        .catch(() => { setShots([]); setShotsErr("Couldn't read the listing's photos from Etsy.") })
+    }, 0)
+    return () => clearTimeout(t)
+  }, [zoom, shots, ourId, p?.images_uploaded])
+  /** What the carousel shows: the live set when we have it, else the stored cover — so the
+   *  dialog is never empty while the fetch is in flight. */
+  const gallery = (shots && shots.length ? shots : cover ? [cover] : []) as string[]
   const title = p?.title || l.title
   const state = (p?.state || "draft").toLowerCase()
   const live = state === "active"
@@ -256,17 +293,53 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedLi
         </div>
       </div>
 
-      {/* The published cover, uncropped, beside what it was published AS. The tile shows a
-          square crop, so this is the only place the actual artwork can be checked. */}
+      {/* The published photos, uncropped, beside what they were published AS. The tile shows
+          a square crop, so this is the only place the actual artwork can be checked. */}
       <Dialog open={zoom} onOpenChange={setZoom}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader><DialogTitle className="pr-6 text-base leading-snug">{title}</DialogTitle></DialogHeader>
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_13rem]">
             {/* object-contain, not cover: a crop is exactly what this view exists to undo. */}
-            <div className="relative flex min-h-[16rem] items-center justify-center overflow-hidden rounded-xl bg-muted/40">
-              {cover
-                ? <Image src={cover} alt={title} width={1200} height={1200} unoptimized className="h-auto max-h-[70vh] w-full object-contain" />
-                : <span className="p-10 text-sm text-muted-foreground">No image was stored for this publish.</span>}
+            <div className="space-y-2">
+              <div className="relative flex min-h-[16rem] items-center justify-center overflow-hidden rounded-xl bg-muted/40">
+                {gallery.length > 0
+                  ? <Image src={gallery[Math.min(shot, gallery.length - 1)]} alt={title} width={1200} height={1200} unoptimized className="h-auto max-h-[70vh] w-full object-contain" />
+                  : <span className="p-10 text-sm text-muted-foreground">No image was stored for this publish.</span>}
+                {/* Arrows only when there is somewhere to go. A pair of dead chevrons on a
+                    one-photo listing is worse than none. */}
+                {gallery.length > 1 && (
+                  <>
+                    <button type="button" aria-label="Previous photo"
+                      onClick={() => setShot((i) => (i - 1 + gallery.length) % gallery.length)}
+                      className="eg-tap absolute left-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-background/85 text-foreground shadow-sm transition-colors hover:bg-background">
+                      <CaretLeft size={14} weight="bold" />
+                    </button>
+                    <button type="button" aria-label="Next photo"
+                      onClick={() => setShot((i) => (i + 1) % gallery.length)}
+                      className="eg-tap absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-background/85 text-foreground shadow-sm transition-colors hover:bg-background">
+                      <CaretRight size={14} weight="bold" />
+                    </button>
+                    <span className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-2xs font-medium text-white">
+                      {Math.min(shot, gallery.length - 1) + 1} / {gallery.length}
+                    </span>
+                  </>
+                )}
+              </div>
+              {/* Thumbnails, because a count plus arrows still doesn't let you get to photo
+                  four in one move — and checking the set is the whole reason to be here. */}
+              {gallery.length > 1 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {gallery.map((src, i) => (
+                    <button key={src + i} type="button" onClick={() => setShot(i)} aria-label={`Photo ${i + 1}`}
+                      className={"eg-tap size-12 overflow-hidden rounded-lg border-2 transition-colors " + (i === Math.min(shot, gallery.length - 1) ? "border-primary" : "border-transparent hover:border-border")}>
+                      <Image src={src} alt="" width={96} height={96} unoptimized className="size-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Says which of the two facts you're looking at. A record claiming two photos
+                  while Etsy returns one is worth seeing, not smoothing over. */}
+              {shotsErr && <p className="text-2xs text-amber-700 dark:text-amber-400">{shotsErr}</p>}
             </div>
             <dl className="space-y-2 text-sm">
               <Spec k="Status" v={live ? "Live" : "Draft"} />

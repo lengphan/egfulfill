@@ -2577,6 +2577,13 @@ export const WEBHOOK_EVENTS = ["order.received", "order.status_changed", "order.
  * `num_favorers` belong to a competitor's shop, and rendering them on a card headed by
  * our title would present someone else's sales as ours.
  */
+/** Every photo on one of OUR Etsy listings, read live. The publish record keeps a cover
+ *  and a count but no list, and a stored list would go stale the moment the seller
+ *  reordered photos on Etsy's own form. */
+export function getEtsyListingImages(listingId: string | number) {
+  return api<{ images?: string[]; error?: string }>(`/api/etsy/listings/${encodeURIComponent(String(listingId))}/images`)
+}
+
 export type PublishedRecord = {
   platform?: "etsy" | "tiktok"
   /** OUR listing on the marketplace. This is also the key `published_listings` is stored

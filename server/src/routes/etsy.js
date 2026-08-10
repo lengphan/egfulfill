@@ -931,6 +931,36 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   }
 
   // Frontend reads this to build the Etsy authorize URL (keystring is public).
+  /**
+   * EVERY photo on one of OUR listings, newest publish state included.
+   *
+   * The publish record stores a cover and a COUNT ("Photos 2") but no list, so the review
+   * dialog could show one image and assert there were more — the least useful pair of facts
+   * to hold. Read live from Etsy rather than backfilled into the record, for two reasons:
+   * it repairs every row already written, and it shows what is ACTUALLY on the listing now,
+   * including anything the seller reordered or added on Etsy's own form afterwards. A
+   * stored list would start lying the moment they touched it.
+   *
+   * Scoped to the caller's own shop connection, so this cannot be used to read images off a
+   * listing that isn't theirs.
+   */
+  app.get('/api/etsy/listings/:id/images', { preHandler: requireAuth }, async (req, reply) => {
+    const conn = await connectionFor(req.user);
+    if (!conn) { reply.code(400); return { error: 'No Etsy shop is connected.' }; }
+    const id = String(req.params.id || '').trim();
+    if (!/^[0-9]+$/.test(id)) { reply.code(400); return { error: 'Not a listing id.' }; }
+    try {
+      const r = await etsyGet(conn, `/listings/${id}/images`);
+      const images = ((r && r.results) || []).map(imgUrlOf).filter(Boolean);
+      return { images };
+    } catch (e) {
+      // Their words, not "couldn't load": a 404 here means the draft was deleted on Etsy,
+      // which is a different problem from an expired token, and only the message says which.
+      reply.code(502);
+      return { error: String((e && e.message) || e) };
+    }
+  });
+
   app.get('/api/etsy/config', async () => ({
     keystring: KEYSTRING, redirect_uri: REDIRECT_URI, scopes: SCOPES,
     configured: !!KEYSTRING
