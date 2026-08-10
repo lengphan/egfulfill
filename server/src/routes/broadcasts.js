@@ -70,6 +70,10 @@ function ensureTables() {
       sent_at         timestamptz
     )`).catch(() => {});
     await q('create index if not exists broadcasts_created_idx on broadcasts(created_at desc)').catch(() => {});
+  // WHY a send failed, kept on the row. It was only ever written to the server log — so the
+  // screen said "failed" and the one fact that makes it fixable (an unverified sender, a
+  // rejected key, a rate limit) lived on a box nobody sending a broadcast is reading.
+  await q('alter table broadcasts add column if not exists last_error text').catch(() => {});
     // Marketing opt-out is its own flag, NOT `active`. Unsubscribing from broadcasts must
     // never stop a password reset or a top-up receipt arriving — those are transactional,
     // the seller asked for them, and silently swallowing them reads as a broken account.
@@ -294,7 +298,7 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
   app.get('/api/broadcasts', { preHandler: requireDraft }, async () => {
     await ensureTables();
     const r = await q(`select id, subject, body, audience, status, recipient_count, sent_count,
-                              failed_count, created_by, created_by_name, created_at, sent_at
+                              failed_count, last_error, created_by, created_by_name, created_at, sent_at
                          from broadcasts order by created_at desc limit 200`);
     return { broadcasts: r.rows, mailConfigured: mailConfigured() };
   });
@@ -448,14 +452,17 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
         // would otherwise have gone.
         await new Promise((res) => setTimeout(res, 120));
       }
+      const why = bad ? (lastMailError() || 'send failed for an unknown reason') : null;
       await q(
         `update broadcasts set sent_count = $2, failed_count = $3, sent_at = now(),
+                last_error = $4,
                 status = case when $2 = 0 then 'failed' else 'sent' end
-           where id = $1::bigint`, [id, ok, bad]).catch(() => {});
-      if (bad) app.log.warn({ broadcast: id, ok, bad, lastError: lastMailError() }, 'broadcast finished with failures');
+           where id = $1::bigint`, [id, ok, bad, why]).catch(() => {});
+      if (bad) app.log.warn({ broadcast: id, ok, bad, lastError: why }, 'broadcast finished with failures');
     })().catch((e) => {
       app.log.error({ err: e, broadcast: id }, 'broadcast send loop crashed');
-      q("update broadcasts set status = 'failed' where id = $1::bigint", [id]).catch(() => {});
+      q("update broadcasts set status = 'failed', last_error = $2 where id = $1::bigint",
+        [id, 'Send loop crashed: ' + String((e && e.message) || e).slice(0, 300)]).catch(() => {});
     });
 
     return { id, recipientCount: recipients.length, status: 'sending' };

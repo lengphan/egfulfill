@@ -442,7 +442,20 @@ export function BroadcastsView() {
                             <span>{b.sent_count.toLocaleString("en-US")}</span>
                             <span className="text-muted-foreground">{" / "}{(b.recipient_count ?? 0).toLocaleString("en-US")}</span>
                             {b.failed_count > 0 && (
-                              <div className="text-xs text-red-600 dark:text-red-400">{b.failed_count} failed</div>
+                              <div className="text-xs text-red-600 dark:text-red-400">
+                                {b.failed_count} failed
+                                {/* The transport's own words. "N failed" alone gives nothing
+                                    to act on, and the reason — unverified sender, rejected
+                                    key, rate limit — decides what you do next. */}
+                                {b.last_error && (
+                                  <div className="mt-0.5 font-normal leading-snug opacity-90">{b.last_error}</div>
+                                )}
+                              </div>
+                            )}
+                            {/* A run that sent nothing is marked failed with no counter to
+                                hang the reason on, so it needs its own line. */}
+                            {b.failed_count === 0 && b.status === "failed" && b.last_error && (
+                              <div className="mt-0.5 text-xs leading-snug text-red-600 opacity-90 dark:text-red-400">{b.last_error}</div>
                             )}
                           </>
                         )}

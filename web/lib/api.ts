@@ -3308,6 +3308,10 @@ export type Broadcast = {
   recipient_count: number | null
   sent_count: number
   failed_count: number
+  /** WHY the send failed, in the transport's own words (an unverified sender, a rejected
+   *  key, a rate limit). Null on a clean send. Without it the screen says "failed" and the
+   *  one fact that makes it fixable lives only in the server log. */
+  last_error: string | null
   created_by: string | null
   created_by_name: string | null
   created_at: string
