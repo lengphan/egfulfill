@@ -657,8 +657,13 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
     } catch (e) {
       reply.code(e.status === 403 || e.status === 401 ? 403 : 502);
       return {
+        // TWO causes wear the same 401/403, and Shopify's own text ("Invalid API key or
+        // access token") doesn't separate them: the stored token has EXPIRED, or it never
+        // carried write_products because the shop connected before publishing existed.
+        // Naming only the second would be a guess stated as a fact. Reconnecting fixes
+        // either, so the instruction is the same — the diagnosis is what stays honest.
         error: (e.status === 403 || e.status === 401)
-          ? `Shopify refused: ${e.message}. This shop was connected before publishing was supported — reconnect it under Stores so its token carries write_products.`
+          ? `Shopify refused: ${e.message}. Either the stored token has expired, or this shop connected before publishing was supported and its token has no write_products scope. Reconnecting the shop under Stores fixes both.`
           : `Shopify refused: ${e.message}`,
       };
     }
