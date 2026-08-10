@@ -19,8 +19,14 @@ const SECRET_DEFS = [
   { name: 'PAYPAL_SECRET',         label: 'Secret',           integration: 'paypal' },
   { name: 'VIETQR_API_USERNAME',   label: 'Username',         integration: 'vietqr' },
   { name: 'VIETQR_API_PASSWORD',   label: 'Password',         integration: 'vietqr' },
-  { name: 'EASYPOST_API_KEY',      label: 'EasyPost key',     integration: 'shipping' },
-  { name: 'SHIPPO_API_TOKEN',      label: 'Shippo token',     integration: 'shipping' },
+  // integration must equal the PANEL CARD's `key`, or the edit fields attach to no card and
+  // the secret becomes unreachable from Settings. These said 'shipping' while the cards are
+  // 'shippo' and 'easypost' — so the Shippo token, the one key that decides whether labels
+  // are test or live, could not be changed anywhere in the product.
+  // EasyPost has no card of its own — shipping.js rate-shops across both providers, so it
+  // rides on the Shippo card rather than being unreachable under a card that doesn't exist.
+  { name: 'EASYPOST_API_KEY',      label: 'EasyPost key',     integration: 'shippo' },
+  { name: 'SHIPPO_API_TOKEN',      label: 'API token',        integration: 'shippo' },
   { name: 'USPS_CONSUMER_KEY',     label: 'Consumer key',     integration: 'usps' },
   { name: 'USPS_CONSUMER_SECRET',  label: 'Consumer secret',  integration: 'usps' },
   { name: 'SS_API_KEY',            label: 'API key',          integration: 'ss' },
