@@ -2,6 +2,7 @@
 // sellers browse. GET is readable by any signed-in user; writes are staff-only.
 // Products carry image data URLs, so we store the whole product object in a
 // `data` jsonb column (lossless round-trip) plus a few typed columns for TablePlus.
+import { createHash } from 'node:crypto';
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 import { quoteSpec } from '../pricing.js';
@@ -120,6 +121,18 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    */
   /** Supplier names, so a `brand || 'SanMar'` style fallback can never be published. */
   const SUPPLIER_NAMES = new Set(['sanmar', 's&s', 'ss', 'ssactivewear', 's&s activewear', 'otto', 'ottocap', 'otto cap']);
+  /** The same rule as a value filter: a supplier's name never survives into a file or page. */
+  const notSupplier = (v) => {
+    const t = String(v ?? '').trim();
+    return SUPPLIER_NAMES.has(t.toLowerCase()) ? '' : t;
+  };
+  /**
+   * Supplier DOMAINS. CLAUDE.md §2.8 covers URLs and redirects, not just fields — an address
+   * bar reading `cdn.ssactivewear.com` names them exactly as plainly as a column headed
+   * "Supplier" does. Anything matching here is re-dispatched through /api/ss/img internally
+   * rather than handed back in a Location header.
+   */
+  const SUPPLIER_HOST = /^https?:\/\/(?:[a-z0-9-]+\.)*(?:ssactivewear|ottocap|sanmar)\.com(?:[/:?#]|$)/i;
   /** Plain text for a public page: tags stripped, whitespace collapsed, length capped.
    *  Returns null rather than an empty string so the client can test one thing. */
   const publicText = (v, max) => {
@@ -370,6 +383,73 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     if (ct) reply.header('Content-Type', ct);
     reply.header('Cache-Control', 'public, max-age=604800, immutable');
     return res.rawPayload;
+  });
+
+  /**
+   * OPAQUE ADDRESSES FOR IMAGES THAT LEAVE THE BUILDING.
+   *
+   * A partner sheet is a file we hand to an outside company, and its image column was
+   * `…/api/ss/img?u=https%3A%2F%2Fcdn.ssactivewear.com%2F…` — our supplier's domain, in
+   * plain text, on every row. CLAUDE.md §2.8 covers URLs, so that is the same breach as a
+   * column headed "Supplier"; it was just less obvious because the field was called `image`.
+   *
+   * A hash rather than an encoding, DELIBERATELY. base64 of the real address hides the
+   * domain from a reader and not at all from anyone who tries, and this file's whole risk is
+   * that a recipient goes looking. sha256 is one-way, so the mapping only exists here.
+   *
+   * The row is written at export time and kept: the sheet outlives the session, and a buyer
+   * opening last quarter's workbook should still see the garments. Same reasoning as
+   * catalog_exports keeping a snapshot.
+   */
+  q(`create table if not exists catalog_img_refs (
+       hash text primary key,
+       url text not null,
+       created_at timestamptz not null default now()
+     )`).catch(() => {});
+
+  const imgHash = (u) => createHash('sha256').update(String(u)).digest('hex').slice(0, 24);
+
+  /**
+   * Serve one. NO AUTH — the recipient of a catalogue is not a user of ours, and a sheet
+   * whose pictures only load for staff is a sheet with no pictures.
+   *
+   * A hash is not a secret, but it is not enumerable either: to ask for one you have to have
+   * been given it, which is exactly the property a link in a document needs.
+   */
+  app.get('/api/catalog/img/:hash', async (req, reply) => {
+    const hash = String((req.params && req.params.hash) || '').toLowerCase();
+    if (!/^[0-9a-f]{24}$/.test(hash)) { reply.code(404); return { error: 'Not found' }; }
+    const r = await q('select url from catalog_img_refs where hash = $1', [hash])
+      .catch(() => ({ rows: [] }));
+    const raw = r.rows[0] && r.rows[0].url;
+    if (!raw) { reply.code(404); return { error: 'Not found' }; }
+
+    if (/^data:image\//i.test(raw)) {
+      const m = /^data:([^;]+);base64,(.*)$/i.exec(raw);
+      if (!m) { reply.code(404); return { error: 'Not found' }; }
+      reply.header('Content-Type', m[1]);
+      reply.header('Cache-Control', 'public, max-age=604800, immutable');
+      return Buffer.from(m[2], 'base64');
+    }
+
+    // A supplier address is re-dispatched INTERNALLY. Redirecting would put their host in the
+    // Location header, which defeats the entire point of the opaque path — the known hole
+    // noted on /api/public/products/:slug/img, closed here because this one is handed out in
+    // a document rather than rendered by our own page.
+    const proxied = raw.startsWith('/api/ss/img') ? upsizeSupplierImg(raw)
+      : SUPPLIER_HOST.test(raw) ? '/api/ss/img?u=' + encodeURIComponent(raw)
+        : null;
+    if (proxied) {
+      const res = await app.inject({ method: 'GET', url: proxied });
+      reply.code(res.statusCode);
+      const ct = res.headers['content-type'];
+      if (ct) reply.header('Content-Type', ct);
+      reply.header('Cache-Control', 'public, max-age=604800, immutable');
+      return res.rawPayload;
+    }
+    if (/^https?:\/\//i.test(raw)) { reply.redirect(raw); return; }
+    reply.code(404);
+    return { error: 'Not found' };
   });
 
   app.get('/api/catalog_products', { preHandler: requireAuth }, async (req) => {
@@ -682,7 +762,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const supplierColours = supplierArt.get('c:' + sid);
       return {
         ref: String(d.id ?? d.sku ?? ''), name: d.name || '', sku: d.sku || '',
-        description: d.description || '', brand: d.brand || '',
+        description: d.description || '', brand: notSupplier(d.brand),
         image: supplierArt.get(sid) || d.image || d.img || '',
         price: row.catalog_price == null ? null : Number(row.catalog_price),
         sizes: Array.isArray(d.sizes) ? d.sizes
@@ -748,7 +828,9 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
 
     const supplier = picked.map((p) => ({
       ref: p.ref, name: p.name || p.ref, sku: p.ref,
-      description: descs.get(p.ref) || '', brand: p.brand || 'S&S',
+      // The lookbook PRINTS this next to the style name (catalog-print.tsx), so `|| 'S&S'`
+      // put our supplier's name on every page of a catalogue handed to a buyer.
+      description: descs.get(p.ref) || '', brand: notSupplier(p.brand),
       image: ssImgUrl(p.image),
       price: p.catalog_price == null ? null : Number(p.catalog_price),
       sizes: p.sizes || [],
@@ -792,17 +874,22 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     ).catch(() => ({ rows: [] }))).rows;
 
     const base = String(process.env.APP_URL || 'https://app.egful.store').replace(/\/$/, '');
-    // Route supplier images through our proxy so they actually load for the recipient.
+
+    /**
+     * EVERY image becomes one of ours, not only the supplier's.
+     *
+     * Filtering by host was the previous shape and it is the wrong test twice over: a
+     * supplier domain we have not listed yet passes straight through, and a `data:` image
+     * goes into the cell as tens of thousands of base64 characters — past Excel's 32,767
+     * limit, so the row silently truncates. One opaque address for all of them answers both.
+     */
+    const imgRefs = new Map();
     const img = (u) => {
       const v = String(u || '').trim();
       if (!v) return '';
-      if (/^https?:\/\/(www\.)?(cdn\.)?ssactivewear\.com/i.test(v) || /ottocap\.com/i.test(v)) {
-        // /api/ss/img — the shared supplier proxy, used by Otto's images too (ottocap.js
-        // routes through the same one). Guessing /api/img would have produced a sheet of
-        // dead links that looked perfectly well-formed.
-        return `${base}/api/ss/img?u=${encodeURIComponent(v)}`;
-      }
-      return v;
+      const h = imgHash(v);
+      imgRefs.set(h, v);
+      return `${base}/api/catalog/img/${h}`;
     };
 
     const out = [];
@@ -828,11 +915,15 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
             price, currency: 'USD',
             image: img(d.image ?? d.img ?? ''),
             variant_image: img((c && (c.image ?? c.img)) || ''),
-            supplier: d.supplier ?? d.brand ?? '',
             // MODEL and BRAND as a partner means them: the style number a manufacturer
             // prints on the label ("64000") and who makes it — not our SKU, which is ours
             // and means nothing to them.
-            brand: d.brand ?? d.supplier ?? '',
+            //
+            // NO `?? d.supplier` FALLBACK. It read as harmless — "use the supplier if we
+            // don't know the brand" — and it is precisely the §2.8 case: it prints who
+            // supplies us exactly when the garment's real brand is missing. Unknown brand
+            // exports blank, and the mapping UI lists the column as unfilled.
+            brand: notSupplier(d.brand),
             model: d.blank ?? d.styleId ?? d.style ?? d.sku ?? '',
           });
         }
@@ -869,8 +960,9 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
             sku: p.ref, product: p.name || '', description: '',
             colour: c || '', size: z || '', price, currency: 'USD',
             image: img(p.image || ''), variant_image: '',
-            supplier: p.brand || 'S&S',
-            brand: p.brand || 'S&S',
+            // `|| 'S&S'` was hardcoded here — a picked style with no brand on the feed
+            // exported our supplier's name into a partner's own workbook.
+            brand: notSupplier(p.brand),
             // A pick IS a style, so its ref is the model number — no guessing needed.
             model: p.ref,
           });
@@ -878,13 +970,39 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       }
     }
 
+    /**
+     * Record the addresses the rows now point at.
+     *
+     * One statement for the whole export, and idempotent — the same picture keeps the same
+     * hash, so re-exporting a settled catalogue writes nothing new and every sheet ever sent
+     * keeps working. Best-effort: a failure here costs the pictures in one file, and must
+     * not cost the file.
+     */
+    if (imgRefs.size) {
+      const hashes = [...imgRefs.keys()];
+      await q(
+        `insert into catalog_img_refs (hash, url)
+         select * from unnest($1::text[], $2::text[])
+         on conflict (hash) do nothing`,
+        [hashes, hashes.map((h) => imgRefs.get(h))]
+      ).catch(() => {});
+    }
+
     return { rows: out, products: rows.length, picks: picks.length };
   };
 
-  /** The field names buildExportRows emits, in the order a mapping UI should offer them. */
+  /**
+   * The field names buildExportRows emits, in the order a mapping UI should offer them.
+   *
+   * `supplier` USED TO BE HERE and is gone on purpose — see CLAUDE.md §2.8. It was offered
+   * as a mappable column in a file that goes to an outside company, which made handing a
+   * partner the name of the firm they could buy the same blank from a one-click mistake.
+   * There is no redacted version of it worth keeping: who supplies us is not a catalogue
+   * field.
+   */
   const EXPORT_FIELDS = [
     'sku', 'model', 'brand', 'product', 'description', 'colour', 'size',
-    'price', 'currency', 'image', 'variant_image', 'supplier',
+    'price', 'currency', 'image', 'variant_image',
   ];
 
   app.get('/api/catalog/export', { preHandler: requireAuth }, async (req, reply) => {
@@ -896,7 +1014,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const { rows, products, picks } = await buildExportRows({ all });
 
     const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const head = ['sku', 'product', 'description', 'colour', 'size', 'price', 'currency', 'image', 'variant_image', 'supplier'];
+    const head = ['sku', 'product', 'description', 'colour', 'size', 'price', 'currency', 'image', 'variant_image'];
     const out = [head.map(esc).join(',')];
     for (const r of rows) out.push(head.map((k) => esc(r[k])).join(','));
 

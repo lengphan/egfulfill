@@ -138,7 +138,10 @@ export function detectLayout(file: ArrayBuffer): TemplateLayout {
 const SYNONYMS: Record<string, string> = {
   sku: "sku", "sku code": "sku", "item number": "sku",
   model: "model", style: "model", "style number": "model", "style #": "model", "model number": "model",
-  brand: "brand", manufacturer: "brand", vendor: "supplier", supplier: "supplier",
+  // NOTE: "vendor" and "supplier" map to NOTHING, deliberately. A partner asking who
+  // supplies us gets an unfilled column and a human decision, not an automatic answer —
+  // CLAUDE.md §2.8. The field was removed from the server's vocabulary too.
+  brand: "brand", manufacturer: "brand",
   name: "product", "product name": "product", title: "product", product: "product", description: "description",
   color: "colour", colour: "colour", "color name": "colour", "colour name": "colour",
   size: "size", "size name": "size",
@@ -250,8 +253,19 @@ export function mappedFields(mapping: Mapping): Set<string> {
   return used
 }
 
-/** Columns a partner asked for that nothing feeds yet — what the UI must not hide. */
-export function unfilledColumns(layout: TemplateLayout, mapping: Mapping): { block: string; label: string }[] {
+/**
+ * Columns a partner asked for that nothing feeds yet — what the UI must not hide.
+ *
+ * `fields` is the server's CURRENT vocabulary, and passing it catches the case a saved
+ * mapping creates: a rule naming a field that no longer exists resolves to `""` at build
+ * time and exports as a blank cell that looks deliberate. `supplier` was withdrawn for
+ * exactly that reason, so every template mapped before then has one — it must show up here
+ * rather than quietly emptying a column someone believes is filled.
+ */
+export function unfilledColumns(
+  layout: TemplateLayout, mapping: Mapping, fields?: string[],
+): { block: string; label: string }[] {
+  const known = fields && fields.length ? new Set(fields) : null
   const out: { block: string; label: string }[] = []
   for (const sheet of layout.sheets) {
     for (const block of sheet.blocks) {
@@ -259,7 +273,10 @@ export function unfilledColumns(layout: TemplateLayout, mapping: Mapping): { blo
       if (!m || m.mode !== "rows") continue
       for (const c of block.columns) {
         const rule = m.columns[c.index]
-        if (!rule || rule.kind === "blank") out.push({ block: block.title || sheet.name, label: c.label })
+        const dead = rule?.kind === "field" && known != null && !known.has(rule.field)
+        if (!rule || rule.kind === "blank" || dead) {
+          out.push({ block: block.title || sheet.name, label: c.label })
+        }
       }
     }
   }

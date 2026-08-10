@@ -25,7 +25,6 @@ const FIELD_LABEL: Record<string, string> = {
   sku: "Our SKU", model: "Style / model no.", brand: "Brand", product: "Product name",
   description: "Description", colour: "Colour", size: "Size", price: "Catalogue price",
   currency: "Currency", image: "Product image URL", variant_image: "Colour image URL",
-  supplier: "Supplier",
 }
 
 const MODES: { value: BlockMode; label: string; hint: string }[] = [
@@ -158,7 +157,7 @@ export function PartnerSheets() {
     setNote(`Built ${current.name}'s sheet from ${rows.length} catalogue line${rows.length === 1 ? "" : "s"}.`)
   }
 
-  const gaps = useMemo(() => unfilledColumns(layout, mapping), [layout, mapping])
+  const gaps = useMemo(() => unfilledColumns(layout, mapping, fields), [layout, mapping, fields])
 
   return (
     <div className="space-y-4 px-5 py-4">
