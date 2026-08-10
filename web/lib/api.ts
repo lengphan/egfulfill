@@ -682,9 +682,25 @@ export function testAiKey(key?: string) {
 // Google Sheets import — server reads the sheet and returns a 2D row array,
 // then the client reuses the same CSV parsing/validation (lib/order-import).
 export function getSheetsConfig() {
-  /** `shareWith` is the service-account address the seller must give their own sheet
-   *  access to. Signed-in callers only — see the route. */
-  return api<{ enabled?: boolean; templateUrl?: string; canCreate?: boolean; shareWith?: string }>(`/api/sheets/config`)
+  /** `copyUrl` is Google's force-a-copy link for our master template — the whole seller
+   *  flow. `needsTemplate` is admin-only and true when no master has been configured yet;
+   *  `shareWith` (the service-account address) is signed-in only. See the route. */
+  return api<{
+    enabled?: boolean
+    templateUrl?: string
+    copyUrl?: string
+    canCreate?: boolean
+    shareWith?: string
+    needsTemplate?: boolean
+  }>(`/api/sheets/config`)
+}
+/** Admin: point the Make-a-copy button at a master template sheet. Any Sheets URL works —
+ *  the /copy form is derived server-side, so pasting the /edit link is correct. */
+export function setSheetTemplate(url: string) {
+  return api<{ ok?: boolean; templateUrl?: string; copyUrl?: string }>(`/api/sheets/template`, {
+    method: "PUT",
+    body: JSON.stringify({ url }),
+  })
 }
 export function getSheetRows(url: string) {
   return api<{ rows?: string[][]; title?: string; tab?: string; error?: string }>(`/api/sheets?url=${encodeURIComponent(url)}`)

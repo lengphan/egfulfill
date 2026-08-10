@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CircleNotch, Copy } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CircleNotch } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,6 @@ import {
   applyTemplates,
   type ImportTemplate,
   CSV_COLUMNS,
-  TEMPLATE_TSV,
   COLUMN_OPTIONS,
   GROUP_LABEL,
   DUTY_LABEL,
@@ -25,7 +24,7 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getSheetsConfig, getSheetRows, createSheet, getTemplates } from "@/lib/api"
+import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, getTemplates } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
 
@@ -119,21 +118,16 @@ export function ImportOrdersDialog({
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [paste, setPaste] = useState("")
-  const [sheetUrl, setSheetUrl] = useState("")
   const [notice, setNotice] = useState<string | null>(null)
   // Header row shown for manual copying when the clipboard write did not happen.
   const [copyFallback, setCopyFallback] = useState<string | null>(null)
-  const [sheetLoading, setSheetLoading] = useState(false)
   const [sheetsEnabled, setSheetsEnabled] = useState(false)
-  // Whether the server can build a formatted sheet for us (service account present), vs
-  // only being able to READ one — which decides which of the two button flows we offer.
-  const [sheetsCanCreate, setSheetsCanCreate] = useState(false)
-  // The service-account address a seller must share their OWN sheet with. Server-supplied
-  // (it lives in an env var), so the dialog can print the thing to paste instead of naming
-  // a config key nobody outside the server can read.
-  const [shareWith, setShareWith] = useState<string | null>(null)
-  const [shareCopied, setShareCopied] = useState(false)
-  const [creating, setCreating] = useState(false)
+  // Google's force-a-copy URL for our master template, and (admins only) whether one has
+  // been configured yet. Server-supplied: the master lives in a setting, not in the bundle.
+  const [copyUrl, setCopyUrl] = useState("")
+  const [needsTemplate, setNeedsTemplate] = useState(false)
+  const [tplInput, setTplInput] = useState("")
+  const [tplSaving, setTplSaving] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState<{ imported: number } | null>(null)
   // The seller's saved templates, fetched ONLY when a parsed sheet actually names one.
@@ -145,12 +139,15 @@ export function ImportOrdersDialog({
     if (!open) return
     // Reset per open, and see whether Google Sheets is configured server-side.
     const id = setTimeout(() => {
-      setRecords(null); setError(null); setPaste(""); setSheetUrl(""); setDone(null)
+      setRecords(null); setError(null); setPaste(""); setDone(null)
       setNotice(null); setCopyFallback(null); setTemplates(null); setTemplatesFailed(false)
-      setShareCopied(false)
+      setTplInput("")
       getSheetsConfig()
-        .then((c) => { setSheetsEnabled(!!c.enabled); setSheetsCanCreate(!!c.canCreate); setShareWith(c.shareWith || null) })
-        .catch(() => { setSheetsEnabled(false); setSheetsCanCreate(false); setShareWith(null) })
+        .then((c) => {
+          setSheetsEnabled(!!c.enabled)
+          setCopyUrl(c.copyUrl || ""); setNeedsTemplate(!!c.needsTemplate)
+        })
+        .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setNeedsTemplate(false) })
     }, 0)
     return () => clearTimeout(id)
   }, [open])
@@ -247,88 +244,28 @@ export function ImportOrdersDialog({
   /**
    * Get the seller a Google Sheet with our template already in it.
    *
-   * PREFERRED: the server builds a real sheet — banded header, colours, frozen rows,
-   * dropdowns — and shares it link-editable. That is the only path that can carry
-   * formatting and data validation, since Google has no "create a sheet from this CSV" URL
-   * and a clipboard paste carries text and nothing else.
+   * ONE MECHANISM NOW: Google's own /copy URL for our master template. It opens Google's
+   * Make-a-copy dialog and the copy lands in the SELLER's Drive, owned by them, with every
+   * colour band, frozen row and dropdown intact. Nothing is shared with us and no
+   * permission is involved, which is what makes it work at all.
    *
-   * FALLBACK (no service account configured): the old open-blank-and-paste flow. It gives
-   * plain headers in the right order, which still imports correctly — just without the
-   * colour bands and dropdowns.
+   * The two paths this replaces both dead-ended:
+   * - Server-side create via the service account. Verified against the live credential on
+   *   2026-08-10: POST /v4/spreadsheets → 403 PERMISSION_DENIED, because a standalone
+   *   service account has no Drive storage to create a file in. Not fixable in the Cloud
+   *   Console; it needs domain-wide delegation this deployment doesn't have.
+   * - Open sheets.new and paste the header row off the clipboard. It carries text and
+   *   nothing else — no colours, no dropdowns — and silently gives you nothing at all
+   *   wherever the clipboard is blocked. That is the "blank Google Sheet" report.
+   *
+   * With no master configured there is no third guess: the .xlsx download is offered
+   * instead, which is a real formatted template and drops straight onto the File tab.
    */
-  const makeSheetCopy = async () => {
+  const makeSheetCopy = () => {
+    if (!copyUrl) return
     setError(null); setCopyFallback(null)
-    if (sheetsCanCreate) {
-      setCreating(true)
-      try {
-        const r = await createSheet()
-        if (r.url) {
-          window.open(r.url, "_blank", "noopener")
-          setSheetUrl(r.url)
-          // The sheet is created by one call and FORMATTED by a second. The second can fail
-          // on its own — leaving a real, usable sheet with no colours, merges or dropdowns.
-          // Saying "coloured, with dropdowns" regardless is how "my dropdowns are missing"
-          // became unanswerable: the app asserted a state it hadn't checked.
-          if (r.formattingError) {
-            setNotice(null)
-            setError(`Sheet created, but Google rejected the formatting — ${r.formattingError}. The columns are correct and it will still import; the colours and dropdowns are missing.`)
-          } else {
-            setNotice("Your sheet is open in a new tab — required columns are blue, optional grey, with dropdowns where we know the options. Fill it in, then press Load.")
-          }
-          return
-        }
-        // Fall through to the clipboard path rather than dead-ending: a sheet they can
-        // paste into beats an error message.
-        setError(r.error || "Couldn't create the sheet — falling back to a blank one.")
-      } catch (e) {
-        // SURFACE THE REAL REASON. api() THROWS on any non-2xx, with `message` set to the
-        // server's own `error` field — so a 502 carrying "Could not create sheet: Google
-        // Drive API has not been used in project …" arrived here and was thrown away,
-        // reported as "couldn't reach the server". That is the wrong diagnosis and an
-        // unactionable one: the server was reached, Google refused, and the fix is one
-        // click in the Cloud Console. Only a genuine transport failure has no message.
-        const msg = e instanceof Error ? e.message.trim() : ""
-        setError(msg
-          ? `Couldn't create the sheet — ${msg}. Falling back to a blank one.`
-          : "Couldn't reach the server to create a sheet — falling back to a blank one.")
-      } finally {
-        setCreating(false)
-      }
-    }
-    // Whether the copy ACTUALLY happened decides what we tell them. navigator.clipboard is
-    // undefined outside a secure context, and `await undefined` resolves happily — so the old
-    // optional-chained call could no-op without throwing, and we would still promise the
-    // template was on their clipboard. They then opened a blank sheet with nothing to paste,
-    // which is exactly the "Google Sheet import is blank" report.
-    let copied = false
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(TEMPLATE_TSV)
-        copied = true
-      }
-    } catch { copied = false }
-    setCopyFallback(copied ? null : TEMPLATE_TSV)
-    window.open("https://sheets.new", "_blank", "noopener")
-    setNotice(
-      copied
-        ? "A blank Google Sheet is opening — the header row is on your clipboard. Click cell A1 and press ⌘V / Ctrl+V."
-        : "A blank Google Sheet is opening, but this browser blocked the clipboard. Copy the header row below and paste it into cell A1."
-    )
-  }
-
-  const loadSheet = async () => {
-    if (!sheetUrl.trim()) return
-    setSheetLoading(true); setError(null)
-    try {
-      const r = await getSheetRows(sheetUrl.trim())
-      if (r.error) throw new Error(r.error)
-      if (!r.rows || r.rows.length < 2) throw new Error("That tab has no order rows — needs a header plus at least one order.")
-      ingest(r.rows)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not read that sheet.")
-    } finally {
-      setSheetLoading(false)
-    }
+    window.open(copyUrl, "_blank", "noopener")
+    setNotice("Google is asking you to make your own copy — click Make a copy. Fill it in, then File → Download → .xlsx or .csv, and drop that file on the File tab here.")
   }
 
   const confirm = async () => {
@@ -504,84 +441,79 @@ export function ImportOrdersDialog({
               </TabsContent>
 
               {sheetsEnabled && (
-                <TabsContent value="sheet" className="mt-3 space-y-2">
-                  <div className="flex gap-2">
-                    <Input value={sheetUrl} onChange={(e) => setSheetUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" />
-                    <Button variant="outline" onClick={loadSheet} disabled={sheetLoading || !sheetUrl.trim()}>
-                      {sheetLoading ? <CircleNotch size={15} className="animate-spin" /> : "Load"}
-                    </Button>
-                  </div>
-                  {/* Start from a correctly-shaped sheet rather than describing the shape.
-                      "Make a copy" hands them a Google Sheet with our exact headers, which
-                      removes the whole class of import failures that begin with a column
-                      named something we don't recognise. */}
-                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
-                    <span className="text-xs text-muted-foreground">No sheet yet?</span>
-                    <Button variant="outline" size="sm" onClick={makeSheetCopy} disabled={creating}>
-                      {creating
-                        ? <><CircleNotch size={13} className="animate-spin" /> Building your sheet…</>
-                        : <><Table size={13} weight="bold" /> {sheetsCanCreate ? "Create my order sheet" : "Make a copy in Google Sheets"}</>}
-                    </Button>
-                    <span className="text-2xs text-muted-foreground">
-                      {sheetsCanCreate
-                        ? "opens a formatted sheet — required columns blue, optional grey, dropdowns filled in"
-                        : "opens a blank sheet with the header row on your clipboard"}
-                    </span>
-                  </div>
-                  {sheetsCanCreate && (
-                    <p className="text-xs text-muted-foreground">
-                      A sheet we make for you is already shared and its link is filled in above — fill it in, then press Load.
-                    </p>
-                  )}
-
-                  {/* BRINGING YOUR OWN SHEET.
-                      A sheet we create is already shared with us; one the seller made is not,
-                      and Google answers that with a 403 that says nothing about what to do.
-                      The instruction used to be "share it as anyone-with-the-link" — which is
-                      both the wrong path now (the server reads as the service account) and the
-                      one that publishes buyer names and home addresses to anyone holding the
-                      URL. So: the actual address, one click to copy it, and the two settings
-                      that trip people up. */}
-                  {shareWith && (
-                    <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-2.5">
-                      <div className="text-xs font-medium">Using a sheet you already have? Share it with us first.</div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-2xs" title={shareWith}>
-                          {shareWith}
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            navigator.clipboard?.writeText(shareWith)
-                              .then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000) })
-                              // A browser that blocks the clipboard must not leave a dead
-                              // button — the address is on screen and selectable either way.
-                              .catch(() => setShareCopied(false))
-                          }}
-                        >
-                          {shareCopied ? <><CheckCircle size={13} weight="fill" /> Copied</> : <><Copy size={13} weight="bold" /> Copy</>}
+                <TabsContent value="sheet" className="mt-3 space-y-3">
+                  {/* COPY → FILL → DOWNLOAD → DROP.
+                      One path, and the seller's Google account does all the work Google will
+                      only let an account do. They copy our master template, fill their copy,
+                      export it, and drop the file on the File tab — the same drop zone that
+                      already accepts .csv/.xlsx, so nothing new has to parse it.
+                      There is deliberately no "paste your sheet's link" field any more: that
+                      route needs the sheet shared with our service account, which is a step
+                      no seller could complete and the source of the 403s. */}
+                  {copyUrl ? (
+                    <>
+                      <div className="rounded-xl border border-border bg-muted/30 p-4">
+                        <Button onClick={makeSheetCopy}>
+                          <Table size={15} weight="bold" /> Make a copy in Google Sheets
                         </Button>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Opens your own copy in your Drive — every column already in place, required
+                          ones blue, dropdowns filled in. It is yours; nothing is shared with us.
+                        </p>
                       </div>
-                      <ol className="list-inside list-decimal space-y-0.5 text-2xs text-muted-foreground">
-                        <li>In your sheet: <span className="font-medium text-foreground">Share</span> → paste that address</li>
-                        <li>Leave it on <span className="font-medium text-foreground">Viewer</span>, and untick <span className="font-medium text-foreground">Notify people</span> — nobody reads that inbox</li>
-                        <li>Paste the sheet link above and press Load</li>
+                      <ol className="list-inside list-decimal space-y-1 text-xs text-muted-foreground">
+                        <li>Click above, then <span className="font-medium text-foreground">Make a copy</span> in Google&apos;s dialog</li>
+                        <li>Fill in your orders — one line per item, same Order Number groups them</li>
+                        <li>In the sheet: <span className="font-medium text-foreground">File → Download → .xlsx</span> (or .csv)</li>
+                        <li>Drop that file on the <span className="font-medium text-foreground">File</span> tab here</li>
                       </ol>
-                      <p className="text-2xs text-muted-foreground">
-                        Your sheet stays private — only this address gains access, so buyer names and
-                        addresses are never exposed to anyone holding the link.
+                    </>
+                  ) : (
+                    /* No master configured. Rather than a broken button, the seller gets the
+                       .xlsx — a genuinely formatted template with the same columns, fills and
+                       dropdowns, which lands on the File tab without a round trip. */
+                    <div className="rounded-xl border border-border bg-muted/30 p-4">
+                      <div className="text-xs font-medium">The Google Sheets template isn&apos;t set up yet.</div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Use the <span className="font-medium text-foreground">Template (.xlsx)</span> button at the top — same
+                        columns, same colours and dropdowns. Fill it in and drop it on the File tab.
                       </p>
                     </div>
                   )}
-                  {/* The link-shared fallback, and ONLY when there is no service account to
-                      share with — it is the path that exposes buyer addresses to anyone
-                      holding the URL, so it must never be the advice while the private one
-                      is available. */}
-                  {!shareWith && !sheetsCanCreate && (
-                    <p className="text-xs text-muted-foreground">
-                      Then share it as “anyone with the link can view” and paste the link above.
-                    </p>
+
+                  {/* ADMIN ONLY, and shown in the dialog rather than buried in Settings: this
+                      is the screen where its absence is felt, and the master has to be made by
+                      a real Google account — our service account gets 403 PERMISSION_DENIED
+                      creating a spreadsheet, since it has no Drive of its own. */}
+                  {needsTemplate && (
+                    <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
+                      <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">Admin · one-time setup</div>
+                      <ol className="list-inside list-decimal space-y-0.5 text-2xs text-amber-800/90 dark:text-amber-300/90">
+                        <li>Download <span className="font-medium">Template (.xlsx)</span> above</li>
+                        <li>Upload it to your Google Drive, open it, then <span className="font-medium">File → Save as Google Sheets</span></li>
+                        <li>Share that sheet <span className="font-medium">anyone with the link → Viewer</span>, and paste its link here</li>
+                      </ol>
+                      <div className="flex gap-2">
+                        <Input value={tplInput} onChange={(e) => setTplInput(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" />
+                        <Button
+                          variant="outline"
+                          disabled={tplSaving || !tplInput.trim()}
+                          onClick={async () => {
+                            setTplSaving(true); setError(null)
+                            try {
+                              const r = await setSheetTemplate(tplInput.trim())
+                              setCopyUrl(r.copyUrl || "")
+                              setNeedsTemplate(!r.copyUrl)
+                              setNotice("Template saved — sellers now get a Make a copy button here.")
+                            } catch (e) {
+                              setError(e instanceof Error && e.message ? e.message : "Couldn't save the template link.")
+                            } finally { setTplSaving(false) }
+                          }}
+                        >
+                          {tplSaving ? <CircleNotch size={15} className="animate-spin" /> : "Save"}
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </TabsContent>
               )}

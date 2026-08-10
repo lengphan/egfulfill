@@ -12,6 +12,7 @@
 // Optionally set SHEETS_TEMPLATE_URL to a master template sheet sellers copy.
 
 import crypto from 'crypto';
+import { q } from '../db.js';
 
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_API_KEY || '';
 const TEMPLATE_URL = process.env.SHEETS_TEMPLATE_URL || '';
@@ -301,7 +302,47 @@ export async function fetchSheetRows(raw, tabWanted) {
 
 
 
-export function sheetsRoutes(app, requireAuth) {
+/**
+ * The master template a seller copies. Stored in the shared `settings` table so an admin
+ * can set it from the app, falling back to SHEETS_TEMPLATE_URL for an existing deployment.
+ *
+ * IT HAS TO BE A SETTING, NOT AN ENV VAR. The service account cannot create the master
+ * itself — see the note on the create route — so a human makes it once, and asking that
+ * human to SSH into a VPS and edit .env to finish a task they started in a dialog is how
+ * this stayed unconfigured across several attempts.
+ */
+const TEMPLATE_KEY = 'sheets_template_url';
+let _tplReady = null;
+function ensureSettings() {
+  if (_tplReady) return _tplReady;
+  _tplReady = q('create table if not exists settings (key text primary key, value jsonb, updated_at timestamptz default now())').catch(() => {});
+  return _tplReady;
+}
+async function readTemplateUrl() {
+  await ensureSettings();
+  try {
+    const r = await q('select value from settings where key = $1', [TEMPLATE_KEY]);
+    const v = r.rows[0] && r.rows[0].value;
+    const s = typeof v === 'string' ? v : (v && typeof v.url === 'string' ? v.url : '');
+    if (s) return s;
+  } catch { /* table not ready */ }
+  return TEMPLATE_URL;
+}
+
+/**
+ * Google's own "force a copy" URL. Opening it shows the seller Google's Make-a-copy
+ * dialog; the copy lands in THEIR Drive, owned by them.
+ *
+ * This is the whole reason the flow no longer needs a service account, a share step or
+ * any permission on our side: we never touch their sheet. They copy, fill, download, and
+ * drop the file on the same drop zone that already takes .csv/.xlsx.
+ */
+function toCopyUrl(url) {
+  const id = extractId(url);
+  return id ? `https://docs.google.com/spreadsheets/d/${id}/copy` : '';
+}
+
+export function sheetsRoutes(app, requireAuth, requireAdmin) {
   // Public config: is import enabled, the template link, and whether the server
   // can auto-create a filled sheet (service account present).
   // enabled = "can this server read a sheet AT ALL", which is EITHER credential. Reporting
@@ -309,22 +350,38 @@ export function sheetsRoutes(app, requireAuth) {
   // preferred, keeps-it-private path the read helper actually uses) but no API key — the
   // import option simply wasn't there, which read as "Google Sheet import is blank".
   //
-  // `shareWith` is the service-account address a seller has to share their OWN sheet with,
-  // and it is the one thing that made this import unusable without a support conversation:
-  // the address existed only in a server .env, so the UI could say "share it with the
-  // service account" and no seller could act on that sentence. It is not a secret — it is
-  // the address you are meant to hand out — but it is only emitted to a SIGNED-IN caller,
-  // because there is no reason to publish our Cloud project id to the open internet. The
-  // onRequest hook in index.js has already attached req.user from the Bearer token, so no
-  // preHandler is needed and the public shape is unchanged for anyone without one.
+  // `shareWith` is the service-account address, emitted only to a SIGNED-IN caller — the
+  // address is meant to be handed out, but our Cloud project id needn't be broadcast. The
+  // onRequest hook in index.js has already attached req.user, so no preHandler is needed
+  // and the public shape is unchanged for anyone without a token.
   app.get('/api/sheets/config', async (req) => {
     const sa = loadSA();
+    const templateUrl = await readTemplateUrl();
     return {
       enabled: !!(API_KEY || sa),
-      templateUrl: TEMPLATE_URL,
+      templateUrl,
+      copyUrl: toCopyUrl(templateUrl),
       canCreate: !!sa,
       shareWith: req.user && sa && sa.client_email ? sa.client_email : undefined,
+      // Only an admin is shown the "set this up" affordance, so only an admin is told
+      // whether it needs setting up.
+      needsTemplate: req.user && req.user.role === 'admin' ? !toCopyUrl(templateUrl) : undefined,
     };
+  });
+
+  // Admin sets the master template link, from the same dialog a seller uses. Accepts any
+  // Google Sheets URL and stores it; the copy form is derived on read, so pasting the
+  // /edit link (what the address bar actually contains) is correct rather than a mistake.
+  app.put('/api/sheets/template', { preHandler: requireAdmin }, async (req, reply) => {
+    const url = String((req.body && req.body.url) || '').trim();
+    if (url && !extractId(url)) { reply.code(400); return { error: 'That is not a Google Sheets link — it has no spreadsheet ID in it.' }; }
+    await ensureSettings();
+    if (!url) await q('delete from settings where key = $1', [TEMPLATE_KEY]);
+    else await q(
+      'insert into settings (key, value, updated_at) values ($1, $2::jsonb, now()) on conflict (key) do update set value = excluded.value, updated_at = now()',
+      [TEMPLATE_KEY, JSON.stringify(url)]
+    );
+    return { ok: true, templateUrl: url, copyUrl: toCopyUrl(url) };
   });
 
   // Diagnostic: does the service account actually authenticate? (auth-gated so it
@@ -369,8 +426,27 @@ export function sheetsRoutes(app, requireAuth) {
     };
   });
 
-  // Create a ready-to-fill Google Sheet (Orders + Options tabs) and share it
-  // "anyone with the link → editor" so the seller can fill it. Returns its URL.
+  /**
+   * Create a ready-to-fill Google Sheet and share it anyone-with-link → editor.
+   *
+   * DOES NOT WORK WITH A BARE SERVICE ACCOUNT, and the failure is not a misconfiguration
+   * you can fix in the Cloud Console. Verified against the live credential on 2026-08-10:
+   * the token mints fine, then
+   *
+   *     POST https://sheets.googleapis.com/v4/spreadsheets
+   *     → 403 "The caller does not have permission" (PERMISSION_DENIED)
+   *
+   * because creating a spreadsheet writes a file to Drive and a standalone service account
+   * has no Drive storage of its own. Enabling APIs, adding IAM roles and re-sharing all
+   * leave it 403 — it needs domain-wide delegation to impersonate a real Workspace user,
+   * which this deployment does not have.
+   *
+   * The seller-facing flow therefore does NOT use this route: it opens Google's own
+   * /copy URL for the master template instead, and the copy is created by the seller's
+   * own Google account, in their Drive. This route is left in place because it works the
+   * moment a delegated account exists, and its template builder is what produced the
+   * master sheet in the first place.
+   */
   app.post('/api/sheets/create', { preHandler: requireAuth }, async (req, reply) => {
     let token;
     try { token = await getServiceToken(); }
