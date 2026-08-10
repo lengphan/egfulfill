@@ -9,7 +9,7 @@ import { ProductCombobox } from "@/components/app/product-combobox"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
-import { getSpecQuote, publishEtsy, publishTiktok, getTiktokCategories, getTiktokWarehouses, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord } from "@/lib/api"
+import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord } from "@/lib/api"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -232,7 +232,7 @@ export function PublishProductDialog({
   // Which marketplace this draft goes to. Etsy takes photos + tags + variants directly;
   // TikTok additionally needs a LEAF category, a warehouse (per-SKU inventory) and a
   // package weight, so those fields appear only when TikTok is the target.
-  const [channel, setChannel] = useState<"etsy" | "tiktok">("etsy")
+  const [channel, setChannel] = useState<"etsy" | "tiktok" | "shopify">("etsy")
   const [ttCatQuery, setTtCatQuery] = useState("")
   const [ttCategories, setTtCategories] = useState<TiktokCategory[]>([])
   const [ttCategory, setTtCategory] = useState<TiktokCategory | null>(null)
@@ -499,6 +499,54 @@ export function PublishProductDialog({
     } finally { setBusy(false) }
   }
 
+  /**
+   * SHOPIFY. Created as a draft, like Etsy's — nothing reaches a buyer until the seller
+   * activates it in their own admin.
+   *
+   * The route needs the `write_products` scope, which was added AFTER most shops connected.
+   * OAuth scopes are fixed at grant time, so a shop connected before that cannot publish
+   * however correct the payload is; the server returns that specific reason and it is shown
+   * verbatim rather than folded into "publish failed", because the fix (reconnect the shop)
+   * is not one anybody would guess.
+   */
+  const publishToShopify = async () => {
+    setBusy(true); setResult(null)
+    try {
+      const r = await publishShopify({
+        title: title.trim(), description: desc.trim() || title.trim(),
+        price: basePrice, tags, images,
+        colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
+        blank_sku: blank?.sku ?? undefined, print_type: method || undefined,
+        design_id: prefill?.designId, design_data: prefill?.designUrl, design_pos: prefill?.designPos,
+      })
+      if (r.error) throw new Error(r.error)
+      setResult({
+        ok: true,
+        text: `Created a draft product on Shopify${r.variants_applied ? ` with ${r.variants_applied} variant${r.variants_applied === 1 ? "" : "s"}` : ""}.`,
+        // Say when photos didn't all land. The product exists either way — the server
+        // deliberately doesn't fail a publish over an image — so silence here would leave a
+        // draft with missing photos and no hint why.
+        note: r.images_uploaded != null && r.images_uploaded < images.length
+          ? `${r.images_uploaded} of ${images.length} photos uploaded — add the rest in Shopify.`
+          : undefined,
+      })
+      onPublished?.(r.url, r.primary_image || images[0], {
+        platform: "shopify",
+        title: title.trim(), price: basePrice, image: r.primary_image || images[0],
+        state: r.state || "draft",
+        blank_sku: blank?.sku ?? undefined, blank_name: blank?.name ?? undefined,
+        print_type: method || undefined,
+        colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
+        images_uploaded: r.images_uploaded ?? 0,
+        listing_id: r.listing_id,
+        variants_applied: r.variants_applied,
+        variant_skus: r.variant_skus,
+      })
+    } catch (e) {
+      setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })
+    } finally { setBusy(false) }
+  }
+
   const publish = async () => {
     if (!title.trim() || !priceReady) {
       // Say WHICH is missing, and — when it's the price — name the two ways to supply it,
@@ -525,6 +573,7 @@ export function PublishProductDialog({
       return
     }
     if (channel === "tiktok") { publishToTiktok(); return }
+    if (channel === "shopify") { publishToShopify(); return }
     setBusy(true); setResult(null)
     try {
       const r = await publishEtsy({
@@ -631,7 +680,7 @@ export function PublishProductDialog({
               <div className="space-y-1.5">
                 <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Publish to</div>
                 <div className="inline-flex rounded-lg border border-border p-0.5">
-                  {(["etsy", "tiktok"] as const).map((c) => (
+                  {(["etsy", "tiktok", "shopify"] as const).map((c) => (
                     <button
                       key={c}
                       type="button"
@@ -641,7 +690,7 @@ export function PublishProductDialog({
                         (channel === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                       }
                     >
-                      {c === "tiktok" ? "TikTok Shop" : "Etsy"}
+                      {c === "tiktok" ? "TikTok Shop" : c === "shopify" ? "Shopify" : "Etsy"}
                     </button>
                   ))}
                 </div>
@@ -969,7 +1018,13 @@ export function PublishProductDialog({
               <p className="text-xs text-muted-foreground">
                 {channel === "tiktok"
                   ? "Creates a DRAFT product on your connected TikTok Shop for you to review, then list."
-                  : "Creates a DRAFT in your connected Etsy shop, reusing an existing listing’s category & shipping profile."}
+                  : channel === "shopify"
+                    // Says the one thing that will otherwise waste a click. write_products
+                    // was added to the OAuth scopes after most shops connected, and scopes
+                    // are fixed at grant time — so a shop connected before that refuses
+                    // every publish until it is reconnected, however correct the payload.
+                    ? "Creates a DRAFT product in your connected Shopify store. A store connected before publishing was supported must be reconnected first — Shopify grants the permission at connect time, not per request."
+                    : "Creates a DRAFT in your connected Etsy shop, reusing an existing listing’s category & shipping profile."}
               </p>
             </div>
           </div>

@@ -2586,8 +2586,30 @@ export function getEtsyListingImages(listingId: string | number) {
   return api<{ images?: string[]; error?: string }>(`/api/etsy/listings/${encodeURIComponent(String(listingId))}/images`)
 }
 
+/**
+ * Publish a product to the caller's OWN Shopify shop, as a draft.
+ *
+ * Requires the `write_products` scope, which was added after most shops connected — a shop
+ * that predates it must RECONNECT before this can succeed, and the server says so by name
+ * rather than failing generically.
+ */
+export function publishShopify(body: {
+  title: string; description?: string; price?: number | string | null
+  tags?: string[]; images?: string[]
+  colors?: string[]; sizes?: string[]
+  blank_sku?: string; print_type?: string
+  design_id?: string | number; design_data?: string; design_pos?: unknown
+}) {
+  return api<{
+    ok?: boolean; error?: string
+    listing_id?: string; state?: string; url?: string
+    images_uploaded?: number; primary_image?: string | null
+    variants_applied?: number; variant_skus?: string[]
+  }>(`/api/shopify/publish`, { method: "POST", body: JSON.stringify(body) })
+}
+
 export type PublishedRecord = {
-  platform?: "etsy" | "tiktok"
+  platform?: "etsy" | "tiktok" | "shopify"
   /** OUR listing on the marketplace. This is also the key `published_listings` is stored
    *  under, so it's what lets the server join back to the blank and artwork we sent. */
   listing_id?: string
