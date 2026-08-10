@@ -499,9 +499,14 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
+              {/* Reference and Method used to be columns of their own. Between a mono
+                  reference like "expedite-cancel-etsy-4128916808" and a Method that is "—"
+                  on almost every row, they pushed the two BALANCE columns off the right
+                  edge — so the one thing this table exists to show, how the balance got
+                  from one number to the next, was the thing you had to scroll to find.
+                  They sit under the description now, and the row still opens a detail
+                  dialog carrying both in full. */}
               <TableHead>Description</TableHead>
-              <TableHead>Reference</TableHead>
-              <TableHead>Method</TableHead>
               <TableHead>Type</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="text-right">Balance before</TableHead>
@@ -511,7 +516,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
           <TableBody>
             {histRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   No transactions yet
                 </TableCell>
               </TableRow>
@@ -519,9 +524,14 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
               histRows.map((t) => (
                 <TableRow key={t.id} onClick={() => setDetail(t)} className="cursor-pointer hover:bg-muted/40">
                   <TableCell className="text-muted-foreground">{t.date}</TableCell>
-                  <TableCell className="font-medium">{t.desc}</TableCell>
-                  <TableCell className="text-muted-foreground">{t.ref}</TableCell>
-                  <TableCell className="text-muted-foreground">{t.method}</TableCell>
+                  <TableCell className="font-medium">
+                    <div>{t.desc}</div>
+                    {(t.ref || (t.method && t.method !== "—")) && (
+                      <div className="mt-0.5 truncate text-xs font-normal text-muted-foreground">
+                        {[t.ref, t.method && t.method !== "—" ? t.method : null].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge className={t.tone} variant="secondary">
                       {t.label}
@@ -541,10 +551,10 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                   </TableCell>
                   {/* Balance before this entry = balance after − the amount it moved. Both
                       dashes for a declined attempt, which never moved money. */}
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                  <TableCell className="whitespace-nowrap text-right tabular-nums text-muted-foreground">
                     {Number.isFinite(t.balance) ? usd(t.balance - t.amount) : "—"}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                  <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
                     {Number.isFinite(t.balance) ? usd(t.balance) : "—"}
                   </TableCell>
                 </TableRow>

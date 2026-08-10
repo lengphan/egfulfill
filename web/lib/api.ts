@@ -3697,10 +3697,55 @@ export type SampleOrder = {
   qty?: number | null
   note?: string | null
   status: "placed" | "received" | "cancelled"
+  /** 'alibaba' when imported from a real order, 'manual' when typed in. */
+  source?: string
+  tradeId?: string | null
+  sellerEid?: string | null
+  sellerName?: string | null
   placedAt?: string
   receivedAt?: string | null
   cancelledAt?: string | null
 }
+/** One of OUR buyer orders on Alibaba, as the picker lists them. Thin by their design —
+ *  the list call returns only these four facts; everything else is in the detail call. */
+export type AlibabaOrderSummary = {
+  tradeId: string
+  status: string
+  statusLabel: string
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+export type AlibabaOrderItem = {
+  name?: string | null
+  productId?: string | null
+  skuId?: string | null
+  modelNumber?: string | null
+  image?: string | null
+  qty?: number | null
+  unitPrice?: number | null
+  variant?: string | null
+}
+export type AlibabaOrderDetail = AlibabaOrderSummary & {
+  /** The buyer's own note on the order — often what tells you it was a sample. */
+  remark?: string | null
+  sellerName?: string | null
+  /** Alibaba's encrypted supplier id. The ONLY supplier identity their API gives us, and
+   *  what a link straight to the supplier's chat is built from. */
+  sellerEid?: string | null
+  currency?: string
+  productTotal?: number | null
+  shipmentFee?: number | null
+  total?: number | null
+  tradeTerm?: string | null
+  items: AlibabaOrderItem[]
+}
+export function getAlibabaOrders() {
+  return api<{ total?: number; orders?: AlibabaOrderSummary[]; error?: string }>(`/api/alibaba/orders`)
+}
+export function getAlibabaOrder(tradeId: string) {
+  return api<AlibabaOrderDetail & { error?: string }>(`/api/alibaba/orders/${encodeURIComponent(tradeId)}`)
+}
+
 export function getSampleOrders(supplierId?: string) {
   const qs = supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""
   return api<{ items: SampleOrder[] }>(`/api/sample-orders${qs}`)
@@ -3708,7 +3753,8 @@ export function getSampleOrders(supplierId?: string) {
 /** Records the order AND books its cost to the factory wallet, at place time. `booked`
  *  reports whether the ledger write actually landed — costs.js is best-effort by design,
  *  and a sample recorded with its cost silently unbooked is the failure to catch. */
-export function placeSampleOrder(p: { supplierId?: string; orderNo: string; amount: number; qty?: number; note?: string }) {
+export function placeSampleOrder(p: { supplierId?: string; orderNo: string; amount: number; qty?: number; note?: string
+                                     tradeId?: string; sellerEid?: string; sellerName?: string }) {
   return api<{ ok?: boolean; id?: string; booked?: boolean; items?: SampleOrder[]; error?: string }>(
     `/api/sample-orders`, { method: "POST", body: JSON.stringify(p) })
 }

@@ -389,6 +389,109 @@ export function alibabaRoutes(app, requireAdmin) {
   });
 
   /**
+   * OUR OWN BUYER ORDERS.
+   *
+   * Probed against the live account 2026-08-10. The path family matters and was got wrong
+   * once: `/eco/buyer/order/*` does not exist (InvalidApiPath on every variant). The real
+   * one is `/alibaba/order/*`, and it needs `role` — without it the gateway answers
+   * MissingParameter, which is the gateway saying "you may call this, you just did it
+   * wrong". `role=seller` returns an empty object on a buying account, as you would hope.
+   *
+   * The LIST is thin on purpose at their end — trade id, status, dates and nothing else.
+   * Everything a human recognises an order by (what it was, who sold it, what it cost)
+   * lives in the detail call, so the picker reads the list and fetches detail on selection
+   * rather than fanning out over every order.
+   */
+  const ORDER_STATUS = {
+    unpay: 'Awaiting payment',
+    wait_seller_send: 'Paid — supplier preparing',
+    wait_confirm_receipt: 'Shipped — confirm receipt',
+    trade_success: 'Completed',
+    trade_closed: 'Closed',
+    cancel: 'Cancelled',
+  };
+
+  app.get('/api/alibaba/orders', { preHandler: requireAdmin }, async (req, reply) => {
+    const row = await tokenRow();
+    if (!row?.access_token) { reply.code(400); return { error: 'Connect Alibaba first.' }; }
+    const auth = await refreshIfDue(row);
+    try {
+      const body = await call('/alibaba/order/list', { role: 'buyer' }, { accessToken: auth.access_token });
+      const list = body?.value?.order_list || [];
+      return {
+        total: Number(body?.value?.total_count) || list.length,
+        orders: list.map((o) => ({
+          tradeId: String(o.trade_id),
+          status: String(o.trade_status || ''),
+          statusLabel: ORDER_STATUS[o.trade_status] || String(o.trade_status || ''),
+          // Their date object carries a preformatted string in the CALLER'S timezone and a
+          // timestamp. The timestamp is the one that survives being rendered anywhere else.
+          createdAt: o.create_date?.timestamp ? new Date(Number(o.create_date.timestamp)).toISOString() : null,
+          updatedAt: o.modify_date?.timestamp ? new Date(Number(o.modify_date.timestamp)).toISOString() : null,
+        })),
+      };
+    } catch (e) {
+      reply.code(502); return { error: String(e?.message || e), detail: e?.body || null };
+    }
+  });
+
+  /**
+   * One order, flattened to what a sample record actually needs.
+   *
+   * `sellerEid` is the reason this route matters beyond prefilling a form: it is the only
+   * place Alibaba hands us a supplier identity. The product search returns five fields and
+   * none of them say who is selling, so before this there was no way to link a prospect to
+   * the person we were talking to. It is an opaque encrypted id — fine, because we only
+   * ever hand it back to them in a URL.
+   */
+  const money = (m) => (m && m.amount != null ? Number(m.amount) : null);
+
+  app.get('/api/alibaba/orders/:tradeId', { preHandler: requireAdmin }, async (req, reply) => {
+    const row = await tokenRow();
+    if (!row?.access_token) { reply.code(400); return { error: 'Connect Alibaba first.' }; }
+    const auth = await refreshIfDue(row);
+    const tradeId = String(req.params.tradeId || '').trim();
+    if (!/^[0-9]+$/.test(tradeId)) { reply.code(400); return { error: 'Not an order number.' }; }
+    try {
+      const body = await call('/alibaba/order/get', { e_trade_id: tradeId }, { accessToken: auth.access_token });
+      const v = body?.value || body || {};
+      const products = Array.isArray(v.order_products) ? v.order_products : [];
+      return {
+        tradeId: String(v.trade_id || tradeId),
+        status: String(v.trade_status || ''),
+        statusLabel: ORDER_STATUS[v.trade_status] || String(v.trade_status || ''),
+        createdAt: v.create_date?.timestamp ? new Date(Number(v.create_date.timestamp)).toISOString() : null,
+        // The buyer's own note on the order. On a real one of these it reads "Color card
+        // sample", which is the whole reason a sample importer is worth having.
+        remark: v.remark || null,
+        sellerName: v.seller?.full_name || null,
+        sellerEid: v.seller?.immutable_eid || null,
+        currency: v.total_amount?.currency || v.product_total_amount?.currency || 'USD',
+        productTotal: money(v.product_total_amount),
+        shipmentFee: money(v.shipment_fee),
+        total: money(v.total_amount),
+        tradeTerm: v.trade_term || null,
+        items: products.map((p) => ({
+          name: p.name || null,
+          productId: p.product_id == null ? null : String(p.product_id),
+          skuId: p.sku_id || null,
+          modelNumber: p.model_number || null,
+          image: p.product_image || null,
+          qty: p.quantity == null ? null : Number(p.quantity),
+          unitPrice: money(p.unit_price),
+          // [{key:'color',value:'Navy Blue'}] → "Navy Blue / Onesize", which is the variant
+          // string the rest of the app already speaks.
+          variant: Array.isArray(p.sku_attributes)
+            ? p.sku_attributes.map((a) => a?.value).filter(Boolean).join(' / ') || null
+            : null,
+        })),
+      };
+    } catch (e) {
+      reply.code(502); return { error: String(e?.message || e), detail: e?.body || null };
+    }
+  });
+
+  /**
    * Product search — the endpoint the Sourcing panel will call once the app is approved.
    * Returns a flattened shape so the UI never has to know about result.data.products.
    *

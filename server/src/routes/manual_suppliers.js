@@ -197,6 +197,13 @@ export function manualSupplierRoutes(app, requireAdmin) {
         // the row (the product+supplier pair), not on the product.
         "stage text default 'prospect'",
         'archived boolean default false',
+        // What was AGREED, as distinct from what was quoted on the listing. Unit cost, MOQ
+        // and lead time are already columns above and stay the single source for those —
+        // these are the terms that had nowhere to live and were being re-read out of the
+        // chat every time.
+        'sample_cost numeric(12,2)',      // what they said a sample would cost
+        'payment_terms text',             // "30/70 T/T", "100% up front", …
+        'terms_confirmed_at timestamptz', // when they last stood behind all of it
       ]) await q(`alter table manual_suppliers add column if not exists ${col}`).catch(() => {});
     })
     .catch(() => {});
@@ -227,6 +234,37 @@ export function manualSupplierRoutes(app, requireAdmin) {
        created_by   text
      )`)
     .then(() => q('create index if not exists sample_orders_supplier on sample_orders (supplier_id, placed_at desc)'))
+    // Where it came from, when it came from Alibaba. `seller_eid` is the encrypted supplier
+    // id off the order payload — the ONLY supplier identity Alibaba gives us (the product
+    // search returns none), and the thing that makes a link straight to their chat possible.
+    .then(() => q('alter table sample_orders add column if not exists alibaba_trade_id text'))
+    .then(() => q('alter table sample_orders add column if not exists seller_eid text'))
+    .then(() => q('alter table sample_orders add column if not exists seller_name text'))
+    .then(() => q('alter table sample_orders add column if not exists source text'))
+    .catch(() => {});
+
+  /**
+   * THE CONVERSATION, kept on our side.
+   *
+   * Alibaba's open API exposes no messages — probed 2026-08-10, and the product search
+   * carries no seller identity at all (id, title, image, price, url and nothing else), so
+   * we cannot read a thread or even link to the right one. What was agreed therefore has to
+   * be recorded here or it stays in a chat window someone has to scroll.
+   *
+   * Plain pasted text with a date. NOT a parsed transcript: what gets pasted is whatever
+   * shape the supplier typed it in, in whatever language, and a parser that guesses at a
+   * price would be confidently wrong about the one number this exists to remember.
+   */
+  q(`create table if not exists supplier_messages (
+       id bigserial primary key,
+       supplier_id bigint not null,
+       body       text not null,
+       said_at    date,
+       direction  text,                  -- them | us
+       created_by text,
+       created_at timestamptz default now()
+     )`)
+    .then(() => q('create index if not exists supplier_messages_supplier on supplier_messages (supplier_id, said_at desc, id desc)'))
     .catch(() => {});
 
   app.get('/api/manual-suppliers', { preHandler: requireAdmin }, async () => {
@@ -445,6 +483,10 @@ Rules:
       qty: x.qty == null ? null : Number(x.qty),
       note: x.note || null,
       status: x.status || 'placed',
+      source: x.source || 'manual',
+      tradeId: x.alibaba_trade_id || null,
+      sellerEid: x.seller_eid || null,
+      sellerName: x.seller_name || null,
       placedAt: x.placed_at,
       receivedAt: x.received_at,
       cancelledAt: x.cancelled_at,
@@ -481,17 +523,31 @@ Rules:
     const supplierId = /^\d+$/.test(String(b.supplierId || '')) ? String(b.supplierId) : null;
     const qty = Number.isFinite(Number(b.qty)) && Number(b.qty) > 0 ? Math.round(Number(b.qty)) : null;
 
+    // Imported from a real Alibaba order, or typed in by hand. An Alibaba import is
+    // idempotent on the trade id: importing the same order twice must not charge twice.
+    const tradeId = String(b.tradeId || '').trim() || null;
+    if (tradeId) {
+      const dup = await q('select id from sample_orders where alibaba_trade_id=$1 limit 1', [tradeId]).catch(() => ({ rows: [] }));
+      if (dup.rows.length) {
+        reply.code(409);
+        return { error: `Alibaba order ${tradeId} is already recorded as a sample.`, id: String(dup.rows[0].id) };
+      }
+    }
     const ins = await q(
-      `insert into sample_orders (supplier_id, order_no, amount, qty, note, created_by)
-       values ($1::bigint, $2, $3, $4, $5, $6) returning id`,
-      [supplierId, orderNo, Math.abs(amount), qty, String(b.note || '').trim() || null, req.user?.sub || null]);
+      `insert into sample_orders (supplier_id, order_no, amount, qty, note, created_by,
+                                  alibaba_trade_id, seller_eid, seller_name, source)
+       values ($1::bigint, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
+      [supplierId, orderNo, Math.abs(amount), qty, String(b.note || '').trim() || null, req.user?.sub || null,
+       tradeId, String(b.sellerEid || '').trim() || null, String(b.sellerName || '').trim() || null,
+       tradeId ? 'alibaba' : 'manual']);
     const id = String(ins.rows[0].id);
 
     // Who it was bought from, so the Billing row reads as a sentence rather than a figure.
     const supplier = supplierId
       ? (await q('select title from manual_suppliers where id=$1::bigint', [supplierId]).catch(() => ({ rows: [] }))).rows[0]
       : null;
-    const note = [`Sample ${orderNo}`, supplier?.title, qty ? `${qty} unit${qty === 1 ? '' : 's'}` : null, String(b.note || '').trim() || null]
+    const note = [`Sample ${orderNo}`, supplier?.title || String(b.sellerName || '').trim() || null,
+                  qty ? `${qty} unit${qty === 1 ? '' : 's'}` : null, String(b.note || '').trim() || null]
       .filter(Boolean).join(' · ');
     const booked = await recordCost('sample', amount, `sample-${id}`, note);
 

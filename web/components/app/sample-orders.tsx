@@ -1,13 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, Check, X, Package, Warning } from "@phosphor-icons/react"
+import { CircleNotch, Check, X, Package, Warning, ChatCircleDots, ArrowSquareOut, DownloadSimple } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { getSampleOrders, placeSampleOrder, setSampleOrderStatus, type SampleOrder } from "@/lib/api"
+import { getSampleOrders, placeSampleOrder, setSampleOrderStatus, getAlibabaOrders, getAlibabaOrder,
+         type SampleOrder, type AlibabaOrderSummary } from "@/lib/api"
 
 const usd = (n?: number | null) =>
   n == null ? "—" : `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -17,6 +18,23 @@ const when = (iso?: string | null) => {
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
 }
+
+/**
+ * PORTING OUT TO ALIBABA.
+ *
+ * In-site chat is not possible: their open API exposes no messages (probed 2026-08-10), so
+ * the best we can do is land you on the right page in one click. Both URLs below were
+ * checked against the live site — signed out they 302 to Alibaba's login, which is what a
+ * real Alibaba route does; a wrong one 404s or 502s, and two candidates did exactly that.
+ *
+ * `sellerEid` is their encrypted supplier id and only ever comes from the ORDER payload —
+ * the product search returns no seller at all — so a sample typed in by hand has no chat
+ * link, and one imported from a real order does.
+ */
+const chatUrl = (eid?: string | null) =>
+  eid ? `https://message.alibaba.com/message/messenger.htm?to=${encodeURIComponent(eid)}` : null
+const orderUrl = (tradeId?: string | null) =>
+  tradeId ? `https://biz.alibaba.com/ta/detail.htm?orderId=${encodeURIComponent(tradeId)}` : null
 
 const STATUS: Record<SampleOrder["status"], { label: string; pill: string }> = {
   placed: { label: "Placed", pill: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300" },
@@ -51,12 +69,45 @@ export function SampleOrderDialog({
   const [note, setNote] = useState("")
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // Real Alibaba orders to pick from. Loaded once per open — the list call is cheap and
+  // an order placed since last time is exactly what you came here for.
+  const [ali, setAli] = useState<AlibabaOrderSummary[] | null>(null)
+  const [picked, setPicked] = useState<string>("")
+  const [pulling, setPulling] = useState(false)
+  const [seller, setSeller] = useState<{ eid?: string | null; name?: string | null }>({})
 
   useEffect(() => {
     if (!open) return
-    const id = setTimeout(() => { setOrderNo(""); setAmount(""); setQty(""); setNote(""); setErr(null) }, 0)
+    const id = setTimeout(() => {
+      setOrderNo(""); setAmount(""); setQty(""); setNote(""); setErr(null); setPicked(""); setSeller({})
+      // A failure here is not an error state: an unconnected Alibaba just means the form
+      // below is the only way in, which is how it worked before this existed.
+      getAlibabaOrders().then((r) => setAli(r.orders ?? [])).catch(() => setAli([]))
+    }, 0)
     return () => clearTimeout(id)
   }, [open])
+
+  // Pull one order's detail and fill the form from it. Nothing is saved until you press
+  // the button — this only ever writes into the fields you can still edit.
+  const pull = async (tradeId: string) => {
+    setPicked(tradeId)
+    if (!tradeId) { setSeller({}); return }
+    setPulling(true); setErr(null)
+    try {
+      const d = await getAlibabaOrder(tradeId)
+      if (d.error) throw new Error(d.error)
+      setOrderNo(d.tradeId)
+      // Their TOTAL, not the product subtotal: freight on a sample is part of what the
+      // answer cost, and on a real one of these it is a third of the bill.
+      if (d.total != null) setAmount(String(d.total))
+      const units = (d.items ?? []).reduce((n, it) => n + (it.qty ?? 0), 0)
+      if (units > 0) setQty(String(Math.round(units)))
+      setNote([d.remark, (d.items ?? []).map((it) => it.name).filter(Boolean)[0]].filter(Boolean).join(" · ").slice(0, 200))
+      setSeller({ eid: d.sellerEid, name: d.sellerName })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't read that order from Alibaba.")
+    } finally { setPulling(false) }
+  }
 
   const save = async () => {
     const amt = Number(amount)
@@ -68,6 +119,9 @@ export function SampleOrderDialog({
         supplierId, orderNo: orderNo.trim(), amount: amt,
         qty: Number(qty) > 0 ? Number(qty) : undefined,
         note: note.trim() || undefined,
+        tradeId: picked || undefined,
+        sellerEid: seller.eid || undefined,
+        sellerName: seller.name || undefined,
       })
       if (r.error) throw new Error(r.error)
       // `booked` is reported, not assumed. The cost write is best-effort server-side, and a
@@ -87,6 +141,35 @@ export function SampleOrderDialog({
           <DialogTitle>Record a sample order{supplierTitle ? ` — ${supplierTitle}` : ""}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          {ali === null ? (
+            <div className="rounded-xl border border-border px-3 py-2 text-xs text-muted-foreground">
+              <CircleNotch size={12} className="mr-1 inline animate-spin" /> Looking for your Alibaba orders…
+            </div>
+          ) : ali.length > 0 ? (
+            <label className="flex flex-col gap-1 rounded-xl border border-border bg-muted/30 p-3">
+              <span className="flex items-center gap-1.5 text-xs font-medium">
+                <DownloadSimple size={13} weight="bold" /> Import from an Alibaba order
+              </span>
+              <select
+                value={picked}
+                onChange={(e) => pull(e.target.value)}
+                disabled={pulling}
+                className="eg-select h-9 rounded-2xl border border-border bg-card px-3 text-sm"
+              >
+                <option value="">Type it in instead…</option>
+                {ali.map((o) => (
+                  <option key={o.tradeId} value={o.tradeId}>
+                    {o.tradeId} — {o.statusLabel}{o.createdAt ? ` · ${when(o.createdAt)}` : ""}
+                  </option>
+                ))}
+              </select>
+              <span className="text-2xs text-muted-foreground">
+                {pulling ? "Reading the order…"
+                  : seller.name ? `From ${seller.name}. Everything below is prefilled — edit anything that's wrong.`
+                    : "Fills in the order number, what it cost and what was in it."}
+              </span>
+            </label>
+          ) : null}
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Supplier&apos;s order number</span>
             <Input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="ALI-88213-7" className="h-9 font-mono" />
@@ -178,9 +261,29 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
             <tbody>
               {items.map((s) => (
                 <tr key={s.id} className="border-t border-border">
-                  <td className="px-4 py-2 font-mono text-xs">{s.orderNo || "—"}</td>
                   <td className="px-4 py-2">
-                    <div className="max-w-[240px] truncate">{s.supplierTitle || "—"}</div>
+                    <div className="font-mono text-xs">{s.orderNo || "—"}</div>
+                    {(chatUrl(s.sellerEid) || orderUrl(s.tradeId)) && (
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        {chatUrl(s.sellerEid) && (
+                          <a href={chatUrl(s.sellerEid)!} target="_blank" rel="noopener noreferrer"
+                             title={`Open the Alibaba chat with ${s.sellerName || "this supplier"} — you'll need to be signed in there`}
+                             className="inline-flex items-center gap-1 text-primary hover:underline">
+                            <ChatCircleDots size={12} weight="bold" /> Chat
+                          </a>
+                        )}
+                        {orderUrl(s.tradeId) && (
+                          <a href={orderUrl(s.tradeId)!} target="_blank" rel="noopener noreferrer"
+                             title="Open this order on Alibaba — where you pay it"
+                             className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline">
+                            <ArrowSquareOut size={12} /> Order
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="max-w-[240px] truncate">{s.supplierTitle || s.sellerName || "—"}</div>
                     {s.note && <div className="max-w-[240px] truncate text-xs text-muted-foreground">{s.note}</div>}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">{usd(s.amount)}</td>
