@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { FilePdf, CircleNotch, ArrowSquareOut, Trash, UploadSimple, Barcode, CheckCircle } from "@phosphor-icons/react"
+import { FilePdf, CircleNotch, ArrowSquareOut, Trash, UploadSimple, Barcode, CheckCircle, Lock } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -254,13 +254,23 @@ export function ExternalLabels() {
                             <ArrowSquareOut size={14} />
                           </a>
                         )}
-                        {/* Offered only while it can still work. Once every label is picked
-                            their API refuses the recall, and a button that always errors is
-                            worse than no button. */}
-                        {!(u.total_labels != null && u.total_labels > 0 && u.scanned_labels >= u.total_labels) && (
+                        {/* Offered only while it can still work. Their DELETE refuses the
+                            whole PDF once ANY label on it has been picked — not just once
+                            all of them have — because those parcels are already committed.
+                            So the test is `scanned_labels === 0`; gating on "fully picked"
+                            left a button on every part-scanned batch that could only ever
+                            return their 409. */}
+                        {u.scanned_labels === 0 ? (
                           <Button size="sm" variant="ghost" disabled={busy} onClick={() => void pullBack(u)} aria-label="Pull back">
                             <Trash size={14} />
                           </Button>
+                        ) : (
+                          <span
+                            title={`${u.scanned_labels} already picked — byeastside won't take this batch back`}
+                            className="inline-flex size-8 items-center justify-center text-2xs text-muted-foreground"
+                          >
+                            <Lock size={13} />
+                          </span>
                         )}
                       </div>
                     </td>
