@@ -54,7 +54,7 @@ export function PurchasingView() {
             are placed and paid on their site and only ever read back. Same page, different
             things — folding them together would put rows with no Receive action into a
             table whose whole point is receiving. */}
-        {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }, { id: "purchase", label: "Orders" }, { id: "alibaba", label: "Alibaba" }] as const).map((t) => (
+        {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }, { id: "purchase", label: "Orders" }, { id: "alibaba", label: "Sample" }] as const).map((t) => (
           <button
             key={t.id}
             onClick={() => pick(t.id)}

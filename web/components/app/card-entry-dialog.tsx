@@ -90,10 +90,22 @@ export function CardEntryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
+        {/* AUTOFILL IS THE "REMEMBER MY CARD".
+              Every field was autoComplete="off", which is what forced the whole number to
+              be retyped for each order. Otto require card_details on every credit-card
+              order — they answered a card-less one with "card_details: Card details
+              required for credit card" — and they expose no saved-card token the way S&S
+              do, so there is nothing safer for us to send instead.
+              Storing it HERE is not the answer: a PAN at rest puts this server in PCI DSS
+              scope, and a CVV may never be stored at all, by anyone, encrypted or not. The
+              browser's own card store is exactly the right place — it is the reader's, not
+              ours — so the fields now carry the standard cc-* hints and Safari, Chrome and
+              1Password fill all four in one click. Nothing changes about what we keep:
+              still nothing. */}
+          <div className="space-y-3 py-2">
           <label className="block space-y-1">
             <span className="text-sm font-medium">Name on card</span>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9" autoComplete="off" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9" autoComplete="cc-name" name="ccname" />
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-medium">Card number</span>
@@ -102,7 +114,7 @@ export function CardEntryDialog({
               // Grouped as you type — a 16-digit run is unreadable, and unreadable is
               // where a transposed digit hides.
               onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 19).replace(/(.{4})/g, "$1 ").trim())}
-              inputMode="numeric" autoComplete="off" className="h-9 font-mono"
+              inputMode="numeric" autoComplete="cc-number" name="cardnumber" className="h-9 font-mono"
               placeholder="4111 1111 1111 1111"
             />
           </label>
@@ -110,12 +122,12 @@ export function CardEntryDialog({
             <label className="block space-y-1">
               <span className="text-sm font-medium">Expiry</span>
               <Input value={exp} onChange={(e) => setExp(e.target.value.replace(/[^0-9/]/g, "").slice(0, 7))}
-                     placeholder="03/28" inputMode="numeric" autoComplete="off" className="h-9 font-mono" />
+                     placeholder="03/28" inputMode="numeric" autoComplete="cc-exp" name="cc-exp" className="h-9 font-mono" />
             </label>
             <label className="block space-y-1">
               <span className="text-sm font-medium">CVV</span>
               <Input value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                     inputMode="numeric" autoComplete="off" className="h-9 font-mono" />
+                     inputMode="numeric" autoComplete="cc-csc" name="cvc" className="h-9 font-mono" />
             </label>
           </div>
 
@@ -131,7 +143,8 @@ export function CardEntryDialog({
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <Lock size={13} weight="fill" className="mt-0.5 shrink-0" />
             Sent with this order only. Not saved here, not written to the purchase order, and
-            stripped from anything the supplier sends back — so it has to be entered each time.
+            stripped from anything the supplier sends back. Let your browser or password
+            manager save it and it fills in one click — Otto ask for it on every order.
           </p>
         </div>
 
