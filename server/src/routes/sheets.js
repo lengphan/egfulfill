@@ -103,8 +103,8 @@ const T_OPTS = {
 };
 
 // Band colours. Deliberately PALE: this is a sheet people type into all day, and a saturated
-// fill behind live text is the "tinted canvas under a 700-row queue" mistake. The banner row
-// carries the strong tone; the header row a wash of it; the data cells nothing at all.
+// fill behind live text is the "tinted canvas under a 700-row queue" mistake. Both header
+// rows wear the band's colour; the data cells nothing at all.
 const BAND = {
   order:   { label: 'ORDER',    banner: { red: 0.88, green: 0.94, blue: 0.90 } },
   ship:    { label: 'SHIP TO',  banner: { red: 0.86, green: 0.90, blue: 1.0 } },
@@ -112,16 +112,11 @@ const BAND = {
   extras:  { label: 'EXTRAS',   banner: { red: 0.94, green: 0.94, blue: 0.94 } },
 };
 
-// TWO colours on the header row, and they encode OBLIGATION — the one question a filler
-// actually asks of a column. The banner above already says what the column is ABOUT, so
-// tinting the header by section too said the same thing twice and left "must I fill this?"
-// carried by an asterisk alone. These are stronger than the old per-section washes, which
-// were pale enough (0.94–0.98) to read as plain white on screen.
-const DUTY_FILL = {
-  req: { red: 0.78, green: 0.85, blue: 1.0 },    // must fill — clearly blue
-  asg: { red: 0.90, green: 0.92, blue: 0.94 },   // optional, but consequential (see mark)
-  '':  { red: 0.90, green: 0.92, blue: 0.94 },   // optional
-};
+// ONE COLOUR PER SECTION, and the header row wears its band's colour too — see BAND above.
+// The header used to be tinted by OBLIGATION instead, so four bands produced seven fills
+// across two rows and neither reading came through. Obligation is already written on the
+// header: `*` means required, nothing means optional. Mirrors SECTION_FILL in
+// web/lib/order-import.ts.
 
 // Mirrors DUTY_MARK in web/lib/order-import.ts. `asg` carries NOTHING — a tilde beside
 // "Order Number" read as part of the column name, and the header fill already separates it
@@ -168,7 +163,7 @@ export function buildTemplate(title) {
     });
   }) };
   const headerRow = { values: T_COLUMNS.map((c) => cell(c.h + DUTY_MARK[c.duty], {
-    backgroundColor: DUTY_FILL[c.duty],
+    backgroundColor: BAND[c.g].banner,
     textFormat: {
       bold: true,
       // Required reads in red as well as carrying the asterisk — colour alone fails for a

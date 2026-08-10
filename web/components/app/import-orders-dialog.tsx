@@ -19,7 +19,7 @@ import {
   DUTY_LABEL,
   DUTY_MARK,
   SECTION_FILL,
-  DUTY_FILL,
+  type CsvSection,
   dutyOf,
   columnBands,
   type ImportRecord,
@@ -58,14 +58,17 @@ async function downloadXlsxTemplate() {
     }
   })
 
-  // Row 2 — headers carrying their obligation mark, filled by obligation.
+  // Row 2 — headers in their SECTION's colour, same as the banner above them. Obligation
+  // is carried by the `*` and by the red it is set in, not by a second palette.
   ws.addRow(CSV_COLUMNS.map((c) => c.header + DUTY_MARK[dutyOf(c)]))
+  const groupOf = new Map<number, CsvSection>()
+  bands.forEach((b) => { for (let i = b.start; i < b.start + b.count; i++) groupOf.set(i, b.group) })
   CSV_COLUMNS.forEach((c, i) => {
     const duty = dutyOf(c)
     const cell = ws.getCell(2, i + 1)
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DUTY_FILL[duty] } }
-    // Required reads in red as well as being filled and asterisked — colour alone fails a
-    // colour-blind filler, and an asterisk alone is easy to miss across 21 columns.
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: SECTION_FILL[groupOf.get(i) ?? "extras"] } }
+    // Required reads in red as well as being asterisked — colour alone fails a colour-blind
+    // filler, and an asterisk alone is easy to miss across 21 columns.
     cell.font = { bold: true, color: { argb: duty === "required" ? "FF9E1721" : "FF1A1A1A" } }
   })
 

@@ -100,14 +100,18 @@ export const dutyOf = (c: CsvColumn): CsvDuty =>
 /** Fills for the .xlsx template, ARGB. The Google Sheet builds its own from float RGB in
  *  sheets.js; these are the same intent in Excel's colour format. Section tints go on the
  *  banner row, duty fills on the header row — the two rows answer different questions. */
+/**
+ * ONE COLOUR PER SECTION, carried by both header rows.
+ *
+ * The banner used to be tinted by section and the header row beneath it by obligation, so
+ * a four-band sheet showed seven fills across two rows and neither reading was clear. The
+ * obligation is already on the header itself — `*` means required, nothing means optional —
+ * so the second palette was saying in colour what the text says in one character.
+ */
 export const SECTION_FILL: Record<CsvSection, string> = {
   order: "FFE0F1E7", shipTo: "FFDBE6FF", product: "FFE8DEFF", extras: "FFF0F0F0",
 }
-export const DUTY_FILL: Record<CsvDuty, string> = {
-  required: "FFC7D9FF", assigned: "FFE6EAEF", oneOf: "FFE6EAEF", optional: "FFE6EAEF",
-}
 
-/** The marker that rides on the column header: `*` required, `~` we'll assign one. */
 // The mark that rides on a header in the sheet. `assigned` carries NOTHING: a tilde beside
 // "Order Number" read as part of the column name to everyone who saw it, and the dashed
 // outline in the guide already says the same thing without putting a symbol in the header
