@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ArrowsClockwise, ShieldCheck, Sparkle, Check, PencilSimple, X, CircleNotch, CaretRight, Warning } from "@phosphor-icons/react"
+import { ArrowsClockwise, ShieldCheck, Sparkle, Check, PencilSimple, X, CircleNotch, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { PanelPicker, type PickerOption } from "@/components/app/panel-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { api, ApiError, getAdminSecrets, setAdminSecret, getAiConfig, setAiConfig, testAiKey, type SecretMeta, type AiConfig } from "@/lib/api"
@@ -261,6 +262,29 @@ const INTEGRATIONS: Integration[] = [
 
 const GROUPS = ["Channels", "Ads", "Payments", "Shipping", "Suppliers", "Embroidery", "Other"]
 
+/** The AI card is picked from the same control as the rest, so it needs a key of its own
+ *  that can never collide with an integration's. */
+const AI_KEY = "__ai"
+
+/**
+ * The one word that goes in the option label. This is the whole point of the screen: a
+ * closed picker has to answer "is anything wrong, and are my keys the live ones" without
+ * being opened.
+ *
+ * `detail` wins for a working service because it is the more specific fact — Shippo's is
+ * "test" vs "live", which is the difference between a label that ships and one that
+ * doesn't, and "connected" would hide it.
+ */
+function statusText(r: Result): string {
+  switch (r.level) {
+    case "checking": return "checking…"
+    case "restricted": return "staff only"
+    case "error": return "reconnect"
+    case "off": return "not set"
+    default: return r.detail || "connected"
+  }
+}
+
 export function IntegrationsPanel() {
   const [results, setResults] = useState<Record<string, Result>>(
     Object.fromEntries(INTEGRATIONS.map((i) => [i.key, { level: "checking" as Level }]))
@@ -331,7 +355,39 @@ export function IntegrationsPanel() {
     return () => clearTimeout(id)
   }, [runChecks])
 
-  const aiSummary = aiCfg == null ? "" : (aiCfg.keySet || aiCfg.fromEnv ? `${aiCfg.model || "Claude"} · key set` : "no key")
+  // Which service the single panel below is showing.
+  const [sel, setSel] = useState<string>(AI_KEY)
+
+  // The friendly model name, not the id — "Haiku 4.5", the same words the Model select
+  // below shows. A raw `claude-haiku-4-5-20251001` in the option label is a date and a
+  // version number where a state word belongs.
+  const aiModelLabel = aiCfg?.models?.find((m) => m.id === aiCfg.model)?.label || aiCfg?.model
+  const aiStatus = aiCfg == null ? "checking…" : (aiCfg.keySet || aiCfg.fromEnv ? (aiModelLabel || "key set") : "no key")
+  // Ordered by GROUPS rather than by the INTEGRATIONS array — that array is append-order
+  // (byeastside is Shipping but sits last), and the picker's headings should read in the
+  // order the groups were designed in.
+  const options: PickerOption[] = [
+    { value: AI_KEY, label: "AI Assistant (Claude)", group: "Assistant", status: aiStatus },
+    ...GROUPS.flatMap((g) =>
+      INTEGRATIONS.filter((i) => i.group === g).map((i): PickerOption => {
+        const res = results[i.key] ?? { level: "checking" as Level }
+        return {
+          value: i.key,
+          label: i.name,
+          group: g,
+          status: statusText(res),
+          // Only a real failure is flagged. "not set" is a normal state for half of these
+          // (USPS-direct is deliberately off), and a list that flags everything flags nothing.
+          attention: res.level === "error",
+        }
+      })
+    ),
+  ]
+
+  const active = INTEGRATIONS.find((i) => i.key === sel)
+  const activeRes = active ? results[active.key] ?? { level: "checking" as Level } : null
+  const activeMeta = activeRes ? LEVEL_META[activeRes.level] : null
+
   return (
     <SectionCard
       title="Connected services"
@@ -348,23 +404,7 @@ export function IntegrationsPanel() {
         their credential once at boot and need a server restart to pick up a change.
       </div>
 
-      {/* Collapsed status rows — a dot + label until you open one. Claude leads (the one
-          editable credential), then the service groups. */}
-      <div className="divide-y divide-border">
-        <details className="group/row">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 transition-colors hover:bg-accent/40 [&::-webkit-details-marker]:hidden">
-            <span className="flex min-w-0 items-center gap-2">
-              <CaretRight size={13} className="shrink-0 text-muted-foreground transition-transform group-open/row:rotate-90" />
-              <Sparkle size={14} weight="fill" className="text-primary" />
-              <span className="font-medium">AI Assistant (Claude)</span>
-            </span>
-            <span className="shrink-0 text-sm text-muted-foreground">{aiSummary}</span>
-          </summary>
-          <div className="border-t border-border bg-muted/20 px-5 py-4">
-            <AiAssistantCard onChanged={() => getAiConfig().then(setAiCfg).catch(() => {})} />
-          </div>
-        </details>
-
+      <div>
         {/* SECRETS THAT NAME A CARD THAT DOESN'T EXIST.
             Fields attach to a card by matching SECRET_DEFS' `integration` to the card's
             `key`, and a mismatch simply dropped the secret — silently. That is how
@@ -402,68 +442,80 @@ export function IntegrationsPanel() {
           )
         })()}
 
-        {GROUPS.map((group) => {
-          const items = INTEGRATIONS.filter((i) => i.group === group)
-          if (!items.length) return null
-          return items.map((i, idx) => {
-            const res = results[i.key] ?? { level: "checking" as Level }
-            const meta = LEVEL_META[res.level]
-            return (
-              <details key={i.key} className="group/row">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 transition-colors hover:bg-accent/40 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <CaretRight size={13} className="shrink-0 text-muted-foreground transition-transform group-open/row:rotate-90" />
-                    <span className="truncate font-medium">{i.name}</span>
-                    {idx === 0 && <span className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs font-medium uppercase tracking-wide text-muted-foreground sm:inline">{group}</span>}
-                  </span>
-                  <span className={"inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-2xs font-medium " + meta.pill}>
-                    {meta.label}
-                  </span>
-                </summary>
-                <div className="space-y-2 border-t border-border bg-muted/20 px-5 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-muted-foreground">{i.blurb}</span>
-                    <span className="flex items-center gap-3">
-                      {i.test && (
-                        <button
-                          onClick={() => runTest(i)}
-                          disabled={tests[i.key]?.running}
-                          title={`Make a live ${i.name} call`}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:underline disabled:opacity-50"
-                        >
-                          {tests[i.key]?.running ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />} Test connection
-                        </button>
-                      )}
-                      <button
-                        onClick={() => recheckOne(i)}
-                        disabled={res.level === "checking"}
-                        title={`Refresh ${i.name}`}
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
-                      >
-                        <ArrowsClockwise size={12} weight="bold" className={res.level === "checking" ? "animate-spin" : ""} /> Recheck
-                      </button>
-                    </span>
-                  </div>
-                  {res.detail && (
-                    <div className="break-all font-mono text-xs text-muted-foreground">{res.detail}</div>
+        {/* ONE select. Every service is in it, its state is in its label, and exactly one
+            panel is open below — instead of 19 collapsed rows that each had to be clicked
+            to say one word. */}
+        <div className="border-b border-border px-5 py-3">
+          <PanelPicker value={sel} onChange={setSel} options={options} label="Choose a connected service" />
+        </div>
+
+        {/* The panel. Keyed so switching service resets the panel's own state rather than
+            rendering the previous one's for a frame. */}
+        <div key={sel} className="px-5 py-4">
+          {sel === AI_KEY ? (
+            <AiAssistantCard onChanged={() => getAiConfig().then(setAiCfg).catch(() => {})} />
+          ) : active && activeRes && activeMeta ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate font-semibold">{active.name}</span>
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs font-medium uppercase tracking-wide text-muted-foreground">{active.group}</span>
+                </span>
+                <span className={"inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-2xs font-medium " + activeMeta.pill}>
+                  {activeMeta.label}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm text-muted-foreground">{active.blurb}</span>
+                <span className="flex items-center gap-3">
+                  {active.test && (
+                    <button
+                      onClick={() => runTest(active)}
+                      disabled={tests[active.key]?.running}
+                      title={`Make a live ${active.name} call`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:underline disabled:opacity-50"
+                    >
+                      {tests[active.key]?.running ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />} Test connection
+                    </button>
                   )}
-                  {tests[i.key]?.result && (
-                    <div className={"break-words text-xs " + (tests[i.key]!.result!.ok ? "text-success" : "text-destructive")}>
-                      {tests[i.key]!.result!.ok ? "✓ " : "✗ "}{tests[i.key]!.result!.msg}
-                    </div>
-                  )}
-                  {(secrets[i.key] ?? []).length > 0 && (
-                    <div className="space-y-1.5 border-t border-border pt-2">
-                      {(secrets[i.key] ?? []).map((s) => (
-                        <SecretRow key={s.name} s={s} onSaved={reloadSecrets} />
-                      ))}
-                    </div>
-                  )}
+                  <button
+                    onClick={() => recheckOne(active)}
+                    disabled={activeRes.level === "checking"}
+                    title={`Refresh ${active.name}`}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
+                  >
+                    <ArrowsClockwise size={12} weight="bold" className={activeRes.level === "checking" ? "animate-spin" : ""} /> Recheck
+                  </button>
+                </span>
+              </div>
+
+              {activeRes.detail && (
+                <div className="break-all font-mono text-xs text-muted-foreground">{activeRes.detail}</div>
+              )}
+              {tests[active.key]?.result && (
+                <div className={"break-words text-xs " + (tests[active.key]!.result!.ok ? "text-success" : "text-destructive")}>
+                  {tests[active.key]!.result!.ok ? "✓ " : "✗ "}{tests[active.key]!.result!.msg}
                 </div>
-              </details>
-            )
-          })
-        })}
+              )}
+              {(secrets[active.key] ?? []).length > 0 ? (
+                <div className="space-y-1.5 border-t border-border pt-3">
+                  {(secrets[active.key] ?? []).map((s) => (
+                    <SecretRow key={s.name} s={s} onSaved={reloadSecrets} />
+                  ))}
+                </div>
+              ) : (
+                // Says WHICH of the two it is, rather than showing the same blank space for
+                // "this service has no editable keys" and "the secrets call failed".
+                <div className="border-t border-border pt-3 text-xs text-muted-foreground">
+                  {activeRes.level === "restricted"
+                    ? "Credentials are admin-only — sign in as an admin to see them."
+                    : `No editable credentials for ${active.name}. Its keys live in the server env.`}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
     </SectionCard>
   )
@@ -538,7 +590,9 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
 
   const models = cfg?.models ?? []
   return (
-    <div className="rounded-xl border border-border p-4">
+    // No border of its own: it sits in the picker's panel, and a bordered card inside a
+    // bordered panel reads as two things.
+    <div>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">

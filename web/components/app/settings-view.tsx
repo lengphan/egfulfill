@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useContext, createContext, isValidEle
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight, X, DownloadSimple, Database } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, X, DownloadSimple, Database } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { ACTION_CATEGORIES } from "@/components/app/activity-meta"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
+import { PanelPicker } from "@/components/app/panel-picker"
 import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { VolumeBoard } from "@/components/app/volume-board"
@@ -909,26 +910,90 @@ function nodeText(node: React.ReactNode): string {
 const matches = (node: React.ReactNode, q: string) =>
   !q || nodeText(node).toLowerCase().includes(q)
 
-function Fold({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
+type FoldProps = {
+  title: string
+  hint?: string
+  /**
+   * The section's own state, shown in the picker's option label — "not set",
+   * "16 cones", "off". Only worth setting where a real fact exists; a made-up one is
+   * worse than none.
+   */
+  status?: string
+  children: React.ReactNode
+}
+
+/**
+ * A section of the Platform form. This is a DECLARATIVE MARKER — it is never rendered
+ * itself. `FoldGroup` reads these props off the element and renders exactly one of them,
+ * which is what lets the sections stay written inline (each closes over this panel's
+ * form state) while the chrome around them is a single picker.
+ */
+function Fold(props: FoldProps): React.ReactNode {
+  // Rendering the children is the honest degradation: a <Fold> used outside a FoldGroup
+  // shows its section rather than silently disappearing.
+  return props.children
+}
+
+/**
+ * One select, one panel — the same shape as Settings › Integrations.
+ *
+ * Nine collapsed folds meant nine clicks to find out whether the ship-from address was
+ * filled in, which is the one setting on this page that blocks buying a label outright.
+ * The state now rides in the option label.
+ *
+ * Search still works and still drives this: it narrows the OPTION LIST, and the panel
+ * follows the first surviving match. That's derived from the query rather than pushed
+ * into state by an effect, so there's no frame where the panel and the query disagree.
+ */
+function FoldGroup({ children }: { children: React.ReactNode }) {
   const q = useContext(SettingsSearch)
-  // A search that leaves everything collapsed has answered nothing, so a matching fold opens
-  // itself — and closes back to whatever the person had chosen once the box is cleared.
-  if (!matches([title, hint, children], q)) return null
-  const expanded = open || !!q
+  const [picked, setPicked] = useState("")
+
+  const folds = Children.toArray(children).filter(
+    (c): c is React.ReactElement<FoldProps> => isValidElement(c)
+  )
+  const visible = folds.filter((f) => matches([f.props.title, f.props.hint, f.props.children], q))
+  const active = visible.find((f) => f.props.title === picked) ?? visible[0]
+
+  if (!visible.length) {
+    return (
+      <div className="border-t border-border px-5 py-10 text-center text-sm text-muted-foreground">
+        No setting matches “{q}”.
+      </div>
+    )
+  }
+
   return (
-    <div className="border-t border-border">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={expanded}
-        className="eg-tap flex w-full items-center gap-2 px-5 py-3.5 text-left transition-colors hover:bg-accent/40"
-      >
-        <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (expanded ? "rotate-90" : "")} />
-        <span className="text-sm font-medium">{title}</span>
-        {hint && <span className="truncate text-xs text-muted-foreground">· {hint}</span>}
-      </button>
-      {expanded && <div className="px-5 pb-5">{children}</div>}
-    </div>
+    <>
+      <div className="border-t border-border px-5 py-3">
+        <PanelPicker
+          value={active?.props.title ?? ""}
+          onChange={setPicked}
+          label="Choose a settings section"
+          options={visible.map((f) => ({
+            value: f.props.title,
+            label: f.props.title,
+            status: f.props.status,
+          }))}
+        />
+        {!!q && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {visible.length} of {folds.length} sections match “{q}”.
+          </p>
+        )}
+      </div>
+      {/* Keyed on the section so switching remounts rather than showing the previous
+          section's scroll/edit state for a frame. */}
+      {active && (
+        <div key={active.props.title} className="border-t border-border px-5 py-5">
+          <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="font-semibold">{active.props.title}</span>
+            {active.props.hint && <span className="text-xs text-muted-foreground">{active.props.hint}</span>}
+          </div>
+          {active.props.children}
+        </div>
+      )}
+    </>
   )
 }
 
@@ -1160,7 +1225,8 @@ function PlatformPanel() {
           )}
         </div>
       </div>
-      <Fold title="Warehouse ship-from address" hint="the sender on every label">
+      <FoldGroup>
+      <Fold title="Warehouse ship-from address" hint="the sender on every label" status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           Where parcels are tendered from. Set once for the whole team. If returns come back
@@ -1212,7 +1278,7 @@ function PlatformPanel() {
           its own address, with its own name, sent to the carrier as address_return
           (Shippo) / return_address (EasyPost). Left blank, the carrier falls back to the
           sender, which is what happened before this field existed. */}
-      <Fold title="Return address" hint="where undeliverable parcels come back to">
+      <Fold title="Return address" hint="where undeliverable parcels come back to" status={returnAddr.street ? "set" : "using ship-from"}>
         <p className="mb-3 text-xs text-muted-foreground">
           Only needed if returns come back to a <b>different address</b> than the one you ship
           from. Leave it blank and returns follow the ship-from address above. The name here is
@@ -1348,7 +1414,7 @@ function PlatformPanel() {
       {/* Product types. The default mockup is the labour-saver: set one 2D outline per
           category and every product in it inherits a blank for the Design Maker, instead
           of an upload per product. A product's own mockup still wins. */}
-      <Fold title="Partner rates" hint="what outside partners cost us, per job">
+      <Fold title="Partner rates" hint="what outside partners cost us, per job" status={Number(expediteCost) > 0 || Number(designPartnerCost) > 0 ? "set" : "unset — nothing booked"}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           Neither partner can be billed through an API — byeastside and Pink Design both
@@ -1397,7 +1463,7 @@ function PlatformPanel() {
         </div>
       </Fold>
 
-      <Fold title="Peak-season capacity" hint="per-seller order limits + the delay notice">
+      <Fold title="Peak-season capacity" hint="per-seller order limits + the delay notice" status={capacityMode ? "on" : "off"}>
         {/* Master switch — off = no header counters, no notice, limits ignored. */}
         <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
           <input type="checkbox" checked={capacityMode} onChange={(e) => setCapacityMode(e.target.checked)} className="size-4 accent-primary" />
@@ -1495,7 +1561,7 @@ function PlatformPanel() {
         </label>
       </Fold>
 
-      <Fold title="Embroidery threads" hint="the cones you actually stock">
+      <Fold title="Embroidery threads" hint="the cones you actually stock" status={`${threads.length} cones`}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           Thread matching picks the nearest cone <em>you stock</em>. The built-in starter
@@ -1597,7 +1663,7 @@ function PlatformPanel() {
         </div>
       </Fold>
 
-      <Fold title="Positions / Design Surfaces" hint="sides + positioning outlines per category">
+      <Fold title="Positions / Design Surfaces" hint="sides + positioning outlines per category" status={`${types.length} types`}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           Sides and outlines are set once per category and inherited by every product in it —
@@ -1750,6 +1816,7 @@ function PlatformPanel() {
           <MoneyField label="Laser" value={bands.method_lsr ?? ""} onChange={(v) => setBand("method_lsr", v)} />
         </div>
       </Fold>
+      </FoldGroup>
       {/* Save stays OUTSIDE the search filter and always visible: a filtered page still
           edits the same form, and hiding Save behind a query is how an edit gets lost. */}
       <div className="flex items-center gap-3 border-t border-border px-5 py-3">
