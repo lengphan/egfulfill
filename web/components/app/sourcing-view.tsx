@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, Binoculars, X } from "@phosphor-icons/react"
+import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, Binoculars, X, Package } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Loading } from "@/components/app/loading"
 import { AlibabaStatus } from "@/components/app/alibaba-status"
@@ -12,6 +12,7 @@ import { getSourcing, saveSourcing, deleteSourcing, fetchSourcingPrice, getSpyde
          SOURCING_STAGES, type SourcingRow, type SourcingStage, type SavedListing } from "@/lib/api"
 import { computeProfit, money, pct, FEE_MODELS, PAYMENT_DEFAULT } from "@/lib/profit"
 import { useConfirm } from "@/components/app/confirm-dialog"
+import { SampleOrderDialog, SampleOrdersPanel } from "@/components/app/sample-orders"
 
 /**
  * Sourcing — where a blank comes from, what it lands at, and what it earns.
@@ -93,6 +94,11 @@ export function SourcingView() {
   const shown = useMemo(
     () => (rows ?? []).filter((r) => !stageFilter || (r.stage || "prospect") === stageFilter),
     [rows, stageFilter])
+
+  // Which prospect the sample dialog is for, and a counter that re-reads the panel after
+  // one is placed or resolved.
+  const [sampleFor, setSampleFor] = useState<SourcingRow | null>(null)
+  const [samplesKey, setSamplesKey] = useState(0)
 
   const setStage = async (row: SourcingRow, stage: SourcingStage) => {
     setRows((prev) => (prev ?? []).map((r) => (r.id === row.id ? { ...r, stage } : r)))  // optimistic
@@ -495,6 +501,11 @@ export function SourcingView() {
                               <ArrowSquareOut size={14} />
                             </a>
                           )}
+                          <button onClick={(e) => { e.stopPropagation(); setSampleFor(r) }}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                                  title="Record a sample order — books its cost to the factory wallet">
+                            <Package size={14} />
+                          </button>
                           <button onClick={(e) => { e.stopPropagation(); remove(r) }}
                                   className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-destructive"
                                   title="Archive">
@@ -605,8 +616,20 @@ export function SourcingView() {
           </div>
         )}
       </SectionCard>
+
+      {/* Samples sit UNDER the prospects, not on their own page: a sample only exists
+          because of a row above it, and the money it cost is the reason a prospect
+          graduates or doesn't. */}
+      <SampleOrdersPanel reloadKey={samplesKey} />
       </div>
 
+      <SampleOrderDialog
+        open={!!sampleFor}
+        onOpenChange={(v) => { if (!v) setSampleFor(null) }}
+        supplierId={sampleFor?.id}
+        supplierTitle={sampleFor?.title}
+        onPlaced={() => { setSamplesKey((n) => n + 1); load() }}
+      />
     </div>
   )
 }

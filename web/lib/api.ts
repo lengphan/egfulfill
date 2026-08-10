@@ -165,6 +165,7 @@ export type WalletSummary = {
   postage: number      // labels
   design: number       // Pink Design
   dispatch: number     // byeastside pick fee
+  samples: number      // sourcing samples (sample-cost)
 }
 export type WalletResponse = {
   account: string
@@ -3611,6 +3612,43 @@ export function suggestSuppliers(p: { listingId?: string; title: string; image?:
                queries?: string[]; podBlank?: boolean; note?: string | null; cached?: boolean
                error?: string }>(
     `/api/manual-suppliers/suggest`, { method: "POST", body: JSON.stringify(p) })
+}
+/**
+ * A sample order placed against a sourcing prospect.
+ *
+ * `amount` is what it cost, in USD, and it is already booked to the FACTORY wallet — this
+ * record is the paperwork around that ledger row, not a second copy of the money.
+ */
+export type SampleOrder = {
+  id: string
+  supplierId?: string | null
+  supplierTitle?: string | null
+  /** The SUPPLIER's own order number — the handle you quote back at them. */
+  orderNo?: string | null
+  amount?: number | null
+  qty?: number | null
+  note?: string | null
+  status: "placed" | "received" | "cancelled"
+  placedAt?: string
+  receivedAt?: string | null
+  cancelledAt?: string | null
+}
+export function getSampleOrders(supplierId?: string) {
+  const qs = supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""
+  return api<{ items: SampleOrder[] }>(`/api/sample-orders${qs}`)
+}
+/** Records the order AND books its cost to the factory wallet, at place time. `booked`
+ *  reports whether the ledger write actually landed — costs.js is best-effort by design,
+ *  and a sample recorded with its cost silently unbooked is the failure to catch. */
+export function placeSampleOrder(p: { supplierId?: string; orderNo: string; amount: number; qty?: number; note?: string }) {
+  return api<{ ok?: boolean; id?: string; booked?: boolean; items?: SampleOrder[]; error?: string }>(
+    `/api/sample-orders`, { method: "POST", body: JSON.stringify(p) })
+}
+/** `received` moves no money — it already moved when the sample was placed. `cancel`
+ *  appends a credit rather than erasing the debit. */
+export function setSampleOrderStatus(id: string, action: "received" | "cancel") {
+  return api<{ ok?: boolean; credited?: boolean; items?: SampleOrder[]; error?: string }>(
+    `/api/sample-orders/${encodeURIComponent(id)}/${action}`, { method: "POST" })
 }
 export function getSourcing() {
   return api<{ items: SourcingRow[] }>(`/api/manual-suppliers`)

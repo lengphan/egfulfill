@@ -228,6 +228,24 @@ export function walletRoutes(app, requireAuth) {
     const byType = Object.fromEntries(sumRows.map((r) => [r.type, Number(r.total) || 0]));
     const pos = (t) => Math.max(0, byType[t] || 0);
     const absNeg = (t) => Math.abs(Math.min(0, byType[t] || 0));
+    /**
+     * A cost category, NET OF ITS CREDITS.
+     *
+     * recordCredit writes `<type>-credit` as a separate positive row — deliberately, so the
+     * ledger keeps both facts. But a summary that reads only the debit reports money we got
+     * back as still spent: a voided label, a supplier return, a cancelled sample. The
+     * balance already nets them (it is SUM(delta) over everything), so the categories
+     * disagreed with the total they are supposed to explain, and every cost read high.
+     *
+     * PARTNER_SQL below already had this right — it prefix-matches so a credit attributes
+     * to the same partner as its debit, "because matching only the exact debit type dropped
+     * every refund/void from the breakdown and overstated what we owed". Same bug, same
+     * file, the other half of it.
+     *
+     * Not clamped at zero: credits exceeding spend means something is wrong upstream, and
+     * a negative that shows is better than one that hides.
+     */
+    const costOf = (t) => absNeg(t) - pos(t + '-credit');
     const summary = {
       revenue: pos('order-charge-in'),      // factory: what sellers paid in
       paid: absNeg('order-charge-out'),     // seller: what they paid out
@@ -235,10 +253,14 @@ export function walletRoutes(app, requireAuth) {
       refundsIn: pos('order-refund-in'),    // seller: refunds received
       refundsOut: absNeg('order-refund-out'), // factory: refunds paid back
       payouts: absNeg('withdrawal'),        // withdrawals
-      productCost: absNeg('blanks-cost'),   // COGS — S&S/Otto POs
-      postage: absNeg('label-cost'),        // Shippo/USPS labels
-      design: absNeg('design-partner-cost'), // Pink Design
-      dispatch: absNeg('expedite-cost'),    // byeastside pick fee
+      productCost: costOf('blanks-cost'),   // COGS — S&S/Otto POs, less supplier returns
+      postage: costOf('label-cost'),        // Shippo/USPS labels, less voided ones
+      design: costOf('design-partner-cost'), // Pink Design
+      dispatch: costOf('expedite-cost'),    // byeastside pick fee
+      // Sourcing samples. Named here for the reason this map exists at all: the balance is
+      // SUM(delta), so a type nobody lists still LOWERS the total while appearing in no
+      // line — money visibly gone and nowhere accounted for.
+      samples: costOf('sample-cost'),
     };
     // Ship the warning threshold WITH the balance, so a client never has to decide for
     // itself what "low" means — two screens using different numbers is how one warns and
@@ -288,6 +310,10 @@ export function walletRoutes(app, requireAuth) {
       when type = 'design-pay' and account = 'factory' then 'designer'
       when type like 'label-cost%'          then 'carrier'
       when type like 'blanks-cost%'         then 'suppliers'
+      -- A sample is bought from a supplier too, so it belongs in the same statement we
+      -- reconcile their invoices against. Left out, it would drop off the partner export
+      -- while still sitting in the factory balance.
+      when type like 'sample-cost%'         then 'suppliers'
     end)`;
 
   app.get('/api/wallet/export', { preHandler: requireAuth }, async (req, reply) => {

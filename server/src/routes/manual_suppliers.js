@@ -9,6 +9,7 @@
 import { q } from '../db.js';
 import { audit } from '../audit.js';
 import { aiComplete } from './support_ai.js';
+import { recordCost, recordCredit } from '../costs.js';
 
 /**
  * Is this URL safe for OUR SERVER to fetch?
@@ -171,24 +172,62 @@ export function manualSupplierRoutes(app, requireAdmin) {
        created_by text,
        created_at timestamptz default now(),
        updated_at timestamptz default now()
-     )`).catch(() => {});
-  // Added for the Sourcing tab. A unit price on its own can't be compared across suppliers:
-  // $3.10 at MOQ 100 with $85 freight is really $3.95 a unit, and 25 days later than the
-  // $8.42 domestic blank with no minimum. These are what make the comparison honest.
-  for (const col of [
-    'moq integer',                    // minimum order quantity (1 = buy one)
-    'ship_total numeric(12,2)',       // inbound freight for the whole MOQ, not per unit
-    'lead_days integer',              // quoted production + transit
-    'supplier_ref text',              // internal supplier style, e.g. "sanmar:PC61" — price re-reads on catalog sync
-    'currency text',                  // as quoted; converted at display time, never stored converted
-    'decoration_cost numeric(12,2)',  // print/embroidery per unit, if not our own factory
-    'image text',
-    // Supplier pipeline. A product can have SEVERAL rows at 'prospect' at once — that is the
-    // point: you shortlist a few, talk to two, and one graduates to 'rotation'. Stage lives on
-    // the row (the product+supplier pair), not on the product.
-    "stage text default 'prospect'",
-    'archived boolean default false',
-  ]) q(`alter table manual_suppliers add column if not exists ${col}`).catch(() => {});
+     )`)
+  // CHAINED, not fired alongside. Two bare q() calls can land on DIFFERENT pool
+  // connections and run out of order, so on a database where this table does not exist yet
+  // every ALTER below raced the CREATE, failed with "relation does not exist", and the
+  // .catch swallowed it — leaving manual_suppliers permanently missing moq, ship_total,
+  // lead_days, stage and the rest until someone restarted the process. Invisible on a
+  // long-lived deployment (the table is already there, so the ALTERs win), and a 500 on
+  // every save on a fresh one. Found by running this against an empty database.
+    .then(async () => {
+      // Added for the Sourcing tab. A unit price on its own can't be compared across suppliers:
+      // $3.10 at MOQ 100 with $85 freight is really $3.95 a unit, and 25 days later than the
+      // $8.42 domestic blank with no minimum. These are what make the comparison honest.
+      for (const col of [
+        'moq integer',                    // minimum order quantity (1 = buy one)
+        'ship_total numeric(12,2)',       // inbound freight for the whole MOQ, not per unit
+        'lead_days integer',              // quoted production + transit
+        'supplier_ref text',              // internal supplier style, e.g. "sanmar:PC61" — price re-reads on catalog sync
+        'currency text',                  // as quoted; converted at display time, never stored converted
+        'decoration_cost numeric(12,2)',  // print/embroidery per unit, if not our own factory
+        'image text',
+        // Supplier pipeline. A product can have SEVERAL rows at 'prospect' at once — that is the
+        // point: you shortlist a few, talk to two, and one graduates to 'rotation'. Stage lives on
+        // the row (the product+supplier pair), not on the product.
+        "stage text default 'prospect'",
+        'archived boolean default false',
+      ]) await q(`alter table manual_suppliers add column if not exists ${col}`).catch(() => {});
+    })
+    .catch(() => {});
+
+  /**
+   * SAMPLE ORDERS — the step between "we have a quote" and "we buy from these people".
+   *
+   * A row per sample actually placed, carrying the SUPPLIER'S OWN order number: that
+   * number is what you quote back at them when it doesn't arrive, and it is the only
+   * handle that ties our record to theirs.
+   *
+   * The money is NOT stored here. It books into wallet_ledger at place time like every
+   * other external cost, and this table holds the paperwork around it — two sets of books
+   * is how the balance and the report start disagreeing. `amount` is kept for display and
+   * for the credit on cancel; the ledger stays the source of truth for what was spent.
+   */
+  q(`create table if not exists sample_orders (
+       id bigserial primary key,
+       supplier_id  bigint,
+       order_no     text,
+       amount       numeric(12,2) not null,
+       qty          integer,
+       note         text,
+       status       text not null default 'placed',   -- placed | received | cancelled
+       placed_at    timestamptz not null default now(),
+       received_at  timestamptz,
+       cancelled_at timestamptz,
+       created_by   text
+     )`)
+    .then(() => q('create index if not exists sample_orders_supplier on sample_orders (supplier_id, placed_at desc)'))
+    .catch(() => {});
 
   app.get('/api/manual-suppliers', { preHandler: requireAdmin }, async () => {
     const r = await q(`select * from manual_suppliers
@@ -386,5 +425,116 @@ Rules:
     if (!r.rowCount) { reply.code(404); return { error: 'Not found.' }; }
     audit(req, 'manual-supplier.removed', { entityType: 'manual_supplier', entityId: String(req.params.id) });
     return { ok: true };
+  });
+
+  // ── Sample orders ──────────────────────────────────────────────────────────
+  const sampleRows = async (supplierId = null) => {
+    const r = await q(
+      `select s.*, m.title as supplier_title
+         from sample_orders s
+         left join manual_suppliers m on m.id = s.supplier_id
+        where ($1::bigint is null or s.supplier_id = $1::bigint)
+        order by s.placed_at desc limit 300`,
+      [supplierId]).catch(() => ({ rows: [] }));
+    return r.rows.map((x) => ({
+      id: String(x.id),
+      supplierId: x.supplier_id == null ? null : String(x.supplier_id),
+      supplierTitle: x.supplier_title || null,
+      orderNo: x.order_no || null,
+      amount: x.amount == null ? null : Number(x.amount),
+      qty: x.qty == null ? null : Number(x.qty),
+      note: x.note || null,
+      status: x.status || 'placed',
+      placedAt: x.placed_at,
+      receivedAt: x.received_at,
+      cancelledAt: x.cancelled_at,
+    }));
+  };
+
+  app.get('/api/sample-orders', { preHandler: requireAdmin }, async (req) => {
+    const sid = req.query?.supplierId ? String(req.query.supplierId) : null;
+    return { items: await sampleRows(sid && /^\d+$/.test(sid) ? sid : null) };
+  });
+
+  /**
+   * Record a sample order that has just been PLACED — and book what it cost.
+   *
+   * Place time, not receive time: the money leaves when you pay for it, and a ledger that
+   * waits for the parcel reports a balance we do not have. The trade-off is real and
+   * deliberate — a sample that never turns up sits as a cost against nothing, which is
+   * exactly what it was: money spent on an answer we did not get. Cancel books a credit
+   * rather than deleting the debit, so both facts survive.
+   *
+   * The ledger ref is `sample-<id>` — one row, one sample, so a double-submit or a retry
+   * lands once against the (account, type, ref) unique index.
+   */
+  app.post('/api/sample-orders', { preHandler: requireAdmin }, async (req, reply) => {
+    const b = req.body || {};
+    const amount = Number(b.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      reply.code(400); return { error: 'What the sample cost is required — it books to the factory wallet as it is placed.' };
+    }
+    const orderNo = String(b.orderNo || '').trim();
+    if (!orderNo) {
+      reply.code(400); return { error: "The supplier's own order number is required — it is the only handle that ties our record to theirs." };
+    }
+    const supplierId = /^\d+$/.test(String(b.supplierId || '')) ? String(b.supplierId) : null;
+    const qty = Number.isFinite(Number(b.qty)) && Number(b.qty) > 0 ? Math.round(Number(b.qty)) : null;
+
+    const ins = await q(
+      `insert into sample_orders (supplier_id, order_no, amount, qty, note, created_by)
+       values ($1::bigint, $2, $3, $4, $5, $6) returning id`,
+      [supplierId, orderNo, Math.abs(amount), qty, String(b.note || '').trim() || null, req.user?.sub || null]);
+    const id = String(ins.rows[0].id);
+
+    // Who it was bought from, so the Billing row reads as a sentence rather than a figure.
+    const supplier = supplierId
+      ? (await q('select title from manual_suppliers where id=$1::bigint', [supplierId]).catch(() => ({ rows: [] }))).rows[0]
+      : null;
+    const note = [`Sample ${orderNo}`, supplier?.title, qty ? `${qty} unit${qty === 1 ? '' : 's'}` : null, String(b.note || '').trim() || null]
+      .filter(Boolean).join(' · ');
+    const booked = await recordCost('sample', amount, `sample-${id}`, note);
+
+    // A sample being placed IS the sampling stage — leaving the row on "talking" means the
+    // board disagrees with the ledger about what is happening.
+    if (supplierId) {
+      await q(`update manual_suppliers set stage='sampling', updated_at=now()
+                where id=$1::bigint and coalesce(stage,'prospect') in ('prospect','talking')`,
+        [supplierId]).catch(() => {});
+    }
+    audit(req, 'sample-order.placed', { entityType: 'sample_order', entityId: id, after: { orderNo, amount, supplierId } });
+    // `booked` is reported rather than assumed: recordCost is best-effort by design, and a
+    // sample recorded with its cost silently unbooked is the failure this whole item is about.
+    return { ok: true, id, booked: !!booked.ok, items: await sampleRows() };
+  });
+
+  /**
+   * Mark a sample arrived, or cancel it.
+   *
+   * Cancel appends a CREDIT rather than removing the debit — "we spent $40 and got it
+   * back" and "we never spent it" are different facts, and only the first survives an
+   * audit. Receiving moves no money: the money already moved when it was placed.
+   */
+  app.post('/api/sample-orders/:id/:action', { preHandler: requireAdmin }, async (req, reply) => {
+    const id = String(req.params.id || '');
+    const action = String(req.params.action || '');
+    if (!/^\d+$/.test(id)) { reply.code(404); return { error: 'Not found.' }; }
+    if (!['received', 'cancel'].includes(action)) { reply.code(400); return { error: 'Unknown action.' }; }
+
+    const cur = (await q('select * from sample_orders where id=$1::bigint', [id]).catch(() => ({ rows: [] }))).rows[0];
+    if (!cur) { reply.code(404); return { error: 'Not found.' }; }
+    if (cur.status === 'cancelled') { reply.code(409); return { error: 'That sample was already cancelled.' }; }
+
+    if (action === 'received') {
+      await q(`update sample_orders set status='received', received_at=now() where id=$1::bigint`, [id]);
+      audit(req, 'sample-order.received', { entityType: 'sample_order', entityId: id });
+      return { ok: true, items: await sampleRows() };
+    }
+
+    await q(`update sample_orders set status='cancelled', cancelled_at=now() where id=$1::bigint`, [id]);
+    const credited = await recordCredit('sample', Number(cur.amount), `sample-cancel-${id}`,
+      `Sample ${cur.order_no || id} cancelled — refunded`);
+    audit(req, 'sample-order.cancelled', { entityType: 'sample_order', entityId: id, before: { status: cur.status } });
+    return { ok: true, credited: !!credited.ok, items: await sampleRows() };
   });
 }

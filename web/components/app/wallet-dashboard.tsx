@@ -142,6 +142,8 @@ function txMeta(type: string, delta: number): { label: string; tone: string } {
   if (t === "label-cost") return { label: "Postage", tone: AM }
   if (t === "design-partner-cost") return { label: "Design", tone: AM }
   if (t === "expedite-cost") return { label: "Dispatch fee", tone: AM }
+  if (t === "sample-cost") return { label: "Sample", tone: AM }
+  if (t === "sample-cost-credit") return { label: "Sample refund", tone: EM }
   if (t === "withdrawal") return { label: "Payout", tone: MUT }
   if (t === "manual-income") return { label: "Income", tone: EM }
   if (t === "manual-expense") return { label: "Expense", tone: AM }
@@ -345,14 +347,21 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
   // never the 200-row window. COGS (blanks) only books when a supplier PO is received, so it
   // reads low until purchasing goes live — labelled so it's "what's booked", not "what's owed".
   const s = view.summary
-  const fees = s ? s.postage + s.design + s.dispatch : 0
+  // Samples sit in `fees` rather than in Product cost: they are money spent to DECIDE, with
+  // no order behind them and no margin to sit against, so folding them into COGS would
+  // worsen every product's apparent cost. They must be in ONE of the two, though — left out
+  // of both, Profit reads high by exactly what sourcing spent.
+  const fees = s ? s.postage + s.design + s.dispatch + (s.samples ?? 0) : 0
   const profit = s ? s.revenue - s.productCost - fees - s.refundsOut : 0
   const kpis = isFactoryWallet && s
     ? [
         { label: "Revenue", value: usd(s.revenue), sub: "order charges received", tone: "pos" as const },
         { label: "Product cost", value: usd(s.productCost), sub: "blanks booked (COGS)", tone: "mut" as const },
-        { label: "Fees & partner", value: usd(fees), sub: "postage · design · dispatch", tone: "mut" as const },
-        { label: "Profit", value: usd(profit), sub: `${pct(profit, s.revenue)} margin`, tone: (profit >= 0 ? "pos" : "neg") as "pos" | "neg" },
+        { label: "Fees & partner", value: usd(fees), sub: "postage · design · dispatch · samples", tone: "mut" as const },
+        // SIGNED when negative. usd() renders Math.abs(), so a factory running at a loss
+        // read "Profit $103.75" — identical to earning it — with only the tone to say
+        // otherwise. A minus sign is not decoration on this number.
+        { label: "Profit", value: profit < 0 ? usd(profit, true) : usd(profit), sub: `${pct(profit, s.revenue)} margin`, tone: (profit >= 0 ? "pos" : "neg") as "pos" | "neg" },
       ]
     : [
         { label: "Available balance", value: usd(view.balance), sub: "Ready for fulfillment", tone: "pos" as const },

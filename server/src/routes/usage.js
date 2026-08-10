@@ -27,6 +27,7 @@ const LEDGER_CATS = [
   { type: 'blanks-cost',         label: 'Blanks (POs)' },
   { type: 'design-partner-cost', label: 'Design partner' },
   { type: 'expedite-cost',       label: 'Dispatch / expedite' },
+  { type: 'sample-cost',         label: 'Sourcing samples' },
 ];
 
 const CFG_KEY = 'integration_usage_config'; // settings jsonb: { [platform]: {costPerCallCents, monthlyLimitCents} }

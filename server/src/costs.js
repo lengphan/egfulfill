@@ -28,6 +28,11 @@ export const COST_TYPES = {
   dispatch: 'expedite-cost',      // byeastside per-label pick fee
   design: 'design-partner-cost',  // Pink Design task
   blanks: 'blanks-cost',          // S&S / Otto purchase orders
+  // A sourcing sample. Factory spend like the rest — never a seller charge — and its own
+  // type rather than folded into `blanks` because a sample is money spent to DECIDE, not
+  // stock bought to sell: it has no order behind it and no margin to sit against, and
+  // averaging it into COGS would quietly worsen every product's cost.
+  sample: 'sample-cost',
 };
 
 /**
@@ -41,7 +46,7 @@ export const COST_TYPES = {
  * purchase or the partner push it describes — losing one accounting row is bad, failing a
  * customer's dispatch over it is worse.
  *
- * @param {'label'|'dispatch'|'design'|'blanks'} kind
+ * @param {'label'|'dispatch'|'design'|'blanks'|'sample'} kind
  * @param {number} amount   positive; what we PAID (stored as a negative delta)
  * @param {string} ref      stable id for the thing, e.g. `label-FF-1042`
  */
@@ -87,7 +92,7 @@ export async function ensureCostColumns() {
  *
  * Idempotent on its own ref, so a credit confirmed twice lands once.
  *
- * @param {'label'|'dispatch'|'design'|'blanks'} kind  what the credit reverses
+ * @param {'label'|'dispatch'|'design'|'blanks'|'sample'} kind  what the credit reverses
  * @param {number} amount   positive; what came BACK (stored as a positive delta)
  * @param {string} ref      stable id for the credit, e.g. `po-return-PO-123-1`
  */
