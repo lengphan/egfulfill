@@ -4,14 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode, CaretDown, CaretRight, Package, Tag } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, XCircle, Clock, FilePdf, Barcode, CaretDown, CaretRight, Package, Tag, type Icon } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
-import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow, type AuditRow, type ShipAddress } from "@/lib/api"
+import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { ExternalLabels } from "@/components/app/external-labels"
 import { getUser } from "@/lib/auth"
@@ -55,7 +55,10 @@ const NEXT = "working"
 
 // History = every order that ever had a label, and WHAT BECAME OF IT — so a label pulled
 // off the board isn't lost track of. `disposition` reads current state into one outcome.
-type DispKey = "scanned" | "shipped" | "awaiting" | "production" | "removed" | "cancelled"
+/** `attention` belongs to EXTERNAL labels only — their extractor read the file and found
+ *  no label on it. No order can be in that state, which is why it has its own key rather
+ *  than being folded into one that already means something else. */
+type DispKey = "scanned" | "shipped" | "awaiting" | "production" | "removed" | "cancelled" | "attention"
 function disposition(o: OrderRow): { key: DispKey; label: string } {
   const fs = normalizeStage(o.factory_status)
   if (fs === "cancelled" || fs === "refunded") return { key: "cancelled", label: fs === "refunded" ? "Refunded" : "Cancelled" }
@@ -65,19 +68,71 @@ function disposition(o: OrderRow): { key: DispKey; label: string } {
   if (fs === "working" || fs === "printed") return { key: "production", label: "In production" }
   return { key: "removed", label: "Off the board" }   // has a label but sits before the board
 }
-// Outcome as a solid tinted pill (no coloured dot). Green = done, violet = in production,
-// amber = stuck, red = cancelled, grey = waiting.
-const DISP_PILL: Record<DispKey, string> = {
-  scanned: "bg-emerald-100 text-emerald-700",
-  shipped: "bg-emerald-100 text-emerald-700",
-  awaiting: "bg-muted text-muted-foreground",
-  production: "bg-violet-100 text-violet-700",
-  removed: "bg-amber-100 text-amber-700",
-  cancelled: "bg-red-100 text-red-700",
+/**
+ * Outcome as a MARK AND A WORD, not a filled pill.
+ *
+ * Every row carried a tinted capsule, so a screen of history was six different coloured
+ * blocks stacked down the left — the loudest thing in each row was its background, and
+ * because each row differed, nothing stood out. Colour that is everywhere ranks nothing.
+ *
+ * The status colours themselves are unchanged and still mean what they mean on the floor
+ * (emerald done, violet in production, amber needs a look, red cancelled, grey waiting) —
+ * they just live in a 13px glyph now, with the word beside it in ordinary ink. Same
+ * information, read the same way, without the row shouting it.
+ */
+const DISP_MARK: Record<DispKey, { icon: Icon; cls: string; weight?: "fill" | "bold" }> = {
+  // Barcode and Truck are STROKED: at 13px a filled barcode is a solid green block — the
+  // gaps between the bars are the glyph. The round badges (XCircle, Warning) need the mass.
+  scanned: { icon: Barcode, cls: "text-emerald-600 dark:text-emerald-400", weight: "bold" },
+  shipped: { icon: Truck, cls: "text-emerald-600 dark:text-emerald-400", weight: "bold" },
+  awaiting: { icon: Clock, cls: "text-muted-foreground", weight: "bold" },
+  production: { icon: Printer, cls: "text-violet-600 dark:text-violet-400", weight: "bold" },
+  removed: { icon: ArrowUUpLeft, cls: "text-amber-600 dark:text-amber-400", weight: "bold" },
+  cancelled: { icon: XCircle, cls: "text-red-600 dark:text-red-400", weight: "fill" },
+  attention: { icon: Warning, cls: "text-amber-600 dark:text-amber-400", weight: "fill" },
 }
+/**
+ * WHAT A DROPPED LABEL BECAME, in the same vocabulary as an order's.
+ *
+ * `total_labels` null and 0 are different facts and stay different here: null is "their
+ * extractor hasn't read it yet", 0 is "it read it and there was no label on the page". The
+ * first is a wait, the second is a file to re-send.
+ */
+function extDisposition(u: DispatchUpload): { key: DispKey; label: string } {
+  if (u.total_labels == null) return { key: "awaiting", label: "Reading the file" }
+  if (u.total_labels === 0) return { key: "attention", label: "No label found" }
+  if (u.scanned_labels >= u.total_labels) return { key: "scanned", label: "Picked" }
+  return { key: "awaiting", label: `${u.scanned_labels} of ${u.total_labels} picked` }
+}
+
+/**
+ * History holds two kinds of thing that are NOT the same shape: our orders, and labels
+ * dropped in that belong to no order. They are interleaved rather than given separate
+ * tabs, because the question the floor asks is "what went to byeastside and what came
+ * back", and splitting the answer in two makes it unanswerable in one glance. Each row
+ * still says plainly which kind it is.
+ */
+type HistRow =
+  | { kind: "order"; id: string; at: string; disp: { key: DispKey; label: string }; o: OrderRow }
+  | { kind: "external"; id: string; at: string; disp: { key: DispKey; label: string }; u: DispatchUpload }
+
+/** Status as an icon plus a word. Module scope, not defined inside the board — a component
+ *  declared during render is remounted every frame and the lint rule that forbids it exists
+ *  because that has bitten this codebase before. */
+function DispStatus({ k, label }: { k: DispKey; label: string }) {
+  const m = DISP_MARK[k]
+  const I = m.icon
+  return (
+    <span className="inline-flex w-fit items-center gap-1.5 text-xs font-medium">
+      <I size={13} weight={m.weight ?? "fill"} className={"shrink-0 " + m.cls} />
+      <span className="truncate">{label}</span>
+    </span>
+  )
+}
+
 // Shared column template for the history table — the header and every row use it so the
 // columns line up. Scrolls horizontally inside the card rather than cramming on narrow.
-const HIST_GRID = "grid items-center gap-3 px-5 grid-cols-[1rem_7rem_7rem_minmax(8rem,1fr)_9rem_11rem_2rem]"
+const HIST_GRID = "grid items-center gap-3 px-5 grid-cols-[1rem_9.5rem_12rem_minmax(7rem,1fr)_9rem_10rem_2rem]"
 // The per-label timeline shows DISPATCH actions only — scans, hand-offs to byeastside,
 // pull-backs, label prints/voids, manifests. Order-level noise (order saved/updated, design
 // files, charges) belongs on the order page, not the scan floor.
@@ -86,6 +141,7 @@ const HIST_FILTERS: { key: "all" | DispKey; label: string }[] = [
   { key: "all", label: "All" }, { key: "scanned", label: "Scanned" }, { key: "awaiting", label: "Awaiting" },
   { key: "production", label: "In production" }, { key: "shipped", label: "Shipped" },
   { key: "removed", label: "Off board" }, { key: "cancelled", label: "Cancelled" },
+  { key: "attention", label: "Needs a look" },
 ]
 
 export function DispatchBoard() {
@@ -176,19 +232,47 @@ export function DispatchBoard() {
     finally { setBusy(false); load() }
   }
 
+  /**
+   * External labels live HERE, not only in their own card.
+   *
+   * The board owns the fetch because GET /api/dispatch/uploads syncs from byeastside on
+   * read — two components polling it would double the calls we make to a partner for one
+   * screen's worth of information. ExternalLabels renders what it is handed.
+   */
+  const [uploads, setUploads] = useState<DispatchUpload[]>([])
+  const loadUploads = useCallback(() => {
+    getDispatchUploads().then((r) => setUploads(r.uploads ?? [])).catch(() => {})
+  }, [])
+  useEffect(() => {
+    const t = setTimeout(loadUploads, 0)
+    const id = setInterval(loadUploads, 30000)
+    return () => { clearTimeout(t); clearInterval(id) }
+  }, [loadUploads])
+
   // History — EVERY order that ever had a label (bought → has tracking, or scanned),
-  // whatever became of it. A label pulled off the board still shows here with its outcome,
-  // so nothing vanishes. Searchable, and filterable by disposition.
-  const history = useMemo(() => {
-    const all = (orders ?? []).filter((o) => o.tracking || o.label_scanned_at)
+  // whatever became of it, PLUS every label dropped in that belongs to no order. A label
+  // pulled off the board still shows here with its outcome, so nothing vanishes.
+  // Searchable, and filterable by disposition.
+  const history = useMemo<HistRow[]>(() => {
     const term = q.trim().toLowerCase()
-    let list = term
-      ? all.filter((o) => [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
-      : all
-    if (histFilter !== "all") list = list.filter((o) => disposition(o).key === histFilter)
-    // Most recent activity first — the scan time if there is one, else when it was created.
-    return [...list].sort((a, b) => String(b.label_scanned_at || b.created_at || "").localeCompare(String(a.label_scanned_at || a.created_at || "")))
-  }, [orders, q, histFilter])
+
+    const orderRows: HistRow[] = (orders ?? [])
+      .filter((o) => o.tracking || o.label_scanned_at)
+      .filter((o) => !term || [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
+      .map((o) => ({ kind: "order", id: o.id, at: String(o.label_scanned_at || o.created_at || ""), disp: disposition(o), o }))
+
+    const extRows: HistRow[] = uploads
+      // Searchable by the same terms that make sense for them: the file, and any tracking
+      // number their extractor pulled off it.
+      .filter((u) => !term || [u.file_name, ...(u.labels ?? []).map((l) => l.trackingNumber)]
+        .some((f) => String(f ?? "").toLowerCase().includes(term)))
+      .map((u) => ({ kind: "external", id: `ext-${u.id}`, at: String(u.created_at || ""), disp: extDisposition(u), u }))
+
+    const all = [...orderRows, ...extRows]
+    const list = histFilter === "all" ? all : all.filter((r) => r.disp.key === histFilter)
+    // Most recent activity first — the scan time if there is one, else when it landed.
+    return list.sort((a, b) => b.at.localeCompare(a.at))
+  }, [orders, uploads, q, histFilter])
 
   // A label is what makes an order dispatchable. Without one there is nothing to scan, so
   // these are surfaced separately rather than silently included in a batch.
@@ -689,39 +773,104 @@ export function DispatchBoard() {
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
               <ListChecks size={26} weight="duotone" className="opacity-50" />
               <div className="text-sm font-medium text-foreground">{q || histFilter !== "all" ? "Nothing matches" : "No label activity yet"}</div>
-              <div className="text-xs">Every label and what became of it — scanned, shipped, pulled off the board — shows here.</div>
+              <div className="text-xs">Every label and what became of it — scanned, shipped, pulled off the board, or dropped in from outside — shows here.</div>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <div className={HIST_GRID + " border-b border-border py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground"}>
                 <span />
                 <span>Status</span>
-                <span>Order</span>
+                <span>Order / file</span>
                 <span>Customer</span>
                 <span>Channel</span>
                 <span>When</span>
                 <span />
               </div>
               <div className="divide-y divide-border">
-              {history.map((o) => {
-                const d = disposition(o)
+              {history.map((row) => {
+                const open = expanded.has(row.id)
+                const when = row.at
+                  ? new Date(row.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+                  : "—"
+
+                /* ── A LABEL THAT BELONGS TO NO ORDER ──────────────────────────────
+                   Same columns, filled with what it actually has. It does NOT borrow an
+                   order number or invent a customer: the file IS the identity, and the
+                   channel column says plainly where it came from. Expanding shows the
+                   tracking numbers their extractor pulled off it, which is this row's
+                   equivalent of an order's dispatch timeline. */
+                if (row.kind === "external") {
+                  const u = row.u
+                  const tracked = (u.labels ?? []).map((l) => l.trackingNumber).filter(Boolean) as string[]
+                  return (
+                    <div key={row.id}>
+                      <div onClick={() => toggleTimeline(row.id)} className={HIST_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
+                        <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
+                        <DispStatus k={row.disp.key} label={row.disp.label} />
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <FilePdf size={13} className="shrink-0 text-muted-foreground" />
+                          <span className="truncate text-sm" title={u.file_name || undefined}>{u.file_name || "label.pdf"}</span>
+                        </span>
+                        {/* No customer, and it says so rather than borrowing one. The page
+                            count goes here because it is the closest thing this row has to
+                            "what's in it". */}
+                        <span className="truncate text-sm text-muted-foreground">
+                          {u.total_pages ? `${u.total_pages} page${u.total_pages === 1 ? "" : "s"}` : "—"}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">External label</span>
+                        <span className="truncate text-xs text-muted-foreground" title={u.created_by ? `Sent by ${u.created_by}` : undefined}>{when}</span>
+                        {u.public_url ? (
+                          <a
+                            href={u.public_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                            className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            aria-label={`Open ${u.file_name || "label"}`}
+                          >
+                            <ArrowSquareOut size={13} weight="bold" />
+                          </a>
+                        ) : <span />}
+                      </div>
+                      {open && (
+                        <div className="space-y-1 border-t border-border bg-muted/20 py-2.5 pl-11 pr-5 text-sm">
+                          {tracked.length ? tracked.map((t) => {
+                            const picked = (u.labels ?? []).find((l) => l.trackingNumber === t)?.status === "PICKED"
+                            return (
+                              <div key={t} className="flex items-center gap-2 text-xs">
+                                <Barcode size={12} className={"shrink-0 " + (picked ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")} />
+                                <span className="font-mono">{t}</span>
+                                <span className="text-muted-foreground">{picked ? "picked" : "waiting"}</span>
+                              </div>
+                            )
+                          }) : (
+                            <div className="text-xs text-muted-foreground">
+                              {u.total_labels === 0
+                                ? "byeastside read the file and found no tracking label on it — re-send a clearer copy."
+                                : "No tracking numbers read off this file yet."}
+                            </div>
+                          )}
+                          <div className="pt-1 text-2xs text-muted-foreground">
+                            Not attached to an EGFULFILL order{u.created_by ? ` · sent by ${u.created_by}` : ""}.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+
+                const o = row.o
+                const d = row.disp
                 const via = (o as { scanned_via?: string | null }).scanned_via
-                const when = o.label_scanned_at
-                  ? new Date(o.label_scanned_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-                  : ""
-                const open = expanded.has(o.id)
                 const events = auditByOrder[o.id]
                 return (
-                  <div key={o.id}>
+                  <div key={row.id}>
                     {/* Row toggles the action timeline. Click the label-link separately. */}
                     <div onClick={() => toggleTimeline(o.id)} className={HIST_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
-                      <span className={"inline-flex w-fit items-center rounded-md px-2 py-0.5 text-2xs font-medium " + DISP_PILL[d.key]}>{d.label}</span>
+                      <DispStatus k={d.key} label={d.label} />
                       <span className="truncate font-mono text-sm font-semibold">{numOf(o)}</span>
                       <span className="truncate text-sm">{customerOf(o)}</span>
                       <span className="truncate text-xs text-muted-foreground">{platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}</span>
-                      <span className="truncate text-xs text-muted-foreground" title={when ? `Scanned${via ? ` · ${via === "byeastside" ? "byeastside" : "in-house"}` : ""}` : "Labelled"}>
-                        {when || (o.created_at ? new Date(o.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—")}
+                      <span className="truncate text-xs text-muted-foreground" title={o.label_scanned_at ? `Scanned${via ? ` · ${via === "byeastside" ? "byeastside" : "in-house"}` : ""}` : "Labelled"}>
+                        {when}
                       </span>
                       {o.tracking_label_url ? (
                         <a
@@ -801,12 +950,13 @@ export function DispatchBoard() {
                           out for external scan or still waiting here. */}
                       {(() => {
                         const d = disposition(o)
+                        // Handed over but not yet picked — an order state the disposition
+                        // vocabulary has no word for, because it is about custody rather
+                        // than outcome.
                         const sentOut = !o.label_scanned_at && !!o.dispatch_pdf_id
-                        const label = sentOut ? "Sent to partner" : d.label
-                        const pill = sentOut ? "bg-amber-100 text-amber-700" : DISP_PILL[d.key]
-                        return (
-                          <span className={"inline-flex w-fit items-center rounded-md px-2 py-0.5 text-2xs font-medium " + pill}>{label}</span>
-                        )
+                        return sentOut
+                          ? <DispStatus k="removed" label="Sent to partner" />
+                          : <DispStatus k={d.key} label={d.label} />
                       })()}
                     </div>
                   </div>
@@ -855,7 +1005,7 @@ export function DispatchBoard() {
       {/* A label that ISN'T one of our orders — someone else's system, or a buyer's own
           postage. Below the queue because it is the exception, not the day's work, and
           deliberately its own card: it touches no order and bills nothing. */}
-      <ExternalLabels />
+      <ExternalLabels uploads={uploads} onChanged={loadUploads} />
 
       {/* Keyed on the selection so reopening after a different pick can't show the
           previous batch's preview for a frame. */}

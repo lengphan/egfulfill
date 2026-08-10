@@ -1,11 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { FilePdf, CircleNotch, ArrowSquareOut, Trash, UploadSimple, Barcode, CheckCircle, Lock } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { getDispatchUploads, uploadDispatchLabel, deleteDispatchUpload, type DispatchUpload } from "@/lib/api"
+import { uploadDispatchLabel, deleteDispatchUpload, type DispatchUpload } from "@/lib/api"
 
 /**
  * EXTERNAL LABELS — pre-scan a label that isn't one of our orders.
@@ -62,28 +62,20 @@ const TONE: Record<"wait" | "warn" | "ok" | "part", string> = {
   part: "text-sky-700 dark:text-sky-400",
 }
 
-export function ExternalLabels() {
+/**
+ * The list is passed IN rather than fetched here. GET /api/dispatch/uploads syncs from
+ * byeastside on read, so two components polling it would double the calls we make to a
+ * partner for one screen — and the dispatch board needs the same rows for its history.
+ * One owner, one poll.
+ */
+export function ExternalLabels({ uploads, onChanged }: { uploads: DispatchUpload[] | null; onChanged: () => void }) {
   const confirm = useConfirm()
-  const [uploads, setUploads] = useState<DispatchUpload[] | null>(null)
-  const [configured, setConfigured] = useState(true)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [sent, setSent] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    getDispatchUploads()
-      .then((r) => { setUploads(r.uploads ?? []); setConfigured(r.configured !== false) })
-      .catch(() => setUploads([]))
-  }, [])
-
-  useEffect(() => {
-    const t = setTimeout(load, 0)
-    // Their extractor runs asynchronously and their floor scans on their own clock, so
-    // this polls — slowly. Nothing else in the product depends on these being current.
-    const id = setInterval(load, 30000)
-    return () => { clearTimeout(t); clearInterval(id) }
-  }, [load])
+  const load = onChanged
 
   const send = async (files: FileList | File[] | null) => {
     const list = Array.from(files ?? [])
@@ -136,12 +128,6 @@ export function ExternalLabels() {
       actions={uploads?.length ? <span className="text-xs text-muted-foreground">{uploads.length} sent</span> : undefined}
       bodyClassName="p-4 space-y-3"
     >
-      {!configured && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-          The dispatch partner isn&apos;t connected (<code>BYEASTSIDE_API_KEY</code>), so nothing can be sent from here yet.
-        </div>
-      )}
-
       <label
         onDragOver={(e) => { e.preventDefault(); setOver(true) }}
         onDragLeave={() => setOver(false)}
@@ -159,7 +145,7 @@ export function ExternalLabels() {
           PDF only — the file your carrier gave you
         </span>
         <input
-          type="file" multiple className="sr-only" disabled={busy || !configured}
+          type="file" multiple className="sr-only" disabled={busy}
           accept="application/pdf"
           onChange={(e) => { void send(e.target.files); e.target.value = "" }}
         />
