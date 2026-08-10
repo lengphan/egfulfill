@@ -66,7 +66,7 @@ export const CSV_COLUMNS: CsvColumn[] = [
   // product, and it is the one production and pricing key on.
   { header: "Listing SKU", key: "item_sku", required: false, section: "product", help: "The SELLER's own SKU on their marketplace listing. Records only — it does not decide what we make. Safe to leave blank." },
   { header: "Blank SKU", key: "blank", required: false, section: "product", help: "OUR catalog product — the garment we print on. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
-  { header: "Template ID", key: "template_id", required: false, section: "product", help: "A saved design template to apply (fills blank + artwork + placement + method)." },
+  { header: "Template ID", key: "template_id", required: false, section: "product", help: "A saved design template — type the number from its card (TPL-12), or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one." },
   { header: "Item Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
   { header: "Print Type", key: "print_type", required: false, section: "product", help: "DTG / DTF / EMB / … Defaults to DTG if blank." },
   { header: "Item Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
@@ -441,4 +441,101 @@ export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
       items,
     }
   })
+}
+
+// ── Template ID ───────────────────────────────────────────────────────────────
+//
+// The column existed, was parsed, and was then dropped on the floor: `templateId` reached
+// ImportItem and nothing ever read it. So the sheet advertised a field that did nothing,
+// which is worse than not offering it — the filler believes the blank and the artwork are
+// handled and finds out on the board that they aren't.
+//
+// What a template can actually supply is TWO things: the blank it was drawn on, and the
+// composed artwork. It does NOT carry a print method — nothing in the template editor
+// records one — so the help text no longer claims it does.
+
+/** The parts of a saved template an import can apply. Deliberately narrow: this module
+ *  must not depend on the full ProductTemplate shape from lib/api. */
+export type ImportTemplate = {
+  id: string
+  /** The short readable number on the card — what a person actually types. */
+  seq: number | null
+  name: string | null
+  /** The catalog SKU the template was drawn on, from `data.blankSku`. */
+  blankSku: string
+  /** The composed preview, used as the line's artwork when the row names none. */
+  composite: string
+}
+
+/** Lowercase, alphanumerics only — so `TPL-12`, `tpl 12`, `Tpl12` and `12` all meet. */
+const tkey = (s: string) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "")
+
+/**
+ * Every string that should find this template. The seq is offered both bare and prefixed
+ * because the card shows `TPL-12` and people type both halves of that.
+ */
+export function templateKeys(t: ImportTemplate): string[] {
+  const keys = [tkey(t.id)]
+  if (t.seq != null) { keys.push(tkey(`TPL-${t.seq}`)); keys.push(tkey(String(t.seq))) }
+  if (t.name) keys.push(tkey(t.name))
+  return keys.filter(Boolean)
+}
+
+/**
+ * Resolve what each row typed into a template, and report what didn't match.
+ *
+ * A NAME THAT IS NOT UNIQUE MATCHES NOTHING. Two templates called "Christmas" cannot be
+ * told apart by a person reading the sheet either, so guessing one would silently apply
+ * the wrong artwork to a real order — the one outcome worth failing loudly for. Ids and
+ * numbers are unique by construction and always win.
+ */
+export function templateIndex(templates: ImportTemplate[]): Map<string, ImportTemplate | null> {
+  const idx = new Map<string, ImportTemplate | null>()
+  const ambiguous = new Set<string>()
+  for (const t of templates) {
+    for (const k of templateKeys(t)) {
+      if (idx.has(k) && idx.get(k) !== t) ambiguous.add(k)
+      else idx.set(k, t)
+    }
+  }
+  // null, not deleted: a key that is ambiguous must not fall through to "no such template",
+  // because the fix is different — pick a different name, rather than fix a typo.
+  for (const k of ambiguous) idx.set(k, null)
+  return idx
+}
+
+/**
+ * Fill each line's blank and artwork from its template, and name every id that matched
+ * nothing so the dialog can say so BEFORE anything is created.
+ *
+ * THE ROW ALWAYS WINS. A template is a default for the fields the row left empty; if
+ * someone typed a Blank SKU next to a Template ID they meant the one they typed, and
+ * quietly overwriting it would make the sheet's most explicit column its least reliable.
+ */
+export function applyTemplates(
+  orders: ImportOrder[],
+  templates: ImportTemplate[],
+): { orders: ImportOrder[]; unmatched: string[]; ambiguous: string[]; applied: number } {
+  const idx = templateIndex(templates)
+  const unmatched = new Set<string>()
+  const ambiguous = new Set<string>()
+  let applied = 0
+  const out = orders.map((o) => ({
+    ...o,
+    items: o.items.map((it) => {
+      const typed = String(it.templateId || "").trim()
+      if (!typed) return it
+      const key = tkey(typed)
+      if (!idx.has(key)) { unmatched.add(typed); return it }
+      const t = idx.get(key)
+      if (!t) { ambiguous.add(typed); return it }
+      applied++
+      return {
+        ...it,
+        blank: it.blank || t.blankSku || "",
+        designUrl: it.designUrl || t.composite || "",
+      }
+    }),
+  }))
+  return { orders: out, unmatched: [...unmatched], ambiguous: [...ambiguous], applied }
 }

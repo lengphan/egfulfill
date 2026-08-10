@@ -11,6 +11,8 @@ import {
   parsePasted,
   rowsToRecords,
   groupToOrders,
+  applyTemplates,
+  type ImportTemplate,
   CSV_COLUMNS,
   TEMPLATE_TSV,
   COLUMN_OPTIONS,
@@ -23,7 +25,7 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getSheetsConfig, getSheetRows, createSheet } from "@/lib/api"
+import { createOrder, getOrders, getSheetsConfig, getSheetRows, createSheet, getTemplates } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
 
@@ -129,13 +131,17 @@ export function ImportOrdersDialog({
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState<{ imported: number } | null>(null)
+  // The seller's saved templates, fetched ONLY when a parsed sheet actually names one.
+  // Composites are base64 images, so this is not a payload to pull on the off-chance.
+  const [templates, setTemplates] = useState<ImportTemplate[] | null>(null)
+  const [templatesFailed, setTemplatesFailed] = useState(false)
 
   useEffect(() => {
     if (!open) return
     // Reset per open, and see whether Google Sheets is configured server-side.
     const id = setTimeout(() => {
       setRecords(null); setError(null); setPaste(""); setSheetUrl(""); setDone(null)
-      setNotice(null); setCopyFallback(null)
+      setNotice(null); setCopyFallback(null); setTemplates(null); setTemplatesFailed(false)
       getSheetsConfig()
         .then((c) => { setSheetsEnabled(!!c.enabled); setSheetsCanCreate(!!c.canCreate) })
         .catch(() => { setSheetsEnabled(false); setSheetsCanCreate(false) })
@@ -156,7 +162,40 @@ export function ImportOrdersDialog({
     if (error) { setError(error); setRecords(null); return }
     setError(null)
     setRecords(records)
+    // Only now do we know whether templates matter. Fetching them up front would pull
+    // every composite (base64 images) for the majority of imports that name none.
+    if (records.some((r) => String(r.template_id || "").trim())) {
+      setTemplatesFailed(false)
+      getTemplates()
+        .then((rows) => setTemplates((rows ?? []).map((t) => ({
+          id: String(t.id),
+          seq: t.seq ?? null,
+          name: t.name ?? null,
+          blankSku: String((t.data as { blankSku?: string } | null)?.blankSku ?? ""),
+          composite: t.composite ?? "",
+        }))))
+        // Not silent. A template that can't be looked up means the blank and the artwork
+        // it promised won't be applied, and the import would otherwise look complete.
+        .catch(() => { setTemplates([]); setTemplatesFailed(true) })
+    } else {
+      setTemplates(null)
+    }
   }
+
+  /**
+   * What the Template ID column will actually do, resolved for the preview.
+   *
+   * Computed BEFORE the import rather than reported after it: an unrecognised id means a
+   * line arrives with no blank and no artwork, and the moment to fix a typo is while the
+   * sheet is still open.
+   */
+  const templateOutcome = useMemo(() => {
+    if (!records || !templates) return null
+    const typed = records.filter((r) => r._valid && String(r.template_id || "").trim()).length
+    if (!typed) return null
+    const r = applyTemplates(groupToOrders(records), templates)
+    return { typed, applied: r.applied, unmatched: r.unmatched, ambiguous: r.ambiguous }
+  }, [records, templates])
 
   const takeFile = (file?: File | null) => {
     if (!file) return
@@ -290,7 +329,9 @@ export function ImportOrdersDialog({
     if (!records) return
     setSaving(true); setError(null)
     try {
-      const orders = groupToOrders(records)
+      // Templates fill the blank and the artwork the row left empty. Applied here, once,
+      // on the same resolver the preview used — so what was shown is what is created.
+      const orders = templates ? applyTemplates(groupToOrders(records), templates).orders : groupToOrders(records)
       const existing = await getOrders().catch(() => [])
       const baseSeq = nextSellerSeq(existing ?? [])
       let imported = 0
@@ -528,6 +569,30 @@ export function ImportOrdersDialog({
                       {summary.ungrouped} {summary.ungrouped === 1 ? "row has" : "rows have"} no Order Number — each imports as
                       its OWN order under a platform number (FF-…). If any of them are lines of the
                       same order, give them a shared Order Number first.
+                    </span>
+                  </div>
+                )}
+                {/* WHAT THE TEMPLATE COLUMN WILL DO. The column used to be parsed and
+                    discarded, so the honest thing now is to say what it applied — and to
+                    name anything it couldn't find while the sheet is still open and a typo
+                    is one edit away. */}
+                {templateOutcome && (
+                  <div className={"flex items-start gap-2 border-b border-border px-4 py-2 text-xs "
+                    + (templateOutcome.unmatched.length || templateOutcome.ambiguous.length || templatesFailed
+                      ? "bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+                      : "text-muted-foreground")}>
+                    {templateOutcome.unmatched.length || templateOutcome.ambiguous.length || templatesFailed
+                      ? <WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
+                      : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
+                    <span>
+                      {templatesFailed
+                        ? "Your saved templates couldn't be loaded, so the Template ID column won't apply anything — the blank and artwork will be empty on those lines."
+                        : <>
+                            {templateOutcome.applied} of {templateOutcome.typed} {templateOutcome.typed === 1 ? "line" : "lines"} will take
+                            their blank and artwork from a saved template.
+                            {templateOutcome.unmatched.length > 0 && <> No template matches <span className="font-mono">{templateOutcome.unmatched.join(", ")}</span> — check the number on the template card.</>}
+                            {templateOutcome.ambiguous.length > 0 && <> More than one template is called <span className="font-mono">{templateOutcome.ambiguous.join(", ")}</span>, so those lines were left alone — use the TPL- number instead.</>}
+                          </>}
                     </span>
                   </div>
                 )}
