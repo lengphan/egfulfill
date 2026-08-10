@@ -3764,10 +3764,20 @@ export function deleteSupplierMessage(supplierId: string, msgId: string) {
 export const SOURCING_STAGES: { id: SourcingStage; label: string; hint: string }[] = [
   // Every hint names the FACT that puts a row here, because the stage is derived and not
   // chosen — see stageSql in server/src/routes/manual_suppliers.js.
-  { id: "prospect", label: "Prospect", hint: "a quote and nothing more" },
-  { id: "talking", label: "Talking", hint: "an exchange recorded, no sample yet" },
+  //
+  // THE ids AND THE labels DELIBERATELY DIVERGE. The id is what the database and the
+  // derivation speak ('prospect', 'rotation'), and one of them — 'archived' — is a value
+  // actually stored on rows today; renaming ids would be a migration bought for nothing.
+  // The label is what a person reads, and each one now describes the ACT rather than a
+  // sales-funnel position: you saved it, you got in touch, you sampled it, you approved it.
+  // "Prospect" was the worst of them — jargon for "nothing has happened yet".
+  //
+  // "Quoted" was considered for the first stage and rejected: a row can be saved with no
+  // unit price at all, and most are, so it would be false on exactly the rows it labels.
+  { id: "prospect", label: "Saved", hint: "saved to compare — nothing has happened yet" },
+  { id: "talking", label: "In touch", hint: "an exchange recorded, no sample yet" },
   { id: "sampling", label: "Sampling", hint: "a sample is placed and not yet received" },
-  { id: "rotation", label: "In rotation", hint: "a sample was received" },
+  { id: "rotation", label: "Approved", hint: "a sample was received" },
 ]
 /** Ask the AI what this product is and how to search for it on a B2B marketplace. Admin-only,
  *  charged per call, and cached server-side against the listing id — so re-opening a product

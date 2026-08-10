@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import { CARD_ACTION_PRIMARY, CARD_ACTION_SECONDARY } from "@/lib/card-actions"
 
 /**
- * Browse Alibaba as a grid, and turn anything into a Prospect.
+ * Browse Alibaba as a grid, and turn anything into a Saved source.
  *
  * MODELLED ON THE SPYDECK CARD deliberately: same square photo, same price chip in the
  * corner, same hover. Product research and supplier research are the same motion — look at
@@ -228,7 +228,11 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
                       >
                         {savingId === id ? <CircleNotch size={12} className="animate-spin" />
                           : isSaved ? <Check size={12} weight="bold" /> : <Plus size={12} weight="bold" />}
-                        {isSaved ? "Prospect" : "Add"}
+                        {/* "Saved", matching the stage this lands the row at. It said
+                            "Prospect" — the old first-stage label — so renaming the stage
+                            without renaming this would leave the button naming something
+                            that no longer appears anywhere in Sourcing. */}
+                        {isSaved ? "Saved" : "Add"}
                       </button>
                       {p.url && (
                         /* ONE button, and it says what it does. There were two — a speech

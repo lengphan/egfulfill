@@ -21,7 +21,7 @@ import { suggestSuppliers, saveSourcing, searchAlibaba, type EtsyListing, type A
  * already searching, against the buyer API. The API is a different door from /trade/ and the
  * robots rule does not apply to it, which is what finally made a real in-app result list
  * possible — but it lives on Sourcing, which has the width and the pagination for it, not in
- * this modal. Pasting a link by hand still works and still lands as a Prospect.
+ * this modal. Pasting a link by hand still works and still lands at the Saved stage.
  */
 
 
@@ -84,7 +84,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
     return () => { alive = false; clearTimeout(t) }
   }, [data])
 
-  /** Save one result straight to Sourcing as a Prospect — the paste-a-link step this replaces. */
+  /** Save one result straight to Sourcing — the paste-a-link step this replaces. */
   const saveHit = async (h: AlibabaProduct) => {
     const id = String(h.id ?? h.url ?? "")
     if (!id || savedIds.has(id)) return
@@ -126,7 +126,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
 
   if (!listing) return null
 
-  // Save a supplier link as a Prospect. The competitor's price becomes the sell price — it's
+  // Save a supplier link. The competitor's price becomes the sell price — it's
   // the market rate — and the supplier's own cost is left blank because only the supplier
   // page knows it, and guessing would produce a margin built on nothing.
 

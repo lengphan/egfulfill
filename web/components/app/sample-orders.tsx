@@ -233,7 +233,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-muted-foreground">
           <Package size={22} />
-          No samples recorded yet. Record one from a prospect&apos;s row and its cost books straight to the factory wallet.
+          No samples recorded yet. Record one from a supplier&apos;s row and its cost books straight to the factory wallet.
         </div>
       ) : (
         <div className="overflow-x-auto">

@@ -27,7 +27,8 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   // station, still open to warehouse — so the floor can still book deliveries in.
   { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, roles: ["admin"] },
   // Sourcing — the supplier pipeline: where a product could come from, what it lands at, and
-  // how far along each supplier is (Prospect -> Talking -> Sampling -> In rotation). Its own
+  // how far along each supplier is (Saved -> In touch -> Sampling -> Approved, derived from
+  // sample orders and recorded messages rather than typed — see SOURCING_STAGES). Its own
   // page rather than a Purchasing tab: Purchasing is about buying from suppliers we already
   // use, Sourcing is about deciding who those should be. ADMIN-only, same as Purchasing.
   { label: "Sourcing", href: "/sourcing", icon: Compass, roles: ["admin"] },

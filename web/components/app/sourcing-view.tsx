@@ -54,7 +54,7 @@ const fullImg = (u?: string | null): string =>
  * The stage, and WHY it says that.
  *
  * Derived server-side from sample orders, so it can't be argued with — which is exactly why
- * it has to explain itself. "In rotation" with no reason given is as opaque as the dropdown
+ * it has to explain itself. "Approved" with no reason given is as opaque as the dropdown
  * that never moved; "a sample was received" is a fact someone can go and check.
  *
  * Colours stay off the reserved factory-status set (emerald shipped, amber hold, red alert):
@@ -68,10 +68,10 @@ const STAGE_PILL: Record<string, string> = {
   archived: "bg-muted text-muted-foreground",
 }
 const STAGE_WHY: Record<string, string> = {
-  prospect: "A quote and nothing more — no sample has been placed against this supplier.",
+  prospect: "Saved to compare. Nothing has happened against this supplier yet — no exchange recorded, no sample placed.",
   talking:  "An exchange with this supplier has been recorded, and no sample placed yet.",
   sampling: "A sample order is on this supplier and has not been received yet.",
-  rotation: "A sample from this supplier was received — this is where the stage comes from.",
+  rotation: "A sample from this supplier was received — that is what approved it.",
   archived: "Archived.",
 }
 
@@ -110,7 +110,7 @@ export function SourcingView() {
   }, [])
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
 
-  // Counts drive the stage chips; several rows for the same product can sit at Prospect at
+  // Counts drive the stage chips; several rows for the same product can sit at Saved at
   // once, which is the point — you shortlist a few and one graduates.
   const stageCounts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -514,16 +514,16 @@ export function SourcingView() {
                       <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{freightUnit ? money(freightUnit) : "—"}</td>
                       <td className="px-4 py-2 text-right font-semibold tabular-nums">{money(landed)}</td>
                       <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.leadDays != null ? `${r.leadDays}d` : "—"}</td>
-                      {/* DERIVED, so it is read. It was a dropdown, and every row sat at
-                          Prospect — because changing it changed nothing, and a label with no
-                          consequence is one nobody maintains. It now comes from what
+                      {/* DERIVED, so it is read. It was a dropdown, and every row sat at the
+                          first stage — because changing it changed nothing, and a label with
+                          no consequence is one nobody maintains. It now comes from what
                           actually happened: a sample placed reads Sampling, a sample
-                          received reads In rotation. The title says which fact put it here,
+                          received reads Approved. The title says which fact put it here,
                           because a stage you cannot argue with should still explain itself. */}
                       <td className="px-4 py-2">
                         <span className={"rounded-full px-2 py-0.5 text-xs font-medium " + STAGE_PILL[r.stage || "prospect"]}
                               title={STAGE_WHY[r.stage || "prospect"]}>
-                          {SOURCING_STAGES.find((s) => s.id === (r.stage || "prospect"))?.label ?? "Prospect"}
+                          {SOURCING_STAGES.find((s) => s.id === (r.stage || "prospect"))?.label ?? "Saved"}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-right">
