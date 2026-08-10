@@ -691,6 +691,7 @@ export function getSheetsConfig() {
     copyUrl?: string
     canCreate?: boolean
     shareWith?: string
+    isTemplateAdmin?: boolean
     needsTemplate?: boolean
   }>(`/api/sheets/config`)
 }
@@ -701,6 +702,12 @@ export function setSheetTemplate(url: string) {
     method: "PUT",
     body: JSON.stringify({ url }),
   })
+}
+/** Admin: write our bands, widths, header rows and DROPDOWNS into the master sheet.
+ *  Google's .xlsx conversion drops data validation, so a master made that way has none
+ *  until this runs. Needs the sheet shared with the service account as Editor. */
+export function formatSheetTemplate() {
+  return api<{ ok?: boolean; tab?: string; dropdowns?: string[] }>(`/api/sheets/template/format`, { method: "POST" })
 }
 export function getSheetRows(url: string) {
   return api<{ rows?: string[][]; title?: string; tab?: string; error?: string }>(`/api/sheets?url=${encodeURIComponent(url)}`)

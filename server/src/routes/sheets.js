@@ -118,7 +118,10 @@ const DUTY_FILL = {
   '':  { red: 0.90, green: 0.92, blue: 0.94 },   // optional
 };
 
-const DUTY_MARK = { req: ' *', asg: ' ~', '': '' };
+// Mirrors DUTY_MARK in web/lib/order-import.ts. `asg` carries NOTHING — a tilde beside
+// "Order Number" read as part of the column name, and the header fill already separates it
+// from the required columns. Required keeps its asterisk; that one is a warning.
+const DUTY_MARK = { req: ' *', asg: '', '': '' };
 
 // Contiguous runs of one band, in column order — what the banner row merges across.
 // Walks the list rather than filtering per band, so the banner can only ever span columns
@@ -363,10 +366,70 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
       copyUrl: toCopyUrl(templateUrl),
       canCreate: !!sa,
       shareWith: req.user && sa && sa.client_email ? sa.client_email : undefined,
-      // Only an admin is shown the "set this up" affordance, so only an admin is told
-      // whether it needs setting up.
+      // Only an admin is shown the template affordances, so only an admin is told anything
+      // about them. `isTemplateAdmin` survives configuration — the sheet still needs
+      // re-formatting whenever a column or a dropdown list changes — where `needsTemplate`
+      // is just "there is no master yet".
+      isTemplateAdmin: req.user && req.user.role === 'admin' ? true : undefined,
       needsTemplate: req.user && req.user.role === 'admin' ? !toCopyUrl(templateUrl) : undefined,
     };
+  });
+
+  /**
+   * Write our formatting INTO the master sheet — bands, widths, header rows and, the point
+   * of it, the dropdowns.
+   *
+   * Google's .xlsx importer does not carry ExcelJS's inline-list data validation across the
+   * conversion, so a master built by uploading the .xlsx and saving as a Sheet arrives with
+   * correct columns and no dropdowns at all. Rebuilding them by hand is 4 columns × 21
+   * options, and it silently drifts from T_OPTS the first time a print method is added.
+   *
+   * This is a batchUpdate on an EXISTING file, which is why it works where create doesn't:
+   * the 403 that blocks POST /v4/spreadsheets is Drive refusing to store a new file for a
+   * service account with no Drive. Editing a file someone else owns needs only that the
+   * sheet is shared with us as Editor — hence the 403 message names the address.
+   */
+  app.post('/api/sheets/template/format', { preHandler: requireAdmin }, async (req, reply) => {
+    const url = await readTemplateUrl();
+    const id = extractId(url);
+    if (!id) { reply.code(400); return { error: 'No master template is set yet — save its link first.' }; }
+    let token;
+    try { token = await getServiceToken(); }
+    catch (e) { reply.code(502); return { error: 'Service account auth failed: ' + String(e.message || e) }; }
+    const A = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+    const sa = loadSA();
+    const shareHint = sa && sa.client_email
+      ? ` Share the sheet with ${sa.client_email} as Editor — we can only format a sheet we can write to.`
+      : '';
+
+    // The first tab is the one we format; its real sheetId is needed for every range.
+    const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties(title,sheetId)`, { headers: A });
+    const meta = await metaR.json().catch(() => ({}));
+    if (!metaR.ok) {
+      reply.code(metaR.status === 403 ? 403 : 502);
+      const msg = (meta.error && meta.error.message) || metaR.status;
+      return { error: `Google says: ${msg}.${metaR.status === 403 ? shareHint : ''}` };
+    }
+    const first = ((meta.sheets || [])[0] || {}).properties || {};
+    const gid = first.sheetId || 0;
+
+    const tpl = buildTemplate('');
+    const rowData = tpl.createBody.sheets[0].data[0].rowData;
+    const body = { requests: [
+      // Header rows rewritten as well as formatted, so an existing master picks up a column
+      // rename — or the tilde coming off "Order Number" — without being rebuilt by hand.
+      { updateCells: { rows: rowData.slice(0, 2), fields: 'userEnteredValue,userEnteredFormat', start: { sheetId: gid, rowIndex: 0, columnIndex: 0 } } },
+      { updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 2 } }, fields: 'gridProperties.frozenRowCount' } },
+      ...tpl.requests(gid),
+    ] };
+    const upR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`, { method: 'POST', headers: A, body: JSON.stringify(body) });
+    if (!upR.ok) {
+      const d = await upR.json().catch(() => ({}));
+      reply.code(upR.status === 403 ? 403 : 502);
+      const msg = (d.error && d.error.message) || upR.status;
+      return { error: `Google says: ${msg}.${upR.status === 403 ? shareHint : ''}` };
+    }
+    return { ok: true, tab: first.title || 'Sheet1', dropdowns: T_COLUMNS.filter((c) => c.opts).map((c) => c.h) };
   });
 
   // Admin sets the master template link, from the same dialog a seller uses. Accepts any

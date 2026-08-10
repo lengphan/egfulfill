@@ -108,8 +108,12 @@ export const DUTY_FILL: Record<CsvDuty, string> = {
 }
 
 /** The marker that rides on the column header: `*` required, `~` we'll assign one. */
+// The mark that rides on a header in the sheet. `assigned` carries NOTHING: a tilde beside
+// "Order Number" read as part of the column name to everyone who saw it, and the dashed
+// outline in the guide already says the same thing without putting a symbol in the header
+// a seller then has to wonder about. Required keeps its asterisk — that one is a warning.
 export const DUTY_MARK: Record<CsvDuty, string> = {
-  required: "*", assigned: "~", oneOf: "†", optional: "",
+  required: "*", assigned: "", oneOf: "†", optional: "",
 }
 export const DUTY_LABEL: Record<CsvDuty, string> = {
   required: "Required on every row",
