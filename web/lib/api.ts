@@ -2370,7 +2370,10 @@ export type EtsyConfig = {
  *  their shop — always send it explicitly rather than letting the server fall back. */
 export type EtsyWhoMade = "i_did" | "someone_else" | "collective"
 export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string; who_made?: EtsyWhoMade }) {
-  return api<{ listing_id?: number; url?: string; error?: string; variants_applied?: number; variant_skus?: string[]; variants_error?: string | null }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
+  // `primary_image` is Etsy's OWN url for the cover photo after upload. Prefer it over the
+  // source we sent: a local upload is a multi-megabyte data: URL, and storing that as a
+  // card thumbnail put a base64 blob in the database on every publish.
+  return api<{ listing_id?: number; url?: string; error?: string; state?: string; images_uploaded?: number; primary_image?: string | null; tags_applied?: number; variants_applied?: number; variant_skus?: string[]; variants_error?: string | null }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
 }
 export function getEtsyConnections() {
   return api<EtsyConnection[]>(`/api/etsy/connections`)
@@ -2546,17 +2549,82 @@ export const WEBHOOK_EVENTS = ["order.received", "order.status_changed", "order.
 // the server, not in React state: a refresh used to empty the tab and offer "Make
 // product" again for something already published, which is how a shop collects
 // duplicate drafts.
-export type UploadedListing = EtsyListing & { uploaded_at?: string; our_listing_id?: string; our_url?: string }
+/**
+ * What WE published — the thing an Uploaded card is actually about.
+ *
+ * Kept deliberately separate from the `EtsyListing` it was sourced from. Those two sets
+ * of numbers look alike and mean opposite things: the source listing's `views` and
+ * `num_favorers` belong to a competitor's shop, and rendering them on a card headed by
+ * our title would present someone else's sales as ours.
+ */
+export type PublishedRecord = {
+  platform?: "etsy" | "tiktok"
+  /** OUR listing on the marketplace. This is also the key `published_listings` is stored
+   *  under, so it's what lets the server join back to the blank and artwork we sent. */
+  listing_id?: string
+  title?: string
+  price?: number | null
+  /** The photo that became the listing's cover — what we sent, not what we copied. */
+  image?: string
+  /** Etsy's own word for it. Every publish lands as `draft`; the seller activates. */
+  state?: string
+  blank_sku?: string
+  blank_name?: string
+  print_type?: string
+  colors?: string[]
+  sizes?: string[]
+  variant_skus?: string[]
+  variants_applied?: number
+  /** Set when the draft published but its inventory PUT was rejected — a flat listing. */
+  variants_error?: string | null
+  images_uploaded?: number
+}
+export type UploadedListing = EtsyListing & {
+  uploaded_at?: string
+  our_listing_id?: string
+  our_url?: string
+  /** Sent by the publish dialog at upload time. */
+  published?: PublishedRecord
+  /** Joined server-side from `published_listings`, so what we built is still known for
+   *  rows written before the dialog carried it — and for any publish path that isn't
+   *  this dialog. Authoritative where the two disagree. */
+  product?: { blank_sku?: string; print_type?: string; color?: string; size?: string; platform?: string }
+}
 export function getSpydeckUploads() {
   return api<UploadedListing[]>(`/api/spydeck/uploads`)
 }
-export function recordSpydeckUpload(listing: EtsyListing, our?: { listing_id?: number | string; url?: string }) {
+/**
+ * A locally-uploaded photo reaches us as a `data:` URL that is routinely 2–5MB. Persisting
+ * one as a card thumbnail writes a base64 blob into the row — 500 of those is a table that
+ * can't be read in one request, and it's the likeliest reason an upload record came back
+ * without its image at all. Small ones (an icon, a swatch) are harmless and kept.
+ */
+const KEEP_INLINE_MAX = 64 * 1024
+const persistableImage = (u?: string | null) =>
+  (u && u.startsWith("data:") && u.length > KEEP_INLINE_MAX) ? undefined : (u ?? undefined)
+
+export function recordSpydeckUpload(
+  listing: EtsyListing,
+  our?: { listing_id?: number | string; url?: string; published?: PublishedRecord },
+) {
+  const data = {
+    ...listing,
+    image: persistableImage(listing.image) ?? null,
+    thumb: persistableImage(listing.thumb) ?? null,
+    // The source's other photos are only ever competitor CDN links, but a merged record
+    // can carry the publish payload's array too — and that one is data: URLs.
+    images: (listing.images ?? []).filter((u) => persistableImage(u) !== undefined),
+  }
+  const published = our?.published
+    ? { ...our.published, image: persistableImage(our.published.image) }
+    : undefined
   return api<{ ok?: boolean; error?: string }>(`/api/spydeck/uploads`, {
     method: "POST",
     body: JSON.stringify({
-      listing_id: String(listing.listing_id), data: listing,
+      listing_id: String(listing.listing_id), data,
       our_listing_id: our?.listing_id != null ? String(our.listing_id) : undefined,
       url: our?.url,
+      published,
     }),
   })
 }

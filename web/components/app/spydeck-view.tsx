@@ -4,13 +4,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Compass } from "@phosphor-icons/react"
+import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Compass, Package, Trash } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, getSpydeckListingDetail } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, deleteSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, type PublishedRecord, getSpydeckListingDetail } from "@/lib/api"
 import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
@@ -102,6 +102,150 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
     </div>
   )
 }
+
+// ── The Uploaded card ────────────────────────────────────────────────────────────────
+//
+// Deliberately NOT a ResultCard. Saved and Uploaded were rendering the identical tile,
+// which made the tab read as a second copy of the research grid — and worse, it was the
+// research grid: title, price, photo and stats all came from the COMPETITOR listing,
+// because that's the only thing the upload row stored. A seller who had just picked a
+// blank, three colours and four sizes saw none of it.
+//
+// Past the choosing stage the question changes from "is this worth copying?" to "what did
+// I ship, and what state is it in?". So this card answers that instead: our cover photo,
+// our title and price, the draft/active state, the blank it's made from, and how many
+// variants and photos actually landed.
+//
+// The competitor's `views`/`num_favorers`/revenue estimates are still on the row and are
+// deliberately NOT rendered here. They're someone else's sales; under our title they'd
+// read as ours. The source is reachable as a labelled link and nothing more.
+const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedListing; onRemove?: (l: UploadedListing) => void }) {
+  const p = l.published
+  // published_listings (joined server-side) is authoritative for the build spec — it was
+  // written by the publish route itself, so it survives rows the dialog never described.
+  const blankSku = l.product?.blank_sku || p?.blank_sku
+  const printType = l.product?.print_type || p?.print_type
+  const platform = (p?.platform || l.product?.platform || "etsy") as string
+  const cover = p?.image || l.thumb || l.image
+  const title = p?.title || l.title
+  const state = (p?.state || "draft").toLowerCase()
+  const live = state === "active"
+  const colors = p?.colors ?? (l.product?.color ? [l.product.color] : [])
+  const sizes = p?.sizes ?? (l.product?.size ? [l.product.size] : [])
+  const nVariants = p?.variants_applied ?? (p?.variant_skus?.length || 0)
+  // A row written before the publish dialog carried its result. Say that, rather than
+  // filling the gaps with the source listing's numbers and letting them pass for ours.
+  const thin = !p && !l.product
+
+  return (
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+      <div className="relative aspect-square overflow-hidden bg-muted/40">
+        {cover ? (
+          <Image src={cover} alt={title} fill unoptimized sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover" />
+        ) : (
+          <div className="flex size-full items-center justify-center text-muted-foreground"><Package size={22} weight="duotone" /></div>
+        )}
+        {/* State, not a "trending" flag — the one thing you open this tab to check. Every
+            publish lands as a DRAFT; the seller activates it on the marketplace. */}
+        <span className={
+          "absolute left-2 top-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-3xs font-bold uppercase tracking-wide text-white shadow-sm " +
+          (live ? "bg-emerald-600" : "bg-amber-500")
+        }>
+          {live ? <><CheckCircle size={11} weight="fill" /> Live</> : <>Draft</>}
+        </span>
+        <span className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-3xs font-bold uppercase tracking-wide text-white backdrop-blur">
+          {platform}
+        </span>
+        {p?.price != null && p.price > 0 && (
+          <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-sm font-bold tabular-nums text-white backdrop-blur">
+            ${p.price.toFixed(2)}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col p-3">
+        <div className="line-clamp-2 text-sm font-medium leading-snug">{title}</div>
+        <div className="mt-1 truncate text-xs text-muted-foreground">
+          {l.uploaded_at ? `Published ${new Date(l.uploaded_at).toLocaleDateString()}` : "Published"}
+          {blankSku ? <> · <span className="font-medium text-foreground/70">{blankSku}</span></> : null}
+          {printType ? ` · ${printType}` : null}
+        </div>
+
+        {thin ? (
+          // Not "no variants" — unknown. A card that renders a confident 0 for something it
+          // never recorded is the empty state that looks like a working one.
+          <div className="mt-2.5 rounded-lg border border-dashed border-border px-2 py-2 text-3xs leading-relaxed text-muted-foreground">
+            Published before this tab recorded build details — the blank and variants aren&apos;t stored for this one. Open it on {platform} to see what listed.
+          </div>
+        ) : (
+          <>
+            <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+              <StatBox label="Variants" value={String(nVariants)} />
+              <StatBox label="Colours" value={String(colors.length)} />
+              <StatBox label="Sizes" value={String(sizes.length)} />
+            </div>
+            {p?.images_uploaded != null && (
+              <div className="mt-1.5 text-3xs text-muted-foreground">
+                {p.images_uploaded} photo{p.images_uploaded === 1 ? "" : "s"} uploaded
+              </div>
+            )}
+            {(colors.length > 0 || sizes.length > 0) && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {[...colors, ...sizes].slice(0, 8).map((v) => (
+                  <span key={v} className="rounded bg-muted px-1.5 py-0.5 text-3xs leading-tight text-muted-foreground">{v}</span>
+                ))}
+                {colors.length + sizes.length > 8 && (
+                  <span className="rounded px-1 py-0.5 text-3xs leading-tight text-muted-foreground/70">+{colors.length + sizes.length - 8}</span>
+                )}
+              </div>
+            )}
+            {/* The publish succeeded but the inventory PUT didn't — a flat listing wearing a
+                success badge is exactly the thing worth saying out loud. */}
+            {p?.variants_error && (
+              <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1.5 text-3xs leading-relaxed text-amber-700 dark:text-amber-400">
+                <Warning size={12} weight="fill" className="mt-px shrink-0" />
+                <span>Listed flat — variants were rejected: {p.variants_error}</span>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="mt-auto flex gap-1.5 pt-3">
+          {l.our_url ? (
+            <a
+              href={l.our_url} target="_blank" rel="noopener noreferrer"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary/10 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+            >
+              <Storefront size={13} weight="bold" /> Open listing
+            </a>
+          ) : (
+            <span className="flex flex-1 items-center justify-center rounded-full bg-muted py-1.5 text-xs font-semibold text-muted-foreground" title="No listing URL was returned when this was published.">
+              No link stored
+            </span>
+          )}
+          {/* Labelled "Source", never presented as ours. */}
+          {l.url && (
+            <a
+              href={l.url} target="_blank" rel="noopener noreferrer" title="The competitor listing this was built from"
+              className="flex shrink-0 items-center justify-center rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-foreground hover:text-background"
+            >
+              Source
+            </a>
+          )}
+          {onRemove && (
+            <button
+              type="button" onClick={() => onRemove(l)} aria-label="Remove from Uploaded"
+              title="Forget this record. The listing stays on the marketplace."
+              className="flex shrink-0 items-center justify-center rounded-full bg-muted px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-rose-600 hover:text-white"
+            >
+              <Trash size={13} weight="bold" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+})
 
 // One research card — image (price + TRENDING overlay) + heart-to-save + estimate
 // stat boxes + the listing's up-to-13 keyword tags (clickable to research + copy all).
@@ -352,19 +496,34 @@ export function SpyDeckView() {
   // Optimistic locally, then persisted — the draft already exists in the shop by this
   // point, so the record of it must outlive the tab. A failed write is logged rather
   // than surfaced: the publish itself succeeded, and re-publishing is the worse outcome.
-  const onPublished = (l: EtsyListing, our?: { listing_id?: number | string; url?: string }) => {
+  const onPublished = (l: EtsyListing, our?: { listing_id?: number | string; url?: string; published?: PublishedRecord }) => {
     const k = String(l.listing_id)
     setUploadedIds((prev) => new Set(prev).add(k))
-    setUploaded((prev) => (prev.some((x) => String(x.listing_id) === k) ? prev : [{ ...l, our_url: our?.url }, ...prev]))
+    setUploaded((prev) => (prev.some((x) => String(x.listing_id) === k)
+      ? prev
+      : [{ ...l, our_url: our?.url, our_listing_id: our?.listing_id != null ? String(our.listing_id) : undefined, published: our?.published }, ...prev]))
     recordSpydeckUpload(l, our).catch(() => {})
   }
   // Record what was actually PUBLISHED, not the source it was copied from: the seller can
   // reorder photos or swap in their own, so the uploaded card must show the cover image
   // the draft went out with. `image`/`thumb` both point at it so the card (thumb||image)
   // renders the published cover rather than a stale competitor shot.
-  const onPublishedFrom = (source: EtsyListing, url?: string, primaryImage?: string) => {
+  //
+  // `published` carries the rest — blank, colours, sizes, variant count, draft/active.
+  // It only exists in the publish dialog's state, so if it isn't handed over here it is
+  // gone the moment the dialog closes, and the Uploaded card has nothing of ours to show.
+  // `listing_id` is also what lets the server join back to published_listings.
+  const onPublishedFrom = (source: EtsyListing, url?: string, primaryImage?: string, published?: PublishedRecord) => {
     const merged = primaryImage ? { ...source, image: primaryImage, thumb: primaryImage } : source
-    onPublished(merged, { url })
+    onPublished(merged, { url, listing_id: published?.listing_id, published })
+  }
+  // Forget the RECORD, not the listing. The draft stays in the shop — deleting it there is
+  // the marketplace's job, and doing it from here would be destroying a live seller asset.
+  const removeUpload = (l: UploadedListing) => {
+    const k = String(l.listing_id)
+    setUploaded((prev) => prev.filter((x) => String(x.listing_id) !== k))
+    setUploadedIds((prev) => { const n = new Set(prev); n.delete(k); return n })
+    deleteSpydeckUpload(k).catch(() => {})
   }
   // `keywords` still comes back from the trending endpoint; it's just not rendered
   // here any more (the Search tab's keyword cloud covers it).
@@ -808,7 +967,7 @@ export function SpyDeckView() {
             <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {uploadedPaged.pageItems.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} onSource={isAdmin ? setSourceListing : undefined} />
+                <UploadedCard key={l.listing_id} l={l} onRemove={removeUpload} />
               ))}
             </div>
             <Pagination page={uploadedPaged.page} pageCount={uploadedPaged.pageCount} perPage={uploadedPaged.perPage} total={uploadedPaged.total} start={uploadedPaged.start} onPage={uploadedPaged.setPage} onPerPage={uploadedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -896,7 +1055,7 @@ export function SpyDeckView() {
           // making. The dialog shows them in a separate strip and never publishes them.
           referenceImages: ((detail?.images?.length ? detail.images : makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []) as string[]).filter(Boolean),
         }))(makeDetail && makeDetail.forId === String(makeListing.listing_id) ? makeDetail : null) : null}
-        onPublished={(url, img) => { if (makeListing) onPublishedFrom(makeListing, url, img) }}
+        onPublished={(url, img, published) => { if (makeListing) onPublishedFrom(makeListing, url, img, published) }}
         title="Make product"
       />
     </div>

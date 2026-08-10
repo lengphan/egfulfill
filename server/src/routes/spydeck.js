@@ -647,14 +647,52 @@ export function spydeckRoutes(app, requireAuth) {
   // research listing to it, so there was no way to answer "did I already make this?".
   app.get('/api/spydeck/uploads', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
     await ensure();
-    const r = await q(
-      'select listing_id, our_listing_id, url, data, created_at from spydeck_uploads where seller_id=$1 order by created_at desc limit 500',
-      [String(req.user.sub)]
-    );
-    return r.rows.map((row) => ({
-      ...(row.data || {}), listing_id: row.listing_id,
-      our_listing_id: row.our_listing_id, our_url: row.url, uploaded_at: row.created_at,
-    }));
+    // LEFT JOIN published_listings: what we BUILT (blank, print method, colour, size) is
+    // recorded there by the publish route itself. Without the join an Uploaded card could
+    // only render `data` — the competitor listing — which is why a published product showed
+    // none of the blank or variants the seller had just picked. The join also covers rows
+    // written before the dialog started sending `published`, and any publish path that
+    // isn't that dialog.
+    //
+    // published_listings is created at route load by etsy.js, not in schema.sql, so on a
+    // deployment where that hasn't run yet the join would 42P01 and take the whole tab
+    // down. Fall back to the plain read rather than trading a missing detail for a
+    // missing page.
+    const BASE = 'select u.listing_id, u.our_listing_id, u.url, u.data, u.created_at';
+    const TAIL = 'where u.seller_id=$1 order by u.created_at desc limit 500';
+    let r;
+    try {
+      // coalesce(our_listing_id, <id parsed out of our_url>): the column was never
+      // populated — the publish dialog's result never reached the record — so every
+      // existing row joins on NULL and shows nothing, even though published_listings has
+      // its blank and variants sitting right there. The url was always stored, and OUR
+      // listing id is in it. Parsing it back out repairs the old rows without a migration,
+      // and costs nothing once the column is filled going forward.
+      r = await q(
+        `${BASE}, p.platform, p.blank_sku, p.print_type, p.color, p.size
+           from spydeck_uploads u
+           left join published_listings p
+             on p.listing_id = coalesce(u.our_listing_id, substring(u.url from 'listing/([0-9]+)'))
+          ${TAIL}`,
+        [String(req.user.sub)]
+      );
+    } catch {
+      r = await q(`${BASE} from spydeck_uploads u ${TAIL}`, [String(req.user.sub)]);
+    }
+    return r.rows.map((row) => {
+      const d = row.data || {};
+      // `published` rides inside data (the POST folds it in) — lift it to the top level so
+      // the client doesn't have to know where it was stored.
+      const { published, ...source } = d;
+      const product = (row.blank_sku || row.print_type || row.color || row.size)
+        ? { blank_sku: row.blank_sku, print_type: row.print_type, color: row.color, size: row.size, platform: row.platform }
+        : undefined;
+      return {
+        ...source, listing_id: row.listing_id,
+        our_listing_id: row.our_listing_id, our_url: row.url, uploaded_at: row.created_at,
+        published: published || undefined, product,
+      };
+    });
   });
 
   app.post('/api/spydeck/uploads', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
@@ -662,6 +700,11 @@ export function spydeckRoutes(app, requireAuth) {
     const b = req.body || {};
     const listingId = String(b.listing_id ?? b.listingId ?? '').trim();
     if (!listingId) { reply.code(400); return { error: 'listing_id required' }; }
+    // Fold what WE published in beside the source listing, under its own key rather than
+    // merged: the two carry same-named fields (title, price, image) meaning opposite
+    // things, and flattening them is exactly how a competitor's figures end up read as ours.
+    const source = b.data ? { ...b.data } : { ...b };
+    if (b.published && typeof b.published === 'object') source.published = b.published;
     await q(
       `insert into spydeck_uploads (seller_id, listing_id, our_listing_id, url, data)
        values ($1,$2,$3,$4,$5)
@@ -670,7 +713,7 @@ export function spydeckRoutes(app, requireAuth) {
       [String(req.user.sub), listingId,
        b.our_listing_id != null ? String(b.our_listing_id) : null,
        b.url ? String(b.url) : null,
-       b.data ? JSON.stringify(b.data) : JSON.stringify(b)]
+       JSON.stringify(source)]
     );
     return { ok: true };
   });

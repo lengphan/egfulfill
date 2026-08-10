@@ -9,7 +9,7 @@ import { ProductCombobox } from "@/components/app/product-combobox"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
-import { getSpecQuote, publishEtsy, publishTiktok, getTiktokCategories, getTiktokWarehouses, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade } from "@/lib/api"
+import { getSpecQuote, publishEtsy, publishTiktok, getTiktokCategories, getTiktokWarehouses, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord } from "@/lib/api"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -179,8 +179,10 @@ export function PublishProductDialog({
   onOpenChange: (v: boolean) => void
   prefill: PublishPrefill | null
   /** `primaryImage` is the photo that became the listing's cover, so the caller can show
-   *  what was actually published instead of the source it copied from. */
-  onPublished?: (url?: string, primaryImage?: string) => void
+   *  what was actually published instead of the source it copied from. `published` carries
+   *  the rest of that record — status, blank, variants — which otherwise died with this
+   *  dialog's state and left the caller with nothing but the competitor listing. */
+  onPublished?: (url?: string, primaryImage?: string, published?: PublishedRecord) => void
   title?: string
 }) {
   // The dialog resolves a picked blank itself rather than asking each caller for a
@@ -483,7 +485,15 @@ export function PublishProductDialog({
         text: r.product_id ? `Created a draft product on TikTok (#${r.product_id}).` : "Created a draft product on TikTok.",
         note: r.warnings?.length ? r.warnings.map((w) => w.message).filter(Boolean).join(" ") : undefined,
       })
-      onPublished?.(undefined, images[0])
+      onPublished?.(undefined, images[0], {
+        platform: "tiktok",
+        title: title.trim(), price: basePrice, image: images[0],
+        state: "draft",
+        blank_sku: blank?.sku ?? undefined, blank_name: blank?.name ?? undefined,
+        print_type: method || undefined,
+        colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
+        images_uploaded: images.length,
+      })
     } catch (e) {
       setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })
     } finally { setBusy(false) }
@@ -578,7 +588,23 @@ export function PublishProductDialog({
             : "Published as a draft listing",
         url: r.url,
       })
-      onPublished?.(r.url, images[0])
+      // Etsy's hosted url for the cover, falling back to what we sent. The fallback is only
+      // reached when the photo upload failed, in which case there IS no published image and
+      // showing the source we tried is the honest thing.
+      const cover = r.primary_image || images[0]
+      onPublished?.(r.url, cover, {
+        platform: "etsy",
+        listing_id: r.listing_id != null ? String(r.listing_id) : undefined,
+        title: title.trim(), price: basePrice, image: cover,
+        state: r.state || "draft",
+        blank_sku: blank?.sku ?? undefined, blank_name: blank?.name ?? undefined,
+        print_type: method || undefined,
+        colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
+        variant_skus: r.variant_skus ?? [],
+        variants_applied: r.variants_applied ?? 0,
+        variants_error: r.variants_error ?? null,
+        images_uploaded: r.images_uploaded ?? 0,
+      })
     } catch (e) {
       setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })
     } finally { setBusy(false) }

@@ -1571,6 +1571,12 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // images[0] stays the listing's primary photo.
       const imgs = (Array.isArray(b.images) && b.images.length) ? b.images : (b.image ? [b.image] : []);
       let uploaded = 0;
+      // Etsy's own CDN url for the photo that became the cover. Worth capturing and
+      // returning: a locally-uploaded photo arrives here as a multi-megabyte `data:` URL,
+      // and the caller was storing THAT as the record's thumbnail — a base64 blob in a
+      // jsonb row, per upload. This hands back a ~100-byte URL of the real published
+      // image instead, so "show me what I listed" doesn't mean re-reading the payload.
+      let primaryImage = null;
       for (const src of imgs) {
         try {
           const img = await imageBytesFrom(src);
@@ -1578,8 +1584,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           const fd = new FormData();
           fd.append('image', new Blob([img.buf], { type: img.mime }), 'photo.' + img.ext);
           fd.append('rank', String(uploaded + 1));   // keep the seller's chosen order
-          await etsyFetch(conn, `/shops/${conn.shop_id}/listings/${listingId}/images`, { method: 'POST', body: fd });
+          const up = await etsyFetch(conn, `/shops/${conn.shop_id}/listings/${listingId}/images`, { method: 'POST', body: fd });
           uploaded++;
+          if (!primaryImage && up) primaryImage = up.url_570xN || up.url_fullxfull || up.url_75x75 || null;
         } catch (e) { /* keep going; the draft still exists without the image */ }
       }
 
@@ -1676,6 +1683,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
 
       return {
         ok: true, listing_id: listingId, state: listing.state || 'draft', images_uploaded: uploaded,
+        primary_image: primaryImage,
         tags_applied: uniqueTags.length,
         variants_applied, variant_skus: variantSkus, variants_error,
         url: listing.url || `https://www.etsy.com/listing/${listingId}`
