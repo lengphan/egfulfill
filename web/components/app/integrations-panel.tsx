@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ArrowsClockwise, ShieldCheck, Sparkle, Check, PencilSimple, X, CircleNotch, CaretRight } from "@phosphor-icons/react"
+import { ArrowsClockwise, ShieldCheck, Sparkle, Check, PencilSimple, X, CircleNotch, CaretRight, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -352,6 +352,43 @@ export function IntegrationsPanel() {
             <AiAssistantCard onChanged={() => getAiConfig().then(setAiCfg).catch(() => {})} />
           </div>
         </details>
+
+        {/* SECRETS THAT NAME A CARD THAT DOESN'T EXIST.
+            Fields attach to a card by matching SECRET_DEFS' `integration` to the card's
+            `key`, and a mismatch simply dropped the secret — silently. That is how
+            SHIPPO_API_TOKEN ('shipping' vs a 'shippo' card) became uneditable while its card
+            still rendered and still showed a value: indistinguishable from a control that
+            merely didn't work, on the one key that decides whether labels are test or live.
+            Listing the orphans means a secret can never again be unreachable — it is either
+            on its card or visibly here. */}
+        {(() => {
+          const known = new Set(INTEGRATIONS.map((i) => i.key))
+          const orphans = Object.entries(secrets).filter(([k]) => !known.has(k))
+          if (!orphans.length) return null
+          return (
+            <div className="border-b border-border bg-amber-50 px-4 py-3 dark:bg-amber-950/20">
+              <div className="flex items-start gap-2 text-sm">
+                <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-amber-500" />
+                <div className="min-w-0">
+                  <div className="font-medium">Keys with no integration card</div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    These are configured on the server but name a card that doesn&apos;t exist, so
+                    they can&apos;t be edited here. Point their <code>integration</code> at a real
+                    card key in <code>SECRET_DEFS</code>.
+                  </p>
+                  <ul className="mt-1.5 space-y-0.5 text-xs">
+                    {orphans.map(([k, list]) => (
+                      <li key={k}>
+                        <span className="font-mono">{k}</span>
+                        <span className="text-muted-foreground"> — {list.map((x) => x.name).join(", ")}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {GROUPS.map((group) => {
           const items = INTEGRATIONS.filter((i) => i.group === group)
