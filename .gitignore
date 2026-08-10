@@ -19,7 +19,10 @@ op_thread_check.js
 
 # ── Claude Code config — NOT part of the app ──
 .claude/
-CLAUDE.md
+# CLAUDE.md is TRACKED on purpose. It carries rules that cost real damage to learn —
+# §2.8 (never reveal who supplies us, including via URLs, redirects and fallbacks) most
+# of all — and while it was ignored those rules existed only on one machine, so any
+# other session started without them.
 CLAUDE (Rules Based).md
 agents/
 rules/
