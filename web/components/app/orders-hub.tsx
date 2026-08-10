@@ -768,31 +768,36 @@ export function OrdersHub() {
   const filterCtx = useMemo(() => ({ catalog, stock, overdueDays }), [catalog, stock, overdueDays])
 
   /**
-   * What floats to the top, and what deliberately doesn't.
+   * WHAT ORDER THE QUEUE IS IN — newest first, and the exceptions live in their own pills.
    *
-   * 1. RUSH — a human decided. It jumps whatever its stock state, because the decision was
-   *    made with more context than this sort has.
-   * 2. OVERDUE **AND WORKABLE** — late work that is only waiting on sequencing. This is the
-   *    whole point of surfacing overdue at all.
-   * 3. Everything else, untouched.
+   * This used to float every overdue-and-workable order above everything else, on the
+   * reasoning that late work waiting only on sequencing is the whole point of surfacing
+   * overdue at all. That reasoning holds for a handful of late orders. It did not hold
+   * here: 708 orders sat in `new` and only 61 were under a week old, so ~600 permanently
+   * late rows owned the top of the list and today's work landed past row 600. The board
+   * read as frozen while the sync was working perfectly — which is exactly what was
+   * reported, and it took a database query to disprove.
    *
-   * Overdue-and-BLOCKED is not promoted. It is late, and it is on the Overdue pill where
-   * purchasing can find it, but it cannot be started — and pinning unstartable work above
-   * the print queue is how a floor learns to scroll past the top of its own list. Losing
-   * that habit costs you the orders they COULD have picked up.
+   * So:
+   *   ALL, and every stage pill  — NEWEST FIRST. What arrived today is what you see.
+   *   OVERDUE                    — OLDEST FIRST. In the one view that exists to answer
+   *                                "what is late", the most late belongs at the top, and
+   *                                that ordering is useful precisely because nothing has
+   *                                been resolved.
    *
-   * A stable sort: equal ranks keep the server's created_at ordering.
+   * RUSH still pins to the top of whatever you are looking at. It is the one promotion a
+   * HUMAN asked for, one order at a time, and unlike overdue it cannot silently grow to
+   * six hundred rows — the pill's own count is the check on that.
    */
   const filtered = useMemo(() => {
     const list = filterOrders(orders ?? [], query, filterCtx)
-    const rank = (o: OrderRow) => {
-      if (isRush(o)) return 0
-      if (!isOverdue(o, overdueDays)) return 2
-      const blocked = catalog.length && orderStock(o.items ?? [], catalog, stock).state === "out"
-      return blocked ? 2 : 1
-    }
-    return [...list].sort((a, b) => rank(a) - rank(b))
-  }, [orders, query, filterCtx, overdueDays, catalog, stock])
+    const at = (o: OrderRow) => String(o.created_at ?? "")
+    const newestFirst = (a: OrderRow, b: OrderRow) => at(b).localeCompare(at(a))
+    const oldestFirst = (a: OrderRow, b: OrderRow) => at(a).localeCompare(at(b))
+    const byAge = query.status === "overdue" ? oldestFirst : newestFirst
+    const rushRank = (o: OrderRow) => (isRush(o) ? 0 : 1)
+    return [...list].sort((a, b) => rushRank(a) - rushRank(b) || byAge(a, b))
+  }, [orders, query, filterCtx])
 
   const paged = usePaged(filtered, 25)
 
