@@ -80,72 +80,6 @@ const apiKey = () => (process.env.BYEASTSIDE_API_KEY || '').trim();
 const apiBase = () => (process.env.BYEASTSIDE_API_BASE || 'https://api.byeastside.uk/api').replace(/\/+$/, '');
 const MAX_PDF = 50 * 1024 * 1024;   // their documented limit
 
-/**
- * WRAP A JPEG IN A ONE-PAGE PDF.
- *
- * Their upload answers `400 {"message":"Only PDF files are allowed"}` to an image —
- * probed against the live API on 2026-08-10 with an 800x1200 PNG, so this is measured,
- * not assumed. But a phone photo of a label is exactly what someone has to hand, so
- * refusing images outright would push them back to a scanner they don't own.
- *
- * Written by hand rather than pulled from a library: PDF's image case is genuinely small,
- * and `server/` deliberately carries five dependencies. A JPEG needs NO re-encoding at all
- * — /DCTDecode means "this stream is a JPEG", so the original bytes go in untouched and
- * nothing is resampled or degraded on the way to their extractor.
- *
- * PNGs never reach here: the browser converts to JPEG on a canvas before upload, because
- * embedding a PNG means decoding and un-filtering it, and the browser already has a
- * decoder. See the drop zone in dispatch-board.tsx.
- *
- * The page is sized in POINTS at 72dpi so a 1200px-wide photo becomes a sane page rather
- * than a 16-foot one, and the image fills the page exactly — their extractor reads the
- * page, so letterboxing would only shrink the barcode.
- */
-function jpegToPdf(jpeg, wpx, hpx) {
-  const w = Math.max(1, Math.round((wpx / 150) * 72));   // 150dpi source is the usual scan
-  const h = Math.max(1, Math.round((hpx / 150) * 72));
-  const parts = [];
-  const offsets = [0];
-  let len = 0;
-  const push = (buf) => { const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf, 'latin1'); parts.push(b); len += b.length; };
-  const obj = (n, body) => { offsets[n] = len; push(`${n} 0 obj\n`); push(body); push('\nendobj\n'); };
-
-  push('%PDF-1.4\n');
-  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
-  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-  obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
-  // The image XObject: the JPEG's own bytes, declared rather than transcoded.
-  offsets[4] = len;
-  push(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${wpx} /Height ${hpx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);
-  push(jpeg);
-  push('\nendstream\nendobj\n');
-  const content = `q ${w} 0 0 ${h} 0 0 cm /Im0 Do Q`;
-  obj(5, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
-
-  const xref = len;
-  push(`xref\n0 6\n0000000000 65535 f \n`);
-  for (let i = 1; i <= 5; i++) push(String(offsets[i]).padStart(10, '0') + ' 00000 n \n');
-  push(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
-  return Buffer.concat(parts);
-}
-
-/** Width/height straight out of a JPEG's SOF marker. Needed because the page has to be
- *  sized to the image, and re-decoding the whole file to learn two numbers is absurd. */
-function jpegSize(buf) {
-  if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) return null;
-  let i = 2;
-  while (i + 9 < buf.length) {
-    if (buf[i] !== 0xff) { i++; continue; }
-    const marker = buf[i + 1];
-    // SOF0..SOF15, skipping the four that are not frame headers.
-    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
-      return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
-    }
-    i += 2 + buf.readUInt16BE(i + 2);
-  }
-  return null;
-}
-
 export function dispatchEnabled() { return !!apiKey(); }
 
 async function bes(path, init = {}) {
@@ -755,14 +689,15 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   /**
    * Drop a label file straight through to the partner.
    *
-   * PDF OR IMAGE, and the difference is handled here rather than refused. Their upload
-   * answers `400 Only PDF files are allowed` to an image — measured against the live API
-   * on 2026-08-10, not assumed — so a JPEG is wrapped in a one-page PDF whose stream IS
-   * the original JPEG (see jpegToPdf). Verified end to end the same day: a generated file
-   * came back 201 with totalPages 1, indistinguishable to them from a real one.
+   * PDF ONLY, on both sides of the boundary. Their upload answers
+   * `400 {"message":"Only PDF files are allowed"}` to anything else — measured against the
+   * live API on 2026-08-10, not assumed — and every label we or a carrier produce is
+   * already a PDF, so there is nothing to convert and no reason to carry a converter.
    *
-   * The browser converts PNG/HEIC/WebP to JPEG before sending, because it already owns a
-   * decoder for every format it can display and the server owns none.
+   * Checked twice on the way in, because the two checks catch different mistakes: the mime
+   * is what the caller CLAIMS, the %PDF- magic is what the file IS. Rejecting here rather
+   * than letting them reject it means the message names the fix instead of quoting a
+   * partner's validator.
    */
   app.post('/api/dispatch/uploads', { preHandler: canDispatch }, async (req, reply) => {
     if (!dispatchEnabled()) { reply.code(400); return { error: 'Dispatch partner not configured (BYEASTSIDE_API_KEY).' }; }
@@ -771,22 +706,19 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     const m = /^data:([^;,]+)[^,]*,(.*)$/s.exec(dataUrl);
     if (!m) { reply.code(400); return { error: 'Send the file as a data URL.' }; }
     const mime = m[1].toLowerCase();
+    if (mime !== 'application/pdf') {
+      reply.code(400);
+      return { error: `${mime} isn't a label file — every carrier label is a PDF, and their queue only takes PDFs.` };
+    }
     let buf;
     try { buf = Buffer.from(m[2], 'base64'); } catch { reply.code(400); return { error: "That file couldn't be decoded." }; }
     if (!buf.length) { reply.code(400); return { error: 'That file is empty.' }; }
-
-    let fileName = String(b.fileName || 'label.pdf').replace(/[^\w.\- ]+/g, '_').slice(0, 120);
-    if (mime === 'image/jpeg' || mime === 'image/jpg') {
-      const size = jpegSize(buf);
-      // No SOF marker means it is not a JPEG whatever the data URL claims. Say so rather
-      // than posting a file their extractor will silently make nothing of.
-      if (!size) { reply.code(400); return { error: "That image couldn't be read — re-save it as a JPEG or a PDF." }; }
-      buf = jpegToPdf(buf, size.w, size.h);
-      fileName = fileName.replace(/\.(jpe?g|png|heic|webp)$/i, '') + '.pdf';
-    } else if (mime !== 'application/pdf') {
-      reply.code(400);
-      return { error: `${mime} isn't a label file — drop a PDF, or a photo of the label.` };
+    // Check the bytes, not the label on the tin. A data URL's mime is whatever the caller
+    // typed; %PDF- is what their extractor will actually look for.
+    if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      reply.code(400); return { error: "That file isn't really a PDF — re-export it from wherever the label came from." };
     }
+    const fileName = String(b.fileName || 'label.pdf').replace(/[^\w.\- ]+/g, '_').slice(0, 120);
     if (buf.length > MAX_PDF) { reply.code(400); return { error: 'That file is over their 50MB limit.' }; }
 
     const form = new FormData();

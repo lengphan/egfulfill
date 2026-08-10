@@ -20,38 +20,15 @@ import { getDispatchUploads, uploadDispatchLabel, deleteDispatchUpload, type Dis
  * asked us to rush THEIR order; there is no seller and no order here.
  */
 
-/** Their upload refuses anything but a PDF — measured against the live API, 2026-08-10:
- *  `400 {"message":"Only PDF files are allowed"}`. A photo of a label is what a person
- *  actually has, so an image is converted to JPEG here and wrapped in a one-page PDF
- *  server-side. The conversion is the browser's job: it already decodes every format it
- *  can display (HEIC from a phone, WebP, PNG), and the server decodes none. */
-const MAX_EDGE = 2400   // enough for a barcode to survive; well under their 50MB
-
-function toJpegDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const img = new Image()
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight))
-      const w = Math.max(1, Math.round(img.naturalWidth * scale))
-      const h = Math.max(1, Math.round(img.naturalHeight * scale))
-      const c = document.createElement("canvas")
-      c.width = w; c.height = h
-      const ctx = c.getContext("2d")
-      if (!ctx) { reject(new Error("This browser couldn't process the image.")); return }
-      // WHITE FIRST. A transparent PNG drawn onto a fresh canvas exports as BLACK behind
-      // the artwork in JPEG, which for a label means a black page with an unreadable
-      // barcode — and their extractor would simply find nothing.
-      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h)
-      ctx.drawImage(img, 0, 0, w, h)
-      resolve(c.toDataURL("image/jpeg", 0.92))
-    }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That image couldn't be opened.")) }
-    img.src = url
-  })
-}
-
+/**
+ * PDF ONLY, and it isn't a limitation worth working around.
+ *
+ * Their upload answers `400 {"message":"Only PDF files are allowed"}` to anything else —
+ * measured against the live API on 2026-08-10 — and every label a carrier issues is
+ * already a PDF, so there was nothing this would ever have converted. An earlier version
+ * wrapped photos on the way through; it was removed rather than left dormant, because a
+ * conversion path nobody exercises is one nobody notices breaking.
+ */
 const readAsDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const fr = new FileReader()
@@ -115,8 +92,13 @@ export function ExternalLabels() {
     let ok = 0
     for (const f of list) {
       try {
-        const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name)
-        const dataUrl = isPdf ? await readAsDataUrl(f) : await toJpegDataUrl(f)
+        // Caught here, before a round trip, so dropping a photo by accident answers
+        // instantly instead of after an upload. The server checks the bytes as well —
+        // this one is about the wait, that one is about the truth.
+        if (!(f.type === "application/pdf" || /\.pdf$/i.test(f.name))) {
+          throw new Error("only PDFs can be pre-scanned — that's what carriers issue")
+        }
+        const dataUrl = await readAsDataUrl(f)
         const r = await uploadDispatchLabel({ fileName: f.name, dataUrl })
         if (r.error) throw new Error(r.error)
         ok++
@@ -170,15 +152,15 @@ export function ExternalLabels() {
       >
         {busy ? <CircleNotch size={20} className="animate-spin text-muted-foreground" /> : <UploadSimple size={20} className="text-muted-foreground" />}
         <span className="text-sm font-medium">{busy ? "Sending…" : "Drop a label here"}</span>
-        {/* Say what happens to a photo. Their API takes PDFs only; we wrap an image rather
-            than refuse it, and someone dropping a phone photo deserves to know that
-            worked on purpose rather than wonder whether it did. */}
+        {/* State the one rule up front. Their queue takes PDFs and nothing else, and so
+            does every carrier's label, so saying it here costs a line and saves a failed
+            drop. */}
         <span className="text-xs text-muted-foreground">
-          PDF, or a photo of the label — a photo is wrapped into a PDF for you
+          PDF only — the file your carrier gave you
         </span>
         <input
           type="file" multiple className="sr-only" disabled={busy || !configured}
-          accept="application/pdf,image/*"
+          accept="application/pdf"
           onChange={(e) => { void send(e.target.files); e.target.value = "" }}
         />
       </label>
