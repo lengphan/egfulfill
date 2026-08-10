@@ -202,6 +202,14 @@ app.get('/api/admin/mail-diag', { preHandler: requireAdmin }, async (req) => {
     configured: mailConfigured(),
     transport,
     from: process.env.SMTP_FROM || process.env.MAIL_FROM || null,
+    // BROADCASTS SEND FROM A DIFFERENT ADDRESS. Bulk mail goes out as MAIL_FROM_BULK — a
+    // marketing subdomain authenticated separately, so a campaign that trips a spam filter
+    // can't drag down the domain password resets depend on. It is therefore verified
+    // separately in Brevo too, which means this diag could pass on the transactional sender
+    // while every broadcast was rejected for an unverified bulk one. Report both, and let
+    // ?bulk=1 send the test AS the bulk sender so broadcasts can actually be diagnosed.
+    from_bulk: process.env.MAIL_FROM_BULK || null,
+    bulk_falls_back_to_transactional: !process.env.MAIL_FROM_BULK,
     smtp_host: process.env.SMTP_HOST || null,
     // What each feature does when mail is off, so the answer is actionable rather than
     // just a red cross.
@@ -217,13 +225,22 @@ app.get('/api/admin/mail-diag', { preHandler: requireAdmin }, async (req) => {
   }
   const to = String((req.query || {}).to || '').trim();
   if (!to) return { ...cfg, ok: null, note: 'Configured. Add ?to=you@example.com to actually send a test message.' };
+  // ?bulk=1 → send as the BROADCAST sender, which is the one to test when broadcasts fail.
+  const bulk = String((req.query || {}).bulk || '') === '1';
+  const asFrom = bulk ? (process.env.MAIL_FROM_BULK || undefined) : undefined;
+  const which = bulk ? 'bulk' : 'transactional';
   const sent = await sendMail({
     to,
-    subject: 'EGFULFILL mail test',
-    text: 'If you are reading this, transactional email is working.',
-    html: '<p>If you are reading this, transactional email is working.</p>',
+    from: asFrom,
+    subject: `EGFULFILL mail test (${which})`,
+    text: `If you are reading this, ${which} email is working.`,
+    html: `<p>If you are reading this, ${which} email is working.</p>`,
   });
-  return { ...cfg, ok: sent, sent_to: to, error: sent ? null : (lastMailError() || 'send failed for an unknown reason') };
+  return {
+    ...cfg, ok: sent, sent_to: to, tested: which,
+    sent_from: bulk ? (process.env.MAIL_FROM_BULK || cfg.from) : cfg.from,
+    error: sent ? null : (lastMailError() || 'send failed for an unknown reason'),
+  };
 });
 
 app.get('/api/admin/storage-diag', { preHandler: requireStaff }, async () => {
