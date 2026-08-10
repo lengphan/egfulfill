@@ -85,6 +85,9 @@ export function TemplatesPanel() {
           {list.map((t) => {
             const { product, name: blankName } = blankOf(t)
             const blankImg = product ? productImage(product) : null
+            // Fall back to the key only for a row saved before `seq` existed and not yet
+            // re-listed — better an ugly reference than a blank one.
+            const ref = t.seq != null ? `TPL-${t.seq}` : t.id
             return (
             <div key={t.id} className="group overflow-hidden rounded-xl border border-border">
               <div className="relative aspect-square bg-muted/40">
@@ -144,12 +147,15 @@ export function TemplatesPanel() {
                       goes in the import sheet's Template ID column, which fills the blank,
                       artwork, placement and method for a line in one field. Same treatment
                       as a design's DSN badge, because it does the same job. */}
+                  {/* TPL-12, not TPL-ms04ehic3elu. The base36 key is unique and unreadable;
+                      nobody copies that off a card into a spreadsheet by eye. Sized to be
+                      read rather than tucked away — same reason the design badge is. */}
                   <button
-                    onClick={() => { navigator.clipboard?.writeText(t.id).catch(() => {}); setCopied(t.id); setTimeout(() => setCopied(null), 1400) }}
-                    title="Copy this template's ID for the import sheet's Template ID column"
-                    className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-0.5 font-mono text-2xs text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => { navigator.clipboard?.writeText(ref).catch(() => {}); setCopied(t.id); setTimeout(() => setCopied(null), 1400) }}
+                    title="Copy this template's reference"
+                    className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    {copied === t.id ? "Copied" : t.id}
+                    {copied === t.id ? "Copied" : ref}
                   </button>
                 </div>
               </div>

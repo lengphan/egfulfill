@@ -13,6 +13,13 @@ export function templatesRoutes(app, requireAuth) {
        composite text,      -- composite preview image (base64 data URL)
        layers jsonb,        -- editable layer snapshot for re-opening in Design Maker
        updated_at timestamptz default now())`).catch(() => {});
+  // A SHORT, HUMAN NUMBER. The primary key is a client-minted
+  // `TPL-<base36 timestamp><random>` — unique and unguessable, and unusable as something a
+  // person reads off a card and types into a spreadsheet ("TPL-ms04ehic3elu"). bigserial
+  // backfills existing rows in creation order, so templates saved before this get numbers
+  // too. The text id stays the key: it is what the URL and the delete route address, and
+  // renaming a primary key to make a label prettier is not worth the blast radius.
+  q('alter table templates add column if not exists seq bigserial').catch(() => {});
 
   // Save / update a template (upsert by id).
   app.post('/api/templates', { preHandler: requireAuth }, async (req) => {
@@ -37,7 +44,7 @@ export function templatesRoutes(app, requireAuth) {
     // owner_id, not seller_id — the insert above writes owner_id and no seller_id column
     // has ever existed, so this query threw "column seller_id does not exist" on every
     // call. Nothing read templates back (the only caller POSTs), so it went unseen.
-    const r = await q(`select id, name, data, composite, layers from templates where owner_id=$1 order by updated_at desc limit 200`, [req.user.sub]);
+    const r = await q(`select id, seq, name, data, composite, layers from templates where owner_id=$1 order by updated_at desc limit 200`, [req.user.sub]);
     return r.rows;
   });
 

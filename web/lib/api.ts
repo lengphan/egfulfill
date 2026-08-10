@@ -2862,6 +2862,9 @@ export function getSpecQuote(spec: { blank?: string; sku?: string; size?: string
 // nothing had ever read these back — this is the first client to.
 export type ProductTemplate = {
   id: string
+  /** The short, readable number shown on the card — `TPL-12`, not the base36 primary key.
+   *  Null only on a row written before the column existed and not yet re-read. */
+  seq: number | null
   name: string | null
   data: Record<string, unknown> | null
   composite: string | null
