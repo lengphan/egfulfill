@@ -169,6 +169,14 @@ const INTEGRATIONS: Integration[] = [
     check: shippingProvider("shippo"),
   },
 
+  // Its OWN card. It was folded onto Shippo's because it had none, which put "EasyPost key"
+  // and "API token" side by side under a heading that says Shippo — and a Shippo token got
+  // typed into the EasyPost field, which silently does nothing for Shippo. Two providers on
+  // one card is two ways to be wrong; the grouping saved a row and cost a credential.
+  {
+    key: "easypost", name: "EasyPost", blurb: "Backup label provider", group: "Shipping",
+    check: configOnly("/api/shipping/config", "easypost"),
+  },
   {
     key: "usps", name: "USPS direct", blurb: "USPS-direct labels", group: "Shipping",
     check: async () => {

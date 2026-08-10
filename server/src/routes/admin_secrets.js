@@ -23,9 +23,7 @@ const SECRET_DEFS = [
   // the secret becomes unreachable from Settings. These said 'shipping' while the cards are
   // 'shippo' and 'easypost' — so the Shippo token, the one key that decides whether labels
   // are test or live, could not be changed anywhere in the product.
-  // EasyPost has no card of its own — shipping.js rate-shops across both providers, so it
-  // rides on the Shippo card rather than being unreachable under a card that doesn't exist.
-  { name: 'EASYPOST_API_KEY',      label: 'EasyPost key',     integration: 'shippo' },
+  { name: 'EASYPOST_API_KEY',      label: 'API key',          integration: 'easypost' },
   { name: 'SHIPPO_API_TOKEN',      label: 'API token',        integration: 'shippo' },
   { name: 'USPS_CONSUMER_KEY',     label: 'Consumer key',     integration: 'usps' },
   { name: 'USPS_CONSUMER_SECRET',  label: 'Consumer secret',  integration: 'usps' },
