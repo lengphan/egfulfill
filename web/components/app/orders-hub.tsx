@@ -20,12 +20,13 @@ import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
-import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, isFactoryColLocked, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
+import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
+import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
-import { filterOrders, matchesStatus, isRush, isOverdue, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
+import { filterOrders, matchesStatus, isRush, isOverdue, shipByOf, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
@@ -780,10 +781,13 @@ export function OrdersHub() {
    *
    * So:
    *   ALL, and every stage pill  — NEWEST FIRST. What arrived today is what you see.
-   *   OVERDUE                    — OLDEST FIRST. In the one view that exists to answer
-   *                                "what is late", the most late belongs at the top, and
-   *                                that ordering is useful precisely because nothing has
-   *                                been resolved.
+   *   OVERDUE                    — MOST LATE FIRST, measured against the SHIP-BY DATE
+   *                                where the marketplace gave us one and against age
+   *                                where it didn't. Sorting an overdue list by age would
+   *                                put a 30-day order promised for next week above a
+   *                                3-day one that was due yesterday — the older row is
+   *                                not the later one. That ordering is useful precisely
+   *                                because nothing has been resolved.
    *
    * RUSH still pins to the top of whatever you are looking at. It is the one promotion a
    * HUMAN asked for, one order at a time, and unlike overdue it cannot silently grow to
@@ -793,11 +797,22 @@ export function OrdersHub() {
     const list = filterOrders(orders ?? [], query, filterCtx)
     const at = (o: OrderRow) => String(o.created_at ?? "")
     const newestFirst = (a: OrderRow, b: OrderRow) => at(b).localeCompare(at(a))
-    const oldestFirst = (a: OrderRow, b: OrderRow) => at(a).localeCompare(at(b))
-    const byAge = query.status === "overdue" ? oldestFirst : newestFirst
+    /**
+     * How late, not how old. An order's deadline is its ship-by date when Etsy gave us
+     * one; otherwise it falls due `overdueDays` after it arrived, which is the same rule
+     * isOverdue applies — so the list is sorted by the very thing that put each row on it.
+     */
+    const dueAt = (o: OrderRow) => {
+      const promised = shipByOf(o)
+      if (promised != null) return promised
+      const created = o.created_at ? new Date(o.created_at).getTime() : NaN
+      return Number.isFinite(created) ? created + overdueDays * 86400_000 : Infinity
+    }
+    const mostLateFirst = (a: OrderRow, b: OrderRow) => dueAt(a) - dueAt(b)
+    const byAge = query.status === "overdue" ? mostLateFirst : newestFirst
     const rushRank = (o: OrderRow) => (isRush(o) ? 0 : 1)
     return [...list].sort((a, b) => rushRank(a) - rushRank(b) || byAge(a, b))
-  }, [orders, query, filterCtx])
+  }, [orders, query, filterCtx, overdueDays])
 
   const paged = usePaged(filtered, 25)
 
@@ -823,7 +838,6 @@ export function OrdersHub() {
   // last and always shown; `order` can't be hidden. Read after mount (localStorage).
   const [dataColOrder, setDataColOrder] = useState<FactoryColId[]>(FACTORY_DATA_COLS)
   const [hiddenCols, setHiddenCols] = useState<FactoryColId[]>([])
-  const [colsMenuOpen, setColsMenuOpen] = useState(false)
   const dragCol = useRef<FactoryColId | null>(null)
   useEffect(() => {
     const id = setTimeout(() => { setDataColOrder(loadFactoryColOrder()); setHiddenCols(loadFactoryHiddenCols()) }, 0)
@@ -840,11 +854,8 @@ export function OrdersHub() {
     const next = reorderFactoryCols(dataColOrder, src, dataColOrder.indexOf(target))
     setDataColOrder(next); saveFactoryColOrder(next)
   }
-  const toggleCol = (id: FactoryColId) => {
-    if (isFactoryColLocked(id)) return
-    const next = hiddenCols.includes(id) ? hiddenCols.filter((x) => x !== id) : [...hiddenCols, id]
-    setHiddenCols(next); saveFactoryHiddenCols(next)
-  }
+  // (Show/hide now lives in FactoryColumnsMenu on the toolbar, which owns the locked-column
+  // rule and persistence via the onOrder/onHidden callbacks below.)
 
   /** One grid template for the header and every row. Lead tracks (caret, + checkbox when
    *  dispatch is on) precede the data columns; action is pinned last. */
@@ -1180,14 +1191,25 @@ export function OrdersHub() {
             </DropdownMenu>
           </div>
 
+          {/* The two controls that reshape the table, grouped and pushed right. Columns used
+              to live in the table's own header row, in the pinned last cell — the word sat
+              on the same line as ORDER / AGE / TRACKING in the same type, so it read as one
+              more column name instead of a control. */}
           {!!orders?.length && (
-            <OrderFilterBar
-              orders={orders}
-              query={query}
-              onChange={setQuery}
-              catalog={catalog}
-              className="ml-auto"
-            />
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <OrderFilterBar
+                orders={orders}
+                query={query}
+                onChange={setQuery}
+                catalog={catalog}
+              />
+              <FactoryColumnsMenu
+                order={dataColOrder}
+                hidden={hiddenCols}
+                onOrder={(ids) => { setDataColOrder(ids); saveFactoryColOrder(ids) }}
+                onHidden={(ids) => { setHiddenCols(ids); saveFactoryHiddenCols(ids) }}
+              />
+            </div>
           )}
         </div>
 
@@ -1273,31 +1295,11 @@ export function OrdersHub() {
             <span />
             {gridCols.map((id) =>
               id === "action" ? (
-                // The pinned last column carries the Columns settings (reorder is by drag on
-                // the header labels; this menu toggles which columns show).
-                <div key={id} className="relative flex justify-end normal-case tracking-normal">
-                  <button type="button" onClick={() => setColsMenuOpen((v) => !v)} className="rounded px-2 py-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" title="Show/hide columns">
-                    Columns
-                  </button>
-                  {colsMenuOpen && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setColsMenuOpen(false)} />
-                      <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1.5 shadow-lg">
-                        <div className="px-2 py-1 text-2xs font-semibold text-muted-foreground">Show columns</div>
-                        {FACTORY_DATA_COLS.map((cid) => {
-                          const locked = isFactoryColLocked(cid)
-                          const shown = !hiddenCols.includes(cid)
-                          return (
-                            <button key={cid} type="button" disabled={locked} onClick={() => toggleCol(cid)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs normal-case tracking-normal text-foreground transition-colors hover:bg-accent disabled:opacity-40">
-                              <span className={"flex size-4 items-center justify-center rounded border " + (shown ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{shown && <Check size={11} weight="bold" />}</span>
-                              {tl("col", FACTORY_COLS[cid].label)}{locked && <span className="ml-auto text-3xs text-muted-foreground">locked</span>}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </>
-                  )}
-                </div>
+                // The pinned last column is now just the empty header over the row actions.
+                // Its Columns button moved up to the toolbar beside Filters: sitting here it
+                // was rendered in the header's own type, on the same line as ORDER and AGE,
+                // and read as a column named "Columns".
+                <span key={id} />
               ) : (
                 <span
                   key={id}
@@ -1340,7 +1342,17 @@ export function OrdersHub() {
                 age: (
                   <div
                     className={"tabular-nums text-xs " + (isOverdue(o, overdueDays) ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground")}
-                    title={o.created_at ? `Ordered ${new Date(o.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}` : "No order date recorded"}
+                    title={[
+                      o.created_at ? `Ordered ${new Date(o.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}` : "No order date recorded",
+                      // Say WHICH clock this row is judged by. Two rows can both read
+                      // "late" on different authority — one against Etsy's promise to the
+                      // buyer, one against our own age threshold — and a tooltip that
+                      // hides that difference makes the weaker claim look like the strong
+                      // one.
+                      o.ship_by
+                        ? `Ship by ${new Date(o.ship_by).toLocaleDateString("en-US", { dateStyle: "medium" })} (Etsy's promise to the buyer)`
+                        : `No marketplace ship-by — counted late after ${overdueDays} days`,
+                    ].join(" · ")}
                   >
                     {ageOf(o.created_at)}
                   </div>

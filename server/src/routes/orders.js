@@ -429,6 +429,19 @@ export function ordersRoutes(app, requireAuth) {
   // When we successfully pushed tracking to the marketplace (Etsy receipt shipped + buyer
   // email). Stamped once so a re-save can't re-email the buyer; a DRY RUN never stamps it.
   q('alter table orders add column if not exists marketplace_fulfilled_at timestamptz').catch(() => {});
+  /**
+   * THE MARKETPLACE'S OWN SHIP-BY DATE — a promise, not an inference.
+   *
+   * Lateness was decided by age: open for more than `overdue_days` and you were overdue.
+   * That is a guess about a promise, and it is wrong in both directions — a 2-day blank tee
+   * and a digitised embroidery order are not equally late on day 10.
+   *
+   * Etsy hands us the real thing on every transaction (`expected_ship_date`), which is the
+   * date it shows the buyer AND the date it measures the shop's late-shipment rate against.
+   * Written by the sync (etsy.js) and never guessed here: an order with no ship_by simply
+   * falls back to the age threshold, which is what every manual order will always do.
+   */
+  q('alter table orders add column if not exists ship_by timestamptz').catch(() => {});
   // Per-seller display number ("#1, #2 …" for manual orders). The id stays the
   // globally-unique PK; this is just the friendly number the seller sees.
   q('alter table orders add column if not exists seq integer').catch(() => {});

@@ -154,9 +154,9 @@ export const readyLabel = (v: string) => READY_OPTIONS.find((o) => o.value === v
 export type FilterContext = {
   catalog?: CatalogProduct[]
   stock?: Record<string, number>
-  /** Age in days past which an OPEN order counts as overdue — factory_settings.overdue_days,
-   *  set by an admin. Not a promise date: no marketplace ship-by is captured yet, so nothing
-   *  built on this may describe it to a seller as a commitment. */
+  /** Age in days past which an OPEN order with NO marketplace promise counts as overdue —
+   *  factory_settings.overdue_days, set by an admin. The FALLBACK, not the rule: an order
+   *  carrying Etsy's own ship-by date is judged against that instead (see isOverdue). */
   overdueDays?: number
 }
 
@@ -164,19 +164,47 @@ export type FilterContext = {
 export const DEFAULT_OVERDUE_DAYS = 10
 
 /**
- * Is this order late, and is anyone able to do anything about it?
+ * The date this order was PROMISED to ship, if the marketplace gave us one.
  *
- * Two questions, deliberately answered separately. Late-and-workable belongs at the front of
- * the production queue. Late-and-blocked does NOT — it is a purchasing problem, and pinning
- * it above the print queue only teaches the floor to scroll past overdue orders, which
- * costs you the signal for the ones they COULD have started.
+ * Etsy does, per line, and we keep the earliest (see the sync in etsy.js). Nothing else
+ * does yet, so this is null for manual orders and for TikTok/Shopify.
+ */
+export const shipByOf = (o: OrderRow): number | null => {
+  const t = o.ship_by ? new Date(o.ship_by).getTime() : NaN
+  return Number.isFinite(t) ? t : null
+}
+
+/**
+ * Is this order late?
+ *
+ * AGAINST THE PROMISE WHERE THERE IS ONE. An age threshold is a guess about a promise, and
+ * it is wrong in both directions: a 2-day blank tee and a digitised embroidery order are
+ * not equally late on day 10. Etsy tells us the date it showed the buyer, and it is the
+ * same date Etsy measures the shop's late-shipment rate against — so where we have it, it
+ * decides, and `days` is not consulted at all.
+ *
+ * The age threshold remains the fallback for everything with no promise attached (manual
+ * orders, and any channel we haven't captured one from). That is a real difference in
+ * confidence between two rows in the same list, which is why `overdueReason` exists — a
+ * screen that says "late" should be able to say on what authority.
+ *
+ * Late-and-workable versus late-and-blocked stays a separate question, answered by the
+ * caller: pinning unstartable work above the print queue only teaches a floor to scroll
+ * past overdue orders, which costs you the ones they COULD have started.
  */
 export function isOverdue(o: OrderRow, days = DEFAULT_OVERDUE_DAYS): boolean {
   if (!matchesStatus(o, "open")) return false          // shipped or excepted is not late
+  const promised = shipByOf(o)
+  if (promised != null) return Date.now() > promised
   const created = o.created_at ? new Date(o.created_at).getTime() : NaN
   if (!Number.isFinite(created)) return false          // no date is not evidence of lateness
   return Date.now() - created > days * 86400_000
 }
+
+/** WHY we call it late, so a screen can say so. "promise" is Etsy's own ship-by date;
+ *  "age" is our threshold standing in for one. */
+export const overdueReason = (o: OrderRow): "promise" | "age" =>
+  shipByOf(o) != null ? "promise" : "age"
 
 /** A rush is a DECISION someone made; overdue is a fact about the clock. Both jump the
  *  queue, but only one of them can be argued with. */

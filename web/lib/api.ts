@@ -1325,6 +1325,19 @@ export type OrderRow = {
    *  own team members (else null). Never a factory account. Used for the seller's history. */
   created_by_name?: string | null
   tracking?: string | null
+  /**
+   * THE MARKETPLACE'S OWN SHIP-BY DATE — a promise, not an inference.
+   *
+   * Etsy's `expected_ship_date`, the earliest across the receipt's lines (a parcel that
+   * ships together is bound by the first promise it carries). This is the date Etsy shows
+   * the buyer AND the date it measures the shop's late-shipment rate against, so lateness
+   * is judged against it wherever it exists.
+   *
+   * Null on manual orders and on any channel that doesn't give us one — those fall back to
+   * the admin's `overdue_days` age threshold, which is a guess about a promise rather than
+   * the promise itself. The two must never be presented as the same thing.
+   */
+  ship_by?: string | null
   /** Stored label file, so a label can be reprinted or batched after purchase. */
   tracking_label_url?: string | null
   /** The order already has a machine file (.pes/.emb). Computed by the list query so the

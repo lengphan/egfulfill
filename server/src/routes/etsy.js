@@ -208,9 +208,26 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
   // conflict update) so a seller's later edits to either survive re-syncs.
   const meta = { source: 'etsy', isGift: !!(rc.is_gift || rc.gift_message),
                  note: rc.message_from_buyer || '', gift: rc.gift_message || '' };
+  /**
+   * THE PROMISE DATE — what Etsy told the buyer, not what we inferred.
+   *
+   * `expected_ship_date` (epoch seconds) lives on the TRANSACTION, one per line, because
+   * processing time is a property of the listing: a blank tee and a digitised embroidery
+   * order carry different promises. Etsy's own Shop Manager shows ONE "Ship by" per order,
+   * and for a parcel that ships together the binding date is the EARLIEST of them — meeting
+   * the latest would already have broken the first.
+   *
+   * This is the number lateness should be judged against. An age threshold is a guess about
+   * a promise; this IS the promise, and it is what Etsy measures the shop on.
+   */
+  const shipBySec = (rc.transactions || [])
+    .map((t) => Number(t.expected_ship_date))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b)[0] || null;
+  const shipByIso = shipBySec ? new Date(shipBySec * 1000).toISOString() : null;
   await q(
-    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order, meta)
-     values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), $11, $12)
+    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order, meta, ship_by)
+     values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), $11, $12, $13::timestamptz)
      on conflict (id) do update set total=excluded.total,
        customer=excluded.customer,
        -- NEVER overwrite a real address with Etsy's redacted nulls. Etsy withholds the
@@ -225,13 +242,18 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
            then excluded.address
          else orders.address
        end,
-       created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
+       created_at=coalesce($10::timestamptz, orders.created_at),
+       -- coalesce, not assign: a receipt that comes back without transactions (Etsy trims
+       -- them on some list responses) must not erase a promise date we already hold. Same
+       -- rule as the address above — a sync may fill a gap, never blank a fact.
+       ship_by=coalesce(excluded.ship_by, orders.ship_by),
+       updated_at=now()`,
     [id, conn.connected_by, conn.shop_name,
      { name: rc.name, email: rc.buyer_email || null },
      { line1: rc.first_line, line2: rc.second_line, city: rc.city, state: rc.state,
        zip: rc.zip, country: rc.country_iso, formatted: rc.formatted_address },
      status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso,
-     !!isFactory, meta]
+     !!isFactory, meta, shipByIso]
   );
   const hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
   // Pre-load existing items so re-syncs DON'T refetch listing images (Etsy rate limit:
