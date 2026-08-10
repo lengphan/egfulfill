@@ -914,11 +914,13 @@ type FoldProps = {
   title: string
   hint?: string
   /**
-   * The section's own state, shown in the picker's option label — "not set",
-   * "16 cones", "off". Only worth setting where a real fact exists; a made-up one is
-   * worse than none.
+   * The section's own state — "not set", "16 cones", "off". Shown beside the heading of
+   * the OPEN panel, not in the option list. Only worth setting where a real fact exists;
+   * a made-up one is worse than none.
    */
   status?: string
+  /** Surfaces the section as a chip above the panel. For the ones that block work. */
+  attention?: boolean
   children: React.ReactNode
 }
 
@@ -974,6 +976,7 @@ function FoldGroup({ children }: { children: React.ReactNode }) {
             value: f.props.title,
             label: f.props.title,
             status: f.props.status,
+            attention: f.props.attention,
           }))}
         />
         {!!q && (
@@ -988,6 +991,9 @@ function FoldGroup({ children }: { children: React.ReactNode }) {
         <div key={active.props.title} className="border-t border-border px-5 py-5">
           <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="font-semibold">{active.props.title}</span>
+            {active.props.status && (
+              <span className="rounded-md bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">{active.props.status}</span>
+            )}
             {active.props.hint && <span className="text-xs text-muted-foreground">{active.props.hint}</span>}
           </div>
           {active.props.children}
@@ -1226,7 +1232,7 @@ function PlatformPanel() {
         </div>
       </div>
       <FoldGroup>
-      <Fold title="Warehouse ship-from address" hint="the sender on every label" status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"}>
+      <Fold title="Warehouse ship-from address" hint="the sender on every label" status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           Where parcels are tendered from. Set once for the whole team. If returns come back

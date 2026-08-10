@@ -6,10 +6,11 @@ export type PickerOption = {
   value: string
   label: string
   /**
-   * The option's state, rendered after a middot inside the option text —
-   * "connected", "test", "reconnect", "not set". A native <option> can't carry a
-   * coloured pill, and that's the point: the state has to survive as WORDS or it
-   * only exists once the panel is open, which is the thing this replaces.
+   * The option's state — "connected", "test", "reconnect", "not set".
+   *
+   * NOT rendered in the option text. Every row carrying its own state turned the open
+   * list into a wall of qualifiers, and the two states that actually need chasing are
+   * already on the chips below. The panel shows this for whichever option is selected.
    */
   status?: string
   /** Optgroup heading. Options without one render above the first group. */
@@ -50,24 +51,26 @@ export function PanelPicker({
   const groups: string[] = []
   for (const o of options) if (o.group && !groups.includes(o.group)) groups.push(o.group)
   const ungrouped = options.filter((o) => !o.group)
-  const text = (o: PickerOption) => (o.status ? `${o.label} · ${o.status}` : o.label)
   const needs = options.filter((o) => o.attention)
 
   return (
     <div className="space-y-2">
+      {/* Full width only on a phone. A picker stretched across a desktop card is a very
+          large control for a list of short names, and the distance between the caret and
+          the name it belongs to is the tell. */}
       <select
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="eg-select h-10 w-full rounded-2xl border border-border bg-card px-3 text-sm font-medium outline-none transition-colors hover:border-primary/40 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="eg-select h-9 w-full rounded-2xl border border-border bg-card px-3 text-sm font-medium outline-none transition-colors hover:border-primary/40 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:w-auto sm:min-w-64 sm:max-w-sm"
       >
         {ungrouped.map((o) => (
-          <option key={o.value} value={o.value}>{text(o)}</option>
+          <option key={o.value} value={o.value}>{o.label}</option>
         ))}
         {groups.map((g) => (
           <optgroup key={g} label={g}>
             {options.filter((o) => o.group === g).map((o) => (
-              <option key={o.value} value={o.value}>{text(o)}</option>
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </optgroup>
         ))}
