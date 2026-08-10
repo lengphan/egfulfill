@@ -742,16 +742,26 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
     // name their own fields, and arrive one round trip later — "shipping_address.state:
     // California is not a valid choice" is a better message than nothing, but a refusal
     // that names the setting to change is better still.
-    // Otto DO NOT need the card on the request. Their payload treats card_details as
-    // optional: payment_method "Credit Card" with none supplied means Otto bills the card
-    // already held on the account, which is how this business actually pays them. Demanding
-    // it here asked for a card number that nothing needed, on every single order — and the
-    // server now refuses a typed card anyway unless OTTO_CARD_ORDERS=1, so the dialog was
-    // collecting a PAN that could not be used.
+    // OTTO NEED THE CARD ON THE REQUEST. This was set to false on the belief that a card
+    // order with no card_details makes Otto bill the card already on the account — and Otto
+    // themselves say otherwise. Their live reply, on a sandbox order placed 2026-08-10:
     //
-    // The card path still exists for an account that genuinely has no card on file: if one
-    // was entered this session it is passed through, but it is never demanded.
-    const ottoNeedsCard = false
+    //   "Otto reject a credit-card order with no card on it — they do not bill a card held
+    //    on your account."
+    //
+    // So every Otto card order failed, and it failed for a reason nothing on this page
+    // asked about, because the dialog that collects the number had been removed. The belief
+    // and the removal pointed the same wrong way, which is why it never recovered.
+    //
+    // Only for a CARD order: an account on terms sends no card and needs none, and asking
+    // for a PAN it will not use is the thing the previous change was right to object to.
+    // The number is typed at placement and sent with that ONE request — the server strips
+    // it from anything it echoes back, so it never reaches purchase_orders.meta and never
+    // lands in a nightly pg_dump. Nothing here stores a card.
+    //
+    // NB the server also refuses a typed card unless OTTO_CARD_ORDERS=1, so that env must
+    // be set or the card is stripped and Otto reject the order for the same reason again.
+    const ottoNeedsCard = /credit\s*card/i.test(String(opts.defaults.otto_payment_method || "")) && !card
     const ottoMissingParty = !(opts.defaults.otto_customer && opts.defaults.otto_contact)
 
     setBusy("place-all"); setMsg(null)
