@@ -1,10 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ElementType } from "react"
 import Link from "next/link"
 import { SquaresFour, Package, ArrowRight, CircleNotch, Warning, Tray, MagnifyingGlass, GearSix, Wrench, Truck, CurrencyDollar, TrendUp, Receipt } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
-import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { ProductionLine } from "@/components/app/production-line"
 import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
@@ -56,6 +55,73 @@ const SHORTCUT_DESC: Record<string, string> = {
   "/stores": "Seller stores",
   "/reports": "Analytics",
   "/developers": "API keys",
+}
+
+/**
+ * A compact KPI tile — icon chip, figure, label.
+ *
+ * Local to this page rather than a variant of the shared `StatCard`, which is deliberately
+ * chipless: a row of tinted chips reads as stickers before it reads as data, and that rule
+ * still holds on the pages that use it. This dashboard is the exception on purpose, so the
+ * exception lives here and can't leak onto the queue boards.
+ */
+function MiniStat({
+  label, value, sub, icon: Icon, tone,
+}: {
+  label: string
+  value: string
+  sub?: string
+  icon: ElementType
+  tone?: "pos" | "neg"
+}) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-primary">
+          <Icon size={16} weight="bold" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-2xl font-black leading-none tracking-tight tabular-nums">{value}</div>
+          <div className="mt-2 truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+          {/* Only NEGATIVE gets a colour. A green sub on a standing label ("last 30 days",
+              "nothing booked yet") reads as good news about the number above it, which it
+              isn't — it's just a caption. Red still earns attention because it means a real
+              loss. */}
+          {sub && (
+            <div className={"mt-0.5 text-2xs leading-snug " + (tone === "neg" ? "text-destructive" : "text-muted-foreground")}>
+              {sub}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A ring gauge. `pct` null means NOT READ — the ring stays empty and the centre says "—",
+ * because a 0% ring and a failed fetch must never look the same on a floor dashboard.
+ */
+function Gauge({ pct, caption }: { pct: number | null; caption: string }) {
+  const R = 54
+  const C = 2 * Math.PI * R
+  return (
+    <div className="relative grid place-items-center">
+      <svg viewBox="0 0 140 140" className="size-36 -rotate-90">
+        <circle cx="70" cy="70" r={R} fill="none" strokeWidth="13" className="stroke-brand/15" />
+        <circle
+          cx="70" cy="70" r={R} fill="none" strokeWidth="13" strokeLinecap="round"
+          className="stroke-brand transition-[stroke-dashoffset] duration-700"
+          strokeDasharray={C}
+          strokeDashoffset={C * (1 - (pct ?? 0) / 100)}
+        />
+      </svg>
+      <div className="absolute grid place-items-center text-center">
+        <div className="text-3xl font-black leading-none tracking-tight tabular-nums">{pct === null ? "—" : `${pct}%`}</div>
+        <div className="mt-1 text-2xs font-medium text-muted-foreground">{caption}</div>
+      </div>
+    </div>
+  )
 }
 
 // The staff home — role-meaningful KPIs off the shared order feed, a live production-line
@@ -234,7 +300,35 @@ export function StaffDashboard() {
   const shortcutDefaults = useMemo(() => catalog.slice(0, 6).map((c) => c.href), [catalog])
 
   return (
-    <div className="space-y-4">
+    /**
+     * A TINTED GROUND, for this page only.
+     *
+     * The house rule is white canvas, and it holds everywhere it was written for: a tinted
+     * sheet under a 700-row queue is one you read *through* all day. This page has no queue
+     * — it is eight cards and a chart, read for ten seconds — so the wash sits under cards
+     * that are themselves still white, and every figure keeps its white paper. The bleed
+     * (negative margins matching `eg-content`'s gutter) is what lets it reach the edges
+     * without touching the shared layout, so no other board inherits it.
+     */
+    <div
+      className="-mx-4 -mt-5 -mb-5 px-4 pt-5 pb-10 md:-mx-8 md:-mt-6 md:-mb-6 md:px-8 md:pt-6"
+      style={{
+        // TWO OVERLAPPING RADIALS, painted on the wrapper itself.
+        //
+        // Not an absolutely-positioned layer at -z-10: the shell root carries `bg-background`,
+        // and a negative z-index inside it puts the wash BEHIND that white — it rendered as
+        // a completely plain page. Not a single linear ramp either; `to-transparent` runs out a
+        // third of the way down and leaves the rest on bare white, reading as an unfinished
+        // background rather than a tinted one.
+        //
+        // color-mix off --brand rather than a literal violet, so it follows the theme and the
+        // dark palette instead of pinning one hex into the app.
+        backgroundImage:
+          "radial-gradient(85rem 48rem at -5% -12%, color-mix(in oklab, var(--brand) 26%, transparent), transparent 62%)," +
+          "radial-gradient(65rem 42rem at 104% -8%, color-mix(in oklab, oklch(0.72 0.19 350) 22%, transparent), transparent 58%)",
+      }}
+    >
+      <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><SquaresFour size={18} weight="fill" /></span>
@@ -270,67 +364,83 @@ export function StaffDashboard() {
         </div>
       )}
 
-      {/**
-        * ONE MONEY PANEL, not five equal cards.
-        *
-        * Five twins in a row say nothing is more important than anything else — and a fifth
-        * one simply wrapped, which is what a grid of equals does when it grows. So the money
-        * becomes a single bounded block with a hierarchy inside it: GMV leads at display
-        * size, the three figures that qualify it sit beside it at a third the weight.
-        *
-        * A TINT, not a fill. --brand is oklch(0.5305 0.2723 283.5) — a saturated violet,
-        * not the #A5B7FF plate CLAUDE.md still describes; the token moved and the doc
-        * didn't. At full strength it swamps the page and argues with the sidebar, which is
-        * already carrying purple. At 7% over white it groups the money without competing,
-        * which is the job — and ordinary foreground text stays legible on it, so nothing
-        * needs a bespoke contrast pairing.
-        *
-        * It sits ABOVE the data, never behind it. The queue below stays on white paper,
-        * which is the rule that matters — a tinted sheet under 700 rows is one you read
-        * through all day.
-        */}
-      {isAdmin ? (
-        <div className="rounded-2xl border border-brand/15 bg-brand/[0.07] p-5 sm:p-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-10">
-            <div>
-              <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-                GMV · {rangeMeta.sub}
+      {/* THE FIGURE ROW. Compact tiles rather than the single money panel that was here —
+          same numbers, same source, read across instead of down. `cards` is already
+          role-tuned, so warehouse and operator get their production counts in the same
+          shape admin gets money in.
+          orders===null means NOT READ, so every tile shows — rather than 0. */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+        {cards.map((c) => (
+          <MiniStat
+            key={c.label}
+            label={c.label}
+            value={orders === null ? "—" : String(c.value)}
+            sub={c.sub}
+            icon={c.icon}
+            tone={c.pos ? "pos" : c.neg && c.value ? "neg" : undefined}
+          />
+        ))}
+      </div>
+
+      {/* Money chart + the one rate worth a gauge. Admin only, like the money itself. */}
+      {isAdmin && (
+        <div className="grid items-stretch gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <SectionCard
+              className="h-full"
+              title="GMV"
+              description="What buyers paid, through the platform"
+              bodyClassName="flex flex-1 flex-col gap-5 p-5"
+            >
+              <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+                <div>
+                  <div className="font-title text-4xl font-black leading-none tracking-tight tabular-nums sm:text-5xl">
+                    {orders === null ? "—" : usd(money.revenue)}
+                  </div>
+                  <div className="mt-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{rangeMeta.sub}</div>
+                </div>
+                {/* The figures that QUALIFY the headline, at a third its weight — the
+                    hierarchy the old panel was built for, kept. */}
+                {moneySide.map((c) => (
+                  <div key={c.label}>
+                    <div className="text-xl font-bold tabular-nums">{c.value}</div>
+                    <div className="mt-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{c.label}</div>
+                    <div className="text-2xs text-muted-foreground">{c.sub}</div>
+                  </div>
+                ))}
               </div>
-              <div className="mt-1 font-title text-5xl font-semibold tracking-tight tabular-nums sm:text-6xl">
-                {orders === null ? "—" : usd(money.revenue)}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                what buyers paid, through the platform
-              </div>
+
               {/* The SHAPE, not the axis. Bars are the one form that reads at this size with
                   no labels at all, and it is the only chart the panel needs. */}
               {gmvBars.length > 0 && (
-                <div className="mt-4 flex h-12 items-end gap-1" aria-hidden>
+                <div className="mt-auto flex h-28 items-end gap-1" aria-hidden>
                   {gmvBars.map((h, i) => (
-                    <span key={i} className="flex-1 rounded-sm bg-brand/35" style={{ height: `${Math.max(4, h * 100)}%` }} />
+                    <span key={i} className="flex-1 rounded-t-md bg-brand/30" style={{ height: `${Math.max(3, h * 100)}%` }} />
                   ))}
                 </div>
               )}
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 self-center border-brand/20 lg:border-l lg:pl-10">
-              {moneySide.map((c) => (
-                <div key={c.label}>
-                  <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{c.label}</div>
-                  <div className="mt-1 text-2xl font-semibold tabular-nums">{c.value}</div>
-                  <div className="mt-0.5 text-2xs text-muted-foreground">{c.sub}</div>
-                </div>
-              ))}
-            </div>
+            </SectionCard>
           </div>
+
+          <SectionCard
+            className="h-full"
+            title="Shipped"
+            description="Share of all orders now shipped"
+            bodyClassName="flex h-full flex-col items-center justify-center gap-5 p-5"
+          >
+            <Gauge pct={orders === null ? null : shippedPct} caption="of all orders" />
+            <div className="grid w-full grid-cols-2 gap-3 text-center">
+              <div className="rounded-xl bg-muted/50 py-2.5">
+                <div className="text-lg font-bold tabular-nums">{orders === null ? "—" : stats.shipped}</div>
+                <div className="text-2xs font-medium text-muted-foreground">shipped</div>
+              </div>
+              <div className="rounded-xl bg-muted/50 py-2.5">
+                <div className="text-lg font-bold tabular-nums">{orders === null ? "—" : stats.total}</div>
+                <div className="text-2xs font-medium text-muted-foreground">all orders</div>
+              </div>
+            </div>
+          </SectionCard>
         </div>
-      ) : (
-        <StatGrid>
-          {cards.map((c) => (
-            // orders===null means "not read yet / failed", so show — rather than 0.
-            <StatCard key={c.label} label={c.label} value={orders === null ? "—" : String(c.value)} sub={c.sub} icon={c.icon} tone={c.pos ? "pos" : c.neg && c.value ? "neg" : undefined} />
-          ))}
-        </StatGrid>
       )}
 
       {/* Production line narrowed to two thirds so the fulfilment-speed card fills the
@@ -390,6 +500,7 @@ export function StaffDashboard() {
         </div>
 
         <ShortcutsCard catalog={catalog} defaults={shortcutDefaults} storageKey="eg_shortcuts_overview" />
+      </div>
       </div>
     </div>
   )
