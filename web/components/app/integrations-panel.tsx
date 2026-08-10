@@ -245,6 +245,18 @@ const INTEGRATIONS: Integration[] = [
     key: "alibaba", name: "Alibaba", blurb: "Supplier sourcing + buyer search", group: "Suppliers",
     check: configOnly("/api/alibaba/config", "configured"),
   },
+  // byeastside and Pink Design had SECRETS but no cards at all, so four keys were configured
+  // on the server and editable nowhere — the same failure as Shippo, found by the orphan
+  // guard rather than by anyone noticing. They are real partners, so they get real cards
+  // rather than being hung off someone else's.
+  {
+    key: "dispatch", name: "byeastside", blurb: "Label pre-scan + dispatch", group: "Shipping",
+    check: configOnly("/api/dispatch/status", "configured"),
+  },
+  {
+    key: "pinkdesign", name: "Pink Design", blurb: "Outsourced digitizing", group: "Embroidery",
+    check: configOnly("/api/pinkdesign/status", "configured"),
+  },
 ]
 
 const GROUPS = ["Channels", "Ads", "Payments", "Shipping", "Suppliers", "Embroidery", "Other"]
