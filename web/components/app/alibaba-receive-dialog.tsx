@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { savePurchaseOrder, type AlibabaOrderDetail, type POLine } from "@/lib/api"
+import { savePurchaseOrder, scanInventory, addInventoryItem, getCatalogProducts, saveCatalogProducts, type AlibabaOrderDetail, type POLine } from "@/lib/api"
 
 /**
  * Bring an Alibaba order into the purchase-order table so it can be RECEIVED.
@@ -47,6 +47,12 @@ export function AlibabaReceiveDialog({
   const [lines, setLines] = useState<POLine[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // "Into stock" used to create a purchase order and stop there — and a PO never becomes
+  // inventory in this system, not even when marked received (purchase.js books the COST;
+  // stock is /api/inventory). So the button was named for something it didn't do, and the
+  // goods were invisible in Inventory afterwards. Both steps happen here now.
+  const [receiveNow, setReceiveNow] = useState(true)
+  const [makeProducts, setMakeProducts] = useState(true)
 
   useEffect(() => {
     if (!order) return
@@ -115,6 +121,55 @@ export function AlibabaReceiveDialog({
         },
       })
       if (r.error) throw new Error(r.error)
+
+      // ── The goods themselves ────────────────────────────────────────────────
+      // A scan is an atomic delta, so an existing stock line is incremented rather than
+      // overwritten, and it leaves a scan_history row — receiving a delivery is a movement
+      // and should read as one. A sku we have never seen 404s, and only then is a new
+      // inventory row created, carrying the quantity as its opening count.
+      if (receiveNow) {
+        for (const l of usable) {
+          const sku = l.sku.trim()
+          const qty = Number(l.qty)
+          try {
+            await scanInventory({ sku, direction: "in", qty, order_ref: poNum })
+          } catch {
+            await addInventoryItem({
+              sku, name: l.name || sku, variant: l.variant || undefined,
+              in_stock: qty, supplier: order.sellerName || "Alibaba",
+            }).catch(() => null)
+          }
+        }
+      }
+
+      // ── The product ─────────────────────────────────────────────────────────
+      // Created OFF: `inCatalog: false` keeps it out of the shop window until someone
+      // decides it belongs there. Only skus with no product yet are added, so re-importing
+      // an order can't duplicate one. The unit price is the SUPPLIER's, so it is our COST
+      // (productCost) — writing it to base price would charge a seller our raw cost with
+      // no margin, the same trap the S&S and Otto builders call out.
+      if (makeProducts) {
+        const existing = await getCatalogProducts().catch(() => null)
+        if (existing) {
+          const have = new Set(existing.map((p) => String(p.sku || "").trim().toLowerCase()).filter(Boolean))
+          const fresh = usable
+            .filter((l) => !have.has(l.sku.trim().toLowerCase()))
+            .map((l) => ({
+              id: `ALI-${l.sku.trim()}`,
+              name: l.name || l.sku.trim(),
+              sku: l.sku.trim(),
+              status: "Active",
+              productCost: Number(l.price) || undefined,
+              img: l.image || undefined,
+              supplier: order.sellerName || "Alibaba",
+              inCatalog: false,
+            }))
+          if (fresh.length) {
+            await saveCatalogProducts([...existing, ...fresh]).catch(() => null)
+          }
+        }
+      }
+
       onImported?.(poNum)
       onClose()
     } catch (e) {
@@ -135,7 +190,7 @@ export function AlibabaReceiveDialog({
                 so the sentence is separated rather than joined — otherwise "Ltd.. Receive". */}
             {order.sellerName ? ` against ${order.sellerName}` : ""}
             {order.sellerName && /[.!?]$/.test(order.sellerName) ? " " : ". "}
-            Receive it from the Orders tab and the quantities go into inventory —{" "}
+            {receiveNow ? " The quantities go into inventory as sellable stock now" : " Receive it from the Orders tab when the goods arrive"} —{" "}
             {order.total != null
               ? <>the <strong>{`$${Number(order.total).toFixed(2)}`}</strong> Alibaba billed, freight included, books to the ledger then.</>
               : <>its cost books to the ledger then.</>}
@@ -150,6 +205,24 @@ export function AlibabaReceiveDialog({
             Alibaba&apos;s lines don&apos;t carry one — these are their model numbers, which is the
             closest thing on the order. Change any that should land on an existing stock line.
           </p>
+
+          <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-2.5">
+            <label className="flex items-start gap-2 text-xs">
+              <input type="checkbox" checked={receiveNow} onChange={(e) => setReceiveNow(e.target.checked)} className="mt-0.5" />
+              <span>
+                <span className="font-medium">Receive into stock now</span> — adds these quantities to
+                inventory as sellable stock. Untick if the goods haven&apos;t physically arrived.
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-xs">
+              <input type="checkbox" checked={makeProducts} onChange={(e) => setMakeProducts(e.target.checked)} className="mt-0.5" />
+              <span>
+                <span className="font-medium">Create products for new skus</span> — built from the
+                supplier&apos;s photo, name and unit cost, and left <strong>switched off</strong> until you
+                publish them in Products. Skus that already have a product are skipped.
+              </span>
+            </label>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
