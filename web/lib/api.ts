@@ -918,7 +918,18 @@ export function importSanmarCatalog(csv: string) {
 }
 
 // ── Inventory (staff) — whole-array upsert: send the full list, missing SKUs are dropped ──
-export type InventoryItem = { sku: string; name?: string | null; variant?: string | null; in_stock?: number; reserved?: number; reorder_at?: number; category?: string | null; supplier?: string | null; updated_at?: string }
+/**
+ * How far a stocked SKU may travel. Mirrors VISIBILITY in server/src/routes/inventory.js.
+ *
+ *   factory  internal only.
+ *   seller   published in the partner stock feed (GET /api/v1/stock).
+ *   public   additionally cleared for unauthenticated surfaces.
+ *
+ * Optional on the type because rows written before the column existed are read back by
+ * older cached responses; treat a missing value as "factory".
+ */
+export type SkuVisibility = "factory" | "seller" | "public"
+export type InventoryItem = { sku: string; name?: string | null; variant?: string | null; in_stock?: number; reserved?: number; reorder_at?: number; category?: string | null; supplier?: string | null; visibility?: SkuVisibility; updated_at?: string }
 /** Stock levels. Short window — a scan on the floor changes these, and a scan is a write,
  *  which clears the cache, so the window only ever elides a re-read while nothing has moved. */
 export function getInventory() {

@@ -60,6 +60,26 @@ async function consignedScan(sku, delta, direction, qty, req, b) {
   };
 }
 
+/**
+ * How far a stocked SKU is allowed to travel.
+ *
+ *   factory  internal only. Never appears outside the factory's own screens.
+ *   seller   published in the partner/seller stock feed (GET /api/v1/stock).
+ *   public   cleared for unauthenticated surfaces as well.
+ *
+ * Exported because the enforcement has to be the SAME set everywhere a row leaves the
+ * building — a second copy of this list in the partner API is how "factory" quietly stops
+ * meaning factory.
+ */
+export const VISIBILITY = ['factory', 'seller', 'public'];
+/** null for anything not on the list — callers decide between 400 and "leave it alone". */
+export const normVisibility = (v) => {
+  const s = String(v ?? '').trim().toLowerCase();
+  return VISIBILITY.includes(s) ? s : null;
+};
+/** The one predicate that decides whether a row may be published outside the factory. */
+export const VISIBLE_TO_PARTNERS = `coalesce(visibility, 'factory') <> 'factory'`;
+
 export function inventoryRoutes(app, requireStaff, requireWarehouse) {
   // READS stay open to any staff — an operator needs to look stock up. WRITES are
   // warehouse/admin: a stock level is a claim about physical custody, and the whole-list
@@ -67,6 +87,26 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
   // inventory. The Scan station already rendered read-only for operators; this is the
   // half that was missing.
   q('alter table inventory add column if not exists supplier text').catch(() => {});
+  /**
+   * VISIBILITY, added in two steps on purpose — and route-load only, never schema.sql,
+   * so a fresh database and a four-month-old one end up in exactly the same state.
+   *
+   * The column is ADDED with default 'seller' and then has its default CHANGED to
+   * 'factory'. That is not redundant:
+   *
+   *   step 1 backfills EXISTING rows to 'seller'. Every row already on the shelf is
+   *          already published in GET /api/v1/stock, and silently emptying a partner's
+   *          stock feed overnight would tell them we can make nothing — a live
+   *          integration must not change behaviour because a column appeared.
+   *   step 2 makes every FUTURE row 'factory'. Which is the actual point: stock arriving
+   *          from a supplier is not a decision to sell it, and receiving must not be the
+   *          moment it becomes visible.
+   *
+   * Both are no-ops on the second boot, so this is safe to run on every start.
+   */
+  q(`alter table inventory add column if not exists visibility text not null default 'seller'`)
+    .then(() => q(`alter table inventory alter column visibility set default 'factory'`))
+    .catch(() => {});
   // scan_history is declared in schema.sql, but that only runs on FIRST db init —
   // an existing deployment never got it. Create it idempotently at route-load (same
   // pattern as order_designs/wallet_ledger) so /scan works on an older database.
@@ -87,6 +127,21 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
     return r.rows;
   });
 
+  /**
+   * VISIBILITY IS DELIBERATELY ABSENT FROM THIS ROUTE — do not add it.
+   *
+   * Both receiving paths (Purchase board "Receive", and the S&S box scanner) build their
+   * payload by reading the whole inventory, merging quantities in, and POSTing it back
+   * here. So anything this route accepts, receiving silently re-asserts from a client
+   * snapshot: a SKU a human had set to factory-only would be flipped back by the next
+   * delivery that happened to touch it, and a brand-new SKU would arrive carrying whatever
+   * the page had in memory.
+   *
+   * Omitting the column from the INSERT means a new row takes the table default
+   * ('factory'), and omitting it from the DO UPDATE means an existing row keeps whatever a
+   * human chose. Receiving therefore cannot publish stock — which is the whole point of
+   * landing this before the receiving bridge. Visibility moves only through PATCH below.
+   */
   app.post('/api/inventory', { preHandler: requireWarehouse }, async (req) => {
     const rows = Array.isArray(req.body) ? req.body : [];
     for (const r of rows) {
@@ -120,7 +175,7 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
   // one re-sends every row from the client's snapshot, so editing an unrelated
   // field (say reorder_at) writes back a stale in_stock and silently erases any
   // stock scanned in since the page loaded. Here only the named fields move.
-  const PATCHABLE = ['name', 'variant', 'in_stock', 'reserved', 'reorder_at', 'category', 'supplier'];
+  const PATCHABLE = ['name', 'variant', 'in_stock', 'reserved', 'reorder_at', 'category', 'supplier', 'visibility'];
   // requireWarehouse, not requireStaff: in_stock is PATCHABLE, and a stock level is a
   // claim about physical custody (see the header note above). Every sibling write here
   // is warehouse/admin; this route was the one gap, letting an operator set any stock to
@@ -130,7 +185,17 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
     const b = req.body || {};
     const sets = [], vals = [];
     for (const f of PATCHABLE) {           // whitelist — field names are never taken from input
-      if (b[f] !== undefined) { vals.push(b[f]); sets.push(f + '=$' + vals.length); }
+      if (b[f] === undefined) continue;
+      let v = b[f];
+      // A typo'd visibility must FAIL, not fall back. Coercing an unknown value to a
+      // default would silently pick a side on the one field that decides whether stock
+      // leaves the factory, and 'sellers' vs 'seller' is exactly the sort of near-miss
+      // that would then read as deliberate.
+      if (f === 'visibility') {
+        v = normVisibility(v);
+        if (!v) { reply.code(400); return { error: `visibility must be one of: ${VISIBILITY.join(', ')}` }; }
+      }
+      vals.push(v); sets.push(f + '=$' + vals.length);
     }
     if (!sets.length) { reply.code(400); return { error: 'No updatable fields supplied' }; }
     vals.push(sku);
@@ -143,19 +208,31 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
   });
 
   // Create/upsert a SINGLE item (the Add-item dialog) — again, no whole-list write.
+  //
+  // Unlike the bulk route this DOES take a visibility, because a person filling in this
+  // dialog is making a decision rather than replaying a snapshot. It still defaults to
+  // 'factory' when omitted, and `coalesce($9, inventory.visibility)` on the conflict path
+  // means re-adding an existing SKU without naming a visibility leaves the one already
+  // chosen alone — `excluded.visibility` would have quietly reset it to the default.
   app.post('/api/inventory/item', { preHandler: requireWarehouse }, async (req, reply) => {
     const r = req.body || {};
     if (!r.sku) { reply.code(400); return { error: 'sku is required' }; }
+    let vis = null;
+    if (r.visibility !== undefined) {
+      vis = normVisibility(r.visibility);
+      if (!vis) { reply.code(400); return { error: `visibility must be one of: ${VISIBILITY.join(', ')}` }; }
+    }
     const out = await q(
-      `insert into inventory (sku, name, variant, in_stock, reserved, reorder_at, category, supplier)
-       values ($1,$2,$3,$4,$5,$6,$7,$8)
+      `insert into inventory (sku, name, variant, in_stock, reserved, reorder_at, category, supplier, visibility)
+       values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9,'factory'))
        on conflict (sku) do update set
          name=excluded.name, variant=excluded.variant, in_stock=excluded.in_stock,
          reserved=excluded.reserved, reorder_at=excluded.reorder_at,
-         category=excluded.category, supplier=excluded.supplier, updated_at=now()
+         category=excluded.category, supplier=excluded.supplier,
+         visibility=coalesce($9, inventory.visibility), updated_at=now()
        returning *`,
       [r.sku, r.name || null, r.variant || null, r.in_stock || 0, r.reserved || 0,
-       (r.reorder_at == null ? 25 : r.reorder_at), r.category || null, r.supplier || null]
+       (r.reorder_at == null ? 25 : r.reorder_at), r.category || null, r.supplier || null, vis]
     );
     return { ok: true, item: out.rows[0] };
   });

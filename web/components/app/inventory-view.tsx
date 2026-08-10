@@ -12,10 +12,22 @@ import { Barcode } from "@/components/app/barcode"
 import { ScanQr } from "@/components/app/scan-code"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, type InventoryItem, type ScanRow } from "@/lib/api"
+import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, type InventoryItem, type ScanRow, type SkuVisibility } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
+
+/**
+ * How far a SKU may travel. A row written before the column existed reads back undefined,
+ * and the safe reading of "we don't know" is the closed one — never assume a blank means
+ * published.
+ */
+const VIS: { id: SkuVisibility; label: string; pill: string }[] = [
+  { id: "factory", label: "Factory only", pill: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  { id: "seller", label: "Sellers", pill: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300" },
+  { id: "public", label: "Public", pill: "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300" },
+]
+const visOf = (it: InventoryItem): SkuVisibility => (it.visibility === "seller" || it.visibility === "public" ? it.visibility : "factory")
 const avail = (it: InventoryItem) => num(it.in_stock) - num(it.reserved)
 const isOut = (it: InventoryItem) => num(it.in_stock) <= 0
 const isLow = (it: InventoryItem) => !isOut(it) && num(it.in_stock) <= (it.reorder_at ?? 25)
@@ -25,6 +37,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
   const [items, setItems] = useState<InventoryItem[] | null>(null)
   const [search, setSearch] = useState("")
   const [cat, setCat] = useState("")
+  const [vis, setVis] = useState<"" | SkuVisibility>("")
   const [saving, setSaving] = useState(false)
   // When the Inventory shell drives the pool (its single Our stock · Seller stock · Scan
   // nav), follow it and hide the in-view toggle; standalone, keep our own.
@@ -67,6 +80,18 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(flush, 600)
   }
+  // Sent immediately rather than through the 600ms debounce the number cells use: this is
+  // a deliberate choice about who can see stock, not a value being typed, and a dropped
+  // debounce on THIS field is the one that publishes something by accident.
+  const setVisibility = (sku: string, next: SkuVisibility) => {
+    const before = (items ?? []).find((i) => i.sku === sku)
+    setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, visibility: next } : it)))
+    patchInventoryItem(sku, { visibility: next }).catch(() => {
+      // Put the row back rather than leaving the table claiming a change that never
+      // landed — a visibility that only looks applied is worse than one that failed.
+      setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, visibility: before?.visibility } : it)))
+    })
+  }
   const remove = (sku: string) => {
     setItems((prev) => (prev ?? []).filter((it) => it.sku !== sku))
     pending.current.delete(sku)
@@ -81,9 +106,10 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
   const cats = useMemo(() => Array.from(new Set((items ?? []).map((i) => i.category).filter(Boolean))).sort() as string[], [items])
   const filtered = useMemo(() => (items ?? []).filter((it) => {
     if (cat && it.category !== cat) return false
+    if (vis && visOf(it) !== vis) return false
     if (!search) return true
     return `${it.sku} ${it.name ?? ""} ${it.variant ?? ""}`.toLowerCase().includes(search.toLowerCase())
-  }), [items, cat, search])
+  }), [items, cat, vis, search])
 
   const stats = useMemo(() => {
     const list = items ?? []
@@ -149,6 +175,15 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               {cats.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           )}
+          <select
+            value={vis}
+            onChange={(e) => setVis(e.target.value as "" | SkuVisibility)}
+            aria-label="Filter by visibility"
+            className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          >
+            <option value="">All visibility</option>
+            {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
           {sel.size > 0 && (
             <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
           )}
@@ -156,6 +191,14 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
             <Printer size={14} weight="bold" /> {sel.size ? `Print ${sel.size} selected` : "Print labels"}
           </Button>
           <Button size="sm" onClick={() => setAddOpen(true)}><Plus size={14} weight="bold" /> Add item</Button>
+        </div>
+
+        <div className="border-b border-border bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Factory only</span> never leaves the building — stock arrives this way,
+          because receiving a blank is not a decision to sell it.{" "}
+          <span className="font-medium text-foreground">Sellers</span> publishes the SKU in the partner stock feed.{" "}
+          <span className="font-medium text-foreground">Public</span> additionally clears it for unauthenticated surfaces —
+          nothing reads that yet, so today it records the decision rather than changing what is served.
         </div>
 
         {items === null ? (
@@ -190,6 +233,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                     <th className="px-4 py-2.5 text-center font-medium">Available</th>
                     <th className="px-4 py-2.5 text-center font-medium">Reorder&nbsp;at</th>
                     <th className="px-4 py-2.5 font-medium">Status</th>
+                    <th className="px-4 py-2.5 font-medium">Visibility</th>
                     <th className="px-4 py-2.5" />
                   </tr>
                 </thead>
@@ -249,9 +293,21 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                       <td className="px-4 py-2 text-center font-semibold tabular-nums">{avail(it)}</td>
                       <td className="px-2 py-2 text-center"><Input value={String(it.reorder_at ?? 25)} onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
                       <td className="px-4 py-2">
-                        {isOut(it) ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Out</span>
-                          : isLow(it) ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Low</span>
-                            : <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
+                        {/* nowrap: the visibility column narrowed this one enough that
+                            "In stock" wrapped onto two lines and the row grew a step. */}
+                        {isOut(it) ? <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Out</span>
+                          : isLow(it) ? <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Low</span>
+                            : <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
+                      </td>
+                      <td className="px-4 py-2">
+                        <select
+                          value={visOf(it)}
+                          onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
+                          aria-label={`Visibility for ${it.sku}`}
+                          className={"eg-select h-7 rounded-full border-0 py-0 pl-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (VIS.find((v) => v.id === visOf(it))?.pill ?? "")}
+                        >
+                          {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+                        </select>
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex items-center justify-end gap-1">
@@ -404,15 +460,18 @@ function AddItemDialog({ open, onOpenChange, onAdd, existing }: { open: boolean;
   const [reorder, setReorder] = useState("25")
   const [category, setCategory] = useState("")
   const [supplier, setSupplier] = useState("")
+  // Starts closed. Adding a row by hand is still not a decision to publish it, and the
+  // dialog should not be the place that quietly differs from receiving.
+  const [visibility, setVisibility] = useState<SkuVisibility>("factory")
   const [err, setErr] = useState<string | null>(null)
 
-  useEffect(() => { if (open) { const id = setTimeout(() => { setSku(""); setName(""); setVariant(""); setStock(""); setReorder("25"); setCategory(""); setSupplier(""); setErr(null) }, 0); return () => clearTimeout(id) } }, [open])
+  useEffect(() => { if (open) { const id = setTimeout(() => { setSku(""); setName(""); setVariant(""); setStock(""); setReorder("25"); setCategory(""); setSupplier(""); setVisibility("factory"); setErr(null) }, 0); return () => clearTimeout(id) } }, [open])
 
   const save = () => {
     const s = sku.trim()
     if (!s) { setErr("A SKU is required."); return }
     if (existing.includes(s)) { setErr("That SKU already exists."); return }
-    onAdd({ sku: s, name: name.trim() || undefined, variant: variant.trim() || undefined, in_stock: Number(stock) || 0, reorder_at: Number(reorder) || 25, category: category.trim() || undefined, supplier: supplier.trim() || undefined })
+    onAdd({ sku: s, name: name.trim() || undefined, variant: variant.trim() || undefined, in_stock: Number(stock) || 0, reorder_at: Number(reorder) || 25, category: category.trim() || undefined, supplier: supplier.trim() || undefined, visibility })
   }
 
   return (
@@ -429,6 +488,21 @@ function AddItemDialog({ open, onOpenChange, onAdd, existing }: { open: boolean;
             <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Category</span><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Apparel" className="h-9" /></label>
           </div>
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Supplier</span><Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="S&S Activewear / Otto Cap" className="h-9" /></label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Visibility</span>
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as SkuVisibility)}
+              className="eg-select h-9 rounded-2xl border border-border bg-card px-3 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+            </select>
+            <span className="text-2xs text-muted-foreground">
+              {visibility === "factory" ? "Internal only — nothing outside the factory sees this SKU."
+                : visibility === "seller" ? "Published in the partner stock feed."
+                  : "Cleared for unauthenticated surfaces too. Nothing reads that yet — this records the decision."}
+            </span>
+          </label>
           {sku.trim() && <div className="flex justify-center rounded-lg border border-border bg-muted/30 py-2"><Barcode value={sku.trim()} height={40} /></div>}
           {err && <div className="text-sm text-destructive">{err}</div>}
           <div className="flex justify-end gap-2">

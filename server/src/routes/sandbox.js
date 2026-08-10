@@ -15,6 +15,7 @@ import { q } from '../db.js';
 import { quoteSpec } from '../pricing.js';
 import { limited, LIMITS } from '../ratelimit.js';
 import { stripMethod } from '../replenish.js';
+import { VISIBLE_TO_PARTNERS } from './inventory.js';
 import { emitWebhook } from '../webhooks.js';
 
 const PREFIX = 'egk_test_';
@@ -505,8 +506,17 @@ export function sandboxRoutes(app, requireAuth) {
     const want = String((req.query || {}).sku || '').trim();
     try {
       const params = [];
-      let where = '';
-      if (want) { params.push(stripMethod(want).toUpperCase()); where = 'where upper(sku) = $1'; }
+      // VISIBILITY GATE. This route is the only place a shelf row leaves the building, so
+      // it is where 'factory' has to mean something. A SKU we have merely RECEIVED is not
+      // a SKU we have decided to sell, and a partner reading this feed cannot tell the
+      // difference — it would just start routing work at blanks that were never offered.
+      //
+      // The predicate is imported rather than retyped: two copies of "which rows may be
+      // published" is how the two drift and 'factory' quietly stops meaning factory.
+      // Existing rows were backfilled to 'seller' when the column landed, so a partner's
+      // feed did not change on deploy; only new arrivals start hidden.
+      let where = `where ${VISIBLE_TO_PARTNERS}`;
+      if (want) { params.push(stripMethod(want).toUpperCase()); where += ' and upper(sku) = $1'; }
       const r = await q(
         `select sku, name, variant, in_stock, reserved, reorder_at, category
            from inventory ${where} order by sku limit 1000`, params);
