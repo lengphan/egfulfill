@@ -14,6 +14,33 @@ import {
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
+
+/**
+ * The failure, in one short line a person can act on.
+ *
+ * The row used to print the transport's raw answer — `Brevo API 400
+ * {"code":"invalid_parameter","message":"email is not valid in to"} | smtp: No recipients
+ * defined` — wrapped across three lines of red in a table cell. It is the right text to
+ * KEEP, and the wrong text to lead with: it reads as a system fault when the actual
+ * meaning is usually "one address on your list is wrong".
+ *
+ * So the row gets the meaning and the detail view keeps the words.
+ */
+function shortFailure(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const s = String(raw)
+  // Our own message already leads with the count and the address — keep that, it is the
+  // one case where the raw text is the useful text.
+  const mine = s.match(/^\d+ of \d+ failed — first was ([^:]+):/)
+  if (mine) return `${mine[1]} isn't a valid address`
+  if (/not a valid email|email is not valid|invalid_parameter/i.test(s)) return "An address on the list isn't valid"
+  if (/unrecognised IP|Unauthorized IP/i.test(s)) return "This server's IP isn't allowed in Brevo"
+  if (/sender|not verified|unverified/i.test(s)) return "The sending address isn't verified"
+  if (/rate|429|too many/i.test(s)) return "Rate limited — some messages were refused"
+  if (/401|unauthor/i.test(s)) return "The mail key was rejected"
+  return "Some messages couldn't be delivered"
+}
+
 /**
  * Spell a count out.
  *
@@ -294,6 +321,9 @@ export function BroadcastsView() {
 
   // Send confirmation. Held separately from the editor because it asks a different
   // question — not "is this right?" but "are you sure?".
+  // A sent broadcast, reopened to read. Separate from `editing`: a sent one cannot be
+  // changed — it is a record of what went out — so this is deliberately read-only.
+  const [viewing, setViewing] = useState<Broadcast | null>(null)
   const [confirming, setConfirming] = useState<Broadcast | null>(null)
   const [count, setCount] = useState<Awaited<ReturnType<typeof previewBroadcastAudience>> | null>(null)
   // The audience AS EDITED on the CONFIRM screen — distinct from `aud` above, which belongs
@@ -466,7 +496,19 @@ export function BroadcastsView() {
                   return (
                     <tr key={String(b.id)} className="align-top">
                       <td className="max-w-72 py-2.5 pr-3">
-                        <div className="truncate font-medium">{b.subject}</div>
+                        {/* READ IT BACK. A sent broadcast is a record, and the record was a
+                            truncated first line — you could see that you mailed everyone and
+                            not what you said. Click the subject to reopen the whole thing.
+                            A draft opens the editor instead, which is the useful action
+                            there. */}
+                        <button
+                          type="button"
+                          onClick={() => (b.status === "draft" ? openEditor(b) : setViewing(b))}
+                          className="eg-tap block max-w-full truncate text-left font-medium transition-colors hover:text-primary"
+                          title={b.status === "draft" ? "Open this draft" : "Read what was sent"}
+                        >
+                          {b.subject}
+                        </button>
                         <div className="truncate text-xs text-muted-foreground">{b.body}</div>
                       </td>
                       <td className="py-2.5 pr-3 text-xs text-muted-foreground">{audienceLabel(b.audience)}</td>
@@ -485,18 +527,18 @@ export function BroadcastsView() {
                             {b.failed_count > 0 && (
                               <div className="text-xs text-red-600 dark:text-red-400">
                                 {b.failed_count} failed
-                                {/* The transport's own words. "N failed" alone gives nothing
-                                    to act on, and the reason — unverified sender, rejected
-                                    key, rate limit — decides what you do next. */}
-                                {b.last_error && (
-                                  <div className="mt-0.5 font-normal leading-snug opacity-90">{b.last_error}</div>
+                                {/* One short line here; the transport's own words are kept
+                                    and shown in the detail view, where there is room for
+                                    them and where you have gone looking for them. */}
+                                {shortFailure(b.last_error) && (
+                                  <div className="mt-0.5 font-normal leading-snug opacity-90">{shortFailure(b.last_error)}</div>
                                 )}
                               </div>
                             )}
                             {/* A run that sent nothing is marked failed with no counter to
                                 hang the reason on, so it needs its own line. */}
-                            {b.failed_count === 0 && b.status === "failed" && b.last_error && (
-                              <div className="mt-0.5 text-xs leading-snug text-red-600 opacity-90 dark:text-red-400">{b.last_error}</div>
+                            {b.failed_count === 0 && b.status === "failed" && shortFailure(b.last_error) && (
+                              <div className="mt-0.5 text-xs leading-snug text-red-600 opacity-90 dark:text-red-400">{shortFailure(b.last_error)}</div>
                             )}
                           </>
                         )}
@@ -601,6 +643,42 @@ export function BroadcastsView() {
       </Dialog>
 
       {/* ── Send confirmation ─────────────────────────────────────────────── */}
+      {/* READ-ONLY record of a sent broadcast. Deliberately not the editor: a sent
+          broadcast is history, and the module already refuses to edit one server-side. */}
+      <Dialog open={!!viewing} onOpenChange={(v) => !v && setViewing(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="pr-6">{viewing?.subject}</DialogTitle>
+            <DialogDescription>
+              {viewing ? `${audienceLabel(viewing.audience)} · ${viewing.sent_count.toLocaleString("en-US")} of ${(viewing.recipient_count ?? 0).toLocaleString("en-US")} delivered` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {/* The body as it was authored — plain text, whitespace kept, because that is
+                how it was written and how it was rendered into the mail. */}
+            <div className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-3 text-sm leading-relaxed">
+              {viewing?.body}
+            </div>
+            {viewing?.last_error && (
+              /* The transport's OWN words, kept verbatim. The row shows a short human line;
+                 this is where the raw text belongs — you came here to look for it. */
+              <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs leading-snug text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+                <div className="font-medium">{viewing.failed_count.toLocaleString("en-US")} didn&apos;t get it</div>
+                <div className="mt-0.5 font-mono opacity-90">{viewing.last_error}</div>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Sent {viewing?.sent_at ? dt(viewing.sent_at) : dt(viewing?.created_at ?? "")}
+              {viewing?.created_by_name || viewing?.created_by ? ` by ${viewing.created_by_name || viewing.created_by}` : ""}.
+              A sent broadcast can&apos;t be edited — it&apos;s the record of what went out.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewing(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!confirming} onOpenChange={(v) => !v && setConfirming(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>

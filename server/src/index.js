@@ -166,6 +166,22 @@ function requireDesignStaff(req, reply, done) {
   done();
 }
 
+/**
+ * Who may write and send a seller broadcast: ADMIN or OPERATOR.
+ *
+ * Not requireStaff — that also admits designer and warehouse, neither of whom has any
+ * reason to mail the customer base, and this is still the least reversible action in the
+ * product: there is no unsend and the blast radius is every seller. Operators are included
+ * because they are the people who actually send announcements (owner's call, 2026-08-10);
+ * the confirm screen, which now lists every recipient and can be edited, is what makes that
+ * safe rather than the role gate alone.
+ */
+function requireBroadcaster(req, reply, done) {
+  const role = req.user && req.user.role;
+  if (role !== 'admin' && role !== 'operator') { reply.code(403).send({ error: 'Admin or operator only' }); return; }
+  done();
+}
+
 function requireAdmin(req, reply, done) {
   if (!req.user || req.user.role !== 'admin') { reply.code(403).send({ error: 'Admin only' }); return; }
   done();
@@ -469,7 +485,7 @@ purchaseRoutes(app, requireAuth, requireAdmin, requireAdmin);            // ADMI
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)
 notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
 adsRoutes(app, requireAdmin);                          // ADMIN: Meta + Google Ads — these CREATE and PAUSE campaigns, i.e. they move money
-broadcastsRoutes(app, requireAdmin, requireAdmin);     // ADMIN: seller email broadcasts — drafting reaches the whole seller list, so it's gated like sending; PUBLIC unsubscribe at /api/broadcasts/unsubscribe
+broadcastsRoutes(app, requireBroadcaster, requireBroadcaster);  // ADMIN or OPERATOR: seller email broadcasts. Drafting reaches the whole seller list, so it is gated the same as sending; PUBLIC unsubscribe at /api/broadcasts/unsubscribe
 siteContentRoutes(app, requireAdmin);                  // editable marketing-home copy — PUBLIC GET (homepage reads it), ADMIN PUT (Settings › Site content)
 dispatchRoutes(app, requireAuth, requireWarehouse);    // byeastside: push labels for pre-scan, poll PICKED
 manifestRoutes(app, requireWarehouse);                  // USPS SCAN forms via Shippo manifests

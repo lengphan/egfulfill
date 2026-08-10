@@ -465,11 +465,14 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
   /**
    * Send.
    *
-   * ADMIN, not staff. requireDraft includes operator, and an operator's zone ends at the
-   * scan — mailing every seller on the platform is the least reversible action in the
-   * product: there is no unsend, and the blast radius is the entire customer base. Drafting
-   * is open to the team; the irreversible step is not. To widen it, swap requireAdmin for
-   * requireDraft on this one route.
+   * ADMIN or OPERATOR (see requireBroadcaster in index.js). Operators are the people who
+   * actually send announcements, so gating them out meant the work happened through an
+   * admin account instead — which is worse for the audit trail than allowing it outright.
+   *
+   * It is still the least reversible action in the product: there is no unsend and the
+   * blast radius is every seller. What makes it safe is the confirm step, which now lists
+   * every recipient by name and lets one be struck off, rather than a role check alone.
+   * Designer and warehouse remain excluded — neither has a reason to mail the customer base.
    *
    * Returns as soon as the audience is resolved rather than after the last message. A few
    * hundred sequential Brevo calls outlives any sane request timeout, and a send that
