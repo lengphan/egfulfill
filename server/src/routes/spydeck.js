@@ -669,7 +669,8 @@ export function spydeckRoutes(app, requireAuth) {
       // listing id is in it. Parsing it back out repairs the old rows without a migration,
       // and costs nothing once the column is filled going forward.
       r = await q(
-        `${BASE}, p.platform, p.blank_sku, p.print_type, p.color, p.size
+        `${BASE}, p.platform, p.blank_sku, p.print_type, p.color, p.size,
+                p.design_id, p.design_data, p.design_pos
            from spydeck_uploads u
            left join published_listings p
              on p.listing_id = coalesce(u.our_listing_id, substring(u.url from 'listing/([0-9]+)'))
@@ -684,8 +685,13 @@ export function spydeckRoutes(app, requireAuth) {
       // `published` rides inside data (the POST folds it in) — lift it to the top level so
       // the client doesn't have to know where it was stored.
       const { published, ...source } = d;
+      // design_* rides along so the card can REOPEN the publish dialog with the artwork
+      // already attached. Without it a re-publish would produce a listing with the right
+      // blank and variants and no design on it, which is worse than not offering the button.
       const product = (row.blank_sku || row.print_type || row.color || row.size)
-        ? { blank_sku: row.blank_sku, print_type: row.print_type, color: row.color, size: row.size, platform: row.platform }
+        ? { blank_sku: row.blank_sku, print_type: row.print_type, color: row.color, size: row.size,
+            platform: row.platform, design_id: row.design_id, design_data: row.design_data,
+            design_pos: row.design_pos }
         : undefined;
       return {
         ...source, listing_id: row.listing_id,

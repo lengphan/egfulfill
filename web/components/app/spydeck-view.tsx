@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash } from "@phosphor-icons/react"
+import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, PencilSimple, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -12,7 +12,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { CARD_ACTION_PRIMARY, CARD_ACTION_SECONDARY, CARD_ACTION_ICON } from "@/lib/card-actions"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, deleteSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, type PublishedRecord, getSpydeckListingDetail, getEtsyListingImages } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, deleteSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, type PublishedRecord, getSpydeckListingDetail, getEtsyListingImages, getCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
@@ -121,7 +121,7 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
 // The competitor's `views`/`num_favorers`/revenue estimates are still on the row and are
 // deliberately NOT rendered here. They're someone else's sales; under our title they'd
 // read as ours. The source is reachable as a labelled link and nothing more.
-const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedListing; onRemove?: (l: UploadedListing) => void }) {
+const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: UploadedListing; onRemove?: (l: UploadedListing) => void; onEdit?: (l: UploadedListing, images: string[]) => void }) {
   // "What did I actually upload?" is a question the 300px tile can't answer — the cover is
   // cropped square and scaled down, so a misplaced design or the wrong file looks fine.
   const [zoom, setZoom] = useState(false)
@@ -265,7 +265,27 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedLi
         )}
 
         <div className="mt-auto flex gap-1.5 pt-3">
-          {l.our_url ? (
+          {/* EDIT, not "Open listing".
+              ─────────────────────────
+              What we publish is a DRAFT — it sits on Etsy until the seller finishes it or
+              activates it — so a link out to it was the least useful thing this card could
+              offer: you land on Etsy's own form with none of the blank, variants or artwork
+              we hold. The useful action is to fix what we sent and send it again, which is
+              this dialog re-opened with everything already in it.
+
+              The link out isn't lost; it lives in the review dialog behind the cover, which
+              is where you go once you actually want the marketplace's copy. Keeping both
+              here would be a third button on a row that is already tight. */}
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={() => onEdit(l, gallery)}
+              title="Reopen the publish window with this listing's blank, variants, artwork and photos"
+              className={cn(CARD_ACTION_PRIMARY, "flex-1")}
+            >
+              <PencilSimple size={13} weight="bold" /> Edit &amp; re-publish
+            </button>
+          ) : l.our_url ? (
             <a href={l.our_url} target="_blank" rel="noopener noreferrer" className={cn(CARD_ACTION_PRIMARY, "flex-1")}>
               <Storefront size={13} weight="bold" /> Open listing
             </a>
@@ -613,6 +633,38 @@ export function SpyDeckView() {
   // dialog seeds itself from a setTimeout closure captured on exactly that render, so the
   // new card's title arrived beside the old card's description.
   const [makeDetail, setMakeDetail] = useState<{ forId?: string; description?: string; images?: string[] } | null>(null)
+
+  /**
+   * RE-PUBLISH: the same dialog, reopened with what we already sent.
+   *
+   * Our publish creates a DRAFT, and nothing here can edit a draft in place — Etsy has an
+   * update API but we have never called it, and pretending otherwise would be the worst
+   * kind of half-feature. So this sends a NEW draft from corrected inputs, and says so on
+   * the button ("re-publish", not "save"). The previous draft stays on Etsy until it is
+   * deleted there, which is the seller's call, not ours to make silently.
+   */
+  const [editing, setEditing] = useState<{ l: UploadedListing; images: string[]; blank: CatalogProduct | null } | null>(null)
+  /**
+   * The catalog, loaded only when the Uploaded tab needs it.
+   *
+   * The stored record keeps `blank_sku`, but the dialog needs the whole CatalogProduct —
+   * the sku alone has no cost, no shipping fee and therefore no margin, which is the one
+   * thing the publish dialog exists to show. Fetched lazily: every other tab here works
+   * without it.
+   */
+  const catalogRef = useRef<CatalogProduct[] | null>(null)
+  const startEdit = useCallback(async (l: UploadedListing, images: string[]) => {
+    if (!catalogRef.current) {
+      catalogRef.current = await getCatalogProducts().then((r): CatalogProduct[] => r ?? []).catch((): CatalogProduct[] => [])
+    }
+    const sku = l.product?.blank_sku || l.published?.blank_sku
+    // Resolved, not guessed. If the blank has since been removed from the catalog the
+    // dialog opens with the picker empty rather than a phantom product — the seller
+    // re-picks, and the margin is right instead of computed from something that is gone.
+    const catalog = catalogRef.current ?? []
+    const blank = sku ? (catalog.find((c) => String(c.sku ?? "") === String(sku)) ?? null) : null
+    setEditing({ l, images, blank })
+  }, [])
   useEffect(() => {
     if (!makeListing) return
     let alive = true
@@ -1101,7 +1153,7 @@ export function SpyDeckView() {
             <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {uploadedPaged.pageItems.map((l) => (
-                <UploadedCard key={l.listing_id} l={l} onRemove={removeUpload} />
+                <UploadedCard key={l.listing_id} l={l} onRemove={removeUpload} onEdit={startEdit} />
               ))}
             </div>
             <Pagination page={uploadedPaged.page} pageCount={uploadedPaged.pageCount} perPage={uploadedPaged.perPage} total={uploadedPaged.total} start={uploadedPaged.start} onPage={uploadedPaged.setPage} onPerPage={uploadedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -1167,6 +1219,40 @@ export function SpyDeckView() {
           listing supplies title/description/tags/images; the blank is chosen in the
           dialog, which is what makes cost and margin computable. */}
       <SourcingSuggestDialog listing={sourceListing} onClose={() => setSourceListing(null)} />
+
+      {/* RE-PUBLISH — the same dialog, seeded from what we actually sent.
+          A SECOND instance rather than a shared one: the two entry points seed different
+          things (a competitor listing supplies reference photos and no images; ours
+          supplies real images and a resolved blank), and one dialog switching between
+          them would need a reset effect — the pattern this repo replaced with remounting.
+          Keyed on the listing so reopening a different card is genuinely fresh state. */}
+      <PublishProductDialog
+        key={editing ? `edit-${editing.l.listing_id}` : "edit-none"}
+        open={!!editing}
+        onOpenChange={(v) => !v && setEditing(null)}
+        prefill={editing ? {
+          title: editing.l.published?.title || editing.l.title,
+          // The description was never stored on the publish record, so it starts empty
+          // rather than borrowing the competitor's — which is what it would otherwise be,
+          // and is the one field where copying is an actual liability.
+          description: "",
+          price: editing.l.published?.price ?? undefined,
+          tags: [],
+          // OUR photos, live from the listing — the ones already on it, so a re-publish
+          // starts from what is there instead of asking for them again.
+          images: editing.images,
+          blank: editing.blank,
+          // The artwork, so the new draft carries the design rather than an empty mockup.
+          designUrl: editing.l.product?.design_data || undefined,
+          designPos: editing.l.product?.design_pos ?? undefined,
+          designId: editing.l.product?.design_id ?? undefined,
+        } : null}
+        onPublished={(url, img, published) => {
+          if (editing) onPublishedFrom(editing.l, url, img, published)
+          setEditing(null)
+        }}
+        title="Edit & re-publish"
+      />
 
       <PublishProductDialog
         // Remount per listing. The dialog seeds its fields once per open; keying it means a

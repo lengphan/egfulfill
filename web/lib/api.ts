@@ -2615,7 +2615,13 @@ export type UploadedListing = EtsyListing & {
   /** Joined server-side from `published_listings`, so what we built is still known for
    *  rows written before the dialog carried it — and for any publish path that isn't
    *  this dialog. Authoritative where the two disagree. */
-  product?: { blank_sku?: string; print_type?: string; color?: string; size?: string; platform?: string }
+  product?: {
+    blank_sku?: string; print_type?: string; color?: string; size?: string; platform?: string
+    /** The ARTWORK this was built from, so the record can reopen the publish dialog with
+     *  the design already attached. A re-publish without these would make a listing with
+     *  the right blank and variants and no design on it. */
+    design_id?: string | null; design_data?: string | null; design_pos?: unknown
+  }
 }
 export function getSpydeckUploads() {
   return api<UploadedListing[]>(`/api/spydeck/uploads`)
