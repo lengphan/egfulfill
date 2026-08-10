@@ -260,9 +260,24 @@ export async function fetchSheetRows(raw, tabWanted) {
   if (!metaR.ok) {
     const msg = (meta.error && meta.error.message) || metaR.status;
     if (metaR.status === 403) {
+      // NAME THE ACCOUNT, AND KEEP GOOGLE'S OWN SENTENCE.
+      //
+      // A 403 here has two unrelated causes that need opposite fixes: the sheet isn't
+      // shared with us (PERMISSION_DENIED), or the Sheets API is switched off for the
+      // credential's Cloud project (SERVICE_DISABLED). This used to throw our sharing
+      // guess for both and DISCARD `msg`, so a disabled API sent you to Google Drive to
+      // re-share a sheet that was already shared. Google's text distinguishes them in
+      // one line; it belongs in front of the reader.
+      //
+      // The address is the other half. "Share it with the client_email from
+      // GOOGLE_SERVICE_ACCOUNT" asks someone to open a server .env to finish a task in
+      // a browser — so the email is printed here, which is safe: a service-account
+      // address is the thing you are meant to hand out.
+      const sa = loadSA();
+      const who = auth && sa && sa.client_email ? sa.client_email : null;
       throw new Error(auth
-        ? 'That sheet isn\'t shared with the service account — share it (Viewer) with the client_email from GOOGLE_SERVICE_ACCOUNT.'
-        : 'That sheet isn\'t shared. Prefer sharing it with a service account; sharing "Anyone with the link" exposes buyer addresses to anyone with the URL.');
+        ? `Google says: ${msg}${who ? ` — if that's a sharing error, share the sheet with ${who} (Viewer to import, Editor to write back).` : ''}`
+        : `Google says: ${msg} — that sheet isn't link-shared. Prefer sharing it with a service account; "Anyone with the link" exposes buyer addresses to anyone with the URL.`);
     }
     throw new Error('Google Sheets error: ' + msg);
   }
