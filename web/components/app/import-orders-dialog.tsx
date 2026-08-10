@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CircleNotch } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CircleNotch, Copy } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -128,6 +128,11 @@ export function ImportOrdersDialog({
   // Whether the server can build a formatted sheet for us (service account present), vs
   // only being able to READ one — which decides which of the two button flows we offer.
   const [sheetsCanCreate, setSheetsCanCreate] = useState(false)
+  // The service-account address a seller must share their OWN sheet with. Server-supplied
+  // (it lives in an env var), so the dialog can print the thing to paste instead of naming
+  // a config key nobody outside the server can read.
+  const [shareWith, setShareWith] = useState<string | null>(null)
+  const [shareCopied, setShareCopied] = useState(false)
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState<{ imported: number } | null>(null)
@@ -142,9 +147,10 @@ export function ImportOrdersDialog({
     const id = setTimeout(() => {
       setRecords(null); setError(null); setPaste(""); setSheetUrl(""); setDone(null)
       setNotice(null); setCopyFallback(null); setTemplates(null); setTemplatesFailed(false)
+      setShareCopied(false)
       getSheetsConfig()
-        .then((c) => { setSheetsEnabled(!!c.enabled); setSheetsCanCreate(!!c.canCreate) })
-        .catch(() => { setSheetsEnabled(false); setSheetsCanCreate(false) })
+        .then((c) => { setSheetsEnabled(!!c.enabled); setSheetsCanCreate(!!c.canCreate); setShareWith(c.shareWith || null) })
+        .catch(() => { setSheetsEnabled(false); setSheetsCanCreate(false); setShareWith(null) })
     }, 0)
     return () => clearTimeout(id)
   }, [open])
@@ -522,11 +528,61 @@ export function ImportOrdersDialog({
                         : "opens a blank sheet with the header row on your clipboard"}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {sheetsCanCreate
-                      ? "The sheet is already shared and its link is filled in above — fill it in, then press Load."
-                      : "Then share it as “anyone with the link can view” and paste the link above."}
-                  </p>
+                  {sheetsCanCreate && (
+                    <p className="text-xs text-muted-foreground">
+                      A sheet we make for you is already shared and its link is filled in above — fill it in, then press Load.
+                    </p>
+                  )}
+
+                  {/* BRINGING YOUR OWN SHEET.
+                      A sheet we create is already shared with us; one the seller made is not,
+                      and Google answers that with a 403 that says nothing about what to do.
+                      The instruction used to be "share it as anyone-with-the-link" — which is
+                      both the wrong path now (the server reads as the service account) and the
+                      one that publishes buyer names and home addresses to anyone holding the
+                      URL. So: the actual address, one click to copy it, and the two settings
+                      that trip people up. */}
+                  {shareWith && (
+                    <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-2.5">
+                      <div className="text-xs font-medium">Using a sheet you already have? Share it with us first.</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-2 py-1.5 font-mono text-2xs" title={shareWith}>
+                          {shareWith}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(shareWith)
+                              .then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000) })
+                              // A browser that blocks the clipboard must not leave a dead
+                              // button — the address is on screen and selectable either way.
+                              .catch(() => setShareCopied(false))
+                          }}
+                        >
+                          {shareCopied ? <><CheckCircle size={13} weight="fill" /> Copied</> : <><Copy size={13} weight="bold" /> Copy</>}
+                        </Button>
+                      </div>
+                      <ol className="list-inside list-decimal space-y-0.5 text-2xs text-muted-foreground">
+                        <li>In your sheet: <span className="font-medium text-foreground">Share</span> → paste that address</li>
+                        <li>Leave it on <span className="font-medium text-foreground">Viewer</span>, and untick <span className="font-medium text-foreground">Notify people</span> — nobody reads that inbox</li>
+                        <li>Paste the sheet link above and press Load</li>
+                      </ol>
+                      <p className="text-2xs text-muted-foreground">
+                        Your sheet stays private — only this address gains access, so buyer names and
+                        addresses are never exposed to anyone holding the link.
+                      </p>
+                    </div>
+                  )}
+                  {/* The link-shared fallback, and ONLY when there is no service account to
+                      share with — it is the path that exposes buyer addresses to anyone
+                      holding the URL, so it must never be the advice while the private one
+                      is available. */}
+                  {!shareWith && !sheetsCanCreate && (
+                    <p className="text-xs text-muted-foreground">
+                      Then share it as “anyone with the link can view” and paste the link above.
+                    </p>
+                  )}
                 </TabsContent>
               )}
             </Tabs>

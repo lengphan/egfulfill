@@ -308,7 +308,24 @@ export function sheetsRoutes(app, requireAuth) {
   // only the API key hid the Sheet tab whenever someone had set up the service account (the
   // preferred, keeps-it-private path the read helper actually uses) but no API key — the
   // import option simply wasn't there, which read as "Google Sheet import is blank".
-  app.get('/api/sheets/config', async () => ({ enabled: !!(API_KEY || loadSA()), templateUrl: TEMPLATE_URL, canCreate: !!loadSA() }));
+  //
+  // `shareWith` is the service-account address a seller has to share their OWN sheet with,
+  // and it is the one thing that made this import unusable without a support conversation:
+  // the address existed only in a server .env, so the UI could say "share it with the
+  // service account" and no seller could act on that sentence. It is not a secret — it is
+  // the address you are meant to hand out — but it is only emitted to a SIGNED-IN caller,
+  // because there is no reason to publish our Cloud project id to the open internet. The
+  // onRequest hook in index.js has already attached req.user from the Bearer token, so no
+  // preHandler is needed and the public shape is unchanged for anyone without one.
+  app.get('/api/sheets/config', async (req) => {
+    const sa = loadSA();
+    return {
+      enabled: !!(API_KEY || sa),
+      templateUrl: TEMPLATE_URL,
+      canCreate: !!sa,
+      shareWith: req.user && sa && sa.client_email ? sa.client_email : undefined,
+    };
+  });
 
   // Diagnostic: does the service account actually authenticate? (auth-gated so it
   // isn't a public probe). Returns the SA email + token-mint result.

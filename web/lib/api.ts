@@ -682,7 +682,9 @@ export function testAiKey(key?: string) {
 // Google Sheets import — server reads the sheet and returns a 2D row array,
 // then the client reuses the same CSV parsing/validation (lib/order-import).
 export function getSheetsConfig() {
-  return api<{ enabled?: boolean; templateUrl?: string; canCreate?: boolean }>(`/api/sheets/config`)
+  /** `shareWith` is the service-account address the seller must give their own sheet
+   *  access to. Signed-in callers only — see the route. */
+  return api<{ enabled?: boolean; templateUrl?: string; canCreate?: boolean; shareWith?: string }>(`/api/sheets/config`)
 }
 export function getSheetRows(url: string) {
   return api<{ rows?: string[][]; title?: string; tab?: string; error?: string }>(`/api/sheets?url=${encodeURIComponent(url)}`)
