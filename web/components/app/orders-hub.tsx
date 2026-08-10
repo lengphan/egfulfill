@@ -789,9 +789,13 @@ export function OrdersHub() {
    *                                not the later one. That ordering is useful precisely
    *                                because nothing has been resolved.
    *
-   * RUSH still pins to the top of whatever you are looking at. It is the one promotion a
-   * HUMAN asked for, one order at a time, and unlike overdue it cannot silently grow to
-   * six hundred rows — the pill's own count is the check on that.
+   * RUSH IS NOT PINNED EITHER, and it has its own pill. It was the last exception — kept
+   * on the argument that a human asked for it one order at a time — but the argument for
+   * newest-first does not have an exception in it: either the top of the list is what
+   * arrived most recently or it is a place things get promoted to, and a list that is
+   * sometimes one and sometimes the other cannot be read at a glance. A rushed order is
+   * still marked on its row and still one click away on the Rush pill, which is how every
+   * other platform handles a flag: a marker plus a view, never a sort override.
    */
   const filtered = useMemo(() => {
     const list = filterOrders(orders ?? [], query, filterCtx)
@@ -809,9 +813,7 @@ export function OrdersHub() {
       return Number.isFinite(created) ? created + overdueDays * 86400_000 : Infinity
     }
     const mostLateFirst = (a: OrderRow, b: OrderRow) => dueAt(a) - dueAt(b)
-    const byAge = query.status === "overdue" ? mostLateFirst : newestFirst
-    const rushRank = (o: OrderRow) => (isRush(o) ? 0 : 1)
-    return [...list].sort((a, b) => rushRank(a) - rushRank(b) || byAge(a, b))
+    return [...list].sort(query.status === "overdue" ? mostLateFirst : newestFirst)
   }, [orders, query, filterCtx, overdueDays])
 
   const paged = usePaged(filtered, 25)
