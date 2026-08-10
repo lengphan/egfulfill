@@ -170,17 +170,21 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
      * every USPS service, every UPS service, FedEx — and their ORDER validator then refuses
      * most of it. Picking USPS Priority off their own list came back as:
      *
-     *   "shipping_method: The USPS service is not available, please contact OTTO customer
-     *    service … FEDEX Priority Overnight®, FEDEX Standard Overnight®, FEDEX Ground …"
+     *   "shipping_method: The USPS service is not available … type: no_service · options:
+     *    FEDEX Priority Overnight®, FEDEX Priority Overnight® Third Party, FEDEX Standard
+     *    Overnight®, FEDEX Standard Overnight® Third Party, FEDEX Ground, FEDEX Ground
+     *    Third Party, FEDEX 2Day®, FEDEX 2Day® Third Party"
      *
      * So the two endpoints disagree, and rendering the catalogue verbatim offered forty
-     * choices where six work. This narrows it to the services Otto named in that refusal.
+     * choices where EIGHT work. That is Otto's complete list, quoted above verbatim.
      *
      * Matched loosely on the label because their list carries the ® and the "Third Party"
      * suffixes, and an exact-string allow-list would silently empty the dropdown the first
-     * time they reworded one.
+     * time they reworded one. 2Day was missing from the first cut of this because the
+     * screenshot of their refusal was truncated — the fix for guessing at a truncated list
+     * is to read the whole one, not to guess better.
      */
-    const OTTO_OK = /^fedex\s+(priority overnight|standard overnight|ground)/i;
+    const OTTO_OK = /^fedex\s+(priority overnight|standard overnight|ground|2day)/i;
     const ottoUsable = (list) => {
       const rows = Array.isArray(list) ? list : [];
       const text = (m) => String((m && (m.label ?? m.name ?? m.description ?? m.value)) ?? m ?? '');
