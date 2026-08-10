@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { getOrderDesignCards, cardForLine, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -63,6 +63,11 @@ export function DesignStage({
   // previous image's ratio gating the new one — and so no effect is needed to reset it,
   // which would be a setState-in-effect this codebase's lint rule rejects.
   const [ar, setAr] = useState<{ url: string; a: number } | null>(null)
+  // Whether the artwork actually fetched. A failed <img> is invisible rather than obviously
+  // broken here, because only its width is constrained.
+  // No reset effect: swapping the artwork triggers a fresh load, and onLoad/onError below
+  // set this either way. An effect here would also trip react-hooks/set-state-in-effect.
+  const [imgBroken, setImgBroken] = useState(false)
   const aspect = ar && ar.url === designUrl ? ar.a : 1
   const setAspect = (a: number) => setAr({ url: designUrl || "", a })
   // The widest this artwork may be drawn before its own height would run off the bed. A
@@ -97,7 +102,13 @@ export function DesignStage({
       if (!ctx) return
       try { ctx.drawImage(img, 0, 0); sampleRef.current = { canvas: c, w: img.naturalWidth, h: img.naturalHeight } } catch { sampleRef.current = null }
     }
-    img.src = designUrl
+    // Through the proxy. This sets crossOrigin="anonymous" above, which makes the fetch a
+    // CORS request — a host that sends no Access-Control-Allow-Origin then fails the LOAD
+    // outright, so onload never fires and the sampler stays empty. That is the "couldn't
+    // read this artwork's colours" message, and it isn't a colour problem at all.
+    // canvasReadableSrc returns an unproxyable host unchanged, so nothing that works today
+    // changes. (Same rule as the rest of the canvas work — see lib/thread-match.)
+    img.src = canvasReadableSrc(designUrl)
     return () => { live = false }
   }, [designUrl])
 
@@ -256,6 +267,13 @@ export function DesignStage({
         </div>
       )}
 
+      {designUrl && imgBroken && (
+        /* An image that cannot be fetched renders as nothing here, so say so. Silence was
+           indistinguishable from "the upload didn't work", which is what it got reported as. */
+        <div className="absolute inset-x-2 top-2 z-10 rounded-md bg-destructive/90 px-2 py-1 text-center text-2xs font-medium text-background">
+          This artwork couldn&apos;t be loaded — replace it, or remove it and upload again.
+        </div>
+      )}
       {designUrl && (
         <div
           onPointerDown={picking ? undefined : startDrag("image", "move")}
@@ -267,10 +285,17 @@ export function DesignStage({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={designUrl}
+            // Proxied for the same reason as the sampler: a remote host that refuses the
+            // request leaves an <img> whose only set dimension is width, so it collapses to
+            // ZERO HEIGHT — the artwork disappears and the placement handles are left
+            // wrapped around a bare line, which reads as "the upload didn't work".
+            src={canvasReadableSrc(designUrl)}
             alt=""
             className="pointer-events-none block w-full select-none"
             draggable={false}
+            // Say it out loud when the picture genuinely cannot be fetched, instead of
+            // rendering an invisible box. onRemove is the way back out.
+            onError={() => setImgBroken(true)}
             // The artwork's HEIGHT was never bounded. Only width is set (pos.w% of the
             // stage) and the image keeps its own ratio, so a PORTRAIT design rendered at
             // w × (naturalH / naturalW) — a 2:3 photo at the default 45% came out 67% tall,
@@ -279,6 +304,7 @@ export function DesignStage({
             // point where the height would reach the edge, so the drag simply stops instead
             // of the design escaping the frame.
             onLoad={(e) => {
+              setImgBroken(false)
               const el = e.currentTarget
               if (el.naturalWidth > 0 && el.naturalHeight > 0) setAspect(el.naturalWidth / el.naturalHeight)
             }}
@@ -579,6 +605,34 @@ export function DesignCanvasDialog({
     }, 0)
     return () => clearTimeout(t)
   }, [open, isStaff, orderId, item.line_id, item.sku])
+
+  // Put THIS line on the design board. Reuses createDesignCard + assignDesignCard, the same
+  // pair the digitizer uses — the card carries the line's own artwork and sku so it lands
+  // attached to the item rather than as a loose card someone has to match up by hand.
+  const [sending, setSending] = useState(false)
+  const sendToBoard = async () => {
+    setSending(true); setErr(null)
+    try {
+      const card = await createDesignCard({
+        title: item.name || item.sku || "Design",
+        data: designUrl || undefined,
+        sku: item.sku || undefined,
+      })
+      if (card.error) throw new Error(card.error)
+      // Assign separately: creating and attaching are two calls, and a card that exists but
+      // is attached to nothing is worse than no card — it shows on the board with no order.
+      if (card.id) {
+        const a = await assignDesignCard(String(card.id), {
+          orderId, sku: item.sku || "", lineId: item.line_id || undefined,
+        })
+        if (a && (a as { error?: string }).error) throw new Error((a as { error?: string }).error as string)
+      }
+      const cards = await getOrderDesignCards(orderId).catch(() => null)
+      if (cards) setBoardCard(cardForLine(cards, { line_id: item.line_id, sku: item.sku }) ?? null)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't send this line to the design board.")
+    } finally { setSending(false) }
+  }
 
   const [dlBusy, setDlBusy] = useState(false)
   const [fileBusy, setFileBusy] = useState(false)
@@ -1144,7 +1198,39 @@ export function DesignCanvasDialog({
                       : <><DownloadSimple size={13} weight="bold" /> Download</>}
                   </Button>
                 )}
-              </div>
+                              {/* REMOVE. The artwork on the canvas has always had its X; the machine file
+                    had Replace and Download and no way to say "not this one after all". A
+                    wrong .emb had to be overwritten by another file, so a line could never
+                    return to having none — and the readiness chip kept reading as ready.
+                    Deletes the newest file for THIS line only; siblings keep theirs. */}
+                {hasMachineFile && latestMachine && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={fileBusy}
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `Remove ${latestMachine.name}?`,
+                        body: "This line goes back to having no machine file. Other items on the order keep theirs.",
+                        confirmLabel: "Remove file",
+                        destructive: true,
+                      })
+                      if (!ok) return
+                      setFileBusy(true); setErr(null)
+                      try {
+                        const r = await deleteDesignFile(latestMachine.designId)
+                        if (r && r.error) throw new Error(r.error)
+                        setHasFile(false); setLatestMachine(null)
+                      } catch (e) {
+                        setErr(e instanceof Error ? e.message : "Couldn't remove the file.")
+                      } finally { setFileBusy(false) }
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
+</div>
               {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
             </div>
           </div>
@@ -1170,7 +1256,7 @@ export function DesignCanvasDialog({
           {/* WHERE THIS LINE IS ON THE BOARD. Named lane, not a generic "sent" — "sent to
               design" three days ago and "Approved" are very different answers, and the lane
               is the one the board itself shows. */}
-          {boardCard && (
+          {boardCard ? (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-sm">
               <span className="font-medium text-foreground">On the design board</span>
               <span className="rounded bg-primary/15 px-1.5 py-0.5 text-2xs font-semibold text-primary">
@@ -1178,7 +1264,25 @@ export function DesignCanvasDialog({
               </span>
               {boardCard.claimed_by && <span className="text-muted-foreground">· {boardCard.claimed_by}</span>}
             </div>
-          )}
+          ) : isStaff ? (
+            /* SEND IT, don't just report on it. This panel already answered "is this line on
+               the board?" and, when the answer was no, offered nothing — so the only way to
+               get a line to a designer was to leave, find the board, and make the card there
+               with none of the context that is open right here. Staff only: the read above is
+               staff-gated too, and a seller has no lane to send into. */
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-2.5 py-2 text-sm">
+              <span className="text-muted-foreground">Not on the design board</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto"
+                disabled={sending}
+                onClick={() => void sendToBoard()}
+              >
+                {sending ? "Sending…" : "Send to design board"}
+              </Button>
+            </div>
+          ) : null}
           {err && <div className="text-sm text-destructive">{err}</div>}
           {/* A machine file was filed. Green, not red, and it says what it did AND what it
               deliberately didn't — the canvas is unchanged, which without a word reads as
