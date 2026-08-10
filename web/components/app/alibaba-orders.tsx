@@ -105,10 +105,9 @@ export function AlibabaOrders() {
   const rows = (orders ?? []).filter((o) => filter === "all" || bucketOf(o) === filter)
 
   return (
-    <SectionCard
-      title="Alibaba orders"
-      description={orders?.length ? `${orders.length} order${orders.length === 1 ? "" : "s"} on your Alibaba account` : undefined}
-    >
+    // No description: the count it carried is already on the "All 4" pill directly below
+    // it, so it restated the next line down and cost the header its calm.
+    <SectionCard title="Alibaba orders">
       {orders === null ? (
         <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
       ) : err ? (
@@ -128,7 +127,9 @@ export function AlibabaOrders() {
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+          {/* pt-3 matches pb-3: the row had no top padding, so it sat flush against the
+              header's rule and the pills read as touching it. */}
+          <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-3">
             {FILTERS.map((f) => (
               <button
                 key={f.id}
