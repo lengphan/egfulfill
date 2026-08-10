@@ -1,13 +1,29 @@
 import Link from "next/link"
 import { SiteHeader } from "@/components/marketing/site-header"
 import { SupportBubble } from "@/components/marketing/support-bubble"
+import { MotionProvider } from "@/components/marketing/motion-provider"
+import { getSiteContent } from "@/lib/site-content"
 
-export default function MarketingLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Async so the motion presets can be read HERE rather than per page.
+ *
+ * The layout is the only place that sees every marketing route, and the presets apply to all
+ * of them — putting the fetch on each page would mean five fetches and five chances for one
+ * page to be left out. The homepage also calls getSiteContent() for its copy; React dedupes
+ * the two within a render, so this costs nothing, and its 60-second ISR window is shared.
+ *
+ * A failure inside getSiteContent returns the baked-in defaults, so the pages animate with the
+ * house values rather than not animating.
+ */
+export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
+  const { motion } = await getSiteContent()
+
   // The header moved to components/marketing/site-header.tsx so it can read the route and
   // sit ON a full-bleed hero plate where a page has one. Still ONE component with one set of
   // links — the hazard the old note here warned about was two headers that could disagree,
   // not a background that varies.
   return (
+    <MotionProvider value={motion}>
     <div className="flex min-h-svh flex-col bg-background">
       <SiteHeader />
 
@@ -43,5 +59,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           they are reading pricing or a product — not after they have found a contact page. */}
       <SupportBubble />
     </div>
+    </MotionProvider>
   )
 }

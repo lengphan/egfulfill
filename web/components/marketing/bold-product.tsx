@@ -81,7 +81,10 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
 
         <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-16">
           {/* ── The picture ──────────────────────────────────────────────── */}
-          <Rise>
+          {/* The two hero columns arrive from DIFFERENT directions — the picture settles down
+              into place, the copy drifts in from the side. Both rising together is one slab
+              moving, which is the gesture that made every page feel like the last one. */}
+          <Rise preset="settle">
             {/* Rail LEFT of the hero, not under it. A vertical strip is how every product
                 page of this kind is read — thumbnails scanned down the edge while the main
                 shot holds its size — and it stops the hero being pushed up the page by a
@@ -136,7 +139,7 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
           </Rise>
 
           {/* ── The facts ────────────────────────────────────────────────── */}
-          <Rise delay={0.08}>
+          <Rise preset="drift">
             {(product.category || product.brand) && (
               <div className="text-xs font-bold uppercase tracking-[0.18em] text-black/45">
                 {[product.brand, product.category].filter(Boolean).join(" · ")}
@@ -215,7 +218,7 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
              two-column grid left the guidelines stranded in the left half with a dead right
              half beside them, which is what made the section look broken rather than short. */
           <div className={"mt-16 grid gap-12 " + (product.methods.length > 0 ? "lg:grid-cols-2" : "max-w-2xl")}>
-            <Rise>
+            <Rise preset="cut">
                 <h2 className="font-display text-2xl font-black tracking-tight">Size chart</h2>
                 {/* One line, not a paragraph. Only some manufacturers publish a measurement
                     feed, so the no-chart case is the state MOST of the catalogue is in — it
@@ -256,7 +259,7 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
             </Rise>
 
             {product.methods.length > 0 && (
-              <Rise delay={0.04}>
+              <Rise preset="cut" index={1}>
                 <h2 className="font-display text-2xl font-black tracking-tight">Where we can print</h2>
                 <p className="mt-1.5 text-sm text-black/50">
                   Placements available on this garment.
@@ -286,7 +289,7 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
             )}
 
             {product.methods.length > 0 && (
-              <Rise delay={0.08}>
+              <Rise preset="cut" index={2}>
                 <h2 className="font-display text-2xl font-black tracking-tight">Artwork guidelines</h2>
                 <p className="mt-1.5 text-sm text-black/50">
                   What to send us for {product.methods.join(" / ")}.

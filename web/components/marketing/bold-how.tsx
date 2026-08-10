@@ -51,7 +51,7 @@ export function BoldHow() {
       <section className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-4 md:grid-cols-3">
           {steps.map((s, i) => (
-            <Rise key={s.title} delay={i * 0.07} className="rounded-2xl border border-black/[0.09] bg-white p-8">
+            <Rise key={s.title} preset="drift" index={i} className="rounded-2xl border border-black/[0.09] bg-white p-8">
               <div className="font-display font-black leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(3rem, 6vw, 4.5rem)" }}>
                 {String(i + 1).padStart(2, "0")}
               </div>
@@ -80,7 +80,7 @@ export function BoldHow() {
           </p>
           <div className="mt-12 space-y-3">
             {journey.map((j, i) => (
-              <Rise key={j.label} delay={i * 0.06} className="flex flex-col gap-2 rounded-xl border border-black/[0.09] bg-white p-5 sm:flex-row sm:items-center sm:gap-6">
+              <Rise key={j.label} preset="cut" index={i} className="flex flex-col gap-2 rounded-xl border border-black/[0.09] bg-white p-5 sm:flex-row sm:items-center sm:gap-6">
                 <span className={"inline-flex w-fit shrink-0 rounded-full px-3 py-1 text-[13px] font-semibold sm:w-28 sm:justify-center " + j.tone}>
                   {j.label}
                 </span>
@@ -92,7 +92,7 @@ export function BoldHow() {
       </section>
 
       <section className="px-6 py-16">
-        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
+        <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
           <h2 className="mx-auto max-w-2xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             Connect a store and watch it work.
           </h2>

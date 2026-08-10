@@ -25,6 +25,9 @@ function ensure() {
  *   Otto  `ottoResponse[].grand_total` — goods + freight + tax, the figure on the card.
  *         Their `sub_total` is the goods alone and is exactly what our line sum already is.
  *   S&S   `orders[].total` — one order per warehouse on a split, so they SUM.
+ *   Alibaba `alibabaOrder.total` — what they billed, freight included. Imported from a
+ *         real order rather than placed here, so this figure is settled fact, not an
+ *         estimate: the goods were already paid for on their site.
  * Anything else falls through to null and the caller uses the line total, which is the
  * behaviour that was there before.
  *
@@ -43,7 +46,7 @@ function supplierCharged(meta) {
     }
     return seen ? t : null;
   };
-  return sum(r.ottoResponse, 'grand_total') ?? sum(r.orders, 'total') ?? null;
+  return sum(r.ottoResponse, 'grand_total') ?? sum(r.orders, 'total') ?? sum(r.alibabaOrder, 'total') ?? null;
 }
 
 /**

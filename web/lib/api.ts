@@ -3723,16 +3723,51 @@ export type SourcingRow = {
   decorationCost?: number | null
   /** absolute http(s) only — this renders straight into an <img src> */
   image?: string | null
-  /** supplier pipeline stage — several rows for one product can sit at 'prospect' at once */
+  /** Pipeline stage, DERIVED server-side from sample orders — read-only. A sample placed
+   *  makes it 'sampling', a sample received makes it 'rotation'. Sending it back has no
+   *  effect except for 'archived', which is a decision rather than an event. */
   stage?: SourcingStage
+  /** What was AGREED, as distinct from what the listing quoted. */
+  sampleCost?: number | null
+  paymentTerms?: string | null
+  /** When the supplier last stood behind all of it. A quote from March is not a quote. */
+  termsConfirmedAt?: string | null
   archived?: boolean
 }
 export type SourcingStage = "prospect" | "talking" | "sampling" | "rotation" | "archived"
+
+/** One pasted exchange with a supplier. Kept verbatim — Alibaba's API exposes no messages,
+ *  so this is the only copy, and a parser guessing at a price would be confidently wrong
+ *  about the one number it exists to remember. */
+export type SupplierMessage = {
+  id: string
+  body: string
+  /** YYYY-MM-DD. The day it was said, not the day it was pasted. */
+  saidAt?: string | null
+  direction: "them" | "us"
+  createdAt?: string
+}
+export function getSupplierMessages(supplierId: string) {
+  return api<{ items?: SupplierMessage[]; error?: string }>(
+    `/api/manual-suppliers/${encodeURIComponent(supplierId)}/messages`)
+}
+export function addSupplierMessage(supplierId: string, p: { body: string; saidAt?: string; direction?: "them" | "us" }) {
+  return api<{ ok?: boolean; id?: string; error?: string }>(
+    `/api/manual-suppliers/${encodeURIComponent(supplierId)}/messages`,
+    { method: "POST", body: JSON.stringify(p) })
+}
+export function deleteSupplierMessage(supplierId: string, msgId: string) {
+  return api<{ ok?: boolean; error?: string }>(
+    `/api/manual-suppliers/${encodeURIComponent(supplierId)}/messages/${encodeURIComponent(msgId)}`,
+    { method: "DELETE" })
+}
 export const SOURCING_STAGES: { id: SourcingStage; label: string; hint: string }[] = [
-  { id: "prospect", label: "Prospect", hint: "saved, not contacted" },
-  { id: "talking", label: "Talking", hint: "messaged them / have a quote" },
-  { id: "sampling", label: "Sampling", hint: "sample ordered or in transit" },
-  { id: "rotation", label: "In rotation", hint: "approved — actively buying" },
+  // Every hint names the FACT that puts a row here, because the stage is derived and not
+  // chosen — see stageSql in server/src/routes/manual_suppliers.js.
+  { id: "prospect", label: "Prospect", hint: "a quote and nothing more" },
+  { id: "talking", label: "Talking", hint: "an exchange recorded, no sample yet" },
+  { id: "sampling", label: "Sampling", hint: "a sample is placed and not yet received" },
+  { id: "rotation", label: "In rotation", hint: "a sample was received" },
 ]
 /** Ask the AI what this product is and how to search for it on a B2B marketplace. Admin-only,
  *  charged per call, and cached server-side against the listing id — so re-opening a product
@@ -3807,6 +3842,22 @@ export function getAlibabaOrders() {
 export function getAlibabaOrder(tradeId: string) {
   return api<AlibabaOrderDetail & { error?: string }>(`/api/alibaba/orders/${encodeURIComponent(tradeId)}`)
 }
+/**
+ * Place an order on Alibaba. DRY RUN unless the server's ALIBABA_ORDER_LIVE=1 AND
+ * `confirm: true` is sent — two gates, because unlike S&S and Otto, Alibaba has no sandbox
+ * and the first call that succeeds is a real purchase.
+ *
+ * `logisticsDetail` is required by them and refused rather than defaulted here: there is no
+ * delivery address this code could pick that would be right by accident.
+ */
+export function createAlibabaOrder(p: {
+  productId: string; quantity: number; skuId?: string; message?: string
+  logisticsDetail: Record<string, unknown>; confirm?: boolean
+}) {
+  return api<{ ok?: boolean; dryRun?: boolean; note?: string; payload?: unknown
+               alibabaResponse?: unknown; error?: string; code?: string }>(
+    `/api/alibaba/order/create`, { method: "POST", body: JSON.stringify(p) })
+}
 
 export function getSampleOrders(supplierId?: string) {
   const qs = supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""
@@ -3829,7 +3880,10 @@ export function setSampleOrderStatus(id: string, action: "received" | "cancel") 
 export function getSourcing() {
   return api<{ items: SourcingRow[] }>(`/api/manual-suppliers`)
 }
-export function saveSourcing(row: Partial<SourcingRow> & { title: string }) {
+/** `confirmTerms` stamps terms_confirmed_at with today. Deliberately separate from the
+ *  fields themselves — fixing a typo in the payment terms must not claim the supplier
+ *  re-confirmed anything. */
+export function saveSourcing(row: Partial<SourcingRow> & { title: string; confirmTerms?: boolean }) {
   return api<{ ok?: boolean; id?: string; error?: string }>(
     `/api/manual-suppliers`, { method: "POST", body: JSON.stringify(row) })
 }

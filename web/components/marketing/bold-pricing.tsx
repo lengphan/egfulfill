@@ -40,7 +40,7 @@ export function BoldPricing() {
       <section className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr]">
           {/* What you pay to be here — the answer first, at display size. */}
-          <Rise className="rounded-2xl border border-black/[0.09] bg-white p-9">
+          <Rise preset="bloom" className="rounded-2xl border border-black/[0.09] bg-white p-9">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/45">Everything, included</div>
             <div className="mt-4 flex items-baseline gap-3">
               <span className="font-display font-black leading-none tracking-[-0.04em]" style={HEADING}>$0</span>
@@ -66,7 +66,7 @@ export function BoldPricing() {
           </Rise>
 
           {/* What an order costs — the second question, and the honest caveat with it. */}
-          <Rise delay={0.08} className="rounded-2xl border border-black/[0.09] bg-black/[0.03] p-9">
+          <Rise preset="bloom" index={1} className="rounded-2xl border border-black/[0.09] bg-black/[0.03] p-9">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/45">Example base costs</div>
             <p className="mt-3 text-[15px] leading-relaxed text-black/55">
               Blank + print, before shipping. The final price depends on product, placement and method.
@@ -89,7 +89,7 @@ export function BoldPricing() {
       {/* The band IS the Rise — nesting a padded wrapper around a padded inner div gave it
           two sets of padding and a white gutter inside its own rounded corner. */}
       <section className="px-6 pb-16">
-        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
+        <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
           <h2 className="mx-auto max-w-2xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             Only pay when it ships.
           </h2>

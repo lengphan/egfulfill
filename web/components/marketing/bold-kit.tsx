@@ -4,6 +4,8 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
 import { ArrowUpRight } from "@phosphor-icons/react"
+import { entrance, type PresetName } from "@/lib/motion"
+import { useMotionPreset } from "./motion-provider"
 
 /**
  * The marketing style kit — every primitive the bold pages share.
@@ -304,20 +306,41 @@ export function Pill({ href, children, tone = "ink", className = "" }: {
   )
 }
 
-/** Scroll-entrance for a block. One definition so every section on every page arrives the
- *  same way — and so "does it respect reduced motion" is answered once. */
-export function Rise({ children, delay = 0, className = "", style }: {
-  children: React.ReactNode; delay?: number; className?: string; style?: React.CSSProperties
+/**
+ * Scroll-entrance for a block. One definition, so "does it respect reduced motion" is answered
+ * once — but no longer ONE ANIMATION.
+ *
+ * It used to hardcode a 22px fade-up, which meant every section of every page arrived exactly
+ * alike; five of the six marketing pages had nothing else, so the site's entire motion design
+ * was that one gesture repeated forty times. `preset` picks from the vocabulary in
+ * lib/motion.ts and defaults to `rise`, which IS the old 22px fade-up — so an un-migrated call
+ * site is unchanged, and a page becomes more considered one prop at a time.
+ *
+ * `index` is how a group staggers. Passing it beats hand-computing `delay={i * 0.06}` at the
+ * call site: the spacing then comes from the preset and is editable in Settings with
+ * everything else, instead of being a number frozen into whichever page was written first.
+ */
+export function Rise({ children, preset = "rise", index = 0, delay = 0, className = "", style }: {
+  children: React.ReactNode
+  preset?: PresetName
+  index?: number
+  delay?: number
+  className?: string
+  style?: React.CSSProperties
 }) {
   const reduce = useReducedMotion()
+  const p = useMotionPreset(preset)
+  const { initial, animate, transition } = entrance(p, { index, delay, reduce: !!reduce })
   return (
     <motion.div
       className={className}
       style={style}
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 22 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={initial}
+      // whileInView, not animate — this is a SCROLL entrance and the element is usually below
+      // the fold. `animate` would run it while nobody is looking and reveal a finished block.
+      whileInView={animate}
       viewport={{ once: true, margin: "0px 0px -12% 0px" }}
-      transition={{ duration: 0.55, delay, ease: EASE }}
+      transition={transition}
     >
       {children}
     </motion.div>

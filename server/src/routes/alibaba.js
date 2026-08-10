@@ -492,6 +492,82 @@ export function alibabaRoutes(app, requireAdmin) {
   });
 
   /**
+   * PLACE AN ORDER — /alibaba/buynow/order/create.
+   *
+   * DOUBLE-GATED, and the gate matters more here than on any other supplier we talk to.
+   * S&S and Otto both have a sandbox: a wrong payload there costs an embarrassing test
+   * order in an environment built for them. Alibaba has NO sandbox for this — the first
+   * call that succeeds is a real order, with a real supplier, for real money. So:
+   *
+   *   1. ALIBABA_ORDER_LIVE must be '1'. Without it this returns the exact payload that
+   *      WOULD be sent and touches nothing. That is the normal state and should stay it
+   *      until a payload has been read by a human who knows what they are buying.
+   *   2. The caller must pass `confirm: true` in the body. A gate that only reads an env
+   *      var is one deploy away from a stray click becoming a purchase; this one also
+   *      needs the request itself to say it means it.
+   *
+   * `logistics_detail` is REQUIRED by their API and is not a formality — it carries the
+   * delivery address and the shipping choice, and an order without it either fails or
+   * ships somewhere we did not choose. It is refused here rather than defaulted, because
+   * there is no address this code could pick that would be right by accident.
+   *
+   * NOTE THE PAYLOAD IS UNVALIDATED against a live account, exactly like S&S's and Otto's
+   * were before someone ran them. Field names come from their doc; treat the first dry run
+   * as something to read, not something to trust.
+   */
+  app.post('/api/alibaba/order/create', { preHandler: requireAdmin }, async (req, reply) => {
+    const row = await tokenRow();
+    if (!row?.access_token) { reply.code(400); return { error: 'Alibaba is not connected.' }; }
+    const b = req.body || {};
+
+    // One product, one quantity, one address. Refuse a half-formed order rather than let
+    // their gateway describe it in their field names a round trip later.
+    const productId = String(b.productId ?? b.product_id ?? '').trim();
+    const quantity = Math.floor(Number(b.quantity));
+    if (!/^\d+$/.test(productId)) { reply.code(400); return { error: 'A product id is required.' }; }
+    if (!Number.isFinite(quantity) || quantity < 1) { reply.code(400); return { error: 'A quantity of at least 1 is required.' }; }
+
+    const logistics = b.logisticsDetail ?? b.logistics_detail ?? null;
+    if (!logistics || typeof logistics !== 'object') {
+      reply.code(400);
+      return {
+        error: 'Alibaba require logistics_detail on every order — the delivery address and the shipping choice. There is no safe default for where goods get sent, so this is refused rather than guessed.',
+        code: 'logistics_required',
+      };
+    }
+
+    const payload = {
+      product_id: productId,
+      quantity,
+      // Their sku handle, when the product has variants. Omitted rather than sent empty:
+      // an empty string is a value, and a gateway that validates it will reject the order.
+      ...(b.skuId || b.sku_id ? { sku_id: String(b.skuId ?? b.sku_id) } : {}),
+      ...(b.message ? { message: String(b.message).slice(0, 500) } : {}),
+      logistics_detail: logistics,
+    };
+
+    const live = String(process.env.ALIBABA_ORDER_LIVE || '') === '1';
+    if (!live || b.confirm !== true) {
+      return {
+        dryRun: true,
+        // Say which gate is shut. "Dry run" alone sends someone to check the wrong one.
+        note: !live
+          ? 'ALIBABA_ORDER_LIVE!=1 → NOT sent to Alibaba. This is the payload that would go. Alibaba has no sandbox: opening this gate means the next call places a REAL order.'
+          : 'The request did not carry confirm:true → NOT sent. Alibaba has no sandbox, so placing needs the env gate AND an explicit confirmation on the request.',
+        payload,
+      };
+    }
+
+    try {
+      const body = await call('/alibaba/buynow/order/create', payload,
+        { accessToken: (await refreshIfDue(row)).access_token, method: 'POST' });
+      return { ok: true, alibabaResponse: body?.value ?? body ?? null };
+    } catch (e) {
+      reply.code(502); return { error: String(e?.message || e), detail: e?.body || null };
+    }
+  });
+
+  /**
    * Product search — the endpoint the Sourcing panel will call once the app is approved.
    * Returns a flattened shape so the UI never has to know about result.data.products.
    *

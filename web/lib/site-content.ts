@@ -7,6 +7,8 @@
 // A blank field in the editor therefore can NEVER blank the homepage — it falls back to
 // this. That property is the whole point, so keep the defaults complete.
 
+import { DEFAULT_MOTION, mergeMotion, type MotionSettings } from "./motion"
+
 export type Stat = { value: string; label: string }
 export type FeatureCard = { title: string; body: string }
 export type Step = { n: string; title: string; body: string }
@@ -34,6 +36,16 @@ export type SiteContent = {
   testimonials: { heading: string; items: Testimonial[] }
   faq: { heading: string; items: Faq[] }
   cta: { heading: string; subhead: string; button: string }
+  /**
+   * HOW the marketing pages animate — see lib/motion.ts.
+   *
+   * It rides in the copy blob rather than getting a settings key of its own, and that is a
+   * decision worth defending: it is the same audience (admin), the same surface (the public
+   * site), the same route, the same 64KB guard, and the same one fetch the layout already
+   * makes. A second key would have bought a second endpoint, a second cache window and the
+   * possibility of the two arriving out of step, in exchange for a tidier noun.
+   */
+  motion: MotionSettings
 }
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
@@ -95,6 +107,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     subhead: "Connect a store and send your first hands-off order today. No monthly fee.",
     button: "Start for free",
   },
+  motion: DEFAULT_MOTION,
 }
 
 /**
@@ -157,6 +170,10 @@ export function mergeSiteContent(stored: unknown): SiteContent {
       subhead: str(cta.subhead, d.cta.subhead),
       button: str(cta.button, d.cta.button),
     },
+    // Its own merge, because the rule for a number is not the rule for a string: 0 is a
+    // legitimate value for every motion field and `str`'s "blank falls back" test would throw
+    // it away. mergeMotion also clamps, so a hand-typed 40-second duration cannot ship.
+    motion: mergeMotion(s.motion),
   }
 }
 

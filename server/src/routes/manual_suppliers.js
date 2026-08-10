@@ -267,11 +267,48 @@ export function manualSupplierRoutes(app, requireAdmin) {
     .then(() => q('create index if not exists supplier_messages_supplier on supplier_messages (supplier_id, said_at desc, id desc)'))
     .catch(() => {});
 
+  /**
+   * THE STAGE IS DERIVED, NOT TYPED.
+   *
+   * It used to be a dropdown on every row, and every row sat at Prospect — because moving
+   * it changed nothing. A label you set by hand that no other behaviour reads is a label
+   * nobody maintains, and a pipeline where all five rows show the same stage is worse than
+   * no pipeline: it looks like information.
+   *
+   * So it comes from what actually happened, which the database already knows:
+   *
+   *   goods received  → rotation   a sample arrived and was accepted; we buy from these people
+   *   sample placed   → sampling   money is out, an answer is pending
+   *   a message kept  → talking    there is a recorded exchange and no sample yet
+   *   otherwise       → prospect   a quote and nothing more
+   *
+   * 'talking' reads supplier_messages rather than being dropped. It was the one stage with
+   * no fact behind it, so its filter chip could only ever show 0 — a filter that can never
+   * match anything is worse than no filter. Now the act that makes it true (recording what
+   * they said) is the same act someone performs anyway.
+   *
+   * The stored column survives for ARCHIVED only, which is a decision rather than an event
+   * and so genuinely has to be typed. Nothing else writes it now.
+   */
+  const stageSql = `
+    case
+      when exists (select 1 from sample_orders s
+                    where s.supplier_id = m.id and s.status = 'received') then 'rotation'
+      when exists (select 1 from sample_orders s
+                    where s.supplier_id = m.id and s.status <> 'cancelled') then 'sampling'
+      when exists (select 1 from supplier_messages g
+                    where g.supplier_id = m.id) then 'talking'
+      else 'prospect'
+    end`;
+
   app.get('/api/manual-suppliers', { preHandler: requireAdmin }, async () => {
-    const r = await q(`select * from manual_suppliers
-                        where coalesce(archived,false) = false
-                          and coalesce(stage,'prospect') <> 'archived'
-                        order by created_at desc limit 500`).catch(() => ({ rows: [] }));
+    // A LEFT JOIN would multiply the supplier row by its samples; these are correlated
+    // EXISTS so one supplier stays one row however many samples it has.
+    const r = await q(`select m.*, ${stageSql} as derived_stage
+                         from manual_suppliers m
+                        where coalesce(m.archived,false) = false
+                          and coalesce(m.stage,'prospect') <> 'archived'
+                        order by m.created_at desc limit 500`).catch(() => ({ rows: [] }));
     return {
       items: r.rows.map((x) => ({
         id: String(x.id), title: x.title, url: x.url, shop: x.shop,
@@ -285,8 +322,16 @@ export function manualSupplierRoutes(app, requireAdmin) {
         supplierRef: x.supplier_ref || null,
         currency: x.currency || 'USD',
         image: x.image || null,
-        stage: x.stage || 'prospect',
+        stage: x.derived_stage || 'prospect',
         decorationCost: x.decoration_cost == null ? null : Number(x.decoration_cost),
+        // What was AGREED, as opposed to what the listing said. These columns have shipped
+        // since the sourcing tab was built and nothing has ever read them, so the terms
+        // people negotiated stayed in a chat window — which is the whole reason they get
+        // re-asked. `termsConfirmedAt` is when the supplier last stood behind all of it:
+        // a quote from March is not a quote.
+        sampleCost: x.sample_cost == null ? null : Number(x.sample_cost),
+        paymentTerms: x.payment_terms || null,
+        termsConfirmedAt: x.terms_confirmed_at || null,
         archived: !!x.archived,
       })),
     };
@@ -335,29 +380,44 @@ export function manualSupplierRoutes(app, requireAdmin) {
     // Only absolute http(s) — this string goes straight into an <img src>, so a
     // javascript: or data: value must never survive the round trip.
     const image = b.image && /^https?:\/\//i.test(String(b.image)) ? String(b.image).slice(0, 1000) : null;
-    // Unknown stage falls back to 'prospect' rather than being stored — a typo must not
-    // create a phantom column in the board.
-    const STAGES = ['prospect', 'talking', 'sampling', 'rotation', 'archived'];
-    const stage = STAGES.includes(String(b.stage || '')) ? String(b.stage) : null;
+    // The pipeline stage is DERIVED from sample orders now (see stageSql), so only
+    // 'archived' is still something a person decides and therefore still stored. Accepting
+    // the others would let a dropdown overwrite a fact — a row marked 'prospect' by hand
+    // while a sample sits received against it.
+    const stage = String(b.stage || '') === 'archived' ? 'archived' : null;
+
+    // Agreed terms. Distinct from the quote on the listing, and re-confirmed rather than
+    // assumed: `terms_confirmed_at` moves only when someone says these were confirmed
+    // TODAY, so a quote from March keeps showing its March date instead of looking fresh
+    // because an unrelated field was edited.
+    const sampleCost = num(b.sampleCost);
+    const paymentTerms = b.paymentTerms ? String(b.paymentTerms).trim().slice(0, 200) : null;
+    const confirmTerms = b.confirmTerms === true;
 
     if (b.id) {
       await q(`update manual_suppliers set title=$2, url=$3, shop=$4, cost=$5, markup_pct=$6,
                  sell_price=$7, product_id=$8, note=$9, moq=$10, ship_total=$11, lead_days=$12,
                  supplier_ref=$13, currency=$14, decoration_cost=$15, image=$16,
-                 stage=coalesce($17, stage), updated_at=now()
+                 stage=coalesce($17, stage),
+                 sample_cost=$18, payment_terms=$19,
+                 terms_confirmed_at=case when $20 then now() else terms_confirmed_at end,
+                 updated_at=now()
                where id=$1::bigint`,
         [String(b.id), title, b.url || null, shop, cost, pct, sell, b.productId || null, b.note || null,
-         moq, shipTotal, leadDays, supplierRef, currency, decoration, image, stage]);
+         moq, shipTotal, leadDays, supplierRef, currency, decoration, image, stage,
+         sampleCost, paymentTerms, confirmTerms]);
       audit(req, 'manual-supplier.updated', { entityType: 'manual_supplier', entityId: String(b.id), after: { title, cost, sell } });
       return { ok: true, id: String(b.id) };
     }
     const r = await q(
       `insert into manual_suppliers (title, url, shop, cost, markup_pct, sell_price, product_id, note,
                                      moq, ship_total, lead_days, supplier_ref, currency, decoration_cost,
-                                     image, stage, created_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id`,
+                                     image, stage, sample_cost, payment_terms, terms_confirmed_at, created_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+               case when $19 then now() else null end, $20) returning id`,
       [title, b.url || null, shop, cost, pct, sell, b.productId || null, b.note || null,
        moq, shipTotal, leadDays, supplierRef, currency, decoration, image, stage || 'prospect',
+       sampleCost, paymentTerms, confirmTerms,
        String((req.user && req.user.sub) || '')]);
     audit(req, 'manual-supplier.added', { entityType: 'manual_supplier', entityId: String(r.rows[0].id), after: { title, shop, cost, sell } });
     return { ok: true, id: String(r.rows[0].id) };
@@ -592,5 +652,74 @@ Rules:
       `Sample ${cur.order_no || id} cancelled — refunded`);
     audit(req, 'sample-order.cancelled', { entityType: 'sample_order', entityId: id, before: { status: cur.status } });
     return { ok: true, credited: !!credited.ok, items: await sampleRows() };
+  });
+
+  /**
+   * WHAT THE SUPPLIER ACTUALLY SAID.
+   *
+   * The `supplier_messages` table has shipped since the sourcing tab was built and nothing
+   * has ever read or written it, so every agreed price, MOQ and lead time lived in a chat
+   * window someone had to scroll — and got re-asked, which is how a supplier learns you
+   * aren't keeping track.
+   *
+   * PASTED TEXT, kept verbatim. Alibaba's open API exposes no messages at all (probed
+   * 2026-08-10), so there is nothing to sync and this is the only copy. It is deliberately
+   * not parsed: what gets pasted is whatever the supplier typed, in whatever language, and
+   * a parser guessing at a price would be confidently wrong about the one number this
+   * exists to remember.
+   */
+  app.get('/api/manual-suppliers/:id/messages', { preHandler: requireAdmin }, async (req, reply) => {
+    const id = String(req.params.id || '');
+    if (!/^\d+$/.test(id)) { reply.code(400); return { error: 'Not a supplier id.' }; }
+    const r = await q(
+      `select id, body, said_at, direction, created_at from supplier_messages
+        where supplier_id=$1::bigint order by said_at desc nulls last, id desc limit 200`,
+      [id]).catch(() => ({ rows: [] }));
+    return {
+      items: r.rows.map((x) => ({
+        id: String(x.id), body: x.body,
+        // A date, not a timestamp: what matters is which day it was agreed, and a pasted
+        // log rarely carries a time anyone trusts.
+        saidAt: x.said_at ? new Date(x.said_at).toISOString().slice(0, 10) : null,
+        direction: x.direction === 'us' ? 'us' : 'them',
+        createdAt: x.created_at,
+      })),
+    };
+  });
+
+  app.post('/api/manual-suppliers/:id/messages', { preHandler: requireAdmin }, async (req, reply) => {
+    const id = String(req.params.id || '');
+    if (!/^\d+$/.test(id)) { reply.code(400); return { error: 'Not a supplier id.' }; }
+    const b = req.body || {};
+    const body = String(b.body || '').trim();
+    if (!body) { reply.code(400); return { error: 'Nothing to save — paste what they said.' }; }
+    // A whole chat log, not a line. Generous, but bounded: this is a text column and an
+    // accidental paste of a page's worth of markup should not become a row nobody can read.
+    if (body.length > 20000) { reply.code(400); return { error: 'That is longer than 20,000 characters — paste the part that matters.' }; }
+    const owner = await q('select id from manual_suppliers where id=$1::bigint', [id]).catch(() => ({ rows: [] }));
+    if (!owner.rows.length) { reply.code(404); return { error: 'No such supplier.' }; }
+    // Their date if given, today if not. Never silently today when a date WAS given and is
+    // unparseable — that would date a March agreement to this morning.
+    const said = b.saidAt ? String(b.saidAt).slice(0, 10) : null;
+    if (said && !/^\d{4}-\d{2}-\d{2}$/.test(said)) { reply.code(400); return { error: 'The date should be YYYY-MM-DD.' }; }
+    const r = await q(
+      `insert into supplier_messages (supplier_id, body, said_at, direction, created_by)
+       values ($1::bigint, $2, coalesce($3::date, current_date), $4, $5) returning id`,
+      [id, body, said, b.direction === 'us' ? 'us' : 'them', String((req.user && req.user.sub) || '')]);
+    audit(req, 'supplier-message.added', { entityType: 'manual_supplier', entityId: id });
+    return { ok: true, id: String(r.rows[0].id) };
+  });
+
+  app.delete('/api/manual-suppliers/:id/messages/:msgId', { preHandler: requireAdmin }, async (req, reply) => {
+    const id = String(req.params.id || '');
+    const msgId = String(req.params.msgId || '');
+    if (!/^\d+$/.test(id) || !/^\d+$/.test(msgId)) { reply.code(400); return { error: 'Not an id.' }; }
+    // Scoped to the supplier as well as the message, so a guessed id from another
+    // supplier's thread cannot be deleted through this route.
+    const r = await q('delete from supplier_messages where id=$1::bigint and supplier_id=$2::bigint',
+      [msgId, id]).catch(() => ({ rowCount: 0 }));
+    if (!r.rowCount) { reply.code(404); return { error: 'No such message.' }; }
+    audit(req, 'supplier-message.deleted', { entityType: 'manual_supplier', entityId: id });
+    return { ok: true };
   });
 }

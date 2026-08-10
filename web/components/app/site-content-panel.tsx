@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getSiteContentAdmin, setSiteContent, uploadHeroImage } from "@/lib/api"
 import { DEFAULT_SITE_CONTENT, type SiteContent } from "@/lib/site-content"
 import { useConfirm } from "@/components/app/confirm-dialog"
+import { MotionEditor } from "@/components/app/motion-editor"
 
 // Module-scope so they're stable across renders (react-hooks/static-components forbids
 // defining components inside render).
@@ -93,6 +94,9 @@ const SUBTABS: { id: string; label: string }[] = [
   { id: "testimonials", label: "Testimonials" },
   { id: "faq", label: "FAQ" },
   { id: "cta", label: "Closing CTA" },
+  // Not copy, but the same blob, the same audience and the same Save — see the `motion` note
+  // in lib/site-content.ts.
+  { id: "motion", label: "Motion" },
 ]
 
 /**
@@ -385,6 +389,22 @@ export function SiteContentPanel() {
           <Field label="Heading" value={c.cta.heading} onChange={(v) => edit((x) => { x.cta.heading = v })} />
           <Area label="Subhead" value={c.cta.subhead} onChange={(v) => edit((x) => { x.cta.subhead = v })} />
           <Field label="Button" value={c.cta.button} onChange={(v) => edit((x) => { x.cta.button = v })} />
+        </TabsContent>
+
+        {/* ── Motion ──
+            Shares this panel's single content object and single Save, exactly like every copy
+            tab: switching away keeps unsaved changes and only Save writes them. The editor is
+            handed the whole MotionSettings and returns a whole one, so it never has to know
+            about `edit`'s structuredClone. */}
+        <TabsContent value="motion" className="mt-4">
+          <Intro>
+            How sections arrive on the public pages. Which animation each section uses is set in
+            the page code; the feel of each one is set here, and takes effect within a minute of
+            saving.
+          </Intro>
+          <div className="mt-3">
+            <MotionEditor value={c.motion} onChange={(next) => edit((x) => { x.motion = next })} />
+          </div>
         </TabsContent>
       </Tabs>
 

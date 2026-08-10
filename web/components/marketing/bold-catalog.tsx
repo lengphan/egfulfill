@@ -86,7 +86,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                   /* Keyed by SLUG, not name. The server already disambiguated duplicate names
                      with an index suffix, so the slug is the unique one — two products sharing
                      a name collided on this key and React reconciled them as one card. */
-                  <Rise key={p.slug} delay={Math.min(i, 6) * 0.05}
+                  <Rise key={p.slug} preset="bloom" index={Math.min(i, 6)}
                         className="group overflow-hidden rounded-2xl border border-black/[0.09] bg-white transition-colors hover:border-black/30">
                   <Link href={`/catalog/${p.slug}`} className="block">
                     {/* Square well, so a mixed catalogue (tees, mugs, caps) lines up. The
@@ -164,7 +164,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
       </section>
 
       <section className="px-6 pb-16">
-        <Rise className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
+        <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
           <h2 className="mx-auto max-w-2xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
             Pick a blank, upload art, ship it.
           </h2>

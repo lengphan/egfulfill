@@ -1,10 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, CaretRight, Package, ChatCircleDots, ArrowSquareOut, Flask, Warning } from "@phosphor-icons/react"
+import { CircleNotch, CaretRight, Package, ChatCircleDots, ArrowSquareOut, Flask, Warning, CheckCircle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { SampleOrderDialog, chatUrl, orderUrl, usd, when } from "@/components/app/sample-orders"
+import { AlibabaReceiveDialog } from "@/components/app/alibaba-receive-dialog"
 import { getAlibabaOrders, getAlibabaOrder,
          type AlibabaOrderSummary, type AlibabaOrderDetail } from "@/lib/api"
 
@@ -64,6 +65,12 @@ export function AlibabaOrders() {
   // Which order the sample dialog is recording. Held as the trade id, so the dialog can be
   // remounted per order (key=) rather than reset by an effect that renders stale values.
   const [sampling, setSampling] = useState<string | null>(null)
+  // Which order is being brought into stock. The DETAIL, not the id — the import needs the
+  // lines and the totals, and those only exist once the row has been opened.
+  const [receiving, setReceiving] = useState<AlibabaOrderDetail | null>(null)
+  // Trade ids already turned into a purchase order this session, so the button can say so
+  // instead of inviting a second PO for the same goods.
+  const [imported, setImported] = useState<Record<string, string>>({})
 
   const load = useCallback(() => {
     setErr(null)
@@ -179,6 +186,20 @@ export function AlibabaOrders() {
                                 title="Record this as a sourcing sample and book its cost to the factory wallet">
                           <Flask size={13} weight="bold" /> Record as sample
                         </Button>
+                        {/* Bringing it into stock needs the LINES, and those arrive with the
+                            detail — so like Chat, this appears once the row is open rather
+                            than as a button that would have to ask you to open it first. */}
+                        {imported[o.tradeId] ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                title={`Purchase order ${imported[o.tradeId]} created — receive it from the Orders tab`}>
+                            <CheckCircle size={11} weight="fill" /> {imported[o.tradeId]}
+                          </span>
+                        ) : loaded && (
+                          <Button size="sm" variant="outline" onClick={() => setReceiving(loaded)}
+                                  title="Create a purchase order from this, so the goods can be received into inventory">
+                            <Package size={13} weight="bold" /> Into stock
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -259,6 +280,13 @@ export function AlibabaOrders() {
           onPlaced={() => setSampling(null)}
         />
       )}
+
+      <AlibabaReceiveDialog
+        key={receiving?.tradeId ?? "none"}
+        order={receiving}
+        onClose={() => setReceiving(null)}
+        onImported={(poNum) => setImported((p) => ({ ...p, [receiving!.tradeId]: poNum }))}
+      />
     </SectionCard>
   )
 }

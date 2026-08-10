@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, Binoculars, X, Package } from "@phosphor-icons/react"
+import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, Binoculars, X, Package, CaretRight } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Loading } from "@/components/app/loading"
 import { AlibabaStatus } from "@/components/app/alibaba-status"
@@ -13,6 +13,7 @@ import { getSourcing, saveSourcing, deleteSourcing, fetchSourcingPrice, getSpyde
 import { computeProfit, money, pct, FEE_MODELS, PAYMENT_DEFAULT } from "@/lib/profit"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { SampleOrderDialog, SampleOrdersPanel } from "@/components/app/sample-orders"
+import { SupplierTerms } from "@/components/app/supplier-terms"
 
 /**
  * Sourcing — where a blank comes from, what it lands at, and what it earns.
@@ -48,6 +49,31 @@ const numOrNull = (v: string): number | null => {
  */
 const fullImg = (u?: string | null): string =>
   typeof u === "string" ? u.replace(/_\d+x\d+\.(?:png|jpe?g|webp)$/i, "") : ""
+
+/**
+ * The stage, and WHY it says that.
+ *
+ * Derived server-side from sample orders, so it can't be argued with — which is exactly why
+ * it has to explain itself. "In rotation" with no reason given is as opaque as the dropdown
+ * that never moved; "a sample was received" is a fact someone can go and check.
+ *
+ * Colours stay off the reserved factory-status set (emerald shipped, amber hold, red alert):
+ * these are sourcing states, and they must not read as floor states on a glance.
+ */
+const STAGE_PILL: Record<string, string> = {
+  prospect: "bg-muted text-muted-foreground",
+  talking:  "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
+  sampling: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300",
+  rotation: "bg-primary/10 text-primary",
+  archived: "bg-muted text-muted-foreground",
+}
+const STAGE_WHY: Record<string, string> = {
+  prospect: "A quote and nothing more — no sample has been placed against this supplier.",
+  talking:  "An exchange with this supplier has been recorded, and no sample placed yet.",
+  sampling: "A sample order is on this supplier and has not been received yet.",
+  rotation: "A sample from this supplier was received — this is where the stage comes from.",
+  archived: "Archived.",
+}
 
 export function SourcingView() {
   const confirm = useConfirm()
@@ -100,11 +126,9 @@ export function SourcingView() {
   const [sampleFor, setSampleFor] = useState<SourcingRow | null>(null)
   const [samplesKey, setSamplesKey] = useState(0)
 
-  const setStage = async (row: SourcingRow, stage: SourcingStage) => {
-    setRows((prev) => (prev ?? []).map((r) => (r.id === row.id ? { ...r, stage } : r)))  // optimistic
-    const r = await saveSourcing({ ...row, stage }).catch(() => null)
-    if (!r || r.error) { setMsg("Couldn't change the stage."); load() }
-  }
+  // setStage is gone with the dropdown. The stage is derived server-side from sample
+  // orders now, so there is nothing here to set — writing one back would let a picker
+  // overwrite a fact.
 
   const active = useMemo(() => (rows ?? []).find((r) => r.id === selected) ?? null, [rows, selected])
   const fee = FEE_MODELS.find((f) => f.id === feeId) ?? FEE_MODELS[0]
@@ -471,7 +495,17 @@ export function SourcingView() {
                           ? <img src={fullImg(r.image)} alt="" className="size-9 rounded border border-border object-cover" />
                           : <span className="flex size-9 items-center justify-center rounded border border-dashed border-border text-3xs text-muted-foreground">—</span>}
                       </td>
-                      <td className="px-4 py-2 font-medium">{r.title}</td>
+                      {/* A CARET, because the row expanding was the page's best feature and
+                          nothing said so. The profit calculator, the rival comparison and
+                          the agreed terms all live in that panel, and the only way to find
+                          out was to click a row that gave no sign it would do anything. */}
+                      <td className="px-4 py-2 font-medium">
+                        <span className="flex items-center gap-1.5">
+                          <CaretRight size={12} weight="bold"
+                                      className={"shrink-0 text-muted-foreground transition-transform " + (isSel ? "rotate-90" : "")} />
+                          {r.title}
+                        </span>
+                      </td>
                       <td className="px-4 py-2 text-muted-foreground">
                         {r.supplierRef ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">{r.supplierRef}</span> : (r.shop || "—")}
                       </td>
@@ -480,11 +514,17 @@ export function SourcingView() {
                       <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{freightUnit ? money(freightUnit) : "—"}</td>
                       <td className="px-4 py-2 text-right font-semibold tabular-nums">{money(landed)}</td>
                       <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.leadDays != null ? `${r.leadDays}d` : "—"}</td>
-                      <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
-                        <select value={r.stage || "prospect"} onChange={(e) => setStage(r, e.target.value as SourcingStage)}
-                                className="eg-select h-7 rounded-md border border-border bg-card px-1.5 text-xs">
-                          {SOURCING_STAGES.map((st) => <option key={st.id} value={st.id}>{st.label}</option>)}
-                        </select>
+                      {/* DERIVED, so it is read. It was a dropdown, and every row sat at
+                          Prospect — because changing it changed nothing, and a label with no
+                          consequence is one nobody maintains. It now comes from what
+                          actually happened: a sample placed reads Sampling, a sample
+                          received reads In rotation. The title says which fact put it here,
+                          because a stage you cannot argue with should still explain itself. */}
+                      <td className="px-4 py-2">
+                        <span className={"rounded-full px-2 py-0.5 text-xs font-medium " + STAGE_PILL[r.stage || "prospect"]}
+                              title={STAGE_WHY[r.stage || "prospect"]}>
+                          {SOURCING_STAGES.find((s) => s.id === (r.stage || "prospect"))?.label ?? "Prospect"}
+                        </span>
                       </td>
                       <td className="px-4 py-2 text-right">
                         <div className="flex justify-end gap-1">
@@ -604,6 +644,13 @@ export function SourcingView() {
                     </strong> up front</>
                   )}
                 </div>
+
+                {/* Terms and the conversation sit UNDER the maths, in the same panel. The
+                    numbers above are what the deal earns; these are what the deal actually
+                    is, and someone deciding between two suppliers needs both in one place.
+                    Remounted per row so a half-typed note can't follow you to another
+                    supplier. */}
+                <SupplierTerms key={active.id} row={active} onSaved={load} />
               </SectionCard>
                         </td>
                       </tr>
