@@ -286,7 +286,21 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     const b = req.body || {};
     const orderId = String(b.orderId || '').trim();
     const sku = String(b.sku || '').trim();
-    if (!orderId || !sku) { reply.code(400); return { error: 'An order and a line are both required — a card on an order but no line belongs to no job.' }; }
+    const lineId = b.lineId ? String(b.lineId).trim() : '';
+    /**
+     * EITHER identifier will do, and demanding the sku was wrong.
+     *
+     * `line_id` IS the line's identity — two lines of the same sku are different jobs — and
+     * a marketplace order arrives with its variants UNSET, so the sku is frequently blank on
+     * exactly the lines someone is trying to send to a designer. This guard therefore
+     * refused the common case with a message about "a line" while checking a field that
+     * isn't the line. The conflict key below already keys on `coalesce('L:' || line_id,
+     * 'S:' || sku)`, so line_id alone has always been sufficient downstream.
+     */
+    if (!orderId || (!sku && !lineId)) {
+      reply.code(400);
+      return { error: 'An order and a line are both required — a card on an order but no line belongs to no job.' };
+    }
 
     const card = await q('select * from design_cards where id=$1::bigint', [String(req.params.id)])
       .then((r) => r.rows[0]).catch(() => null);
@@ -306,7 +320,6 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     // line_id, not just sku. Two lines of the same sku are different jobs, so attaching by
     // sku alone would put this artwork on whichever sibling the key happened to reach and
     // leave the other showing it too.
-    const lineId = b.lineId ? String(b.lineId) : null;
     await q(
       `insert into order_designs (order_id, sku, line_id, kind, data, storage_key, name, art_hash, updated_at)
        values ($1,$2,$7,'raster',$3,$4,$5,$6, now())
@@ -320,7 +333,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       // nothing, which is the precise failure the guard exists to prevent. Both columns hold
       // something an <img> can render, so a URL is a valid value for either.
       [orderId, sku, card.art_data || card.thumb || null, card.art_key || null,
-       card.title || null, card.art_hash || null, lineId]
+       card.title || null, card.art_hash || null, lineId || null]
     );
 
     await q('update design_cards set order_id=$2, line_id=$3, sku=$4 where id=$1::bigint',

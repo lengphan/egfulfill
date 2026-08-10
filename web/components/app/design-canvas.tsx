@@ -1180,7 +1180,14 @@ export function DesignCanvasDialog({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">Machine file</div>
-                  <div className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || undefined}>{hasMachineFile ? (latestMachine ? `Latest: ${latestMachine.name}` : "Added — the stitch file") : "The stitch file — .emb / .pes / .dst …"}</div>
+                  {/* When the file is here the step SAYS it is finished, so the design
+                      board never has to appear as a third choice below. */}
+                  <div className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || undefined}>
+                    {hasMachineFile
+                      ? (latestMachine ? `${latestMachine.name} — ready to make` : "Added — ready to make")
+                      : designUrl ? "Not cut yet — attach one, or send the image to a designer"
+                      : "The stitch file — .emb / .pes / .dst …"}
+                  </div>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1234,8 +1241,61 @@ export function DesignCanvasDialog({
               {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
             </div>
           </div>
-          {/* Ten shirts, one file — only when there IS another line to apply to. */}
-          {/* Ten shirts, one file — only when there IS another line to apply to. Two separate
+          {/* THE DESIGN BOARD IS ONE STEP OF A SEQUENCE, NOT A THIRD OPTION.
+              ────────────────────────────────────────────────────────────────
+              This read as a menu: an image control, a file control, and a board button, all
+              equally weighted, all always present — so every visit asked which of three
+              things you meant, when only one of them is ever the next thing to do.
+
+              The board exists for exactly one purpose: turning an IMAGE into a MACHINE FILE.
+              That makes the whole thing a sequence, and the sequence answers itself:
+
+                already on the board  → say where it is. Not a choice — a status.
+                machine file attached → the board has nothing left to do. Show nothing.
+                image, no file        → this IS the next step. Show it, alone.
+                neither               → nothing to send. Say what's missing instead of
+                                        offering a button that would make an empty card.
+
+              So at most ONE thing appears here, and when it appears it is the only decision
+              on screen. */}
+          {boardCard ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-sm">
+              <span className="font-medium text-foreground">On the design board</span>
+              <span className="rounded bg-primary/15 px-1.5 py-0.5 text-2xs font-semibold text-primary">
+                {boardCard.lane_label || boardCard.col || "Incoming"}
+              </span>
+              {boardCard.claimed_by && <span className="text-muted-foreground">· {boardCard.claimed_by}</span>}
+            </div>
+          ) : isStaff && !hasMachineFile ? (
+            /* SEND IT, don't just report on it — the only way to get a line to a designer
+               used to be leaving, finding the board, and making the card there with none of
+               the context that is open right here. Staff only: a seller has no lane to send
+               into. */
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-2.5 py-2 text-sm">
+              <span className="text-muted-foreground">
+                {designUrl ? "Needs digitising" : "Add an image first — a designer needs something to work from"}
+              </span>
+              <Button
+                size="sm"
+                className="ml-auto"
+                /* DISABLED WITHOUT ARTWORK, rather than creating an empty card. The order
+                   board's own push has always refused this; this route didn't, so it could
+                   put a card on the board with nothing to digitise and no way to tell what
+                   it should become. */
+                disabled={sending || !designUrl}
+                title={designUrl ? undefined : "There is no artwork on this line yet"}
+                onClick={() => void sendToBoard()}
+              >
+                {sending ? "Sending…" : "Send to design board"}
+              </Button>
+            </div>
+          ) : null}
+          {/* LAST, under the next step, because it is a shortcut rather than a decision:
+              "do this line" is the question, "and the other nine" is the follow-up. It used
+              to sit above the board strip, which put a bulk action in front of the one thing
+              you actually came here to do.
+
+              Ten shirts, one file — only when there IS another line to apply to. Two separate
               buttons because they are two separate things: the image is what the mockup shows,
               the machine file is what the machine stitches, and an order can legitimately want
               one shared and the other per-item. */}
@@ -1256,33 +1316,6 @@ export function DesignCanvasDialog({
           {/* WHERE THIS LINE IS ON THE BOARD. Named lane, not a generic "sent" — "sent to
               design" three days ago and "Approved" are very different answers, and the lane
               is the one the board itself shows. */}
-          {boardCard ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-sm">
-              <span className="font-medium text-foreground">On the design board</span>
-              <span className="rounded bg-primary/15 px-1.5 py-0.5 text-2xs font-semibold text-primary">
-                {boardCard.lane_label || boardCard.col || "Incoming"}
-              </span>
-              {boardCard.claimed_by && <span className="text-muted-foreground">· {boardCard.claimed_by}</span>}
-            </div>
-          ) : isStaff ? (
-            /* SEND IT, don't just report on it. This panel already answered "is this line on
-               the board?" and, when the answer was no, offered nothing — so the only way to
-               get a line to a designer was to leave, find the board, and make the card there
-               with none of the context that is open right here. Staff only: the read above is
-               staff-gated too, and a seller has no lane to send into. */
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-2.5 py-2 text-sm">
-              <span className="text-muted-foreground">Not on the design board</span>
-              <Button
-                size="sm"
-                variant="outline"
-                className="ml-auto"
-                disabled={sending}
-                onClick={() => void sendToBoard()}
-              >
-                {sending ? "Sending…" : "Send to design board"}
-              </Button>
-            </div>
-          ) : null}
           {err && <div className="text-sm text-destructive">{err}</div>}
           {/* A machine file was filed. Green, not red, and it says what it did AND what it
               deliberately didn't — the canvas is unchanged, which without a word reads as
