@@ -1954,7 +1954,11 @@ function UsersPanel() {
   }
 
   const addUser = async () => {
-    if (!nu.email.trim() || nu.password.length < 8) { setNuErr("Email/username and a password of 8+ characters are required."); return }
+    // An ADDRESS here, not a username: this account gets a password someone has to be
+    // told, and it joins the broadcast audience. The server enforces the same rule — this
+    // copy exists so you learn it while typing rather than after pressing the button.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nu.email.trim())) { setNuErr("Enter an email address — a username can't receive the password or any mail we send."); return }
+    if (nu.password.length < 8) { setNuErr("The password needs at least 8 characters."); return }
     setBusy("new"); setNuErr(null)
     try {
       const r = await createUserAdmin({ email: nu.email.trim(), password: nu.password, role: nu.role })
@@ -2036,7 +2040,7 @@ function UsersPanel() {
     <div className="space-y-4">
       <SectionCard title="New staff / user">
         <div className="flex flex-wrap items-end gap-2 p-5">
-          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Email / username</span><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="ops@egful.store" className="h-9" /></label>
+          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Email</span><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="ops@egful.store" className="h-9" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Password</span><PasswordInput value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="8+ characters" className="h-9" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Role</span>
             <select value={nu.role} onChange={(e) => setNu({ ...nu, role: e.target.value })} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>

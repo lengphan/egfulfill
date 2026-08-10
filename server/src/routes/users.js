@@ -89,16 +89,44 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     return r.rows;   // never returns password_hash
   });
 
+  /**
+   * A first profile name, derived from the address.
+   *
+   * An account created here had a blank `name`, so every screen that shows a person fell
+   * back to its own placeholder — the account read as "Unknown" from the moment it was
+   * made. The address is the one thing we always have, so it seeds the name: local part,
+   * separators to spaces, each word capitalised. `linh.phan@egful.store` -> `Linh Phan`.
+   *
+   * It is a STARTING value, not a derived one — stored in the column like any other name,
+   * so the moment the person edits their profile theirs wins and this never reappears.
+   */
+  const nameFromEmail = (email) =>
+    String(email).split('@')[0]
+      .replace(/[._+-]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+
   app.post('/api/users', { preHandler: requireAdmin }, async (req, reply) => {
     const { email, password, role = 'seller', name = '' } = req.body || {};
     if (!email || !password) { reply.code(400); return { error: 'Email and password are required' }; }
+    // An ADDRESS, not a username. Sign-in accepts either, but an account made here has to
+    // be reachable: it gets a password someone must be told, and it lands in the broadcast
+    // audience — a username there is a message that can never be delivered. Usernames are
+    // still chosen by the person themselves in their own profile.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+      reply.code(400);
+      return { error: 'Enter an email address — a username can’t receive the password or any mail we send' };
+    }
     if (password.length < 8) { reply.code(400); return { error: 'Password must be at least 8 characters' }; }
     if (!ROLES.includes(role)) { reply.code(400); return { error: 'Invalid role' }; }
     try {
       const hash = await hashPassword(password);
+      const addr = String(email).trim().toLowerCase();
       const r = await q(
         'insert into users (email, password_hash, role, name) values ($1,$2,$3,$4) returning id, email, name, role, created_at',
-        [email.toLowerCase(), hash, role, name]
+        [addr, hash, role, String(name).trim() || nameFromEmail(addr)]
       );
       return r.rows[0];
     } catch (e) {
