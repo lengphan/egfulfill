@@ -23,7 +23,12 @@ const SECRET_DEFS = [
   // the secret becomes unreachable from Settings. These said 'shipping' while the cards are
   // 'shippo' and 'easypost' — so the Shippo token, the one key that decides whether labels
   // are test or live, could not be changed anywhere in the product.
-  { name: 'EASYPOST_API_KEY',      label: 'API key',          integration: 'easypost' },
+  // EASYPOST removed from the editable set (2026-08-10): Shippo covers everything USPS
+  // direct does not, so a second aggregator is a second key to misconfigure — which it
+  // already was, absorbing a Shippo token typed into the wrong field. The CODE stays for
+  // now and is inert without a key (every call site guards on epKey()); tearing 41
+  // references out of the label-buying path is a separate change, not one to make on the
+  // day live labels start being bought.
   { name: 'SHIPPO_API_TOKEN',      label: 'API token',        integration: 'shippo' },
   { name: 'USPS_CONSUMER_KEY',     label: 'Consumer key',     integration: 'usps' },
   { name: 'USPS_CONSUMER_SECRET',  label: 'Consumer secret',  integration: 'usps' },
