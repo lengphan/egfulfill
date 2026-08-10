@@ -283,7 +283,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
               title="Reopen the publish window with this listing's blank, variants, artwork and photos"
               className={cn(CARD_ACTION_PRIMARY, "flex-1")}
             >
-              <PencilSimple size={13} weight="bold" /> Edit &amp; re-publish
+              <PencilSimple size={13} weight="bold" /> Edit listing
             </button>
           ) : l.our_url ? (
             <a href={l.our_url} target="_blank" rel="noopener noreferrer" className={cn(CARD_ACTION_PRIMARY, "flex-1")}>
@@ -1231,13 +1231,15 @@ export function SpyDeckView() {
         open={!!editing}
         onOpenChange={(v) => !v && setEditing(null)}
         prefill={editing ? {
-          title: editing.l.published?.title || editing.l.title,
-          // The description was never stored on the publish record, so it starts empty
-          // rather than borrowing the competitor's — which is what it would otherwise be,
-          // and is the one field where copying is an actual liability.
-          description: "",
+          // OUR title, description and tags — the ones we actually sent, now stored on the
+          // publish record. They fall back to the competitor's TITLE only (never its
+          // description or tags): a title is a starting point someone will rewrite, whereas
+          // inheriting a competitor's description or tag set is the one place copying is an
+          // actual liability rather than a shortcut.
+          title: editing.l.product?.title || editing.l.published?.title || editing.l.title,
+          description: editing.l.product?.description || "",
           price: editing.l.published?.price ?? undefined,
-          tags: [],
+          tags: editing.l.product?.tags ?? [],
           // OUR photos, live from the listing — the ones already on it, so a re-publish
           // starts from what is there instead of asking for them again.
           images: editing.images,
@@ -1251,7 +1253,7 @@ export function SpyDeckView() {
           if (editing) onPublishedFrom(editing.l, url, img, published)
           setEditing(null)
         }}
-        title="Edit & re-publish"
+        title="Edit listing"
       />
 
       <PublishProductDialog

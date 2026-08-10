@@ -670,7 +670,8 @@ export function spydeckRoutes(app, requireAuth) {
       // and costs nothing once the column is filled going forward.
       r = await q(
         `${BASE}, p.platform, p.blank_sku, p.print_type, p.color, p.size,
-                p.design_id, p.design_data, p.design_pos
+                p.design_id, p.design_data, p.design_pos,
+                p.title as published_title, p.description as published_description, p.tags as published_tags
            from spydeck_uploads u
            left join published_listings p
              on p.listing_id = coalesce(u.our_listing_id, substring(u.url from 'listing/([0-9]+)'))
@@ -691,7 +692,12 @@ export function spydeckRoutes(app, requireAuth) {
       const product = (row.blank_sku || row.print_type || row.color || row.size)
         ? { blank_sku: row.blank_sku, print_type: row.print_type, color: row.color, size: row.size,
             platform: row.platform, design_id: row.design_id, design_data: row.design_data,
-            design_pos: row.design_pos }
+            design_pos: row.design_pos,
+            // The words we sent. Named apart from the competitor's title/description, which
+            // also ride on this row — mixing them is how a re-publish would quietly restore
+            // someone else's copy.
+            title: row.published_title, description: row.published_description,
+            tags: row.published_tags }
         : undefined;
       return {
         ...source, listing_id: row.listing_id,

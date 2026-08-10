@@ -2623,6 +2623,11 @@ export type UploadedListing = EtsyListing & {
      *  the design already attached. A re-publish without these would make a listing with
      *  the right blank and variants and no design on it. */
     design_id?: string | null; design_data?: string | null; design_pos?: unknown
+    /** THE WORDS WE SENT — kept so reopening the publish window doesn't ask for them a
+     *  second time. Deliberately named apart from the competitor's title/description that
+     *  also ride on this row: mixing them is how a re-publish quietly restores someone
+     *  else's copy. */
+    title?: string | null; description?: string | null; tags?: string[] | null
   }
 }
 export function getSpydeckUploads() {

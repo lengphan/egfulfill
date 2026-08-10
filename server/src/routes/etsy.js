@@ -1575,6 +1575,20 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
        size        text,
        created_at  timestamptz default now()
      )`).catch(() => {});
+  /**
+   * THE WORDS WE SENT, kept so a re-publish doesn't ask for them twice.
+   *
+   * The record held the blank, the variants and the artwork but not the title's companions
+   * — so reopening the publish window restored everything except the two fields that take
+   * longest to write. Storing them makes "edit and send again" mean what it says instead of
+   * "retype the description".
+   *
+   * `tags` as text[] rather than a joined string: they are a list everywhere else in this
+   * file, and re-splitting a string is how a tag containing a comma quietly becomes two.
+   */
+  q('alter table published_listings add column if not exists description text').catch(() => {});
+  q('alter table published_listings add column if not exists tags text[]').catch(() => {});
+  q('alter table published_listings add column if not exists title text').catch(() => {});
 
   app.post('/api/etsy/publish', { preHandler: requireAuth }, async (req, reply) => {
     try {
@@ -1675,16 +1689,21 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // arrives ready to make instead of anonymous. Best-effort: a publish that succeeded
       // must not fail because we couldn't write a note about it.
       q(`insert into published_listings
-           (listing_id, platform, seller_id, blank_sku, design_id, design_data, design_pos, print_type, color, size)
-         values ($1,'etsy',$2,$3,$4,$5,$6,$7,$8,$9)
+           (listing_id, platform, seller_id, blank_sku, design_id, design_data, design_pos, print_type, color, size,
+            title, description, tags)
+         values ($1,'etsy',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          on conflict (listing_id) do update set
            blank_sku=excluded.blank_sku, design_id=excluded.design_id,
            design_data=excluded.design_data, design_pos=excluded.design_pos,
-           print_type=excluded.print_type, color=excluded.color, size=excluded.size`,
+           print_type=excluded.print_type, color=excluded.color, size=excluded.size,
+           title=excluded.title, description=excluded.description, tags=excluded.tags`,
         [String(listingId), req.user.sub || null, b.blank || b.sku || null, b.designId || null,
          b.designUrl || b.design || null,
          b.designPos ? JSON.stringify(b.designPos) : null,
-         b.printType || b.method || null, b.color || null, b.size || null]
+         b.printType || b.method || null, b.color || null, b.size || null,
+         // The words, so reopening this listing doesn't ask for them a second time.
+         title || null, b.description ? String(b.description) : null,
+         Array.isArray(uniqueTags) && uniqueTags.length ? uniqueTags : null]
       ).catch(() => {});
 
       // Upload the photo(s). Sources are data: URLs (local uploads) OR remote Etsy-CDN

@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 import { clampDays, windowStartSec } from '../backfill.js';
+import { audit } from '../audit.js';
 
 const API_KEY     = process.env.SHOPIFY_API_KEY || '';
 const API_SECRET  = process.env.SHOPIFY_API_SECRET || '';
@@ -15,7 +16,13 @@ const API_SECRET  = process.env.SHOPIFY_API_SECRET || '';
 // when order-sync/tracking is built.
 // Fulfillment-order scopes are needed to push tracking (create a fulfillment). A store
 // connected before these were added must RECONNECT to grant them, or the fulfillment 403s.
-const SCOPES      = process.env.SHOPIFY_SCOPES || 'read_orders,write_orders,read_products,write_merchant_managed_fulfillment_orders,read_merchant_managed_fulfillment_orders';
+// write_products is what lets /api/shopify/publish create anything. It was absent, so a
+// token from an existing connection CANNOT create a product however correct the payload is
+// — Shopify refuses on scope, not on content. Adding it here only affects connections made
+// from now on: OAuth scopes are fixed at grant time, so every already-connected shop must
+// RECONNECT before publishing works for it. That is unavoidable rather than a design
+// choice, and the publish route says so by name when Shopify rejects it.
+const SCOPES      = process.env.SHOPIFY_SCOPES || 'read_orders,write_orders,read_products,write_products,write_merchant_managed_fulfillment_orders,read_merchant_managed_fulfillment_orders';
 // Force canonical (non-www) so the authorize redirect_uri matches the popup origin.
 const REDIRECT_URI = (process.env.SHOPIFY_REDIRECT_URI || 'https://egful.store/oauth-callback.html').replace('://www.', '://');
 const API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-07';
@@ -563,6 +570,152 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
   });
 
   // Diagnostic (staff): confirm the stored token still works against the Shop API.
+  /**
+   * Publish a product to Shopify.
+   *
+   * Mirrors /api/etsy/publish and /api/tiktok/publish: one product, its variants, its
+   * images, and a row in published_listings so the Uploaded card can describe what we made
+   * rather than what it was copied from.
+   *
+   * SHOPIFY HAS NO DRAFT/ACTIVE AMBIGUITY to hide behind — `status: 'draft'` is explicit and
+   * is what we send, for the same reason Etsy gets a draft: nothing reaches a buyer until
+   * the seller looks at it. Their own admin is where it gets activated.
+   *
+   * The connection is the CALLER's own shop, never "the first row in the table" — writing a
+   * product into a shop you do not own is the same violation the Etsy route was fixed for.
+   */
+  app.post('/api/shopify/publish', { preHandler: requireAuth }, async (req, reply) => {
+    if (!API_KEY || !API_SECRET) { reply.code(400); return { error: 'Server missing SHOPIFY_API_KEY / SHOPIFY_API_SECRET' }; }
+    const b = req.body || {};
+    const title = String(b.title || '').trim();
+    if (!title) { reply.code(400); return { error: 'A title is required.' }; }
+
+    const conn = (await q(
+      `select * from platform_connections where platform='shopify' and connected_by=$1 limit 1`,
+      [req.user.sub])).rows[0];
+    if (!conn) { reply.code(400); return { error: 'No Shopify shop is connected to your account.' }; }
+
+    const base = `https://${conn.shop_id}/admin/api/${API_VERSION}`;
+    const call = async (path, init = {}) => {
+      const r = await fetch(base + path, {
+        ...init,
+        headers: { 'X-Shopify-Access-Token': conn.access_token, 'Content-Type': 'application/json', ...(init.headers || {}) },
+      });
+      const text = await r.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { /* keep the raw text below */ }
+      if (!r.ok) {
+        // Their words. A 403 here is almost always the missing write_products scope, and
+        // that has a specific fix (reconnect the shop) that a generic failure would hide.
+        const why = (data && (data.errors || data.error)) || text || `HTTP ${r.status}`;
+        const err = new Error(typeof why === 'string' ? why : JSON.stringify(why));
+        err.status = r.status;
+        throw err;
+      }
+      return data;
+    };
+
+    // VARIANTS. Shopify takes options as up to three named axes; we ship colour and size,
+    // which is what the catalogue actually varies. An empty axis is omitted rather than
+    // sent empty — Shopify creates a "Title / Default" variant in that case, which is the
+    // correct shape for a one-variant product.
+    const colors = (Array.isArray(b.colors) ? b.colors : []).map(String).filter(Boolean);
+    const sizes  = (Array.isArray(b.sizes)  ? b.sizes  : []).map(String).filter(Boolean);
+    const options = [];
+    if (colors.length) options.push({ name: 'Color', values: colors });
+    if (sizes.length)  options.push({ name: 'Size',  values: sizes });
+    const price = Number(b.price) > 0 ? Number(b.price).toFixed(2) : '0.00';
+    const variants = [];
+    const pairs = colors.length && sizes.length
+      ? colors.flatMap((c) => sizes.map((z) => [c, z]))
+      : colors.length ? colors.map((c) => [c, null])
+      : sizes.length ? sizes.map((z) => [null, z])
+      : [[null, null]];
+    for (const [c, z] of pairs) {
+      const v = { price, inventory_management: null };
+      if (c) v.option1 = c;
+      if (z) v[c ? 'option2' : 'option1'] = z;
+      // The BLANK sku, suffixed per variant, so an order coming back is resolvable to a
+      // product the floor can actually make. Matches the Etsy route's variant_skus.
+      if (b.blank_sku) v.sku = [b.blank_sku, c, z].filter(Boolean).join('-');
+      variants.push(v);
+    }
+
+    const product = {
+      title,
+      body_html: String(b.description || ''),
+      status: 'draft',
+      tags: (Array.isArray(b.tags) ? b.tags : []).map(String).filter(Boolean).join(', '),
+      product_type: String(b.print_type || ''),
+      ...(options.length ? { options } : {}),
+      variants,
+    };
+
+    let created;
+    try {
+      created = await call('/products.json', { method: 'POST', body: JSON.stringify({ product }) });
+    } catch (e) {
+      reply.code(e.status === 403 || e.status === 401 ? 403 : 502);
+      return {
+        error: (e.status === 403 || e.status === 401)
+          ? `Shopify refused: ${e.message}. This shop was connected before publishing was supported — reconnect it under Stores so its token carries write_products.`
+          : `Shopify refused: ${e.message}`,
+      };
+    }
+    const p = created && created.product;
+    if (!p || !p.id) { reply.code(502); return { error: 'Shopify accepted the request but returned no product.' }; }
+
+    /**
+     * IMAGES, one call each, and a failure here does NOT fail the publish.
+     *
+     * The product exists by this point. Reporting the whole thing as failed would leave a
+     * real draft in the shop that our record denies — the same "board says done, order says
+     * nothing" split the design routes were fixed for. So images are counted and the count
+     * is returned, exactly as the Etsy route does.
+     */
+    const imgs = (Array.isArray(b.images) ? b.images : []).map(String).filter(Boolean).slice(0, 10);
+    let uploaded = 0, primaryImage = null;
+    for (const src of imgs) {
+      try {
+        const body = /^data:/i.test(src)
+          ? { image: { attachment: src.replace(/^data:[^,]*,/, '') } }
+          : { image: { src } };
+        const r = await call(`/products/${p.id}/images.json`, { method: 'POST', body: JSON.stringify(body) });
+        if (r && r.image) { uploaded++; if (!primaryImage) primaryImage = r.image.src || null; }
+      } catch (e) {
+        req.log?.warn?.({ err: e, product: p.id }, 'shopify image upload failed');
+      }
+    }
+
+    await q(
+      `insert into published_listings (listing_id, platform, seller_id, blank_sku, design_id, design_data, design_pos, print_type, color, size,
+                                       title, description, tags)
+       values ($1,'shopify',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       on conflict (listing_id) do update set blank_sku=excluded.blank_sku, print_type=excluded.print_type,
+         title=excluded.title, description=excluded.description, tags=excluded.tags`,
+      [String(p.id), req.user.sub, b.blank_sku || null, b.design_id || null, b.design_data || null,
+       b.design_pos ? JSON.stringify(b.design_pos) : null, b.print_type || null,
+       colors[0] || null, sizes[0] || null,
+       // Same as Etsy: kept so an edit-and-send-again doesn't ask for the words twice.
+       title || null, b.description ? String(b.description) : null,
+       (Array.isArray(b.tags) && b.tags.length) ? b.tags.map(String) : null]
+    ).catch(() => {});
+
+    audit(req, 'shopify.publish', {
+      entityType: 'listing', entityId: String(p.id),
+      after: { title, variants: variants.length, images: uploaded, blank: b.blank_sku || null },
+      note: `Published "${title}" to ${conn.shop_id} as a draft`,
+    });
+
+    return {
+      ok: true, listing_id: String(p.id), state: p.status || 'draft',
+      images_uploaded: uploaded, primary_image: primaryImage,
+      variants_applied: variants.length,
+      variant_skus: variants.map((v) => v.sku).filter(Boolean),
+      url: `https://${conn.shop_id}/admin/products/${p.id}`,
+    };
+  });
+
   app.get('/api/shopify/debug', { preHandler: requireStaff }, async (req, reply) => {
     try {
       const conn = (await q(`select * from platform_connections where platform='shopify' order by created_at limit 1`)).rows[0];
