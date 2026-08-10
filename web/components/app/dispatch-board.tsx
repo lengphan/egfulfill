@@ -13,6 +13,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow, type AuditRow, type ShipAddress } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
+import { ExternalLabels } from "@/components/app/external-labels"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
@@ -850,6 +851,11 @@ export function DispatchBoard() {
           </div>
         )}
       </SectionCard>
+
+      {/* A label that ISN'T one of our orders — someone else's system, or a buyer's own
+          postage. Below the queue because it is the exception, not the day's work, and
+          deliberately its own card: it touches no order and bills nothing. */}
+      <ExternalLabels />
 
       {/* Keyed on the selection so reopening after a different pick can't show the
           previous batch's preview for a frame. */}

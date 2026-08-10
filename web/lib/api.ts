@@ -1604,6 +1604,48 @@ export function getDispatchStatus() {
 export function pushToDispatch(orderIds: string[]) {
   return api<DispatchPushResult>(`/api/dispatch/push`, { method: "POST", body: JSON.stringify({ orderIds }) })
 }
+
+/**
+ * EXTERNAL LABELS — a label that is not one of our orders.
+ *
+ * Unlinked by design: it touches no order and bills nothing. The expedite fee exists
+ * because a seller asked us to rush THEIR order; there is no seller and no order here.
+ */
+export type DispatchUpload = {
+  id: string | number
+  /** Their id — the key every status poll goes through. */
+  pdf_id: string | null
+  file_name: string | null
+  /** Their copy of the file, so "open the label" doesn't need us to store it. */
+  public_url: string | null
+  /** THEIR vocabulary (PENDING / EXTRACTED / …), passed through rather than translated —
+   *  a word we invent here can't be matched against what their own dashboard shows. */
+  status: string | null
+  total_pages: number | null
+  /** Null until their extractor has run. Null and 0 mean different things: "not looked
+   *  yet" versus "looked and found none". */
+  total_labels: number | null
+  scanned_labels: number
+  labels: { trackingNumber?: string; status?: string; pickedAt?: string }[]
+  note: string | null
+  created_by: string | null
+  created_at: string
+  synced_at: string | null
+}
+export function getDispatchUploads() {
+  return api<{ configured: boolean; uploads: DispatchUpload[] }>(`/api/dispatch/uploads`)
+}
+/** `dataUrl` is a PDF or a JPEG. Anything else the browser can display should be drawn to
+ *  a canvas and exported as JPEG first — the server has no image decoder, and their API
+ *  refuses images outright, so a JPEG is wrapped in a one-page PDF server-side. */
+export function uploadDispatchLabel(body: { fileName: string; dataUrl: string; note?: string }) {
+  return api<{ ok?: boolean; upload?: DispatchUpload; error?: string }>(`/api/dispatch/uploads`, {
+    method: "POST", body: JSON.stringify(body),
+  })
+}
+export function deleteDispatchUpload(id: string | number) {
+  return api<{ ok?: boolean; error?: string }>(`/api/dispatch/uploads/${id}`, { method: "DELETE" })
+}
 /**
  * Pull labels back OUT of the pre-scan queue — "we pushed 5, one got picked, we want the
  * other 4 back". Per order, because each push uploads its own PDF.

@@ -80,6 +80,72 @@ const apiKey = () => (process.env.BYEASTSIDE_API_KEY || '').trim();
 const apiBase = () => (process.env.BYEASTSIDE_API_BASE || 'https://api.byeastside.uk/api').replace(/\/+$/, '');
 const MAX_PDF = 50 * 1024 * 1024;   // their documented limit
 
+/**
+ * WRAP A JPEG IN A ONE-PAGE PDF.
+ *
+ * Their upload answers `400 {"message":"Only PDF files are allowed"}` to an image —
+ * probed against the live API on 2026-08-10 with an 800x1200 PNG, so this is measured,
+ * not assumed. But a phone photo of a label is exactly what someone has to hand, so
+ * refusing images outright would push them back to a scanner they don't own.
+ *
+ * Written by hand rather than pulled from a library: PDF's image case is genuinely small,
+ * and `server/` deliberately carries five dependencies. A JPEG needs NO re-encoding at all
+ * — /DCTDecode means "this stream is a JPEG", so the original bytes go in untouched and
+ * nothing is resampled or degraded on the way to their extractor.
+ *
+ * PNGs never reach here: the browser converts to JPEG on a canvas before upload, because
+ * embedding a PNG means decoding and un-filtering it, and the browser already has a
+ * decoder. See the drop zone in dispatch-board.tsx.
+ *
+ * The page is sized in POINTS at 72dpi so a 1200px-wide photo becomes a sane page rather
+ * than a 16-foot one, and the image fills the page exactly — their extractor reads the
+ * page, so letterboxing would only shrink the barcode.
+ */
+function jpegToPdf(jpeg, wpx, hpx) {
+  const w = Math.max(1, Math.round((wpx / 150) * 72));   // 150dpi source is the usual scan
+  const h = Math.max(1, Math.round((hpx / 150) * 72));
+  const parts = [];
+  const offsets = [0];
+  let len = 0;
+  const push = (buf) => { const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf, 'latin1'); parts.push(b); len += b.length; };
+  const obj = (n, body) => { offsets[n] = len; push(`${n} 0 obj\n`); push(body); push('\nendobj\n'); };
+
+  push('%PDF-1.4\n');
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
+  // The image XObject: the JPEG's own bytes, declared rather than transcoded.
+  offsets[4] = len;
+  push(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${wpx} /Height ${hpx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);
+  push(jpeg);
+  push('\nendstream\nendobj\n');
+  const content = `q ${w} 0 0 ${h} 0 0 cm /Im0 Do Q`;
+  obj(5, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+
+  const xref = len;
+  push(`xref\n0 6\n0000000000 65535 f \n`);
+  for (let i = 1; i <= 5; i++) push(String(offsets[i]).padStart(10, '0') + ' 00000 n \n');
+  push(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return Buffer.concat(parts);
+}
+
+/** Width/height straight out of a JPEG's SOF marker. Needed because the page has to be
+ *  sized to the image, and re-decoding the whole file to learn two numbers is absurd. */
+function jpegSize(buf) {
+  if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) return null;
+  let i = 2;
+  while (i + 9 < buf.length) {
+    if (buf[i] !== 0xff) { i++; continue; }
+    const marker = buf[i + 1];
+    // SOF0..SOF15, skipping the four that are not frame headers.
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+    }
+    i += 2 + buf.readUInt16BE(i + 2);
+  }
+  return null;
+}
+
 export function dispatchEnabled() { return !!apiKey(); }
 
 async function bes(path, init = {}) {
@@ -612,6 +678,150 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     }
     if (cancelled) egBroadcast({ type: 'orders' });
     return { ok: true, cancelled, results };
+  });
+
+  // ── EXTERNAL LABELS ─────────────────────────────────────────────────────────
+  //
+  // A label that is NOT one of our orders. Someone hands the floor a parcel from a
+  // different system, or a customer's own postage, and it still has to be pre-scanned.
+  // Today that means opening byeastside's own website, which is a second login, a second
+  // place to look, and no record on our side of what was sent.
+  //
+  // DELIBERATELY UNLINKED, and that is the whole design. Earlier this feature was declined
+  // precisely because a dropped label has no EGFULFILL order to hang scans on — so it does
+  // not pretend to have one. It gets its own table and its own list, touches no order, and
+  // bills nothing: the expedite fee exists because a seller asked us to rush THEIR order,
+  // and there is no seller and no order here.
+  q(`create table if not exists dispatch_uploads (
+       id             bigserial primary key,
+       pdf_id         text,                     -- their id, the join key for every poll
+       file_name      text,
+       public_url     text,                     -- their copy of the file, for "open the label"
+       status         text,                     -- PENDING | EXTRACTED | ... their vocabulary, not ours
+       total_pages    integer,
+       total_labels   integer,
+       scanned_labels integer not null default 0,
+       labels         jsonb not null default '[]',
+       note           text,
+       error          text,
+       created_by     text,
+       created_at     timestamptz not null default now(),
+       synced_at      timestamptz)`).catch(() => {});
+
+  /** Their words for a batch that will never change again — nothing left to poll for. */
+  const settled = (row) => Number(row.total_labels || 0) > 0
+    && Number(row.scanned_labels || 0) >= Number(row.total_labels || 0);
+
+  /**
+   * Drop a label file straight through to the partner.
+   *
+   * PDF OR IMAGE, and the difference is handled here rather than refused. Their upload
+   * answers `400 Only PDF files are allowed` to an image — measured against the live API
+   * on 2026-08-10, not assumed — so a JPEG is wrapped in a one-page PDF whose stream IS
+   * the original JPEG (see jpegToPdf). Verified end to end the same day: a generated file
+   * came back 201 with totalPages 1, indistinguishable to them from a real one.
+   *
+   * The browser converts PNG/HEIC/WebP to JPEG before sending, because it already owns a
+   * decoder for every format it can display and the server owns none.
+   */
+  app.post('/api/dispatch/uploads', { preHandler: canDispatch }, async (req, reply) => {
+    if (!dispatchEnabled()) { reply.code(400); return { error: 'Dispatch partner not configured (BYEASTSIDE_API_KEY).' }; }
+    const b = req.body || {};
+    const dataUrl = String(b.dataUrl || '');
+    const m = /^data:([^;,]+)[^,]*,(.*)$/s.exec(dataUrl);
+    if (!m) { reply.code(400); return { error: 'Send the file as a data URL.' }; }
+    const mime = m[1].toLowerCase();
+    let buf;
+    try { buf = Buffer.from(m[2], 'base64'); } catch { reply.code(400); return { error: "That file couldn't be decoded." }; }
+    if (!buf.length) { reply.code(400); return { error: 'That file is empty.' }; }
+
+    let fileName = String(b.fileName || 'label.pdf').replace(/[^\w.\- ]+/g, '_').slice(0, 120);
+    if (mime === 'image/jpeg' || mime === 'image/jpg') {
+      const size = jpegSize(buf);
+      // No SOF marker means it is not a JPEG whatever the data URL claims. Say so rather
+      // than posting a file their extractor will silently make nothing of.
+      if (!size) { reply.code(400); return { error: "That image couldn't be read — re-save it as a JPEG or a PDF." }; }
+      buf = jpegToPdf(buf, size.w, size.h);
+      fileName = fileName.replace(/\.(jpe?g|png|heic|webp)$/i, '') + '.pdf';
+    } else if (mime !== 'application/pdf') {
+      reply.code(400);
+      return { error: `${mime} isn't a label file — drop a PDF, or a photo of the label.` };
+    }
+    if (buf.length > MAX_PDF) { reply.code(400); return { error: 'That file is over their 50MB limit.' }; }
+
+    const form = new FormData();
+    form.append('file', new Blob([buf], { type: 'application/pdf' }), fileName);
+    const r = await bes('/customer/pdfs/upload', { method: 'POST', body: form });
+    if (!r.ok) {
+      // Their raw words. With no documented error codes this text is the only diagnostic,
+      // and it is what told us images were refused in the first place.
+      const msg = (r.data && (r.data.message || r.data.error)) || r.error || `Upload failed (${r.status})`;
+      reply.code(502);
+      return { error: String(msg) };
+    }
+    const d = r.data || {};
+    const row = await q(
+      `insert into dispatch_uploads (pdf_id, file_name, public_url, status, total_pages, total_labels, note, created_by, synced_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8, now()) returning *`,
+      [String(d.id ?? ''), fileName, d.publicUrl || null, d.status || 'PENDING',
+       d.totalPages ?? null, d.totalLabels ?? null,
+       b.note ? String(b.note).slice(0, 200) : null, String((req.user && req.user.email) || '')]);
+    audit(req, 'dispatch.upload', { entityType: 'dispatch_upload', entityId: String(d.id ?? ''),
+      after: { file: fileName, pages: d.totalPages ?? null }, note: `External label ${fileName} sent for pre-scan` });
+    return { ok: true, upload: row.rows[0] };
+  });
+
+  /**
+   * The list, refreshed from their side on read.
+   *
+   * Polled here rather than on the dispatch timer: these are unlinked, so nothing else in
+   * the product depends on them being current, and a batch nobody is looking at does not
+   * need to be asked about every minute. Rows that are fully scanned are never asked
+   * again — they cannot change.
+   */
+  app.get('/api/dispatch/uploads', { preHandler: canDispatch }, async () => {
+    const rows = (await q('select * from dispatch_uploads order by created_at desc limit 200')
+      .catch(() => ({ rows: [] }))).rows;
+    if (!dispatchEnabled()) return { configured: false, uploads: rows };
+    for (const row of rows) {
+      if (!row.pdf_id || settled(row)) continue;
+      const st = await bes(`/customer/pdfs/${encodeURIComponent(row.pdf_id)}`);
+      if (!st.ok || !st.data) continue;
+      const lb = await bes(`/customer/pdfs/${encodeURIComponent(row.pdf_id)}/labels`);
+      const labels = Array.isArray(lb.data) ? lb.data : [];
+      const picked = labels.filter((l) => String(l.status || '').toUpperCase() === 'PICKED').length;
+      const upd = await q(
+        `update dispatch_uploads set status=$2, total_pages=$3, total_labels=$4,
+                scanned_labels=$5, labels=$6::jsonb, synced_at=now()
+           where id=$1 returning *`,
+        [row.id, st.data.status || row.status, st.data.totalPages ?? row.total_pages,
+         st.data.totalLabels ?? row.total_labels, picked, JSON.stringify(labels)]).catch(() => null);
+      if (upd && upd.rows[0]) Object.assign(row, upd.rows[0]);
+    }
+    return { configured: true, uploads: rows };
+  });
+
+  /**
+   * Pull one back. Their DELETE answers 409 once a label has been scanned, and that
+   * refusal is correct — the parcel is committed. Reported as their own sentence rather
+   * than swallowed into a generic failure.
+   */
+  app.delete('/api/dispatch/uploads/:id', { preHandler: canDispatch }, async (req, reply) => {
+    const row = (await q('select * from dispatch_uploads where id=$1::bigint', [String(req.params.id)])
+      .catch(() => ({ rows: [] }))).rows[0];
+    if (!row) { reply.code(404); return { error: 'not found' }; }
+    if (row.pdf_id && dispatchEnabled()) {
+      const r = await bes(`/customer/pdfs/${encodeURIComponent(row.pdf_id)}`, { method: 'DELETE' });
+      if (!r.ok) {
+        const msg = (r.data && (r.data.message || r.data.error)) || r.error || `Their side refused (${r.status})`;
+        reply.code(r.status === 409 ? 409 : 502);
+        return { error: r.status === 409 ? 'Already scanned — it can\'t be pulled back now.' : String(msg) };
+      }
+    }
+    await q('delete from dispatch_uploads where id=$1::bigint', [String(req.params.id)]).catch(() => {});
+    audit(req, 'dispatch.upload.cancel', { entityType: 'dispatch_upload', entityId: String(row.pdf_id || req.params.id),
+      note: `External label ${row.file_name || ''} pulled back` });
+    return { ok: true };
   });
 
   // Manual "check now", and the same call the timer makes.
