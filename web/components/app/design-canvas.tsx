@@ -1180,11 +1180,13 @@ export function DesignCanvasDialog({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">Machine file</div>
-                  {/* When the file is here the step SAYS it is finished, so the design
-                      board never has to appear as a third choice below. */}
+                  {/* This one line carries the whole state of the step, including "a
+                      designer has it" — which is why there is no longer a separate board
+                      strip underneath competing to say the same thing. */}
                   <div className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || undefined}>
                     {hasMachineFile
                       ? (latestMachine ? `${latestMachine.name} — ready to make` : "Added — ready to make")
+                      : boardCard ? `With a designer · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
                       : designUrl ? "Not cut yet — attach one, or send the image to a designer"
                       : "The stitch file — .emb / .pes / .dst …"}
                   </div>
@@ -1192,6 +1194,33 @@ export function DesignCanvasDialog({
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Button variant="outline" size="sm" onClick={() => machineRef.current?.click()}>{hasMachineFile ? "Replace file" : "Attach file"}</Button>
+                {/* THE SECOND ROUTE TO THE SAME THING, standing beside the first.
+                    ──────────────────────────────────────────────────────────────
+                    There are exactly two ways this line ever gets a stitch file: someone
+                    hands us one, or a designer cuts one from the image. They are
+                    alternatives — the owner's word for it was "either or" — and they were
+                    being shown in two different places, one as a button inside this step
+                    and one as a strip floating below the whole section. Reading the panel
+                    meant discovering that the orphan strip at the bottom answered the
+                    question the step above had just asked.
+
+                    Now they sit side by side, so the choice is visible as a choice, and the
+                    whole panel is two rows that each read "or": the image comes from an
+                    upload OR the library, the stitch file comes from a file OR a designer.
+
+                    Hidden once a file exists (nothing left to cut) or once it is already
+                    with a designer (the subtitle says so) — so this is never a third thing
+                    to weigh, only ever the other half of one decision. */}
+                {isStaff && !hasMachineFile && !boardCard && (
+                  <Button
+                    size="sm"
+                    disabled={sending || !designUrl}
+                    title={designUrl ? undefined : "Add an image first — a designer needs something to work from"}
+                    onClick={() => void sendToBoard()}
+                  >
+                    {sending ? "Sending…" : "Send to a designer"}
+                  </Button>
+                )}
                 {/* DOWNLOAD. The file could be attached, named and confirmed here with no way
                     to actually get it — the only route to the bytes was the readiness chip in
                     the row behind this dialog, which is not where anyone looks for it.
@@ -1241,59 +1270,8 @@ export function DesignCanvasDialog({
               {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
             </div>
           </div>
-          {/* THE DESIGN BOARD IS ONE STEP OF A SEQUENCE, NOT A THIRD OPTION.
-              ────────────────────────────────────────────────────────────────
-              This read as a menu: an image control, a file control, and a board button, all
-              equally weighted, all always present — so every visit asked which of three
-              things you meant, when only one of them is ever the next thing to do.
-
-              The board exists for exactly one purpose: turning an IMAGE into a MACHINE FILE.
-              That makes the whole thing a sequence, and the sequence answers itself:
-
-                already on the board  → say where it is. Not a choice — a status.
-                machine file attached → the board has nothing left to do. Show nothing.
-                image, no file        → this IS the next step. Show it, alone.
-                neither               → nothing to send. Say what's missing instead of
-                                        offering a button that would make an empty card.
-
-              So at most ONE thing appears here, and when it appears it is the only decision
-              on screen. */}
-          {boardCard ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-sm">
-              <span className="font-medium text-foreground">On the design board</span>
-              <span className="rounded bg-primary/15 px-1.5 py-0.5 text-2xs font-semibold text-primary">
-                {boardCard.lane_label || boardCard.col || "Incoming"}
-              </span>
-              {boardCard.claimed_by && <span className="text-muted-foreground">· {boardCard.claimed_by}</span>}
-            </div>
-          ) : isStaff && !hasMachineFile ? (
-            /* SEND IT, don't just report on it — the only way to get a line to a designer
-               used to be leaving, finding the board, and making the card there with none of
-               the context that is open right here. Staff only: a seller has no lane to send
-               into. */
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-2.5 py-2 text-sm">
-              <span className="text-muted-foreground">
-                {designUrl ? "Needs digitising" : "Add an image first — a designer needs something to work from"}
-              </span>
-              <Button
-                size="sm"
-                className="ml-auto"
-                /* DISABLED WITHOUT ARTWORK, rather than creating an empty card. The order
-                   board's own push has always refused this; this route didn't, so it could
-                   put a card on the board with nothing to digitise and no way to tell what
-                   it should become. */
-                disabled={sending || !designUrl}
-                title={designUrl ? undefined : "There is no artwork on this line yet"}
-                onClick={() => void sendToBoard()}
-              >
-                {sending ? "Sending…" : "Send to design board"}
-              </Button>
-            </div>
-          ) : null}
-          {/* LAST, under the next step, because it is a shortcut rather than a decision:
-              "do this line" is the question, "and the other nine" is the follow-up. It used
-              to sit above the board strip, which put a bulk action in front of the one thing
-              you actually came here to do.
+          {/* LAST, because it is a shortcut rather than a decision: "do this line" is the
+              question, "and the other nine" is the follow-up.
 
               Ten shirts, one file — only when there IS another line to apply to. Two separate
               buttons because they are two separate things: the image is what the mockup shows,
