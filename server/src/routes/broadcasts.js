@@ -74,6 +74,17 @@ function ensureTables() {
   // screen said "failed" and the one fact that makes it fixable (an unverified sender, a
   // rejected key, a rate limit) lived on a box nobody sending a broadcast is reading.
   await q('alter table broadcasts add column if not exists last_error text').catch(() => {});
+  // OPT-OUT FOR ADDRESSES THAT ARE NOT SELLERS.
+  //
+  // A seller unsubscribes by having marketing_opt_out set on their users row. An address
+  // typed into a broadcast by hand has no row, so that mechanism cannot represent it — and
+  // mailing marketing to someone whose unsubscribe link silently does nothing is the one
+  // part of the message that has to work. Keyed by email, lowercased, so it holds for any
+  // recipient regardless of whether an account exists now or later.
+  await q(`create table if not exists broadcast_suppressions (
+       email      text primary key,
+       created_at timestamptz not null default now(),
+       source     text)`).catch(() => {});
     // Marketing opt-out is its own flag, NOT `active`. Unsubscribing from broadcasts must
     // never stop a password reset or a top-up receipt arriving — those are transactional,
     // the seller asked for them, and silently swallowing them reads as a broken account.
@@ -103,6 +114,13 @@ function audienceSql(aud) {
     vals.push(aud.sellerIds.map(String));
     where.push(`id = any($${vals.length}::uuid[])`);
   }
+  // Recipients struck off by hand on the confirm screen. Narrows like every other filter,
+  // so it can only ever remove people — there is no combination that widens past
+  // role='seller'.
+  if (Array.isArray(aud.excludeIds) && aud.excludeIds.length) {
+    vals.push(aud.excludeIds.map(String));
+    where.push(`id <> all($${vals.length}::uuid[])`);
+  }
   return { sql: where.join(' and '), vals };
 }
 
@@ -112,10 +130,40 @@ function audienceSql(aud) {
 // remains the real judge.
 const validEmail = (e) => /^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/.test(String(e || '').trim());
 
+/**
+ * Everyone this broadcast goes to: the audience query, plus any addresses typed in by hand,
+ * minus anyone on the email suppression list.
+ *
+ * `sub` is what the unsubscribe token is signed over. A seller's is their user id — the
+ * same value tokens have always carried, so links in mail already delivered keep working.
+ * A typed-in address gets `e:<email>`, which the unsubscribe route routes to the
+ * suppression table instead of a users row.
+ */
 async function resolveRecipients(aud) {
+  aud = aud && typeof aud === 'object' ? aud : {};
   const { sql, vals } = audienceSql(aud);
   const r = await q(`select id, email, name from users where ${sql} order by created_at asc`, vals);
-  return r.rows;
+  const out = r.rows.map((x) => ({ id: x.id, email: x.email, name: x.name, sub: String(x.id), extra: false }));
+
+  const seen = new Set(out.map((x) => String(x.email || '').trim().toLowerCase()));
+  for (const raw of (Array.isArray(aud.extraEmails) ? aud.extraEmails : [])) {
+    const email = String(raw || '').trim();
+    const key = email.toLowerCase();
+    // Never mail the same person twice because they were also typed in by hand.
+    if (!email || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id: null, email, name: null, sub: 'e:' + key, extra: true });
+  }
+
+  // The suppression list is authoritative over BOTH sources. A seller who opted out is
+  // already filtered by audienceSql; this also catches an address that opted out before it
+  // ever had an account, and a hand-typed one that opted out of an earlier send.
+  const emails = out.map((x) => String(x.email || '').trim().toLowerCase()).filter(Boolean);
+  if (!emails.length) return out;
+  const sup = await q('select email from broadcast_suppressions where email = any($1::text[])', [emails])
+    .catch(() => ({ rows: [] }));
+  const blocked = new Set(sup.rows.map((x) => x.email));
+  return out.filter((x) => !blocked.has(String(x.email || '').trim().toLowerCase()));
 }
 
 // ── Body rendering ────────────────────────────────────────────────────────────
@@ -265,12 +313,39 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
   // infrastructure with no cookie and no bearer token, and a human clicking the link in a
   // mail client is not logged in either. The HMAC in the token is the whole authorisation.
   const doUnsubscribe = async (token) => {
-    const id = verifyUnsubToken(token);
-    if (!id) return false;
+    const sub = verifyUnsubToken(token);
+    if (!sub) return false;
     await ensureTables();
-    await q('update users set marketing_opt_out = true, marketing_opt_out_at = now() where id = $1::uuid', [id]).catch(() => {});
+
+    // TWO KINDS OF SUBJECT, one token format.
+    //
+    // A seller's token is signed over their user id and always has been — so every link in
+    // mail already delivered keeps working, unchanged. An address typed into a broadcast by
+    // hand has no user row to flag, so its token carries `e:<email>` and lands in the
+    // suppression table instead. Both are the same HMAC; only the subject differs.
+    if (sub.startsWith('e:')) {
+      const email = sub.slice(2).trim().toLowerCase();
+      if (!email) return false;
+      await q(
+        `insert into broadcast_suppressions (email, source) values ($1, 'one-click')
+           on conflict (email) do nothing`, [email]).catch(() => {});
+      audit(null, 'broadcast.suppressed', {
+        entityType: 'email', entityId: email, actor: email, actorRole: 'system',
+        note: 'One-click unsubscribe from a broadcast (address is not a seller account)',
+      });
+      return true;
+    }
+
+    await q('update users set marketing_opt_out = true, marketing_opt_out_at = now() where id = $1::uuid', [sub]).catch(() => {});
+    // Also suppress by address. A seller who opts out and is later typed into a broadcast by
+    // hand would otherwise be mailed again through the extras path, which reads as ignoring
+    // their opt-out — and is, whatever the mechanism.
+    await q(
+      `insert into broadcast_suppressions (email, source)
+         select lower(trim(email)), 'seller-opt-out' from users where id = $1::uuid and email is not null
+         on conflict (email) do nothing`, [sub]).catch(() => {});
     audit(null, 'seller.unsubscribed', {
-      entityType: 'user', entityId: id, actor: id, actorRole: 'system',
+      entityType: 'user', entityId: sub, actor: sub, actorRole: 'system',
       note: 'One-click unsubscribe from a broadcast',
     });
     return true;
@@ -448,7 +523,7 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
           if (!firstBad) firstBad = { email: r.email || '(blank)', why: 'not a valid email address — fix it on the seller record' };
           continue;
         }
-        const unsubUrl = `${publicOrigin()}/api/broadcasts/unsubscribe?t=${unsubToken(r.id)}`;
+        const unsubUrl = `${publicOrigin()}/api/broadcasts/unsubscribe?t=${unsubToken(r.sub || r.id)}`;
         const sent = await sendMail({
           to: r.email,
           // Sent from the MARKETING subdomain (mail.egful.store, authenticated separately),

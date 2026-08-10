@@ -3299,7 +3299,17 @@ export type BroadcastAudience = {
   hasOrders?: boolean
   /** A hand-picked set. Combines with the other filters as an AND. */
   sellerIds?: string[]
+  /** Recipients struck off by hand on the confirm screen. Narrows only — like every other
+   *  filter, no combination can widen past role='seller'. */
+  excludeIds?: string[]
+  /** Addresses typed in that aren't sellers. They get an unsubscribe signed over the
+   *  address rather than a user id, which lands in the email suppression list — so the
+   *  opt-out is real for someone who has no account. */
+  extraEmails?: string[]
 }
+
+/** One resolved recipient. `extra` marks an address typed in rather than a seller. */
+export type BroadcastRecipient = { id: string | null; email: string; name: string | null; extra?: boolean }
 
 export type Broadcast = {
   id: string | number
@@ -3327,7 +3337,15 @@ export function getBroadcasts() {
 /** Counts an audience WITHOUT sending — same resolver the send uses, so the number shown
  *  in the confirm dialog cannot drift from the number actually mailed. */
 export function previewBroadcastAudience(audience: BroadcastAudience) {
-  return api<{ count: number; optedOut: number; sample: string[] }>(`/api/broadcasts/preview`, {
+  return api<{
+    count: number
+    optedOut: number
+    sample: string[]
+    /** Everyone who will be mailed — the confirm screen shows the list, not "first few". */
+    recipients?: BroadcastRecipient[]
+    /** Addresses that cannot be delivered to. Shown while they're still cheap to fix. */
+    invalid?: { id: string | null; email: string }[]
+  }>(`/api/broadcasts/preview`, {
     method: "POST", body: JSON.stringify({ audience }),
   })
 }

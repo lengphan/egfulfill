@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { EnvelopeSimple, CircleNotch, Warning, Plus, PaperPlaneTilt, Trash, PencilSimple } from "@phosphor-icons/react"
+import { EnvelopeSimple, CircleNotch, Warning, Plus, PaperPlaneTilt, Trash, PencilSimple, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import {
   getBroadcasts, previewBroadcastAudience, createBroadcast, updateBroadcast, deleteBroadcast,
   sendBroadcast, getEmailBranding, setEmailBranding, uploadHeroImage,
-  type Broadcast, type BroadcastAudience, type EmailBranding,
+  type Broadcast, type BroadcastAudience, type BroadcastRecipient, type EmailBranding,
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
@@ -295,7 +295,14 @@ export function BroadcastsView() {
   // Send confirmation. Held separately from the editor because it asks a different
   // question — not "is this right?" but "are you sure?".
   const [confirming, setConfirming] = useState<Broadcast | null>(null)
-  const [count, setCount] = useState<{ count: number; optedOut: number; sample: string[] } | null>(null)
+  const [count, setCount] = useState<Awaited<ReturnType<typeof previewBroadcastAudience>> | null>(null)
+  // The audience AS EDITED on the CONFIRM screen — distinct from `aud` above, which belongs
+  // to the composer. The draft's stored audience is the starting point; striking someone off
+  // or typing an address in changes this, and it is written back to the draft before the
+  // send, because the server resolves recipients from what is stored, not from anything this
+  // dialog passes.
+  const [sendAud, setSendAud] = useState<BroadcastAudience>({})
+  const [addr, setAddr] = useState("")
   const [counting, setCounting] = useState(false)
   const [sending, setSending] = useState(false)
 
@@ -355,16 +362,51 @@ export function BroadcastsView() {
   // resolver the send uses — NOT a number stored on the draft, which would be stale the
   // moment anyone signed up or unsubscribed.
   const startSend = async (b: Broadcast) => {
-    setConfirming(b); setCount(null); setCounting(true); setErr(null)
-    try { setCount(await previewBroadcastAudience(b.audience ?? {})) }
+    const a = b.audience ?? {}
+    setConfirming(b); setCount(null); setCounting(true); setErr(null); setSendAud(a); setAddr("")
+    try { setCount(await previewBroadcastAudience(a)) }
     catch (e) { setErr(e instanceof Error ? e.message : "Could not count the audience") }
     finally { setCounting(false) }
+  }
+
+  // Re-resolve after every edit. The list shown is always the list the send will use —
+  // computing it locally would be a second implementation of the audience rules, and the
+  // two would drift.
+  const reprice = async (next: BroadcastAudience) => {
+    setSendAud(next); setCounting(true); setErr(null)
+    try { setCount(await previewBroadcastAudience(next)) }
+    catch (e) { setErr(e instanceof Error ? e.message : "Could not count the audience") }
+    finally { setCounting(false) }
+  }
+
+  const dropRecipient = (r: BroadcastRecipient) => {
+    if (r.extra) {
+      const keep = (sendAud.extraEmails ?? []).filter((e) => e.trim().toLowerCase() !== r.email.trim().toLowerCase())
+      return reprice({ ...sendAud, extraEmails: keep })
+    }
+    if (!r.id) return
+    return reprice({ ...sendAud, excludeIds: [...new Set([...(sendAud.excludeIds ?? []), r.id])] })
+  }
+
+  const addRecipient = () => {
+    const e = addr.trim()
+    if (!e) return
+    const have = new Set([...(count?.recipients ?? []).map((r) => r.email.toLowerCase()), ...(sendAud.extraEmails ?? []).map((x) => x.toLowerCase())])
+    if (have.has(e.toLowerCase())) { setAddr(""); return }   // already on the list
+    setAddr("")
+    return reprice({ ...sendAud, extraEmails: [...(sendAud.extraEmails ?? []), e] })
   }
 
   const doSend = async () => {
     if (!confirming) return
     setSending(true); setErr(null)
-    try { await sendBroadcast(confirming.id); setConfirming(null); load() }
+    try {
+      // Persist the edits FIRST. The send resolves recipients from the draft's stored
+      // audience, so an unsaved exclusion would be silently ignored and the person struck
+      // off would get the mail anyway — the worst possible outcome for this screen.
+      await updateBroadcast(confirming.id, { audience: sendAud })
+      await sendBroadcast(confirming.id); setConfirming(null); load()
+    }
     catch (e) { setErr(e instanceof Error ? e.message : "Could not send") }
     finally { setSending(false) }
   }
@@ -583,8 +625,59 @@ export function BroadcastsView() {
                 {count.optedOut > 0
                   ? `${count.optedOut.toLocaleString("en-US")} seller${count.optedOut === 1 ? " has" : "s have"} unsubscribed and ${count.optedOut === 1 ? "is" : "are"} excluded.`
                   : "No seller has unsubscribed yet."}
-                {count.sample.length > 0 && <> First few: {count.sample.join(", ")}.</>}
               </p>
+
+              {/* ADDRESSES THAT CANNOT BE DELIVERED TO. Shown here because this is the last
+                  moment fixing them is cheap — after the send they are a red line on a row. */}
+              {!!count.invalid?.length && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                  {count.invalid.length} address{count.invalid.length === 1 ? "" : "es"} can&apos;t be delivered to and will fail:{" "}
+                  <span className="font-mono">{count.invalid.map((x) => x.email || "(blank)").join(", ")}</span>. Fix the seller record, or remove them below.
+                </div>
+              )}
+
+              {/* THE LIST, EDITABLE. It used to say "First few: a, b, c" — enough to make you
+                  wonder who else was on it and nothing you could do about it. Removing writes
+                  to the draft's audience before the send; the count re-resolves server-side
+                  after every change, so what is shown is always what will be mailed. */}
+              {!!count.recipients?.length && (
+                <div className="rounded-lg border border-border">
+                  <div className="max-h-44 overflow-y-auto">
+                    {count.recipients.map((r) => (
+                      <div key={r.id ?? r.email} className="flex items-center gap-2 border-b border-border/60 px-2.5 py-1.5 text-xs last:border-b-0">
+                        <span className="min-w-0 flex-1 truncate">
+                          {r.email}
+                          {r.name && <span className="ml-1.5 text-muted-foreground">{r.name}</span>}
+                        </span>
+                        {r.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">added</span>}
+                        <button
+                          type="button"
+                          onClick={() => void dropRecipient(r)}
+                          disabled={counting}
+                          aria-label={`Remove ${r.email}`}
+                          className="eg-tap shrink-0 text-muted-foreground transition-colors hover:text-destructive"
+                        >
+                          <X size={12} weight="bold" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1.5 border-t border-border p-2">
+                    <Input
+                      value={addr}
+                      onChange={(e) => setAddr(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addRecipient() } }}
+                      placeholder="Add an address…"
+                      className="h-7 text-xs"
+                    />
+                    <Button size="sm" variant="outline" disabled={!addr.trim() || counting} onClick={() => void addRecipient()}>Add</Button>
+                  </div>
+                  {/* Said plainly, because it is the part people assume doesn't work. */}
+                  <p className="border-t border-border px-2.5 py-1.5 text-3xs text-muted-foreground">
+                    Added addresses get a real unsubscribe link — opting out suppresses that address for good, account or not.
+                  </p>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 Subject: <strong className="text-foreground">{confirming?.subject}</strong>
               </p>
