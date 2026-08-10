@@ -93,7 +93,7 @@ export function reorderCols(ids: OrderColId[], id: OrderColId, toIndex: number):
 // `grid` (not a Tailwind width class) because this table is a CSS grid, not a <table>: an
 // order row and its expanded detail have to share one row container, and a grid lets the
 // detail sit as a full-width sibling instead of being forced into a colspan cell.
-export type FactoryColId = "status" | "order" | "tracking" | "store" | "customer" | "items" | "ready" | "action"
+export type FactoryColId = "status" | "order" | "age" | "tracking" | "store" | "customer" | "items" | "ready" | "action"
 
 export type FactoryColDef = { id: FactoryColId; label: string; grid: string; align?: "left" | "right" }
 
@@ -107,6 +107,18 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // Wide enough for a FULL tracking number rather than an ellipsis. A truncated tracking
   // number cannot be read to a buyer on the phone, which is the only reason it is on the
   // row at all — so it is sized to the longest carrier format, not to the space left over.
+  // HOW OLD THE ORDER IS, measured from the buyer's purchase (created_at is set from the
+  // marketplace's own timestamp, not our sync time — see the insert in etsy.js), so it
+  // answers "when did they pay?" rather than "when did we notice?".
+  //
+  // It exists because the board floats overdue-and-workable work to the top, and with a
+  // backlog that runs back years the top of the list is permanently old — which reads as
+  // "nothing new is arriving" when new orders are arriving fine, just below 600 rows of
+  // history. An age you can see turns that from a mystery into a number.
+  //
+  // Narrow on purpose: "3d" is the whole content, and it sits beside Order where you are
+  // already looking.
+  age:      { id: "age",      label: "Age",      grid: "4rem", align: "right" },
   tracking: { id: "tracking", label: "Tracking", grid: "12rem" },
   store:    { id: "store",    label: "Store",    grid: "7rem" },
   // CAPPED, not flexible. As the only 1fr track it swallowed every spare pixel, so a board
@@ -146,7 +158,7 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
  *  loadFactoryColOrder; the columns shown are that list minus loadFactoryHiddenCols. Kept
  *  because it documents the intended left-to-right order, but edit the two loaders below to
  *  change what a board actually opens with. */
-export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "tracking", "store", "customer", "items", "ready", "action"]
+export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "age", "tracking", "store", "customer", "items", "ready", "action"]
 
 /**
  * HIDDEN on a board nobody has customised — `items`, and only `items`. One click in the
@@ -178,7 +190,7 @@ export function factoryGridTemplate(ids: FactoryColId[], lead: number): string {
 // Only the DATA columns reorder/hide. `action` (the buttons) is pinned last and always
 // shown, and `order` (the identifier) can never be hidden — a row must stay identifiable
 // and actionable. Same localStorage-backed model as the seller table above.
-export const FACTORY_DATA_COLS: FactoryColId[] = ["status", "order", "tracking", "store", "customer", "items", "ready"]
+export const FACTORY_DATA_COLS: FactoryColId[] = ["status", "order", "age", "tracking", "store", "customer", "items", "ready"]
 const FACTORY_LOCKED: FactoryColId[] = ["order"]
 export const isFactoryColLocked = (id: FactoryColId) => FACTORY_LOCKED.includes(id)
 const isFactoryDataId = (v: unknown): v is FactoryColId => typeof v === "string" && (FACTORY_DATA_COLS as string[]).includes(v)

@@ -175,6 +175,32 @@ const openLabel = (r: UspsLabelResult) => {
 // ONE order page for the whole factory team. The queue + item controls are shared; the
 // action set adapts to the role: operators review artwork + drive production, warehouse
 // receives + ships, admin does everything.
+/**
+ * Age as ONE token — `4h`, `3d`, `6w`, `1y` — because it sits in a 4rem column beside the
+ * order number and is read by scanning down, not by reading across. Under an hour reads
+ * "new" rather than "0h": the distinction that matters at that end is "this just landed",
+ * not how many minutes ago.
+ *
+ * Weeks, not months, between 14 and 60 days: a floor asks "how many weeks has this been
+ * sitting?" and "2mo" rounds away the difference between 5 and 8 weeks, which is exactly
+ * the range where someone has to decide whether to chase it.
+ */
+function ageOf(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  const t = new Date(iso).getTime()
+  if (isNaN(t)) return "—"
+  const mins = Math.floor((Date.now() - t) / 60000)
+  if (mins < 60) return "new"
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h`
+  const days = Math.floor(hrs / 24)
+  if (days < 14) return `${days}d`
+  if (days < 60) return `${Math.floor(days / 7)}w`
+  if (days < 365) return `${Math.floor(days / 30)}mo`
+  const yrs = (days / 365).toFixed(days < 730 ? 1 : 0)
+  return `${yrs}y`
+}
+
 export function OrdersHub() {
   const router = useRouter()
   const tl = useLabelT()
@@ -1297,6 +1323,23 @@ export function OrdersHub() {
               const cell: Record<FactoryColId, ReactNode> = {
                 status: <span className="justify-self-start"><StageBadge status={stage} /></span>,
                 order: <div className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</div>,
+                /**
+                 * HOW LONG THIS HAS BEEN WAITING, from the buyer's purchase.
+                 *
+                 * Plain ink until it passes the overdue threshold, then amber — the same
+                 * threshold the Overdue pill counts on, so the column and the pill can
+                 * never tell different stories. Everything else on the board is already
+                 * coloured by state; an age that tinted every row by how old it was would
+                 * just be another rainbow.
+                 */
+                age: (
+                  <div
+                    className={"tabular-nums text-xs " + (isOverdue(o, overdueDays) ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground")}
+                    title={o.created_at ? `Ordered ${new Date(o.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}` : "No order date recorded"}
+                  >
+                    {ageOf(o.created_at)}
+                  </div>
+                ),
                 tracking: (
                   <div className="flex min-w-0 items-center gap-1.5">
                     {track ? (
