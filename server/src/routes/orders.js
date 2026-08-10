@@ -214,6 +214,29 @@ export function stageDenial(role, current, target) {
 // public URL when TTL is 0, null for rows that predate storage (inline base64).
 function designUrlOf(row) {
   if (!row || !row.storage_key) return null;
+  /**
+   * SAME-ORIGIN FIRST — because the "permanent public address" isn't one.
+   *
+   * With DESIGN_URL_TTL_DAYS=0 this returned publicUrl(), which prefers SPACES_CDN when it
+   * is set. It is set, to cdn.egful.store — a host that has never been connected and
+   * answers NXDOMAIN. So every storage-backed order design pointed at a hostname that does
+   * not exist, and the artwork simply never loaded. Measured on the live database: 16 rows
+   * affected (the other 173 hold inline base64 and were never routed through this).
+   *
+   * Nor would dropping the CDN alias fix it: the bucket is PRIVATE, so its direct address
+   * refuses an unsigned read. A public URL was never the right shape for these bytes.
+   *
+   * So they are re-served through this API, exactly as design_cards already does for card
+   * artwork (/api/design_cards/art/:hash) and for exactly the same reason — that route
+   * exists because this problem was solved once already, on the other table. Keyed by the
+   * content hash, which is unguessable, so an <img> that cannot send an auth header still
+   * loads. Rows written before art_hash existed fall back to the old behaviour rather than
+   * losing their link.
+   */
+  if (row.art_hash) {
+    const ext = (String(row.storage_key).match(/\.[a-z0-9]+$/i) || [''])[0] || '';
+    return `/api/order_designs/art/${row.art_hash}${ext}`;
+  }
   return designUrlTtlDays() > 0 ? presignGet(row.storage_key) : publicUrl(row.storage_key);
 }
 
@@ -1931,6 +1954,39 @@ export function ordersRoutes(app, requireAuth) {
 
   // Fetch all designs for one order — called lazily when the order is opened, so a
   // big base64 payload never rides along on the main /api/orders list.
+  /**
+   * Same-origin re-serve of one order design's bytes — what designUrlOf now points at.
+   *
+   * UNAUTHENTICATED BY DESIGN, identically to /api/design_cards/art/:hash: an <img> cannot
+   * carry a Bearer header, and the path key is the artwork's SHA-256 content hash, which is
+   * unguessable and reveals nothing about the order it belongs to. The alternative — a
+   * signed storage URL — leaks the bucket and expires; the one before that pointed at a
+   * hostname that does not resolve.
+   */
+  app.get('/api/order_designs/art/:hash', async (req, reply) => {
+    const hash = String(req.params.hash || '').replace(/\.[a-z0-9]+$/i, '').toLowerCase();
+    if (!/^[0-9a-f]{16,64}$/.test(hash)) { reply.code(404); return { error: 'not found' }; }
+    const row = (await q('select storage_key, data from order_designs where art_hash=$1 limit 1', [hash])
+      .catch(() => ({ rows: [] }))).rows[0];
+    if (!row) { reply.code(404); return { error: 'not found' }; }
+    reply.header('Cache-Control', 'public, max-age=86400');
+    const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', svg: 'image/svg+xml', pdf: 'application/pdf' };
+    // Rows that predate storage keep their bytes inline; serve those decoded rather than 404.
+    if (!row.storage_key && row.data) {
+      const m = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(String(row.data));
+      if (m) {
+        reply.header('Content-Type', m[1] || 'application/octet-stream');
+        return reply.send(Buffer.from(m[3], m[2] ? 'base64' : 'utf8'));
+      }
+    }
+    if (!row.storage_key) { reply.code(404); return { error: 'not found' }; }
+    const obj = await getObject(row.storage_key).catch(() => null);
+    if (!obj || !obj.body) { reply.code(404); return { error: 'not found' }; }
+    const ext = (String(row.storage_key).match(/\.([a-z0-9]+)$/i) || [null, ''])[1].toLowerCase();
+    reply.header('Content-Type', obj.contentType || MIME[ext] || 'application/octet-stream');
+    return reply.send(obj.body);
+  });
+
   app.get('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const r = await q(`select sku, line_id, kind, data, storage_key, name, pos from order_designs where order_id=$1`, [req.params.id]);
