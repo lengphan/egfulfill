@@ -189,15 +189,31 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
               const isSaved = saved.has(id)
               return (
                 <div key={id} className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+                  {/* The photo goes to the product, because that is what a photo in a
+                      results grid is for — every other shopping surface behaves this way,
+                      and clicking one here did nothing at all. Same destination as
+                      Contact below; the anchor wraps only the image so the price chip
+                      stays a label rather than becoming part of the hit target.
+                      Without a url there is nowhere to go, so it stays a plain div rather
+                      than a link that looks clickable and isn't. */}
                   <div className="relative aspect-square overflow-hidden bg-muted/40">
-                    {p.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.image} alt="" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                    ) : (
-                      <div className="flex size-full items-center justify-center text-xs text-muted-foreground">no photo</div>
-                    )}
+                    {(() => {
+                      const art = p.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.image} alt="" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      ) : (
+                        <div className="flex size-full items-center justify-center text-xs text-muted-foreground">no photo</div>
+                      )
+                      return p.url ? (
+                        <a href={p.url} target="_blank" rel="noopener noreferrer"
+                           title="Open this product on Alibaba"
+                           className="block size-full cursor-pointer">
+                          {art}
+                        </a>
+                      ) : art
+                    })()}
                     {p.price && (
-                      <span className="absolute bottom-2 left-2 rounded-lg bg-black/70 px-2 py-1 text-xs font-semibold text-white backdrop-blur">
+                      <span className="pointer-events-none absolute bottom-2 left-2 rounded-lg bg-black/70 px-2 py-1 text-xs font-semibold text-white backdrop-blur">
                         {p.price}
                       </span>
                     )}

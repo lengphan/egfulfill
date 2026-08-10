@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { getSampleOrders, placeSampleOrder, setSampleOrderStatus, getAlibabaOrders, getAlibabaOrder,
-         type SampleOrder, type AlibabaOrderSummary } from "@/lib/api"
+import { getSampleOrders, placeSampleOrder, setSampleOrderStatus, getAlibabaOrder,
+         type SampleOrder } from "@/lib/api"
 
-const usd = (n?: number | null) =>
+export const usd = (n?: number | null) =>
   n == null ? "—" : `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const when = (iso?: string | null) => {
+export const when = (iso?: string | null) => {
   if (!iso) return "—"
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
@@ -31,9 +31,9 @@ const when = (iso?: string | null) => {
  * the product search returns no seller at all — so a sample typed in by hand has no chat
  * link, and one imported from a real order does.
  */
-const chatUrl = (eid?: string | null) =>
+export const chatUrl = (eid?: string | null) =>
   eid ? `https://message.alibaba.com/message/messenger.htm?to=${encodeURIComponent(eid)}` : null
-const orderUrl = (tradeId?: string | null) =>
+export const orderUrl = (tradeId?: string | null) =>
   tradeId ? `https://biz.alibaba.com/ta/detail.htm?orderId=${encodeURIComponent(tradeId)}` : null
 
 const STATUS: Record<SampleOrder["status"], { label: string; pill: string }> = {
@@ -45,22 +45,33 @@ const STATUS: Record<SampleOrder["status"], { label: string; pill: string }> = {
 /**
  * Record a sample order that has just been placed.
  *
- * A TYPING FORM, deliberately. Whether this could instead pick from our real Alibaba
- * orders is still open — it depends what their order API actually returns — and a form
- * that takes the same four facts works either way: a picker, when it exists, prefills
- * these fields rather than replacing them.
+ * Two ways in, and they want different things from this form:
+ *
+ *   - From an ALIBABA ORDER (`tradeId`) — the order is already on screen in the order
+ *     history, so this pulls its detail and prefills. It used to get there through a
+ *     dropdown listing every Alibaba order inside this dialog, which was a second, worse
+ *     copy of that list: no lines, no totals, no way to tell two same-day orders apart
+ *     beyond their number. Picking the order is the order history's job; this fills in
+ *     what was picked.
+ *   - By HAND — a sample bought somewhere with no API behind it. Same four facts, typed.
+ *
+ * Prefilled fields stay editable either way: their total is what the supplier billed, and
+ * what we consider the sample to have cost is occasionally not the same number.
  */
 export function SampleOrderDialog({
   open,
   onOpenChange,
   supplierId,
   supplierTitle,
+  tradeId,
   onPlaced,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   supplierId?: string
   supplierTitle?: string
+  /** An Alibaba order to prefill from. Omitted = the hand-typed form. */
+  tradeId?: string
   onPlaced?: () => void
 }) {
   const [orderNo, setOrderNo] = useState("")
@@ -69,32 +80,20 @@ export function SampleOrderDialog({
   const [note, setNote] = useState("")
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  // Real Alibaba orders to pick from. Loaded once per open — the list call is cheap and
-  // an order placed since last time is exactly what you came here for.
-  const [ali, setAli] = useState<AlibabaOrderSummary[] | null>(null)
   const [picked, setPicked] = useState<string>("")
   const [pulling, setPulling] = useState(false)
   const [seller, setSeller] = useState<{ eid?: string | null; name?: string | null }>({})
 
-  useEffect(() => {
-    if (!open) return
-    const id = setTimeout(() => {
-      setOrderNo(""); setAmount(""); setQty(""); setNote(""); setErr(null); setPicked(""); setSeller({})
-      // A failure here is not an error state: an unconnected Alibaba just means the form
-      // below is the only way in, which is how it worked before this existed.
-      getAlibabaOrders().then((r) => setAli(r.orders ?? [])).catch(() => setAli([]))
-    }, 0)
-    return () => clearTimeout(id)
-  }, [open])
-
   // Pull one order's detail and fill the form from it. Nothing is saved until you press
   // the button — this only ever writes into the fields you can still edit.
-  const pull = async (tradeId: string) => {
-    setPicked(tradeId)
-    if (!tradeId) { setSeller({}); return }
+  // Declared ABOVE the effect that calls it: reading it earlier is a use-before-declare the
+  // hooks lint refuses, and it is right to — the effect would close over the wrong one.
+  const pull = useCallback(async (id: string) => {
+    setPicked(id)
+    if (!id) { setSeller({}); return }
     setPulling(true); setErr(null)
     try {
-      const d = await getAlibabaOrder(tradeId)
+      const d = await getAlibabaOrder(id)
       if (d.error) throw new Error(d.error)
       setOrderNo(d.tradeId)
       // Their TOTAL, not the product subtotal: freight on a sample is part of what the
@@ -107,7 +106,16 @@ export function SampleOrderDialog({
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't read that order from Alibaba.")
     } finally { setPulling(false) }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    const id = setTimeout(() => {
+      setOrderNo(""); setAmount(""); setQty(""); setNote(""); setErr(null); setPicked(""); setSeller({})
+      if (tradeId) void pull(tradeId)
+    }, 0)
+    return () => clearTimeout(id)
+  }, [open, tradeId, pull])
 
   const save = async () => {
     const amt = Number(amount)
@@ -141,35 +149,18 @@ export function SampleOrderDialog({
           <DialogTitle>Record a sample order{supplierTitle ? ` — ${supplierTitle}` : ""}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          {ali === null ? (
-            <div className="rounded-xl border border-border px-3 py-2 text-xs text-muted-foreground">
-              <CircleNotch size={12} className="mr-1 inline animate-spin" /> Looking for your Alibaba orders…
+          {/* Only when this was opened FROM an order — otherwise there is nothing being
+              read and a status line about reading would be describing nothing. */}
+          {tradeId && (
+            <div className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <DownloadSimple size={13} weight="bold" className="mr-1 inline" />
+              {/* Supplier names routinely END in a full stop ("… Co., Ltd."), so a sentence
+                  joined straight on gives "Ltd.. Everything". Separated instead. */}
+              {pulling ? `Reading Alibaba order ${tradeId}…`
+                : seller.name ? `From Alibaba order ${tradeId} · ${seller.name} — everything below is prefilled, edit anything that's wrong.`
+                  : `From Alibaba order ${tradeId}.`}
             </div>
-          ) : ali.length > 0 ? (
-            <label className="flex flex-col gap-1 rounded-xl border border-border bg-muted/30 p-3">
-              <span className="flex items-center gap-1.5 text-xs font-medium">
-                <DownloadSimple size={13} weight="bold" /> Import from an Alibaba order
-              </span>
-              <select
-                value={picked}
-                onChange={(e) => pull(e.target.value)}
-                disabled={pulling}
-                className="eg-select h-9 rounded-2xl border border-border bg-card px-3 text-sm"
-              >
-                <option value="">Type it in instead…</option>
-                {ali.map((o) => (
-                  <option key={o.tradeId} value={o.tradeId}>
-                    {o.tradeId} — {o.statusLabel}{o.createdAt ? ` · ${when(o.createdAt)}` : ""}
-                  </option>
-                ))}
-              </select>
-              <span className="text-2xs text-muted-foreground">
-                {pulling ? "Reading the order…"
-                  : seller.name ? `From ${seller.name}. Everything below is prefilled — edit anything that's wrong.`
-                    : "Fills in the order number, what it cost and what was in it."}
-              </span>
-            </label>
-          ) : null}
+          )}
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Supplier&apos;s order number</span>
             <Input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="ALI-88213-7" className="h-9 font-mono" />
@@ -189,7 +180,7 @@ export function SampleOrderDialog({
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="two colourways, express freight" className="h-9" />
           </label>
           <p className="text-xs text-muted-foreground">
-            The cost books to the <span className="font-medium text-foreground">factory</span> wallet now, not when the parcel
+            The cost books to the <span className="font-medium text-foreground">factory</span>{" "}wallet now, not when the parcel
             lands — that&apos;s when the money actually leaves. Cancelling later adds a refund row rather than removing this one.
           </p>
           {err && <div className="text-sm text-destructive">{err}</div>}
