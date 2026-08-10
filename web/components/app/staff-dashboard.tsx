@@ -301,32 +301,28 @@ export function StaffDashboard() {
 
   return (
     /**
-     * A TINTED GROUND, for this page only.
+     * FULL-BLEED HEADER, white ground.
      *
-     * The house rule is white canvas, and it holds everywhere it was written for: a tinted
-     * sheet under a 700-row queue is one you read *through* all day. This page has no queue
-     * — it is eight cards and a chart, read for ten seconds — so the wash sits under cards
-     * that are themselves still white, and every figure keeps its white paper. The bleed
-     * (negative margins matching `eg-content`'s gutter) is what lets it reach the edges
-     * without touching the shared layout, so no other board inherits it.
+     * This carried a tinted wash on the argument that the house white-canvas rule was
+     * written for long queues and this page is only cards and a chart. That argument was
+     * wrong in practice: colour behind the figures competed with the reserved status hues
+     * that carry meaning elsewhere, and it made the dashboard look like a different
+     * application from every page it links to. Removed 2026-08-10.
+     *
+     * The bleed stays. The negative margins match `eg-content`'s gutter so the header can
+     * reach the shell edges without touching the shared layout, and no other board inherits
+     * it — that part was never the problem.
      */
     <div
       className="-mx-4 -mt-5 -mb-5 px-4 pt-5 pb-10 md:-mx-8 md:-mt-6 md:-mb-6 md:px-8 md:pt-6"
-      style={{
-        // TWO OVERLAPPING RADIALS, painted on the wrapper itself.
-        //
-        // Not an absolutely-positioned layer at -z-10: the shell root carries `bg-background`,
-        // and a negative z-index inside it puts the wash BEHIND that white — it rendered as
-        // a completely plain page. Not a single linear ramp either; `to-transparent` runs out a
-        // third of the way down and leaves the rest on bare white, reading as an unfinished
-        // background rather than a tinted one.
-        //
-        // color-mix off --brand rather than a literal violet, so it follows the theme and the
-        // dark palette instead of pinning one hex into the app.
-        backgroundImage:
-          "radial-gradient(85rem 48rem at -5% -12%, color-mix(in oklab, var(--brand) 26%, transparent), transparent 62%)," +
-          "radial-gradient(65rem 42rem at 104% -8%, color-mix(in oklab, oklch(0.72 0.19 350) 22%, transparent), transparent 58%)",
-      }}
+      // NO TINTED WASH. Two radial gradients used to sit behind this header — a violet
+      // bleeding into pink across the full bleed of the page. It broke the rule the rest of
+      // the app follows: the canvas is white, cards are white and separated by their border,
+      // and the sidebar is the one bounded block that carries colour. Colour behind the
+      // numbers competes with the reserved status hues (emerald shipped, amber hold, red
+      // alert) that carry meaning on the floor, and a page you read all day should not be a
+      // sheet you read THROUGH. The negative margins stay: they are what lets the header sit
+      // flush to the shell edges, and that was never the part doing the damage.
     >
       <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
