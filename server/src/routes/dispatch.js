@@ -419,11 +419,51 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         refunded = paid;
       }
     } catch { /* best-effort */ }
-    // The label is void — drop the stored PDF so a dead label can't be printed.
-    await q('update orders set tracking_label_url=null where id=$1', [id]).catch(() => {});
+    /**
+     * A VOIDED LABEL LEAVES NO SHIPMENT BEHIND.
+     *
+     * This dropped only the PDF, so the order kept its tracking number, its carrier, and —
+     * if the number had already gone to the marketplace — a marketplace_fulfilled_at stamp
+     * saying the buyer was told. The result was an order that looked shipped, showed a dead
+     * tracking number to the customer, and could never push a corrected one, because that
+     * stamp is exactly what stops a second push.
+     *
+     * So the whole shipment is cleared. label_scanned_at goes too: a scan is a claim that
+     * this parcel was handed over, and the parcel it referred to no longer exists.
+     *
+     * What is NOT cleared is the ledger — the charge and its compensating credit both stand,
+     * because both really happened. Money is history; the shipment is state.
+     *
+     * NB the marketplace is not told. Etsy's API creates shipments and cannot retract one,
+     * so a number already pushed stays on their receipt. Clearing the stamp is what lets a
+     * REPLACEMENT label push cleanly, which is the best correction available — see the
+     * note on pushMarketplaceTracking in orders.js.
+     */
+    await q(`update orders set tracking_label_url=null, tracking=null, carrier=null,
+               label_ref=null, label_provider=null, label_scanned_at=null,
+               marketplace_fulfilled_at=null
+             where id=$1`, [id]).catch(() => {});
     audit(req, 'label.void', { entityType: 'order', entityId: id, after: { refundStatus: refund.status || 'submitted', refunded } });
     egBroadcast({ type: 'orders' });
-    return { ok: true, status: refund.status || 'submitted', refunded };
+    /**
+     * The STAGE is deliberately left alone, and reported instead.
+     *
+     * An order sitting at 'shipped' with no tracking is now inconsistent — shipBlockers
+     * refuses to mark shipped without a label, so it could never have been set that way by
+     * hand. But walking a stage BACKWARDS is a claim about the goods, not the label, and
+     * this route only knows about the label. Voiding to reprint is routine; voiding because
+     * the order is cancelled is not, and only the person clicking knows which.
+     *
+     * So the caller is told and decides. Silently reversing the stage would be this route
+     * asserting something it cannot know.
+     */
+    const stage = (await q('select factory_status from orders where id=$1', [id])
+      .then((r) => String(r.rows[0]?.factory_status || '')).catch(() => ''));
+    return {
+      ok: true, status: refund.status || 'submitted', refunded,
+      stage,
+      needsStageReview: stage === 'shipped',
+    };
   });
 
   /**
