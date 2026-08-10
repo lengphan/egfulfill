@@ -9,6 +9,8 @@ import {
   type SpyShop, type EtsyListing, type EtsyCategory,
 } from "@/lib/api"
 import { ResultCard } from "@/components/app/spydeck-view"
+import { cn } from "@/lib/utils"
+import { CARD_ACTION_PRIMARY, CARD_ACTION_ICON } from "@/lib/card-actions"
 
 // Shared listing-level handlers, threaded from SpyDeckView so a competitor's product can be
 // saved or turned into a draft with the exact same flow as any other research card.
@@ -95,10 +97,10 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
           <div className="rounded-lg bg-muted/50 py-1.5"><div className="flex items-center justify-center gap-0.5 text-sm font-semibold tabular-nums">{s.rating != null ? <>{s.rating.toFixed(1)}<Star size={11} weight="fill" className="text-amber-500" /></> : "—"}</div><div className="text-3xs text-muted-foreground">{fmtK(s.reviews)} reviews</div></div>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => onOpen(s)} className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary/10 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
+          <button type="button" onClick={() => onOpen(s)} className={cn(CARD_ACTION_PRIMARY, "flex-1")}>
             <Storefront size={13} weight="bold" /> Go To Store
           </button>
-          {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent" title="Open on Etsy"><ArrowSquareOut size={15} /></a>}
+          {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className={cn(CARD_ACTION_ICON, "text-muted-foreground hover:text-foreground")} title="Open on Etsy"><ArrowSquareOut size={15} /></a>}
         </div>
       </div>
 

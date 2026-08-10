@@ -4,13 +4,14 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Compass, Package, Trash } from "@phosphor-icons/react"
+import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { CARD_ACTION_PRIMARY, CARD_ACTION_SECONDARY, CARD_ACTION_ICON } from "@/lib/card-actions"
 import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, deleteSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, type PublishedRecord, getSpydeckListingDetail } from "@/lib/api"
 import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
@@ -228,23 +229,18 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedLi
 
         <div className="mt-auto flex gap-1.5 pt-3">
           {l.our_url ? (
-            <a
-              href={l.our_url} target="_blank" rel="noopener noreferrer"
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary/10 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
-            >
+            <a href={l.our_url} target="_blank" rel="noopener noreferrer" className={cn(CARD_ACTION_PRIMARY, "flex-1")}>
               <Storefront size={13} weight="bold" /> Open listing
             </a>
           ) : (
-            <span className="flex flex-1 items-center justify-center rounded-full bg-muted py-1.5 text-xs font-semibold text-muted-foreground" title="No listing URL was returned when this was published.">
+            <span className={cn(CARD_ACTION_SECONDARY, "flex-1 cursor-default opacity-60")} title="No listing URL was returned when this was published.">
               No link stored
             </span>
           )}
           {/* Labelled "Source", never presented as ours. */}
           {l.url && (
-            <a
-              href={l.url} target="_blank" rel="noopener noreferrer" title="The competitor listing this was built from"
-              className="flex shrink-0 items-center justify-center rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-foreground hover:text-background"
-            >
+            <a href={l.url} target="_blank" rel="noopener noreferrer" title="The competitor listing this was built from"
+               className={cn(CARD_ACTION_SECONDARY, "flex-1")}>
               Source
             </a>
           )}
@@ -252,7 +248,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedLi
             <button
               type="button" onClick={() => onRemove(l)} aria-label="Remove from Uploaded"
               title="Forget this record. The listing stays on the marketplace."
-              className="flex shrink-0 items-center justify-center rounded-full bg-muted px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-rose-600 hover:text-white"
+              className={cn(CARD_ACTION_ICON, "text-muted-foreground hover:border-destructive/40 hover:text-destructive")}
             >
               <Trash size={13} weight="bold" />
             </button>
@@ -417,12 +413,19 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
             </div>
           )}
 
-          {/* Pinned to the card bottom so cards with more keywords don't misalign the button row */}
+          {/* Pinned to the card bottom so cards with more keywords don't misalign the button row.
+              CARD_ACTION_* — the same box as every other card's action pair. These were
+              hand-rolled (rounded-full + py-1.5, no height) so they sat at a different height
+              from the h-7 pills on the sourcing cards, and the pair itself didn't match: a
+              tinted violet block beside a solid grey one reads as two unrelated controls
+              rather than a primary and its alternative. */}
           <div className="mt-auto flex gap-1.5 pt-3">
             <button
               type="button"
               onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); onMakeProduct(l) }}
-              className={"flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (uploaded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
+              className={uploaded
+                ? cn(CARD_ACTION_SECONDARY, "flex-1 border-emerald-600/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400")
+                : cn(CARD_ACTION_PRIMARY, "flex-1")}
             >
               {uploaded ? <><CheckCircle size={13} weight="fill" /> Uploaded</> : <><Storefront size={13} weight="bold" /> Make product</>}
             </button>
@@ -433,9 +436,9 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
                 type="button"
                 title="Work out what this is and how to search for it on a B2B marketplace"
                 onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); onSource(l) }}
-                className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-foreground hover:text-background"
+                className={cn(CARD_ACTION_SECONDARY, "flex-1")}
               >
-                <Compass size={13} weight="bold" /> Suppliers
+                Suppliers
               </button>
             )}
           </div>

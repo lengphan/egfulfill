@@ -5,6 +5,8 @@ import { SupplierFlag } from "@/components/app/supplier-flag"
 import { Heart, Plus, CheckCircle, CircleNotch, ShoppingCart, ArrowsClockwise } from "@phosphor-icons/react"
 import { swatchBg } from "@/lib/color-swatch"
 import { prettyColorName } from "@/lib/color-name"
+import { cn } from "@/lib/utils"
+import { CARD_ACTION_PRIMARY, CARD_ACTION_SECONDARY } from "@/lib/card-actions"
 
 // One product card for BOTH suppliers (S&S + Otto) so they look identical: image, brand,
 // title, price (range where applicable), clickable color chips that swap to that color's
@@ -251,12 +253,17 @@ export function SupplierProductCard({
         <div className="mt-auto grid grid-cols-2 gap-2 pt-3">
           {onQuickOrder && (
             <button onClick={onQuickOrder} title="Order this — quantities and prices per size"
-              className="flex items-center justify-center gap-1.5 rounded-full border border-border py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent">
+              className={cn(CARD_ACTION_SECONDARY, "w-full")}>
               <ShoppingCart size={13} weight="bold" /> Order
             </button>
           )}
           <button onClick={onAdd} disabled={added || adding}
-            className={"flex items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (onQuickOrder ? "" : "col-span-2 ") + (added ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}>
+            className={cn(
+              added
+                ? CARD_ACTION_SECONDARY + " border-emerald-600/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                : CARD_ACTION_PRIMARY,
+              "w-full", !onQuickOrder && "col-span-2",
+            )}>
             {adding ? <CircleNotch size={13} className="animate-spin" /> : added ? <><CheckCircle size={13} weight="fill" /> Added</> : <><Plus size={13} weight="bold" /> Add to catalog</>}
           </button>
         </div>

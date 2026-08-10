@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
 import { getAlibabaConfig, searchAlibaba, saveSourcing, type AlibabaProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
+import { cn } from "@/lib/utils"
+import { CARD_ACTION_PRIMARY, CARD_ACTION_SECONDARY } from "@/lib/card-actions"
 
 /**
  * Browse Alibaba as a grid, and turn anything into a Prospect.
@@ -203,14 +205,15 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
                   <div className="flex flex-1 flex-col gap-2 p-3">
                     <p className="line-clamp-2 text-xs leading-snug">{cleanTitle(p.title)}</p>
                     <div className="mt-auto flex items-center gap-1.5">
-                      <Button
-                        size="sm" variant={isSaved ? "outline" : "default"} className="h-7 flex-1 text-xs"
+                      <button
+                        type="button"
+                        className={cn(isSaved ? CARD_ACTION_SECONDARY : CARD_ACTION_PRIMARY, "flex-1")}
                         onClick={() => addProspect(p)} disabled={isSaved || savingId === id}
                       >
                         {savingId === id ? <CircleNotch size={12} className="animate-spin" />
                           : isSaved ? <Check size={12} weight="bold" /> : <Plus size={12} weight="bold" />}
                         {isSaved ? "Prospect" : "Add"}
-                      </Button>
+                      </button>
                       {p.url && (
                         /* ONE button, and it says what it does. There were two — a speech
                            bubble and an external-link arrow — pointing at the same URL, so
@@ -220,13 +223,16 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
                            the ISV set, and this endpoint returns no supplier or company id,
                            so even a deep link into their messenger cannot be constructed.
                            The product page is where Contact Supplier lives. */
-                        /* No icons, and the SAME box as Add — h-7 flex-1, so the pair reads as
-                           two equal choices rather than a button beside a decorated link.
+                        /* No icons, and the SAME box as Add, so the pair reads as two equal
+                           choices rather than a button beside a decorated link. It said that
+                           and wasn't: hand-rolled as rounded-MD next to a Button that is
+                           rounded-full, which is a pill sitting beside a rectangle. Now the
+                           shared definition, so it can't drift again.
                            The speech bubble was actively misleading: it suggested an in-app
                            chat, and this only opens a product page. */
                         <a href={p.url} target="_blank" rel="noopener noreferrer"
                            title="Opens the product on Alibaba, where Contact Supplier is"
-                           className="inline-flex h-7 flex-1 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary">
+                           className={cn(CARD_ACTION_SECONDARY, "flex-1")}>
                           Contact
                         </a>
                       )}
