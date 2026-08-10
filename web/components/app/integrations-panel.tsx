@@ -16,9 +16,18 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState("")
   const [busy, setBusy] = useState(false)
+  // Saved, but the module using it snapshotted process.env at import — so the masked
+  // preview above already shows the new key while the integration is still calling with
+  // the old one. Without this line the panel looked like proof the change had landed.
+  const [pending, setPending] = useState(false)
   const save = async (clear = false) => {
     setBusy(true)
-    try { await setAdminSecret(s.name, clear ? "" : val.trim()); setEditing(false); setVal(""); onSaved() } catch {} finally { setBusy(false) }
+    try {
+      const r = await setAdminSecret(s.name, clear ? "" : val.trim())
+      setEditing(false); setVal("")
+      setPending(!!r.restartRequired)
+      onSaved()
+    } catch {} finally { setBusy(false) }
   }
   if (editing) {
     return (
@@ -32,16 +41,24 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
     )
   }
   return (
-    <div className="flex items-center justify-between gap-2 text-sm">
-      <span className="text-muted-foreground">{s.label}</span>
-      <span className="flex items-center gap-1.5 font-mono">
-        {s.set ? <span className="text-foreground">{s.masked || `••••${s.last4 ?? ""}`}</span> : <span className="text-muted-foreground">not set</span>}
-        {s.editable && (
-          <button onClick={() => setEditing(true)} className="text-muted-foreground transition-colors hover:text-primary" title={s.set ? "Replace" : "Set"} aria-label="Edit credential">
-            <PencilSimple size={12} />
-          </button>
-        )}
-      </span>
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="text-muted-foreground">{s.label}</span>
+        <span className="flex items-center gap-1.5 font-mono">
+          {s.set ? <span className="text-foreground">{s.masked || `••••${s.last4 ?? ""}`}</span> : <span className="text-muted-foreground">not set</span>}
+          {s.editable && (
+            <button onClick={() => setEditing(true)} className="text-muted-foreground transition-colors hover:text-primary" title={s.set ? "Replace" : "Set"} aria-label="Edit credential">
+              <PencilSimple size={12} />
+            </button>
+          )}
+        </span>
+      </div>
+      {pending && (
+        <div className="flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-2xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+          <Warning size={11} weight="fill" className="mt-0.5 shrink-0" />
+          <span>Saved, but not in use yet — this one is read when the API starts. Restart it, then this row is what&apos;s live.</span>
+        </div>
+      )}
     </div>
   )
 }

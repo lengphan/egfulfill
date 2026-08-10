@@ -4,7 +4,7 @@
 // credential (exactly what Stripe/AWS dashboards show). Reads straight from
 // process.env — no DB, no decryption. Powers the last-4 display in Settings ›
 // Integrations, which is already gated to staff in the UI.
-import { setSecret, SECRET_NAMES } from '../secrets.js';
+import { setSecret, SECRET_NAMES, RESTART_REQUIRED } from '../secrets.js';
 
 const SECRET_DEFS = [
   { name: 'ETSY_KEYSTRING',        label: 'Keystring',        integration: 'etsy' },
@@ -98,7 +98,11 @@ export function adminSecretsRoutes(app, requireAdmin) {
         const editable = SECRET_NAMES.includes(d.name);
         // `last4` stays for older clients; `masked` is the preview to show (head…tail for admins).
         return { name: d.name, label: d.label, integration: d.integration, set: !!v,
-                 masked: maskSecret(v, full), last4: v ? v.slice(-4) : null, mode: keyMode(v), editable };
+                 masked: maskSecret(v, full), last4: v ? v.slice(-4) : null, mode: keyMode(v), editable,
+                 // Whether saving this one reaches the code that uses it, or waits for a
+                 // restart. The panel showed a fresh last-4 either way, which is how a save
+                 // could look applied while the integration still called with the old key.
+                 restartRequired: RESTART_REQUIRED.has(d.name) };
       }),
     };
   });
@@ -113,6 +117,7 @@ export function adminSecretsRoutes(app, requireAdmin) {
     try { await setSecret(name, b.value, req.user.sub); }
     catch (e) { reply.code(400); return { error: (e && e.message) || 'Save failed' }; }
     const v = (process.env[name] || '').trim();
-    return { ok: true, name, set: !!v, masked: maskSecret(v, true), last4: v ? v.slice(-4) : null };
+    return { ok: true, name, set: !!v, masked: maskSecret(v, true), last4: v ? v.slice(-4) : null,
+             restartRequired: RESTART_REQUIRED.has(name) };
   });
 }

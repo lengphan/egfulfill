@@ -2315,12 +2315,15 @@ export function googleLogin(credential: string) {
 }
 
 // ─────────────────── Integration credentials (masked, read-only, staff) ───────────────────
-export type SecretMeta = { name: string; label: string; integration: string; set: boolean; last4: string | null; masked?: string | null; editable?: boolean }
+/** `restartRequired`: the module using this key snapshots process.env at import, so saving
+ *  it does not reach that code until the API restarts. Everything else is live on the next
+ *  request. The masked preview updates either way — which is why this flag exists. */
+export type SecretMeta = { name: string; label: string; integration: string; set: boolean; last4: string | null; masked?: string | null; editable?: boolean; restartRequired?: boolean }
 export function getAdminSecrets() {
   return api<{ secrets: SecretMeta[] }>(`/api/admin/secrets`)
 }
 export function setAdminSecret(name: string, value: string) {
-  return api<{ ok?: boolean; name?: string; set?: boolean; last4?: string | null; error?: string }>(`/api/admin/secrets`, { method: "PUT", body: JSON.stringify({ name, value }) })
+  return api<{ ok?: boolean; name?: string; set?: boolean; last4?: string | null; error?: string; restartRequired?: boolean }>(`/api/admin/secrets`, { method: "PUT", body: JSON.stringify({ name, value }) })
 }
 
 // ─────────────────── Address validation (USPS) ───────────────────

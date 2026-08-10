@@ -34,6 +34,29 @@ export const SECRET_NAMES = [
 ];
 const ALLOWED = new Set(SECRET_NAMES);
 
+/**
+ * Secrets whose module SNAPSHOTS process.env at import time, so a save here does not
+ * reach the code using them until the API restarts.
+ *
+ * setSecret() writes the live process.env, which is why the masked preview in Settings
+ * updates the instant you save — and that is exactly the trap: the panel showed the NEW
+ * key while the integration kept calling with the OLD one, with nothing on screen saying
+ * so. Everything not listed reads at call time and takes effect on the next request.
+ *
+ * Derived by hand from `const X = process.env.Y` at the top of each route module. If you
+ * convert one of these to a call-time read (the pattern CLAUDE.md asks for), delete it
+ * from this list in the same commit.
+ */
+export const RESTART_REQUIRED = new Set([
+  'SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET',          // shopify.js:11
+  'TIKTOK_APP_KEY', 'TIKTOK_APP_SECRET',            // tiktok.js:15
+  'USPS_CONSUMER_KEY', 'USPS_CONSUMER_SECRET',      // usps.js:33
+  'META_APP_ID', 'META_APP_SECRET',                 // ads.js:17
+  'GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET',
+  'GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_LOGIN_CUSTOMER_ID', // ads.js:21
+  'GOOGLE_SHEETS_API_KEY',                          // sheets.js:17
+]);
+
 let _ready = null;
 function ensure() {
   if (_ready) return _ready;
