@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CircleNotch } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -122,6 +122,11 @@ export function ImportOrdersDialog({
   // Header row shown for manual copying when the clipboard write did not happen.
   const [copyFallback, setCopyFallback] = useState<string | null>(null)
   const [sheetsEnabled, setSheetsEnabled] = useState(false)
+  // The config call FAILED, as opposed to answering "not configured". A two-second API
+  // blip during a deploy used to hide the Sheet tab outright, which reads as the feature
+  // having been deleted — CLAUDE.md's rule that a broken thing must never look identical
+  // to an absent one. The tab stays, and says which it is.
+  const [configErr, setConfigErr] = useState(false)
   // Google's force-a-copy URL for our master template, and (admins only) whether one has
   // been configured yet. Server-supplied: the master lives in a setting, not in the bundle.
   const [copyUrl, setCopyUrl] = useState("")
@@ -137,6 +142,16 @@ export function ImportOrdersDialog({
   const [templates, setTemplates] = useState<ImportTemplate[] | null>(null)
   const [templatesFailed, setTemplatesFailed] = useState(false)
 
+  const loadSheetsConfig = useCallback(() => {
+    setConfigErr(false)
+    return getSheetsConfig()
+      .then((c) => {
+        setSheetsEnabled(!!c.enabled)
+        setCopyUrl(c.copyUrl || ""); setNeedsTemplate(!!c.needsTemplate); setIsTemplateAdmin(!!c.isTemplateAdmin)
+      })
+      .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setNeedsTemplate(false); setIsTemplateAdmin(false); setConfigErr(true) })
+  }, [])
+
   useEffect(() => {
     if (!open) return
     // Reset per open, and see whether Google Sheets is configured server-side.
@@ -144,15 +159,10 @@ export function ImportOrdersDialog({
       setRecords(null); setError(null); setPaste(""); setDone(null)
       setNotice(null); setCopyFallback(null); setTemplates(null); setTemplatesFailed(false)
       setTplInput("")
-      getSheetsConfig()
-        .then((c) => {
-          setSheetsEnabled(!!c.enabled)
-          setCopyUrl(c.copyUrl || ""); setNeedsTemplate(!!c.needsTemplate); setIsTemplateAdmin(!!c.isTemplateAdmin)
-        })
-        .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setNeedsTemplate(false); setIsTemplateAdmin(false) })
+      loadSheetsConfig()
     }, 0)
     return () => clearTimeout(id)
-  }, [open])
+  }, [open, loadSheetsConfig])
 
   const summary = useMemo(() => {
     const list = records ?? []
@@ -411,10 +421,10 @@ export function ImportOrdersDialog({
             </details>
 
             <Tabs defaultValue="file">
-              <TabsList className={sheetsEnabled ? "grid w-full grid-cols-3" : "grid w-full grid-cols-2"}>
+              <TabsList className={sheetsEnabled || configErr ? "grid w-full grid-cols-3" : "grid w-full grid-cols-2"}>
                 <TabsTrigger value="file">File</TabsTrigger>
                 <TabsTrigger value="paste">Paste</TabsTrigger>
-                {sheetsEnabled && <TabsTrigger value="sheet">Sheet</TabsTrigger>}
+                {(sheetsEnabled || configErr) && <TabsTrigger value="sheet">Sheet</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="file" className="mt-3">
@@ -442,7 +452,7 @@ export function ImportOrdersDialog({
                 <Button variant="outline" size="sm" onClick={ingestPaste} disabled={!paste.trim()}>Preview rows</Button>
               </TabsContent>
 
-              {sheetsEnabled && (
+              {(sheetsEnabled || configErr) && (
                 <TabsContent value="sheet" className="mt-3 space-y-3">
                   {/* COPY → FILL → DOWNLOAD → DROP.
                       One path, and the seller's Google account does all the work Google will
@@ -452,7 +462,19 @@ export function ImportOrdersDialog({
                       There is deliberately no "paste your sheet's link" field any more: that
                       route needs the sheet shared with our service account, which is a step
                       no seller could complete and the source of the 403s. */}
-                  {copyUrl ? (
+                  {configErr ? (
+                    /* Couldn't ask the server. Say so — and offer the retry — rather than
+                       showing the not-configured copy, which would blame the setup for what
+                       is actually a dropped request. */
+                    <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-4">
+                      <div className="text-xs font-medium">Couldn&apos;t check the Google Sheets setup.</div>
+                      <p className="text-xs text-muted-foreground">
+                        The server didn&apos;t answer — usually a few seconds during a deploy. Nothing has
+                        changed; try again, or use the File tab meanwhile.
+                      </p>
+                      <Button variant="outline" size="sm" onClick={() => loadSheetsConfig()}>Try again</Button>
+                    </div>
+                  ) : copyUrl ? (
                     <>
                       <div className="rounded-xl border border-border bg-muted/30 p-4">
                         <Button onClick={makeSheetCopy}>

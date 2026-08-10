@@ -93,7 +93,12 @@ const T_COLUMNS = [
 const T_OPTS = {
   methods: ['DTG', 'DTF', 'EMB', 'APL', 'LSR', 'SCR', 'SUB', 'VNL'],
   sizes: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'One Size'],
-  services: ['USPS Ground Advantage', 'USPS Priority Mail', 'USPS Priority Mail Express', 'UPS Ground', 'UPS 2nd Day Air', 'FedEx Ground', 'FedEx 2Day'],
+  // ONLY what the label screen can buy — three USPS mail classes. UPS and FedEx were
+  // listed here and could not be honoured: the picker offers USPS and nothing else, so
+  // "FedEx 2Day" in the sheet quietly became USPS Ground Advantage at the label. Checked
+  // against the live Shippo account 2026-08-10: usps + ups connected, no FedEx account.
+  // Mirrors SHIPPING_SERVICES in web/lib/order-import.ts — change both.
+  services: ['USPS Ground Advantage', 'USPS Priority Mail', 'USPS Priority Mail Express'],
   states: ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'],
 };
 

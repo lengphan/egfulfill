@@ -153,9 +153,22 @@ export const US_STATES = [
   "WV", "WI", "WY",
 ]
 export const ITEM_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "One Size"]
+/**
+ * ONLY WHAT THE LABEL SCREEN CAN ACTUALLY BUY.
+ *
+ * This listed UPS Ground, UPS 2nd Day Air, FedEx Ground and FedEx 2Day, and none of them
+ * could be honoured: the buy screen offers three USPS mail classes and nothing else, so a
+ * seller who picked FedEx 2Day in the sheet got USPS Ground Advantage and no notice that
+ * their choice had been overruled. A dropdown is a promise about what happens next.
+ *
+ * Checked against the live Shippo account (2026-08-10): usps and ups are connected,
+ * FedEx is not connected at all. UPS is therefore buyable in principle but is not offered
+ * by the label picker — add it to MAIL_CLASSES in orders-hub.tsx first, then here.
+ *
+ * Mirrored by T_OPTS.services in server/src/routes/sheets.js — change both.
+ */
 export const SHIPPING_SERVICES = [
   "USPS Ground Advantage", "USPS Priority Mail", "USPS Priority Mail Express",
-  "UPS Ground", "UPS 2nd Day Air", "FedEx Ground", "FedEx 2Day",
 ]
 
 export const COLUMN_OPTIONS: Record<string, string[]> = {
