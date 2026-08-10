@@ -42,7 +42,6 @@ export type SupplierCardData = {
 
 export function SupplierProductCard({
   data, added, adding, onAdd, onFavorite, loadColors, supplierLabel, onQuickOrder, onSync,
-  imageFit = "contain",
 }: {
   data: SupplierCardData
   /**
@@ -58,7 +57,6 @@ export function SupplierProductCard({
    * Otto's square shots. Because the shape and centring are uniform across their whole
    * catalogue, cropping to square removes padding rather than product.
    */
-  imageFit?: "contain" | "cover" 
   added: boolean
   adding: boolean
   onAdd: () => void
@@ -132,8 +130,19 @@ export function SupplierProductCard({
           // square — but a square S&S image aligned fine, which is the tell.
           // Absolutely-positioned children don't contribute to the parent's height, so
           // the box is now exactly square regardless of the image's shape.
+          //
+          // CONTAIN, always. There is no per-supplier override any more: SanMar art was
+          // switched to object-cover because it "rendered tiny", but the images are
+          // 1200x1800 — portrait 2:3, measured off the live CDN — not small. In a square
+          // bed, contain fits them to the height and leaves a third of the width white,
+          // which reads as small beside S&S's square shots; cover instead fills the square
+          // by cropping a third of the HEIGHT off, which is what cut the tops and bottoms
+          // off caps and backpacks. A catalogue tile whose job is "is this the blank I
+          // want" must show the whole product, so the whitespace stays and the crop goes.
+          // If they still read small, the fix is the tile's aspect ratio for every
+          // supplier, not a crop for one.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt="" loading="lazy" className={`absolute inset-0 size-full ${imageFit === "cover" ? "object-cover" : "object-contain"}`} />
+          <img src={img} alt="" loading="lazy" className="absolute inset-0 size-full object-contain" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50">No image</div>
         )}
