@@ -18,6 +18,7 @@ import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { sendMail, mailConfigured, lastMailError } from '../mailer.js';
 import { audit } from '../audit.js';
+import { notify } from './notifications.js';
 
 // Where the unsubscribe link points. Must be a host Caddy proxies /api/* to Fastify on —
 // NOT app.egful.store, which is Vercel and would 404 the whole path.
@@ -90,6 +91,18 @@ function ensureTables() {
     // the seller asked for them, and silently swallowing them reads as a broken account.
     await q('alter table users add column if not exists marketing_opt_out boolean not null default false').catch(() => {});
     await q('alter table users add column if not exists marketing_opt_out_at timestamptz').catch(() => {});
+    // WHERE this broadcast goes. Two places, independently: the seller's mailbox, and the
+    // bell inside the app. Existing rows default to email alone, which is what they were.
+    //
+    // They are not the same message and must not be gated together. Mail carries the
+    // branding, the greeting and the legally required unsubscribe footer; the in-app
+    // announcement is a title and a body, delivered to someone already signed in — nothing
+    // to unsubscribe from and nothing to render. So the in-app copy also ignores
+    // marketing_opt_out: opting out of marketing EMAIL is not a request to stop being told
+    // things by the factory you fulfil through.
+    await q(`alter table broadcasts add column if not exists channels text[] not null default '{email}'`).catch(() => {});
+    // How many bells were rung, kept apart from sent_count so a mixed send can say both.
+    await q('alter table broadcasts add column if not exists posted_count integer not null default 0').catch(() => {});
   })();
   return _ready;
 }
@@ -97,13 +110,18 @@ function ensureTables() {
 // ── Audience ──────────────────────────────────────────────────────────────────
 // {} means every seller. Every filter narrows; none widens past role='seller', so no
 // combination can post staff mail to a seller list or vice versa.
-function audienceSql(aud) {
+function audienceSql(aud, opts) {
   aud = aud && typeof aud === 'object' ? aud : {};
-  const where = [
-    "role = 'seller'",
-    "email is not null and email <> ''",
-    'coalesce(marketing_opt_out, false) = false',
-  ];
+  // The in-app audience is the same people, minus two conditions that are about MAIL and
+  // only mail: an address has to exist and be deliverable, and marketing_opt_out has to be
+  // clear. A seller with no address still has a bell, and unsubscribing from marketing
+  // email is not a request to stop being told things inside the app they work in.
+  const inApp = !!(opts && opts.inApp);
+  const where = ["role = 'seller'"];
+  if (!inApp) {
+    where.push("email is not null and email <> ''");
+    where.push('coalesce(marketing_opt_out, false) = false');
+  }
   const vals = [];
   // Default to active-only. A deactivated account is one we've shut off; mailing it a
   // promotion is the wrong message to the wrong person.
@@ -129,6 +147,19 @@ function audienceSql(aud) {
 // costs a send and reads as a broadcast failure. Anything plausible passes; the transport
 // remains the real judge.
 const validEmail = (e) => /^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/.test(String(e || '').trim());
+
+/**
+ * The two places a broadcast can land, normalised. Anything unrecognised is dropped rather
+ * than stored, and an empty list falls back to email — a broadcast that goes nowhere is
+ * never what someone meant, and silently storing a channel the sender doesn't understand
+ * is how one gets skipped without anyone noticing.
+ */
+const CHANNELS = ['email', 'inapp'];
+function normalizeChannels(v) {
+  const list = (Array.isArray(v) ? v : [v]).map((x) => String(x || '').trim().toLowerCase())
+    .filter((x) => CHANNELS.includes(x));
+  return list.length ? Array.from(new Set(list)) : ['email'];
+}
 
 /**
  * Everyone this broadcast goes to: the audience query, plus any addresses typed in by hand,
@@ -164,6 +195,21 @@ async function resolveRecipients(aud) {
     .catch(() => ({ rows: [] }));
   const blocked = new Set(sup.rows.map((x) => x.email));
   return out.filter((x) => !blocked.has(String(x.email || '').trim().toLowerCase()));
+}
+
+/**
+ * Everyone who gets the in-app announcement: user ids only.
+ *
+ * Separate from resolveRecipients on purpose — no addresses, no suppression list, no
+ * hand-typed extras. An address typed into the confirm screen has no account, so there is
+ * no bell to ring; it gets the mail and nothing else, which is the honest outcome rather
+ * than a silently dropped half.
+ */
+async function resolveAnnouncees(aud) {
+  aud = aud && typeof aud === 'object' ? aud : {};
+  const { sql, vals } = audienceSql(aud, { inApp: true });
+  const r = await q(`select id from users where ${sql}`, vals);
+  return r.rows.map((x) => String(x.id));
 }
 
 // ── Body rendering ────────────────────────────────────────────────────────────
@@ -393,8 +439,13 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
     // Shown BEFORE sending, because that is the only point at which it is cheap to fix.
     const invalid = rows.filter((r) => !validEmail(r.email)).map((r) => ({ id: r.id, email: r.email || '' }));
     const optedOut = await q('select count(*)::int as n from users where role = $1 and coalesce(marketing_opt_out,false) = true', ['seller']);
+    // The IN-APP audience is a different number, so it is counted rather than inferred from
+    // the mail list: it includes sellers who opted out of marketing email and sellers whose
+    // address is missing or malformed, both of whom still have a bell.
+    const inApp = await resolveAnnouncees((req.body || {}).audience);
     return {
       count: rows.length,
+      inAppCount: inApp.length,
       optedOut: optedOut.rows[0] ? optedOut.rows[0].n : 0,
       sample: rows.slice(0, 5).map((x) => x.email),
       // The full list, so the confirm screen can show who is actually being mailed rather
@@ -430,9 +481,10 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
     const body = String(b.body || '').trim();
     if (!subject || !body) { reply.code(400); return { error: 'Subject and body are both required.' }; }
     const r = await q(
-      `insert into broadcasts (subject, body, audience, created_by, created_by_name)
-       values ($1,$2,$3,$4,$5) returning *`,
-      [subject, body, JSON.stringify(b.audience || {}), req.user && req.user.email, req.user && req.user.name]);
+      `insert into broadcasts (subject, body, audience, channels, created_by, created_by_name)
+       values ($1,$2,$3,$4,$5,$6) returning *`,
+      [subject, body, JSON.stringify(b.audience || {}), normalizeChannels(b.channels),
+       req.user && req.user.email, req.user && req.user.name]);
     return r.rows[0];
   });
 
@@ -446,12 +498,13 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
     if (cur.rows[0].status !== 'draft') { reply.code(409); return { error: 'Only a draft can be edited.' }; }
     const r = await q(
       `update broadcasts set subject = coalesce($2, subject), body = coalesce($3, body),
-              audience = coalesce($4, audience)
+              audience = coalesce($4, audience), channels = coalesce($5, channels)
          where id = $1::bigint returning *`,
       [String(req.params.id),
        b.subject != null ? String(b.subject).trim() : null,
        b.body != null ? String(b.body).trim() : null,
-       b.audience != null ? JSON.stringify(b.audience) : null]);
+       b.audience != null ? JSON.stringify(b.audience) : null,
+       b.channels != null ? normalizeChannels(b.channels) : null]);
     return r.rows[0];
   });
 
@@ -482,7 +535,6 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
   app.post('/api/broadcasts/:id/send', { preHandler: requireAdmin }, async (req, reply) => {
     await ensureTables();
     const id = String(req.params.id);
-    if (!mailConfigured()) { reply.code(503); return { error: 'No mail transport configured — set BREVO_API_KEY.' }; }
 
     // Claim the row before doing anything. Conditioning the update on status='draft' means
     // two clicks (or two operators) can't both start the same send: the second updates
@@ -494,22 +546,65 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
       return { error: cur.rows.length ? `Already ${cur.rows[0].status} — a broadcast sends once.` : 'not found' };
     }
     const bc = claim.rows[0];
+    const channels = Array.isArray(bc.channels) && bc.channels.length ? bc.channels : ['email'];
+    const wantsEmail = channels.includes('email');
+    const wantsPost = channels.includes('inapp');
 
-    // Resolved HERE, at send. Anyone who unsubscribed since this was drafted is already
-    // gone from this list.
-    const recipients = await resolveRecipients(bc.audience);
+    // Only a mail send needs a mail transport. An announcement-only broadcast must still go
+    // out when Brevo is down — that is precisely when you most want to tell people something.
+    if (wantsEmail && !mailConfigured()) {
+      await q("update broadcasts set status = 'draft' where id = $1::bigint", [id]).catch(() => {});
+      reply.code(503); return { error: 'No mail transport configured — set BREVO_API_KEY.' };
+    }
+
+    // Both audiences resolved HERE, at send. Anyone who unsubscribed since this was drafted
+    // is already gone from the mail list.
+    const recipients = wantsEmail ? await resolveRecipients(bc.audience) : [];
+    const announcees = wantsPost ? await resolveAnnouncees(bc.audience) : [];
     await q('update broadcasts set recipient_count = $2 where id = $1::bigint', [id, recipients.length]);
 
-    if (!recipients.length) {
+    if (!recipients.length && !announcees.length) {
       await q("update broadcasts set status = 'sent', sent_at = now() where id = $1::bigint", [id]);
       return { id, recipientCount: 0, note: 'Nobody matched — nothing was sent.' };
     }
 
     audit(req, 'broadcast.sent', {
       entityType: 'broadcast', entityId: id,
-      after: { subject: bc.subject, recipients: recipients.length, audience: bc.audience },
-      note: `"${bc.subject}" to ${recipients.length} seller${recipients.length === 1 ? '' : 's'}`,
+      after: { subject: bc.subject, recipients: recipients.length, announcees: announcees.length, channels, audience: bc.audience },
+      note: `"${bc.subject}" to ${recipients.length} mailbox${recipients.length === 1 ? '' : 'es'}`
+        + (wantsPost ? ` and ${announcees.length} in-app` : ''),
     });
+
+    /**
+     * THE IN-APP HALF, first and synchronously.
+     *
+     * It is one insert for the whole audience and a push over the SSE hub that already
+     * exists, so it costs nothing next to the mail loop and there is no reason to make
+     * someone wait behind a few hundred Brevo calls to see it. notify() never throws by
+     * contract, so this cannot take the send down with it.
+     *
+     * TITLE AND BODY ONLY — no branding, no greeting, no unsubscribe footer. The reader is
+     * already signed in and looking at the product; the parts that exist to make a stranger
+     * trust an email are noise here.
+     */
+    if (announcees.length) {
+      await notify({
+        userIds: announcees,
+        type: 'announcement',
+        title: bc.subject,
+        body: bc.body,          // notify() trims to the column's 500
+        href: '/notifications',
+        entityId: id,
+      });
+      await q('update broadcasts set posted_count = $2 where id = $1::bigint', [id, announcees.length]).catch(() => {});
+    }
+
+    // Announcement-only: there is no loop to run, so finish here rather than falling into
+    // one that would immediately mark a zero-recipient send as failed.
+    if (!recipients.length) {
+      await q("update broadcasts set status = 'sent', sent_at = now() where id = $1::bigint", [id]).catch(() => {});
+      return { id, recipientCount: 0, postedCount: announcees.length, status: 'sent' };
+    }
 
     // Fire the loop and let the request return. Errors are recorded on the row, which is
     // what the board polls — nothing here can reject into an unhandled rejection.
@@ -583,6 +678,6 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
         [id, 'Send loop crashed: ' + String((e && e.message) || e).slice(0, 300)]).catch(() => {});
     });
 
-    return { id, recipientCount: recipients.length, status: 'sending' };
+    return { id, recipientCount: recipients.length, postedCount: announcees.length, status: 'sending' };
   });
 }

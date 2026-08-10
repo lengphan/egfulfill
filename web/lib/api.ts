@@ -3308,6 +3308,15 @@ export type BroadcastAudience = {
   extraEmails?: string[]
 }
 
+/**
+ * Where a broadcast lands. Two independent places, not two formats of one thing:
+ *   "email" — the seller's mailbox: branding, greeting, unsubscribe footer, the lot.
+ *   "inapp" — the bell inside the app: title and body only, to someone already signed in.
+ * An in-app announcement ignores marketing opt-out, because opting out of marketing EMAIL
+ * is not a request to stop being told things by the factory you fulfil through.
+ */
+export type BroadcastChannel = "email" | "inapp"
+
 /** One resolved recipient. `extra` marks an address typed in rather than a seller. */
 export type BroadcastRecipient = { id: string | null; email: string; name: string | null; extra?: boolean }
 
@@ -3316,11 +3325,15 @@ export type Broadcast = {
   subject: string
   body: string
   audience: BroadcastAudience
+  /** Older rows predate the column and come back as ["email"], which is what they were. */
+  channels: BroadcastChannel[]
   status: "draft" | "sending" | "sent" | "failed"
   /** Null until it sends — the count is resolved AT SEND, so a draft honestly has none. */
   recipient_count: number | null
   sent_count: number
   failed_count: number
+  /** Bells rung. Kept apart from sent_count so a mixed send can report both honestly. */
+  posted_count: number
   /** WHY the send failed, in the transport's own words (an unverified sender, a rejected
    *  key, a rate limit). Null on a clean send. Without it the screen says "failed" and the
    *  one fact that makes it fixable lives only in the server log. */
@@ -3339,6 +3352,9 @@ export function getBroadcasts() {
 export function previewBroadcastAudience(audience: BroadcastAudience) {
   return api<{
     count: number
+    /** The in-app audience — a different number: it includes sellers who opted out of
+     *  marketing email and sellers with no usable address, both of whom still have a bell. */
+    inAppCount?: number
     optedOut: number
     sample: string[]
     /** Everyone who will be mailed — the confirm screen shows the list, not "first few". */
@@ -3349,19 +3365,19 @@ export function previewBroadcastAudience(audience: BroadcastAudience) {
     method: "POST", body: JSON.stringify({ audience }),
   })
 }
-export function createBroadcast(b: { subject: string; body: string; audience?: BroadcastAudience }) {
+export function createBroadcast(b: { subject: string; body: string; audience?: BroadcastAudience; channels?: BroadcastChannel[] }) {
   return api<Broadcast>(`/api/broadcasts`, { method: "POST", body: JSON.stringify(b) })
 }
-export function updateBroadcast(id: string | number, b: { subject?: string; body?: string; audience?: BroadcastAudience }) {
+export function updateBroadcast(id: string | number, b: { subject?: string; body?: string; audience?: BroadcastAudience; channels?: BroadcastChannel[] }) {
   return api<Broadcast>(`/api/broadcasts/${id}`, { method: "PATCH", body: JSON.stringify(b) })
 }
 export function deleteBroadcast(id: string | number) {
   return api<{ ok: boolean }>(`/api/broadcasts/${id}`, { method: "DELETE" })
 }
-/** Admin only. Returns as soon as the audience is resolved — the send continues server-side,
- *  so poll getBroadcasts() for sent_count rather than expecting this to wait. */
+/** Admin or operator. Returns as soon as the audience is resolved — the send continues
+ *  server-side, so poll getBroadcasts() for sent_count rather than expecting this to wait. */
 export function sendBroadcast(id: string | number) {
-  return api<{ id: string; recipientCount: number; status?: string; note?: string }>(`/api/broadcasts/${id}/send`, { method: "POST" })
+  return api<{ id: string; recipientCount: number; postedCount?: number; status?: string; note?: string }>(`/api/broadcasts/${id}/send`, { method: "POST" })
 }
 
 // ── Site content — editable marketing-home copy (admin) ──────────────────────

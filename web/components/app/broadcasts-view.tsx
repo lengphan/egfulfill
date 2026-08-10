@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import {
   getBroadcasts, previewBroadcastAudience, createBroadcast, updateBroadcast, deleteBroadcast,
   sendBroadcast, getEmailBranding, setEmailBranding, uploadHeroImage,
-  type Broadcast, type BroadcastAudience, type BroadcastRecipient, type EmailBranding,
+  type Broadcast, type BroadcastAudience, type BroadcastChannel, type BroadcastRecipient, type EmailBranding,
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
@@ -75,6 +75,17 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 }
 
 /** The audience, said as a sentence rather than as a filter object. */
+/** Does this broadcast send mail at all? Rows saved before the channel column did. */
+const mailsOf = (b: Broadcast) => !b.channels?.length || b.channels.includes("email")
+
+/** "Email + in-app", "In-app only" — said in the reader's words, not the column's. */
+function channelLabel(ch: BroadcastChannel[]): string {
+  const e = ch.includes("email"), i = ch.includes("inapp")
+  if (e && i) return "Email + in-app"
+  if (i) return "In-app only"
+  return "Email only"
+}
+
 function audienceLabel(a: BroadcastAudience | null | undefined): string {
   const aud = a ?? {}
   if (Array.isArray(aud.sellerIds) && aud.sellerIds.length) return `${aud.sellerIds.length} hand-picked`
@@ -317,6 +328,7 @@ export function BroadcastsView() {
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [aud, setAud] = useState<BroadcastAudience>({})
+  const [channels, setChannels] = useState<BroadcastChannel[]>(["email", "inapp"])
   const [saving, setSaving] = useState(false)
 
   // Send confirmation. Held separately from the editor because it asks a different
@@ -362,11 +374,19 @@ export function BroadcastsView() {
   }, [rows, load])
 
   const isAdmin = role === "admin"
+  // Sending is admin OR operator — operators are the people who actually send
+  // announcements. Mirrors requireBroadcaster on the server; the server is the boundary,
+  // this only decides whether the button is worth showing.
+  const canSend = role === "admin" || role === "operator"
 
   const openEditor = (b: Broadcast | null) => {
     setEditing(b)
     setSubject(b?.subject ?? "")
     setBody(b?.body ?? "")
+    // A new broadcast goes BOTH places by default. An announcement that only reached the
+    // people who happen to open their mail is the failure mode this exists to fix, and the
+    // in-app copy costs one insert. Older drafts keep whatever they were saved with.
+    setChannels(b?.channels?.length ? b.channels : ["email", "inapp"])
     setAud(b?.audience ?? {})
     setErr(null)
     setOpen(true)
@@ -375,8 +395,8 @@ export function BroadcastsView() {
   const save = async () => {
     setSaving(true); setErr(null)
     try {
-      if (editing) await updateBroadcast(editing.id, { subject, body, audience: aud })
-      else await createBroadcast({ subject, body, audience: aud })
+      if (editing) await updateBroadcast(editing.id, { subject, body, audience: aud, channels })
+      else await createBroadcast({ subject, body, audience: aud, channels })
       setOpen(false); load()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not save")
@@ -440,6 +460,12 @@ export function BroadcastsView() {
     catch (e) { setErr(e instanceof Error ? e.message : "Could not send") }
     finally { setSending(false) }
   }
+
+  // What the broadcast being confirmed is actually set to do. A draft saved before the
+  // channel column existed has none, and was email — same fallback as the server's.
+  const confirmChannels = confirming?.channels?.length ? confirming.channels : (["email"] as BroadcastChannel[])
+  const sendsEmail = confirmChannels.includes("email")
+  const sendsInApp = confirmChannels.includes("inapp")
 
   if (loading) {
     return (
@@ -511,7 +537,15 @@ export function BroadcastsView() {
                         </button>
                         <div className="truncate text-xs text-muted-foreground">{b.body}</div>
                       </td>
-                      <td className="py-2.5 pr-3 text-xs text-muted-foreground">{audienceLabel(b.audience)}</td>
+                      <td className="py-2.5 pr-3 text-xs text-muted-foreground">
+                        {audienceLabel(b.audience)}
+                        {/* WHERE it went, not just to whom. Rows predating the channel column
+                            were email, and say nothing rather than claiming a channel they
+                            never had. */}
+                        {b.channels?.length ? (
+                          <div className="text-2xs opacity-80">{channelLabel(b.channels)}</div>
+                        ) : null}
+                      </td>
                       <td className="py-2.5 pr-3">
                         <Badge className={st.cls}>{st.label}</Badge>
                       </td>
@@ -520,6 +554,10 @@ export function BroadcastsView() {
                             would read as "sent to nobody". */}
                         {b.status === "draft" ? (
                           <span className="text-muted-foreground">—</span>
+                        ) : !mailsOf(b) ? (
+                          /* Announcement-only. "0 / 0" here read as a send to nobody, when
+                             in fact every one of these people was told. */
+                          <span title="Posted in-app; no email was sent">{(b.posted_count ?? 0).toLocaleString("en-US")} posted</span>
                         ) : (
                           <>
                             <span>{b.sent_count.toLocaleString("en-US")}</span>
@@ -550,8 +588,8 @@ export function BroadcastsView() {
                           <div className="flex justify-end gap-1">
                             <Button size="sm" variant="ghost" onClick={() => openEditor(b)} aria-label="Edit"><PencilSimple size={14} /></Button>
                             <Button size="sm" variant="ghost" onClick={() => remove(b)} aria-label="Delete"><Trash size={14} /></Button>
-                            {isAdmin && (
-                              <Button size="sm" disabled={!mailOk} onClick={() => startSend(b)}>
+                            {canSend && (
+                              <Button size="sm" disabled={!mailOk && mailsOf(b)} onClick={() => startSend(b)}>
                                 <PaperPlaneTilt size={14} />Send
                               </Button>
                             )}
@@ -565,9 +603,9 @@ export function BroadcastsView() {
             </table>
           </div>
         )}
-        {!isAdmin && rows.some((b) => b.status === "draft") && (
+        {!canSend && rows.some((b) => b.status === "draft") && (
           <p className="mt-3 text-xs text-muted-foreground">
-            Drafts are open to the team; sending is admin-only. There is no unsend.
+            Drafts are open to the team; sending is admin and operator only. There is no unsend.
           </p>
         )}
       </SectionCard>
@@ -593,6 +631,26 @@ export function BroadcastsView() {
                 placeholder={"Blank lines start a new paragraph.\n\nSellers are greeted by name automatically."} />
             </div>
             <div>
+              {/* WHERE IT GOES. Two places, chosen independently — this is not a format
+                  switch. Mail reaches someone who isn't in the app; the bell reaches
+                  someone who is, and reaches sellers with no deliverable address at all.
+                  Most announcements want both, which is why both start ticked. */}
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Send to</label>
+              <div className="mb-3 space-y-1.5 rounded-lg border border-border p-3">
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-0.5 accent-primary" checked={channels.includes("email")}
+                    onChange={(e) => setChannels((p) => e.target.checked ? [...new Set([...p, "email" as BroadcastChannel])] : p.filter((c) => c !== "email"))} />
+                  <span>Email<span className="block text-xs text-muted-foreground">Full message with your branding and the unsubscribe footer.</span></span>
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-0.5 accent-primary" checked={channels.includes("inapp")}
+                    onChange={(e) => setChannels((p) => e.target.checked ? [...new Set([...p, "inapp" as BroadcastChannel])] : p.filter((c) => c !== "inapp"))} />
+                  <span>In-app announcement<span className="block text-xs text-muted-foreground">Subject and body only, to the seller&apos;s notifications. Goes to everyone in the audience — including anyone who opted out of marketing email, since that isn&apos;t an opt-out from the app.</span></span>
+                </label>
+                {channels.length === 0 && (
+                  <p className="pt-1 text-xs text-amber-700 dark:text-amber-400">Pick at least one — otherwise this goes nowhere.</p>
+                )}
+              </div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">Audience</label>
               <div className="space-y-1.5 rounded-lg border border-border p-3">
                 <label className="flex items-center gap-2 text-sm">
@@ -635,7 +693,7 @@ export function BroadcastsView() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save} disabled={saving || !subject.trim() || !body.trim()}>
+            <Button onClick={save} disabled={saving || !subject.trim() || !body.trim() || channels.length === 0}>
               {saving ? <CircleNotch size={14} className="animate-spin" /> : null}Save draft
             </Button>
           </DialogFooter>
@@ -650,7 +708,13 @@ export function BroadcastsView() {
           <DialogHeader>
             <DialogTitle className="pr-6">{viewing?.subject}</DialogTitle>
             <DialogDescription>
-              {viewing ? `${audienceLabel(viewing.audience)} · ${viewing.sent_count.toLocaleString("en-US")} of ${(viewing.recipient_count ?? 0).toLocaleString("en-US")} delivered` : ""}
+              {viewing
+                ? `${audienceLabel(viewing.audience)} · ${
+                    mailsOf(viewing)
+                      ? `${viewing.sent_count.toLocaleString("en-US")} of ${(viewing.recipient_count ?? 0).toLocaleString("en-US")} delivered`
+                      : `posted in-app to ${(viewing.posted_count ?? 0).toLocaleString("en-US")}`
+                  }${viewing.channels?.includes("inapp") && mailsOf(viewing) ? ` · also posted in-app to ${(viewing.posted_count ?? 0).toLocaleString("en-US")}` : ""}`
+                : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -690,15 +754,29 @@ export function BroadcastsView() {
           ) : count ? (
             <div className="space-y-3">
               <div className="rounded-lg border border-border bg-muted/40 p-3.5">
-                <p className="text-sm">
-                  This will email{" "}
-                  <strong>{inWords(count.count)}</strong>{" "}
-                  seller{count.count === 1 ? "" : "s"}{" "}
-                  <span className="text-muted-foreground">({count.count.toLocaleString("en-US")})</span>.
-                </p>
+                {/* Say each destination with its OWN number. They genuinely differ — the
+                    in-app list includes sellers who opted out of marketing email and
+                    sellers with no usable address — and one blended figure would be wrong
+                    for both. */}
+                {sendsEmail && (
+                  <p className="text-sm">
+                    This will email{" "}
+                    <strong>{inWords(count.count)}</strong>{" "}
+                    seller{count.count === 1 ? "" : "s"}{" "}
+                    <span className="text-muted-foreground">({count.count.toLocaleString("en-US")})</span>.
+                  </p>
+                )}
+                {sendsInApp && (
+                  <p className={sendsEmail ? "mt-1 text-sm" : "text-sm"}>
+                    {sendsEmail ? "It also posts" : "This will post"} an announcement to{" "}
+                    <strong>{inWords(count.inAppCount ?? count.count)}</strong>{" "}
+                    seller{(count.inAppCount ?? count.count) === 1 ? "" : "s"}{" "}
+                    <span className="text-muted-foreground">({(count.inAppCount ?? count.count).toLocaleString("en-US")})</span> in the app.
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-muted-foreground">{audienceLabel(confirming?.audience)}</p>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className={sendsEmail ? "text-xs text-muted-foreground" : "hidden"}>
                 {count.optedOut > 0
                   ? `${count.optedOut.toLocaleString("en-US")} seller${count.optedOut === 1 ? " has" : "s have"} unsubscribed and ${count.optedOut === 1 ? "is" : "are"} excluded.`
                   : "No seller has unsubscribed yet."}
@@ -706,7 +784,7 @@ export function BroadcastsView() {
 
               {/* ADDRESSES THAT CANNOT BE DELIVERED TO. Shown here because this is the last
                   moment fixing them is cheap — after the send they are a red line on a row. */}
-              {!!count.invalid?.length && (
+              {sendsEmail && !!count.invalid?.length && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
                   {count.invalid.length} address{count.invalid.length === 1 ? "" : "es"} can&apos;t be delivered to and will fail:{" "}
                   <span className="font-mono">{count.invalid.map((x) => x.email || "(blank)").join(", ")}</span>. Fix the seller record, or remove them below.
@@ -717,7 +795,7 @@ export function BroadcastsView() {
                   wonder who else was on it and nothing you could do about it. Removing writes
                   to the draft's audience before the send; the count re-resolves server-side
                   after every change, so what is shown is always what will be mailed. */}
-              {!!count.recipients?.length && (
+              {sendsEmail && !!count.recipients?.length && (
                 <div className="rounded-lg border border-border">
                   <div className="max-h-44 overflow-y-auto">
                     {count.recipients.map((r) => (

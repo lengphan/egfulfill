@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, Package, Headset, ChatCircle, Warning } from "@phosphor-icons/react"
+import { Bell, Package, Headset, ChatCircle, Megaphone, Warning } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { getNotifications, markNotificationsRead, type Notification } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
@@ -23,6 +23,10 @@ const ICON: Record<string, React.ReactNode> = {
   "order-new": <Package size={13} weight="fill" />,
   "support-message": <Headset size={13} weight="fill" />,
   "order-message": <ChatCircle size={13} weight="fill" />,
+  // A broadcast posted to the app. Its own mark, because it is the one kind here that
+  // isn't about a specific order — the warning triangle made an announcement look like
+  // something had gone wrong.
+  announcement: <Megaphone size={13} weight="fill" />,
 }
 
 // A short chime, synthesized rather than shipped as an audio file — no asset to
