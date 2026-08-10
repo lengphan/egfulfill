@@ -10,6 +10,7 @@ import { requireSpydeck } from '../entitlements.js';
 import { fetchSheetRows } from './sheets.js';
 import { imageBytesFrom } from '../images.js';
 import { clampDays, windowStartSec } from '../backfill.js';
+import { hashOf } from '../fingerprint.js';
 
 const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
 const SHARED_SECRET = (process.env.ETSY_SHARED_SECRET || '').trim();
@@ -185,6 +186,67 @@ async function ownerIsStaff(userId) {
 // Upsert one Etsy receipt into orders. Returns 'imported' or 'skipped'.
 // Re-syncs never overwrite the internal pipeline (status/factory_status) or items.
 // isFactory: true → factory-owned (admin shop); false → seller-owned (seller's shop).
+/**
+ * Digitised once, attached forever — for the SAME seller's own repeat work.
+ *
+ * A listing we published carries its artwork back onto every order it produces, but never
+ * the machine file, so the second order of a design the floor digitised in January still
+ * arrived needing a human to find and attach the file. That is the same job, done again,
+ * for as long as the listing sells.
+ *
+ * Three deliberate limits, each one a rule this codebase already holds:
+ *
+ *  - **`emb` only, never `pes`.** `pes` is the seller's PAID deliverable and carries a
+ *    price; copying one onto an order hands over something they would otherwise buy.
+ *    `emb` is the factory's working file, staff-visible only, and costs the seller nothing.
+ *  - **Same seller only.** Cross-seller reuse is real and valuable, but it is a FACTORY
+ *    decision made by a human through /api/design_files/:id/reuse — a seller must never
+ *    learn their design was used by another seller, and an automatic attach is exactly the
+ *    signal that would tell them.
+ *  - **Exact hash only.** The perceptual (phash) tier stays a suggestion a human confirms.
+ *    A false positive here puts the wrong artwork on someone's order, which is much worse
+ *    than digitising twice.
+ *
+ * Copies rather than links, matching the reuse route: the receiving line gets an ordinary
+ * file of its own, and the source row keeps its own identity and entitlements.
+ */
+async function attachKnownMachineFile({ orderId, sku, lineId, artHash, sellerId }) {
+  try {
+    if (!artHash || !sellerId) return;
+    // Already has one? Then there is nothing to do — and re-attaching would stack
+    // duplicates on every re-sync of the same receipt.
+    const have = await q(
+      `select 1 from design_file_data
+        where order_id=$1 and kind in ('pes','emb')
+          and (line_id is null or line_id=$2) limit 1`,
+      [orderId, lineId]).then((r) => r.rows.length > 0);
+    if (have) return;
+
+    const src = await q(
+      `select f.* from design_file_data f
+         join order_designs d on d.order_id = f.order_id and d.sku = f.sku
+        where d.art_hash = $1 and f.order_id <> $2 and f.kind = 'emb' and f.seller_id = $3
+        order by f.created_at desc limit 1`,
+      [artHash, orderId, String(sellerId)]).then((r) => r.rows[0]);
+    if (!src) return;
+
+    const newId = `EMB-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    await q(
+      `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, content_hash, price, kind, created_at, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'emb', now(), now())`,
+      [newId, orderId, sku, lineId, String(sellerId), src.file_name, src.mime, src.data, src.url,
+       src.content_hash, Number(src.price) || 0]
+    );
+    // Recorded as `system`: a file appearing on an order with no actor is the kind of thing
+    // that has to be explainable months later, and the source id makes it traceable.
+    audit(null, 'design_file.auto_attached', {
+      entityType: 'order', entityId: orderId,
+      after: { from: src.design_id, to: newId, sku, line_id: lineId, reason: 'same-seller exact artwork match' },
+      note: 'Machine file reused automatically from this seller\'s earlier order with identical artwork',
+    });
+  } catch { /* best-effort: a sync must never fail over a convenience */ }
+}
+
 async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
   const id = 'etsy-' + rc.receipt_id;
   // Etsy's sale notifications go to the SHOP's email, which is usually not the seller's
@@ -312,12 +374,20 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
         ).catch(() => {});
         // The artwork is the expensive part — attach it regardless of variant match.
         if (built.design_data) {
+          // art_hash, computed HERE rather than left for the boot-time backfill in
+          // orders.js to pick up. It's the key the whole "we have already digitised this"
+          // machinery runs on (design_files.js /reuse, autoPushDesigns' file-exists check),
+          // and the backfill only runs at route load, 1000 rows at a time — so a design
+          // that arrived by sync was unhashed, and therefore invisible to reuse, until the
+          // next restart. The attach below needs it on the order that just landed.
+          const artHash = hashOf(built.design_data);
           await q(
-            `insert into order_designs (order_id, sku, kind, data, name, pos, updated_at)
-             values ($1,$2,'raster',$3,$4,$5, now())
+            `insert into order_designs (order_id, sku, line_id, kind, data, name, pos, art_hash, updated_at)
+             values ($1,$2,$3,'raster',$4,$5,$6,$7, now())
              on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind) do nothing`,
-            [id, tr.sku || null, built.design_data, 'Published artwork', built.design_pos || null]
+            [id, tr.sku || null, lineId, built.design_data, 'Published artwork', built.design_pos || null, artHash]
           ).catch(() => {});
+          if (artHash) await attachKnownMachineFile({ orderId: id, sku: tr.sku || null, lineId, artHash, sellerId: conn.connected_by });
         }
       }
     } else if (exItem) {
