@@ -1240,6 +1240,12 @@ export function SpyDeckView() {
           description: editing.l.product?.description || "",
           price: editing.l.published?.price ?? undefined,
           tags: editing.l.product?.tags ?? [],
+          // The variants as picked last time. published_listings keeps only the FIRST
+          // colour/size (single columns), so the full axes come from the publish blob,
+          // which stored them as arrays — falling back to the single columns for rows
+          // written before the blob carried them.
+          colors: editing.l.published?.colors ?? (editing.l.product?.color ? [editing.l.product.color] : []),
+          sizes: editing.l.published?.sizes ?? (editing.l.product?.size ? [editing.l.product.size] : []),
           // OUR photos, live from the listing — the ones already on it, so a re-publish
           // starts from what is there instead of asking for them again.
           images: editing.images,

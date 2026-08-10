@@ -689,7 +689,16 @@ export function spydeckRoutes(app, requireAuth) {
       // design_* rides along so the card can REOPEN the publish dialog with the artwork
       // already attached. Without it a re-publish would produce a listing with the right
       // blank and variants and no design on it, which is worse than not offering the button.
-      const product = (row.blank_sku || row.print_type || row.color || row.size)
+      /**
+       * The guard has to cover EVERY field it carries, not just the four it started with.
+       * A listing published without a blank had none of blank_sku/print_type/color/size, so
+       * `product` came back undefined and took the title, description, tags and ARTWORK
+       * down with it — the words were stored correctly and then dropped on the way out,
+       * which reads exactly like they were never saved.
+       */
+      const product = (row.blank_sku || row.print_type || row.color || row.size
+                       || row.published_title || row.published_description || row.published_tags
+                       || row.design_id || row.design_data)
         ? { blank_sku: row.blank_sku, print_type: row.print_type, color: row.color, size: row.size,
             platform: row.platform, design_id: row.design_id, design_data: row.design_data,
             design_pos: row.design_pos,

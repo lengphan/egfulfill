@@ -155,6 +155,12 @@ export type PublishPrefill = {
   referenceImages?: string[]
   /** Catalog product to produce this on. Sets the cost side of the margin. */
   blank?: CatalogProduct | null
+  /** The variant axes as they were PICKED last time, so reopening a published listing
+   *  restores its variants instead of asking for them again. Only meaningful alongside
+   *  `blank` — the publish call sends variants only when a blank is resolved, so seeding
+   *  these without one would show a selection that then silently doesn't ship. */
+  colors?: string[]
+  sizes?: string[]
   /** The ARTWORK, not the composite in `images`. This is what gets attached to the order
    *  when one arrives, and what makes the line sendable to the Design board. */
   designUrl?: string
@@ -263,6 +269,11 @@ export function PublishProductDialog({
       setImages((prefill?.images ?? []).filter(Boolean).slice(0, MAX_IMAGES))
       setBlank(prefill?.blank ?? null)
       setBlankText(prefill?.blank?.name ?? "")
+      // Restore the variant selection. Guarded on the blank for the same reason the publish
+      // call is: without one, `colors`/`sizes` are sent empty regardless, so showing ticks
+      // here would promise variants that then don't ship.
+      setPickedColors(prefill?.blank ? (prefill?.colors ?? []) : [])
+      setPickedSizes(prefill?.blank ? (prefill?.sizes ?? []) : [])
       setResult(null)
       getSpydeckTrending().then((r) => setSuggested((r.keywords ?? []).slice(0, 12))).catch(() => {})
       getCatalogProducts().then((rows) => { catalogRef.current = rows ?? [] }).catch(() => {})
@@ -820,7 +831,12 @@ export function PublishProductDialog({
                   {/* Leaf category — required. Search then pick from the tree. */}
                   <div className="space-y-1">
                     <div className="text-xs font-medium">Category {ttCategory && <span className="text-muted-foreground">· {ttCategory.local_name}</span>}</div>
-                    <Input value={ttCatQuery} onChange={(e) => setTtCatQuery(e.target.value)} placeholder={ttCategories.length ? "Search categories…" : "Loading categories…"} className="h-8 text-xs" />
+                    <Input value={ttCatQuery} onChange={(e) => setTtCatQuery(e.target.value)} /* An empty list after a FAILED load is not a loading list. Showing the error above
+                         while the field still said "Loading categories…" left the two halves of the
+                         screen contradicting each other, and the spinner-ish wording is the one people
+                         believe — so it read as slow rather than broken. */
+                      placeholder={ttCategories.length ? "Search categories…" : ttLoadErr ? "Couldn't load categories" : "Loading categories…"}
+                      disabled={!ttCategories.length && !!ttLoadErr} className="h-8 text-xs" />
                     {ttCatQuery.trim() && (
                       <div className="max-h-36 overflow-y-auto rounded-md border border-border">
                         {ttCatMatches.length === 0 ? (

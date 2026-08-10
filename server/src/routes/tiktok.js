@@ -838,7 +838,19 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       const conn = await connectionForPublish(req.user);
       if (!conn) { reply.code(400); return { error: 'No TikTok shop connected' }; }
       const cipher = await getShopCipher(conn);
-      const query = { shop_cipher: cipher };
+      /**
+       * category_version=v2, because TikTok now refuses anything else.
+       *
+       * Omitting it returned: "All region shops must use V2 categories. Check the
+       * documentation for further details. @ /product/202309/categories" — the picker sat
+       * on "Loading categories…" forever, since an error here leaves the list empty and the
+       * empty list looks identical to a slow one.
+       *
+       * It has to be sent on the PRODUCT CREATE too (below). The category id space differs
+       * between versions, so a v2 id posted without the flag is a v1 id that doesn't exist —
+       * which fails at publish, long after the mistake was made.
+       */
+      const query = { shop_cipher: cipher, category_version: 'v2' };
       if (req.query && req.query.keyword) query.keyword = String(req.query.keyword);
       const d = await ttSignedRequest(conn, 'GET', '/product/202309/categories', { query });
       return { categories: d.categories || d.category_list || [] };
@@ -918,8 +930,11 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
 
       // 2) Create the product.
       const payload = buildTiktokProductPayload(b, uris);
+      // category_version must MATCH the version the picker listed from (v2, above) — the id
+      // spaces differ, so sending a v2 id without saying so is sending a v1 id that doesn't
+      // exist.
       const d = await ttSignedRequest(conn, 'POST', '/product/202309/products', {
-        query: { shop_cipher: conn.shop_cipher }, body: payload,
+        query: { shop_cipher: conn.shop_cipher, category_version: 'v2' }, body: payload,
       });
       const productId = d.product_id || null;
 
