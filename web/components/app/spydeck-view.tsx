@@ -4,7 +4,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Compass, Package, Trash } from "@phosphor-icons/react"
+import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Compass, Package, Trash } from "@phosphor-icons/react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -120,6 +121,9 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
 // deliberately NOT rendered here. They're someone else's sales; under our title they'd
 // read as ours. The source is reachable as a labelled link and nothing more.
 const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedListing; onRemove?: (l: UploadedListing) => void }) {
+  // "What did I actually upload?" is a question the 300px tile can't answer — the cover is
+  // cropped square and scaled down, so a misplaced design or the wrong file looks fine.
+  const [zoom, setZoom] = useState(false)
   const p = l.published
   // published_listings (joined server-side) is authoritative for the build spec — it was
   // written by the publish route itself, so it survives rows the dialog never described.
@@ -141,7 +145,19 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedLi
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
       <div className="relative aspect-square overflow-hidden bg-muted/40">
         {cover ? (
-          <Image src={cover} alt={title} fill unoptimized sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover" />
+          // The whole cover is the target — a small zoom affordance in a corner is a thing
+          // you have to find. The magnifier appears on hover to say the click does something.
+          <button
+            type="button" onClick={() => setZoom(true)}
+            className="group/img absolute inset-0 cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+            title="See the full image and what was published"
+            aria-label="See the full published image"
+          >
+            <Image src={cover} alt={title} fill unoptimized sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover" />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover/img:bg-black/25 group-hover/img:opacity-100">
+              <span className="rounded-full bg-white/90 p-2 text-neutral-900"><MagnifyingGlassPlus size={18} weight="bold" /></span>
+            </span>
+          </button>
         ) : (
           <div className="flex size-full items-center justify-center text-muted-foreground"><Package size={22} weight="duotone" /></div>
         )}
@@ -243,9 +259,51 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove }: { l: UploadedLi
           )}
         </div>
       </div>
+
+      {/* The published cover, uncropped, beside what it was published AS. The tile shows a
+          square crop, so this is the only place the actual artwork can be checked. */}
+      <Dialog open={zoom} onOpenChange={setZoom}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader><DialogTitle className="pr-6 text-base leading-snug">{title}</DialogTitle></DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_13rem]">
+            {/* object-contain, not cover: a crop is exactly what this view exists to undo. */}
+            <div className="relative flex min-h-[16rem] items-center justify-center overflow-hidden rounded-xl bg-muted/40">
+              {cover
+                ? <Image src={cover} alt={title} width={1200} height={1200} unoptimized className="h-auto max-h-[70vh] w-full object-contain" />
+                : <span className="p-10 text-sm text-muted-foreground">No image was stored for this publish.</span>}
+            </div>
+            <dl className="space-y-2 text-sm">
+              <Spec k="Status" v={live ? "Live" : "Draft"} />
+              <Spec k="Channel" v={platform} />
+              {p?.price != null && p.price > 0 && <Spec k="Price" v={`$${p.price.toFixed(2)}`} />}
+              {blankSku && <Spec k="Blank" v={blankSku} />}
+              {printType && <Spec k="Print" v={printType} />}
+              {colors.length > 0 && <Spec k="Colours" v={colors.join(", ")} />}
+              {sizes.length > 0 && <Spec k="Sizes" v={sizes.join(", ")} />}
+              {p?.images_uploaded != null && <Spec k="Photos" v={String(p.images_uploaded)} />}
+              {l.uploaded_at && <Spec k="Published" v={new Date(l.uploaded_at).toLocaleString()} />}
+              {l.our_url && (
+                <a href={l.our_url} target="_blank" rel="noopener noreferrer" className="mt-3 block text-sm font-medium text-primary hover:underline">
+                  Open on {platform} →
+                </a>
+              )}
+            </dl>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 })
+
+/** One label/value line in the published-image dialog. */
+function Spec({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-1.5">
+      <dt className="shrink-0 text-xs text-muted-foreground">{k}</dt>
+      <dd className="truncate text-right text-sm font-medium" title={v}>{v}</dd>
+    </div>
+  )
+}
 
 // One research card — image (price + TRENDING overlay) + heart-to-save + estimate
 // stat boxes + the listing's up-to-13 keyword tags (clickable to research + copy all).

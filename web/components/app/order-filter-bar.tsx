@@ -22,8 +22,14 @@ import { type OrderRow, type CatalogProduct } from "@/lib/api"
  *
  *  Selected state is carried by weight and foreground colour, not a second accent — the
  *  stage pills beside it are the only violet in this row. */
-function FilterMenu({ label, value, options, onPick }: {
+function FilterMenu({ label, anyLabel, value, options, onPick }: {
+  /** The facet's name. Now only for assistive tech — the row beside the trigger says it
+   *  in print, and having the trigger repeat it was the bug this signature fixes. */
   label: string
+  /** What "not filtering by this" is called: "All platforms", "Any time". Used BOTH as the
+   *  trigger's resting text and as the first row of the menu, so the control always names a
+   *  state rather than a category. */
+  anyLabel: string
   value: string
   options: { value: string; label: string }[]
   onPick: (v: string) => void
@@ -33,24 +39,30 @@ function FilterMenu({ label, value, options, onPick }: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        aria-label={label}
+        // Fixed width, not max-width: the triggers sized to their own text, so a column of
+        // them down the panel had a ragged right edge that read as misalignment.
         className={
-          "inline-flex h-8 max-w-[11rem] items-center gap-1 rounded-md border px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
+          "inline-flex h-8 w-40 shrink-0 items-center justify-between gap-1 rounded-md border px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
           (on
             ? "border-primary/40 bg-primary/5 text-foreground"
             : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground")
         }
       >
-        <span className="truncate">{on ? current?.label ?? value : label}</span>
+        <span className="truncate">{on ? current?.label ?? value : anyLabel}</span>
         <CaretDown size={11} weight="bold" className="shrink-0 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-72 w-52 overflow-y-auto p-1">
-        {/* The reset row is the filter's own TITLE — "Platform", not "Platform: any". It
-            reads as the unfiltered heading the trigger falls back to, which is exactly what
-            picking it does. It stays an explicit row rather than only a Clear button: a
-            dropdown you can enter but not leave is the classic filter trap. */}
+        {/* The unset row names the STATE — "All platforms" — not the facet. It used to be
+            the facet's own title, which was fine when this trigger stood alone in a toolbar
+            and was the only label there. Inside a labelled row it meant the word "Platform"
+            appeared on the line twice and then again as the ticked value inside the menu, so
+            the filter looked like it was set to something called Platform.
+            It stays an explicit row rather than only a Clear button: a dropdown you can
+            enter but not leave is the classic filter trap. */}
         <DropdownMenuItem onClick={() => onPick("")} className="flex items-center gap-2 text-sm">
           <Check size={12} weight="bold" className={value ? "opacity-0" : "text-primary"} />
-          <span className={value ? "text-muted-foreground" : "font-medium"}>{label}</span>
+          <span className={value ? "text-muted-foreground" : "font-medium"}>{anyLabel}</span>
         </DropdownMenuItem>
         {options.map((o) => (
           <DropdownMenuItem key={o.value} onClick={() => onPick(o.value)} className="flex items-center gap-2 text-sm">
@@ -173,31 +185,31 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
             what each one narrows, which is exactly what the cramped toolbar could not. */}
         <div className="space-y-2">
           <FilterRow label="List">
-            <FilterMenu label="List" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
+            <FilterMenu label="List" anyLabel="All orders" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
           </FilterRow>
           {facets.platforms.length > 1 && (
             <FilterRow label="Platform">
-              <FilterMenu label="Platform" value={query.platform}
+              <FilterMenu label="Platform" anyLabel="All platforms" value={query.platform}
                 options={facets.platforms.map((p) => ({ value: p, label: p }))}
                 onPick={(v) => set({ platform: v })} />
             </FilterRow>
           )}
           {facets.stores.length > 1 && (
             <FilterRow label="Shop">
-              <FilterMenu label="Shop" value={query.store}
+              <FilterMenu label="Shop" anyLabel="All shops" value={query.store}
                 options={facets.stores.map((x) => ({ value: x, label: x }))}
                 onPick={(v) => set({ store: v })} />
             </FilterRow>
           )}
           {facets.methods.length > 1 && (
             <FilterRow label="Print">
-              <FilterMenu label="Print" value={query.method} options={facets.methods} onPick={(v) => set({ method: v })} />
+              <FilterMenu label="Print" anyLabel="All methods" value={query.method} options={facets.methods} onPick={(v) => set({ method: v })} />
             </FilterRow>
           )}
           {/* Date is always offered — unlike the others it needs no data to be meaningful,
               and "what came in today" is the question a floor asks most. */}
           <FilterRow label="Date">
-            <FilterMenu label="Date" value={query.days === null ? "" : String(query.days)}
+            <FilterMenu label="Date" anyLabel="Any time" value={query.days === null ? "" : String(query.days)}
               options={DATE_RANGES.filter((r) => r.days !== null).map((r) => ({ value: String(r.days), label: r.label }))}
               onPick={(v) => set({ days: v === "" ? null : Number(v) })} />
           </FilterRow>
