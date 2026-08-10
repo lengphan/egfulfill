@@ -163,6 +163,33 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
     // Otto's methods come from THEIR API. A failure here is reported, not swallowed into
     // an empty list — "no payment methods" and "couldn't ask" look identical otherwise,
     // and one of them means the order will be placed on the wrong terms.
+    /**
+     * WHAT OTTO WILL ACTUALLY ACCEPT.
+     *
+     * Their /shipping_methods endpoint returns their whole global catalogue — Library Mail,
+     * every USPS service, every UPS service, FedEx — and their ORDER validator then refuses
+     * most of it. Picking USPS Priority off their own list came back as:
+     *
+     *   "shipping_method: The USPS service is not available, please contact OTTO customer
+     *    service … FEDEX Priority Overnight®, FEDEX Standard Overnight®, FEDEX Ground …"
+     *
+     * So the two endpoints disagree, and rendering the catalogue verbatim offered forty
+     * choices where six work. This narrows it to the services Otto named in that refusal.
+     *
+     * Matched loosely on the label because their list carries the ® and the "Third Party"
+     * suffixes, and an exact-string allow-list would silently empty the dropdown the first
+     * time they reworded one.
+     */
+    const OTTO_OK = /^fedex\s+(priority overnight|standard overnight|ground)/i;
+    const ottoUsable = (list) => {
+      const rows = Array.isArray(list) ? list : [];
+      const text = (m) => String((m && (m.label ?? m.name ?? m.description ?? m.value)) ?? m ?? '');
+      const kept = rows.filter((m) => OTTO_OK.test(text(m).trim()));
+      // Never hand back an empty picker: if Otto rename these, showing everything is worse
+      // than showing nothing but far better than showing nothing AND blocking every order.
+      return kept.length ? kept : rows;
+    };
+
     let otto = { available: false, reason: 'Otto Cap is not configured.', paymentMethods: [], shippingMethods: [] };
     try {
       const { ottoEnabled, ottoGet } = await import('./ottocap.js');
@@ -175,7 +202,7 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
           available: !!(pay && pay.ok),
           reason: pay && pay.ok ? null : `Couldn't read Otto's payment methods${pay && pay.error ? ` — ${pay.error}` : ''}.`,
           paymentMethods: (pay && pay.ok && pay.data) || [],
-          shippingMethods: (ship && ship.ok && ship.data) || [],
+          shippingMethods: ottoUsable((ship && ship.ok && ship.data) || []),
         };
       }
     } catch (e) {
