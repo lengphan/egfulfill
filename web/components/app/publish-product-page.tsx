@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ProductCombobox } from "@/components/app/product-combobox"
+import { SectionCard } from "@/components/app/section-card"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
@@ -1007,18 +1008,23 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
              dialog those sat at the bottom of a scroll box, which is how you end up
              editing a listing without being able to see where it's going. */
           <div className="grid items-start gap-5 xl:grid-cols-[1.05fr_1fr_23rem]">
-            {/* COLUMN 1 — what the listing looks like */}
+            {/* COLUMN 1 — what the listing looks like.
+                Every group is a SectionCard, the same block every other page in the app is
+                built from. On a page the fields had nothing behind them: a dialog's own
+                edges did the grouping, and without them the form read as one long drift of
+                inputs with no structure and no column boundary. */}
             <div className="space-y-4">
+              {/* The count and the reference-photo caveat ride in the card's own header —
+                  repeating "Photos" inside a card called Photos is the kind of doubling a
+                  dialog's title bar used to hide. */}
+              <SectionCard
+                title={<>Photos <span className="font-normal text-muted-foreground">({images.length}/{MAX_IMAGES})</span></>}
+                description={referencePhotos.length > 0
+                  ? `${referencePhotos.length} reference ${referencePhotos.length === 1 ? "photo" : "photos"} shown, none published`
+                  : undefined}
+                bodyClassName="space-y-3 p-4"
+              >
               <div className="space-y-1.5">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-sm font-medium">Photos</span>
-                  <span className="text-sm text-muted-foreground">({images.length}/{MAX_IMAGES})</span>
-                  {referencePhotos.length > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      · {referencePhotos.length} reference {referencePhotos.length === 1 ? "photo" : "photos"} shown, none published
-                    </span>
-                  )}
-                </div>
                 <div className="grid grid-cols-4 gap-2">
                   {images.map((src, i) => (
                     <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
@@ -1064,6 +1070,9 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addImages(e.target.files); e.target.value = "" }} />
               </div>
 
+              </SectionCard>
+
+              <SectionCard title="Listing" bodyClassName="space-y-4 p-4">
               <label className="flex flex-col gap-1"><span className="text-sm font-medium">Title</span>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Retro Sunset Comfort Colors Tee" />
               </label>
@@ -1095,10 +1104,12 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     even at 13/13, when nothing could be added. They were never about this
                     product either; the box above takes any keyword you want to type. */}
               </div>
+              </SectionCard>
             </div>
 
-            {/* RIGHT — what it's made on, and whether it makes money */}
+            {/* COLUMN 2 — what it's made on, and whether it makes money */}
             <div className="space-y-4">
+              <SectionCard title="Product & pricing" bodyClassName="space-y-4 p-4">
               <div className="space-y-1.5">
                 <div className="text-sm font-medium">Base product</div>
                 <ProductCombobox
@@ -1228,13 +1239,15 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   </dl>
                 )}
               </div>
-
+              </SectionCard>
             </div>
+
             {/* COLUMN 3 — WHERE IT GOES, and the button that sends it. Sticky, so the
                 shops and the action stay put however far down the copy you are. */}
             {/* top-20, not top-4: the app header is sticky and 64px tall, so a rail pinned
                 at 16px slides UNDER it and loses its first line — measured, not guessed. */}
-            <aside className="space-y-4 xl:sticky xl:top-20">
+            <aside className="xl:sticky xl:top-20">
+              <SectionCard title="Publish to" bodyClassName="space-y-4 p-4">
               {/* WHERE THIS GOES — the seller's connected shops.
                   One shop: a sentence, no checkbox. There is no choice to make, and a
                   single tick-box you must tick before publishing is ceremony.
@@ -1242,7 +1255,6 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   are two rows that differ by name — the case the old platform toggle
                   couldn't express at all. */}
               <div className="space-y-1.5">
-                <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Publish to</div>
                 {dests === null ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <CircleNotch size={12} className="animate-spin" /> Finding your shops…
@@ -1388,6 +1400,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 {pickedDests.some((d) => d.platform === "shopify") && " A Shopify store connected before publishing was supported must be reconnected first — Shopify grants the permission at connect time, not per request."}
                 {pickedDests.some((d) => d.dry_run) && " One shop is in dry-run mode: it will be validated and nothing will be sent."}
               </p>
+              </SectionCard>
             </aside>
           </div>
         )}

@@ -1035,7 +1035,7 @@ export function DispatchBoard() {
                             return (
                               <div key={t} className="flex items-center gap-2 text-xs">
                                 <Barcode size={12} className={"shrink-0 " + (picked ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")} />
-                                <span className="font-mono">{t}</span>
+                                <span className="tabular-nums">{t}</span>
                                 <span className="text-muted-foreground">{picked ? "picked" : "waiting"}</span>
                               </div>
                             )
@@ -1177,7 +1177,7 @@ export function DispatchBoard() {
                     {sentOut ? <DispStatus k="removed" label="Sent to partner" /> : <DispStatus k={d.key} label={d.label} />}
                   </span>
                   {o.tracking ? (
-                    <span className="truncate font-mono text-xs text-muted-foreground" title={o.tracking}>{o.tracking}</span>
+                    <span className="truncate text-xs tabular-nums text-muted-foreground" title={o.tracking}>{o.tracking}</span>
                   ) : (
                     // No label yet → give the action right here rather than a dead gap. Buys
                     // the label for this order (stopPropagation: the row is a <label>).
