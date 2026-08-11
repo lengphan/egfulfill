@@ -7,7 +7,7 @@ import { ArrowLeft, Package, PenNib, Tag } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
-import { sizesOf } from "@/lib/variant-resolve"
+import { sizesOf, methodsOf } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { descriptionLines } from "@/lib/description"
 
@@ -41,11 +41,22 @@ function galleryOf(p: CatalogProduct): string[] {
   return Array.from(set)
 }
 
-// Every technique this product supports, split out of its (often combined) method
-// string and de-duped. Shared with the variant pickers via lib/print-method so a method
-// is named identically everywhere.
+/**
+ * Every technique this product supports.
+ *
+ * Was a private re-derivation that read `method` and `methodPrices` but not the `methods`
+ * ARRAY some products carry, so this page and the order line disagreed about the same
+ * product. methodsOf is the one definition (lib/variant-resolve) and it reads all three;
+ * normalizeMethods puts the labels back into {key,label} for the tabs here.
+ *
+ * The DTG fallback stays: this page always shows a technique tab, and a product with
+ * nothing declared is shown the commonest one rather than an empty strip. That is a
+ * display default on a read-only page — it is deliberately NOT done anywhere an option is
+ * offered for selection, where inventing a method the product never claimed would put an
+ * unmakeable technique on an order.
+ */
 function techsOf(p: CatalogProduct): { key: string; label: string }[] {
-  const out = normalizeMethods([...Object.keys(p.methodPrices ?? {}), p.method])
+  const out = normalizeMethods(methodsOf(p))
   return out.length ? out : [{ key: "dtg", label: "DTG printing" }]
 }
 

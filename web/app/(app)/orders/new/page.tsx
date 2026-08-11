@@ -351,9 +351,22 @@ export default function NewOrderPage() {
               </label>
               <label className="hidden flex-col gap-1 sm:flex">
                 <span className="text-xs text-muted-foreground">Method</span>
-                {/* Always a dropdown: the product's own methods if any, else the standard
-                    technique list — a blank item is picked, never free-typed. */}
-                <VariantField compact className="h-9 text-xs" label="Method" value={l.method} options={l.methods.length ? l.methods : METHOD_LABELS} onChange={(v) => setLine(i, { method: v })} placeholder="Method" />
+                {/* EXACTLY WHAT THE BLANK OFFERS, once a blank has been picked.
+                    It used to fall back to the full standard list whenever the product
+                    declared none, so a blank that supports embroidery only could be ordered
+                    as DTG — an option the catalogue never claimed, priced by a surcharge
+                    that may not exist, and unmakeable on the floor. A product that lists no
+                    technique is a gap in the product, and the honest thing is to say so
+                    rather than to fill it in with all eight.
+                    The standard list still stands in for a line with NO blank picked, where
+                    there is no product to contradict — the same rule Colour and Size follow
+                    by falling back to free text. */}
+                <VariantField
+                  compact className="h-9 text-xs" label="Method" value={l.method}
+                  options={l.blank ? l.methods : METHOD_LABELS}
+                  emptyLabel="None on this blank"
+                  onChange={(v) => setLine(i, { method: v })} placeholder="Method"
+                />
               </label>
               <Button
                 variant="ghost"
