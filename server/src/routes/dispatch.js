@@ -157,6 +157,11 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   // like a real one: real-shaped tracking, a real PDF, a real-looking price, and no charge.
   // Null means "bought before we asked", which is not the same as false.
   q('alter table orders add column if not exists label_test boolean').catch(() => {});
+  // The number a refunded label USED to carry. Kept separately from `tracking` rather than
+  // left in it: `tracking` is what says this order is shipped and what blocks a replacement
+  // label from pushing to the marketplace, so it has to go — but the number itself is
+  // history, and a row that silently loses it reads as a row that lost the parcel.
+  q('alter table orders add column if not exists voided_tracking text').catch(() => {});
   q('alter table orders add column if not exists dispatch_pushed_at timestamptz').catch(() => {});
   q('alter table orders add column if not exists dispatch_error text').catch(() => {});
   // Scan provenance — who scanned a label out and via which channel (in-house / partner /
@@ -295,6 +300,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       `select o.id, o.seq, o.tracking, o.carrier, o.tracking_label_url,
               o.factory_status, o.delivery_status, o.delivery_detail, o.delivery_checked_at,
               o.label_scanned_at, o.scanned_via, o.created_at, o.ship_service, o.label_test,
+              o.voided_tracking,
               -- price from the order column if stored, else the label-cost ledger row (so
               -- labels bought before the column existed still show what they cost).
               coalesce(o.label_cost,
@@ -351,6 +357,10 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         id: x.id, num: x.seq ? '#' + x.seq : x.id,
         customer: x.customer || null, state: x.state || null,
         tracking: x.tracking, carrier: x.carrier || null,
+        // The number this label carried before it was refunded. The row shows it struck
+        // through — the parcel it named is gone, but the digits are still the answer to
+        // "what was that number", which is what a buyer holding it will ask.
+        voidedTracking: x.voided_tracking || null,
         labelUrl: x.tracking_label_url || null,
         method: x.ship_service || null,
         price: x.label_cost != null ? Number(x.label_cost) : null,
@@ -429,7 +439,13 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
      * REPLACEMENT label push cleanly, which is the best correction available — see the
      * note on pushMarketplaceTracking in orders.js.
      */
-    await q(`update orders set tracking_label_url=null, tracking=null, carrier=null,
+    // The number is REMEMBERED as it is cleared. Same statement, so it reads the old row:
+    // `tracking` empties because it is what asserts this order shipped, and `voided_tracking`
+    // keeps the digits because someone will still be asked "what was that number" — by a
+    // buyer holding it, or by the carrier. Losing state and losing the record are different
+    // things, and only the first one is wanted here.
+    await q(`update orders set voided_tracking=coalesce(nullif(tracking,''), voided_tracking),
+               tracking_label_url=null, tracking=null, carrier=null,
                label_ref=null, label_provider=null, label_scanned_at=null,
                marketplace_fulfilled_at=null
              where id=$1`, [id]).catch(() => {});

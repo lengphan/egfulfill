@@ -373,13 +373,18 @@ export function ShipmentsView() {
                           <div className="text-sm tabular-nums">{s.tracking}</div>
                           {s.carrier && <div className="text-2xs text-muted-foreground">{s.carrier}</div>}
                         </>
+                      ) : s.voidedTracking ? (
+                        // STRUCK THROUGH, NOT REMOVED. The parcel this named no longer
+                        // exists — which is why `tracking` itself is cleared, since that
+                        // field is what asserts the order shipped — but the digits are still
+                        // the answer to "what was that number", which is what a buyer
+                        // holding it will ask. The line through it IS the status; it needs
+                        // no sentence underneath repeating what the strike already says.
+                        <div className="text-sm tabular-nums text-muted-foreground line-through decoration-destructive/70">
+                          {s.voidedTracking}
+                        </div>
                       ) : (
-                        // A refund CLEARS the tracking number on purpose — the buyer must not
-                        // be left holding a dead one. Saying so is the difference between a
-                        // row that explains itself and a row that looks broken.
-                        <span className="text-xs text-muted-foreground">
-                          {(s.refunded ?? 0) > 0 ? "voided — no tracking" : "—"}
-                        </span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
                     {/* nowrap: "Ground Advantage" was breaking across two lines in a narrow
@@ -387,16 +392,17 @@ export function ShipmentsView() {
                         made the whole table look ragged. The table already scrolls
                         horizontally, so width here is cheaper than height on every row. */}
                     <td className="whitespace-nowrap px-3 py-2.5 text-xs">{s.method || <span className="text-muted-foreground">—</span>}</td>
+                    {/* Struck through when it came back, rather than carrying a "refunded
+                        $6.24" line underneath. The amount was the same number twice, and the
+                        row already says refunded twice over — the crossed-out tracking above
+                        and the crossed-out price here. A third statement of it is noise, and
+                        the totals live in the tile where they can be read at a glance. */}
                     <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums">
-                      {s.price != null ? `$${s.price.toFixed(2)}` : <span className="text-muted-foreground">—</span>}
-                      {/* Struck through, because the number above is still true — that IS what
-                          the label cost — it just came back. Hiding it would lose the fact
-                          that postage was spent at all. */}
-                      {(s.refunded ?? 0) > 0 && (
-                        <div className="text-2xs font-medium text-emerald-700 dark:text-emerald-400">
-                          refunded ${(s.refunded ?? 0).toFixed(2)}
-                        </div>
-                      )}
+                      {s.price != null ? (
+                        <span className={(s.refunded ?? 0) > 0 ? "text-muted-foreground line-through decoration-destructive/70" : ""}>
+                          ${s.price.toFixed(2)}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>}
                     </td>
                     {/* BOTH COLUMNS WERE ENTIRELY text-2xs — the smallest step on the page,
                         used for the value AND its caption, so nothing separated them and the

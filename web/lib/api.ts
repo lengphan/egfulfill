@@ -3543,6 +3543,9 @@ export type ShipmentRow = {
   refunded: number | null
   /** Bought on a TEST key: real-shaped tracking and price, never actually charged. */
   test: boolean
+  /** The number this label carried before it was refunded. `tracking` is cleared on a
+   *  refund because it is what asserts the order shipped; this keeps the digits. */
+  voidedTracking: string | null
   stage: string | null
   /** What the CARRIER says, as distinct from `stage` which is what the floor says. When
    *  they disagree, which one is wrong is the thing being worked out. */
