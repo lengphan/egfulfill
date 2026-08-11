@@ -3,6 +3,7 @@
 import { MagnifyingGlass, CaretDown, X, Check, FunnelSimple } from "@phosphor-icons/react"
 
 import { Input } from "@/components/ui/input"
+import { useLabelT } from "@/lib/i18n"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import {
@@ -89,6 +90,7 @@ export function OrderSearchInput({ query, onChange, className = "" }: {
   onChange: (q: OrderQuery) => void
   className?: string
 }) {
+  const tl = useLabelT()
   return (
     <div className={"relative " + className}>
       <MagnifyingGlass size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -98,10 +100,10 @@ export function OrderSearchInput({ query, onChange, className = "" }: {
         // Short: the full "order, customer, tracking or SKU" list truncated to "Search
         // order, customer, t", which reads as a broken field. What it searches is in the
         // title and the label, where it isn't clipped.
-        placeholder="Search orders…"
-        title="Search order number, customer, tracking, store, SKU or item name"
+        placeholder={tl("ui", "Search orders…")}
+        title={tl("ui", "Search order number, customer, tracking, store, SKU or item name")}
         className="h-9 rounded-md pl-8 text-sm"
-        aria-label="Search order number, customer, tracking, store, SKU or item name"
+        aria-label={tl("ui", "Search order number, customer, tracking, store, SKU or item name")}
       />
     </div>
   )
@@ -129,6 +131,7 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
   catalog?: CatalogProduct[]
   className?: string
 }) {
+  const tl = useLabelT()
   const facets = orderFacets(orders)
   const set = (patch: Partial<OrderQuery>) => onChange({ ...query, ...patch })
   const active = isOrderQueryActive(query)
@@ -161,7 +164,7 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
         }
       >
         <FunnelSimple size={14} weight="bold" />
-        Filters
+        {tl("ui", "Filters")}
         {facetCount > 0 && (
           <span className="rounded bg-primary px-1.5 text-2xs font-bold leading-[1.45] text-primary-foreground">{facetCount}</span>
         )}
@@ -170,13 +173,13 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
 
       <PopoverContent align="end" className="w-72 p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-semibold">Filters</span>
+          <span className="text-sm font-semibold">{tl("ui", "Filters")}</span>
           {active && (
             <button
               onClick={() => onChange({ ...EMPTY_ORDER_QUERY })}
               className="eg-tap inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              <X size={11} weight="bold" /> Clear{count > 1 ? ` (${count})` : ""}
+              <X size={11} weight="bold" /> {tl("ui", "Clear")}{count > 1 ? ` (${count})` : ""}
             </button>
           )}
         </div>
@@ -184,33 +187,33 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
         {/* Labelled rows, not a bare row of triggers: inside a panel there is room to say
             what each one narrows, which is exactly what the cramped toolbar could not. */}
         <div className="space-y-2">
-          <FilterRow label="List">
-            <FilterMenu label="List" anyLabel="All orders" value={query.ready} options={readyOptions} onPick={(v) => set({ ready: v })} />
+          <FilterRow label={tl("filter", "List")}>
+            <FilterMenu label={tl("filter", "List")} anyLabel={tl("filter", "All orders")} value={query.ready} options={readyOptions.map((o) => ({ ...o, label: tl("ready", o.label) }))} onPick={(v) => set({ ready: v })} />
           </FilterRow>
           {facets.platforms.length > 1 && (
-            <FilterRow label="Platform">
-              <FilterMenu label="Platform" anyLabel="All platforms" value={query.platform}
+            <FilterRow label={tl("filter", "Platform")}>
+              <FilterMenu label={tl("filter", "Platform")} anyLabel={tl("filter", "All platforms")} value={query.platform}
                 options={facets.platforms.map((p) => ({ value: p, label: p }))}
                 onPick={(v) => set({ platform: v })} />
             </FilterRow>
           )}
           {facets.stores.length > 1 && (
-            <FilterRow label="Shop">
-              <FilterMenu label="Shop" anyLabel="All shops" value={query.store}
+            <FilterRow label={tl("filter", "Shop")}>
+              <FilterMenu label={tl("filter", "Shop")} anyLabel={tl("filter", "All shops")} value={query.store}
                 options={facets.stores.map((x) => ({ value: x, label: x }))}
                 onPick={(v) => set({ store: v })} />
             </FilterRow>
           )}
           {facets.methods.length > 1 && (
-            <FilterRow label="Print">
-              <FilterMenu label="Print" anyLabel="All methods" value={query.method} options={facets.methods} onPick={(v) => set({ method: v })} />
+            <FilterRow label={tl("filter", "Print")}>
+              <FilterMenu label={tl("filter", "Print")} anyLabel={tl("filter", "All methods")} value={query.method} options={facets.methods} onPick={(v) => set({ method: v })} />
             </FilterRow>
           )}
           {/* Date is always offered — unlike the others it needs no data to be meaningful,
               and "what came in today" is the question a floor asks most. */}
-          <FilterRow label="Date">
-            <FilterMenu label="Date" anyLabel="Any time" value={query.days === null ? "" : String(query.days)}
-              options={DATE_RANGES.filter((r) => r.days !== null).map((r) => ({ value: String(r.days), label: r.label }))}
+          <FilterRow label={tl("filter", "Date")}>
+            <FilterMenu label={tl("filter", "Date")} anyLabel={tl("filter", "Any time")} value={query.days === null ? "" : String(query.days)}
+              options={DATE_RANGES.filter((r) => r.days !== null).map((r) => ({ value: String(r.days), label: tl("daterange", r.label) }))}
               onPick={(v) => set({ days: v === "" ? null : Number(v) })} />
           </FilterRow>
         </div>
@@ -232,21 +235,40 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
 /** The sentence an empty table should show, given what's narrowing it. Exported so every
  *  board says the same thing — and so "nothing here" is never confused with "nothing
  *  matches", which is the difference between a quiet day and a filter you forgot about. */
-export function emptyOrdersMessage(totalLoaded: number, q: OrderQuery, ctx: FilterContext = {}) {
-  if (totalLoaded === 0) return "No orders are in production yet."
-  if (!isOrderQueryActive(q)) return "No orders match this filter."
+/**
+ * Translators are passed IN rather than pulled from a hook, because this is a plain
+ * function called from a render body, not a component. `t` builds the composed sentence
+ * (it interpolates), `tl` translates the fixed ones and the filter names spliced into it.
+ * Both default to the identity, so a caller that hasn't been localised yet still gets
+ * English rather than a crash.
+ */
+type Tx = (key: string, vars?: Record<string, string | number>) => string
+type LabelTx = (ns: string, value: string) => string
+
+export function emptyOrdersMessage(
+  totalLoaded: number,
+  q: OrderQuery,
+  ctx: FilterContext = {},
+  t: Tx = (k) => k,
+  tl: LabelTx = (_ns, v) => v,
+) {
+  if (totalLoaded === 0) return tl("ui", "No orders are in production yet.")
+  if (!isOrderQueryActive(q)) return tl("ui", "No orders match this filter.")
   // Names every narrowing thing, including the stage — which used to be a separate flag and
   // so produced "No orders at this stage." while a search term nobody could see was also on.
   const bits: string[] = []
   if (q.text.trim()) bits.push(`“${q.text.trim()}”`)
-  if (q.status) bits.push(statusLabel(q.status))
-  if (q.ready) bits.push(readyLabel(q.ready).toLowerCase())
+  // The stage and List names have catalog entries already (the pills and the filter panel
+  // show the same words); platform, shop and print method are proper nouns / codes and are
+  // spliced in as they are.
+  if (q.status) bits.push(tl("stage", statusLabel(q.status)))
+  if (q.ready) bits.push(tl("ready", readyLabel(q.ready)).toLowerCase())
   if (q.platform) bits.push(q.platform)
   if (q.store) bits.push(q.store)
   if (q.method) bits.push(PRODUCT_METHODS.find((m) => m.key === q.method)?.label ?? q.method.toUpperCase())
-  if (q.days !== null) bits.push(dateRangeLabel(q.days).toLowerCase())
+  if (q.days !== null) bits.push(tl("daterange", dateRangeLabel(q.days)).toLowerCase())
   // A stock filter with no catalog loaded yet can only return nothing, and "no orders match
   // short on stock" would read as a fact about the orders rather than about the page.
-  if (q.ready.startsWith("stock:") && !ctx.catalog?.length) return "Blank stock hasn't loaded yet, so this filter can't be answered."
-  return `No orders match ${bits.join(" · ")}.`
+  if (q.ready.startsWith("stock:") && !ctx.catalog?.length) return t("ui.stockNotLoaded")
+  return t("ui.noOrdersMatch", { bits: bits.join(" · ") })
 }

@@ -32,7 +32,7 @@ import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
-import { useLabelT } from "@/lib/i18n"
+import { useT, useLabelT } from "@/lib/i18n"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
@@ -125,6 +125,8 @@ const addrToText = (a: ShipAddress): string =>
 /** One prior deliverable. Fuzzy hits carry how far off they are, so "similar" is never
  *  presented with the same confidence as "identical". */
 function MatchRow({ m, similar, onUse }: { m: ReuseMatch; similar?: boolean; onUse?: () => void }) {
+  const t = useT()
+  const tl = useLabelT()
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
       <div className="min-w-0">
@@ -135,12 +137,12 @@ function MatchRow({ m, similar, onUse }: { m: ReuseMatch; similar?: boolean; onU
       </div>
       {similar && m.distance != null && (
         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs font-medium text-muted-foreground">
-          {m.distance === 0 ? "near-identical" : `${m.distance}/64 different`}
+          {m.distance === 0 ? tl("ui", "near-identical") : t("ui.bitsDifferent", { n: m.distance })}
         </span>
       )}
       {onUse && (
-        <Button size="sm" variant="outline" className="shrink-0" onClick={onUse} title="Copy this file onto this order">
-          Use this file
+        <Button size="sm" variant="outline" className="shrink-0" onClick={onUse} title={tl("ui", "Copy this file onto this order")}>
+          {tl("ui", "Use this file")}
         </Button>
       )}
     </div>
@@ -205,6 +207,7 @@ function ageOf(iso: string | null | undefined): string {
 
 export function OrdersHub() {
   const router = useRouter()
+  const t = useT()
   const tl = useLabelT()
   const role = getUser()?.role || ""
   const isAdmin = role === "admin"
@@ -1048,10 +1051,10 @@ export function OrdersHub() {
     if (oid) loadFiles(oid, true)
   }), [loadFiles])
 
-  const subtitle = isAdmin
+  const subtitle = tl("ui", isAdmin
     ? "Every order across the team — production to shipping."
     : canFulfill ? "Receive, pack, and ship orders out the door."
-      : "Review artwork and drive orders through production."
+      : "Review artwork and drive orders through production.")
 
   return (
     <div className="space-y-4">
@@ -1060,7 +1063,7 @@ export function OrdersHub() {
       <div className="flex items-center gap-3 md:hidden">
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
         <div>
-          <h1 className="font-title text-2xl font-semibold tracking-tight">Orders</h1>
+          <h1 className="font-title text-2xl font-semibold tracking-tight">{tl("nav", "Orders")}</h1>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
       </div>
@@ -1075,10 +1078,13 @@ export function OrdersHub() {
             blocked on stock, because that share isn't the floor's to fix — pretending one
             number covers both audiences is how an overdue count gets ignored. */}
         <StatCard
-          label={tl("stat", `Overdue (${overdueDays}d+)`)} value={String(stats.overdue)}
-          sub={tl("stat", stats.overdue
-            ? (stats.overdueBlocked ? `${stats.overdueBlocked} waiting on stock` : "all workable now")
-            : "nothing late")}
+          // Both of these interpolate, so they go through t() with a var — a template
+          // literal can never match a useLabelT key, which is why this card's title and
+          // its blocked-count caption were the two that stayed English.
+          label={t("stat.overdueLabel", { days: overdueDays })} value={String(stats.overdue)}
+          sub={stats.overdue
+            ? (stats.overdueBlocked ? t("stat.waitingOnStock", { n: stats.overdueBlocked }) : tl("stat", "all workable now"))
+            : tl("stat", "nothing late")}
           tone={stats.overdue ? "neg" : undefined}
           onClick={() => jumpTo({ status: "overdue" })} active={jumpedTo({ status: "overdue" })}
         />
@@ -1107,14 +1113,14 @@ export function OrdersHub() {
         <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm">
           <PaperPlaneTilt size={16} weight="bold" className="mt-0.5 shrink-0 text-muted-foreground" />
           <span className="flex-1">{note}</span>
-          <button onClick={() => setNote(null)} className="shrink-0 font-medium text-muted-foreground underline underline-offset-2">Dismiss</button>
+          <button onClick={() => setNote(null)} className="shrink-0 font-medium text-muted-foreground underline underline-offset-2">{tl("ui", "Dismiss")}</button>
         </div>
       )}
       {actionErr && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
           <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />
           <span className="flex-1">{actionErr}</span>
-          <button onClick={() => setActionErr(null)} className="shrink-0 font-medium underline underline-offset-2">Dismiss</button>
+          <button onClick={() => setActionErr(null)} className="shrink-0 font-medium underline underline-offset-2">{tl("ui", "Dismiss")}</button>
         </div>
       )}
 
@@ -1190,7 +1196,7 @@ export function OrdersHub() {
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label="Choose which status pills to show"
-                title="Choose which status pills to show"
+                title={tl("ui", "Choose which status pills to show")}
                 className="eg-tap flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <Plus size={14} weight="bold" />
@@ -1199,7 +1205,7 @@ export function OrdersHub() {
                 {/* Label INSIDE the Group — Base UI's Menu.GroupLabel throws outside one,
                     which blanks the whole page rather than misrendering a heading. */}
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-2 py-1 text-2xs text-muted-foreground">Show these pills</DropdownMenuLabel>
+                  <DropdownMenuLabel className="px-2 py-1 text-2xs text-muted-foreground">{tl("ui", "Show these pills")}</DropdownMenuLabel>
                   {STATUS_PILLS.filter((p) => p.value).map((p) => {
                     const shown = !hiddenPills.includes(p.value)
                     return (
@@ -1255,7 +1261,7 @@ export function OrdersHub() {
               unknown rather than zero. {loadErr}
             </div>
             <button onClick={load} className="eg-tap mt-1 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent">
-              Try again
+              {tl("ui", "Try again")}
             </button>
           </div>
         ) : filtered.length === 0 ? (
@@ -1265,7 +1271,9 @@ export function OrdersHub() {
             {/* Names what's actually narrowing the list — "no matches for OLVERA-TEES ·
                 last 7 days" is recoverable, "Nothing here" over a filter you forgot you set
                 is not. */}
-            <div className="text-sm">{tl("ui", emptyOrdersMessage(orders.length, query, filterCtx))}</div>
+            {/* Already translated inside — it composes a sentence from the active filters,
+                so it takes the translators rather than returning a string to look up. */}
+            <div className="text-sm">{emptyOrdersMessage(orders.length, query, filterCtx, t, tl)}</div>
           </div>
         ) : (
           <>
@@ -1291,7 +1299,7 @@ export function OrdersHub() {
               {/* Unlabelled ×: without it there's no way out of a selection except
                   unticking every row. */}
               <button onClick={() => setSelected(new Set())}
-                className="text-muted-foreground hover:text-foreground" aria-label="Clear selection">
+                className="text-muted-foreground hover:text-foreground" aria-label={tl("ui", "Clear selection")}>
                 <X size={14} weight="bold" />
               </button>
               {pushMsg && (
@@ -1337,7 +1345,7 @@ export function OrdersHub() {
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => onColDrop(id)}
                   className="cursor-grab select-none truncate"
-                  title="Drag to reorder"
+                  title={tl("ui", "Drag to reorder")}
                 >
                   {tl("col", FACTORY_COLS[id].label)}
                 </span>
@@ -1404,8 +1412,8 @@ export function OrdersHub() {
                         type="button"
                         onClick={() => openTiktokLabel(o)}
                         disabled={ttLabel === o.id}
-                        title="Open the shipping label TikTok generated for this order"
-                        aria-label="Open TikTok label"
+                        title={tl("ui", "Open the shipping label TikTok generated for this order")}
+                        aria-label={tl("ui", "Open TikTok label")}
                         className="eg-tap shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
                       >
                         {ttLabel === o.id
@@ -1823,7 +1831,7 @@ export function OrdersHub() {
                             warehouse address (Settings › Platform), so it isn't shown or edited
                             here. The address is validated live — see the badge by the header. */}
                         <div className="space-y-2">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Ship to")}</div>
                           {/* Live validation status sits INSIDE the box, bottom-right. */}
                           <div className="relative">
                             <textarea
@@ -1838,8 +1846,8 @@ export function OrdersHub() {
                               className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                             />
                             <div className="pointer-events-none absolute bottom-2 right-2.5">
-                              {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking…</span>}
-                              {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-success"><CheckCircle size={12} weight="fill" /> Validated</span>}
+                              {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> {tl("ui", "Checking…")}</span>}
+                              {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {tl("ui", "Validated")}</span>}
                               {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
                             </div>
                           </div>
@@ -1850,25 +1858,25 @@ export function OrdersHub() {
                       {/* Package + service */}
                       <div className="flex flex-wrap items-end gap-2">
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Service</span>
+                          <span className="text-xs text-muted-foreground">{tl("ui", "Service")}</span>
                           <select value={pkg.mailClass} onChange={(e) => setPkg({ ...pkg, mailClass: e.target.value })} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                             {MAIL_CLASSES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                           </select>
                         </label>
                         <label className="flex w-20 flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">Weight oz</span>
+                          <span className="text-xs text-muted-foreground">{tl("ui", "Weight oz")}</span>
                           <Input type="number" min={1} value={pkg.weightOz} onChange={(e) => setPkg({ ...pkg, weightOz: Number(e.target.value) })} className="h-9" />
                         </label>
                         <label className="flex w-16 flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">L in</span>
+                          <span className="text-xs text-muted-foreground">{tl("ui", "L in")}</span>
                           <Input type="number" min={1} value={pkg.length} onChange={(e) => setPkg({ ...pkg, length: Number(e.target.value) })} className="h-9" />
                         </label>
                         <label className="flex w-16 flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">W in</span>
+                          <span className="text-xs text-muted-foreground">{tl("ui", "W in")}</span>
                           <Input type="number" min={1} value={pkg.width} onChange={(e) => setPkg({ ...pkg, width: Number(e.target.value) })} className="h-9" />
                         </label>
                         <label className="flex w-16 flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">H in</span>
+                          <span className="text-xs text-muted-foreground">{tl("ui", "H in")}</span>
                           <Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" />
                         </label>
                         {/* No ml-auto. This button buys a label FROM the five fields to its
@@ -1882,7 +1890,7 @@ export function OrdersHub() {
                           return (
                             <Button size="sm" onClick={() => buyLabel(o)} disabled={busy === `label:${o.id}` || unset > 0}
                               title={unset > 0 ? `${unset} item${unset === 1 ? "" : "s"} still ${unset === 1 ? "needs" : "need"} setup — pick every variant before buying a label.` : undefined}>
-                              {busy === `label:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Printer size={14} weight="bold" /> Buy USPS label</>}
+                              {busy === `label:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Printer size={14} weight="bold" /> {tl("ui", "Buy USPS label")}</>}
                             </Button>
                           )
                         })()}
@@ -1906,26 +1914,26 @@ export function OrdersHub() {
 
                       {/* Manual fallback — record a label bought elsewhere */}
                       <details className="rounded-lg border border-border bg-card">
-                        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted-foreground">Already have a label? Record tracking manually</summary>
+                        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted-foreground">{tl("ui", "Already have a label? Record tracking manually")}</summary>
                         <div className="flex flex-wrap items-end gap-2 border-t border-border p-3">
                           <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">Carrier</span>
+                            <span className="text-xs text-muted-foreground">{tl("ui", "Carrier")}</span>
                             <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                               {CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
                             </select>
                           </label>
                           <label className="flex flex-1 flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">Tracking number</span>
+                            <span className="text-xs text-muted-foreground">{tl("ui", "Tracking number")}</span>
                             <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" className="h-9" />
                           </label>
                           <Button size="sm" variant="outline" onClick={() => shipOrder(o)} disabled={busy === `ship:${o.id}`}>
-                            {busy === `ship:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Truck size={14} weight="bold" /> Mark shipped</>}
+                            {busy === `ship:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Truck size={14} weight="bold" /> {tl("ui", "Mark shipped")}</>}
                           </Button>
                         </div>
                       </details>
 
                       <div className="flex justify-end">
-                        <Button size="sm" variant="ghost" onClick={() => setShipOpen(null)}>Close</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShipOpen(null)}>{tl("ui", "Close")}</Button>
                       </div>
                     </div>
                   )}
@@ -1948,7 +1956,7 @@ export function OrdersHub() {
                     return (
                       <div className="mb-3 grid gap-3 rounded-lg border border-border bg-muted/30 p-3 text-xs sm:grid-cols-2">
                         <div>
-                          <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+                          <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Ship to")}</div>
                           {masked ? (
                             // Say WHICH it is: the address exists and is being withheld, not
                             // missing. Region is kept so a seller can still recognise the
@@ -1974,19 +1982,19 @@ export function OrdersHub() {
                               <div className="mt-1 text-3xs text-muted-foreground">{addressSourceLabel(o)}</div>
                             </div>
                           ) : (
-                            <div className="text-muted-foreground">Not available yet.</div>
+                            <div className="text-muted-foreground">{tl("ui", "Not available yet.")}</div>
                           )}
                         </div>
                         <div className="space-y-2">
                           {personal.length > 0 && (
                             <div>
-                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">Personalisation</div>
+                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Personalisation")}</div>
                               {personal.map((p, i) => <div key={i} className="leading-relaxed">{decodeEntities(p)}</div>)}
                             </div>
                           )}
                           {notes && (
                             <div>
-                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">Note</div>
+                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Note")}</div>
                               <div className="leading-relaxed">{notes}</div>
                             </div>
                           )}
@@ -2216,7 +2224,7 @@ export function OrdersHub() {
                                 disabled={busy === key}
                                 className={"eg-select h-8 shrink-0 rounded-lg border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-border bg-card hover:border-primary/40")}
                                 aria-label={`Status for ${it.name || it.sku}`}
-                                title="Set this item's status — forward or back"
+                                title={tl("ui", "Set this item's status — forward or back")}
                               >
                                 <optgroup label={tl("ui", "Production")}>
                                   {prod.map((s) => <option key={s.id || "new"} value={s.id}>{tl("stage", s.label)}</option>)}
@@ -2258,7 +2266,7 @@ export function OrdersHub() {
 
                 {reuse?.exact.length ? (
                   <div>
-                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Identical artwork</div>
+                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{tl("ui", "Identical artwork")}</div>
                     <div className="space-y-1.5">
                       {reuse.exact.map((m) => (
                     <MatchRow
@@ -2285,7 +2293,7 @@ export function OrdersHub() {
 
                 {reuse?.similar.length ? (
                   <div>
-                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Looks similar — confirm before reusing</div>
+                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{tl("ui", "Looks similar — confirm before reusing")}</div>
                     <div className="space-y-1.5">
                       {reuse.similar.map((m) => <MatchRow key={m.design_id} m={m} similar />)}
                     </div>
@@ -2293,12 +2301,12 @@ export function OrdersHub() {
                 ) : null}
               </div>
               <DialogFooter>
-                <Button variant="outline" size="sm" onClick={() => setReuse(null)}>Cancel</Button>
+                <Button variant="outline" size="sm" onClick={() => setReuse(null)}>{tl("ui", "Cancel")}</Button>
                 <Button
                   size="sm"
                   onClick={() => { const r = reuse; setReuse(null); if (r) sendToDesigner(r.order, r.item, true) }}
                 >
-                  Send to the board anyway
+                  {tl("ui", "Send to the board anyway")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -2422,15 +2430,15 @@ export function OrdersHub() {
             )
           })()}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCatchUp(null)} disabled={catchingUp}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCatchUp(null)} disabled={catchingUp}>{tl("ui", "Cancel")}</Button>
             <Button onClick={() => void runCatchUp()} disabled={catchingUp}>
-              {catchingUp ? <><CircleNotch size={14} className="animate-spin" /> Recording…</> : `Record all stages`}
+              {catchingUp ? <><CircleNotch size={14} className="animate-spin" /> {tl("ui", "Recording…")}</> : tl("ui", "Record all stages")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <p className="text-center text-xs text-muted-foreground">Stages: {FACTORY_STAGES.map((s) => s.label).join(" → ")}</p>
+      <p className="text-center text-xs text-muted-foreground">{tl("ui", "Stages")}: {FACTORY_STAGES.map((s) => tl("stage", s.label)).join(" → ")}</p>
 
     </div>
   )
