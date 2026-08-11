@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { extractDominant, hexToRgb, rgbToOklab } from "@/lib/thread-match"
 import { normalizeMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 import { packagingHint } from "@/lib/dim-weight"
+import { cleanSku } from "@/lib/sku"
 
 // Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
 // surcharges cannot drift apart again.
@@ -79,19 +80,36 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
 // Create/edit one catalog product. Colors/sizes are chips (with supplier-suggested picks),
 // pricing shows the live margin, and supplier-derived blanks pre-fill description + cost.
 export function ProductEditorDialog({
-  open, onOpenChange, product, onSave, newIdSeed, title, ctaLabel,
+  open, onOpenChange, product, onSave, newIdSeed, nextSku, title, ctaLabel,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   product: CatalogProduct | null
   onSave: (p: CatalogProduct) => void
   newIdSeed: number
+  /** The next free EG SKU, pre-filled for a NEW product. This dialog never set a sku at
+   *  all, which is why two catalogue rows carry none — and a product without one can't be
+   *  stocked, can't be resolved from an order line, and publishes a variant sku built on
+   *  an empty base. */
+  nextSku?: string
   /** Override the heading/CTA. A supplier import passes a product that does NOT exist
    *  yet, so the defaults ("Edit product" / "Save changes") would misdescribe it. */
   title?: string
   ctaLabel?: string
 }) {
   const [name, setName] = useState("")
+  // OURS and THEIRS — see lib/sku.ts. Only `sku` ever reaches a marketplace or a seller.
+  const [sku, setSku] = useState("")
+  /**
+   * Read through a ref, NOT a dependency of the seeding effect.
+   *
+   * nextSku changes when the catalogue finishes loading. As a dependency it would re-run
+   * the seed and wipe whatever had already been typed into an open form; as a ref it is
+   * simply the freshest suggestion at the moment a new product is started.
+   */
+  const nextSkuRef = useRef(nextSku)
+  useEffect(() => { nextSkuRef.current = nextSku }, [nextSku])
+  const [supplierSku, setSupplierSku] = useState("")
   const [type, setType] = useState("Apparel")
   // Managed types + their category mockups.
   const [types, setTypes] = useState<ProductType[]>([])
@@ -177,6 +195,10 @@ export function ProductEditorDialog({
     const p = product
     const id = setTimeout(() => {
       setName(p?.name ?? "")
+      // An existing product keeps its sku; a new one is offered the next free number, so
+      // the common case is "accept it and move on" rather than "invent one".
+      setSku(String(p?.sku ?? "") || (p ? "" : (nextSkuRef.current ?? "")))
+      setSupplierSku(String(p?.supplierSku ?? ""))
       setType(p?.type ?? "Apparel")
       setMethod(p?.method ?? "DTG")
       setProductCost(p?.productCost != null ? String(p.productCost) : "")
@@ -373,6 +395,10 @@ export function ProductEditorDialog({
       ...(product ?? {}),
       id: product?.id ?? genId(newIdSeed),
       name: name.trim(),
+      // Never blank: an untyped sku falls back to the pre-filled next one, because a
+      // product without a sku is one that silently can't be stocked or resolved.
+      sku: cleanSku(sku) || cleanSku(nextSku ?? "") || undefined,
+      supplierSku: supplierSku.trim() || undefined,
       type, method, status,
       // Product cost = supplier COGS; Base cost = what the seller is charged. Save both as
       // undefined when blank so the server derives base = productCost + markup rather than
@@ -450,6 +476,21 @@ export function ProductEditorDialog({
             </div>
             <div className="flex-1 space-y-2">
               <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
+              {/* TWO SKUS, and the labels say which is which — the whole point is that one
+                  of them never leaves the factory. Ours is pre-filled for a new product;
+                  theirs is optional and only exists for a blank we buy in. */}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-muted-foreground">Our SKU</span>
+                  <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="EG-1005" className="h-9 font-mono" />
+                  <span className="text-2xs text-muted-foreground">Stock is held against this, and the seller sees it on their listing.</span>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-muted-foreground">Supplier SKU</span>
+                  <Input value={supplierSku} onChange={(e) => setSupplierSku(e.target.value)} placeholder="optional" className="h-9 font-mono" />
+                  <span className="text-2xs text-muted-foreground">Never shown to sellers or published anywhere.</span>
+                </label>
+              </div>
               {/* Type + Status share the top row; Status used to sit alone far down the
                   form. Methods drop to their own full-width line below (see next block) so
                   the chips flow across the whole width instead of wrapping inside a cramped

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
+import { nextEgSku } from "@/lib/sku"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getCatalogProducts, saveCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
@@ -358,7 +359,7 @@ export function ProductsCatalog() {
       )}
 
       {isStaff && (
-        <ProductEditorDialog open={editorOpen} onOpenChange={setEditorOpen} product={editing} onSave={saveProduct} newIdSeed={(products?.length ?? 0) + 1000} />
+        <ProductEditorDialog open={editorOpen} onOpenChange={setEditorOpen} product={editing} onSave={saveProduct} newIdSeed={(products?.length ?? 0) + 1000} nextSku={nextEgSku(products ?? [])} />
       )}
     </div>
   )
