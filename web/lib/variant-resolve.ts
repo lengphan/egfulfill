@@ -9,6 +9,19 @@ export function variantSkusOf(p: CatalogProduct): string[] {
   const out: string[] = []
   const push = (s?: string | null) => { if (s) out.push(String(s).toUpperCase().trim()) }
   push(p.sku)
+  /**
+   * THE SUPPLIER'S OWN CODE, AS AN ALIAS — never as the identity.
+   *
+   * `sku` is ours ("EG-1001"); `supplierSku` is theirs ("103-713-031753A"). Orders placed
+   * before the split carry the supplier code, and listings published before it still quote
+   * it back at us when they sell. Dropping it from the match would strand every one of
+   * those lines — the alias is what makes the rename safe rather than a silent data loss.
+   *
+   * It is only ever READ here. Nothing publishes it, and the server strips it from a
+   * seller's copy of the product entirely (sellerSafe in catalog.js), so a seller's
+   * catalogue simply has no supplier code to match on — which is the intent.
+   */
+  push(p.supplierSku)
   for (const v of p.variantSkus ?? []) push(typeof v === "string" ? v : (v.sku ?? v.SKU))
   return out.filter(Boolean)
 }
@@ -17,7 +30,7 @@ export function resolveProduct(item: OrderItem, catalog: CatalogProduct[]): Cata
   const blank = String(item.blank || "").trim().toLowerCase()
   if (blank) {
     const hit = catalog.find((p) =>
-      [p.name, p.sku, p.id].some((v) => v != null && String(v).trim().toLowerCase() === blank))
+      [p.name, p.sku, p.supplierSku, p.id].some((v) => v != null && String(v).trim().toLowerCase() === blank))
     if (hit) return hit
   }
   const s = String(item.sku || "").toUpperCase().trim()

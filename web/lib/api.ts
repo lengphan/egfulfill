@@ -616,7 +616,14 @@ export type CatalogProduct = {
    *  base_price, which is what an order actually charges. */
   inCatalog?: boolean
   catalogPrice?: number | null
+  /** OURS — "EG-1001". Inventory is keyed on it, an order line resolves to it, and publish
+   *  writes it onto the seller's listing, where the seller reads it as their product SKU. */
   sku?: string
+  /** THEIRS — the supplier's own style number. Factory-only: the server strips it from a
+   *  seller's copy (sellerSafe in catalog.js), because a code that identifies the supplier
+   *  lets anyone buy the same blank without us (§2.8). Matched as an ALIAS when resolving
+   *  older order lines, never published. */
+  supplierSku?: string
   type?: string
   method?: string
   /** Some products carry their techniques as a LIST rather than a joined `method` string —

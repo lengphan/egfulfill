@@ -33,6 +33,21 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    */
   q('alter table catalog_products add column if not exists in_catalog boolean not null default false').catch(() => {});
   q('alter table catalog_products add column if not exists catalog_price numeric(12,2)').catch(() => {});
+  /**
+   * TWO SKUS, AND ONLY ONE OF THEM EVER LEAVES THE BUILDING.
+   *
+   *   sku           OURS — "EG-1001". What inventory is keyed on, what an order line
+   *                 resolves to, and what publish writes onto the seller's listing. The
+   *                 seller reads it as their product's SKU, which is the point.
+   *   supplier_sku  THEIRS — "103-713-031753A". Factory-only, stripped by sellerSafe.
+   *
+   * It used to be one field holding the SUPPLIER's style number, and publish sends the
+   * blank's sku as sku_base — so Otto's own style number was being written onto sellers'
+   * Etsy and Shopify listings (published_listings still records blank_sku=103-713-031753A
+   * on four of them). Anyone who can read that number can find the supplier and buy the
+   * same blank without us, which is §2.8 exactly.
+   */
+  q('alter table catalog_products add column if not exists supplier_sku text').catch(() => {});
 
   // What one unit of a spec costs us to make + ship. Powers the margin readout in the
   // publish dialog, using the SAME pricing path that bills an order.
@@ -49,7 +64,10 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
   // call site, so a new consumer can't reintroduce the leak.
   const sellerSafe = (data) => {
     if (!data || typeof data !== 'object') return data;
-    const { productCost, product_cost, ...rest } = data;
+    // supplierSku goes with the cost: both name who makes this and what they charge, and
+    // both are stripped on the way OUT rather than at each call site, so a new consumer
+    // can't reintroduce the leak.
+    const { productCost, product_cost, supplierSku, supplier_sku, ...rest } = data;
     if (Array.isArray(rest.sizePrices)) {
       rest.sizePrices = rest.sizePrices.map((t) => {
         if (!t || typeof t !== 'object') return t;
@@ -1171,14 +1189,16 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         }
       }
       await q(
-        `insert into catalog_products (id, name, sku, type, method, status, base_price, price, main_color, data, updated_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+        `insert into catalog_products (id, name, sku, supplier_sku, type, method, status, base_price, price, main_color, data, updated_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
          on conflict (id) do update set
-           name=excluded.name, sku=excluded.sku, type=excluded.type, method=excluded.method,
+           name=excluded.name, sku=excluded.sku, supplier_sku=excluded.supplier_sku,
+           type=excluded.type, method=excluded.method,
            status=excluded.status, base_price=excluded.base_price, price=excluded.price,
            main_color=excluded.main_color, data=excluded.data, updated_at=now()`,
         [
-          id, p.name || '', p.sku || null, p.type || null, p.method || null,
+          id, p.name || '', p.sku || null, p.supplierSku || p.supplier_sku || null,
+          p.type || null, p.method || null,
           p.status || 'Active', Number(p.basePrice ?? p.base_price ?? 0) || 0,
           Number(p.price ?? 0) || 0, p.mainColor || p.main_color || null, p
         ]
