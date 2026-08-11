@@ -1030,11 +1030,12 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 bodyClassName="space-y-3 p-4"
               >
               <div className="space-y-1.5">
-                {/* More columns as the card widens. Four across a full-width column makes
-                    each thumbnail ~170px, so seven photos filled half a screen — these are
-                    for recognising a shot, not viewing it (the reference tiles open full
-                    size on click). */}
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
+                {/* Sized by a MINIMUM WIDTH, not a column count. A fixed 4-across made each
+                    tile ~170px in a full-width column (seven photos filled half a screen);
+                    a fixed 6-across made them postage stamps when a listing has one or two.
+                    auto-fill at 10rem keeps a thumbnail recognisable at any count and wraps
+                    when there are enough to need it. */}
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2">
                   {images.map((src, i) => (
                     <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1279,7 +1280,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     Connect one under <a href="/stores" className="font-medium text-primary hover:underline">Stores</a>.
                   </div>
                 ) : dests.length === 1 ? (
-                  <div className="flex flex-wrap items-center gap-x-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
                     <span className="font-medium">{dests[0].shop_name}</span>
                     <span className="text-xs text-muted-foreground">· {dests[0].platform_label}</span>
                     {dests[0].dry_run && (
@@ -1293,8 +1294,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                       return (
                         <label
                           key={d.connection_id}
-                          className={"flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors " +
-                            (on ? "border-primary/40 bg-primary/5" : "border-border hover:border-primary/30")}
+                          className={"flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors " +
+                            (on ? "bg-primary/5 text-primary" : "hover:bg-muted/60")}
                         >
                           <input
                             type="checkbox"
