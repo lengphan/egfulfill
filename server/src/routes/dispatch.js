@@ -281,14 +281,27 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
               coalesce(o.label_cost,
                 (select -sum(w.delta) from wallet_ledger w where w.type='label-cost' and w.ref='label-'||o.id)
               )::float as label_cost,
+              -- What came BACK. A void books a positive label-cost row under a 'label-void-'
+              -- ref (see the void route below), so the refund is already recorded — it just
+              -- had no way to reach the screen, which is why a voided label looked exactly
+              -- like a live one and its postage looked like money still spent.
+              (select sum(w.delta) from wallet_ledger w
+                where w.type='label-cost' and w.ref='label-void-'||o.id)::float as label_refund,
               o.customer->>'name' as customer, o.address->>'state' as state
          from orders o
          ${where}
         order by coalesce(o.label_scanned_at, o.created_at) desc
         limit $${args.length}`, args);
     // Total label spend (all time), for the page's stat tile — straight off the ledger.
-    const spend = await q("select coalesce(-sum(delta),0)::float as total from wallet_ledger where type='label-cost'")
-      .then((x) => (x.rows[0] || {}).total || 0).catch(() => 0);
+    // Gross and refunded are reported SEPARATELY rather than netted: "we spent $65.90" and
+    // "we spent $71.90 and got $6 back" are different facts about how the week went, and a
+    // single net figure hides the second one entirely. The screen does the subtraction.
+    const totals = await q(
+      `select coalesce(-sum(delta) filter (where ref not like 'label-void-%'), 0)::float as spend,
+              coalesce( sum(delta) filter (where ref like 'label-void-%'), 0)::float as refunded
+         from wallet_ledger where type='label-cost'`)
+      .then((x) => x.rows[0] || {}).catch(() => ({}));
+    const spend = totals.spend || 0;
     // Fill in any missing label fees in the background. It runs off the critical path so the
     // list returns immediately; when it recovers anything, a live 'orders' event nudges the
     // page to reload and the newly-priced rows appear on their own. Converges to nothing —
@@ -297,6 +310,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     recoverLabelCosts(50).then((res) => { if (res && res.updated) egBroadcast({ type: 'orders' }); }).catch(() => {});
     return {
       labelSpend: spend,
+      labelRefunded: totals.refunded || 0,
       shipments: r.rows.map((x) => ({
         id: x.id, num: x.seq ? '#' + x.seq : x.id,
         customer: x.customer || null, state: x.state || null,
@@ -304,6 +318,10 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         labelUrl: x.tracking_label_url || null,
         method: x.ship_service || null,
         price: x.label_cost != null ? Number(x.label_cost) : null,
+        // > 0 means this label was voided and the postage credited back. Kept as the AMOUNT
+        // rather than a boolean: "voided" and "voided, $6.24 back" answer different questions,
+        // and a refund that came back short is the one worth seeing.
+        refunded: x.label_refund != null ? Number(x.label_refund) : null,
         stage: x.factory_status || null,
         // Two DIFFERENT facts, kept apart on purpose: `stage` is what the floor says,
         // `delivery` is what the carrier says. They disagree, and which one is wrong is

@@ -2398,7 +2398,7 @@ export type EtsyConfig = {
 /** Etsy's own declaration of who physically made the item. The seller's statement about
  *  their shop — always send it explicitly rather than letting the server fall back. */
 export type EtsyWhoMade = "i_did" | "someone_else" | "collective"
-export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string; who_made?: EtsyWhoMade }) {
+export function publishEtsy(body: { connection_id?: string; title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string; who_made?: EtsyWhoMade }) {
   // `primary_image` is Etsy's OWN url for the cover photo after upload. Prefer it over the
   // source we sent: a local upload is a multi-megabyte data: URL, and storing that as a
   // card thumbnail put a base64 blob in the database on every publish.
@@ -2414,14 +2414,47 @@ export function getEtsyConnections() {
 // TIKTOK_PUBLISH_LIVE flag is set — a dry run returns the assembled `payload` for review.
 export type TiktokCategory = { id: string; local_name?: string; is_leaf?: boolean; parent_id?: string; permission_statuses?: string[] }
 export type TiktokWarehouse = { id: string; name?: string; type?: string; sub_type?: string }
-export function getTiktokCategories(keyword?: string) {
-  const qs = keyword ? `?keyword=${encodeURIComponent(keyword)}` : ""
-  return api<{ categories?: TiktokCategory[]; error?: string }>(`/api/tiktok/categories${qs}`)
+/**
+ * WHERE A PRODUCT CAN BE PUBLISHED — one row per connected SHOP, not per platform.
+ *
+ * The dialog used to hardcode three tabs, which states which integrations exist rather
+ * than where this seller can actually send a listing. A seller with one Etsy shop saw two
+ * tabs they could never use; a seller with two Etsy shops could only reach the first.
+ * Render this array and all of those cases are just lengths.
+ */
+export type PublishDestination = {
+  connection_id: string
+  platform: "etsy" | "tiktok" | "shopify"
+  platform_label: string
+  shop_name: string
+  shop_id: string
+  connected_at?: string
+  /** What this shop needs beyond the shared fields. Empty for Etsy and Shopify, which is
+   *  why ticking one of those adds no work. */
+  extra_fields: string[]
+  /** Publishing here creates nothing yet — said on the row, not discovered afterwards. */
+  dry_run: boolean
 }
-export function getTiktokWarehouses() {
-  return api<{ warehouses?: TiktokWarehouse[]; error?: string }>(`/api/tiktok/warehouses`)
+export function getPublishDestinations() {
+  return api<{ destinations: PublishDestination[] }>(`/api/publish/destinations`)
+}
+
+// Both are read against a SHOP's cipher, so they take the connection they're filling in
+// for. Omitted, the server falls back to the caller's first TikTok shop as before.
+export function getTiktokCategories(keyword?: string, connectionId?: string) {
+  const qs = new URLSearchParams()
+  if (keyword) qs.set("keyword", keyword)
+  if (connectionId) qs.set("connection_id", connectionId)
+  const s = qs.toString()
+  return api<{ categories?: TiktokCategory[]; error?: string }>(`/api/tiktok/categories${s ? `?${s}` : ""}`)
+}
+export function getTiktokWarehouses(connectionId?: string) {
+  const qs = connectionId ? `?connection_id=${encodeURIComponent(connectionId)}` : ""
+  return api<{ warehouses?: TiktokWarehouse[]; error?: string }>(`/api/tiktok/warehouses${qs}`)
 }
 export function publishTiktok(body: {
+  /** Which connected shop this goes to. Omitted → the caller's first TikTok shop. */
+  connection_id?: string
   title: string; description?: string; price: number; quantity?: number
   images?: string[]; tags?: string[]
   colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>
@@ -2601,6 +2634,7 @@ export function getEtsyListingImages(listingId: string | number) {
  * rather than failing generically.
  */
 export function publishShopify(body: {
+  connection_id?: string
   title: string; description?: string; price?: number | string | null
   tags?: string[]; images?: string[]
   colors?: string[]; sizes?: string[]
@@ -3479,6 +3513,8 @@ export type ShipmentRow = {
   tracking: string; carrier: string | null; labelUrl: string | null
   /** Shipping service (e.g. "USPS Ground Advantage"), and what the label cost. */
   method: string | null; price: number | null
+  /** Postage credited back by a void, as an amount. Null/0 = never voided. */
+  refunded: number | null
   stage: string | null
   /** What the CARRIER says, as distinct from `stage` which is what the floor says. When
    *  they disagree, which one is wrong is the thing being worked out. */
@@ -3489,7 +3525,7 @@ export function getShipments(p: { search?: string; limit?: number } = {}) {
   const s = new URLSearchParams()
   if (p.search) s.set("search", p.search)
   if (p.limit) s.set("limit", String(p.limit))
-  return api<{ shipments: ShipmentRow[]; labelSpend?: number }>(`/api/shipments?${s.toString()}`)
+  return api<{ shipments: ShipmentRow[]; labelSpend?: number; labelRefunded?: number }>(`/api/shipments?${s.toString()}`)
 }
 // Void/refund a bought label — cancels it with the carrier AND credits the label cost
 // back in the ledger (so it shows in Billing under the carrier). Staff only, server-side.

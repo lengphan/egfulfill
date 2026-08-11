@@ -39,6 +39,29 @@ const DELIVERY: Record<string, { label: string; cls: string }> = {
 const when = (s: string | null) =>
   s ? new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null
 
+/**
+ * The status filter, as the questions someone actually arrives with.
+ *
+ * Not one pill per DELIVERY key: "Returning" and "Failed" are the same job (a parcel that
+ * needs a human) and splitting them makes you check two pills to ask one question. And
+ * "Not checked" is a pill in its own right because a null delivery is NOT a state the
+ * carrier reported — it's us never having asked, which is the difference between a quiet
+ * parcel and an unmonitored one.
+ *
+ * Refunded is here rather than in its own control because it answers the same shape of
+ * question — "which of these is in what state" — and it is the only one that is about
+ * money rather than movement, which the amount column already shows.
+ */
+const FILTERS: { key: string; label: string; match: (s: ShipmentRow) => boolean }[] = [
+  { key: "all", label: "All", match: () => true },
+  { key: "in_transit", label: "In transit", match: (s) => s.delivery === "in_transit" },
+  { key: "awaiting_pickup", label: "Not collected", match: (s) => s.delivery === "awaiting_pickup" },
+  { key: "delivered", label: "Delivered", match: (s) => s.delivery === "delivered" },
+  { key: "problem", label: "Needs a look", match: (s) => s.delivery === "returned" || s.delivery === "failed" },
+  { key: "unchecked", label: "Not checked", match: (s) => !s.delivery },
+  { key: "refunded", label: "Refunded", match: (s) => (s.refunded ?? 0) > 0 },
+]
+
 /** Who recorded the scan. Worth naming rather than a bare tick: the three routes carry
  *  different weight, and only one of them is the carrier's own word. */
 const VIA: Record<string, string> = {
@@ -50,6 +73,8 @@ const VIA: Record<string, string> = {
 export function ShipmentsView() {
   const [rows, setRows] = useState<ShipmentRow[] | null>(null)
   const [spend, setSpend] = useState(0)
+  const [refunded, setRefunded] = useState(0)
+  const [status, setStatus] = useState("all")
   const [q, setQ] = useState("")
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -60,18 +85,21 @@ export function ShipmentsView() {
     if (!getUser()) { setRows([]); return }
     setBusy(true)
     getShipments({ search: search?.trim() || undefined, limit: 300 })
-      .then((r) => { setRows(r.shipments ?? []); setSpend(r.labelSpend ?? 0); setErr(null) })
+      .then((r) => { setRows(r.shipments ?? []); setSpend(r.labelSpend ?? 0); setRefunded(r.labelRefunded ?? 0); setErr(null) })
       .catch((e: Error) => { setErr(e.message); setRows([]) })
       .finally(() => setBusy(false))
   }, [])
 
   // Client-side CSV of what's on screen — reconciles against the label-cost ledger in Billing.
+  // WHAT'S ON SCREEN means the filtered list: exporting all 200 rows from under a "Needs a
+  // look: 3" pill hands back a file that answers a question nobody asked. Refunded is a
+  // column of its own so the sheet can net out without re-deriving it from the void log.
   const exportCsv = () => {
-    const r = rows ?? []
+    const r = shown
     if (!r.length) return
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`
-    const head = ["Order", "Customer", "State", "Tracking", "Carrier", "Method", "Price", "Stage", "Delivery", "Scanned at"]
-    const lines = [head.join(","), ...r.map((s) => [s.num, s.customer, s.state, s.tracking, s.carrier, s.method, s.price != null ? s.price.toFixed(2) : "", s.stage, s.delivery, s.scannedAt].map(esc).join(","))]
+    const head = ["Order", "Customer", "State", "Tracking", "Carrier", "Method", "Price", "Refunded", "Stage", "Delivery", "Scanned at"]
+    const lines = [head.join(","), ...r.map((s) => [s.num, s.customer, s.state, s.tracking, s.carrier, s.method, s.price != null ? s.price.toFixed(2) : "", (s.refunded ?? 0) > 0 ? (s.refunded ?? 0).toFixed(2) : "", s.stage, s.delivery, s.scannedAt].map(esc).join(","))]
     const blob = new Blob([lines.join("\n")], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -116,6 +144,15 @@ export function ShipmentsView() {
     finally { setVoiding(null) }
   }
 
+  // Filtered in the browser, not refetched. The list is already capped at 200 rows and the
+  // search box is what narrows the SET; these pills narrow the VIEW of it, so making them a
+  // round trip would put a spinner between a question and an answer that is already here.
+  // Plain, not useMemo: the React Compiler refuses to optimize a component whose manual
+  // memoization it can't preserve, and it can't preserve a memo that closes over a function
+  // looked up out of a table. Filtering 200 rows costs nothing; losing compiler
+  // optimization on the whole component to protect that cost is the bad trade.
+  const shown = (rows ?? []).filter((FILTERS.find((x) => x.key === status) ?? FILTERS[0]).match)
+
   const counts = useMemo(() => {
     const r = rows ?? []
     return {
@@ -134,14 +171,29 @@ export function ShipmentsView() {
         <div className="flex items-center gap-3">
           {busy && <CircleNotch size={14} className="animate-spin text-muted-foreground" />}
           <span className="text-xs text-muted-foreground">
-            {err ? "count unknown" : `${counts.total} shown`}
+            {/* Says which number it is. "12 shown" under an active filter, next to a total
+                of 200, otherwise reads as the whole list having shrunk. */}
+            {err ? "count unknown" : status === "all" ? `${counts.total} shown` : `${shown.length} of ${counts.total}`}
             {/* Only surfaced when non-zero. A row of zeroes reads as a dashboard; these are
                 here to be acted on, and "0 need attention" is noise. */}
             {counts.stuck > 0 && ` · ${counts.stuck} not collected`}
             {counts.problem > 0 && ` · ${counts.problem} need attention`}
           </span>
           {spend > 0 && (
-            <span className="text-xs"><span className="text-muted-foreground">Label spend </span><span className="font-semibold tabular-nums">${spend.toFixed(2)}</span></span>
+            <span className="text-xs">
+              <span className="text-muted-foreground">Label spend </span>
+              <span className="font-semibold tabular-nums">${spend.toFixed(2)}</span>
+              {/* Only when there IS one. "refunded $0.00" beside every total is a column of
+                  zeroes pretending to be information, and it buries the case that matters. */}
+              {refunded > 0 && (
+                <>
+                  <span className="text-muted-foreground"> · refunded </span>
+                  <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">${refunded.toFixed(2)}</span>
+                  <span className="text-muted-foreground"> · net </span>
+                  <span className="font-semibold tabular-nums">${(spend - refunded).toFixed(2)}</span>
+                </>
+              )}
+            </span>
           )}
           <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows || rows.length === 0}>
             <DownloadSimple size={14} weight="bold" /> Export CSV
@@ -167,6 +219,32 @@ export function ShipmentsView() {
             className="h-9 w-80 pl-8"
           />
         </div>
+        {/* Each pill carries its own count, so the answer to "is anything stuck?" is on
+            screen before you click anything. A pill with nothing behind it is disabled
+            rather than hidden — a filter that appears and disappears as data changes is a
+            moving target, and "Needs a look: 0" is the good news worth being able to read. */}
+        <div className="flex flex-wrap gap-1.5">
+          {FILTERS.map((f) => {
+            const n = f.key === "all" ? (rows ?? []).length : (rows ?? []).filter(f.match).length
+            const on = status === f.key
+            return (
+              <button
+                key={f.key}
+                onClick={() => setStatus(f.key)}
+                disabled={!on && n === 0 && f.key !== "all"}
+                className={
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40 " +
+                  (on
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground")
+                }
+              >
+                {f.label}
+                <span className={"ml-1.5 tabular-nums " + (on ? "opacity-80" : "opacity-60")}>{n}</span>
+              </button>
+            )
+          })}
+        </div>
         {q && <Button size="sm" variant="ghost" onClick={() => setQ("")}>Clear</Button>}
       </div>
 
@@ -178,23 +256,28 @@ export function ShipmentsView() {
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
           <CircleNotch size={16} className="animate-spin" /> Loading shipments…
         </div>
-      ) : rows.length === 0 ? (
-        // THREE different nothings, and they must not look alike: the read failed, the
-        // search matched nothing, or there genuinely are no parcels. The failure case was
-        // printing "No parcel has a tracking number yet" underneath its own error banner —
-        // asserting a fact about the data while saying we couldn't read the data.
+      ) : shown.length === 0 ? (
+        // FOUR different nothings, and they must not look alike: the read failed, the search
+        // matched nothing, the status filter matched nothing, or there genuinely are no
+        // parcels. The failure case was printing "No parcel has a tracking number yet"
+        // underneath its own error banner — asserting a fact about the data while saying we
+        // couldn't read the data. The filter case is new and is the one most likely to be
+        // misread as "nothing shipped": there ARE rows, just none in this state.
         <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
           <Package size={26} weight="duotone" className="opacity-50" />
           <p className="text-sm">
             {err
               ? "Couldn't read shipments, so this list isn't empty — it's unknown."
-              : q ? `Nothing matches “${q}”.`
-                : "No parcel has a tracking number yet."}
+              : rows.length > 0
+                ? `None of the ${rows.length} shipments here are ${(FILTERS.find((f) => f.key === status)?.label ?? "").toLowerCase()}.`
+                : q ? `Nothing matches “${q}”.`
+                  : "No parcel has a tracking number yet."}
           </p>
           {err
             ? <Button size="sm" variant="outline" onClick={() => load(q)}>Try again</Button>
-            : q ? <Button size="sm" variant="outline" onClick={() => setQ("")}>Show all</Button>
-              : null}
+            : rows.length > 0 ? <Button size="sm" variant="outline" onClick={() => setStatus("all")}>Show all statuses</Button>
+              : q ? <Button size="sm" variant="outline" onClick={() => setQ("")}>Show all</Button>
+                : null}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -212,21 +295,35 @@ export function ShipmentsView() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((s) => {
+              {shown.map((s) => {
                 const d = s.delivery ? DELIVERY[s.delivery] : null
                 return (
                   <tr key={s.id} className="border-b border-border/60 last:border-0 hover:bg-accent/40">
-                    <td className="whitespace-nowrap px-5 py-2.5 font-mono text-xs">{s.num}</td>
+                    {/* An order number is the thing you read first and read most, so it gets
+                        the body font at body size. Mono at text-xs was two handicaps at once:
+                        a narrower face AND the smallest step on the page. tabular-nums keeps
+                        the digits in a column, which is the only part mono was earning. */}
+                    <td className="whitespace-nowrap px-5 py-2.5 text-sm font-semibold tabular-nums">{s.num}</td>
                     <td className="px-3 py-2.5">
                       <div className="max-w-[14rem] truncate">{s.customer ?? "—"}</div>
                       {s.state && <div className="text-2xs text-muted-foreground">{s.state}</div>}
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="font-mono text-xs">{s.tracking}</div>
+                      <div className="text-sm tabular-nums">{s.tracking}</div>
                       {s.carrier && <div className="text-2xs text-muted-foreground">{s.carrier}</div>}
                     </td>
                     <td className="px-3 py-2.5 text-xs">{s.method || <span className="text-muted-foreground">—</span>}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums">{s.price != null ? `$${s.price.toFixed(2)}` : <span className="text-muted-foreground">—</span>}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums">
+                      {s.price != null ? `$${s.price.toFixed(2)}` : <span className="text-muted-foreground">—</span>}
+                      {/* Struck through, because the number above is still true — that IS what
+                          the label cost — it just came back. Hiding it would lose the fact
+                          that postage was spent at all. */}
+                      {(s.refunded ?? 0) > 0 && (
+                        <div className="text-2xs font-medium text-emerald-700 dark:text-emerald-400">
+                          refunded ${(s.refunded ?? 0).toFixed(2)}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5">
                       {d ? (
                         <span className={"rounded px-1.5 py-0.5 text-2xs font-medium " + d.cls}>{d.label}</span>
