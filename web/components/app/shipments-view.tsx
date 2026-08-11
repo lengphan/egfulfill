@@ -326,8 +326,12 @@ export function ShipmentsView() {
                 <th className="px-3 py-2 font-medium">Tracking</th>
                 <th className="px-3 py-2 font-medium">Method</th>
                 <th className="px-3 py-2 text-right font-medium">Price</th>
-                <th className="px-3 py-2 font-medium">Carrier says</th>
-                <th className="px-3 py-2 font-medium">Scan</th>
+                {/* "Carrier says" was written to keep it distinct from the floor's own
+                    stage — a real distinction, but the column header is the wrong place to
+                    argue it, and it read as a sentence fragment. The badge below already
+                    says whose claim it is by being the carrier's vocabulary. */}
+                <th className="whitespace-nowrap px-4 py-2 font-medium">Delivery status</th>
+                <th className="whitespace-nowrap px-4 py-2 font-medium">Pre-scan</th>
                 <th className="px-3 py-2 text-right font-medium">Label</th>
               </tr>
             </thead>
@@ -358,7 +362,11 @@ export function ShipmentsView() {
                       <div className="text-sm tabular-nums">{s.tracking}</div>
                       {s.carrier && <div className="text-2xs text-muted-foreground">{s.carrier}</div>}
                     </td>
-                    <td className="px-3 py-2.5 text-xs">{s.method || <span className="text-muted-foreground">—</span>}</td>
+                    {/* nowrap: "Ground Advantage" was breaking across two lines in a narrow
+                        cell, which set the height of every row that had a service name and
+                        made the whole table look ragged. The table already scrolls
+                        horizontally, so width here is cheaper than height on every row. */}
+                    <td className="whitespace-nowrap px-3 py-2.5 text-xs">{s.method || <span className="text-muted-foreground">—</span>}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums">
                       {s.price != null ? `$${s.price.toFixed(2)}` : <span className="text-muted-foreground">—</span>}
                       {/* Struck through, because the number above is still true — that IS what
@@ -370,26 +378,31 @@ export function ShipmentsView() {
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2.5">
+                    {/* BOTH COLUMNS WERE ENTIRELY text-2xs — the smallest step on the page,
+                        used for the value AND its caption, so nothing separated them and the
+                        pair read as one grey clump. The value moves up to text-xs and the
+                        caption stays small, which is what makes it a caption. px-4 and a
+                        nowrap date do the rest; the date was wrapping inside its cell. */}
+                    <td className="whitespace-nowrap px-4 py-2.5">
                       {d ? (
-                        <span className={"rounded px-1.5 py-0.5 text-2xs font-medium " + d.cls}>{d.label}</span>
+                        <span className={"inline-block rounded px-2 py-1 text-xs font-medium " + d.cls}>{d.label}</span>
                       ) : (
                         // Never blank. "Not checked" and "checked, nothing yet" are
                         // different facts and the difference decides whether to chase.
-                        <span className="text-2xs text-muted-foreground">Not checked</span>
+                        <span className="text-xs text-muted-foreground">Not checked</span>
                       )}
                       {s.deliveryCheckedAt && (
-                        <div className="mt-0.5 text-2xs text-muted-foreground">{when(s.deliveryCheckedAt)}</div>
+                        <div className="mt-1 text-2xs text-muted-foreground">checked {when(s.deliveryCheckedAt)}</div>
                       )}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="whitespace-nowrap px-4 py-2.5">
                       {s.scannedAt ? (
                         <>
-                          <div className="text-2xs">{when(s.scannedAt)}</div>
-                          <div className="text-2xs text-muted-foreground">{VIA[s.scannedVia ?? ""] ?? "scanned"}</div>
+                          <div className="text-xs">{when(s.scannedAt)}</div>
+                          <div className="mt-0.5 text-2xs text-muted-foreground">{VIA[s.scannedVia ?? ""] ?? "scanned"}</div>
                         </>
                       ) : (
-                        <span className="text-2xs text-muted-foreground">Not scanned</span>
+                        <span className="text-xs text-muted-foreground">Not scanned</span>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right">
