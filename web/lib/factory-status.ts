@@ -127,6 +127,25 @@ export function orderStage(items: { factory_status?: string | null }[]): string 
   return minIdx < ORDER.length ? ORDER[minIdx] : ""
 }
 
+/**
+ * HOW MANY OF AN ORDER'S LINES ARE UNDER WAY.
+ *
+ * `orderStage` above answers with the LEAST-ADVANCED line, which is the right answer for
+ * "can this ship" and the wrong one for "what is happening". A seven-cap order with six
+ * caps stitched and one blank still on order reads Draft — true, and it hides the six.
+ *
+ * `mixed` is the only case worth drawing: when every line is at the same stage the badge
+ * has already said everything, and a bar reading 7/7 beside "Working" is noise.
+ */
+export function lineProgress(items: { factory_status?: string | null }[]): { total: number; started: number; mixed: boolean } {
+  const total = items?.length ?? 0
+  const started = (items ?? []).filter((it) => {
+    const v = normalizeStage(it.factory_status)
+    return v === "working" || v === "shipped"
+  }).length
+  return { total, started, mixed: total > 1 && started > 0 && started < total }
+}
+
 // ── Who may set which stage ────────────────────────────────────────────────────
 // MIRRORS stageDenial() in server/src/routes/orders.js — keep the two in sync. The
 // server is what enforces this; these helpers exist only so a user isn't offered an

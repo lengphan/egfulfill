@@ -23,7 +23,7 @@ import { isApprovable } from "@/components/app/approve-order-button"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
-import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
@@ -79,7 +79,11 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
       disabled={!clickable || sending}
       onClick={clickable ? () => onSend(order) : undefined}
       title={title}
-      className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
+      // MATCHES THE THREE CHIPS BESIDE IT, exactly — text-2xs and px-1.5, not text-xs and
+      // px-2 (see the Tag in readiness-dots.tsx). Sitting in the same row a size larger and
+      // a notch wider, "Stock" read as a different KIND of thing from Label/Scan/Design
+      // when it is the fourth of the same set.
+      className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-2xs font-medium transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
     >
       {sending ? "Sending…" : label}
     </button>
@@ -457,12 +461,14 @@ export function OrdersHub() {
     })))
 
   const advanceItem = async (order: OrderRow, item: OrderItem, to: string) => {
-    if (!item.sku) return
+    // line_id is line identity; the sku can be NULL on a marketplace line. Gating on sku
+    // alone left exactly those lines unmovable by the control that exists to move them.
+    if (!item.sku && !item.line_id) return
     const key = lineKey(order, item)
     setBusy(key)
-    patchItem(order.id, item.sku, to, item.line_id)
+    patchItem(order.id, item.sku ?? "", to, item.line_id)
     try {
-      const r = await postItemStatus(order.id, item.sku, to, item.line_id)
+      const r = await postItemStatus(order.id, item.sku ?? "", to, item.line_id)
       // Say what the auto-push did. Held-back is the interesting case: without a word,
       // "we already have that file" is indistinguishable from "nothing happened".
       const d = r?.design
@@ -1365,7 +1371,30 @@ export function OrdersHub() {
               // order. JSX is IDENTICAL to before — only relocated here. `action` stays inline
               // below (pinned last), so its large action logic is untouched.
               const cell: Record<FactoryColId, ReactNode> = {
-                status: <span className="justify-self-start"><StageBadge status={stage} /></span>,
+                /**
+                 * The badge, and — only when the lines disagree — how many are under way.
+                 *
+                 * An order's stage is its LEAST-ADVANCED line, so six stitched caps and one
+                 * blank still on order read "Draft". That is the right answer for "can this
+                 * ship" and a useless one for "what is happening"; the bar is the six.
+                 * Hidden when every line is together, because then the badge already said it.
+                 */
+                status: (() => {
+                  const p = lineProgress(o.items ?? [])
+                  return (
+                    <span className="flex min-w-0 flex-col items-start gap-1 justify-self-start">
+                      <StageBadge status={stage} />
+                      {p.mixed && (
+                        <span className="flex items-center gap-1.5" title={`${p.started} of ${p.total} lines started — this order shows the least-advanced one`}>
+                          <span className="block h-1 w-10 overflow-hidden rounded-full bg-muted">
+                            <span className="block h-full rounded-full bg-primary" style={{ width: `${Math.round((p.started / p.total) * 100)}%` }} />
+                          </span>
+                          <span className="text-2xs tabular-nums text-muted-foreground">{p.started}/{p.total}</span>
+                        </span>
+                      )}
+                    </span>
+                  )
+                })(),
                 order: <div className="min-w-0 truncate font-mono text-sm font-semibold">{numOf(o)}</div>,
                 /**
                  * HOW LONG THIS HAS BEEN WAITING, from the buyer's purchase.
@@ -2176,6 +2205,33 @@ export function OrdersHub() {
                                 : <><PaperPlaneTilt size={13} weight="bold" /> {tl("ui", "Board")}</>}
                             </Button>
                           )}
+                          {/* START THIS ONE LINE.
+                              The dropdown beside it can already set any stage, but a
+                              dropdown is a "set a value" control — you have to know what
+                              to pick. Not all lines start together: one blank is short, one
+                              design isn't approved, and the rest can be on the machine
+                              today. This is the same word the order carries, aimed at a
+                              single line.
+                              Shown only when the line's next move IS Working — so a
+                              seller's order that nobody has accepted yet doesn't offer to
+                              start a line (its next stage is Pending, an order-level
+                              decision), and a line already under way doesn't offer it at
+                              all. The dropdown stays for corrections and going back. */}
+                          {(() => {
+                            const fac = isFactoryOrder(o)
+                            const to = nextStage(it.factory_status, fac)
+                            if (to !== "working" || !canSetStage(role, it.factory_status, to, fac)) return null
+                            return (
+                              <Button
+                                size="sm" variant="outline" className="h-8 shrink-0"
+                                disabled={busy === key}
+                                onClick={() => advanceItem(o, it, "working")}
+                                title="Start making this line — the rest of the order is unaffected"
+                              >
+                                {tl("ui", "Start")}
+                              </Button>
+                            )
+                          })()}
                           {/* ONE control per item. This row used to carry THREE things
                               that all showed/set the same field — a badge, this select,
                               and a next-stage button. The select already shows the
