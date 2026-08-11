@@ -1,14 +1,15 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CircleNotch, ArrowSquareOut, CheckCircle, Warning, Truck } from "@phosphor-icons/react"
+import { CircleNotch, ArrowSquareOut, CheckCircle, Warning, Truck, Package } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
-import { PackagingHint } from "@/components/app/packaging-hint"
-import { createOrder, validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, type ShipAddress, type UspsLabelResult, type ShippingRate } from "@/lib/api"
+import { STOCK_SIZES, DEFAULT_SIZE, customSizes, addCustomSize, sizeKey, sizeLabel, type ParcelSize } from "@/lib/parcel-sizes"
+import { parcelFromOrder, parcelBasisNote } from "@/lib/parcel-from-order"
+import { createOrder, validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, getCatalogProducts, type ShipAddress, type UspsLabelResult, type ShippingRate, type OrderItem } from "@/lib/api"
 
 const BLANK: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
 const DEFAULT_CARRIERS = ["usps", "ups"]
@@ -27,12 +28,28 @@ const FROM_STORE = "eg_ship_from"
  * Ship-to is a single paste box (validated live); ship-from is the saved warehouse address
  * (Settings › Platform). Optional add-ons (signature, insurance) ride the same buy.
  */
-export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void; order?: { id: string; num?: string; to?: ShipAddress } }) {
+export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
+  open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void
+  /** `items` lets the parcel be worked out from what's actually being shipped rather than
+   *  guessed — see parcel-from-order.ts. Optional: a standalone label has no order and
+   *  falls back to the stock mailer. */
+  order?: { id: string; num?: string; to?: ShipAddress; items?: OrderItem[] }
+}) {
   const [pasteText, setPasteText] = useState("")
   const [to, setTo] = useState<ShipAddress>({ ...BLANK })
   const confirm = useConfirm()
   const [from, setFrom] = useState<ShipAddress>({ ...BLANK })
-  const [pkg, setPkg] = useState({ lb: 0, oz: 6, length: 10, width: 8, height: 1 })
+  // Opens on the mailer this factory reaches for most, not on a placeholder nobody stocks.
+  const [pkg, setPkg] = useState({ lb: 0, oz: 6, length: DEFAULT_SIZE.length, width: DEFAULT_SIZE.width, height: DEFAULT_SIZE.height })
+  // Stock sizes plus anything this person saved. Read after mount, because localStorage
+  // doesn't exist during the server render and a mismatch there is a hydration error.
+  const [sizes, setSizes] = useState<ParcelSize[]>(STOCK_SIZES)
+  useEffect(() => {
+    const t = setTimeout(() => setSizes([...STOCK_SIZES, ...customSizes()]), 0)
+    return () => clearTimeout(t)
+  }, [])
+
+  const [basis, setBasis] = useState<string | null>(null)
   const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0)
   // Add-ons the carrier prices into the rate: signature on delivery, declared insurance.
   const [svc, setSvc] = useState<{ signature: boolean; insurance: number }>({ signature: false, insurance: 0 })
@@ -86,6 +103,35 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
   // Any change to the parcel or add-ons invalidates the quoted rates — you can't buy a rate
   // that was priced for a different box. Re-fetch after editing.
   const invalidateRates = () => { setRates(null); setPickedToken(null) }
+
+  // PREFILL FROM THE PRODUCTS, when there are any. Over-declaring is the expensive
+  // direction — the carrier bills the greater of actual and dimensional weight — so a
+  // parcel typed larger than it is gets charged for the difference on every label. The
+  // catalog already holds each blank's weight and box; this reads them rather than guessing.
+  useEffect(() => {
+    if (!open || !order?.items?.length) return
+    let alive = true
+    getCatalogProducts()
+      .then((r) => {
+        if (!alive) return
+        const g = parcelFromOrder(order.items, r)
+        if (!g) return
+        setPkg((p) => ({
+          lb: Math.floor(g.weightOz / 16) || 0,
+          oz: g.weightOz ? Math.round(g.weightOz % 16) : p.oz,
+          // Only override a dimension the catalog actually knows; a product with a weight
+          // but no box keeps the stock mailer rather than collapsing to zero.
+          length: g.length || p.length,
+          width: g.width || p.width,
+          height: g.height || p.height,
+        }))
+        setBasis(parcelBasisNote(g))
+        invalidateRates()
+      })
+      .catch(() => { /* no catalog — the stock mailer stands */ })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, order?.id])
 
   const getRates = async () => {
     setErr(null)
@@ -208,9 +254,50 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
                 <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => { setPkg({ ...pkg, width: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
                 <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => { setPkg({ ...pkg, height: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
               </div>
-              {/* Dim-weight packaging suggestion (÷166, USPS/Shippo) — always visible once
-                  there's a weight, so the box guidance is findable, not just a rare warning. */}
-              <PackagingHint weightOz={weightOz} length={pkg.length} width={pkg.width} height={pkg.height} />
+
+              {/* THE MAILERS ACTUALLY ON THE SHELF, instead of a dim-weight lecture.
+                  The fields used to open on 10 × 8 × 1 — a size nobody stocks — so the hint
+                  underneath spent its life objecting to a placeholder, and every label began
+                  with the same three corrections. Picking the box you reached for is one
+                  click; the boxes above stay open for the exception. */}
+              {/* Where the numbers came from. A figure the machine derived and one someone
+                  typed must be tellable apart — that is what decides whether it's worth
+                  re-weighing the parcel before buying. */}
+              {basis && (
+                <p className="flex items-start gap-1.5 text-2xs text-muted-foreground">
+                  <Package size={12} weight="fill" className="mt-0.5 shrink-0" />
+                  {basis}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={sizes.some((s) => sizeKey(s) === sizeKey(pkg)) ? sizeKey(pkg) : "custom"}
+                  onChange={(e) => {
+                    const hit = sizes.find((s) => sizeKey(s) === e.target.value)
+                    if (!hit) return   // "Custom" isn't a size — it just means the boxes are yours
+                    setPkg({ ...pkg, length: hit.length, width: hit.width, height: hit.height })
+                    invalidateRates()
+                  }}
+                  className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
+                >
+                  {sizes.map((s) => (
+                    <option key={sizeKey(s)} value={sizeKey(s)}>{s.label || sizeLabel(s)}</option>
+                  ))}
+                  <option value="custom">Custom size…</option>
+                </select>
+                {/* Only offered when the dimensions are genuinely new — a button that saves a
+                    size you already have is a button that does nothing and says nothing. */}
+                {!sizes.some((s) => sizeKey(s) === sizeKey(pkg)) && pkg.length > 0 && pkg.width > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSizes([...STOCK_SIZES, ...addCustomSize({ label: "", length: pkg.length, width: pkg.width, height: pkg.height })])}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Save {sizeLabel(pkg)} as a size
+                  </button>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex cursor-pointer items-center gap-2 text-sm">

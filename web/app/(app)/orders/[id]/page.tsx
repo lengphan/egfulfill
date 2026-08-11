@@ -381,7 +381,9 @@ export default function OrderDetailPage() {
         <NewLabelDialog
           open={labelOpen}
           onOpenChange={setLabelOpen}
-          order={{ id: order.id, num, to: toShipAddress(order) }}
+          // items ride along so the parcel is worked out from the blanks being shipped
+          // rather than guessed — over-declaring is billed on every label.
+          order={{ id: order.id, num, to: toShipAddress(order), items: order.items }}
           onCreated={reloadAll}
         />
       )}
