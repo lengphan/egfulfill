@@ -18,7 +18,12 @@ import { orderNeedsSetup } from "@/lib/variant-resolve"
  * only way to begin the floor's own work.
  */
 export const isApprovable = (o: { factory_status?: string | null; factory_order?: boolean | null }) =>
-  isFactoryOrder(o) ? normalizeStage(o.factory_status) === "" : normalizeStage(o.factory_status) === "in_review"
+  isFactoryOrder(o)
+    // Draft is where a factory order waits. in_review is where the ones written BEFORE
+    // Pending was taken off their line are stranded — the same button gets those out, in
+    // one click, which is a better answer than a migration nobody remembers running.
+    ? ["", "in_review"].includes(normalizeStage(o.factory_status))
+    : normalizeStage(o.factory_status) === "in_review"
 
 /**
  * Approve — the factory accepts an order into production, moving it to Awaiting scan: one
@@ -66,12 +71,16 @@ export function ApproveOrderButton({
       onClick={approve}
       disabled={busy || blocked}
       title={blocked
-        ? `${incomplete} item${incomplete === 1 ? "" : "s"} still need a blank, colour, size & method — set them before approving.`
-        : "Accept into production — moves to Awaiting scan"}
+        ? `${incomplete} item${incomplete === 1 ? "" : "s"} still need a blank, colour, size & method — set them before starting.`
+        : isFactoryOrder(order)
+          ? "Put this into production — moves it to Awaiting scan"
+          : "Accept this seller's order into production — moves it to Awaiting scan"}
     >
-      {/* "Approve" is an answer to someone — there is nobody to answer on the factory's
-          own order, so the same button says what it does instead: Start. */}
-      {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> {isFactoryOrder(order) ? "Start" : "Approve"}</>}
+      {/* ONE WORD, both kinds of order. "Approve" and "Start" were the same write with two
+          names, and the row in the hub had a third ("Next stage") for the same act on a
+          Pending order — three labels for one decision, which is what made it unreadable.
+          Who is waiting is already on the row: a seller's order says Pending. */}
+      {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Start</>}
     </Button>
   )
 }

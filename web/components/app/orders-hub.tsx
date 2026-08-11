@@ -19,6 +19,7 @@ import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
+import { isApprovable } from "@/components/app/approve-order-button"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
@@ -481,21 +482,34 @@ export function OrdersHub() {
     }
   }
   /**
-   * Warehouse intake — "Start order": move every unstarted item into the scan flow, AND
-   * the order with them.
+   * START — the one move that puts an order into production, whoever it belongs to.
    *
-   * The order-level write is the half that was missing. Nothing rolls item stages up to
-   * `orders.factory_status` — the column has exactly one writer, this PATCH — so moving
-   * only the lines left the order reading `new` while its rows read Awaiting scan. The row
-   * here looked right (the hub derives its stage from the items) and the Dispatch board,
-   * which filters on the ORDER's column, never showed it. Same two writes the Approve/Start
-   * button on the order page makes, so the two doors now land in the same place.
+   * This was three buttons wearing three names for the same act: "Start order" on a Draft
+   * row, "Approve" on the order page, and "Next stage" on a Pending row (which advanced to
+   * Awaiting scan — the same thing again, described as a position rather than a decision).
+   * Nothing distinguished them but the stage the order happened to be sitting at.
+   *
+   * It writes the LINES and then the ORDER. Both are needed: nothing rolls item stages up
+   * to `orders.factory_status` — that column has exactly one writer, this PATCH — so moving
+   * only the lines left the order reading `new` while its rows read Awaiting scan. The hub
+   * row looked right (it derives its stage from the items) and the Dispatch board, which
+   * filters on the ORDER's column, never showed it.
+   *
+   * Keyed by line_id with `sku ?? ""`, not gated on the sku: a marketplace line can arrive
+   * with a NULL one, and the old intake skipped exactly those lines — so an Etsy order
+   * could be "started" with half of it left behind.
    */
-  const receiveOrder = async (order: OrderRow) => {
-    for (const it of order.items ?? []) if (it.sku && !normalizeStage(it.factory_status)) await advanceItem(order, it, "awaiting_scan")
-    try { await updateOrder(order.id, { factoryStatus: "awaiting_scan" }) }
-    catch (e) { setActionErr(e instanceof Error ? e.message : "Couldn't start that order.") }
-    load()
+  const startOrder = async (order: OrderRow) => {
+    setBusy(`ord:${order.id}`)
+    try {
+      for (const it of order.items ?? []) {
+        if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", "awaiting_scan", it.line_id)
+      }
+      await updateOrder(order.id, { factoryStatus: "awaiting_scan" })
+      setActionErr(null)
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "Couldn't start that order.")
+    } finally { setBusy(null); load() }
   }
   // Ship: mark every line shipped + record tracking/carrier on the order.
   const shipOrder = async (order: OrderRow) => {
@@ -1601,18 +1615,33 @@ export function OrdersHub() {
                        */
                       const next = nextStage(stage, fac)
                       const canAdvance = !!next && canSetStage(role, stage, next, fac)
-                      // Offered only when the move it makes is one the API would accept.
-                      // "Start order" jumps Draft → Awaiting scan, which is legal for the
-                      // factory's own order and a SKIP for a seller's — on those it 403'd
-                      // per line and the row simply didn't move. A seller order at Draft
-                      // falls through to "Next stage" instead, which is Pending: the right
-                      // next move for an order somebody paid for and we haven't accepted.
-                      const canStart = canFulfill && stage === "" && !stopped && canSetStage(role, stage, "awaiting_scan", fac)
+                      /**
+                       * WAITING TO GO INTO PRODUCTION — which is Draft for the factory's
+                       * own order and Pending for a seller's, because those are the two
+                       * stages that mean "nobody has started this". Same button, same
+                       * write, one word: isApprovable is the same test the order page's
+                       * Start uses, so the row and the page can't disagree about whether an
+                       * order is ready to begin.
+                       *
+                       * Still checked against the guard: the move must be one the API would
+                       * accept from here, or the button would offer a 403.
+                       */
+                      const canStart = canFulfill && !stopped && isApprovable(o) && canSetStage(role, stage, "awaiting_scan", fac)
                       const canLabels = canFulfill && items.some((it) => it.sku && variantOf(it))
-                      // Primary = the one obvious next move. Intake → Start; ready → ship;
-                      // otherwise advance a stage.
-                      const primary: "start" | "ship" | "advance" | null =
-                        canStart ? "start" : canShip ? "ship" : canAdvance ? "advance" : null
+                      /**
+                       * Primary = the one obvious next move: start it, or ship it. There
+                       * is no third.
+                       *
+                       * "Next stage" used to fill this slot for everything in between, and
+                       * it was the source of the confusion: on a Pending row it WAS the
+                       * approve button, wearing a name that described a position on a list
+                       * rather than the decision being made. Mid-pipeline it named no
+                       * destination at all — you pressed it to find out where it went.
+                       * Moving a stage is now one thing in one place, the ⋯ menu, where
+                       * every stage is listed by name with the reason it can't be used.
+                       */
+                      const primary: "start" | "ship" | null =
+                        canStart ? "start" : canShip ? "ship" : null
                       const busyO = busy?.startsWith(o.id)
                       return (
                         <div className="flex items-center justify-end gap-2 sm:shrink-0">
@@ -1655,9 +1684,15 @@ export function OrdersHub() {
                               </span>
                             )
                           })()}
-                          {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}>{tl("ui", "Start order")}</Button>}
+                          {primary === "start" && (
+                            <Button size="sm" onClick={() => startOrder(o)} disabled={busyO}
+                              title={fac
+                                ? "Put this into production — moves it to Awaiting scan"
+                                : "Accept this seller's order into production — moves it to Awaiting scan"}>
+                              {tl("ui", "Start")}
+                            </Button>
+                          )}
                           {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}>{tl("ui", "Create new label")}</Button>}
-                          {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further.">{tl("ui", "Next stage")}</Button>}
                           <DropdownMenu>
                             <DropdownMenuTrigger
                               aria-label={tl("ui", "More actions")}
@@ -1669,7 +1704,15 @@ export function OrdersHub() {
                             <DropdownMenuContent align="end" className="w-52">
                               {/* the non-primary pipeline actions */}
                               <DropdownMenuItem onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}><ArrowSquareOut size={14} weight="bold" /> {tl("ui", "Open order")}</DropdownMenuItem>
-                              {primary !== "advance" && canAdvance && <DropdownMenuItem onClick={() => advanceOrder(o)}><SkipForward size={14} weight="fill" /> {tl("ui", "Next stage")}</DropdownMenuItem>}
+                              {/* The one-step advance lives HERE now, and only here — it is
+                                  never the row's primary. Named with its destination, since
+                                  in a list of stages "next" is the only one that doesn't say
+                                  where it goes. */}
+                              {canAdvance && next && (
+                                <DropdownMenuItem onClick={() => advanceOrder(o)}>
+                                  <SkipForward size={14} weight="fill" /> {tl("ui", "Move to")} {stageMeta(next)?.label ?? next}
+                                </DropdownMenuItem>
+                              )}
                               {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> {tl("ui", "Create new label")}</DropdownMenuItem>}
                               {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> {tl("ui", "Reopen label")}</DropdownMenuItem>}
                               {/* TikTok orders can be shipped on TIKTOK'S label, which lives
