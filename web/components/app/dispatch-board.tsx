@@ -13,7 +13,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
-import { ExternalLabelRows, LabelDropBar, PageDropZone, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
+import { StagedLabelRow, UploadLabelRow, useLabelPullBack, LabelDropBar, PageDropZone, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
 import { DISPATCH_GRID, DISPATCH_HEAD } from "@/components/app/dispatch-grid"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
@@ -182,6 +182,25 @@ const HIST_GRID = "grid items-center gap-3 px-5 grid-cols-[1rem_9.5rem_12rem_min
 // pull-backs, label prints/voids, manifests. Order-level noise (order saved/updated, design
 // files, charges) belongs on the order page, not the scan floor.
 const DISPATCH_ACTIONS = /^order\.scan|^dispatch\.|^label\.|^order\.manifested|^order\.(shipped|tracking)/
+/**
+ * FILTERS FOR THE SCAN QUEUE, which had none — only a search box, which answers "where is
+ * THIS parcel" and not "show me the ones I can act on".
+ *
+ * The distinctions are the ones that change what you do next, not a taxonomy: a label
+ * waiting to be scanned here, a label already with byeastside (nothing to do but wait), a
+ * file dropped in that has not been sent, and an order the platform gave a tracking number
+ * to. Counts on every chip, because a filter that hides how much it is hiding makes an
+ * empty list ambiguous between "nothing matches" and "nothing exists".
+ */
+type QueueFilter = "all" | "here" | "partner" | "unsent" | "external"
+const QUEUE_FILTERS: { key: QueueFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "here", label: "To scan here" },
+  { key: "partner", label: "With byeastside" },
+  { key: "unsent", label: "Not sent yet" },
+  { key: "external", label: "External" },
+]
+
 const HIST_FILTERS: { key: "all" | DispKey; label: string }[] = [
   { key: "all", label: "All" }, { key: "scanned", label: "Scanned" }, { key: "awaiting", label: "To scan" },
   { key: "production", label: "In production" }, { key: "shipped", label: "Shipped" },
@@ -214,6 +233,7 @@ export function DispatchBoard() {
   // where the scan happens.
   const [view, setView] = useState<"queue" | "history">("queue")
   const [histFilter, setHistFilter] = useState<"all" | DispKey>("all")
+  const [qFilter, setQFilter] = useState<QueueFilter>("all")
   // Expandable per-label action timeline (lazy-loaded from the audit log). undefined = not
   // fetched, null = loading, [] = fetched-empty.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -322,7 +342,12 @@ export function DispatchBoard() {
   // Newly dropped files arrive TICKED. Dropping is already the statement of intent — the
   // box exists so you can change your mind, not so you have to say it twice.
   const stageFiles = useCallback((files: File[]) => {
-    const rows: StagedLabel[] = files.map((f) => ({ key: String(++stageSeq.current), name: f.name, file: f, parse: null }))
+    // `at` is what puts a just-dropped file at the TOP of the list rather than at the
+    // bottom of the markup. Stamped here, on the drop, because that is the moment the row
+    // came into existence — nothing else about the file records a time.
+    const rows: StagedLabel[] = files.map((f) => ({
+      key: String(++stageSeq.current), name: f.name, file: f, parse: null, at: Date.now(),
+    }))
     setStaged((p) => [...p, ...rows])
     setExtPicked((p) => { const n = new Set(p); for (const r of rows) n.add(stagedKeyOf(r)); return n })
     // READ THE LABEL, in the background, one file at a time.
@@ -342,11 +367,73 @@ export function DispatchBoard() {
   }
   const toggleExt = (k: string) =>
     setExtPicked((p) => { const n = new Set(p); if (n.has(k)) n.delete(k); else n.add(k); return n })
-  const extKeys = useMemo(
-    () => [...staged.map(stagedKeyOf), ...uploads.map(uploadKeyOf)],
-    [staged, uploads])
   const stagedChosen = staged.filter((s) => extPicked.has(stagedKeyOf(s)))
   const uploadsChosen = uploads.filter((u) => extPicked.has(uploadKeyOf(u)))
+
+  // The pull-back confirm + its failure message belong to the LIST, not to whichever row
+  // was clicked — so one owner, here, shared by every upload row rendered below.
+  const { pullBack: pullBackOne, pulling, err: pullErr } = useLabelPullBack(() => loadUploads())
+
+  /**
+   * ONE LIST, THREE KINDS, NEWEST FIRST.
+   *
+   * Orders, files waiting to be sent, and labels already with byeastside were rendered as
+   * three blocks in that fixed order, so a file dropped ten seconds ago sat underneath an
+   * order from yesterday. Nobody chose that ordering; it fell out of the markup. They are
+   * all "a parcel going out", so they sort together on the one thing they all have — when
+   * they arrived.
+   *
+   * Timestamps are ISO strings on every kind (a staged file stamps `at` when it is dropped),
+   * which is why a string compare is a date compare here.
+   */
+  type QueueRow =
+    | { kind: "order"; key: string; ts: string; o: OrderRow }
+    | { kind: "staged"; key: string; ts: string; s: StagedLabel }
+    | { kind: "upload"; key: string; ts: string; u: DispatchUpload }
+
+  const allRows = useMemo<QueueRow[]>(() => {
+    const term = q.trim().toLowerCase()
+    // `queue` has already applied the search to orders; the label rows have their own
+    // fields to match on, and a search that skipped them would hide the very parcel
+    // someone typed a tracking number to find.
+    const hit = (...f: (string | null | undefined)[]) =>
+      !term || f.some((x) => String(x ?? "").toLowerCase().includes(term))
+    const rows: QueueRow[] = queue.map((o) => ({ kind: "order", key: `o:${o.id}`, ts: String(o.created_at || ""), o }))
+    for (const s of staged) {
+      if (hit(s.name, s.parse?.name, s.parse?.shipTo, s.parse?.tracking)) {
+        rows.push({ kind: "staged", key: stagedKeyOf(s), ts: new Date(s.at).toISOString(), s })
+      }
+    }
+    for (const u of uploads) {
+      if (hit(u.file_name, u.recipient, u.ship_to, u.tracking)) {
+        rows.push({ kind: "upload", key: uploadKeyOf(u), ts: String(u.created_at || ""), u })
+      }
+    }
+    return rows.sort((a, b) => b.ts.localeCompare(a.ts))
+  }, [queue, staged, uploads, q])
+
+  /** What each filter keeps. Written once so the chip counts and the list can never
+   *  disagree about what a filter means. */
+  const matchesFilter = useCallback((r: QueueRow, f: QueueFilter) => {
+    switch (f) {
+      case "all": return true
+      // Ours to scan: here on our floor, not handed to anyone.
+      case "here": return r.kind === "order" && !r.o.dispatch_pdf_id
+      // Waiting on someone else's floor — theirs to pick, ours to watch.
+      case "partner": return (r.kind === "order" && !!r.o.dispatch_pdf_id) || r.kind === "upload"
+      // Still on this machine. The only rows where "Send" does anything.
+      case "unsent": return r.kind === "staged"
+      case "external": return r.kind !== "order"
+    }
+  }, [])
+
+  const rows = useMemo(() => allRows.filter((r) => matchesFilter(r, qFilter)), [allRows, qFilter, matchesFilter])
+  const filterCounts = useMemo(() => {
+    const out = {} as Record<QueueFilter, number>
+    for (const f of QUEUE_FILTERS) out[f.key] = allRows.filter((r) => matchesFilter(r, f.key)).length
+    return out
+  }, [allRows, matchesFilter])
+
 
   // History — EVERY order that ever had a label (bought → has tracking, or scanned),
   // whatever became of it, PLUS every label dropped in that belongs to no order. A label
@@ -377,7 +464,6 @@ export function DispatchBoard() {
   // these are surfaced separately rather than silently included in a batch.
   // Everything in the queue has a label — that is the definition of being in it. What
   // varies is who is holding it: still on our bench, or already with the partner.
-  const withLabel = queue
   const withPartner = queue.filter((o) => !!o.dispatch_pdf_id)
 
   // Is byeastside configured? Offering a route that can't work is worse than offering
@@ -394,19 +480,28 @@ export function DispatchBoard() {
   const toggle = (id: string) =>
     setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
   /**
-   * SELECT ALL means all of one table now that there is only one.
+   * SELECT ALL means everything you can currently SEE.
    *
-   * Orders keep the "has a label" rule — an order with nothing to scan cannot join a batch,
-   * which is why this was never simply `queue.length`. External rows have no such rule:
-   * every one of them either can be sent or can be pulled back, so all of them are
-   * selectable. The button reports the sum, and clearing clears both.
+   * It used to mean every selectable row on the board, which was right when the board had
+   * no filter and wrong the moment it got one: filtering to External and pressing "Select
+   * all 5" put two orders you weren't looking at into the batch, and the next button you
+   * pressed acted on them. A selection you cannot see is a selection you cannot check.
+   *
+   * Orders keep the "has a label" rule — an order with nothing to scan cannot join a batch.
+   * External rows have no such rule: each one can either be sent or pulled back.
    */
-  const selectableAll = withLabel.length + extKeys.length
-  const allSelected = selectableAll > 0 && picked.size === withLabel.length && extPicked.size === extKeys.length
+  const visibleOrderIds = useMemo(
+    () => rows.filter((r) => r.kind === "order" && !!r.o.tracking).map((r) => (r as { o: OrderRow }).o.id),
+    [rows])
+  const visibleExtKeys = useMemo(() => rows.filter((r) => r.kind !== "order").map((r) => r.key), [rows])
+  const selectableAll = visibleOrderIds.length + visibleExtKeys.length
+  const allSelected = selectableAll > 0
+    && visibleOrderIds.every((id) => picked.has(id))
+    && visibleExtKeys.every((k) => extPicked.has(k))
   const toggleAllRows = () => {
     const clear = allSelected
-    setPicked(clear ? new Set() : new Set(withLabel.map((o) => o.id)))
-    setExtPicked(clear ? new Set() : new Set(extKeys))
+    setPicked(clear ? new Set() : new Set(visibleOrderIds))
+    setExtPicked(clear ? new Set() : new Set(visibleExtKeys))
   }
 
   /** Advance a whole batch once it's been scanned. Per-order so one failure can't strand the rest. */
@@ -916,8 +1011,29 @@ export function DispatchBoard() {
               ))}
             </div>
           )}
+          {/* Filter chips, the same shape History already uses — one screen, one idiom.
+              Counted, so an empty list is never ambiguous between "nothing matches this
+              filter" and "nothing is here at all". */}
+          {view === "queue" && (
+            <div className="flex flex-wrap items-center gap-1">
+              {QUEUE_FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setQFilter(f.key)}
+                  disabled={f.key !== "all" && !filterCounts[f.key]}
+                  className={"rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-40 " +
+                    (qFilter === f.key ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                >
+                  {f.label}{filterCounts[f.key] ? ` · ${filterCounts[f.key]}` : ""}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* ml-auto: with the filter chips added, the batch count and Select all were being
+              wrapped to a second line one at a time and reading as stray controls. Pinned
+              right, they wrap together as the pair they are. */}
           {view === "queue" && chosen.length + extPicked.size > 0 && (
-            <span className="text-xs text-muted-foreground">{chosen.length + extPicked.size} in this batch</span>
+            <span className="ml-auto text-xs text-muted-foreground">{chosen.length + extPicked.size} in this batch</span>
           )}
           {/* ONE select-all for one table. It used to be two — this one for orders, another
               in the external card's header — which meant "select all" never selected all of
@@ -929,9 +1045,11 @@ export function DispatchBoard() {
           )}
         </div>
 
-        {err && (
+        {/* A pull-back that byeastside refused reads the same as any other board failure —
+            it is the board's message, not the row's, which is why the hook is owned here. */}
+        {(err || pullErr) && (
           <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
-            <Warning size={14} weight="fill" className="mt-0.5 shrink-0" /> {err}
+            <Warning size={14} weight="fill" className="mt-0.5 shrink-0" /> {err || pullErr}
           </div>
         )}
         {sent && (
@@ -1122,14 +1240,35 @@ export function DispatchBoard() {
                 label — a just-dispatched order should stay on top, not sink below older
                 labelled ones. Whether it has a label yet is shown by a per-row tag, not by
                 dimming the whole row (which read as "cancelled"). */}
-            {queue.map((o) => {
+            {rows.map((r) => {
+              // The two label kinds render themselves; an order row is the long one, so it
+              // stays inline rather than becoming a component that would have to be handed
+              // eight callbacks.
+              if (r.kind === "staged") {
+                return (
+                  <StagedLabelRow
+                    key={r.key} s={r.s}
+                    picked={extPicked.has(r.key)} onToggle={toggleExt} onDiscard={discardStaged}
+                  />
+                )
+              }
+              if (r.kind === "upload") {
+                return (
+                  <UploadLabelRow
+                    key={r.key} u={r.u}
+                    picked={extPicked.has(r.key)} onToggle={toggleExt}
+                    busy={busy} pulling={pulling} onPullBack={(u) => void pullBackOne(u)}
+                  />
+                )
+              }
+              const o = r.o
               const d = disposition(o)
               // Handed over but not yet picked — an order state the disposition vocabulary
               // has no word for, because it is about custody rather than outcome.
               const sentOut = !o.label_scanned_at && !!o.dispatch_pdf_id
               return (
                 <label
-                  key={o.id}
+                  key={r.key}
                   className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}
                 >
                   {/* Selectable whether or not it has a label. Only the label-dependent
@@ -1181,19 +1320,6 @@ export function DispatchBoard() {
                 </label>
               )
             })}
-            {/* THE SAME TABLE, after the orders. A label from outside is still a parcel
-                going out today, so it belongs in the list of parcels going out today —
-                last, because it is the exception rather than the day's work, and tagged,
-                because it is not an order and nothing is charged for it. */}
-            <ExternalLabelRows
-              uploads={uploads}
-              staged={staged}
-              picked={extPicked}
-              onDiscard={discardStaged}
-              onToggle={toggleExt}
-              busy={busy}
-              onChanged={loadUploads}
-            />
             </div>
           </div>
         )}

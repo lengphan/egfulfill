@@ -49,7 +49,13 @@ const readAsDataUrl = (file: File) =>
 /** A file that has been dropped but NOT sent. `key` is ours — the file has no id until
  *  byeastside gives it one, and identity has to survive re-renders before then.
  *  `parse` is null while the PDF is still being read; see readStagedLabel below. */
-export type StagedLabel = { key: string; name: string; file: File; parse: LabelParse | null }
+export type StagedLabel = {
+  key: string; name: string; file: File
+  parse: LabelParse | null
+  /** When it was dropped, epoch ms. The board sorts orders, staged files and sent labels
+   *  into one newest-first list, and this is the only time a staged file has. */
+  at: number
+}
 
 /**
  * Read the label so the row can say who the parcel is for.
@@ -121,6 +127,33 @@ const TONE: Record<"wait" | "warn" | "ok" | "part", string> = {
 const TONE_ICON = { wait: Clock, warn: Warning, ok: CheckCircle, part: Barcode } as const
 
 /**
+ * THE drop card — one definition, rendered in two places.
+ *
+ * "Why are there two drop zones?" was a fair question with a bad answer: there was one
+ * target, drawn two different ways. The resting panel was a full-width grey band and the
+ * drag overlay a centred primary card, so they looked like separate features. Sharing the
+ * class string and the body makes the drag state read as this card lifting off the page,
+ * which is what it actually is.
+ */
+const DROP_CARD =
+  "flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/60 bg-primary/[0.02] px-6 py-8 text-center"
+
+function DropCardBody() {
+  return (
+    <>
+      <UploadSimple size={28} weight="duotone" className="text-primary" />
+      <span className="text-base font-semibold">Drop label PDFs here</span>
+      {/* Two facts, and only two: anywhere works, and dropping is not sending. Everything
+          else this used to carry now lives in the row it creates. */}
+      <span className="max-w-md text-sm text-muted-foreground">
+        Anywhere on this page works — or click to choose. They join the queue below and
+        nothing is sent to byeastside until you press Send.
+      </span>
+    </>
+  )
+}
+
+/**
  * THE DROP TARGET — the panel, at rest, at the top of the screen.
  *
  * It has been three shapes. A tall dashed box buried under both lists, which put the one
@@ -151,24 +184,19 @@ export function LabelDropBar({ onStage }: { onStage: (files: File[]) => void }) 
 
   return (
     <div className="space-y-2">
-      {/* Dashed border-2, the icon, the heading and the subline in the same order and the
-          same sizes as PageDropZone's overlay. Deliberately: dragging a file should look
-          like this panel growing to fill the window, not like a second feature appearing. */}
+      {/* ONE DROP ZONE, not two. This is DROP_CARD — the identical card the full-window
+          overlay renders while you drag. It was reasonable-looking but different: a
+          full-width grey band here, a centred primary card there, which read as two
+          separate drop zones that happened to do the same thing. Same card, two places:
+          at rest it sits here, and while you drag it lifts onto a dimmed page. */}
       <label
         onDragOver={(e) => { e.preventDefault(); setOver(true) }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
-        className={"flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-colors "
-          + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/60 hover:bg-primary/[0.03]")}
+        className={DROP_CARD + " mx-auto w-full max-w-lg cursor-pointer transition-colors "
+          + (over ? "bg-primary/5" : "hover:bg-primary/[0.03]")}
       >
-        <UploadSimple size={28} weight="duotone" className={over ? "text-primary" : "text-muted-foreground"} />
-        <span className="text-base font-semibold">Drop label PDFs here</span>
-        <span className="max-w-md text-sm text-muted-foreground">
-          {/* Two facts, and only two: anywhere works, and dropping is not sending. Everything
-              else this used to carry now lives in the row it creates. */}
-          Anywhere on this page works — or click to choose. They join the queue below and
-          nothing is sent to byeastside until you press Send.
-        </span>
+        <DropCardBody />
         <input
           type="file" multiple className="sr-only"
           accept="application/pdf"
@@ -241,12 +269,9 @@ export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) 
   }
   return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-8 backdrop-blur-sm">
-      <div className="flex w-full max-w-lg flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary bg-card/90 px-8 py-12 text-center shadow-xl">
-        <UploadSimple size={34} weight="duotone" className="text-primary" />
-        <div className="text-base font-semibold">Drop label PDFs here</div>
-        <div className="text-sm text-muted-foreground">
-          They join the queue and wait — nothing is sent to byeastside until you press Send.
-        </div>
+      {/* The SAME card, scaled up and shadowed — the resting one lifting off the page. */}
+      <div className={DROP_CARD + " w-full max-w-lg scale-105 border-primary bg-card/95 shadow-xl"}>
+        <DropCardBody />
       </div>
     </div>
   )
@@ -274,18 +299,17 @@ export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) 
  * — the whole reason this feature was once declined — so every row carries an "External"
  * tag and the block that explains them sits directly above. Sharing a table is a claim about
  * layout, not about what the rows are.
+ *
+ * ONE ROW PER COMPONENT, rather than one component rendering every external row in a block.
+ * The block put them all after the orders, which is a sort order nobody chose — a file
+ * dropped ten seconds ago sat below an order from yesterday. The board interleaves all
+ * three kinds by time now, so it needs to render them one at a time.
  */
-export function ExternalLabelRows({
-  uploads, staged, picked, onDiscard, onToggle, busy, onChanged,
-}: {
-  uploads: DispatchUpload[] | null
-  staged: StagedLabel[]
-  picked: Set<string>
-  onDiscard: (key: string) => void
-  onToggle: (key: string) => void
-  busy: boolean
-  onChanged: () => void
-}) {
+
+/** The pull-back, and the error it can produce, shared by every upload row on the board.
+ *  Hoisted to one owner because the confirm dialog and the failure message belong to the
+ *  list, not to whichever row happened to be clicked. */
+export function useLabelPullBack(onChanged: () => void) {
   const confirm = useConfirm()
   const [err, setErr] = useState<string | null>(null)
   const [pulling, setPulling] = useState(false)
@@ -306,22 +330,22 @@ export function ExternalLabelRows({
     } finally { setPulling(false); onChanged() }
   }
 
-  if (!staged.length && !(uploads?.length)) return null
+  return { pullBack, pulling, err, clearErr: () => setErr(null) }
+}
 
+/** A file on this machine that has not been sent. */
+export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
+  s: StagedLabel
+  picked: boolean
+  onToggle: (key: string) => void
+  onDiscard: (key: string) => void
+}) {
+  const k = stagedKeyOf(s)
+  const p = s.parse
   return (
-    <>
-      {err && (
-        <div className="border-b border-border bg-red-50 px-5 py-2 text-xs text-red-800 dark:bg-red-950/30 dark:text-red-200">{err}</div>
-      )}
-
-      {/* WAITING TO GO first — it is the only part of this that anyone has to act on. */}
-      {staged.map((s) => {
-        const k = stagedKeyOf(s)
-        const p = s.parse
-        return (
-          <label key={k} className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
+          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
             <input
-              type="checkbox" checked={picked.has(k)} onChange={() => onToggle(k)}
+              type="checkbox" checked={picked} onChange={() => onToggle(k)}
               className="size-4 shrink-0 accent-primary" aria-label={`Select ${s.name}`}
             />
             <span className="flex min-w-0 flex-col">
@@ -357,21 +381,29 @@ export function ExternalLabelRows({
               </button>
             </span>
           </label>
-        )
-      })}
+  )
+}
 
-      {(uploads ?? []).map((u) => {
-        const k = uploadKeyOf(u)
-        const p = progressOf(u)
-        const PI = TONE_ICON[p.tone]
-        // Theirs first: an extractor that has READ the label beats what we parsed off it
-        // before sending, because theirs is what their queue will actually scan.
-        const tracked = (u.labels ?? []).map((l) => l.trackingNumber).filter(Boolean) as string[]
-        const trackText = tracked[0] || u.tracking || null
-        return (
-          <label key={k} className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
+/** A label that IS with byeastside. */
+export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack }: {
+  u: DispatchUpload
+  picked: boolean
+  onToggle: (key: string) => void
+  busy: boolean
+  pulling: boolean
+  onPullBack: (u: DispatchUpload) => void
+}) {
+  const k = uploadKeyOf(u)
+  const p = progressOf(u)
+  const PI = TONE_ICON[p.tone]
+  // Theirs first: an extractor that has READ the label beats what we parsed off it
+  // before sending, because theirs is what their queue will actually scan.
+  const tracked = (u.labels ?? []).map((l) => l.trackingNumber).filter(Boolean) as string[]
+  const trackText = tracked[0] || u.tracking || null
+  return (
+          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
             <input
-              type="checkbox" checked={picked.has(k)} onChange={() => onToggle(k)}
+              type="checkbox" checked={picked} onChange={() => onToggle(k)}
               className="size-4 shrink-0 accent-primary" aria-label={`Select ${u.file_name || "label"}`}
             />
             <span className="flex min-w-0 flex-col">
@@ -436,7 +468,7 @@ export function ExternalLabelRows({
               {u.scanned_labels === 0 ? (
                 <button
                   type="button" disabled={busy || pulling}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); void pullBack(u) }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPullBack(u) }}
                   className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                   aria-label={`Pull back ${u.file_name || "label"}`}
                   title="Pull this label back out of byeastside's queue"
@@ -457,9 +489,6 @@ export function ExternalLabelRows({
               )}
             </span>
           </label>
-        )
-      })}
-    </>
   )
 }
 
