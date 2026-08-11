@@ -44,6 +44,11 @@ services:
       TIKTOK_AUTH_HOST: ${TIKTOK_AUTH_HOST:-}
       TIKTOK_API_HOST: ${TIKTOK_API_HOST:-}
       TIKTOK_BACKFILL_DAYS: ${TIKTOK_BACKFILL_DAYS:-}
+      # 1 = product publishing actually reaches TikTok. Unset, /api/tiktok/publish returns
+      # the assembled payload as a dry run and creates nothing. Same class of switch as
+      # OTTOCAP_ORDER_LIVE below, and the same trap: a line in .env alone does NOTHING,
+      # because this file forwards env by NAME.
+      TIKTOK_PUBLISH_LIVE: ${TIKTOK_PUBLISH_LIVE:-}
       # Shopify per-store OAuth — Client ID + Client secret from the Shopify app.
       # Register the redirect URL as https://egful.store/oauth-callback.html
       SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:-}
