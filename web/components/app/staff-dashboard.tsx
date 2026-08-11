@@ -162,7 +162,9 @@ export function StaffDashboard() {
   const stats = useMemo(() => {
     const list = orders ?? []
     const by = (id: string) => list.filter((o) => orderStage(o.items ?? []) === id).length
-    const inProd = ["awaiting_scan", "printed", "working"]
+    // Retired ids kept so a row written before the stage was folded still counts here;
+    // normalizeStage maps them all to "working" on read anyway.
+    const inProd = ["working", "awaiting_scan", "printed"]
     const todayStr = new Date().toDateString()
     return {
       total: list.length,

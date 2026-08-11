@@ -275,22 +275,21 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
 /**
  * Record a bought label.
  *
- * Buying a label does NOT ship an order. The warehouse flow is:
- *   label bought (tracking exists) → AWAITING SCAN → scanned (by us or a scan service,
- *   and combined with the design) → WORKING → shipped
+ * BUYING A LABEL MOVES NO STAGE. It is a fact about the parcel's paperwork, not about the
+ * goods: the tracking number, the label file, what it cost and where it was addressed. The
+ * stage says what we are MAKING, and buying postage doesn't make anything.
  *
- * This used to flip straight to 'shipped' the moment a label was bought, which skipped
- * the scan and the entire make step — so a parcel was marked gone before anyone had made
- * it, and it never appeared in the scan queue. Now it moves the order INTO awaiting_scan,
- * which is exactly what "waiting to be scanned" means.
+ * It used to write 'shipped', which claimed a parcel had gone before anyone made it. That
+ * was replaced with a move to 'awaiting_scan', which was better but still wrong in the same
+ * direction — it accepted an order into production because money had been spent on postage,
+ * behind the back of the Start button and the item-setup guard it enforces. A morning's
+ * batch of twenty labels moved twenty orders into the factory.
  *
- * Only ever moves an order FORWARD to awaiting_scan — an order already at working or
- * shipped isn't dragged backwards by reprinting a label.
- *
- * The label URL is persisted alongside the tracking number so a label can be reprinted or
- * batched later; without it a label could only be printed at the moment of purchase.
+ * Where the label has got to is read from what this writes: `tracking` and
+ * `label_scanned_at`. The dispatch queue is "a tracking number, not yet scanned" — so this
+ * function is what puts an order on the dispatch page, without touching what it says about
+ * production. The label URL is persisted so it can be reprinted or batched later.
  */
-const PRE_SCAN = ['', 'new', 'draft', 'in_review', 'approved', 'ready_print', 'in_queue', 'queued', 'prescan'];
 
 /**
  * `to` is the address the parcel was ACTUALLY sent to, and it is written back onto the
@@ -338,14 +337,14 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
     recordCost('label', cost, `label-${orderId}`, `Postage · ${carrier || 'USPS'} · order ${orderId}`, { orderId })
       .catch(() => {});
   }
+  // Read back only to REPORT where the order stands. Nothing here changes it — see the note
+  // above; the stage belongs to production and postage isn't production.
   const cur = await q('select factory_status from orders where id=$1', [orderId])
     .then((r) => String((r.rows[0] || {}).factory_status || '').toLowerCase()).catch(() => '');
-  const advance = PRE_SCAN.includes(cur);
   await q(
     `update orders set tracking=$1, carrier=$2, tracking_label_url=coalesce($3, tracking_label_url),
        label_cost=coalesce($4, label_cost), ship_service=coalesce(nullif($5,''), ship_service),
        label_test=coalesce($6, label_test)
-       ${advance ? ", factory_status='awaiting_scan'" : ''}
      where id=$7`,
     [tracking, carrier || 'USPS', labelUrl || null,
      (cost != null && isFinite(Number(cost))) ? Number(cost) : null,
@@ -395,7 +394,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
       `update orders set label_provider=$1, label_ref=$2, label_carrier_account=$3 where id=$4`,
       [ref.provider || null, ref.providerId, ref.carrierAccount || null, orderId]).catch(() => {});
   }
-  return { shipped: false, stage: advance ? 'awaiting_scan' : cur };
+  return { shipped: false, stage: cur };
 }
 
   // Create a label. body: { to:{name,street,street2,city,state,zip}, from:{...},

@@ -1,5 +1,5 @@
-// replenish.js — when an order reaches awaiting_scan, top up the blanks it consumed
-// by appending them to a DRAFT purchase order.
+// replenish.js — when an order is ACCEPTED INTO PRODUCTION (reaches 'working'), top up the
+// blanks it consumed by appending them to a DRAFT purchase order.
 //
 // Three decisions worth stating, because they're the difference between this being
 // useful and it being a way to accidentally buy 400 shirts:
@@ -9,10 +9,10 @@
 //     place safely yet: the S&S/Otto payloads are still unvalidated dry runs.)
 //  2. ONE open draft per supplier, merged by SKU. Ten orders for the same blank add
 //     ten quantities to one line, not ten purchase orders.
-//  3. It counts COMMITTED demand, not just in_stock. At awaiting_scan the label is
-//     printed but nothing has been scanned off the shelf yet, so in_stock still
-//     reads high. Ordering against it would under-order every time. What matters is
-//     in_stock minus everything already promised to unshipped orders.
+//  3. It counts COMMITTED demand, not just in_stock. The moment an order is accepted
+//     nothing has been picked off the shelf yet, so in_stock still reads high.
+//     Ordering against it would under-order every time. What matters is in_stock
+//     minus everything already promised to unshipped orders.
 import { q } from './db.js';
 
 const AUTO_PO = (supplier) => 'PO-AUTO-' + String(supplier || 'UNASSIGNED').toUpperCase().replace(/[^A-Z0-9]+/g, '-').slice(0, 24);

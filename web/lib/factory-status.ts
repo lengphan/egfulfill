@@ -1,7 +1,11 @@
 // Factory production pipeline — the canonical item lifecycle the boards drive, matching
 // the old app's CURRENT status vocabulary (egfulfill-store.js SELLER_STATUS factory keys):
 //
-//   (new) → In review → Awaiting scan → Scanned → Printing → Packing → Shipped
+//   (new) → Pending → Working → Shipped
+//
+// The line describes PRODUCTION only. Where the label has got to — bought, queued, scanned —
+// is carried by facts beside it (tracking, label_scanned_at) and shown by the Label/Scan
+// chips, because a label's journey runs alongside the making rather than through it.
 //
 // (Queued / QC / Packed were the OLDER model — kept only as normalize() aliases.) Plus
 // off-pipeline EXCEPTION states an order can drop into: On hold, Cancelled, Refunded.
@@ -25,11 +29,25 @@ export type FactoryStage = { id: string; label: string; tone: FactoryTone }
 // `in_review` — the id `new` already means "not started / Draft" in normalizeStage, and
 // reusing it would make a seller's unsubmitted Draft and a submitted order indistinguishable
 // in the DB. Labels are what people read; ids are data. ('printed' was removed — the scan
-// walked straight through it; legacy 'printed' rows fold to awaiting_scan.)
+// walked straight through it; legacy 'printed' rows fold to working.)
+/**
+ * THE LINE DESCRIBES PRODUCTION. NOTHING ELSE.
+ *
+ * 'awaiting_scan' was removed for the same reason 'printed' was before it: it is not a state
+ * of the GOODS. It described where the LABEL had got to, and a label's journey runs BESIDE
+ * production rather than through it — bought, queued, handed to the scan service, picked —
+ * all while the thing is being made. One column holds one value, so the label kept winning:
+ * a cap on the machine read "Awaiting scan", and an order byeastside had already picked read
+ * "Awaiting scan" too, because their sync writes label_scanned_at and never touches a stage.
+ *
+ * That fact already had a home: `label_scanned_at`, and the Label/Scan chips the row has
+ * always carried (lib/order-readiness.ts). The dispatch queue is read from those now —
+ * a tracking number, not yet scanned. Legacy rows fold to "working" in normalizeStage,
+ * exactly as 'printed'/'scanned'/'packing' already do.
+ */
 export const FACTORY_STAGES: FactoryStage[] = [
   { id: "in_review", label: "Pending", tone: "review" },    // seller submitted + paid; awaiting factory approval; cancellable by them
-  { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" }, // approved; label made; waiting on the scan
-  { id: "working", label: "Working", tone: "prod" },        // scanned + combined with the design; being made
+  { id: "working", label: "Working", tone: "prod" },        // accepted into production; being made
   { id: "shipped", label: "Shipped", tone: "shipped" },
 ]
 const ORDER = FACTORY_STAGES.map((s) => s.id)
@@ -53,10 +71,13 @@ export function normalizeStage(s?: string | null): string {
   const v = String(s || "").toLowerCase().trim()
   if (v === "new" || v === "draft" || v === "none" || v === "pending") return ""
   if (ORDER.includes(v) || EXCEPTIONS.has(v)) return v
-  // 'printed' was removed (label made, pre-scan) → folds to awaiting_scan, alongside the
-  // other label/queue aliases. Retired make-step ids fold to working.
-  if (["approved", "ready_print", "in_queue", "queued", "prescan", "printed", "label", "labelled", "labeled"].includes(v)) return "awaiting_scan"
-  if (["scanned", "printing", "qc", "production", "in_production", "in-prod", "prepress",
+  // Every retired id folds onto "working" — they all meant "accepted and being made",
+  // whatever paperwork step they were named after. 'awaiting_scan' joins them: an order
+  // carrying it was accepted into production, which is what "working" says, and where its
+  // label has got to is read from label_scanned_at as it always was.
+  if (["approved", "ready_print", "in_queue", "queued", "prescan", "printed", "label", "labelled", "labeled",
+       "awaiting_scan", "awaiting-scan",
+       "scanned", "printing", "qc", "production", "in_production", "in-prod", "prepress",
        "packing", "packed", "ready", "finished"].includes(v)) return "working"
   if (["fulfilled", "delivered", "in_transit"].includes(v)) return "shipped"
   // Flagged + Backorder were retired — collapse them and their aliases onto On hold, the one
@@ -76,14 +97,14 @@ export function isException(id?: string | null): boolean {
  * The next linear stage to advance an item to (null once shipped or in an exception).
  *
  * `isFactory` matters at exactly one point, and it's the first: a factory order leaves
- * Draft for Awaiting scan, because Pending is a seller stage it can never occupy. A legacy
- * factory row sitting AT in_review also advances to Awaiting scan, which is how those get
- * out. See FACTORY_LINE below.
+ * Draft for Working, because Pending is a seller stage it can never occupy. A legacy
+ * factory row sitting AT in_review also advances to Working, which is how those get out.
+ * See FACTORY_LINE below.
  */
 export function nextStage(current?: string | null, isFactory?: boolean): string | null {
   const v = normalizeStage(current)
   if (EXCEPTIONS.has(v)) return null
-  if (isFactory && (!v || v === "in_review")) return "awaiting_scan"
+  if (isFactory && (!v || v === "in_review")) return "working"
   if (!v) return "in_review"
   const i = ORDER.indexOf(v)
   return i >= 0 && i < ORDER.length - 1 ? ORDER[i + 1] : null
@@ -116,7 +137,10 @@ export function orderStage(items: { factory_status?: string | null }[]): string 
 // Carve-outs: flagged/on_hold are a STOP signal rather than a custody claim, so artwork
 // review can pull the andon cord at any stage; cancelled/refunded are admin money calls
 // and backorder is a warehouse/admin stock call.
-const OP_ZONE = new Set(["", "in_review", "awaiting_scan"])
+// An operator may accept work INTO production; they still cannot claim it left. The zone
+// used to end at "awaiting_scan" — with that stage gone, "working" is the same boundary
+// under the name that survived.
+const OP_ZONE = new Set(["", "in_review", "working"])
 const OP_STOPS = new Set(["on_hold"])
 const MONEY_STAGES = new Set(["cancelled", "refunded"])
 
@@ -130,7 +154,7 @@ const MONEY_STAGES = new Set(["cancelled", "refunded"])
 // yet. A factory-owned order has no seller and is never charged, so the stage can say
 // nothing true about one — it was only ever passed through to satisfy the one-step rule,
 // and any that stopped there sat in the seller queue looking like work someone was waiting
-// on us for. For those orders the stage is simply not on the line, so Draft → Awaiting scan
+// on us for. For those orders the stage is simply not on the line, so Draft → Working
 // is one move. The skip rule is untouched otherwise: it exists so nobody can assert
 // physical work that didn't happen, and in_review isn't work.
 const SELLER_LINE = ["", ...FACTORY_STAGES.map((s) => s.id)]
@@ -189,8 +213,8 @@ export function stageDenialReason(role: string, current: string | null | undefin
     if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision — put the order on hold instead."
     if (OP_STOPS.has(to)) return null                       // andon cord: any stage
     // Tested on the DESTINATION, not the origin. As `at === "in_review"` it blocked only
-    // the direct hop, and OP_ZONE also holds awaiting_scan — so the same move went through
-    // in two clicks via Awaiting scan. Anything past Received has been PAID for.
+    // the direct hop, and OP_ZONE also holds the next stage along — so the same move went
+    // through in two clicks via Working. Anything past Received has been PAID for.
     // The justification is the CHARGE, so it can't apply to a factory order — nothing was
     // taken, and saying "this order has been paid for" about the floor's own order would
     // be untrue. Custody is still covered by the OP_ZONE tests below.
@@ -198,7 +222,7 @@ export function stageDenialReason(role: string, current: string | null | undefin
       return "This order has been paid for — only warehouse or admin can send it back."
     }
     if (!OP_ZONE.has(at)) return "The warehouse has this item — only warehouse or admin can change its status now."
-    if (!OP_ZONE.has(to)) return "Operators can move an item as far as Awaiting scan."
+    if (!OP_ZONE.has(to)) return "Operators can move an item as far as Working."
     return null
   }
   return "Your role cannot change production status."
@@ -243,7 +267,7 @@ export function canWalk(role: string, current: string | null | undefined, target
 }
 
 // Does this role get a status CONTROL for an item at this stage, or a read-only badge?
-// An operator past Awaiting scan keeps only the stop options, never the pipeline.
+// An operator past Working keeps only the stop options, never the pipeline.
 //
 // Pending is dropped outright for a factory order rather than offered-and-disabled, which
 // is the one place this file breaks its own "never hide, explain" rule — and deliberately.

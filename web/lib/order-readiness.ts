@@ -55,16 +55,22 @@ export function orderReadiness(
   // NO stage fallback. An order with no recorded pre-scan reads as not pre-scanned, which
   // is simply true: we have no evidence it was.
   const preScanned = !!order.label_scanned_at
-  // AMBER = queued to be scanned, by either route. Two ways in, and they read differently,
-  // because "we haven't got to it" and "someone else has it" are different problems with
-  // different people to chase.
+  // AMBER = waiting to be scanned, which is simply: a label exists and no scan is recorded.
+  //
+  // THIS CHIP *IS* THE DISPATCH QUEUE. It used to read `factory_status === 'awaiting_scan'`
+  // back into itself — a stage that existed to feed this chip, and which the chip was then
+  // derived from. That loop is why a cap on the embroidery machine read "Awaiting scan" and
+  // why an order the partner had already picked still did. The stage is gone; the fact was
+  // always here.
+  //
+  // Two ways in still read differently, because "we haven't got to it" and "someone else
+  // has it" are different problems with different people to chase.
   const withPartner = !!(order as { dispatch_pdf_id?: string | null }).dispatch_pdf_id
-  const queuedHere = String(order.factory_status || "") === "awaiting_scan"
   // On a USPS SCAN form. Amber, not violet: the form is a document we printed, and USPS
   // scanning it is a separate event that happens at handover — or doesn't, if the pile
   // never goes out.
   const manifested = !!(order as { manifested_at?: string | null }).manifested_at
-  const scanPending = !preScanned && (withPartner || queuedHere || manifested)
+  const scanPending = !preScanned && !!order.tracking
 
   const scanStatus = preScanned
     // VIOLET the moment a scan is actually recorded, whoever did it. The route is a
@@ -83,10 +89,9 @@ export function orderReadiness(
         // printed is not the parcel being accepted, and only one of those the buyer sees.
         : manifested
           ? "On today's USPS SCAN form — printed, but the carrier hasn't accepted it yet."
-          : "On the dispatch board, waiting to be scanned."
-      : order.tracking
-        ? "Label exists but hasn't been scanned — the buyer's tracking has not started."
-        : "No label yet, so nothing to scan."
+          : "On the dispatch page, waiting to be scanned — the buyer's tracking has not started."
+      // Grey is now exactly one thing: there is no label. Nothing to scan, nothing queued.
+      : "No label yet, so nothing to scan."
 
   const list = items ?? order.items ?? []
   const decorated = list.filter((it) => String(it.print_type || "").trim())

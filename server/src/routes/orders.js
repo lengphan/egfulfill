@@ -53,18 +53,33 @@ function notifyOrderEvent(orderId, event, extra) {
 // Mirrors normalizeStage in web/lib/factory-status.ts — keep the two in sync. The
 // client filters the dropdown so operators aren't shown options that would 403;
 // THIS is what actually enforces it.
-// 'printed' (the label-paperwork step) was removed: in practice the scan walked straight
-// through it, so it never earned its own place on the line. Legacy 'printed' rows fold to
-// awaiting_scan (label made, not yet scanned) via normalizeStage below.
-const PIPELINE = ['in_review', 'awaiting_scan', 'working', 'shipped'];
+// THE LINE DESCRIBES PRODUCTION. NOTHING ELSE.
+//
+// 'awaiting_scan' was removed for the same reason 'printed' was before it: it is not a
+// state of the GOODS. It described where the LABEL had got to — bought, queued, waiting on
+// the scan service — and a label's journey runs BESIDE production, not through it. One
+// column can hold one value, so the label kept winning it: a cap being embroidered read
+// "Awaiting scan", and an order byeastside had already picked read "Awaiting scan" too,
+// because the partner sync writes label_scanned_at and never touches the stage.
+//
+// That fact has a home already — `label_scanned_at`, plus the Label/Scan chips the row has
+// always carried (web/lib/order-readiness.ts). The dispatch queue is now read from those:
+// a label we bought, not yet scanned. Legacy rows fold to 'working' below, exactly as
+// 'printed'/'scanned'/'packing' already do.
+const PIPELINE = ['in_review', 'working', 'shipped'];
 // Flagged + Backorder were retired; normalizeStage collapses any legacy value onto on_hold.
 const EXCEPTIONS = ['on_hold', 'cancelled', 'refunded'];
 function normalizeStage(s) {
   const v = String(s || '').toLowerCase().trim();
   if (['new', 'draft', 'none', 'pending'].includes(v)) return '';
   if (PIPELINE.includes(v) || EXCEPTIONS.includes(v)) return v;
-  if (['approved', 'ready_print', 'in_queue', 'queued', 'prescan', 'printed', 'label', 'labelled', 'labeled'].includes(v)) return 'awaiting_scan';
-  if (['scanned', 'printing', 'qc', 'production', 'in_production', 'in-prod', 'prepress',
+  // Every retired id folds onto 'working' — they all meant "accepted and being made",
+  // whatever paperwork step they were named after. 'awaiting_scan' joins them: the 3 orders
+  // and 6 line items still carrying it were accepted into production, which is what
+  // 'working' says, and their label state is read from label_scanned_at as it always was.
+  if (['approved', 'ready_print', 'in_queue', 'queued', 'prescan', 'printed', 'label', 'labelled', 'labeled',
+       'awaiting_scan', 'awaiting-scan',
+       'scanned', 'printing', 'qc', 'production', 'in_production', 'in-prod', 'prepress',
        'packing', 'packed', 'ready', 'finished'].includes(v)) return 'working';
   if (['fulfilled', 'delivered', 'in_transit'].includes(v)) return 'shipped';
   // Flagged + Backorder were retired — collapse them and their aliases onto on_hold, the one
@@ -83,7 +98,10 @@ function normalizeStage(s) {
 //     nor rewinds; it parks the item for warehouse/admin.
 //   • cancelled/refunded are money calls (admin). The operator puts it on hold; whoever
 //     has the authority resolves.
-const OP_ZONE = new Set(['', 'in_review', 'awaiting_scan']);   // normalized
+// An operator may accept work INTO production; they still cannot claim it left. The zone
+// used to end at 'awaiting_scan' — with that stage gone, 'working' is the same boundary
+// under the name that survived, and 'shipped' is still theirs to not touch.
+const OP_ZONE = new Set(['', 'in_review', 'working']);   // normalized
 const OP_STOPS = new Set(['on_hold']);
 const MONEY_STAGES = new Set(['cancelled', 'refunded']);
 
@@ -97,11 +115,11 @@ const MONEY_STAGES = new Set(['cancelled', 'refunded']);
 // job yet. A factory-owned order has no seller, is never charged (the charge lives in the
 // `if (sel)` block, and staff resolve to sel = null) and approves itself — so the stage
 // cannot describe anything true about it. It was only ever passed THROUGH, to satisfy the
-// one-step rule: the floor's own orders were walked new → in_review → awaiting_scan in
-// under a second, and any that stopped halfway sat in the seller queue looking like work
-// someone was waiting on us for.
+// one-step rule: the floor's own orders were walked new → in_review → working in under a
+// second, and any that stopped halfway sat in the seller queue looking like work someone
+// was waiting on us for.
 //
-// So for those orders the stage simply isn't on the line: '' → awaiting_scan is one step.
+// So for those orders the stage simply isn't on the line: '' → working is one step.
 // This does not weaken the skip rule. That rule exists so nobody can assert PHYSICAL WORK
 // that didn't happen — printed, scanned, shipped. in_review is a payment-and-approval
 // state that cannot exist for a factory order, so stepping over it asserts nothing at all.
@@ -116,8 +134,7 @@ const posOf = (s, isFactory = false) => lineFor(isFactory).indexOf(normalizeStag
 // Human names, so a refusal can say which stages would be skipped rather than printing
 // the internal ids at someone.
 const STAGE_LABEL = {
-  '': 'Draft', in_review: 'Pending', awaiting_scan: 'Awaiting scan',
-  working: 'Working', shipped: 'Shipped',
+  '': 'Draft', in_review: 'Pending', working: 'Working', shipped: 'Shipped',
 };
 
 /**
@@ -185,10 +202,10 @@ export function stageDenial(role, current, target, isFactory = false) {
     // untouched while the money stays taken — and the seller sees it as editable again.
     // Anything that leaves a paid order looking unpaid is warehouse or admin.
     // The test is the DESTINATION, not the origin. Written as `at === 'in_review'` it only
-    // blocked the direct hop, and OP_ZONE also contains awaiting_scan — so the same move
+    // blocked the direct hop, and OP_ZONE holds the next stage along too — so the same move
     // went through in two clicks:
     //     Submitted --X--> Received        blocked
-    //     Submitted --OK--> Awaiting scan --OK--> Received     same result, guard skipped
+    //     Submitted --OK--> Working --OK--> Received     same result, guard skipped
     // Anything that has reached in_review has been PAID for; sending it back to Received
     // makes a paid order read as untouched and editable while the money stays taken. That
     // is true whichever stage it is sent back FROM, so the rule is about where it lands.
@@ -1208,8 +1225,8 @@ export function ordersRoutes(app, requireAuth) {
       const fs = String(cur.factory_status || '');
       // The seller's own zone. 'in_review' is theirs too: they've submitted (and been
       // charged) but nobody has picked the order up, so cancelling is still safe and
-      // fully refundable. Once it's awaiting_scan or beyond, the floor owns it and the
-      // only route back is a refund REQUEST the factory approves.
+      // fully refundable. Once it's working or beyond, the floor owns it and the only
+      // route back is a refund REQUEST the factory approves.
       const SELLER_ZONE = ['', 'new', 'draft', 'in_review'];
       const started = !SELLER_ZONE.includes(fs);
       if (body.tracking !== undefined || body.carrier !== undefined) {
@@ -1534,16 +1551,20 @@ export function ordersRoutes(app, requireAuth) {
     // endpoint being down must never fail the floor's status write.
     notifyOrderEvent(req.params.id, normalizeStage(status) === 'shipped' ? 'order.shipped' : 'order.status_changed',
       { line: { sku, line_id: lineId || null }, status: normalizeStage(status) || null });
-    // Reaching the scan stage tops the blanks back up: anything now projected below its
-    // reorder point is appended to that supplier's DRAFT purchase order (draft only —
-    // placing an order stays a human click on the Purchase board).
+    // ACCEPTING WORK tops the blanks back up: anything now projected below its reorder
+    // point is appended to that supplier's DRAFT purchase order (draft only — placing an
+    // order stays a human click on the Purchase board).
+    //
+    // Keyed on 'working', which is where an accepted order now lands. It was keyed on the
+    // retired scan stage, which was the same moment under a name that described the label.
+    // Committing to make something is what consumes a blank; buying its postage is not.
     //
     // Designs are DELIBERATELY not auto-carded here. A design reaches the board only when a
     // human sends it (Send to designer / Send to Pink), so a status change — or a label —
     // never floods the board. `design` stays null to keep the response shape stable for
     // existing callers. (autoPushDesigns is now dormant.)
     let design = null, replenish = null;
-    if (normalizeStage(status) === 'awaiting_scan') {
+    if (normalizeStage(status) === 'working') {
       replenish = await autoReplenish(req.params.id).catch(() => null);
     }
     egBroadcast({ type: 'item-status' });   // no id/sku — see the note above

@@ -18,22 +18,36 @@ import { DISPATCH_GRID, DISPATCH_HEAD } from "@/components/app/dispatch-grid"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
-import { canSetStage, canWalk, stagePath, normalizeStage } from "@/lib/factory-status"
+import { canSetStage, canWalk, stagePath, normalizeStage, isException, orderStage, isFactoryOrder } from "@/lib/factory-status"
 
 /**
- * DISPATCH — everything that has finished production and is waiting to leave.
+ * DISPATCH — every label that needs scanning.
  *
  * The production queue answers "what are we making?"; this answers "what's going out
- * today?", which is a different job done by a different person at a different time. Orders
- * land here at `awaiting_scan` and leave when their labels have been scanned — either by
- * us or by a third-party scan service, which is why the batch has to be printable and
- * handable rather than only clickable.
+ * today?", a different job done by a different person at a different time — which is why
+ * the batch has to be printable and handable rather than only clickable.
+ *
+ * IT IS A QUESTION ABOUT LABELS, NOT A STAGE.
+ *
+ * This used to hold `factory_status === 'awaiting_scan'`, which made the dispatch queue a
+ * position in the middle of the PRODUCTION line. A label's journey doesn't run through
+ * production, it runs beside it: bought, queued, handed to the scan service, picked — all
+ * while the thing is still on the machine. One column can hold one of those, so the label
+ * kept winning and a cap being embroidered read "Awaiting scan".
+ *
+ * So the queue is now the fact it always was: a tracking number with no scan against it.
+ * Buying a label puts an order here (or a TikTok order arriving with the platform's own
+ * tracking number — same test, we don't care who issued it). Recording a scan takes it
+ * away. Nothing about production is claimed either way.
  *
  * Deliberately NOT wired to the design board: pushing artwork and moving custody are
  * separate claims, and coupling them would re-push designs we already have.
  */
-
-const STAGE = "awaiting_scan"
+const needsScan = (o: OrderRow) => {
+  const fs = normalizeStage(o.factory_status)
+  // A shipped or stopped order is nobody's scan job — it has left, or it has been halted.
+  return !!o.tracking && !o.label_scanned_at && fs !== "shipped" && !isException(fs)
+}
 
 // Ship-to for the inline label dialog, read from the order's address with the same loose
 // fallbacks the boards use (marketplace payloads spell the fields a dozen ways).
@@ -48,12 +62,6 @@ const toShip = (o: OrderRow): ShipAddress => {
     zip: a.zip || a.postal_code || a.postcode || "",
   }
 }
-// Scanned parcels go to WORKING: once the scan service has scanned the label and it's been
-// combined with the design, the item is production work with its tasks checked. "printed"
-// sits between the two in the pipeline but describes the label step, which by this point
-// has already happened.
-const NEXT = "working"
-
 // History = every order that ever had a label, and WHAT BECAME OF IT — so a label pulled
 // off the board isn't lost track of. `disposition` reads current state into one outcome.
 /** `attention` belongs to EXTERNAL labels only — their extractor read the file and found
@@ -65,9 +73,10 @@ function disposition(o: OrderRow): { key: DispKey; label: string } {
   if (fs === "cancelled" || fs === "refunded") return { key: "cancelled", label: fs === "refunded" ? "Refunded" : "Cancelled" }
   if (fs === "shipped") return { key: "shipped", label: "Shipped" }
   if (o.label_scanned_at) return { key: "scanned", label: "Scanned" }
-  if (fs === "awaiting_scan") return { key: "awaiting", label: "Awaiting scan" }
-  if (fs === "working" || fs === "printed") return { key: "production", label: "In production" }
-  return { key: "removed", label: "Off the board" }   // has a label but sits before the board
+  // Not scanned yet — so this row says WHERE ITS LABEL IS, which is the only thing this
+  // page is about. What production is doing is a separate answer and has its own column.
+  if (o.tracking) return { key: "awaiting", label: "Not scanned" }
+  return { key: "removed", label: "No label" }
 }
 /**
  * Outcome as a MARK AND A WORD, not a filled pill.
@@ -147,7 +156,7 @@ function DispStatus({ k, label }: { k: DispKey; label: string }) {
   const m = DISP_MARK[k]
   const I = m.icon
   return (
-    <span className="inline-flex w-fit items-center gap-1.5 text-xs font-medium">
+    <span className="inline-flex max-w-full items-center gap-1.5 text-xs font-medium">
       <I size={13} weight={m.weight ?? "fill"} className={"shrink-0 " + m.cls} />
       <span className="truncate">{label}</span>
     </span>
@@ -174,7 +183,7 @@ const HIST_GRID = "grid items-center gap-3 px-5 grid-cols-[1rem_9.5rem_12rem_min
 // files, charges) belongs on the order page, not the scan floor.
 const DISPATCH_ACTIONS = /^order\.scan|^dispatch\.|^label\.|^order\.manifested|^order\.(shipped|tracking)/
 const HIST_FILTERS: { key: "all" | DispKey; label: string }[] = [
-  { key: "all", label: "All" }, { key: "scanned", label: "Scanned" }, { key: "awaiting", label: "Awaiting" },
+  { key: "all", label: "All" }, { key: "scanned", label: "Scanned" }, { key: "awaiting", label: "To scan" },
   { key: "production", label: "In production" }, { key: "shipped", label: "Shipped" },
   { key: "removed", label: "Off board" }, { key: "cancelled", label: "Cancelled" },
   { key: "attention", label: "Needs a look" },
@@ -244,7 +253,7 @@ export function DispatchBoard() {
   }, [load])
 
   const queue = useMemo(() => {
-    const all = (orders ?? []).filter((o) => String(o.factory_status ?? "") === STAGE)
+    const all = (orders ?? []).filter(needsScan)
     const term = q.trim().toLowerCase()
     const matched = term
       ? all.filter((o) => [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
@@ -254,11 +263,11 @@ export function DispatchBoard() {
     return [...matched].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
   }, [orders, q])
 
-  // Orders still LINKED to the partner (dispatch_pdf_id) but OFF the board and not scanned —
-  // i.e. a recall that failed (byeastside 500). They read amber forever with no way to fix it
-  // from the queue, so surface them with an admin force-clear.
+  // Orders still LINKED to the partner (dispatch_pdf_id) but no longer in the scan queue and
+  // never scanned — i.e. a recall that failed (byeastside 500). They read amber forever with
+  // no way to fix it from the queue, so surface them with an admin force-clear.
   const stuck = useMemo(() =>
-    (orders ?? []).filter((o) => o.dispatch_pdf_id && !o.label_scanned_at && normalizeStage(o.factory_status) !== STAGE),
+    (orders ?? []).filter((o) => o.dispatch_pdf_id && !o.label_scanned_at && !needsScan(o)),
     [orders])
 
   // Admin escape hatch for a stuck link (partner refused the recall). Clears OUR dispatch_pdf_id
@@ -366,8 +375,10 @@ export function DispatchBoard() {
 
   // A label is what makes an order dispatchable. Without one there is nothing to scan, so
   // these are surfaced separately rather than silently included in a batch.
-  const withLabel = queue.filter((o) => !!o.tracking)
-  const noLabel = queue.filter((o) => !o.tracking)
+  // Everything in the queue has a label — that is the definition of being in it. What
+  // varies is who is holding it: still on our bench, or already with the partner.
+  const withLabel = queue
+  const withPartner = queue.filter((o) => !!o.dispatch_pdf_id)
 
   // Is byeastside configured? Offering a route that can't work is worse than offering
   // one route, because the failure only shows after the click.
@@ -447,80 +458,40 @@ export function DispatchBoard() {
   }
 
   /**
-   * Take orders back off the dispatch board.
+   * NO "REMOVE FROM BOARD".
    *
-   * They return to in_review — the stage they were staged FROM — rather than being
-   * cancelled or shipped: coming off this board means "not being scanned right now",
-   * which is a scheduling decision, not a claim about the work or the money.
+   * It used to send the order back to Pending — rewinding PRODUCTION to take a label out of
+   * the scan queue, because the queue was a production stage. A dispatch decision must never
+   * say the cap stopped being made.
    *
-   * This existed nowhere. An order with no label couldn't even be selected, so an order
-   * staged here by mistake had nothing that could touch it and simply sat.
+   * There is also nothing left to remove: an order is listed here because it carries a
+   * tracking number nobody has scanned. It leaves by being scanned, or by the label being
+   * voided. Which parcels go in today's handover is what the tick-boxes are for, and
+   * "Cancel with byeastside" still recalls anything already handed over.
    */
-  const removeFromBoard = async (ids: string[]) => {
-    if (!ids.length) return
-    setBusy(true); setErr(null)
-    // An order that's with the partner must be PULLED BACK first. Otherwise "remove" only
-    // changes the stage while the label stays in their queue — they can still scan it (starting
-    // the buyer's clock) and the Scan tag rightly stays amber. Cancelling clears dispatch_pdf_id
-    // (→ the tag greys, since it's no longer with anyone) and records it in history.
-    const list = orders ?? []
-    const withPartner = list.filter((o) => ids.includes(o.id) && o.dispatch_pdf_id && !o.label_scanned_at)
-    const blocked = new Set<string>()   // pulled-back attempt found it already scanned — leave it
-    if (withPartner.length) {
-      try {
-        const r = await cancelDispatch(withPartner.map((o) => o.id))
-        for (const res of r.results ?? []) if (!res.ok && res.reason === "already-scanned") blocked.add(res.id)
-      } catch { /* best-effort — still move the rest back */ }
-    }
-    const failed: string[] = []
-    for (const id of ids) {
-      if (blocked.has(id)) continue   // it got scanned; its tracking is live — don't un-review it
-      try { await updateOrder(id, { factoryStatus: "in_review" }) } catch { failed.push(id) }
-    }
-    setBusy(false)
-    setPicked(new Set())
-    const msgs: string[] = []
-    if (blocked.size) msgs.push(`${blocked.size} already scanned by the partner — left as they are.`)
-    if (failed.length) msgs.push(`Couldn't remove ${failed.length} order${failed.length === 1 ? "" : "s"} — your role may not be able to move them back.`)
-    if (msgs.length) setErr(msgs.join(" "))
-    load()
-  }
 
+  /**
+   * We scanned these ourselves. RECORD THE SCAN — and nothing else.
+   *
+   * It used to also walk the order two stages up the pipeline, because the scan WAS a stage.
+   * That is the claim this change removes: scanning a label says the buyer's tracking is
+   * live, not that the cap has been embroidered. An order can be scanned on Monday and
+   * finished on Wednesday — that is the whole point of pre-scanning — and the stage must go
+   * on saying what production is doing while that happens.
+   *
+   * So the only write is `label_scanned_at`, which is what the Scan chip has always read.
+   * The order leaves this queue because it has been scanned, not because it moved.
+   */
   const markScanned = async () => {
     if (!chosen.length) return
     setBusy(true); setErr(null)
     const failed: string[] = []
-    // The pipeline is awaiting_scan → printed → working, so a scan advances TWO stages.
-    // The server refuses a two-stage jump one hop at a time (skip guard), so record each
-    // stage on the way — "printed" is the label-paperwork step, done by the time a parcel
-    // is scanned. Falls back to a single move if the pipeline ever makes them adjacent.
-    const path = stagePath(STAGE, NEXT) ?? [NEXT]
     for (const o of chosen) {
-      try {
-        // RECORD THE SCAN ITSELF, not just the stage move. These are two different facts
-        // and only one of them was being written: label_scanned_at means "the buyer's
-        // tracking is live", while factory_status means "where the work has got to". The
-        // stage was advancing and the scan was never recorded, so the readiness pill —
-        // which reads label_scanned_at, correctly — stayed dark on orders the floor had
-        // just scanned.
-        //
-        // Best-effort: an order whose scan won't record must still advance, because the
-        // parcel has physically been scanned either way.
-        await markScannedInHouse(o.id).catch(() => {})
-        // Walk the stages in order: every item to "printed", then every item to "working".
-        // Each hop is validated against the item's CURRENT stage, so the second hop only
-        // passes because the first already moved it — teleporting straight to working 403s.
-        for (const stage of path) {
-          for (const it of o.items ?? []) {
-            if (it.sku || it.line_id) await postItemStatus(o.id, it.sku ?? "", stage, it.line_id)
-          }
-        }
-        await updateOrder(o.id, { factoryStatus: NEXT })
-      } catch { failed.push(numOf(o)) }
+      try { await markScannedInHouse(o.id) } catch { failed.push(numOf(o)) }
     }
     setBusy(false)
     setPicked(new Set())
-    if (failed.length) setErr(`Couldn't advance ${failed.length} order${failed.length === 1 ? "" : "s"}: ${failed.join(", ")}`)
+    if (failed.length) setErr(`Couldn't record the scan on ${failed.length} order${failed.length === 1 ? "" : "s"}: ${failed.join(", ")}`)
     load()
   }
 
@@ -571,7 +542,7 @@ export function DispatchBoard() {
       if (other.length) parts.push(`${other.length} failed (${other[0].reason})`)
       setErr(parts.length ? parts.join(" · ") : "Nothing to pull back.")
       // Keep the successfully pulled-back orders SELECTED — they stay on the board
-      // (still awaiting_scan) and the usual next move is to scan them in-house right away,
+      // (still unscanned) and the usual next move is to scan them in-house right away,
       // so "Scanned here" should be live without re-ticking every box. Already-picked ones
       // (couldn't recall) drop out of the selection.
       setPicked(new Set(results.filter((x) => x.ok).map((x) => String(x.id))))
@@ -718,16 +689,20 @@ export function DispatchBoard() {
   // way to Shipped (one hop at a time so the skip guard passes), then sets the order Shipped,
   // so the seller sees Fulfilled. The server ship guard STILL applies per order — anything not
   // actually ready (a line unmade, no label) is skipped and reported, never force-shipped.
+  //
+  // The walk starts from EACH ORDER'S OWN stage, not from a fixed one. This queue is a
+  // question about labels now, so the orders in it can be anywhere in production — one
+  // pre-scanned on Monday and still on the machine, another finished and boxed.
   const finishAll = async () => {
     if (!chosen.length) return
     if (!(await confirm({ title: `Finish ${chosen.length} order${chosen.length === 1 ? "" : "s"}?`, body: `This marks ${chosen.length === 1 ? "it" : "them"} Shipped — Fulfilled to the seller — and closes ${chosen.length === 1 ? "it" : "them"} out.`, confirmLabel: "Finish", destructive: false }))) return
     setBusy(true); setErr(null)
     const failed: string[] = []
-    const path = stagePath(STAGE, "shipped") ?? ["shipped"]
     for (const o of chosen) {
       try {
         await markScannedInHouse(o.id).catch(() => {})
-        for (const stage of path) {
+        const from = o.factory_status ?? orderStage(o.items ?? [])
+        for (const stage of stagePath(from, "shipped", isFactoryOrder(o)) ?? ["shipped"]) {
           for (const it of o.items ?? []) {
             if (it.sku || it.line_id) await postItemStatus(o.id, it.sku ?? "", stage, it.line_id)
           }
@@ -740,14 +715,16 @@ export function DispatchBoard() {
     load()
   }
 
-  // awaiting_scan → working is TWO steps in the pipeline ("printed" sits between), so it's a
-  // skip, and stageDenial refuses a skip for EVERYONE — which greyed "Scanned here" out for
-  // every role, always, however an order was selected. The scan doesn't teleport past
-  // printed; it WALKS it (markScanned below), so the gate is "can this role walk there" —
-  // true for warehouse/admin, still false for an operator whose zone ends at the scan.
-  const canAdvance = canSetStage(role, STAGE, NEXT) || canWalk(role, STAGE, NEXT)
-  // Finishing walks all the way to Shipped, so the gate is "can this role walk there".
-  const canFinish = canWalk(role, STAGE, "shipped") || canSetStage(role, STAGE, "shipped")
+  // "Scanned here" needs no stage permission at all now — it records a scan, and a scan is
+  // not a claim about production. The role gate that remains is the one that always
+  // mattered: `canScanOut`, since asserting physical custody stays warehouse/admin.
+  // Finishing DOES move the stage, all the way to Shipped, so it keeps its walk test —
+  // asked of each selected order's own stage, because they can be anywhere in production.
+  const canFinish = chosen.every((o) => {
+    const from = o.factory_status ?? orderStage(o.items ?? [])
+    const fac = isFactoryOrder(o)
+    return canWalk(role, from, "shipped", fac) || canSetStage(role, from, "shipped", fac)
+  })
   const [manifestOpen, setManifestOpen] = useState(false)
   // Mirrors the server's eligibility rules (lib/manifest-eligible.ts) so the button can
   // say why before the click rather than after.
@@ -760,8 +737,8 @@ export function DispatchBoard() {
   return (
     <div className="space-y-4">
       <StatGrid>
-        <StatCard label="Ready to dispatch" value={String(withLabel.length)} sub="labelled, waiting to scan" tone="pos" />
-        <StatCard label="Missing a label" value={String(noLabel.length)} sub="can&apos;t go out yet" tone="neg" />
+        <StatCard label="To scan" value={String(queue.length)} sub="labelled, not scanned yet" tone="pos" />
+        <StatCard label="With byeastside" value={String(withPartner.length)} sub="in their queue, not picked yet" tone={withPartner.length ? "neg" : "mut"} />
       </StatGrid>
 
       {/* Stuck with the partner: still linked (dispatch_pdf_id) but off the board and unscanned,
@@ -863,15 +840,15 @@ export function DispatchBoard() {
                 <ArrowUUpLeft size={14} weight="bold" /> Pull back <CaretDown size={12} weight="bold" className="text-muted-foreground" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 p-1">
-                {/* Takes the selected orders off the board AND discards any selected file
-                    that was dropped but never sent — same word for both, because in both
-                    cases nothing has left and nothing is being claimed. */}
+                {/* Discards any selected file that was dropped but never sent. Only staged
+                    files — an ORDER has nothing to discard, it is listed because it has an
+                    unscanned label. */}
                 <DropdownMenuItem
-                  disabled={(!chosen.length && !stagedChosen.length) || busy}
-                  onClick={() => { for (const s of stagedChosen) discardStaged(stagedKeyOf(s)); void removeFromBoard(chosen.map((o) => o.id)) }}
-                  title="Send these back to review — off the board without being scanned"
+                  disabled={!stagedChosen.length || busy}
+                  onClick={() => { for (const s of stagedChosen) discardStaged(stagedKeyOf(s)) }}
+                  title="Discard the dropped files that haven't been sent anywhere"
                 >
-                  <X size={14} weight="bold" /> Remove from board
+                  <X size={14} weight="bold" /> Discard dropped files
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={(!chosen.length && !uploadsChosen.length) || busy} onClick={pullBack}>
                   <ArrowUUpLeft size={14} weight="bold" /> Cancel with byeastside
@@ -894,7 +871,8 @@ export function DispatchBoard() {
               </Button>
             )}
             {canScanOut && (
-              <Button size="sm" variant="outline" disabled={!chosen.length || busy || !canAdvance} onClick={markScanned} title={canAdvance ? undefined : "Your role can't move orders past this stage"}>
+              <Button size="sm" variant="outline" disabled={!chosen.length || busy} onClick={markScanned}
+                title="Record that we scanned these ourselves — starts the buyer's tracking. Doesn't change what production is doing.">
                 {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Scanned here</>}
               </Button>
             )}
@@ -908,14 +886,14 @@ export function DispatchBoard() {
         )}
       >
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-          {/* Awaiting-scan vs. scanned history. Kept as a segmented toggle rather than a
+          {/* Waiting-to-scan vs. history. Kept as a segmented toggle rather than a
               second page so the search box and stat cards above stay put. */}
           <div className="inline-flex shrink-0 rounded-lg border border-border p-0.5 text-sm">
             <button
               onClick={() => setView("queue")}
               className={"rounded-md px-3 py-1 font-medium transition-colors " + (view === "queue" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
             >
-              Awaiting scan
+              To scan
             </button>
             <button
               onClick={() => setView("history")}
@@ -1120,7 +1098,7 @@ export function DispatchBoard() {
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
             <Truck size={26} weight="duotone" className="opacity-50" />
             <div className="text-sm font-medium text-foreground">Nothing waiting to go out</div>
-            <div className="text-xs">Orders appear here once production marks them awaiting scan — or drop a label PDF anywhere on this page.</div>
+            <div className="text-xs">An order appears here the moment it has a label nobody has scanned — or drop a label PDF anywhere on this page.</div>
           </div>
         ) : (
           /* ONE COLUMN PER FACT — the same nine the external-label list uses, so the two
@@ -1199,19 +1177,6 @@ export function DispatchBoard() {
                         <ArrowSquareOut size={13} weight="bold" />
                       </a>
                     )}
-                    {/* Per-row remove as well as the bulk one: a single order staged by
-                        mistake shouldn't need a selection first, and this row is exactly
-                        where someone notices it doesn't belong. stopPropagation because the
-                        row is a <label> — without it, clicking this toggles the checkbox. */}
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); void removeFromBoard([o.id]) }}
-                      disabled={busy}
-                      className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                      aria-label={`Remove ${numOf(o)} from the dispatch board`}
-                      title="Remove from board — sends it back to review, unscanned"
-                    >
-                      <X size={13} weight="bold" />
-                    </button>
                   </span>
                 </label>
               )

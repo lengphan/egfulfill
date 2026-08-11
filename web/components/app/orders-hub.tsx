@@ -506,9 +506,9 @@ export function OrdersHub() {
     setBusy(`ord:${order.id}`)
     try {
       for (const it of order.items ?? []) {
-        if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", "awaiting_scan", it.line_id)
+        if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", "working", it.line_id)
       }
-      await updateOrder(order.id, { factoryStatus: "awaiting_scan" })
+      await updateOrder(order.id, { factoryStatus: "working" })
       setActionErr(null)
     } catch (e) {
       setActionErr(e instanceof Error ? e.message : "Couldn't start that order.")
@@ -958,7 +958,7 @@ export function OrdersHub() {
     try {
       const ids = [...selected]
       const results = await Promise.all(ids.map((id) =>
-        updateOrder(id, { factoryStatus: "awaiting_scan" })
+        updateOrder(id, { factoryStatus: "working" })
           .then(() => ({ ok: true, error: "" }))
           .catch((e: unknown) => ({ ok: false, error: e instanceof Error ? e.message : "failed" }))))
       const failed = results.filter((x) => !x.ok)
@@ -1634,7 +1634,7 @@ export function OrdersHub() {
                        * Still checked against the guard: the move must be one the API would
                        * accept from here, or the button would offer a 403.
                        */
-                      const canStart = canFulfill && !stopped && isApprovable(o) && canSetStage(role, stage, "awaiting_scan", fac)
+                      const canStart = canFulfill && !stopped && isApprovable(o) && canSetStage(role, stage, "working", fac)
                       const canLabels = canFulfill && items.some((it) => it.sku && variantOf(it))
                       /**
                        * Primary = the one obvious next move: start it, or ship it. There

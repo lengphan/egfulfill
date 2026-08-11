@@ -52,12 +52,12 @@ export function ApproveOrderButton({
     setBusy(true)
     onError?.("")
     try {
-      // One hop either way — in_review → awaiting_scan for a seller's order, "" →
-      // awaiting_scan for the factory's own. Move each line, then the order.
+      // One hop either way — Pending → Working for a seller's order, Draft → Working for
+      // the factory's own. Move each line, then the order.
       for (const it of order.items ?? []) {
-        if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", "awaiting_scan", it.line_id)
+        if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", "working", it.line_id)
       }
-      const r = await updateOrder(order.id, { factoryStatus: "awaiting_scan" })
+      const r = await updateOrder(order.id, { factoryStatus: "working" })
       if ((r as { error?: string })?.error) throw new Error((r as { error?: string }).error)
       onDone()
     } catch (e) {
