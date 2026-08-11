@@ -7,34 +7,25 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { cardProblems, saveCard, type CardDetails } from "@/lib/otto-card"
 
-export type CardDetails = { name: string; card_number: string; cvv: string; exp_date: string }
-
-/** Luhn check, so an obvious typo is caught here rather than as a supplier rejection. */
-function luhnOk(n: string) {
-  let sum = 0, alt = false
-  for (let i = n.length - 1; i >= 0; i--) {
-    let d = parseInt(n[i], 10)
-    if (alt) { d *= 2; if (d > 9) d -= 9 }
-    sum += d; alt = !alt
-  }
-  return n.length > 0 && sum % 10 === 0
-}
+export type { CardDetails }
 
 /**
- * Card entry for an Otto order.
+ * Card entry for an Otto order — the FALLBACK, not the normal path.
  *
- * Otto have NO saved-card concept — unlike S&S, who register a card once and hand back a
- * profileID. Otto's API wants the full number, CVV and expiry on EVERY credit-card order,
- * so it has to be typed each time.
+ * Otto have NO saved-card concept: unlike S&S, who register a card once and hand back a
+ * profileID, Otto's API wants the full number, CVV and expiry on EVERY credit-card order.
+ * That used to mean this window on every purchase, which is exactly what it felt like.
  *
- * Nothing here is stored. The card lives in this component's state, is sent with the one
- * order, and is discarded when the dialog closes. It is never written to a purchase
- * order, and the server strips it from every payload it echoes back — the CVV entirely,
- * since card networks prohibit keeping it in any form.
+ * The card is now entered once in Order settings › Payment and kept in the browser
+ * (lib/otto-card.ts), and placement reads it from there — so this only opens when no
+ * usable card is saved on this machine, or the saved one has expired. "Save in this
+ * browser" below is the same store, so answering it once is the last time it appears.
  *
- * That is not a limitation to work around later: a card number at rest in the database
- * would put the whole of it in PCI scope.
+ * Nothing here reaches our server as storage: the card goes out with that one order, is
+ * never written to a purchase order, and is stripped from every payload the server echoes
+ * back — the CVV entirely, since card networks prohibit keeping it in any form.
  */
 export function CardEntryDialog({
   open, onOpenChange, onSubmit, amount,
@@ -49,27 +40,30 @@ export function CardEntryDialog({
   const [cvv, setCvv] = useState("")
   const [exp, setExp] = useState("")
   const [touched, setTouched] = useState(false)
+  // Default ON: this dialog exists because the card wasn't on file, and leaving it off
+  // means it opens again on the next order — the thing being fixed.
+  const [remember, setRemember] = useState(true)
 
   useEffect(() => {
     if (open) return
     // Clear on close, always. A card left in state after the dialog shuts is a card
     // sitting in memory for no reason.
-    const t = setTimeout(() => { setName(""); setNumber(""); setCvv(""); setExp(""); setTouched(false) }, 0)
+    const t = setTimeout(() => { setName(""); setNumber(""); setCvv(""); setExp(""); setTouched(false); setRemember(true) }, 0)
     return () => clearTimeout(t)
   }, [open])
 
   const digits = number.replace(/\D/g, "")
   const cvvDigits = cvv.replace(/\D/g, "")
-  const errs: string[] = []
-  if (!name.trim()) errs.push("Name on the card")
-  if (digits.length < 13 || digits.length > 19 || !luhnOk(digits)) errs.push("A valid card number")
-  if (cvvDigits.length < 3 || cvvDigits.length > 4) errs.push("A 3 or 4 digit CVV")
-  if (!/^\d{2}\/\d{2,4}$/.test(exp.trim())) errs.push("Expiry as MM/YY")
+  // Same rules the settings form uses — one definition, so a card accepted in one place
+  // can't be rejected in the other.
+  const errs = cardProblems({ name, card_number: number, cvv, exp_date: exp })
 
   const submit = () => {
     setTouched(true)
     if (errs.length) return
-    onSubmit({ name: name.trim(), card_number: digits, cvv: cvvDigits, exp_date: exp.trim() })
+    const card: CardDetails = { name: name.trim(), card_number: digits, cvv: cvvDigits, exp_date: exp.trim() }
+    if (remember) saveCard(card)
+    onSubmit(card)
   }
 
   return (
@@ -78,7 +72,11 @@ export function CardEntryDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><CreditCard size={18} weight="fill" /> Card details</DialogTitle>
           <DialogDescription>
-            Otto require the card on every order — they have no saved-card API.
+            {/* WHY IT OPENED. It no longer appears on every order, so "Otto require a card"
+                alone doesn't explain this particular window — the answer is that this
+                browser has no usable card on file. */}
+            No card is saved in this browser, so this order needs one. Otto require it on
+            every order and have no saved-card API.
             {/* The figure we hold is the PRODUCT subtotal, and Otto bill freight on top of
                 it: a $3.60 order of caps came back charged at $21.35. Presenting the
                 subtotal as "this order is $3.60" understates the card by the whole of the
@@ -138,13 +136,24 @@ export function CardEntryDialog({
             </div>
           )}
 
+          {/* The way out of this window. Ticked, the card goes to the same browser store
+              Order settings › Payment writes, and placement reads it from there. */}
+          <label className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
+                   className="mt-0.5 size-3.5 accent-[var(--primary)]" />
+            <span>
+              <strong className="text-foreground">Save in this browser</strong> so Otto orders stop
+              asking. Change or remove it any time at <strong>Order settings › Payment</strong>.
+            </span>
+          </label>
+
           {/* Said plainly, because "will this be saved" is the reasonable question and the
-              honest answer is a selling point rather than a caveat. */}
+              honest answer is short. */}
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <Lock size={13} weight="fill" className="mt-0.5 shrink-0" />
-            Sent with this order only. Not saved here, not written to the purchase order, and
-            stripped from anything the supplier sends back. Let your browser or password
-            manager save it and it fills in one click — Otto ask for it on every order.
+            {remember
+              ? "Kept in this browser only — never on EGFULFILL's server, never written to the purchase order, and stripped from anything the supplier sends back."
+              : "Sent with this order only. Not saved here, not written to the purchase order, and stripped from anything the supplier sends back — so the next Otto order will ask again."}
           </p>
         </div>
 

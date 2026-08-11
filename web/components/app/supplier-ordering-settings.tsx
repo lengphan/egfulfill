@@ -5,6 +5,7 @@ import { CircleNotch, Check, Warning, ArrowSquareOut } from "@phosphor-icons/rea
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSupplierOptions, setFactorySettings, type SupplierOptions } from "@/lib/api"
+import { OttoCardOnFile } from "@/components/app/otto-card-on-file"
 
 const maskCard = (label: string | null) => {
   if (!label) return "Saved payment method"
@@ -37,10 +38,10 @@ const selectCls =
  * reference — and the label they return is already masked to the last four. We keep the
  * id. A full PAN never reaches this app, which is what keeps it outside PCI DSS scope.
  *
- * Otto is different and cannot be fixed from our side: their API exposes no saved cards,
- * so a card-paid Otto order needs the number every time. Storing it ourselves is exactly
- * the thing worth avoiding, so the card field stays in the order dialog and this screen
- * says why.
+ * Otto is different and cannot be fixed from our side: their API exposes no saved cards, so
+ * a card-paid Otto order needs the number every time. It is entered here once and held in
+ * the BROWSER — never in our database, which is what keeps a PAN out of PCI scope and out
+ * of the nightly dump. See lib/otto-card.ts.
  */
 export function SupplierOrderingSettings() {
   const [opts, setOpts] = useState<SupplierOptions | null>(null)
@@ -169,16 +170,12 @@ export function SupplierOrderingSettings() {
               </select>
             </Row>
 
-            {/* Credit Card is a valid, working choice — Otto bills the card held on your
-                account and no number is entered here. What is off is TYPING a card into this
-                app, which would put the server in PCI scope. The old copy conflated the two
-                and read as "card orders don't work", which they do. */}
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              <strong className="text-foreground">Credit Card works</strong> — Otto charges the card
-              held on your account, and no card number is entered here or sent by us. What&apos;s
-              switched off is typing a card into EGFULFILL, which would put this server inside PCI
-              DSS scope. Unlike S&amp;S, Otto&apos;s API exposes no saved-card token, so there is
-              nothing safer for us to store. 
+            {/* Otto reject a credit-card order that arrives without a card — they do NOT bill
+                one held on the account, which is what the old copy here assumed. So a card has
+                to be sent, and this is where it's entered: once, in the browser, instead of in
+                a dialog on every placement. */}
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <OttoCardOnFile />
             </div>
 
             <Row label="Order as" hint="Otto require a customer and a contact on every order.">

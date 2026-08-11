@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getSupplierOptions, setFactorySettings, getSsDaysInTransit, setAdminSecret, type SupplierOptions } from "@/lib/api"
 import { getUser } from "@/lib/auth"
+import { OttoCardOnFile } from "@/components/app/otto-card-on-file"
 
 /**
  * Show a payment profile safely.
@@ -296,8 +297,16 @@ export function SupplierOrderingDialog({
                         </select>
                       </Field>
                       <p className="text-xs text-muted-foreground">
-                        Billing terms from your Otto account — they expose no saved cards.
+                        Billing terms from your Otto account — they expose no saved cards, so a
+                        card-paid order carries the card below.
                       </p>
+                      {/* The card lives HERE rather than in a dialog at placement. Otto need it
+                          on every credit-card order, so asking at placement meant typing the
+                          same number for every purchase. Saved once in this browser, that
+                          window never opens. */}
+                      <div className="rounded-lg border border-border bg-muted/20 p-3">
+                        <OttoCardOnFile compact />
+                      </div>
                       {/* Otto REQUIRE both on every order and they come from their
                           Customer API, so they're picked here rather than typed. */}
                       <Field label="Order as">

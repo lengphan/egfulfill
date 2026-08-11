@@ -21,7 +21,8 @@ import { PoReturnDialog } from "@/components/app/po-return-dialog"
 import { StockSplitWarning } from "@/components/app/stock-split-warning"
 import { warehouseEta, fmtEta } from "@/lib/warehouse-eta"
 import { ReceiveScanDialog } from "@/components/app/receive-scan-dialog"
-import { CardEntryDialog, type CardDetails } from "@/components/app/card-entry-dialog"
+import { CardEntryDialog } from "@/components/app/card-entry-dialog"
+import { usableCard, type CardDetails } from "@/lib/otto-card"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -192,8 +193,9 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [supplierCfg, setSupplierCfg] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
-  // Otto have no saved cards, so a card order needs one typed at placement. Held here only
-  // for the moment between entry and send — never stored, never written to a PO.
+  // Otto have no saved cards, so a card order carries one. It normally comes from the card
+  // on file in this browser (Order settings › Payment) and nothing opens; this is only for
+  // the case where there isn't a usable one to send.
   const [needCard, setNeedCard] = useState(false)
   const [returning, setReturning] = useState<PurchaseOrder | null>(null)
   // S&S tracking, keyed by PO number. Fetched on demand rather than stored: a shipment in
@@ -386,6 +388,10 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
               shipping_address: opts.shipTo,
               shipping_method: opts.defaults.otto_shipping_method || undefined,
               payment_method: opts.defaults.otto_payment_method || undefined,
+              // Same card the place-all path sends — the one saved in this browser at Order
+              // settings › Payment. Without it a credit-card order is rejected by Otto, and
+              // this path had no way to supply one at all.
+              card_details: usableCard() ?? undefined,
               customer_po: po.num,
             })
             if (r.error) throw new Error(r.error); resp = r
@@ -765,13 +771,20 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
     //
     // Only for a CARD order: an account on terms sends no card and needs none, and asking
     // for a PAN it will not use is the thing the previous change was right to object to.
-    // The number is typed at placement and sent with that ONE request — the server strips
-    // it from anything it echoes back, so it never reaches purchase_orders.meta and never
-    // lands in a nightly pg_dump. Nothing here stores a card.
+    // The card is sent with that ONE request — the server strips it from anything it echoes
+    // back, so it never reaches purchase_orders.meta and never lands in a nightly pg_dump.
+    // Nothing on OUR side stores a card.
+    //
+    // WHERE IT COMES FROM has changed: it's entered once at Order settings › Payment and
+    // kept in this browser (lib/otto-card.ts), so the dialog no longer opens on every
+    // purchase. `card` is the dialog's answer and wins when present; otherwise the card on
+    // file is used, and only when there is no usable one — none saved, or the saved one has
+    // expired — does anything get asked.
     //
     // NB the server also refuses a typed card unless OTTO_CARD_ORDERS=1, so that env must
     // be set or the card is stripped and Otto reject the order for the same reason again.
-    const ottoNeedsCard = /credit\s*card/i.test(String(opts.defaults.otto_payment_method || "")) && !card
+    const ottoCard = card ?? usableCard() ?? undefined
+    const ottoNeedsCard = /credit\s*card/i.test(String(opts.defaults.otto_payment_method || "")) && !ottoCard
     const ottoMissingParty = !(opts.defaults.otto_customer && opts.defaults.otto_contact)
 
     setBusy("place-all"); setMsg(null)
@@ -811,9 +824,9 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
               payment_method: opts.defaults.otto_payment_method || undefined,
               customer: opts.defaults.otto_customer || undefined,
               contact: opts.defaults.otto_contact || undefined,
-              // Sent, never saved: the server strips it from anything it echoes back, so
+              // Sent, never saved server-side: it's stripped from anything echoed back, so
               // it can't reach purchase_orders.meta.
-              card_details: card,
+              card_details: ottoCard,
               customer_po: poNum,
             })
             if (r.error) throw new Error(r.error); resp = r
