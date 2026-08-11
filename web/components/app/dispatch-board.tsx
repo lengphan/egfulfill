@@ -13,7 +13,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
-import { ExternalLabels, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
+import { ExternalLabels, LabelDropBar, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
 import { DISPATCH_GRID, DISPATCH_HEAD } from "@/components/app/dispatch-grid"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
@@ -774,6 +774,11 @@ export function DispatchBoard() {
         </div>
       )}
 
+      {/* ABOVE BOTH LISTS. Dropping a file is the only thing on this screen that isn't
+          done to a row, and it was buried under both of them — see LabelDropBar. Hidden in
+          history, which is a record and takes no new work. */}
+      {view !== "history" && <LabelDropBar onStage={stageFiles} />}
+
       <SectionCard
         title="Dispatch"
         actions={view === "history" ? undefined : (
@@ -1175,7 +1180,6 @@ export function DispatchBoard() {
         uploads={uploads}
         staged={staged}
         picked={extPicked}
-        onStage={stageFiles}
         onDiscard={discardStaged}
         onToggle={toggleExt}
         onToggleAll={toggleAllExt}

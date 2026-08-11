@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { FilePdf, CircleNotch, ArrowSquareOut, Trash, UploadSimple, Barcode, Lock, X, Clock, CheckCircle, Warning } from "@phosphor-icons/react"
+import { FilePdf, CircleNotch, ArrowSquareOut, UploadSimple, Barcode, Lock, X, Clock, CheckCircle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -94,29 +94,20 @@ const TONE: Record<"wait" | "warn" | "ok" | "part", string> = {
 const TONE_ICON = { wait: Clock, warn: Warning, ok: CheckCircle, part: Barcode } as const
 
 /**
- * The list is passed IN rather than fetched here. GET /api/dispatch/uploads syncs from
- * byeastside on read, so two components polling it would double the calls we make to a
- * partner for one screen — and the dispatch board needs the same rows for its history.
- * One owner, one poll. The staged files and the selection are lifted for the same reason:
- * the buttons that act on them live in the board's header.
+ * THE DROP TARGET, as a strip at the top of the screen rather than a panel in the middle.
+ *
+ * It was a tall dashed box inside the external-labels card, which put the one thing you DO
+ * on this screen underneath both lists, and gave a rare action more room than the day's
+ * work. It is also the only control here that isn't a row, so it belongs above the rows
+ * rather than between them.
+ *
+ * One line, because that is all it has to say. The small print it used to carry — PDF only,
+ * and dropping does not send — is now in the strip's own wording and in the row it creates,
+ * which says "Waiting to send" in the status column and is the honest place for it.
  */
-export function ExternalLabels({
-  uploads, staged, picked, onStage, onDiscard, onToggle, onToggleAll, busy, onChanged,
-}: {
-  uploads: DispatchUpload[] | null
-  staged: StagedLabel[]
-  picked: Set<string>
-  onStage: (files: File[]) => void
-  onDiscard: (key: string) => void
-  onToggle: (key: string) => void
-  onToggleAll: () => void
-  busy: boolean
-  onChanged: () => void
-}) {
-  const confirm = useConfirm()
+export function LabelDropBar({ onStage }: { onStage: (files: File[]) => void }) {
   const [over, setOver] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [pulling, setPulling] = useState(false)
 
   /** Caught here, before anything leaves, so dropping a photo by accident answers instantly.
    *  The server checks the bytes as well — this one is about the wait, that one is the truth. */
@@ -128,6 +119,54 @@ export function ExternalLabels({
     setErr(bad.length ? `${bad.map((f) => f.name).join(", ")} — only PDFs can be pre-scanned, that's what carriers issue.` : null)
     if (good.length) onStage(good)
   }
+
+  return (
+    <div className="space-y-2">
+      <label
+        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
+        className={"flex cursor-pointer items-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm transition-colors "
+          + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
+      >
+        <UploadSimple size={15} className="shrink-0 text-muted-foreground" />
+        <span className="shrink-0 font-medium">Drop a label PDF</span>
+        <span className="truncate text-xs text-muted-foreground">
+          or click to choose — it waits below until you send it to byeastside
+        </span>
+        <input
+          type="file" multiple className="sr-only"
+          accept="application/pdf"
+          onChange={(e) => { stage(e.target.files); e.target.value = "" }}
+        />
+      </label>
+      {err && <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">{err}</div>}
+    </div>
+  )
+}
+
+/**
+ * The list is passed IN rather than fetched here. GET /api/dispatch/uploads syncs from
+ * byeastside on read, so two components polling it would double the calls we make to a
+ * partner for one screen — and the dispatch board needs the same rows for its history.
+ * One owner, one poll. The staged files and the selection are lifted for the same reason:
+ * the buttons that act on them live in the board's header.
+ */
+export function ExternalLabels({
+  uploads, staged, picked, onDiscard, onToggle, onToggleAll, busy, onChanged,
+}: {
+  uploads: DispatchUpload[] | null
+  staged: StagedLabel[]
+  picked: Set<string>
+  onDiscard: (key: string) => void
+  onToggle: (key: string) => void
+  onToggleAll: () => void
+  busy: boolean
+  onChanged: () => void
+}) {
+  const confirm = useConfirm()
+  const [err, setErr] = useState<string | null>(null)
+  const [pulling, setPulling] = useState(false)
 
   const pullBack = async (u: DispatchUpload) => {
     const okToGo = await confirm({
@@ -164,29 +203,8 @@ export function ExternalLabels({
       }
       bodyClassName="space-y-3 p-4"
     >
-      <label
-        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-        onDragLeave={() => setOver(false)}
-        onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
-        className={"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed py-7 text-center transition-colors "
-          + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
-      >
-        <UploadSimple size={20} className="text-muted-foreground" />
-        <span className="text-sm font-medium">Drop a label here</span>
-        {/* State both rules up front: the file type their queue accepts, and the fact that
-            dropping does not send. Both cost a line and save a surprise. */}
-        <span className="text-xs text-muted-foreground">
-          PDF only — the file your carrier gave you. It waits here until you send it.
-        </span>
-        <input
-          type="file" multiple className="sr-only"
-          accept="application/pdf"
-          onChange={(e) => { stage(e.target.files); e.target.value = "" }}
-        />
-      </label>
-
       {/* These go to the partner's queue and NOT onto an order — said once, here, because
-          it is the single thing someone could reasonably assume wrong about this box. */}
+          it is the single thing someone could reasonably assume wrong about this card. */}
       <p className="text-xs text-muted-foreground">
         {/* The explicit space is load-bearing: the compiler drops the one after a closing
             tag mid-line, so "byeastsideabove" is what actually shipped without it. */}
@@ -319,7 +337,12 @@ export function ExternalLabels({
                         aria-label={`Pull back ${u.file_name || "label"}`}
                         title="Pull this label back out of byeastside's queue"
                       >
-                        <Trash size={13} weight="bold" />
+                        {/* The SAME X the staged row uses. Two icons for one gesture —
+                            discard here, bin there — read as two different powers, and the
+                            row above is the only place the eye has to compare them. The
+                            difference that matters is carried by the words (discard vs pull
+                            back) and by the confirm, not by the glyph. */}
+                        <X size={13} weight="bold" />
                       </button>
                     ) : (
                       <span
