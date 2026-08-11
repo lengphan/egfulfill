@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
+import { useT, useLabelT } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
 import { getToken, getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
@@ -24,15 +25,19 @@ import { sellerStatus } from "@/lib/order-status"
 import { revenueSeries, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
 
 const DAY = 864e5
+// USD, en-US, IN EVERY LOCALE — deliberately not localised. Sellers here list on
+// international marketplaces and price in dollars, so the figure is the same number in
+// the same currency whatever language the labels are in. The only place money is
+// genuinely converted is the VietQR top-up, which formats its own VND.
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: (Number(n) || 0) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 
 // "Open" = not yet shipped or closed (canonical seller groups).
 const OPEN_GROUPS = new Set(["draft", "pending", "production", "attention"])
 
-const itemsLabel = (o: OrderRow) => {
+const itemsLabel = (o: OrderRow, fallback: string) => {
   const items = o.items ?? []
   if (!items.length) return "—"
-  const first = items[0]?.name || items[0]?.sku || "Item"
+  const first = items[0]?.name || items[0]?.sku || fallback
   return items.length > 1 ? `${first} +${items.length - 1}` : first
 }
 const fmtDate = (s?: string | null) => {
@@ -51,6 +56,8 @@ const DEMO: OrderRow[] = [
 
 export function DashboardView() {
   const router = useRouter()
+  const t = useT()
+  const cl = useLabelT()
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [balance, setBalance] = useState<number | null>(null)
   const [isDemo, setIsDemo] = useState(false)
@@ -80,12 +87,12 @@ export function DashboardView() {
         // Signed out, the demo preview is still the right thing to show. Signed in, leave
         // orders null so the tiles stay "—" and say why.
         if (!signedIn) { setOrders(DEMO); setIsDemo(true); return }
-        setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.")
+        setLoadErr(e instanceof Error ? e.message : t("dash.errServer"))
       })
     getWallet()
       .then((w) => setBalance(w.balance))
       .catch(() => setBalance(null))
-  }, [])
+  }, [t])
   useEffect(() => {
     const id = setTimeout(() => {
       setNow(Date.now())
@@ -106,9 +113,9 @@ export function DashboardView() {
 
   // Time-of-day greeting — client component, so this is the seller's own local clock.
   const greetDate = new Date()
-  const greeting = greetDate.getHours() < 12 ? "Good morning" : greetDate.getHours() < 18 ? "Good afternoon" : "Good evening"
+  const greeting = t(greetDate.getHours() < 12 ? "dash.goodMorning" : greetDate.getHours() < 18 ? "dash.goodAfternoon" : "dash.goodEvening")
   const todayLabel = greetDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
-  const name = getUser()?.name || "there"
+  const name = getUser()?.name || t("dash.there")
 
   const series = useMemo(() => revenueSeries(orders ?? [], now), [orders, now])
 
@@ -125,37 +132,39 @@ export function DashboardView() {
           <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
           <p className="text-sm text-muted-foreground">
             {todayLabel}
-            {orders !== null && stats.newToday > 0 && <> · <span className="font-medium text-foreground">{stats.newToday}</span> new today</>}
+            {orders !== null && stats.newToday > 0 && <> · <span className="font-medium text-foreground">{stats.newToday}</span> {t("dash.newToday")}</>}
           </p>
         </div>
       </div>
 
+      {/* Labels and captions translate; the VALUES stay USD in every locale (see `usd`). */}
       <StatGrid>
-        <StatCard label="Orders (30d)" value={orders === null ? "—" : String(stats.count30)} sub="last 30 days" icon={Receipt} />
-        <StatCard label="Revenue (30d)" value={orders === null ? "—" : usd(stats.rev30)} sub="gross, last 30 days" tone="pos" icon={CurrencyDollar} />
-        <StatCard label="Open orders" value={orders === null ? "—" : String(stats.open)} sub="in the pipeline" icon={Package} />
-        <StatCard label="Wallet balance" value={balance === null ? "—" : usd(balance)} sub="available to fulfill" icon={Wallet} />
+        <StatCard label={cl("kpi", "Orders (30d)")} value={orders === null ? "—" : String(stats.count30)} sub={cl("kpisub", "last 30 days")} icon={Receipt} />
+        <StatCard label={cl("kpi", "Revenue (30d)")} value={orders === null ? "—" : usd(stats.rev30)} sub={cl("kpisub", "gross, last 30 days")} tone="pos" icon={CurrencyDollar} />
+        <StatCard label={cl("kpi", "Open orders")} value={orders === null ? "—" : String(stats.open)} sub={cl("kpisub", "in the pipeline")} icon={Package} />
+        <StatCard label={cl("kpi", "Wallet balance")} value={balance === null ? "—" : usd(balance)} sub={cl("kpisub", "available to fulfill")} icon={Wallet} />
       </StatGrid>
 
       {isDemo && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
-          <Sparkle size={13} weight="fill" /> Showing sample data — sign in to load your live dashboard.
+          <Sparkle size={13} weight="fill" /> {t("dash.demo")}
         </div>
       )}
 
       {loadErr && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
           <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
-          <span>Couldn&apos;t load your orders, so these figures are unavailable — they are not zero. {loadErr}</span>
+          {/* The server's own message is appended untranslated — the API is English-only. */}
+          <span>{t("dash.errFigures")} {loadErr}</span>
         </div>
       )}
 
       {/* A chart of zeros is a claim about revenue. When the read failed we have no
           series to draw, so say that instead of rendering a flat line at the axis. */}
       {orders === null && loadErr ? (
-        <SectionCard title="Revenue">
+        <SectionCard title={t("dash.revenue")}>
           <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-            No revenue data to chart — your orders couldn&apos;t be loaded.
+            {t("dash.noChart")}
           </div>
         </SectionCard>
       ) : (
@@ -163,10 +172,10 @@ export function DashboardView() {
       )}
 
       <SectionCard
-        title="Recent orders"
+        title={t("dash.recentOrders")}
         actions={
           <Button variant="outline" size="sm" onClick={() => router.push("/orders")}>
-            View all
+            {t("dash.viewAll")}
           </Button>
         }
       >
@@ -174,7 +183,7 @@ export function DashboardView() {
           // Not skeletons: `orders` stays null after a failure, so a pulsing placeholder
           // would animate forever and read as "still loading" rather than "this failed".
           <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-            Couldn&apos;t load recent orders.
+            {t("dash.errRecent")}
           </div>
         ) : orders === null ? (
           <div className="space-y-2 p-5">
@@ -186,24 +195,24 @@ export function DashboardView() {
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[88px]">Order</TableHead>
-                <TableHead className="w-[160px]">Customer</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead className="w-[120px]">Status</TableHead>
-                <TableHead className="w-[104px] text-right">Total</TableHead>
-                <TableHead className="w-[84px] text-right">Date</TableHead>
+                <TableHead className="w-[88px]">{cl("col", "Order")}</TableHead>
+                <TableHead className="w-[160px]">{cl("col", "Customer")}</TableHead>
+                <TableHead>{cl("col", "Items")}</TableHead>
+                <TableHead className="w-[120px]">{cl("col", "Status")}</TableHead>
+                <TableHead className="w-[104px] text-right">{cl("col", "Total")}</TableHead>
+                <TableHead className="w-[84px] text-right">{cl("col", "Date")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {recent.map((o) => (
                 <TableRow
                   key={o.id}
-                  {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), `Open order ${numOf(o)}`)}
+                  {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), t("dash.openOrder", { num: numOf(o) }))}
                   className="cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
                 >
                   <TableCell className="truncate font-mono text-xs font-semibold">{numOf(o)}</TableCell>
                   <TableCell className="truncate font-medium">{o.customer?.name || "—"}</TableCell>
-                  <TableCell className="truncate text-muted-foreground">{itemsLabel(o)}</TableCell>
+                  <TableCell className="truncate text-muted-foreground">{itemsLabel(o, t("dash.item"))}</TableCell>
                   <TableCell><SellerStatusBadge order={o} /></TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{usd(totalOf(o))}</TableCell>
                   <TableCell className="text-right text-muted-foreground">{fmtDate(o.created_at)}</TableCell>

@@ -4,6 +4,7 @@ import { Fragment } from "react"
 import { FACTORY_STAGES, EXCEPTION_STAGES, orderStage } from "@/lib/factory-status"
 import { platformOf } from "@/lib/order-format"
 import { type OrderRow } from "@/lib/api"
+import { useT, useLabelT } from "@/lib/i18n"
 
 // The linear stages, Draft first — the same vocabulary the boards show as badges. Exception
 // states hang off the pipeline rather than sitting in it, so they're appended and only shown
@@ -42,7 +43,7 @@ const slotFor = (p: string) => CHANNELS.find((c) => c.name === p) ?? OTHER
 const dayjs = (iso?: string | null) => (iso ? (Date.now() - new Date(iso).getTime()) / 86400000 : NaN)
 /** How long the oldest thing in a stage has been sitting. A stage holding old work is a
  *  different problem from a busy one, and the count alone can't say which. */
-const ageLabel = (d: number) => (!Number.isFinite(d) ? "" : d < 1 ? "today" : `${Math.floor(d)}d`)
+const ageLabel = (d: number, today: string) => (!Number.isFinite(d) ? "" : d < 1 ? today : `${Math.floor(d)}d`)
 
 /**
  * The production floor as a single glance: how many orders sit at each stage, which channels
@@ -56,6 +57,11 @@ const ageLabel = (d: number) => (!Number.isFinite(d) ? "" : d < 1 ? "today" : `$
 // three extra rows here.)
 
 export function ProductionLine({ orders }: { orders: OrderRow[] }) {
+  const t = useT()
+  // Stage names come from FACTORY_STAGES and are translated ONLY at render — `s.id` and the
+  // channel `name` are identity here (slotFor matches on it), so nothing above this line
+  // may be localised or the grouping breaks.
+  const tl = useLabelT()
   const rows = [...LINE, ...OFF_LINE].map((s) => {
     const inStage = orders.filter((o) => orderStage(o.items ?? []) === s.id)
     // Grouped in the fixed slot order, so a stack's bands sit in the same order on every row
@@ -91,7 +97,7 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
           {channelsPresent.map((c) => (
             <span key={c.name} className="inline-flex items-center gap-1.5 text-2xs font-medium text-muted-foreground">
               <span className={"size-2 rounded-[2px] " + c.cls} />
-              {c.name}
+              {tl("ui", c.name)}
             </span>
           ))}
         </div>
@@ -109,14 +115,14 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
           <div
             className="group flex min-h-[32px] flex-1 items-center gap-3 rounded-md px-1 transition-colors hover:bg-accent/40"
             title={
-              `${r.label}: ${r.n} order${r.n === 1 ? "" : "s"}` +
-              (total ? ` · ${Math.round((r.n / total) * 100)}% of the floor` : "") +
-              (r.byChannel.length ? `\n${r.byChannel.map((c) => `${c.name} ${c.n}`).join(" · ")}` : "") +
-              (Number.isFinite(r.oldest) ? `\nOldest waiting ${ageLabel(r.oldest)}` : "")
+              t("dash.lineCount", { label: tl("stage", r.label), n: r.n }) +
+              (total ? ` · ${t("dash.lineShare", { pct: Math.round((r.n / total) * 100) })}` : "") +
+              (r.byChannel.length ? `\n${r.byChannel.map((c) => `${tl("ui", c.name)} ${c.n}`).join(" · ")}` : "") +
+              (Number.isFinite(r.oldest) ? `\n${t("dash.lineOldest", { age: ageLabel(r.oldest, t("dash.today")) })}` : "")
             }
           >
             <div className={"w-24 shrink-0 truncate text-xs font-medium " + (r.off ? "text-muted-foreground/70 italic" : "text-muted-foreground")}>
-              {r.label}
+              {tl("stage", r.label)}
             </div>
 
             {/* One shared track, so every stack is measured against the same width and the
@@ -151,7 +157,7 @@ export function ProductionLine({ orders }: { orders: OrderRow[] }) {
             {/* Oldest-waiting, muted: context for the count rather than a competing number.
                 Fixed width so it never shoves the counts out of their column. */}
             <div className="w-12 shrink-0 text-right text-2xs tabular-nums text-muted-foreground/70">
-              {r.n ? ageLabel(r.oldest) : ""}
+              {r.n ? ageLabel(r.oldest, t("dash.today")) : ""}
             </div>
 
             {/* Value at the end of the ROW, not the end of the bar: a 2%-wide stack has

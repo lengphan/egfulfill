@@ -12,7 +12,7 @@ import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getP
 import { canvasReadableSrc } from "@/lib/thread-match"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
 import { mockupFaces, setTypeMockups, typeMockupOf, typeSidesOf } from "@/lib/variant-resolve"
-import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-dialog"
+import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-page"
 import { DesignLabTabs } from "@/components/app/design-lab-tabs"
 
 // The blank to DESIGN on. Falls back to the type's default mockup (Settings → Platform)

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { Plus, X, PencilSimple, Check, DotsSix, type Icon } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { useT, useLabelT } from "@/lib/i18n"
 
 export type ShortcutItem = { label: string; href: string; icon: Icon; desc?: string }
 
@@ -18,16 +19,21 @@ export type ShortcutItem = { label: string; href: string; icon: Icon; desc?: str
  * the column heights line up instead of leaving a lopsided gap.
  */
 export function ShortcutsCard({
-  title = "Jump to",
+  title,
   catalog,
   defaults,
   storageKey,
 }: {
+  /** Defaults to the translated "Jump to" — a default parameter can't call the hook. */
   title?: string
   catalog: ShortcutItem[]
   defaults: string[]
   storageKey: string
 }) {
+  const t = useT()
+  // Tile labels ARE nav labels, so they translate through the shared `nav.` namespace the
+  // sidebar already uses — the launcher can't drift from the menu it links into.
+  const nl = useLabelT()
   const byHref = useMemo(() => Object.fromEntries(catalog.map((c) => [c.href, c])), [catalog])
   // Only ever keep hrefs that still exist in the catalog — a role change or a removed page
   // must not leave a dead tile behind.
@@ -103,7 +109,7 @@ export function ShortcutsCard({
 
   return (
     <SectionCard
-      title={title}
+      title={title ?? t("dash.jumpTo")}
       className="h-full"
       bodyClassName="flex flex-1 flex-col"
       actions={
@@ -112,7 +118,7 @@ export function ShortcutsCard({
           aria-pressed={editing}
           className={"eg-tap inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors " + (editing ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
         >
-          {editing ? <><Check size={13} weight="bold" /> Done</> : <><PencilSimple size={13} weight="bold" /> Edit</>}
+          {editing ? <><Check size={13} weight="bold" /> {t("dash.done")}</> : <><PencilSimple size={13} weight="bold" /> {t("dash.edit")}</>}
         </button>
       }
     >
@@ -140,7 +146,7 @@ export function ShortcutsCard({
                   The accent is kept for things that need you, not for every tile. */}
               <span className="flex items-center justify-center text-muted-foreground transition-colors group-hover:text-foreground"><Icon size={22} /></span>
               <span className="min-w-0">
-                <span className="block text-base font-semibold leading-tight tracking-tight">{q.label}</span>
+                <span className="block text-base font-semibold leading-tight tracking-tight">{nl("nav", q.label)}</span>
                 {/* NOT truncated. The description is the whole reason the tile isn't just a
                     word — clipping "Dispatch + shipments" to "Dispatch + ship…" costs the
                     reader the distinction it was added to make, and a mid-word ellipsis is
@@ -155,7 +161,7 @@ export function ShortcutsCard({
               <div key={q.href} {...dragProps} className={tileCls}>
                 <DotsSix size={14} className="absolute right-2 top-2 text-muted-foreground/50" />
                 <button
-                  aria-label={`Remove ${q.label}`}
+                  aria-label={t("dash.removeShortcut", { label: nl("nav", q.label) })}
                   onClick={() => remove(q.href)}
                   className="eg-tap absolute right-1.5 bottom-1.5 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground shadow-sm transition-colors hover:text-red-600"
                 >
@@ -177,7 +183,7 @@ export function ShortcutsCard({
             className="eg-tap flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
           >
             <Plus size={20} weight="bold" />
-            <span className="text-sm font-medium">Add shortcut</span>
+            <span className="text-sm font-medium">{t("dash.addShortcut")}</span>
           </button>
         )}
         {addOpen && menuPos && (
@@ -189,7 +195,7 @@ export function ShortcutsCard({
                 return (
                   <button key={c.href} onClick={() => add(c.href)} className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent">
                     <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary"><Icon size={14} weight="duotone" /></span>
-                    {c.label}
+                    {nl("nav", c.label)}
                   </button>
                 )
               })}
@@ -198,7 +204,7 @@ export function ShortcutsCard({
         )}
 
         {shown.length === 0 && !editing && (
-          <div className="col-span-2 py-8 text-center text-sm text-muted-foreground">No shortcuts — tap Edit to add some.</div>
+          <div className="col-span-2 py-8 text-center text-sm text-muted-foreground">{t("dash.noShortcuts")}</div>
         )}
       </div>
     </SectionCard>

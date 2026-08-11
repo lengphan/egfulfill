@@ -37,6 +37,72 @@ const en: Dict = {
   "topbar.accountMenu": "Account menu",
   "topbar.profileSettings": "Profile & settings",
   "topbar.logout": "Log out",
+
+  // ── Dashboards (seller + staff) ───────────────────────────────────────────
+  // Keyed strings, so these MUST be listed here: useT falls back en → key, and a missing
+  // English entry renders the raw key. The useLabelT namespaces below (kpi./range./
+  // shortcut./speed.) need no English side — they fall back to the value itself.
+  //
+  // MONEY IS NOT TRANSLATED. Every figure on these cards stays USD, formatted en-US,
+  // because sellers list on international marketplaces and price in dollars. Only the
+  // words around the figure move. The one exception in the app is the VietQR top-up,
+  // where the amount is genuinely converted to VND before it is charged.
+  "dash.goodMorning": "Good morning",
+  "dash.goodAfternoon": "Good afternoon",
+  "dash.goodEvening": "Good evening",
+  "dash.there": "there",
+  "dash.newToday": "new today",
+  "dash.revenue": "Revenue",
+  "dash.recentOrders": "Recent orders",
+  "dash.viewAll": "View all",
+  "dash.openQueue": "Open queue",
+  "dash.item": "Item",
+  "dash.openOrder": "Open order {num}",
+  "dash.demo": "Showing sample data — sign in to load your live dashboard.",
+  "dash.errFigures": "Couldn't load your orders, so these figures are unavailable — they are not zero.",
+  "dash.errCounts": "Couldn't load orders, so these counts are unavailable — they are not zero.",
+  "dash.errRecent": "Couldn't load recent orders.",
+  "dash.errServer": "Couldn't reach the server.",
+  "dash.errSignedOut": "You're signed out.",
+  "dash.noChart": "No revenue data to chart — your orders couldn't be loaded.",
+  "dash.noOrders": "No orders yet.",
+  "dash.productionLine": "Production line",
+  // English pluralises, Vietnamese doesn't — so the count picks the key rather than the
+  // render site splicing an "s" onto a translated noun.
+  "dash.onHoldOne": "1 order on hold — need attention",
+  "dash.onHold": "{n} orders on hold — need attention",
+  "dash.ofAllOrders": "of all orders",
+  "dash.shippedLower": "shipped",
+  "dash.allOrdersLower": "all orders",
+  "dash.fulfillmentSpeed": "Fulfillment speed",
+  "dash.noDataYet": "no data yet",
+  "dash.collecting": "collecting",
+  "dash.ofDelivered": "of {n} delivered",
+  "dash.oneOrder": "1 order",
+  "dash.nOrders": "{n} orders",
+  "dash.compare": "Compare",
+  "dash.thisPeriod": "This period",
+  "dash.previous": "Previous",
+  "dash.7d": "7d",
+  "dash.4weeks": "4 weeks",
+  "dash.3months": "3 months",
+  // Shortcut launcher
+  "dash.jumpTo": "Jump to",
+  "dash.edit": "Edit",
+  "dash.done": "Done",
+  "dash.addShortcut": "Add shortcut",
+  "dash.removeShortcut": "Remove {label}",
+  "dash.noShortcuts": "No shortcuts — tap Edit to add some.",
+  // KPI captions that interpolate — these go through useT, not useLabelT, so unlike the
+  // rest of the kpi.* namespace they need their English source listed here.
+  "kpi.throughPlatform": "{window} · through the platform",
+  "kpi.afterCosts": "after {cost} costs",
+  "kpi.pctOfAll": "{pct}% of all",
+  // Production-line tooltip
+  "dash.lineCount": "{label}: {n} orders",
+  "dash.lineShare": "{pct}% of the floor",
+  "dash.lineOldest": "Oldest waiting {age}",
+  "dash.today": "today",
 }
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
@@ -81,6 +147,13 @@ const vi: Dict = {
   "nav.Digitizer": "Số hóa thêu",
   "nav.Catalogue": "Danh mục",
   "nav.Notifications": "Thông báo",
+  // The merged section shells (see the tabbed-wrapper nav consolidation) — these are the
+  // labels staffNav actually emits, and they were the ones still reading English on the
+  // staff shortcut tiles. "SpyDeck" is deliberately still absent: it's a brand name.
+  "nav.Shipping": "Vận chuyển",
+  "nav.Purchasing": "Mua hàng",
+  "nav.Sourcing": "Tìm nguồn hàng",
+  "nav.Finance": "Tài chính",
   // Section headings
   "nav.Account": "Tài khoản",
   "nav.Tools": "Công cụ",
@@ -171,6 +244,145 @@ const vi: Dict = {
   "stat.Awaiting scan": "Chờ quét",
   "stat.labels made, not scanned": "đã tạo nhãn, chưa quét",
   "stat.scan queue clear": "hàng chờ quét đã hết",
+
+  // ── Dashboards (seller + staff) ───────────────────────────────────────────
+  // AI-drafted, pending review. Figures stay USD — only the words move.
+  "dash.goodMorning": "Chào buổi sáng",
+  "dash.goodAfternoon": "Chào buổi chiều",
+  "dash.goodEvening": "Chào buổi tối",
+  "dash.there": "bạn",
+  "dash.newToday": "đơn mới hôm nay",
+  "dash.revenue": "Doanh thu",
+  "dash.recentOrders": "Đơn gần đây",
+  "dash.viewAll": "Xem tất cả",
+  "dash.openQueue": "Mở hàng chờ",
+  "dash.item": "Sản phẩm",
+  "dash.openOrder": "Mở đơn {num}",
+  "dash.demo": "Đang hiển thị dữ liệu mẫu — đăng nhập để xem bảng điều khiển thật của bạn.",
+  "dash.errFigures": "Không tải được đơn hàng nên các số liệu này không khả dụng — chúng không phải bằng 0.",
+  "dash.errCounts": "Không tải được đơn hàng nên các số liệu này không khả dụng — chúng không phải bằng 0.",
+  "dash.errRecent": "Không tải được đơn hàng gần đây.",
+  "dash.errServer": "Không kết nối được máy chủ.",
+  "dash.errSignedOut": "Bạn đã đăng xuất.",
+  "dash.noChart": "Không có dữ liệu doanh thu để vẽ biểu đồ — không tải được đơn hàng của bạn.",
+  "dash.noOrders": "Chưa có đơn nào.",
+  "dash.productionLine": "Dây chuyền sản xuất",
+  "dash.onHoldOne": "1 đơn đang tạm giữ — cần xử lý",
+  "dash.onHold": "{n} đơn đang tạm giữ — cần xử lý",
+  "dash.ofAllOrders": "trên tổng số đơn",
+  "dash.shippedLower": "đã gửi",
+  "dash.allOrdersLower": "tổng số đơn",
+  "dash.fulfillmentSpeed": "Tốc độ hoàn tất",
+  "dash.noDataYet": "chưa có dữ liệu",
+  "dash.collecting": "đang thu thập",
+  "dash.ofDelivered": "trên {n} đơn đã giao",
+  "dash.oneOrder": "1 đơn",
+  "dash.nOrders": "{n} đơn",
+  "dash.compare": "So sánh",
+  "dash.thisPeriod": "Kỳ này",
+  "dash.previous": "Kỳ trước",
+  "dash.7d": "7 ngày",
+  "dash.4weeks": "4 tuần",
+  "dash.3months": "3 tháng",
+  "dash.jumpTo": "Truy cập nhanh",
+  "dash.edit": "Sửa",
+  "dash.done": "Xong",
+  "dash.addShortcut": "Thêm lối tắt",
+  "dash.removeShortcut": "Bỏ {label}",
+  "dash.noShortcuts": "Chưa có lối tắt — nhấn Sửa để thêm.",
+  "dash.lineCount": "{label}: {n} đơn",
+  "dash.lineShare": "{pct}% của xưởng",
+  "dash.lineOldest": "Chờ lâu nhất {age}",
+  "dash.today": "hôm nay",
+
+  // KPI tiles — keyed by their English label (useLabelT), so a tile whose wording isn't
+  // listed here keeps its English rather than going blank.
+  "kpi.Orders (30d)": "Đơn hàng (30 ngày)",
+  "kpi.Revenue (30d)": "Doanh thu (30 ngày)",
+  "kpi.Open orders": "Đơn đang mở",
+  "kpi.Wallet balance": "Số dư ví",
+  "kpi.GMV": "GMV",
+  // "Doanh thu của chúng ta" is the literal translation and it TRUNCATES — the MiniStat
+  // label is a single truncating line, and Vietnamese runs long. This says the same thing
+  // (our income, as opposed to the GMV beside it) in a width the tile actually has.
+  "kpi.Our revenue": "Doanh thu xưởng",
+  "kpi.Profit": "Lợi nhuận",
+  "kpi.Orders": "Đơn hàng",
+  "kpi.Avg order": "Giá trị đơn TB",
+  "kpi.To receive": "Chờ nhận",
+  "kpi.In production": "Đang sản xuất",
+  "kpi.Working": "Đang làm",
+  "kpi.Shipped": "Đã gửi hàng",
+  "kpi.New": "Mới",
+  "kpi.In review": "Đang duyệt",
+  // KPI captions
+  "kpisub.last 30 days": "30 ngày qua",
+  "kpisub.gross, last 30 days": "tổng, 30 ngày qua",
+  "kpisub.in the pipeline": "đang trong quy trình",
+  "kpisub.available to fulfill": "khả dụng để sản xuất",
+  "kpisub.we earned": "chúng ta thu được",
+  "kpisub.nothing booked": "chưa ghi nhận khoản nào",
+  "kpisub.nothing booked yet": "chưa ghi nhận khoản nào",
+  "kpisub.loading": "đang tải",
+  "kpisub.per order": "mỗi đơn",
+  "kpisub.new intake": "hàng mới về",
+  "kpisub.scan → pack": "quét → đóng gói",
+  "kpisub.being made": "đang sản xuất",
+  "kpisub.awaiting start": "chờ bắt đầu",
+  "kpisub.artwork check": "kiểm tra thiết kế",
+  "kpi.throughPlatform": "{window} · qua nền tảng",
+  "kpi.afterCosts": "sau {cost} chi phí",
+  "kpi.pctOfAll": "{pct}% tổng số",
+
+  // Money window toggle
+  "range.Today": "Hôm nay",
+  "range.7 days": "7 ngày",
+  "range.30 days": "30 ngày",
+  "range.All": "Tất cả",
+  "rangesub.today": "hôm nay",
+  "rangesub.last 7 days": "7 ngày qua",
+  "rangesub.last 30 days": "30 ngày qua",
+  "rangesub.all time": "toàn thời gian",
+
+  // Shortcut tile captions
+  "shortcut.Production queue": "Hàng chờ sản xuất",
+  // NOT "Bảng thiết kế" — that's nav.Board, this tile's own label, and the tile would then
+  // print the same two words twice. The blurb has to say something the label doesn't.
+  "shortcut.Artwork board": "Duyệt file thiết kế",
+  "shortcut.Dispatch + shipments": "Xuất hàng + kiện hàng",
+  "shortcut.Stock levels + scan": "Tồn kho + quét mã",
+  "shortcut.Browse, cart + orders": "Duyệt, giỏ + đơn mua",
+  "shortcut.Wallet + costs": "Ví + chi phí",
+  "shortcut.Seller email": "Email người bán",
+  "shortcut.Supplier costing": "Tính giá nhà cung cấp",
+  "shortcut.Ad spend": "Chi phí quảng cáo",
+  "shortcut.Payouts": "Chi trả",
+  "shortcut.Machine files": "File máy thêu",
+  "shortcut.Competitor research": "Nghiên cứu đối thủ",
+  "shortcut.Catalog + blanks": "Danh mục + phôi",
+  "shortcut.Trade shop window": "Gian hàng bán buôn",
+  "shortcut.Design lab": "Xưởng thiết kế",
+  "shortcut.Seller stores": "Cửa hàng người bán",
+  "shortcut.Analytics": "Phân tích",
+  "shortcut.API keys": "Khóa API",
+
+  // Fulfilment-speed rows
+  "speed.Production": "Sản xuất",
+  "speed.Transit": "Vận chuyển",
+  "speed.Total lead time": "Tổng thời gian",
+  "speed.On-time": "Đúng hẹn",
+  "speed.placed → shipped": "đặt → gửi hàng",
+  "speed.shipped → delivered": "gửi hàng → giao",
+  "speed.placed → delivered": "đặt → giao",
+  "speed.delivered by USPS ETA": "giao đúng dự kiến của USPS",
+
+  // Extra column headers used by the seller dashboard's recent-orders table.
+  "col.Total": "Tổng",
+  "col.Date": "Ngày",
+
+  // Channel slots that aren't brand names (Etsy/Shopify/TikTok stay as they are).
+  "ui.Manual": "Thủ công",
+  "ui.Other": "Khác",
 }
 
 export const messages: Record<Locale, Dict> = { en, vi }

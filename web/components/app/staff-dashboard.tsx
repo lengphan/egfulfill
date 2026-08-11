@@ -9,6 +9,7 @@ import { ProductionLine } from "@/components/app/production-line"
 import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
 import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
 import { getOrders, getFactoryPnl, type OrderRow, type FactoryPnl } from "@/lib/api"
+import { useT, useLabelT } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
 import { getToken, getUser } from "@/lib/auth"
 import { staffNav, staffTools } from "@/lib/staff-nav"
@@ -16,6 +17,10 @@ import { orderStage } from "@/lib/factory-status"
 import { orderTotalOf, orderTs } from "@/lib/analytics"
 
 // Whole-dollar KPI money — cents are noise at this size.
+//
+// USD, en-US, IN EVERY LOCALE, and deliberately so: GMV and the P&L are dollar figures
+// whatever language the labels are read in. Translating the wording around a number must
+// never restate the number in another currency.
 const usd = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`
 
 // Time windows the money KPIs can be read over. `since` is a cutoff timestamp; "all" = 0.
@@ -121,8 +126,13 @@ function Gauge({ pct, caption }: { pct: number | null; caption: string }) {
 // The staff home — role-meaningful KPIs off the shared order feed, a live production-line
 // snapshot, a recent-orders list, and quick links into the surfaces that role actually uses.
 export function StaffDashboard() {
+  const t = useT()
+  // KPI labels, captions, window names and shortcut blurbs are all defined as English
+  // strings in data structures, so they translate through useLabelT (keyed by the value)
+  // rather than being restructured into keys.
+  const tl = useLabelT()
   const role = getUser()?.role || ""
-  const name = getUser()?.name || "there"
+  const name = getUser()?.name || t("dash.there")
   const isAdmin = role === "admin"
   const isWarehouse = role === "warehouse"
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
@@ -135,17 +145,17 @@ export function StaffDashboard() {
   const [range, setRange] = useState<RangeId>("30d")
 
   const load = useCallback(() => {
-    if (!getToken()) { setLoadErr("You're signed out."); return }
+    if (!getToken()) { setLoadErr(t("dash.errSignedOut")); return }
     getOrders()
       .then((r) => { setOrders(r ?? []); setLoadErr(null) })
-      .catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server."))
-  }, [])
+      .catch((e) => setLoadErr(e instanceof Error ? e.message : t("dash.errServer")))
+  }, [t])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
 
   // Time-of-day greeting + today's date. Client component, so `new Date()` is the browser's
   // local clock — the reader's own morning, not the server's.
   const now = new Date()
-  const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening"
+  const greeting = t(now.getHours() < 12 ? "dash.goodMorning" : now.getHours() < 18 ? "dash.goodAfternoon" : "dash.goodEvening")
   const todayLabel = now.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
   const nowMs = now.getTime()
 
@@ -203,10 +213,10 @@ export function StaffDashboard() {
    * whole point of the panel: GMV is the number you glance at, these are what it means.
    */
   const moneySide = useMemo(() => ([
-    { label: "Our revenue", value: pnl ? usd(pnl.income) : "—", sub: pnl?.known ? "we earned" : "nothing booked" },
-    { label: "Profit", value: pnl?.known ? usd(pnl.profit) : "—", sub: pnl?.known ? `after ${usd(Math.abs(pnl.cost))} costs` : "nothing booked" },
-    { label: "Avg order", value: orders === null ? "—" : usd(money.aov), sub: "per order" },
-  ]), [pnl, orders, money.aov])
+    { label: tl("kpi", "Our revenue"), value: pnl ? usd(pnl.income) : "—", sub: tl("kpisub", pnl?.known ? "we earned" : "nothing booked") },
+    { label: tl("kpi", "Profit"), value: pnl?.known ? usd(pnl.profit) : "—", sub: pnl?.known ? t("kpi.afterCosts", { cost: usd(Math.abs(pnl.cost)) }) : tl("kpisub", "nothing booked") },
+    { label: tl("kpi", "Avg order"), value: orders === null ? "—" : usd(money.aov), sub: tl("kpisub", "per order") },
+  ]), [pnl, orders, money.aov, t, tl])
 
   /**
    * GMV per day across the window, scaled 0..1 — the shape of the run, nothing more.
@@ -255,30 +265,30 @@ export function StaffDashboard() {
       // marketplaces. It flows through the platform; it is not money we receive, and
       // calling it revenue is what made a $0 profit beside it look like a catastrophe
       // rather than a missing calculation.
-      { label: "GMV", value: usd(money.revenue), sub: `${rangeMeta.sub} · through the platform`, icon: CurrencyDollar, pos: true },
+      { label: tl("kpi", "GMV"), value: usd(money.revenue), sub: t("kpi.throughPlatform", { window: tl("rangesub", rangeMeta.sub) }), icon: CurrencyDollar, pos: true },
       // OUR income, from the ledger — order charges and subscriptions booked to `factory`.
-      { label: "Our revenue", value: pnl ? usd(pnl.income) : "—",
-        sub: pnl ? (pnl.known ? rangeMeta.sub : "nothing booked yet") : "loading", icon: Receipt, pos: true },
+      { label: tl("kpi", "Our revenue"), value: pnl ? usd(pnl.income) : "—",
+        sub: pnl ? (pnl.known ? tl("rangesub", rangeMeta.sub) : tl("kpisub", "nothing booked yet")) : tl("kpisub", "loading"), icon: Receipt, pos: true },
       // Income minus cost over the same window. Both sides are real ledger rows: a label
       // cost is booked when a label is bought, an order charge when a seller is charged.
-      { label: "Profit", value: pnl && pnl.known ? usd(pnl.profit) : "—",
-        sub: pnl && pnl.known ? `after ${usd(Math.abs(pnl.cost))} costs` : "nothing booked yet",
+      { label: tl("kpi", "Profit"), value: pnl && pnl.known ? usd(pnl.profit) : "—",
+        sub: pnl && pnl.known ? t("kpi.afterCosts", { cost: usd(Math.abs(pnl.cost)) }) : tl("kpisub", "nothing booked yet"),
         icon: TrendUp, pos: !!(pnl && pnl.profit > 0), neg: !!(pnl && pnl.profit < 0) },
-      { label: "Orders", value: money.count, sub: rangeMeta.sub, icon: Package },
-      { label: "Avg order", value: usd(money.aov), sub: "per order", icon: Receipt },
+      { label: tl("kpi", "Orders"), value: money.count, sub: tl("rangesub", rangeMeta.sub), icon: Package },
+      { label: tl("kpi", "Avg order"), value: usd(money.aov), sub: tl("kpisub", "per order"), icon: Receipt },
     ]
     : isWarehouse
       ? [
-        { label: "To receive", value: stats.newCount, sub: "new intake", icon: Tray, neg: true },
-        { label: "In production", value: stats.production, sub: "scan → pack", icon: GearSix },
-        { label: "Working", value: stats.ready, sub: "being made", icon: Wrench, pos: true },
-        { label: "Shipped", value: stats.shipped, sub: `${shippedPct}% of all`, icon: Truck, pos: true },
+        { label: tl("kpi", "To receive"), value: stats.newCount, sub: tl("kpisub", "new intake"), icon: Tray, neg: true },
+        { label: tl("kpi", "In production"), value: stats.production, sub: tl("kpisub", "scan → pack"), icon: GearSix },
+        { label: tl("kpi", "Working"), value: stats.ready, sub: tl("kpisub", "being made"), icon: Wrench, pos: true },
+        { label: tl("kpi", "Shipped"), value: stats.shipped, sub: t("kpi.pctOfAll", { pct: shippedPct }), icon: Truck, pos: true },
       ]
       : [
-        { label: "New", value: stats.newCount, sub: "awaiting start", icon: Tray, neg: true },
-        { label: "In review", value: stats.review, sub: "artwork check", icon: MagnifyingGlass },
-        { label: "In production", value: stats.production, sub: "scan → pack", icon: GearSix },
-        { label: "Shipped", value: stats.shipped, sub: `${shippedPct}% of all`, icon: Truck, pos: true },
+        { label: tl("kpi", "New"), value: stats.newCount, sub: tl("kpisub", "awaiting start"), icon: Tray, neg: true },
+        { label: tl("kpi", "In review"), value: stats.review, sub: tl("kpisub", "artwork check"), icon: MagnifyingGlass },
+        { label: tl("kpi", "In production"), value: stats.production, sub: tl("kpisub", "scan → pack"), icon: GearSix },
+        { label: tl("kpi", "Shipped"), value: stats.shipped, sub: t("kpi.pctOfAll", { pct: shippedPct }), icon: Truck, pos: true },
       ]
 
   // Shortcut catalog = every page this role can actually reach (nav boards + tools), so the
@@ -288,8 +298,11 @@ export function StaffDashboard() {
     const seen = new Set<string>()
     return [...staffNav(role), ...staffTools(role)]
       .filter((i) => i.href !== "/overview" && !seen.has(i.href) && seen.add(i.href))
-      .map((i) => ({ label: i.label, href: i.href, icon: i.icon, desc: SHORTCUT_DESC[i.href] }))
-  }, [role])
+      // `label` stays English here — ShortcutsCard translates it through the shared `nav.`
+      // namespace, so the launcher and the sidebar can never drift apart. Only the blurb,
+      // which is local to this file, is translated at source.
+      .map((i) => ({ label: i.label, href: i.href, icon: i.icon, desc: SHORTCUT_DESC[i.href] ? tl("shortcut", SHORTCUT_DESC[i.href]) : undefined }))
+  }, [role, tl])
   // Sensible starting set before the user customises — the first handful of their catalog.
   const shortcutDefaults = useMemo(() => catalog.slice(0, 6).map((c) => c.href), [catalog])
 
@@ -326,7 +339,7 @@ export function StaffDashboard() {
             <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
             <p className="text-sm text-muted-foreground">
               {todayLabel}
-              {stats.createdToday > 0 && <> · <span className="font-medium text-foreground">{stats.createdToday}</span> new today</>}
+              {stats.createdToday > 0 && <> · <span className="font-medium text-foreground">{stats.createdToday}</span> {t("dash.newToday")}</>}
             </p>
           </div>
         </div>
@@ -340,7 +353,7 @@ export function StaffDashboard() {
                 aria-pressed={range === r.id}
                 className={"rounded-md px-2.5 py-1 text-xs font-medium transition-colors " + (range === r.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
               >
-                {r.label}
+                {tl("range", r.label)}
               </button>
             ))}
           </div>
@@ -350,7 +363,8 @@ export function StaffDashboard() {
       {loadErr && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
           <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
-          <span>Couldn&apos;t load orders, so these counts are unavailable — they are not zero. {loadErr}</span>
+          {/* The server's own message is appended untranslated — the API is English-only. */}
+          <span>{t("dash.errCounts")} {loadErr}</span>
         </div>
       )}
 
@@ -376,7 +390,7 @@ export function StaffDashboard() {
           <div className="lg:col-span-2">
             <SectionCard
               className="h-full"
-              title="GMV"
+              title={tl("kpi", "GMV")}
               bodyClassName="flex flex-1 flex-col gap-5 p-5"
             >
               <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
@@ -384,7 +398,7 @@ export function StaffDashboard() {
                   <div className="font-title text-4xl font-black leading-none tracking-tight tabular-nums sm:text-5xl">
                     {orders === null ? "—" : usd(money.revenue)}
                   </div>
-                  <div className="mt-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{rangeMeta.sub}</div>
+                  <div className="mt-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{tl("rangesub", rangeMeta.sub)}</div>
                 </div>
                 {/* The figures that QUALIFY the headline, at a third its weight — the
                     hierarchy the old panel was built for, kept. */}
@@ -411,18 +425,18 @@ export function StaffDashboard() {
 
           <SectionCard
             className="h-full"
-            title="Shipped"
+            title={tl("kpi", "Shipped")}
             bodyClassName="flex h-full flex-col items-center justify-center gap-5 p-5"
           >
-            <Gauge pct={orders === null ? null : shippedPct} caption="of all orders" />
+            <Gauge pct={orders === null ? null : shippedPct} caption={t("dash.ofAllOrders")} />
             <div className="grid w-full grid-cols-2 gap-3 text-center">
               <div className="rounded-xl bg-muted/50 py-2.5">
                 <div className="text-lg font-bold tabular-nums">{orders === null ? "—" : stats.shipped}</div>
-                <div className="text-2xs font-medium text-muted-foreground">shipped</div>
+                <div className="text-2xs font-medium text-muted-foreground">{t("dash.shippedLower")}</div>
               </div>
               <div className="rounded-xl bg-muted/50 py-2.5">
                 <div className="text-lg font-bold tabular-nums">{orders === null ? "—" : stats.total}</div>
-                <div className="text-2xs font-medium text-muted-foreground">all orders</div>
+                <div className="text-2xs font-medium text-muted-foreground">{t("dash.allOrdersLower")}</div>
               </div>
             </div>
           </SectionCard>
@@ -438,8 +452,8 @@ export function StaffDashboard() {
         <div className="lg:col-span-2">
           <SectionCard
             className="h-full"
-            title="Production line"
-            actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">Open queue <ArrowRight size={13} weight="bold" /></Link>}
+            title={t("dash.productionLine")}
+            actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">{t("dash.openQueue")} <ArrowRight size={13} weight="bold" /></Link>}
             /* flex-1 so the body actually receives the card's stretched height — without it
                the chart sized to its content and left a third of the card empty. */
             bodyClassName="flex flex-1 flex-col divide-y divide-border"
@@ -452,7 +466,7 @@ export function StaffDashboard() {
                 {stats.attention > 0 && (
                   <Link href="/operator" className="flex items-center gap-2 bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50">
                     <Warning size={14} weight="fill" className="shrink-0" />
-                    <span>{stats.attention} order{stats.attention === 1 ? "" : "s"} on hold — need attention</span>
+                    <span>{stats.attention === 1 ? t("dash.onHoldOne") : t("dash.onHold", { n: stats.attention })}</span>
                     <ArrowRight size={13} weight="bold" className="ml-auto shrink-0" />
                   </Link>
                 )}
@@ -464,11 +478,11 @@ export function StaffDashboard() {
 
       <div className="grid items-stretch gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SectionCard title="Recent orders" actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">Open queue <ArrowRight size={13} weight="bold" /></Link>}>
+          <SectionCard title={t("dash.recentOrders")} actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">{t("dash.openQueue")} <ArrowRight size={13} weight="bold" /></Link>}>
             {orders === null ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
             ) : recent.length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">No orders yet.</div>
+              <div className="py-12 text-center text-sm text-muted-foreground">{t("dash.noOrders")}</div>
             ) : (
               <div className="divide-y divide-border">
                 {recent.map((o) => (

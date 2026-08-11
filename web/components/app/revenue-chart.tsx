@@ -11,6 +11,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import { useT } from "@/lib/i18n"
 
 export type RevenuePoint = { label: string; revenue: number; prev: number }
 
@@ -40,25 +41,28 @@ const DATA: Record<string, RevenuePoint[]> = {
   ],
 }
 
-const chartConfig = {
-  revenue: { label: "This period", color: "var(--chart-1)" },
-  prev: { label: "Previous", color: "var(--chart-2)" },
-} satisfies ChartConfig
-
 export function RevenueChart({ data: dataProp }: { data?: Record<string, RevenuePoint[]> }) {
+  const t = useT()
   const source = dataProp ?? DATA
   const [period, setPeriod] = useState<string>("4w")
   const [compare, setCompare] = useState(false)
   const data = source[period] ?? []
 
+  // Built per render rather than at module scope so the tooltip's series names follow the
+  // locale. The bucket labels on the axis come from the caller's data and are left alone.
+  const chartConfig = {
+    revenue: { label: t("dash.thisPeriod"), color: "var(--chart-1)" },
+    prev: { label: t("dash.previous"), color: "var(--chart-2)" },
+  } satisfies ChartConfig
+
   return (
     <SectionCard
-      title="Revenue"
+      title={t("dash.revenue")}
       actions={
         <>
           <label className="mr-1 flex items-center gap-2 text-sm text-muted-foreground">
             <Switch checked={compare} onCheckedChange={setCompare} />
-            Compare
+            {t("dash.compare")}
           </label>
           <ToggleGroup
             value={[period]}
@@ -66,9 +70,9 @@ export function RevenueChart({ data: dataProp }: { data?: Record<string, Revenue
             variant="outline"
             size="sm"
           >
-            <ToggleGroupItem value="7d">7d</ToggleGroupItem>
-            <ToggleGroupItem value="4w">4 weeks</ToggleGroupItem>
-            <ToggleGroupItem value="3m">3 months</ToggleGroupItem>
+            <ToggleGroupItem value="7d">{t("dash.7d")}</ToggleGroupItem>
+            <ToggleGroupItem value="4w">{t("dash.4weeks")}</ToggleGroupItem>
+            <ToggleGroupItem value="3m">{t("dash.3months")}</ToggleGroupItem>
           </ToggleGroup>
         </>
       }
