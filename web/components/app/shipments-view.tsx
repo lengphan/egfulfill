@@ -146,12 +146,21 @@ export function ShipmentsView() {
   const canVoid = role === "warehouse" || role === "admin"
   const confirm = useConfirm()
   const doVoid = async (s: ShipmentRow) => {
-    if (!(await confirm({ title: `Void the label for ${s.num}?`, body: "This refunds the postage with the carrier and credits it back.", confirmLabel: "Void label" }))) return
+    // Says what it costs as well as what it does — the tracking number going away is the
+    // surprising half, and the reason is that the buyer must not be left holding a dead one.
+    if (!(await confirm({
+      title: `Refund the label for ${s.num}?`,
+      body: `The carrier cancels the label and credits ${s.price != null ? `$${s.price.toFixed(2)}` : "the postage"} back. The tracking number is removed from this order, so nothing shows the buyer a number that will never move. Carriers settle the credit over a few days.`,
+      confirmLabel: "Refund the label",
+    }))) return
     setVoiding(s.id)
     try {
       const r = await voidLabel(s.id)
-      if (r.ok) { setErr(`Label voided${r.refunded ? ` — $${r.refunded.toFixed(2)} credited back` : ""}.`); load(q) }
-      else setErr(r.error || "Void failed.")
+      // Says where it went, because the row it came from is about to change shape — the
+      // tracking number disappears and the Refunded tile moves. Without that sentence the
+      // list looks like it lost something.
+      if (r.ok) { setErr(`Refunded${r.refunded ? ` — $${r.refunded.toFixed(2)} credited back` : ""}. The row stays here with its tracking removed.`); load(q) }
+      else setErr(r.error || "The carrier refused the refund.")
     } catch (e) { setErr((e as Error).message) }
     finally { setVoiding(null) }
   }
@@ -201,7 +210,7 @@ export function ShipmentsView() {
       <StatCard
         label="Refunded"
         value={money(refunded)}
-        sub={tally.voided ? `${tally.voided} label${tally.voided === 1 ? "" : "s"} voided` : "nothing voided"}
+        sub={tally.voided ? `${tally.voided} label${tally.voided === 1 ? "" : "s"} refunded` : "nothing refunded"}
         tone={refunded > 0 ? "pos" : "mut"}
         onClick={tally.voided ? () => setStatus("refunded") : undefined}
         active={status === "refunded"}
@@ -359,8 +368,19 @@ export function ShipmentsView() {
                       {s.state && <div className="text-2xs text-muted-foreground">{s.state}</div>}
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="text-sm tabular-nums">{s.tracking}</div>
-                      {s.carrier && <div className="text-2xs text-muted-foreground">{s.carrier}</div>}
+                      {s.tracking ? (
+                        <>
+                          <div className="text-sm tabular-nums">{s.tracking}</div>
+                          {s.carrier && <div className="text-2xs text-muted-foreground">{s.carrier}</div>}
+                        </>
+                      ) : (
+                        // A refund CLEARS the tracking number on purpose — the buyer must not
+                        // be left holding a dead one. Saying so is the difference between a
+                        // row that explains itself and a row that looks broken.
+                        <span className="text-xs text-muted-foreground">
+                          {(s.refunded ?? 0) > 0 ? "voided — no tracking" : "—"}
+                        </span>
+                      )}
                     </td>
                     {/* nowrap: "Ground Advantage" was breaking across two lines in a narrow
                         cell, which set the height of every row that had a service name and
@@ -406,29 +426,36 @@ export function ShipmentsView() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                      <div className="inline-flex items-center gap-1">
+                      {/* WORDS, NOT THREE ANONYMOUS GLYPHS. A circular arrow, a box-with-arrow
+                          and an X sat in a row at 13px, and telling "re-check the carrier"
+                          from "open the PDF" from "refund $6.24" meant hovering each one to
+                          read a tooltip. Two of the three are harmless and the third moves
+                          money, which is the worst possible thing to leave to a guess. */}
+                      <div className="inline-flex items-center gap-1.5">
                         {/* Re-asking the carrier costs an API call and can move money
                             nowhere, so it's open to any staffer — unlike anything that
                             asserts a scan. */}
                         <button
                           onClick={() => recheck(s.id)}
                           disabled={checking === s.id}
-                          className="eg-tap rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                          className="eg-tap inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
                           title="Ask the carrier for the latest status"
                           aria-label={`Re-check tracking for ${s.num}`}
                         >
                           {checking === s.id
-                            ? <CircleNotch size={13} className="animate-spin" />
-                            : <ArrowClockwise size={13} weight="bold" />}
+                            ? <CircleNotch size={12} className="animate-spin" />
+                            : <ArrowClockwise size={12} weight="bold" />}
+                          Check
                         </button>
                         {s.labelUrl ? (
                           <a
                             href={s.labelUrl} target="_blank" rel="noopener noreferrer"
-                            className="eg-tap rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            className="eg-tap inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                             title="Open the label PDF"
                             aria-label={`Open label for ${s.num}`}
                           >
-                            <ArrowSquareOut size={13} weight="bold" />
+                            <ArrowSquareOut size={12} weight="bold" />
+                            Label
                           </a>
                         ) : (
                           // The label was bought but its file wasn't stored — which is a
@@ -438,15 +465,21 @@ export function ShipmentsView() {
                             not stored
                           </span>
                         )}
-                        {canVoid && s.labelUrl && (
+                        {/* "Refund", not "Void". Void is the carrier's word for cancelling
+                            the label; what the person pressing it wants is the postage back,
+                            and that is also what the row shows afterwards. One word for one
+                            outcome. Hidden once it HAS been refunded — a second press can
+                            only ever collect the carrier's refusal. */}
+                        {canVoid && s.labelUrl && (s.refunded ?? 0) === 0 && (
                           <button
                             onClick={() => doVoid(s)}
                             disabled={voiding === s.id}
-                            className="eg-tap rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                            title="Void label — refunds the postage with the carrier"
-                            aria-label={`Void label for ${s.num}`}
+                            className="eg-tap inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                            title="Cancel the label and get the postage credited back"
+                            aria-label={`Refund the label for ${s.num}`}
                           >
-                            {voiding === s.id ? <CircleNotch size={13} className="animate-spin" /> : <X size={13} weight="bold" />}
+                            {voiding === s.id ? <CircleNotch size={12} className="animate-spin" /> : <X size={12} weight="bold" />}
+                            Refund
                           </button>
                         )}
                       </div>

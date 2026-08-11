@@ -269,7 +269,21 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     const search = String((req.query && req.query.search) || '').trim().toLowerCase();
     const limit = Math.min(500, Math.max(1, parseInt((req.query && req.query.limit) || '200', 10) || 200));
     const args = [];
-    let where = "where coalesce(o.tracking,'') <> ''";
+    /**
+     * A REFUNDED LABEL IS STILL HISTORY.
+     *
+     * Voiding deliberately clears tracking — an order must not sit there showing a buyer a
+     * dead number — and this list keyed off tracking alone, so the moment you refunded a
+     * label the whole row vanished. The postage was still in the ledger, spent and credited
+     * back, with nothing on screen accounting for either. It also made the Refunded filter
+     * and tile contradict each other: the tile summed money the list could never show a row
+     * for, because those are exactly the rows being excluded.
+     *
+     * So: anything with a tracking number, OR anything we ever booked postage for.
+     */
+    let where = `where (coalesce(o.tracking,'') <> ''
+                        or exists (select 1 from wallet_ledger w
+                                    where w.type='label-cost' and w.ref='label-'||o.id))`;
     if (search) {
       args.push('%' + search + '%');
       where += ` and (lower(o.tracking) like $1 or lower(o.id) like $1
