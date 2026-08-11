@@ -1,15 +1,17 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { CircleNotch, Storefront, UploadSimple, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ProductCombobox } from "@/components/app/product-combobox"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
-import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getPublishDestinations, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord, type PublishDestination } from "@/lib/api"
+import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getPublishDestinations, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord, type PublishDestination, recordSpydeckUpload } from "@/lib/api"
+import { readPublishDraft, clearPublishDraft, type PublishDraft, type PublishPrefill } from "@/lib/publish-draft"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -304,31 +306,7 @@ function OutcomeLine({ dest, outcome }: { dest: PublishDestination; outcome?: Ou
   )
 }
 
-export type PublishPrefill = {
-  title?: string
-  description?: string
-  price?: number | string | null
-  tags?: string[]
-  images?: string[]
-  /** LOOK-AT-ONLY photos — the competitor's own shots behind a SpyDeck listing. Shown so a
-   *  seller can see what they're making; NEVER published. Kept out of `images` on purpose:
-   *  anything in `images` goes to the marketplace, and a set you can see but that silently
-   *  doesn't ship is the most misleading arrangement of the three. */
-  referenceImages?: string[]
-  /** Catalog product to produce this on. Sets the cost side of the margin. */
-  blank?: CatalogProduct | null
-  /** The variant axes as they were PICKED last time, so reopening a published listing
-   *  restores its variants instead of asking for them again. Only meaningful alongside
-   *  `blank` — the publish call sends variants only when a blank is resolved, so seeding
-   *  these without one would show a selection that then silently doesn't ship. */
-  colors?: string[]
-  sizes?: string[]
-  /** The ARTWORK, not the composite in `images`. This is what gets attached to the order
-   *  when one arrives, and what makes the line sendable to the Design board. */
-  designUrl?: string
-  designPos?: unknown
-  designId?: string | number
-}
+export type { PublishPrefill }
 
 /**
  * ONE publish dialog for both entry points — the design maker ("publish what I made")
@@ -340,20 +318,49 @@ export type PublishPrefill = {
  * there is no cost, no shipping fee and no margin — which is exactly why the old
  * dialogs couldn't show any of them — and nothing to actually produce against.
  */
-export function PublishProductDialog({
-  open, onOpenChange, prefill, onPublished, title: dialogTitle = "Publish product",
-}: {
-  open: boolean
-  onOpenChange: (v: boolean) => void
-  prefill: PublishPrefill | null
-  /** `primaryImage` is the photo that became the listing's cover, so the caller can show
-   *  what was actually published instead of the source it copied from. `published` carries
-   *  the rest of that record — status, blank, variants — which otherwise died with this
-   *  dialog's state and left the caller with nothing but the competitor listing. */
-  onPublished?: (url?: string, primaryImage?: string, published?: PublishedRecord) => void
-  title?: string
-}) {
-  // The dialog resolves a picked blank itself rather than asking each caller for a
+export function PublishProductPage({ draftId }: { draftId: string | null }) {
+  const router = useRouter()
+  /**
+   * The draft, read once from sessionStorage — in an EFFECT, so the three states stay
+   * distinct:
+   *
+   *   undefined  still reading (one frame, and during server render)
+   *   null       there is no such draft — the tab was closed, or this URL was shared
+   *   a draft    the listing to publish
+   *
+   * The middle case is real and has to be said. sessionStorage dies with the tab, so a
+   * bookmarked /publish?d=… opens to nothing, and an empty form with no explanation is
+   * exactly the "broken feature or empty state?" ambiguity the house rules forbid.
+   */
+  const [draft, setDraft] = useState<PublishDraft | null | undefined>(undefined)
+  useEffect(() => {
+    const t = setTimeout(() => setDraft(readPublishDraft(draftId)), 0)
+    return () => clearTimeout(t)
+  }, [draftId])
+  const prefill = draft?.prefill ?? null
+  const source = draft?.source ?? null
+  const returnTo = draft?.returnTo ?? "/spydeck"
+  const returnLabel = draft?.returnLabel ?? "Back"
+  const pageTitle = draft?.title ?? "Publish product"
+
+  /** Back — to the stored path, never history. See lib/publish-draft.ts. */
+  const leave = () => router.push(returnTo)
+
+  /**
+   * Tell SpyDeck what we published, from here.
+   *
+   * In the dialog this was an `onPublished` prop: SpyDeck held the competitor listing in
+   * state and recorded the upload against it. A page has no parent to call, so the source
+   * listing travels in the draft and the record is written here instead — the same
+   * server-side call SpyDeck made, so the Uploaded card is there when you go back.
+   */
+  const onPublished = (url?: string, primaryImage?: string, published?: PublishedRecord) => {
+    if (!source) return
+    const merged = primaryImage ? { ...source, image: primaryImage, thumb: primaryImage } : source
+    recordSpydeckUpload(merged, { url, listing_id: published?.listing_id, published }).catch(() => {})
+  }
+
+  // The page resolves a picked blank itself rather than asking each caller for a
   // lookup — the combobox hands back a flattened shape, and pricing needs the full row.
   const catalogRef = useRef<CatalogProduct[]>([])
   const [blank, setBlank] = useState<CatalogProduct | null>(null)
@@ -422,10 +429,12 @@ export function PublishProductDialog({
   // images actually attach instead of silently never showing up.
   const imgTouched = useRef(false)
 
-  // Seed once per open, from whichever source supplied the prefill.
+  // Seed once, on mount. In the dialog this ran per open; a page IS the open — it mounts
+  // with its draft and is thrown away when you leave.
   useEffect(() => {
-    if (!open) { seeded.current = false; return }
-    if (seeded.current) return
+    // WAIT for the draft. Seeding from a not-yet-read prefill would fill the form with
+    // blanks and set seeded, so the real values would never land.
+    if (draft === undefined || seeded.current) return
     seeded.current = true
     const id = setTimeout(() => {
       setTitle(prefill?.title ?? "")
@@ -444,21 +453,20 @@ export function PublishProductDialog({
       getCatalogProducts().then((rows) => { catalogRef.current = rows ?? [] }).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
-  }, [open, prefill])
+  }, [draft, prefill])
 
   // Re-sync photos from the prefill as the async listing-detail fetch fills them in — until
   // the user edits them. Without this, competitor photos loaded after open never attach.
   useEffect(() => {
-    if (!open) { imgTouched.current = false; return }
     if (imgTouched.current) return
     const imgs = (prefill?.images ?? []).filter(Boolean).slice(0, MAX_IMAGES)
     if (!imgs.length) return
     const id = setTimeout(() => { if (!imgTouched.current) setImages(imgs) }, 0)
     return () => clearTimeout(id)
-  }, [open, prefill])
+  }, [prefill])
 
   /**
-   * The shops, once per open.
+   * The shops, once on mount.
    *
    * A SINGLE destination is auto-ticked: there is no choice to make, and presenting one
    * checkbox to tick before you may press Publish is ceremony for its own sake. Two or
@@ -466,7 +474,6 @@ export function PublishProductDialog({
    * must not make, and the button says what's missing rather than guessing.
    */
   useEffect(() => {
-    if (!open) return
     const id = setTimeout(() => {
       setDestErr("")
       getPublishDestinations()
@@ -478,15 +485,10 @@ export function PublishProductDialog({
         .catch((e) => { setDests([]); setDestErr(e instanceof Error ? e.message : "Couldn't load your connected shops.") })
     }, 0)
     return () => clearTimeout(id)
-  }, [open])
+  }, [])
 
-  // Reset the per-run state when the dialog closes, so reopening isn't haunted by the last
-  // publish's ticks and results.
-  useEffect(() => {
-    if (open) return
-    const id = setTimeout(() => { setOutcomes({}); setPicked([]); setDests(null); setTt({}) }, 0)
-    return () => clearTimeout(id)
-  }, [open])
+  // NO RESET-ON-CLOSE effect. A page unmounts when you leave it, so the state goes with
+  // it — the dialog needed that only because it stayed mounted between opens.
 
   /**
    * TikTok's category tree and warehouse list, PER TICKED SHOP.
@@ -939,95 +941,74 @@ export function PublishProductDialog({
     setBusy(false)
   }
 
+  // The draft has served its purpose the moment every ticked shop is finished; leaving it
+  // would let Back-then-forward return to a form that would publish all over again.
+  useEffect(() => {
+    if (allDone && !busy) clearPublishDraft(draftId)
+  }, [allDone, busy, draftId])
+
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-5xl">
-        <DialogHeader><DialogTitle>{dialogTitle}</DialogTitle></DialogHeader>
+    <div className="mx-auto w-full max-w-[1500px] space-y-5 p-4 sm:p-6">
+      {/* THE WAY BACK, first thing on the page and never scrolled away from.
+          A page you reached by pressing a button on a board has to say where that board
+          was — "Back" alone makes the reader remember, and the one time they can't they
+          are stuck on a form they didn't mean to be a destination. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={leave}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:border-primary/40 hover:text-primary"
+        >
+          <CaretLeft size={13} weight="bold" /> {returnLabel}
+        </button>
+        <h1 className="text-xl font-semibold">{pageTitle}</h1>
+      </div>
 
-        {/* THE DONE SCREEN, only when every ticked shop is actually finished. With one shop
-            this is the same panel it always was; with four it lists what happened at each,
-            because "published" over a run that included a dry run would be a claim about
-            three shops and a lie about the fourth. Any failure keeps the form on screen so
-            it can be fixed without retyping the listing. */}
-        {allDone && !busy ? (
-          <div className="flex flex-col items-center gap-3 py-8 text-center">
+      {/* NO DRAFT. Say which of the two it is — still reading, or genuinely gone — because
+          a blank form and a lost one look identical otherwise. sessionStorage dies with the
+          tab, so this is what a shared or bookmarked /publish URL lands on. */}
+      {draft === null && (
+        <div className="mx-auto max-w-lg space-y-3 rounded-2xl border border-border bg-card p-6 text-center">
+          <p className="font-medium">There&apos;s nothing to publish here.</p>
+          <p className="text-sm text-muted-foreground">
+            A publish page is opened from a product — and the draft it carried is gone, which
+            happens when the tab was closed or this link came from somewhere else. Start again
+            from the board you were on.
+          </p>
+          <div className="flex justify-center gap-2">
+            <Button variant="outline" onClick={() => router.push("/spydeck")}>SpyDeck</Button>
+            <Button variant="outline" onClick={() => router.push("/design/maker")}>Design maker</Button>
+          </div>
+        </div>
+      )}
+
+      {/* THE DONE SCREEN, only when every ticked shop is actually finished. With one shop
+          this is the same panel it always was; with four it lists what happened at each,
+          because "published" over a run that included a dry run would be a claim about
+          three shops and a lie about the fourth. Any failure keeps the form on screen so
+          it can be fixed without retyping the listing. */}
+        {draft == null ? null : allDone && !busy ? (
+          <div className="mx-auto flex max-w-lg flex-col items-center gap-3 rounded-2xl border border-border bg-card py-10 text-center">
             <div className="font-semibold text-success">
               {pickedDests.every((d) => outcomes[d.connection_id]?.state === "ok")
                 ? PUBLISH_OK
                 : "Finished — with one shop that sent nothing"}
             </div>
-            <div className="w-full max-w-md space-y-1 text-left">
+            <div className="w-full max-w-md space-y-1 px-6 text-left">
               {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} />)}
             </div>
-            <Button onClick={() => onOpenChange(false)}>Done</Button>
+            <Button onClick={leave}>{returnLabel}</Button>
           </div>
         ) : (
-          <div className="grid max-h-[72vh] gap-5 overflow-y-auto pr-1 md:grid-cols-[1.1fr_1fr]">
-            {/* LEFT — what the listing looks like */}
+          /* THREE COLUMNS: what it looks like · what it is · where it goes.
+             The third is a STICKY rail, so the shops you picked and the button that sends
+             it stay on screen while you write a description four screens down. In the
+             dialog those sat at the bottom of a scroll box, which is how you end up
+             editing a listing without being able to see where it's going. */
+          <div className="grid items-start gap-5 xl:grid-cols-[1.05fr_1fr_23rem]">
+            {/* COLUMN 1 — what the listing looks like */}
             <div className="space-y-4">
-              {/* WHERE THIS GOES — the seller's connected shops.
-                  One shop: a sentence, no checkbox. There is no choice to make, and a
-                  single tick-box you must tick before publishing is ceremony.
-                  Several: a row each, ticked deliberately. Two shops on the SAME platform
-                  are two rows that differ by name — the case the old platform toggle
-                  couldn't express at all. */}
-              <div className="space-y-1.5">
-                <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Publish to</div>
-                {dests === null ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <CircleNotch size={12} className="animate-spin" /> Finding your shops…
-                  </div>
-                ) : destErr ? (
-                  <p className="text-xs text-destructive">{destErr}</p>
-                ) : dests.length === 0 ? (
-                  // Not an empty picker — an empty picker looks like a broken feature.
-                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                    No shop is connected to your account yet, so there&apos;s nowhere to publish this.
-                    Connect one under <a href="/stores" className="font-medium text-primary hover:underline">Stores</a>.
-                  </div>
-                ) : dests.length === 1 ? (
-                  <div className="flex flex-wrap items-center gap-x-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
-                    <span className="font-medium">{dests[0].shop_name}</span>
-                    <span className="text-xs text-muted-foreground">· {dests[0].platform_label}</span>
-                    {dests[0].dry_run && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">dry run — nothing is sent</span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {dests.map((d) => {
-                      const on = picked.includes(d.connection_id)
-                      return (
-                        <label
-                          key={d.connection_id}
-                          className={"flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors " +
-                            (on ? "border-primary/40 bg-primary/5" : "border-border hover:border-primary/30")}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={on}
-                            disabled={isDone(d.connection_id)}
-                            onChange={(e) => {
-                              setResult(null)
-                              setPicked((p) => e.target.checked ? [...p, d.connection_id] : p.filter((x) => x !== d.connection_id))
-                            }}
-                            className="size-3.5 accent-[var(--primary)]"
-                          />
-                          <span className="font-medium">{d.shop_name}</span>
-                          <span className="text-xs text-muted-foreground">{d.platform_label}</span>
-                          {d.dry_run && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">dry run</span>
-                          )}
-                          {isDone(d.connection_id) && (
-                            <span className="ml-auto text-2xs font-medium text-success">published</span>
-                          )}
-                        </label>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="text-sm font-medium">Photos</span>
@@ -1142,54 +1123,6 @@ export function PublishProductDialog({
               </div>
 
 
-              {/* ONE BLOCK PER TICKED TIKTOK SHOP. A category tree is read against a shop's
-                  cipher and a warehouse belongs to one shop, so two TikTok shops get two
-                  sets of fields rather than one shared set that would be wrong for one of
-                  them. Etsy and Shopify rows expand to nothing — ticking them adds no work. */}
-              {pickedDests.filter((d) => d.platform === "tiktok").map((d) => (
-                <TiktokFields
-                  key={d.connection_id}
-                  dest={d}
-                  fields={tt[d.connection_id] ?? TT_EMPTY}
-                  onChange={(patch) => setTt((m) => ({ ...m, [d.connection_id]: { ...(m[d.connection_id] ?? TT_EMPTY), ...patch } }))}
-                />
-              ))}
-
-              {/* No "size priced" picker any more — the table below prices every size, so
-                  choosing one to represent the rest was the thing hiding the others. */}
-              {blank && (
-                <label className="flex flex-col gap-1">
-                  <span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Method</span>
-                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                    {methodOpts.length === 0 && <option value="">Any</option>}
-                    {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </label>
-              )}
-
-              {/* Colours and sizes are CHOICES now, not a readout. Every chip that's on
-                  becomes an Etsy variant, so the listing offers what you meant to sell
-                  rather than everything the blank happens to come in. No cap on the list:
-                  hiding colours behind a "+N" made them unreachable. */}
-              {blank && colorOpts.length > 0 && (
-                <VariantChips
-                  label="Colours"
-                  options={colorOpts}
-                  picked={pickedColors}
-                  onChange={setPickedColors}
-                  render={prettyColorName}
-                />
-              )}
-
-              {blank && sizeOpts.length > 0 && (
-                <VariantChips
-                  label="Sizes"
-                  options={sizeOpts}
-                  picked={pickedSizes}
-                  onChange={setPickedSizes}
-                />
-              )}
-
               {blank && (pickedColors.length === 0 || (sizeOpts.length > 0 && pickedSizes.length === 0)) && (
                 <p className="text-xs text-amber-700">
                   With none selected this publishes as a flat listing with no variants.
@@ -1296,6 +1229,123 @@ export function PublishProductDialog({
                 )}
               </div>
 
+            </div>
+            {/* COLUMN 3 — WHERE IT GOES, and the button that sends it. Sticky, so the
+                shops and the action stay put however far down the copy you are. */}
+            {/* top-20, not top-4: the app header is sticky and 64px tall, so a rail pinned
+                at 16px slides UNDER it and loses its first line — measured, not guessed. */}
+            <aside className="space-y-4 xl:sticky xl:top-20">
+              {/* WHERE THIS GOES — the seller's connected shops.
+                  One shop: a sentence, no checkbox. There is no choice to make, and a
+                  single tick-box you must tick before publishing is ceremony.
+                  Several: a row each, ticked deliberately. Two shops on the SAME platform
+                  are two rows that differ by name — the case the old platform toggle
+                  couldn't express at all. */}
+              <div className="space-y-1.5">
+                <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Publish to</div>
+                {dests === null ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CircleNotch size={12} className="animate-spin" /> Finding your shops…
+                  </div>
+                ) : destErr ? (
+                  <p className="text-xs text-destructive">{destErr}</p>
+                ) : dests.length === 0 ? (
+                  // Not an empty picker — an empty picker looks like a broken feature.
+                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    No shop is connected to your account yet, so there&apos;s nowhere to publish this.
+                    Connect one under <a href="/stores" className="font-medium text-primary hover:underline">Stores</a>.
+                  </div>
+                ) : dests.length === 1 ? (
+                  <div className="flex flex-wrap items-center gap-x-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                    <span className="font-medium">{dests[0].shop_name}</span>
+                    <span className="text-xs text-muted-foreground">· {dests[0].platform_label}</span>
+                    {dests[0].dry_run && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">dry run — nothing is sent</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {dests.map((d) => {
+                      const on = picked.includes(d.connection_id)
+                      return (
+                        <label
+                          key={d.connection_id}
+                          className={"flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors " +
+                            (on ? "border-primary/40 bg-primary/5" : "border-border hover:border-primary/30")}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            disabled={isDone(d.connection_id)}
+                            onChange={(e) => {
+                              setResult(null)
+                              setPicked((p) => e.target.checked ? [...p, d.connection_id] : p.filter((x) => x !== d.connection_id))
+                            }}
+                            className="size-3.5 accent-[var(--primary)]"
+                          />
+                          <span className="font-medium">{d.shop_name}</span>
+                          <span className="text-xs text-muted-foreground">{d.platform_label}</span>
+                          {d.dry_run && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">dry run</span>
+                          )}
+                          {isDone(d.connection_id) && (
+                            <span className="ml-auto text-2xs font-medium text-success">published</span>
+                          )}
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* ONE BLOCK PER TICKED TIKTOK SHOP. A category tree is read against a shop's
+                  cipher and a warehouse belongs to one shop, so two TikTok shops get two
+                  sets of fields rather than one shared set that would be wrong for one of
+                  them. Etsy and Shopify rows expand to nothing — ticking them adds no work. */}
+              {pickedDests.filter((d) => d.platform === "tiktok").map((d) => (
+                <TiktokFields
+                  key={d.connection_id}
+                  dest={d}
+                  fields={tt[d.connection_id] ?? TT_EMPTY}
+                  onChange={(patch) => setTt((m) => ({ ...m, [d.connection_id]: { ...(m[d.connection_id] ?? TT_EMPTY), ...patch } }))}
+                />
+              ))}
+
+              {/* No "size priced" picker any more — the table below prices every size, so
+                  choosing one to represent the rest was the thing hiding the others. */}
+              {blank && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Method</span>
+                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                    {methodOpts.length === 0 && <option value="">Any</option>}
+                    {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {/* Colours and sizes are CHOICES now, not a readout. Every chip that's on
+                  becomes an Etsy variant, so the listing offers what you meant to sell
+                  rather than everything the blank happens to come in. No cap on the list:
+                  hiding colours behind a "+N" made them unreachable. */}
+              {blank && colorOpts.length > 0 && (
+                <VariantChips
+                  label="Colours"
+                  options={colorOpts}
+                  picked={pickedColors}
+                  onChange={setPickedColors}
+                  render={prettyColorName}
+                />
+              )}
+
+              {blank && sizeOpts.length > 0 && (
+                <VariantChips
+                  label="Sizes"
+                  options={sizeOpts}
+                  picked={pickedSizes}
+                  onChange={setPickedSizes}
+                />
+              )}
+
               {result && !result.ok && <p className="text-sm text-destructive">{result.text}</p>}
 
               {/* PER-SHOP RESULTS, live as the run walks the list. Shown here and not in a
@@ -1312,7 +1362,7 @@ export function PublishProductDialog({
                   seller acknowledges it. Publishing someone else's images to your shop can
                   get a listing pulled and, repeated, put the shop at risk. */}
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                <Button variant="outline" onClick={leave}>Cancel</Button>
                 {/* The label says what will actually happen. "Publish draft" over four ticked
                     shops understates it, and after a partial failure the button's job has
                     changed to retrying only what failed — which the label has to admit, or
@@ -1338,12 +1388,10 @@ export function PublishProductDialog({
                 {pickedDests.some((d) => d.platform === "shopify") && " A Shopify store connected before publishing was supported must be reconnected first — Shopify grants the permission at connect time, not per request."}
                 {pickedDests.some((d) => d.dry_run) && " One shop is in dry-run mode: it will be validated and nothing will be sent."}
               </p>
-            </div>
+            </aside>
           </div>
         )}
-
-      </DialogContent>
-    </Dialog>
+    </div>
 
       {/* THE LIGHTBOX.
           A sibling of the publish dialog, not a child of it: a second Base UI dialog mounted

@@ -125,13 +125,21 @@ export function ordersHomeFor(role?: string | null): string {
 // May this staff role sit on this (app) page? (admin = all; others = shared + their tools)
 export function staffCanUseAppPath(role: string | null | undefined, pathname: string): boolean {
   if (role === "admin") return true
+  const tools = staffTools(role).map((i) => i.href)
   const allowed = [
     ...STAFF_SHARED_PATHS,
     ...(ORDER_ROLES.includes(String(role)) ? ["/orders"] : []),
-    ...staffTools(role).map((i) => i.href),
+    ...tools,
+    // /publish is not a nav item — it is where SpyDeck and Design Lab GO. So it is allowed
+    // to whoever may use one of those, and to nobody else. Without this an operator
+    // pressing "Make product" was bounced to their dashboard, which reads as the button
+    // being broken rather than the page being forbidden.
+    ...(tools.some((h) => PUBLISH_ENTRY_PATHS.includes(h)) ? ["/publish"] : []),
   ]
   return allowed.some((p) => pathname === p || pathname.startsWith(p + "/"))
 }
+/** The pages that open the publish page. Kept beside the rule that reads them. */
+const PUBLISH_ENTRY_PATHS = ["/spydeck", "/design"]
 
 export function staffNav(role?: string | null): StaffNavItem[] {
   if (!role) return []
@@ -142,7 +150,7 @@ export function staffNav(role?: string | null): StaffNavItem[] {
 // (Products/SpyDeck/Design Lab/Stores/Wallet/…) AND the shared pages — not just
 // STAFF_ITEMS, so a detail route like /products/16468 shows "Products" instead of falling
 // through to the bare "EGFULFILL" brand. Longest-prefix wins so /products/x beats /.
-const SHARED_TITLES: Record<string, string> = { "/chat": "Chat", "/settings": "Settings", "/help": "Help", "/orders": "Orders", "/notifications": "Notifications" }
+const SHARED_TITLES: Record<string, string> = { "/chat": "Chat", "/settings": "Settings", "/help": "Help", "/orders": "Orders", "/notifications": "Notifications", "/publish": "Publish" }
 export function staffNavTitle(pathname: string): string {
   const all = [...STAFF_ITEMS, ...STAFF_TOOLS, ...Object.entries(SHARED_TITLES).map(([href, label]) => ({ href, label }))]
   let best = ""; let bestLen = -1

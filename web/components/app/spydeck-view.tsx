@@ -12,13 +12,14 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { CARD_ACTION_PRIMARY, CARD_ACTION_SECONDARY, CARD_ACTION_ICON } from "@/lib/card-actions"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, deleteSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, type PublishedRecord, getSpydeckListingDetail, getEtsyListingImages, getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, rebuildSpydeckTrending, getEtsyCategories, getSpydeckUploads, deleteSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, getSpydeckListingDetail, getEtsyListingImages, getCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
 import { StoresTab } from "@/components/app/spydeck-stores"
 import { detectTrademarks } from "@/lib/trademarks"
-import { PublishProductDialog } from "@/components/app/publish-product-page"
+import { useRouter } from "next/navigation"
+import { stashPublishDraft } from "@/lib/publish-draft"
 import { SourcingSuggestDialog } from "@/components/app/sourcing-suggest-dialog"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ShopAnalyzer } from "@/components/app/shop-analyzer"
@@ -679,30 +680,92 @@ export function SpyDeckView() {
   }, [makeListing])
   const [uploaded, setUploaded] = useState<UploadedListing[]>([])
   const [uploadedIds, setUploadedIds] = useState<Set<string>>(new Set())
-  // Optimistic locally, then persisted — the draft already exists in the shop by this
-  // point, so the record of it must outlive the tab. A failed write is logged rather
-  // than surfaced: the publish itself succeeded, and re-publishing is the worse outcome.
-  const onPublished = (l: EtsyListing, our?: { listing_id?: number | string; url?: string; published?: PublishedRecord }) => {
-    const k = String(l.listing_id)
-    setUploadedIds((prev) => new Set(prev).add(k))
-    setUploaded((prev) => (prev.some((x) => String(x.listing_id) === k)
-      ? prev
-      : [{ ...l, our_url: our?.url, our_listing_id: our?.listing_id != null ? String(our.listing_id) : undefined, published: our?.published }, ...prev]))
-    recordSpydeckUpload(l, our).catch(() => {})
-  }
-  // Record what was actually PUBLISHED, not the source it was copied from: the seller can
-  // reorder photos or swap in their own, so the uploaded card must show the cover image
-  // the draft went out with. `image`/`thumb` both point at it so the card (thumb||image)
-  // renders the published cover rather than a stale competitor shot.
-  //
-  // `published` carries the rest — blank, colours, sizes, variant count, draft/active.
-  // It only exists in the publish dialog's state, so if it isn't handed over here it is
-  // gone the moment the dialog closes, and the Uploaded card has nothing of ours to show.
-  // `listing_id` is also what lets the server join back to published_listings.
-  const onPublishedFrom = (source: EtsyListing, url?: string, primaryImage?: string, published?: PublishedRecord) => {
-    const merged = primaryImage ? { ...source, image: primaryImage, thumb: primaryImage } : source
-    onPublished(merged, { url, listing_id: published?.listing_id, published })
-  }
+  /**
+   * NOTHING RECORDS AN UPLOAD HERE ANY MORE.
+   *
+   * onPublished/onPublishedFrom updated this list optimistically and then persisted, which
+   * only worked while publishing happened in a dialog mounted on this page. It is a route
+   * now, so the page writes the record itself (see publish-product-page.tsx) and the effect
+   * below re-reads the list from the server on every mount — which is what coming back from
+   * /publish is. One writer, and the card is there when you return.
+   */
+  const router = useRouter()
+  // Couldn't stash the draft — said out loud rather than navigating to an empty form.
+  const [publishErr, setPublishErr] = useState("")
+
+  /**
+   * EDIT — re-publish one of ours, seeded from what we actually sent.
+   *
+   * Our title, description and tags fall back to the competitor's TITLE only (never its
+   * description or tag set): a title is a starting point someone rewrites, whereas
+   * inheriting a description or tags is the one place copying is an actual liability.
+   */
+  useEffect(() => {
+    if (!editing) return
+    const l = editing
+    const id = setTimeout(() => {
+      const draftId = stashPublishDraft({
+        prefill: {
+          title: l.l.product?.title || l.l.published?.title || l.l.title,
+          description: l.l.product?.description || "",
+          price: l.l.published?.price ?? undefined,
+          tags: l.l.product?.tags ?? [],
+          // published_listings keeps only the FIRST colour/size, so the full axes come from
+          // the publish blob, falling back to the single columns for older rows.
+          colors: l.l.published?.colors ?? (l.l.product?.color ? [l.l.product.color] : []),
+          sizes: l.l.published?.sizes ?? (l.l.product?.size ? [l.l.product.size] : []),
+          images: l.images,
+          blank: l.blank,
+          designUrl: l.l.product?.design_data || undefined,
+          designPos: l.l.product?.design_pos ?? undefined,
+          designId: l.l.product?.design_id ?? undefined,
+        },
+        source: l.l,
+        returnTo: "/spydeck",
+        returnLabel: "Back to SpyDeck",
+        title: "Edit listing",
+      })
+      setEditing(null)
+      if (!draftId) { setPublishErr("Couldn't open the publish page — that listing's photos are too large for the browser to hand over."); return }
+      router.push(`/publish?d=${draftId}`)
+    }, 0)
+    return () => clearTimeout(id)
+  }, [editing, router])
+
+  /**
+   * MAKE — a new listing from a competitor's card.
+   *
+   * The publishable set starts EMPTY: a listing made from a competitor has none of its own
+   * photos yet, and pretending otherwise is what put a seller's shop one click from an IP
+   * takedown. Their photos travel as REFERENCE, which the page shows and never publishes.
+   */
+  useEffect(() => {
+    if (!makeListing) return
+    const l = makeListing
+    const detail = makeDetail && makeDetail.forId === String(l.listing_id) ? makeDetail : null
+    const id = setTimeout(() => {
+      const draftId = stashPublishDraft({
+        prefill: {
+          title: l.title,
+          description: detail?.description ?? l.description ?? "",
+          // Prefer the USD-converted price so the seller starts from a comparable number.
+          price: l.price_usd ?? l.price,
+          tags: l.tags ?? [],
+          images: [],
+          referenceImages: ((detail?.images?.length ? detail.images : l.images?.length ? l.images : l.image ? [l.image] : []) as string[]).filter(Boolean),
+        },
+        source: l,
+        returnTo: "/spydeck",
+        returnLabel: "Back to SpyDeck",
+        title: "Make product",
+      })
+      setMakeListing(null)
+      if (!draftId) { setPublishErr("Couldn't open the publish page — that listing's photos are too large for the browser to hand over."); return }
+      router.push(`/publish?d=${draftId}`)
+    }, 0)
+    return () => clearTimeout(id)
+  }, [makeListing, makeDetail, router])
+
   // Forget the RECORD, not the listing. The draft stays in the shop — deleting it there is
   // the marketplace's job, and doing it from here would be destroying a live seller asset.
   const removeUpload = (l: UploadedListing) => {
@@ -1220,72 +1283,24 @@ export function SpyDeckView() {
           dialog, which is what makes cost and margin computable. */}
       <SourcingSuggestDialog listing={sourceListing} onClose={() => setSourceListing(null)} />
 
+      {/* The draft couldn't be handed over to the publish page (a storage quota, in
+          practice). Said here rather than navigating to a page that would find nothing. */}
+      {publishErr && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{publishErr}</div>
+      )}
+
       {/* RE-PUBLISH — the same dialog, seeded from what we actually sent.
           A SECOND instance rather than a shared one: the two entry points seed different
           things (a competitor listing supplies reference photos and no images; ours
           supplies real images and a resolved blank), and one dialog switching between
           them would need a reset effect — the pattern this repo replaced with remounting.
           Keyed on the listing so reopening a different card is genuinely fresh state. */}
-      <PublishProductDialog
-        key={editing ? `edit-${editing.l.listing_id}` : "edit-none"}
-        open={!!editing}
-        onOpenChange={(v) => !v && setEditing(null)}
-        prefill={editing ? {
-          // OUR title, description and tags — the ones we actually sent, now stored on the
-          // publish record. They fall back to the competitor's TITLE only (never its
-          // description or tags): a title is a starting point someone will rewrite, whereas
-          // inheriting a competitor's description or tag set is the one place copying is an
-          // actual liability rather than a shortcut.
-          title: editing.l.product?.title || editing.l.published?.title || editing.l.title,
-          description: editing.l.product?.description || "",
-          price: editing.l.published?.price ?? undefined,
-          tags: editing.l.product?.tags ?? [],
-          // The variants as picked last time. published_listings keeps only the FIRST
-          // colour/size (single columns), so the full axes come from the publish blob,
-          // which stored them as arrays — falling back to the single columns for rows
-          // written before the blob carried them.
-          colors: editing.l.published?.colors ?? (editing.l.product?.color ? [editing.l.product.color] : []),
-          sizes: editing.l.published?.sizes ?? (editing.l.product?.size ? [editing.l.product.size] : []),
-          // OUR photos, live from the listing — the ones already on it, so a re-publish
-          // starts from what is there instead of asking for them again.
-          images: editing.images,
-          blank: editing.blank,
-          // The artwork, so the new draft carries the design rather than an empty mockup.
-          designUrl: editing.l.product?.design_data || undefined,
-          designPos: editing.l.product?.design_pos ?? undefined,
-          designId: editing.l.product?.design_id ?? undefined,
-        } : null}
-        onPublished={(url, img, published) => {
-          if (editing) onPublishedFrom(editing.l, url, img, published)
-          setEditing(null)
-        }}
-        title="Edit listing"
-      />
-
-      <PublishProductDialog
-        // Remount per listing. The dialog seeds its fields once per open; keying it means a
-        // different card gets genuinely fresh state rather than a reset effect racing the
-        // prefill (the repo's reset-by-remounting rule).
-        key={makeListing ? String(makeListing.listing_id) : "none"}
-        open={!!makeListing}
-        onOpenChange={(v) => !v && setMakeListing(null)}
-        prefill={makeListing ? ((detail) => ({
-          title: makeListing.title,
-          description: detail?.description ?? makeListing.description ?? "",
-          // Prefer the USD-converted price so the seller starts from a comparable number.
-          price: makeListing.price_usd ?? makeListing.price,
-          tags: makeListing.tags ?? [],
-          // The publishable set starts EMPTY. A listing made from a competitor has none of
-          // its own photos yet, and pretending otherwise is what put a seller's shop one
-          // click from an IP takedown.
-          images: [],
-          // Their photos come through as reference so the seller can see what they're
-          // making. The dialog shows them in a separate strip and never publishes them.
-          referenceImages: ((detail?.images?.length ? detail.images : makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []) as string[]).filter(Boolean),
-        }))(makeDetail && makeDetail.forId === String(makeListing.listing_id) ? makeDetail : null) : null}
-        onPublished={(url, img, published) => { if (makeListing) onPublishedFrom(makeListing, url, img, published) }}
-        title="Make product"
-      />
+      {/* PUBLISHING IS A PAGE NOW, not two dialogs mounted here.
+          Both entry points stash the listing and navigate: the draft carries the SOURCE
+          listing too, so the page can record the Uploaded card against it — that used to
+          be the onPublished callback, which a navigation cannot preserve. Both effects
+          below fire when their listing is set, which is what the two dialogs' `open` props
+          used to do. */}
     </div>
   )
 }

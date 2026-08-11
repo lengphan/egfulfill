@@ -12,7 +12,8 @@ import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getP
 import { canvasReadableSrc } from "@/lib/thread-match"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
 import { mockupFaces, setTypeMockups, typeMockupOf, typeSidesOf } from "@/lib/variant-resolve"
-import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-page"
+import { useRouter } from "next/navigation"
+import { stashPublishDraft } from "@/lib/publish-draft"
 import { DesignLabTabs } from "@/components/app/design-lab-tabs"
 
 // The blank to DESIGN on. Falls back to the type's default mockup (Settings → Platform)
@@ -125,7 +126,6 @@ export function DesignMaker() {
   const [dragOver, setDragOver] = useState(false)
   // Built when Publish opens: the composed design becomes the primary photo and the
   // blank already picked here carries over, so the dialog opens ready rather than blank.
-  const [pubPrefill, setPubPrefill] = useState<PublishPrefill | null>(null)
   // The full catalog, so a product picked from the dialog (which hands back a flattened
   // shape) can be resolved to its catalog row for the print zone.
   const catalogRef = useRef<CatalogProduct[]>([])
@@ -140,7 +140,10 @@ export function DesignMaker() {
   const [name, setName] = useState("")
   const [pickerOpen, setPickerOpen] = useState(false)
   const [libOpen, setLibOpen] = useState(false)
-  const [pubOpen, setPubOpen] = useState(false)
+  // Only the failure needs state now: publishing navigates away, so there is nothing
+  // "open" to track — but a draft too large to stash has to be said, not swallowed.
+  const [pubErr, setPubErr] = useState("")
+  const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null)
   // Images library: the seller's own reusable uploads + buyer art from their orders.
@@ -445,13 +448,24 @@ export function DesignMaker() {
                 // images[] is the composite the BUYER sees; designUrl is the artwork the
                 // FACTORY needs. Sending only the composite is why published listings
                 // produced orders with nothing to digitise.
-                setPubPrefill({ title: name, images: composed ? [composed] : [], blank: product, designUrl, designPos: pos })
-                setPubOpen(true)
+                // Publishing is its own PAGE now, so the listing travels through
+                // sessionStorage rather than as a prop — see lib/publish-draft.ts. A failed
+                // stash is said out loud: navigating to a page whose draft was never stored
+                // would land on an empty form with no explanation.
+                const id = stashPublishDraft({
+                  prefill: { title: name, images: composed ? [composed] : [], blank: product, designUrl, designPos: pos },
+                  returnTo: "/design/maker",
+                  returnLabel: "Back to Design maker",
+                  title: "Publish product",
+                })
+                if (!id) { setPubErr("Couldn't open the publish page — this design is too large for the browser to hand over."); return }
+                router.push(`/publish?d=${id}`)
               }}
               disabled={!designUrl && texts.length === 0}
             >
               <Export size={15} weight="bold" /> Publish product
             </Button>
+            {pubErr && <p className="text-xs text-destructive">{pubErr}</p>}
           </div>
         </aside>
       </div>
@@ -465,12 +479,6 @@ export function DesignMaker() {
           setSide("front")
         }} />
       <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }} />
-      <PublishProductDialog
-        open={pubOpen}
-        onOpenChange={setPubOpen}
-        prefill={pubPrefill}
-        title="Publish product"
-      />
     </div>
   )
 }
