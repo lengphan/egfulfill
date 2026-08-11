@@ -321,16 +321,23 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
   // WHO bought postage against WHICH order, and what it cost. The one chokepoint every
   // buy path goes through, so auditing here covers the aggregator, the direct-USPS and
   // the rate-token routes without three near-identical calls. Fire-and-forget.
+  // A test-mode label quotes a real-looking price and is never charged, so its "cost" is
+  // not money and must not reach the ledger. This is not hypothetical: every label-cost row
+  // in the database (11 rows, $65.90, 25-29 July) was bought on a shippo_test_ token, so the
+  // factory's postage spend has been overstated by the whole of it.
+  const isTest = !!(ref && ref.test);
   audit(req, 'shipping.label_bought', {
     entityType: 'order', entityId: orderId,
-    after: { tracking, carrier: carrier || 'USPS', cost: cost ?? null, to_zip: (to && (to.zip || to.postal_code)) || null },
-    note: `Label bought · ${carrier || 'USPS'} · ${tracking || 'no tracking'}`,
+    after: { tracking, carrier: carrier || 'USPS', cost: cost ?? null, test: isTest, to_zip: (to && (to.zip || to.postal_code)) || null },
+    note: `Label bought · ${carrier || 'USPS'} · ${tracking || 'no tracking'}${isTest ? ' · TEST MODE, not charged' : ''}`,
   });
   // Book the postage as it's bought. The carrier tells us the price exactly once, in the
   // buy response — if we don't write it down here it's gone, and no report can recover
   // what a label cost. Idempotent on the order, so a re-buy doesn't double-count.
-  recordCost('label', cost, `label-${orderId}`, `Postage · ${carrier || 'USPS'} · order ${orderId}`, { orderId })
-    .catch(() => {});
+  if (!isTest) {
+    recordCost('label', cost, `label-${orderId}`, `Postage · ${carrier || 'USPS'} · order ${orderId}`, { orderId })
+      .catch(() => {});
+  }
   const cur = await q('select factory_status from orders where id=$1', [orderId])
     .then((r) => String((r.rows[0] || {}).factory_status || '').toLowerCase()).catch(() => '');
   const advance = PRE_SCAN.includes(cur);

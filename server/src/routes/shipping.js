@@ -157,6 +157,12 @@ async function shBuy(rateObjectId, sel) {
   recordUsage('shippo', { endpoint: 'buy', ok: true }); // $ tracked in wallet_ledger (label-cost); count volume only
   return {
     provider: 'shippo',
+    // A TEST-MODE LABEL COSTS NOTHING, and the buy response is the only place that says so.
+    // Shippo's test environment quotes real-looking prices against a shippo_test_ token and
+    // charges none of them — which is how $65.90 of postage that was never paid ended up
+    // booked to wallet_ledger as factory spend. Carried out so recordLabel can decline to
+    // book money that does not exist.
+    test: !!d.test,
     carrier: (rate && rate.provider) || sel.carrier || '',
     service: (rate && rate.servicelevel && rate.servicelevel.name) || sel.service || '',
     cost: (rate && Number(rate.amount)) || Number(sel.amount) || null,
