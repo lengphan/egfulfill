@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
 import { resolveProduct, colorsOf, methodsOf, sizesOf } from "@/lib/variant-resolve"
 import { VariantField } from "@/components/app/variant-field"
@@ -46,6 +46,40 @@ export function VariantPicker({
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't save") }
     finally { setBusy(null) }
   }
+
+  /**
+   * A FIELD WITH ONE OPTION IS NOT A CHOICE — fill it in.
+   *
+   * A marketplace line arrives with everything unset, and the line is blocked from
+   * production until each field the blank offers has been picked (itemNeedsSetup). When the
+   * blank offers exactly one method there is nothing to decide: somebody has to open the
+   * dropdown, see a single entry, and select it before the order can move. That is a click
+   * to confirm a fact the catalogue already stated.
+   *
+   * ONCE PER LINE, and never in reply to a clear. Clearing is a real gesture — VariantField
+   * offers it — and a rule that refills the moment the field empties would make the clear
+   * look broken. The ref remembers which lines have already been filled in, so the first
+   * render sets it and nothing after that fights the human.
+   *
+   * METHOD ONLY. The same argument holds for a one-colour or one-size blank, but colour and
+   * size are things a buyer chose and a picker confirms against the parcel; a print method
+   * is how WE make it. Widening this is a product decision, not a tidy-up.
+   */
+  const autoFilled = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const lineKey = String(item.line_id ?? item.sku ?? "")
+    if (!lineKey || !product) return
+    if (methodOpts.length !== 1 || (item.print_type ?? "").trim()) return
+    if (autoFilled.current.has(lineKey)) return
+    autoFilled.current.add(lineKey)
+    // Deferred: this sets state (busy) and posts, and an effect body that does either
+    // synchronously cascades a render before paint.
+    const t = setTimeout(() => { void save({ printType: methodOpts[0] }, "printType") }, 0)
+    return () => clearTimeout(t)
+    // `save` is stable enough for this — it closes over orderId/key, both of which change
+    // only when the line itself does, which is exactly when this should run again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product, methodOpts, item.print_type, item.line_id, item.sku])
 
   // Picking a blank clears colour/size/method that don't exist on the new product, so a
   // stale "Navy" from the previous blank can't linger and mis-price.
