@@ -271,7 +271,10 @@ export type TopupRequest = {
   id: string
   amount_usd: number | string
   vnd?: number | string | null
-  method?: string | null
+  method?: string
+  /** Some products carry their techniques as a LIST rather than a joined string — imports
+   *  and anything built against the API. Read alongside `method`, never instead of it. */
+  methods?: string[] | null
   ref?: string | null
   status: "pending" | "received" | "rejected"
   txn_id?: string | null
@@ -616,6 +619,10 @@ export type CatalogProduct = {
   sku?: string
   type?: string
   method?: string
+  /** Some products carry their techniques as a LIST rather than a joined `method` string —
+   *  imports, and anything built against the API. Read alongside `method`, never instead of
+   *  it, or a product that has both loses half its options. */
+  methods?: string[] | null
   material?: string
   status?: string
   price?: number | string

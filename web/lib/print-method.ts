@@ -9,37 +9,54 @@
 export type PrintMethod = { key: string; label: string }
 
 /**
- * The methods a product may be assigned — the SINGLE source for the picker.
+ * ONE TABLE. Key, the label we print, and what a stored string has to look like to be
+ * recognised as this method.
  *
- * These were hardcoded in product-editor-dialog.tsx and had drifted from both this file
- * and the pricing surcharges: the picker offered Screen Print / Sublimation / Vinyl,
- * which had no `method_*` fee key at all (so they priced at $0), while DTF, Appliqué and
- * Laser were priced but couldn't be selected. Every entry here now has a matching
- * surcharge in factory_settings KEYS — keep the three in step.
+ * There were two lists, and they disagreed. `PRODUCT_METHODS` labelled dtg "DTG" while
+ * `normTech` labelled it "DTG printing"; scr was "Screen Print" in one and "Screen print"
+ * in the other. Both are the same eight methods, so nothing looked wrong — until something
+ * compared a label produced by one against the set defined by the other, which is exactly
+ * what the product editor did:
+ *
+ *   normalizeMethods(["DTG Print / Embroidery"]) -> ["DTG printing", "Embroidery"]
+ *   .filter(m => PRODUCT_METHODS_LABELS.includes(m))  ->  ["Embroidery"]
+ *
+ * so a product that could be printed AND embroidered showed only Embroidery ticked, and
+ * the next chip anyone clicked wrote the ticked set back — silently dropping DTG from the
+ * product for good. That is how blanks end up offering ONE method on an order line: not a
+ * rendering fault in the line, a technique deleted from the product weeks earlier.
+ *
+ * Matching is by KEY everywhere now, so the label can be whatever reads best and old data
+ * in any spelling still resolves. `re` keeps recognising the wordings already in the
+ * database ("DTG Print", "Direct to Garment") — that is a matcher, not a vocabulary.
+ *
+ * Every entry has a matching `method_*` surcharge in factory_settings KEYS. Keep in step.
  */
-export const PRODUCT_METHODS: PrintMethod[] = [
-  { key: "dtg", label: "DTG" },
-  { key: "dtf", label: "DTF" },
-  { key: "emb", label: "Embroidery" },
-  { key: "apl", label: "Appliqué" },
-  { key: "lsr", label: "Laser" },
-  { key: "scr", label: "Screen Print" },
-  { key: "sub", label: "Sublimation" },
-  { key: "vnl", label: "Vinyl" },
+const METHOD_TABLE: (PrintMethod & { re: RegExp })[] = [
+  { key: "dtf", label: "DTF printing", re: /dtf/ },
+  { key: "dtg", label: "DTG printing", re: /dtg|direct to garment/ },
+  { key: "emb", label: "Embroidery", re: /emb|embroid/ },
+  { key: "apl", label: "Appliqué", re: /appliqu|\bapl\b/ },
+  { key: "lsr", label: "Laser", re: /laser|\blsr\b|engrav/ },
+  { key: "scr", label: "Screen print", re: /screen|\bscr\b/ },
+  { key: "sub", label: "Sublimation", re: /sublim|\bdye\b|\bsub\b/ },
+  { key: "vnl", label: "Vinyl", re: /vinyl|htv|\bvnl\b/ },
 ]
+
+/** The methods a product may be assigned — the SINGLE source for every picker. */
+export const PRODUCT_METHODS: PrintMethod[] = METHOD_TABLE.map(({ key, label }) => ({ key, label }))
+
+/** Look one up by key. Null for the ad-hoc keys normTech invents for unknown techniques. */
+export const methodByKey = (key: string): PrintMethod | null =>
+  PRODUCT_METHODS.find((m) => m.key === key) ?? null
 
 /** Normalise one raw technique to a stable {key,label}. */
 export function normTech(raw: string): PrintMethod | null {
   const s = String(raw || "").trim().toLowerCase()
   if (!s) return null
-  if (/dtf/.test(s)) return { key: "dtf", label: "DTF printing" }
-  if (/dtg|direct to garment/.test(s)) return { key: "dtg", label: "DTG printing" }
-  if (/emb|embroid/.test(s)) return { key: "emb", label: "Embroidery" }
-  if (/appliqu|\bapl\b/.test(s)) return { key: "apl", label: "Appliqué" }
-  if (/laser|\blsr\b|engrav/.test(s)) return { key: "lsr", label: "Laser" }
-  if (/screen/.test(s)) return { key: "scr", label: "Screen print" }
-  if (/sublim|\bdye\b/.test(s)) return { key: "sub", label: "Sublimation" }
-  if (/vinyl|htv/.test(s)) return { key: "vnl", label: "Vinyl" }
+  for (const m of METHOD_TABLE) if (m.re.test(s)) return { key: m.key, label: m.label }
+  // UV is recognised but not offered — it exists in old data and has no surcharge, so it
+  // must still normalise rather than being turned into a junk key.
   if (/\buv\b/.test(s)) return { key: "uv", label: "UV print" }
   return { key: s.replace(/[^a-z0-9]+/g, "").slice(0, 6) || "t", label: raw.charAt(0).toUpperCase() + raw.slice(1) }
 }

@@ -43,10 +43,20 @@ export function colorsOf(p: CatalogProduct | null): string[] {
 
 export function methodsOf(p: CatalogProduct | null): string[] {
   if (!p) return []
-  // SPLIT the method string. A product's `method` commonly lists several techniques in
-  // one field ("DTG Print / DTF Print / Embroidery / Appliqué"); adding it whole offered
-  // that entire run-on string as a single un-pickable option.
-  return normalizeMethods([...Object.keys(p.methodPrices ?? {}), p.method]).map((m) => m.label)
+  // SPLIT the method string: `method` commonly lists several techniques in one field
+  // ("DTG Print / DTF Print / Embroidery / Appliqué"), and adding it whole offered that
+  // entire run-on string as a single un-pickable option.
+  //
+  // THREE PLACES A PRODUCT CAN SAY WHAT IT SUPPORTS, and it was only being asked two.
+  //
+  // `method` is the joined string the editor writes; `methodPrices` keys are whatever the
+  // pricing table was given. But an imported or API-built product can carry a `methods`
+  // ARRAY instead — the server already reads `d.methods` when it publishes one (see
+  // catalog.js) — and this ignored it, so those blanks offered whatever single value
+  // happened to be in `method` and nothing else. Deduped by key, so listing a technique in
+  // two of the three fields still yields one option.
+  const arr = Array.isArray(p.methods) ? p.methods : []
+  return normalizeMethods([...arr, ...Object.keys(p.methodPrices ?? {}), p.method]).map((m) => m.label)
 }
 
 // The mockup faces to place artwork on. Prefers the per-COLOUR image for the front (so a

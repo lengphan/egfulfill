@@ -11,13 +11,12 @@ import { getFactorySettings, type CatalogProduct, type FactorySettings, type Pro
 import { prettyColorName } from "@/lib/color-name"
 import { swatchHex } from "@/lib/color-swatch"
 import { extractDominant, hexToRgb, rgbToOklab } from "@/lib/thread-match"
-import { normalizeMethods, PRODUCT_METHODS } from "@/lib/print-method"
+import { normalizeMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 import { packagingHint } from "@/lib/dim-weight"
 
 // Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
 // surcharges cannot drift apart again.
-const METHODS = PRODUCT_METHODS.map((m) => m.label)
 // Fallback only — the real list is managed in Settings → Platform. Used until settings
 // load, and if the platform has never saved a list.
 const TYPES = ["Apparel", "Headwear", "Bags", "Drinkware", "Accessories", "Other"]
@@ -309,10 +308,11 @@ export function ProductEditorDialog({
   // The methods currently ticked, read back out of the joined `method` string through the
   // same normaliser the rest of the app uses — so a product imported with
   // "DTG Print / Embroidery" shows both ticked rather than neither.
-  const pickedMethods = useMemo(
-    () => normalizeMethods([method]).map((m) => m.label).filter((m) => METHODS.includes(m)),
-    [method]
-  )
+  // BY KEY, not by label. Filtering the normalised labels against the picker's own label
+  // list silently dropped any method whose two spellings differed — see METHOD_TABLE in
+  // lib/print-method.ts. Keys are stable, so a product stored as "DTG Print", "dtg" or
+  // "Direct to Garment" ticks the same chip.
+  const pickedKeys = useMemo(() => normalizeMethods([method]).map((m) => m.key), [method])
   const markup = Number(fees?.base_markup) || 0
   useEffect(() => {
     const id = setTimeout(() => { getFactorySettings().then(setFees).catch(() => {}) }, 0)
@@ -472,16 +472,20 @@ export function ProductEditorDialog({
               <div className="flex flex-col gap-1">
                 <span className="text-sm text-muted-foreground">Methods</span>
                 <div className="flex flex-wrap gap-1.5 rounded-2xl border border-border bg-card px-2 py-2">
-                  {METHODS.map((m) => {
-                    const on = pickedMethods.includes(m)
+                  {PRODUCT_METHODS.map((pm) => {
+                    const m = pm.label
+                    const on = pickedKeys.includes(pm.key)
                     return (
                       <button
-                        key={m}
+                        key={pm.key}
                         type="button"
                         aria-pressed={on}
                         onClick={() => {
-                          const next = on ? pickedMethods.filter((x) => x !== m) : [...pickedMethods, m]
-                          setMethod(next.join(" / "))
+                          // Rebuilt from the KEYS that are on, then written back as canonical
+                          // labels — so toggling one chip can no longer erase a method the
+                          // list simply failed to recognise.
+                          const keys = on ? pickedKeys.filter((k) => k !== pm.key) : [...pickedKeys, pm.key]
+                          setMethod(keys.map((k) => methodByKey(k)?.label).filter(Boolean).join(" / "))
                         }}
                         className={"rounded-md border px-2 py-0.5 text-xs font-medium transition-colors " +
                           (on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground")}
