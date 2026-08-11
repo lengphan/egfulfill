@@ -950,7 +950,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
 
   return (
     <>
-    <div className="mx-auto w-full max-w-[1500px] space-y-5 p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-[70rem] space-y-5 p-4 sm:p-6">
       {/* THE WAY BACK, first thing on the page and never scrolled away from.
           A page you reached by pressing a button on a board has to say where that board
           was — "Back" alone makes the reader remember, and the one time they can't they
@@ -1007,8 +1007,13 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
              it stay on screen while you write a description four screens down. In the
              dialog those sat at the bottom of a scroll box, which is how you end up
              editing a listing without being able to see where it's going. */
-          <div className="grid items-start gap-5 xl:grid-cols-[1.05fr_1fr_23rem]">
-            {/* COLUMN 1 — what the listing looks like.
+          /* ONE COLUMN OF FORM, and a rail beside it.
+             A listing is a sequence — photos, words, product, price — so it reads down a
+             single column of comfortable measure. Only "where does this go" and the button
+             sit alongside, and below 1280px even they drop underneath, which is the stacked
+             layout this page is best at. */
+          <div className="mx-auto grid w-full max-w-[70rem] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            {/* THE FORM — what the listing looks like.
                 Every group is a SectionCard, the same block every other page in the app is
                 built from. On a page the fields had nothing behind them: a dialog's own
                 edges did the grouping, and without them the form read as one long drift of
@@ -1025,7 +1030,11 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 bodyClassName="space-y-3 p-4"
               >
               <div className="space-y-1.5">
-                <div className="grid grid-cols-4 gap-2">
+                {/* More columns as the card widens. Four across a full-width column makes
+                    each thumbnail ~170px, so seven photos filled half a screen — these are
+                    for recognising a shot, not viewing it (the reference tiles open full
+                    size on click). */}
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6">
                   {images.map((src, i) => (
                     <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1105,10 +1114,12 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     product either; the box above takes any keyword you want to type. */}
               </div>
               </SectionCard>
-            </div>
 
-            {/* COLUMN 2 — what it's made on, and whether it makes money */}
-            <div className="space-y-4">
+              {/* What it's made on and whether it makes money — AFTER the words, because
+                  that is the order you fill a listing in. Splitting these across columns
+                  asked the reader to scan sideways for the sequence, and squeezed the
+                  per-size price table into a third of the page when it is the widest thing
+                  on it. */}
               <SectionCard title="Product & pricing" bodyClassName="space-y-4 p-4">
               <div className="space-y-1.5">
                 <div className="text-sm font-medium">Base product</div>
