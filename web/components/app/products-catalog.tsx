@@ -124,9 +124,7 @@ export function ProductsCatalog() {
     // is whether we still sell the item; `inCatalog` is whether it appears on the marketing
     // catalogue. A product can be Active and unpublished all day.
     const published = list.filter((p) => p.inCatalog).length
-    const prices = list.map(priceOf).filter((n) => n > 0)
-    const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
-    return { total: list.length, cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size), active, published, avg }
+    return { total: list.length, cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size), active, published }
   }, [products])
 
   // ── loading skeleton ──
@@ -162,7 +160,6 @@ export function ProductsCatalog() {
           sub={stats.published === stats.total ? "all on the public site" : `of ${stats.total} on the public site`}
           tone={stats.published ? "pos" : undefined}
         />
-        <StatCard label="Avg price" value={usd(stats.avg)} sub="across catalog" />
       </StatGrid>
 
       {/* toolbar */}
