@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
@@ -11,9 +11,10 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
-import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
+import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
-import { ExternalLabels } from "@/components/app/external-labels"
+import { ExternalLabels, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
+import { DISPATCH_GRID, DISPATCH_HEAD } from "@/components/app/dispatch-grid"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
@@ -190,6 +191,10 @@ export function DispatchBoard() {
   const [busy, setBusy] = useState(false)
   const confirm = useConfirm()
   const [err, setErr] = useState<string | null>(null)
+  // A thing that WORKED is not a warning. Both notices are transient and clear themselves,
+  // but they can't share one box: "1 external label sent for pre-scan" in an amber panel
+  // behind a ⚠ reads as a problem you have to go and check.
+  const [sent, setSent] = useState<string | null>(null)
   const [q, setQ] = useState("")
   // Two views of the same board: what's waiting to go out, and what already went. The
   // second is a read-only history — "did this order actually get scanned?" was a question
@@ -222,6 +227,11 @@ export function DispatchBoard() {
     const t = setTimeout(() => setErr(null), 6000)
     return () => clearTimeout(t)
   }, [err])
+  useEffect(() => {
+    if (!sent) return
+    const t = setTimeout(() => setSent(null), 6000)
+    return () => clearTimeout(t)
+  }, [sent])
   // The partner scans on their own schedule, so this board goes stale on its own — an
   // order byeastside scanned five minutes ago sits here looking unscanned until someone
   // reloads. The scan sync broadcasts, so listen rather than poll.
@@ -281,6 +291,43 @@ export function DispatchBoard() {
     return () => { clearTimeout(t); clearInterval(id) }
   }, [loadUploads])
 
+  /**
+   * DROPPED, NOT SENT — and the selection that decides which of them go.
+   *
+   * A drop used to be an upload to an outside company, which made it the one irreversible
+   * gesture on a screen where every other one is a tick box. Dropped files now wait in
+   * `staged` on this machine, and leave only when "Send to byeastside" is pressed — the
+   * same button, the same batch, as the orders above.
+   *
+   * The set holds BOTH kinds of external row (`s:` staged, `u:` already with the partner)
+   * because the header's actions apply to both: Send takes the staged ones, Pull back
+   * takes the sent ones, Remove discards the staged ones. Kept apart from `picked` (the
+   * orders) so a mixed batch can't confuse one for the other.
+   */
+  const [staged, setStaged] = useState<StagedLabel[]>([])
+  const [extPicked, setExtPicked] = useState<Set<string>>(new Set())
+  const stageSeq = useRef(0)
+  // Newly dropped files arrive TICKED. Dropping is already the statement of intent — the
+  // box exists so you can change your mind, not so you have to say it twice.
+  const stageFiles = (files: File[]) => {
+    const rows = files.map((f) => ({ key: String(++stageSeq.current), name: f.name, file: f }))
+    setStaged((p) => [...p, ...rows])
+    setExtPicked((p) => { const n = new Set(p); for (const r of rows) n.add(stagedKeyOf(r)); return n })
+  }
+  const discardStaged = (k: string) => {
+    setStaged((p) => p.filter((s) => stagedKeyOf(s) !== k))
+    setExtPicked((p) => { const n = new Set(p); n.delete(k); return n })
+  }
+  const toggleExt = (k: string) =>
+    setExtPicked((p) => { const n = new Set(p); if (n.has(k)) n.delete(k); else n.add(k); return n })
+  const extKeys = useMemo(
+    () => [...staged.map(stagedKeyOf), ...uploads.map(uploadKeyOf)],
+    [staged, uploads])
+  const toggleAllExt = () =>
+    setExtPicked((p) => (p.size === extKeys.length ? new Set() : new Set(extKeys)))
+  const stagedChosen = staged.filter((s) => extPicked.has(stagedKeyOf(s)))
+  const uploadsChosen = uploads.filter((u) => extPicked.has(uploadKeyOf(u)))
+
   // History — EVERY order that ever had a label (bought → has tracking, or scanned),
   // whatever became of it, PLUS every label dropped in that belongs to no order. A label
   // pulled off the board still shows here with its outcome, so nothing vanishes.
@@ -337,18 +384,38 @@ export function DispatchBoard() {
    * them to would be asserting a fact about someone else's warehouse.
    */
   const sendToPartner = async () => {
-    if (!chosenWithLabel.length) return
-    setBusy(true); setErr(null)
+    if (!chosenWithLabel.length && !stagedChosen.length) return
+    setBusy(true); setErr(null); setSent(null)
+    const notes: string[] = []
     try {
-      const r = await pushToDispatch(chosenWithLabel.map((o) => o.id))
-      if (r.error) throw new Error(r.error)
-      const failed = (r.results ?? []).filter((x) => !x.ok)
-      setErr(failed.length
+      if (chosenWithLabel.length) {
+        const r = await pushToDispatch(chosenWithLabel.map((o) => o.id))
+        if (r.error) throw new Error(r.error)
+        const failed = (r.results ?? []).filter((x) => !x.ok)
         // Their words: byeastside don't document error codes, so what they sent back is
         // the only thing that helps.
-        ? `${r.pushed ?? 0} sent · ${failed.length} failed — ${failed[0].error ?? "unknown error"}`
-        : null)
-      setPicked(new Set())
+        if (failed.length) notes.push(`${r.pushed ?? 0} order label${r.pushed === 1 ? "" : "s"} sent · ${failed.length} failed — ${failed[0].error ?? "unknown error"}`)
+        setPicked(new Set())
+      }
+      // The dropped files, uploaded one at a time so a bad page names itself rather than
+      // failing the batch anonymously. Each one that lands leaves `staged` immediately —
+      // a retry after a mid-batch failure must not re-send what already went.
+      if (stagedChosen.length) {
+        let ok = 0
+        for (const s of stagedChosen) {
+          try {
+            await sendStagedLabel(s)
+            ok++
+            discardStaged(stagedKeyOf(s))
+          } catch (e) {
+            notes.push(`${s.name}: ${e instanceof Error ? e.message : "couldn't be sent"}`)
+            break
+          }
+        }
+        if (ok) setSent(`${ok} external label${ok === 1 ? "" : "s"} sent for pre-scan.`)
+        loadUploads()
+      }
+      setErr(notes.length ? notes.join(" · ") : null)
       load()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't send those to byeastside.")
@@ -442,15 +509,39 @@ export function DispatchBoard() {
    * is correct, so it's shown as a fact rather than an error to retry.
    */
   const pullBack = async () => {
-    if (!chosen.length) return
+    if (!chosen.length && !uploadsChosen.length) return
     setBusy(true); setErr(null)
     try {
+      const parts: string[] = []
+      // Selected EXTERNAL labels come back the same way, through their own endpoint —
+      // they have no order, so cancelDispatch has nothing to key them on. Anything with a
+      // picked label is left alone rather than sent to collect a certain 409: their DELETE
+      // refuses the whole PDF once ANY label on it has gone out.
+      if (uploadsChosen.length) {
+        const recallable = uploadsChosen.filter((u) => u.scanned_labels === 0)
+        const committed = uploadsChosen.length - recallable.length
+        let done = 0
+        for (const u of recallable) {
+          try {
+            const r = await deleteDispatchUpload(u.id)
+            if (r.error) throw new Error(r.error)
+            done++
+            setExtPicked((p) => { const n = new Set(p); n.delete(uploadKeyOf(u)); return n })
+          } catch (e) { parts.push(`${u.file_name || "a label"}: ${e instanceof Error ? e.message : "couldn't be pulled back"}`) }
+        }
+        if (done) parts.push(`Pulled ${done} external label${done === 1 ? "" : "s"} back`)
+        if (committed) parts.push(`${committed} external already picked and can't be recalled`)
+        loadUploads()
+      }
+      if (!chosen.length) {
+        setErr(parts.length ? parts.join(" · ") : "Nothing to pull back.")
+        return
+      }
       const r = await cancelDispatch(chosen.map((o) => o.id))
       if (r.error) throw new Error(r.error)
       const results = r.results ?? []
       const scanned = results.filter((x) => !x.ok && x.reason === "already-scanned").length
       const other = results.filter((x) => !x.ok && x.reason !== "already-scanned")
-      const parts: string[] = []
       if (r.cancelled) parts.push(`Pulled ${r.cancelled} back`)
       if (scanned) parts.push(`${scanned} already picked and can't be recalled`)
       if (other.length) parts.push(`${other.length} failed (${other[0].reason})`)
@@ -724,10 +815,17 @@ export function DispatchBoard() {
                 <ArrowUUpLeft size={14} weight="bold" /> Pull back <CaretDown size={12} weight="bold" className="text-muted-foreground" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 p-1">
-                <DropdownMenuItem disabled={!chosen.length || busy} onClick={() => removeFromBoard(chosen.map((o) => o.id))} title="Send these back to review — off the board without being scanned">
+                {/* Takes the selected orders off the board AND discards any selected file
+                    that was dropped but never sent — same word for both, because in both
+                    cases nothing has left and nothing is being claimed. */}
+                <DropdownMenuItem
+                  disabled={(!chosen.length && !stagedChosen.length) || busy}
+                  onClick={() => { for (const s of stagedChosen) discardStaged(stagedKeyOf(s)); void removeFromBoard(chosen.map((o) => o.id)) }}
+                  title="Send these back to review — off the board without being scanned"
+                >
                   <X size={14} weight="bold" /> Remove from board
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={!chosen.length || busy} onClick={pullBack}>
+                <DropdownMenuItem disabled={(!chosen.length && !uploadsChosen.length) || busy} onClick={pullBack}>
                   <ArrowUUpLeft size={14} weight="bold" /> Cancel with byeastside
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -735,9 +833,15 @@ export function DispatchBoard() {
 
             {/* THE TWO ROUTES kept prominent — this is where the choice is made. Both start
                 the buyer's tracking clock; they differ in who does it and what it costs. */}
-            {dispatchOn && (
-              <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={sendToPartner}
-                title="Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label">
+            {/* Also the send button for external labels dropped below — a dropped file now
+                waits to be sent rather than sending itself, and this is what sends it. Kept
+                visible while any file is waiting even if the partner reads as unconfigured,
+                so a staged file can never become unsendable. */}
+            {(dispatchOn || staged.length > 0) && (
+              <Button size="sm" variant="outline" disabled={(!chosenWithLabel.length && !stagedChosen.length) || busy} onClick={sendToPartner}
+                title={stagedChosen.length
+                  ? `Upload ${chosenWithLabel.length ? "these labels and " : ""}${stagedChosen.length} dropped file${stagedChosen.length === 1 ? "" : "s"} to byeastside's pre-scan queue`
+                  : "Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label"}>
                 {busy ? <CircleNotch size={14} className="animate-spin" /> : <><TrayArrowDown size={14} weight="bold" /> Send to byeastside</>}
               </Button>
             )}
@@ -797,6 +901,11 @@ export function DispatchBoard() {
         {err && (
           <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
             <Warning size={14} weight="fill" className="mt-0.5 shrink-0" /> {err}
+          </div>
+        )}
+        {sent && (
+          <div className="mx-5 mt-3 flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-400">
+            <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0" /> {sent}
           </div>
         )}
 
@@ -961,16 +1070,36 @@ export function DispatchBoard() {
             <div className="text-xs">Orders appear here once production marks them awaiting scan.</div>
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          /* ONE COLUMN PER FACT — the same nine the external-label list uses, so the two
+             cards read as one screen (see dispatch-grid.ts). Channel, units, address and
+             status used to share a single wrapping line under the order number, which made
+             the address the thing that moved every row's status somewhere different. */
+          <div className="overflow-x-auto">
+            <div className={DISPATCH_GRID + " " + DISPATCH_HEAD}>
+              <span />
+              <span>Order</span>
+              <span>Customer</span>
+              <span>Channel</span>
+              <span>Units</span>
+              <span>Ship to</span>
+              <span>Status</span>
+              <span>Tracking</span>
+              <span />
+            </div>
+            <div className="divide-y divide-border">
             {/* Newest first (queue is already sorted by created/scan time), NOT grouped by
                 label — a just-dispatched order should stay on top, not sink below older
                 labelled ones. Whether it has a label yet is shown by a per-row tag, not by
                 dimming the whole row (which read as "cancelled"). */}
             {queue.map((o) => {
+              const d = disposition(o)
+              // Handed over but not yet picked — an order state the disposition vocabulary
+              // has no word for, because it is about custody rather than outcome.
+              const sentOut = !o.label_scanned_at && !!o.dispatch_pdf_id
               return (
                 <label
                   key={o.id}
-                  className="flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40"
+                  className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}
                 >
                   {/* Selectable whether or not it has a label. Only the label-dependent
                       ACTIONS need one; tying the checkbox itself to a label left an
@@ -980,71 +1109,61 @@ export function DispatchBoard() {
                     type="checkbox" checked={picked.has(o.id)} onChange={() => toggle(o.id)}
                     className="size-4 shrink-0 accent-primary" aria-label={`Select ${numOf(o)}`}
                   />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
-                      <span className="truncate text-sm">{customerOf(o)}</span>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
-                        {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
-                      </span>
-                      <span>{unitsOf(o)} unit{unitsOf(o) === 1 ? "" : "s"}</span>
-                      {addrLine(o) && <span className="truncate">{addrLine(o)}</span>}
-                      {/* The label's OWN status here — not the production readiness pills, which
-                          belong on the make boards. "Sent to partner" is the byeastside hand-off
-                          (pushed but not scanned back yet), so it's visible whether a parcel is
-                          out for external scan or still waiting here. */}
-                      {(() => {
-                        const d = disposition(o)
-                        // Handed over but not yet picked — an order state the disposition
-                        // vocabulary has no word for, because it is about custody rather
-                        // than outcome.
-                        const sentOut = !o.label_scanned_at && !!o.dispatch_pdf_id
-                        return sentOut
-                          ? <DispStatus k="removed" label="Sent to partner" />
-                          : <DispStatus k={d.key} label={d.label} />
-                      })()}
-                    </div>
-                  </div>
+                  <span className="truncate font-mono text-sm font-semibold">{numOf(o)}</span>
+                  <span className="truncate text-sm">{customerOf(o)}</span>
+                  <span className="truncate text-xs text-muted-foreground" title={o.store || undefined}>
+                    {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{unitsOf(o)}</span>
+                  <span className="truncate text-xs text-muted-foreground" title={addrLine(o) || undefined}>{addrLine(o) || "—"}</span>
+                  {/* The label's OWN status — not the production readiness pills, which belong
+                      on the make boards. "Sent to partner" is the byeastside hand-off (pushed
+                      but not scanned back yet), so it's visible whether a parcel is out for
+                      external scan or still waiting here. */}
+                  <span className="min-w-0">
+                    {sentOut ? <DispStatus k="removed" label="Sent to partner" /> : <DispStatus k={d.key} label={d.label} />}
+                  </span>
                   {o.tracking ? (
-                    <span className="shrink-0 font-mono text-xs text-muted-foreground">{o.tracking}</span>
+                    <span className="truncate font-mono text-xs text-muted-foreground" title={o.tracking}>{o.tracking}</span>
                   ) : (
                     // No label yet → give the action right here rather than a dead gap. Buys
                     // the label for this order (stopPropagation: the row is a <label>).
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLabelFor(o) }}
-                      className="eg-tap shrink-0 inline-flex items-center gap-1 rounded-lg border border-primary/40 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                      className="eg-tap inline-flex w-fit items-center gap-1 rounded-lg border border-primary/40 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
                     >
                       <Tag size={12} weight="bold" /> Create label
                     </button>
                   )}
-                  {o.tracking_label_url && (
-                    <a
-                      href={o.tracking_label_url} target="_blank" rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      aria-label={`Open label for ${numOf(o)}`}
+                  <span className="flex justify-end gap-1">
+                    {o.tracking_label_url && (
+                      <a
+                        href={o.tracking_label_url} target="_blank" rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        aria-label={`Open label for ${numOf(o)}`}
+                      >
+                        <ArrowSquareOut size={13} weight="bold" />
+                      </a>
+                    )}
+                    {/* Per-row remove as well as the bulk one: a single order staged by
+                        mistake shouldn't need a selection first, and this row is exactly
+                        where someone notices it doesn't belong. stopPropagation because the
+                        row is a <label> — without it, clicking this toggles the checkbox. */}
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); void removeFromBoard([o.id]) }}
+                      disabled={busy}
+                      className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      aria-label={`Remove ${numOf(o)} from the dispatch board`}
+                      title="Remove from board — sends it back to review, unscanned"
                     >
-                      <ArrowSquareOut size={13} weight="bold" />
-                    </a>
-                  )}
-                  {/* Per-row remove as well as the bulk one: a single order staged by
-                      mistake shouldn't need a selection first, and this row is exactly
-                      where someone notices it doesn't belong. stopPropagation because the
-                      row is a <label> — without it, clicking this toggles the checkbox. */}
-                  <button
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); void removeFromBoard([o.id]) }}
-                    disabled={busy}
-                    className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    aria-label={`Remove ${numOf(o)} from the dispatch board`}
-                    title="Remove from board — sends it back to review, unscanned"
-                  >
-                    <X size={13} weight="bold" />
-                  </button>
+                      <X size={13} weight="bold" />
+                    </button>
+                  </span>
                 </label>
               )
             })}
+            </div>
           </div>
         )}
       </SectionCard>
@@ -1052,7 +1171,17 @@ export function DispatchBoard() {
       {/* A label that ISN'T one of our orders — someone else's system, or a buyer's own
           postage. Below the queue because it is the exception, not the day's work, and
           deliberately its own card: it touches no order and bills nothing. */}
-      <ExternalLabels uploads={uploads} onChanged={loadUploads} />
+      <ExternalLabels
+        uploads={uploads}
+        staged={staged}
+        picked={extPicked}
+        onStage={stageFiles}
+        onDiscard={discardStaged}
+        onToggle={toggleExt}
+        onToggleAll={toggleAllExt}
+        busy={busy}
+        onChanged={loadUploads}
+      />
 
       {/* Keyed on the selection so reopening after a different pick can't show the
           previous batch's preview for a frame. */}

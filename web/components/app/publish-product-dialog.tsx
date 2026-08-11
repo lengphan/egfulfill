@@ -9,7 +9,7 @@ import { ProductCombobox } from "@/components/app/product-combobox"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
-import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord } from "@/lib/api"
+import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord } from "@/lib/api"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -232,7 +232,6 @@ export function PublishProductDialog({
    */
   const whoMade: EtsyWhoMade = "i_did"
   const [tagDraft, setTagDraft] = useState("")
-  const [suggested, setSuggested] = useState<string[]>([])
   const [images, setImages] = useState<string[]>([])
   const [size, setSize] = useState("")
   const [method, setMethod] = useState("")
@@ -290,7 +289,6 @@ export function PublishProductDialog({
       setPickedColors(prefill?.blank ? (prefill?.colors ?? []) : [])
       setPickedSizes(prefill?.blank ? (prefill?.sizes ?? []) : [])
       setResult(null)
-      getSpydeckTrending().then((r) => setSuggested((r.keywords ?? []).slice(0, 12))).catch(() => {})
       getCatalogProducts().then((rows) => { catalogRef.current = rows ?? [] }).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
@@ -802,13 +800,11 @@ export function PublishProductDialog({
                     {tags.map((t) => <button key={t} onClick={() => removeTag(t)} className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">{t} ✕</button>)}
                   </div>
                 )}
-                {suggested.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {suggested.filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase())).map((s) => (
-                      <button key={s} onClick={() => addTag(s)} className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary">{s}</button>
-                    ))}
-                  </div>
-                )}
+                {/* NO TRENDING-KEYWORD CHIPS. A dozen shop-wide SpyDeck keywords sat under
+                    the 13 real tags in near-identical pills, so a full listing showed 25
+                    chips of which only the first 13 were on it — and they kept their row
+                    even at 13/13, when nothing could be added. They were never about this
+                    product either; the box above takes any keyword you want to type. */}
               </div>
             </div>
 
