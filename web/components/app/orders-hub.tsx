@@ -55,7 +55,7 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
   sending: boolean
   onSend: (o: OrderRow) => void
 }) {
-  const { state } = orderStock(items, catalog, stock)
+  const { state, why } = orderStock(items, catalog, stock)
   // Same solid-tinted pill as the Label/Scan/Design chips beside it (readiness-dots.tsx):
   // purple = ready/in-stock, amber = needs action/out, grey = unknown. The colour IS the
   // status, and it recomputes every render — so picking a blank on a line flips it live. The
@@ -72,7 +72,11 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
   const clickable = state === "out" && canPO
   const title = state === "in" ? "Blank stock is on hand for every line"
     : state === "out" ? (canPO ? "Short on blank stock — click to add to a draft purchase order. Open the order for the per-line breakdown." : "Short on blank stock — open the order for the per-line breakdown")
-    : "Blank stock not tracked, or no blank picked yet — open the order to check"
+    // GREY NOW SAYS WHICH LINK IS MISSING. It used to read "not tracked, or no blank picked
+    // yet — open the order to check", which is three guesses and an errand: the chip knows
+    // exactly which of the three it is, and saying so is the difference between a dead pill
+    // and one telling you what to fix.
+    : (why || "Blank stock not tracked yet — open the order to check")
   return (
     <button
       type="button"
