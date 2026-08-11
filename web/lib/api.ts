@@ -1173,13 +1173,17 @@ export function undoScan(id: string) {
 export type ShipAddress = { name?: string; street?: string; street2?: string; city?: string; state?: string; zip?: string }
 export type UspsLabelResult = { ok?: boolean; error?: string; mock?: boolean; trackingNumber?: string; labelUrl?: string; labelImage?: string; labelHtml?: string; imageType?: string; carrier?: string; service?: string; cost?: number }
 // One quoted rate from the multi-carrier rate-shop. `token` is what you buy against.
-export type ShippingRate = { token: string; provider: string; carrier: string; service: string; amount: number; currency?: string; days?: number | null }
+/** `carrierAccount` is the ONLY place this value exists. Shippo puts it on the rate and
+ *  returns `rate` as a bare id string on the bought transaction, so it has to survive the
+ *  round trip from quote to buy or the label records none — and a label with no carrier
+ *  account can never go on a USPS SCAN form (manifests.js:119). */
+export type ShippingRate = { token: string; provider: string; carrier: string; service: string; amount: number; currency?: string; days?: number | null; carrierAccount?: string }
 export function getShippingRates(body: { to: ShipAddress; from?: ShipAddress; parcel: { weightOz?: number; length?: number; width?: number; height?: number }; extra?: { signature?: boolean; insurance?: number } }) {
   return api<{ rates: ShippingRate[]; errors?: string[]; error?: string }>(`/api/shipping/rates`, { method: "POST", body: JSON.stringify(body) })
 }
 // `rate`/`rateToken` buys a SPECIFIC carrier rate the operator picked; otherwise the body
 // falls back to the USPS-cheapest path. Both record the label the same way.
-export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightOz?: number; length?: number; width?: number; height?: number; mailClass?: string; orderId?: string; directUsps?: boolean; signature?: boolean; insurance?: number; refNo?: string; refNo2?: string; contents?: string; rateToken?: string; rate?: { amount?: number; carrier?: string; service?: string } }) {
+export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightOz?: number; length?: number; width?: number; height?: number; mailClass?: string; orderId?: string; directUsps?: boolean; signature?: boolean; insurance?: number; refNo?: string; refNo2?: string; contents?: string; rateToken?: string; rate?: { amount?: number; carrier?: string; service?: string; carrierAccount?: string } }) {
   // Route through the aggregator (Shippo/EasyPost) when one is configured — it needs no
   // USPS EPS billing approval, and a test key buys free sample labels.
   //
