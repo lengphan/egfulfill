@@ -836,7 +836,9 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
   // fields come back (id/local name/is_leaf) so we don't hard-code a shape we haven't seen.
   app.get('/api/tiktok/categories', { preHandler: requireAuth }, async (req, reply) => {
     try {
-      const conn = await connectionForPublish(req.user);
+      // Per-SHOP, like the publish itself: category trees are read against a shop cipher,
+      // so with two shops connected the picker must ask the one it's filling in for.
+      const conn = await resolveDestination('tiktok', req.query, req.user, connectionForPublish);
       if (!conn) { reply.code(400); return { error: 'No TikTok shop connected' }; }
       const cipher = await getShopCipher(conn);
       /**
@@ -861,7 +863,10 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
   // Warehouses — each SKU's inventory is booked against a warehouse_id.
   app.get('/api/tiktok/warehouses', { preHandler: requireAuth }, async (req, reply) => {
     try {
-      const conn = await connectionForPublish(req.user);
+      // A WAREHOUSE BELONGS TO A SHOP. Returning shop A's warehouses while filling in a
+      // product for shop B would put a valid-looking id on a listing that TikTok rejects,
+      // or worse accepts against the wrong stock location.
+      const conn = await resolveDestination('tiktok', req.query, req.user, connectionForPublish);
       if (!conn) { reply.code(400); return { error: 'No TikTok shop connected' }; }
       const cipher = await getShopCipher(conn);
       const d = await ttSignedRequest(conn, 'GET', '/logistics/202309/warehouses', { query: { shop_cipher: cipher } });

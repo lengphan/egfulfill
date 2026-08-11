@@ -9,7 +9,7 @@ import { ProductCombobox } from "@/components/app/product-combobox"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
-import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord } from "@/lib/api"
+import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getPublishDestinations, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord, type PublishDestination } from "@/lib/api"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -157,6 +157,153 @@ function VariantChips({
  */
 const PUBLISH_OK = "Listing uploaded successfully!"
 
+/**
+ * The TikTok-only fields, held PER SHOP.
+ *
+ * A category tree is read against a shop's cipher and a warehouse id belongs to one shop,
+ * so two connected TikTok shops cannot share these. Keyed by connection_id for that reason
+ * — a single shared set would put shop A's warehouse on shop B's product, which TikTok
+ * either rejects or, worse, accepts against the wrong stock location.
+ */
+type TtFields = {
+  categories: TiktokCategory[]
+  category: TiktokCategory | null
+  query: string
+  warehouses: TiktokWarehouse[]
+  warehouse: string
+  weight: string
+  unit: string
+  loadErr: string
+  loaded: boolean
+}
+const TT_EMPTY: TtFields = {
+  categories: [], category: null, query: "", warehouses: [], warehouse: "",
+  weight: "", unit: "POUND", loadErr: "", loaded: false,
+}
+
+/**
+ * What happened at ONE shop. Partial success is the normal outcome of publishing to
+ * several, not an error state: three shops can easily be two drafts, one rejection, and
+ * the rejection is fixable without touching the two that worked.
+ *
+ * `dry` is its own state rather than a flavour of ok. A green tick beside a shop where
+ * nothing was created is the dishonest empty state the house rules forbid.
+ */
+type Outcome = { state: "running" | "ok" | "dry" | "fail"; text: string; note?: string; url?: string }
+
+/**
+ * The three fields TikTok needs, for ONE shop.
+ *
+ * Module-level, not defined inside the dialog's render: a component declared in render is
+ * a new type every frame, so React remounts it and every keystroke in the search box would
+ * lose focus (the repo's react-hooks/static-components rule).
+ */
+function TiktokFields({ dest, fields, onChange }: {
+  dest: PublishDestination
+  fields: TtFields
+  onChange: (patch: Partial<TtFields>) => void
+}) {
+  // Leaf categories that match what the seller typed. Capped so a 5,000-node tree can't
+  // render at once; the search box is how you reach the rest.
+  const matches = useMemo(() => {
+    const qy = fields.query.trim().toLowerCase()
+    return fields.categories.filter((c) => !qy || (c.local_name ?? "").toLowerCase().includes(qy)).slice(0, 40)
+  }, [fields.categories, fields.query])
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+      <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {dest.shop_name} needs
+      </div>
+      {fields.loadErr && <p className="text-xs text-destructive">{fields.loadErr}</p>}
+
+      {/* Leaf category — required. Search then pick from the tree. */}
+      <div className="space-y-1">
+        <div className="text-xs font-medium">Category {fields.category && <span className="text-muted-foreground">· {fields.category.local_name}</span>}</div>
+        <Input
+          value={fields.query}
+          onChange={(e) => onChange({ query: e.target.value })}
+          /* An empty list after a FAILED load is not a loading list. Showing the error above
+             while the field still said "Loading categories…" left the two halves of the
+             screen contradicting each other, and the spinner-ish wording is the one people
+             believe — so it read as slow rather than broken. */
+          placeholder={fields.categories.length ? "Search categories…" : fields.loadErr ? "Couldn't load categories" : "Loading categories…"}
+          disabled={!fields.categories.length && !!fields.loadErr}
+          className="h-8 text-xs"
+        />
+        {fields.query.trim() && (
+          <div className="max-h-36 overflow-y-auto rounded-md border border-border">
+            {matches.length === 0 ? (
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">No leaf category matches.</div>
+            ) : matches.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onChange({ category: c, query: "" })}
+                className={"flex w-full items-center justify-between px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted " + (fields.category?.id === c.id ? "bg-primary/10 text-primary" : "")}
+              >
+                <span className="truncate">{c.local_name || c.id}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Warehouse — per-SKU inventory is booked against it, and it belongs to THIS shop. */}
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium">Warehouse</span>
+        <select value={fields.warehouse} onChange={(e) => onChange({ warehouse: e.target.value })} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+          {!fields.warehouses.length && <option value="">No warehouse found</option>}
+          {fields.warehouses.map((w) => <option key={w.id} value={w.id}>{w.name || w.id}</option>)}
+        </select>
+      </label>
+
+      {/* Package weight — required for physical products. */}
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium">Package weight</span>
+        <div className="flex gap-1.5">
+          <Input value={fields.weight} onChange={(e) => onChange({ weight: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="0.5" inputMode="decimal" className="h-8 flex-1 text-xs" />
+          <select value={fields.unit} onChange={(e) => onChange({ unit: e.target.value })} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs">
+            <option value="POUND">lb</option>
+            <option value="KILOGRAM">kg</option>
+          </select>
+        </div>
+      </label>
+    </div>
+  )
+}
+
+/** One shop's status after a run — the row that makes partial success readable. */
+function OutcomeLine({ dest, outcome }: { dest: PublishDestination; outcome?: Outcome }) {
+  if (!outcome) return null
+  const tone =
+    outcome.state === "ok" ? "text-success"
+    : outcome.state === "fail" ? "text-destructive"
+    : outcome.state === "dry" ? "text-amber-700"
+    : "text-muted-foreground"
+  return (
+    <div className="flex items-start gap-2 text-xs">
+      <span className="mt-0.5 shrink-0">
+        {outcome.state === "running" ? <CircleNotch size={12} className="animate-spin" />
+          : outcome.state === "ok" ? "✅"
+          : outcome.state === "dry" ? "⚠️" : "❌"}
+      </span>
+      <span className="min-w-0">
+        <span className="font-medium">{dest.shop_name}</span>
+        <span className="text-muted-foreground"> · {dest.platform_label} — </span>
+        <span className={tone}>{outcome.text}</span>
+        {outcome.note && <span className="text-muted-foreground"> {outcome.note}</span>}
+        {outcome.url && (
+          <>
+            {" "}
+            <a href={outcome.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View →</a>
+          </>
+        )}
+      </span>
+    </div>
+  )
+}
+
 export type PublishPrefill = {
   title?: string
   description?: string
@@ -249,18 +396,23 @@ export function PublishProductDialog({
   const [sizeRetail, setSizeRetail] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string; url?: string; note?: string } | null>(null)
-  // Which marketplace this draft goes to. Etsy takes photos + tags + variants directly;
-  // TikTok additionally needs a LEAF category, a warehouse (per-SKU inventory) and a
-  // package weight, so those fields appear only when TikTok is the target.
-  const [channel, setChannel] = useState<"etsy" | "tiktok" | "shopify">("etsy")
-  const [ttCatQuery, setTtCatQuery] = useState("")
-  const [ttCategories, setTtCategories] = useState<TiktokCategory[]>([])
-  const [ttCategory, setTtCategory] = useState<TiktokCategory | null>(null)
-  const [ttWarehouses, setTtWarehouses] = useState<TiktokWarehouse[]>([])
-  const [ttWarehouse, setTtWarehouse] = useState("")
-  const [ttWeight, setTtWeight] = useState("")
-  const [ttWeightUnit, setTtWeightUnit] = useState("POUND")
-  const [ttLoadErr, setTtLoadErr] = useState("")
+  /**
+   * WHERE THIS CAN GO — the seller's connected shops, from the server.
+   *
+   * Not a hardcoded Etsy/TikTok/Shopify toggle: that stated which integrations exist, and
+   * the question on this screen is which shops THIS seller has. One shop and there is no
+   * choice to present; two Etsy shops and a platform toggle cannot express the choice at
+   * all.
+   */
+  const [dests, setDests] = useState<PublishDestination[] | null>(null)
+  const [destErr, setDestErr] = useState("")
+  /** Ticked shops, by connection_id. Everything ticked gets the same listing. */
+  const [picked, setPicked] = useState<string[]>([])
+  /** Per-shop TikTok fields, keyed by connection_id — see TtFields. */
+  const [tt, setTt] = useState<Record<string, TtFields>>({})
+  /** What happened at each shop, keyed by connection_id. Survives a retry so a shop that
+   *  already published keeps its link and cannot be sent twice. */
+  const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({})
   const fileRef = useRef<HTMLInputElement>(null)
   const seeded = useRef(false)
   // A SpyDeck listing's competitor photos aren't in the grid payload — they arrive from an
@@ -305,25 +457,74 @@ export function PublishProductDialog({
     return () => clearTimeout(id)
   }, [open, prefill])
 
-  // Load TikTok's leaf categories + warehouses the first time the seller switches channels.
-  // The category tree is large, so we fetch it once and filter locally as they type.
+  /**
+   * The shops, once per open.
+   *
+   * A SINGLE destination is auto-ticked: there is no choice to make, and presenting one
+   * checkbox to tick before you may press Publish is ceremony for its own sake. Two or
+   * more start UNTICKED — publishing to a shop nobody chose is the one mistake this screen
+   * must not make, and the button says what's missing rather than guessing.
+   */
   useEffect(() => {
-    if (channel !== "tiktok") return
-    if (!ttCategories.length) {
-      getTiktokCategories()
-        .then((r) => { if (r.error) setTtLoadErr(r.error); else { setTtLoadErr(""); setTtCategories((r.categories ?? []).filter((c) => c.is_leaf !== false)) } })
-        .catch((e) => setTtLoadErr(e instanceof Error ? e.message : "Couldn't load TikTok categories"))
-    }
-    if (!ttWarehouses.length) {
-      getTiktokWarehouses()
+    if (!open) return
+    const id = setTimeout(() => {
+      setDestErr("")
+      getPublishDestinations()
         .then((r) => {
-          const ws = r.warehouses ?? []
-          setTtWarehouses(ws)
-          setTtWarehouse((w) => w || (ws[0] ? String(ws[0].id) : ""))
+          const list = r.destinations ?? []
+          setDests(list)
+          setPicked(list.length === 1 ? [list[0].connection_id] : [])
         })
-        .catch(() => {})
-    }
-  }, [channel, ttCategories.length, ttWarehouses.length])
+        .catch((e) => { setDests([]); setDestErr(e instanceof Error ? e.message : "Couldn't load your connected shops.") })
+    }, 0)
+    return () => clearTimeout(id)
+  }, [open])
+
+  // Reset the per-run state when the dialog closes, so reopening isn't haunted by the last
+  // publish's ticks and results.
+  useEffect(() => {
+    if (open) return
+    const id = setTimeout(() => { setOutcomes({}); setPicked([]); setDests(null); setTt({}) }, 0)
+    return () => clearTimeout(id)
+  }, [open])
+
+  /**
+   * TikTok's category tree and warehouse list, PER TICKED SHOP.
+   *
+   * Fetched when a TikTok shop is first ticked rather than on open — the tree is large and
+   * a seller who never ticks TikTok should never pay for it. Each request carries its
+   * connection_id, because both answers are specific to that shop.
+   */
+  const ttPending = useMemo(
+    () => (dests ?? []).filter((d) => d.platform === "tiktok" && picked.includes(d.connection_id) && !tt[d.connection_id]?.loaded),
+    [dests, picked, tt]
+  )
+  useEffect(() => {
+    if (!ttPending.length) return
+    const id = setTimeout(() => {
+      for (const d of ttPending) {
+        const cid = d.connection_id
+        // Marked loaded up front so a re-render mid-flight doesn't fire a second fetch.
+        setTt((m) => ({ ...m, [cid]: { ...(m[cid] ?? TT_EMPTY), loaded: true } }))
+        getTiktokCategories(undefined, cid)
+          .then((r) => setTt((m) => ({
+            ...m,
+            [cid]: r.error
+              ? { ...(m[cid] ?? TT_EMPTY), loadErr: r.error }
+              : { ...(m[cid] ?? TT_EMPTY), loadErr: "", categories: (r.categories ?? []).filter((c) => c.is_leaf !== false) },
+          })))
+          .catch((e) => setTt((m) => ({ ...m, [cid]: { ...(m[cid] ?? TT_EMPTY), loadErr: e instanceof Error ? e.message : "Couldn't load TikTok categories" } })))
+        getTiktokWarehouses(cid)
+          .then((r) => setTt((m) => {
+            const ws = r.warehouses ?? []
+            const cur = m[cid] ?? TT_EMPTY
+            return { ...m, [cid]: { ...cur, warehouses: ws, warehouse: cur.warehouse || (ws[0] ? String(ws[0].id) : "") } }
+          }))
+          .catch(() => {})
+      }
+    }, 0)
+    return () => clearTimeout(id)
+  }, [ttPending])
 
   // Variant options follow the chosen blank — the same resolvers the order pickers use,
   // so a listing offers exactly what the factory can actually make.
@@ -464,51 +665,44 @@ export function PublishProductDialog({
     return () => window.removeEventListener("keydown", onKey, true)
   }, [zoom, referencePhotos.length])
 
-  // Leaf categories that match what the seller typed. Capped so a 5,000-node tree can't
-  // render at once; the search box is how you reach the rest.
-  const ttCatMatches = useMemo(() => {
-    const qy = ttCatQuery.trim().toLowerCase()
-    return ttCategories
-      .filter((c) => !qy || (c.local_name ?? "").toLowerCase().includes(qy))
-      .slice(0, 40)
-  }, [ttCategories, ttCatQuery])
-
-  // Publish to TikTok Shop. Shares the common fields with the Etsy path but adds the three
-  // TikTok-only requirements. The server is DRY-RUN until its TIKTOK_PUBLISH_LIVE flag is
-  // set, so a dry run comes back with the assembled payload rather than a live product.
-  const publishToTiktok = async () => {
-    if (!ttCategory) { setResult({ ok: false, text: "Pick a TikTok category (it must be a leaf)." }); return }
-    if (!ttWarehouse) { setResult({ ok: false, text: "Pick a warehouse for stock." }); return }
-    if (!(Number(ttWeight) > 0)) { setResult({ ok: false, text: "Enter a package weight." }); return }
-    setBusy(true); setResult(null)
+  /**
+   * ONE SHOP, one outcome. These three never throw and never set the shared banner: a
+   * refusal at one shop is that row's business, and the shops after it still go.
+   *
+   * Publish to TikTok Shop. Shares the common fields with the Etsy path but adds the three
+   * TikTok-only requirements. The server is DRY-RUN until its TIKTOK_PUBLISH_LIVE flag is
+   * set, so a dry run comes back with the assembled payload rather than a live product.
+   */
+  const publishToTiktokShop = async (d: PublishDestination): Promise<Outcome> => {
+    const f = tt[d.connection_id] ?? TT_EMPTY
+    // Guarded here as well as in publish(): TikTok's create call has no meaning without a
+    // leaf category, so this function must not be able to send one without it.
+    if (!f.category) return { state: "fail", text: "Needs a category" }
     try {
       const r = await publishTiktok({
+        connection_id: d.connection_id,
         title: title.trim(), description: desc.trim() || title.trim(),
         price: basePrice, quantity: Number(qty) || 999,
         images, tags,
         colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
         sku_base: blank?.sku ?? undefined,
         size_prices: Object.fromEntries(sizeRows.filter((r) => r.price > 0).map((r) => [r.size, r.price])),
-        category_id: ttCategory.id, warehouse_id: ttWarehouse,
-        package_weight: ttWeight, weight_unit: ttWeightUnit,
+        category_id: f.category.id, warehouse_id: f.warehouse,
+        package_weight: f.weight, weight_unit: f.unit,
         blank: blank?.sku ?? undefined, printType: method || undefined,
         designId: prefill?.designId, designUrl: prefill?.designUrl, designPos: prefill?.designPos,
       })
       if (r.error) throw new Error(r.error)
       if (r.dryRun) {
-        // Honest about the mode: nothing was sent. Show what's still missing, if anything.
-        setResult({
-          ok: true,
-          text: "Validated for TikTok — but publishing is in dry-run mode, so nothing was sent to the shop.",
-          note: r.missing?.length ? `Still needed before it can list: ${r.missing.join(", ")}.` : "Ask an admin to enable live TikTok publishing to send it.",
-        })
-        return
+        // Honest about the mode: nothing was sent, so this is not a success.
+        return {
+          state: "dry",
+          text: "Dry run — nothing was sent",
+          note: r.missing?.length
+            ? `Still needed before it can list: ${r.missing.join(", ")}.`
+            : "Live TikTok publishing is switched off on the server.",
+        }
       }
-      setResult({
-        ok: true,
-        text: PUBLISH_OK,
-        note: r.warnings?.length ? r.warnings.map((w) => w.message).filter(Boolean).join(" ") : undefined,
-      })
       onPublished?.(undefined, images[0], {
         platform: "tiktok",
         title: title.trim(), price: basePrice, image: images[0],
@@ -518,9 +712,14 @@ export function PublishProductDialog({
         colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
         images_uploaded: images.length,
       })
+      return {
+        state: "ok",
+        text: "Draft product created",
+        note: r.warnings?.length ? r.warnings.map((w) => w.message).filter(Boolean).join(" ") : undefined,
+      }
     } catch (e) {
-      setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })
-    } finally { setBusy(false) }
+      return { state: "fail", text: e instanceof Error ? e.message : "Publish failed." }
+    }
   }
 
   /**
@@ -533,10 +732,10 @@ export function PublishProductDialog({
    * verbatim rather than folded into "publish failed", because the fix (reconnect the shop)
    * is not one anybody would guess.
    */
-  const publishToShopify = async () => {
-    setBusy(true); setResult(null)
+  const publishToShopifyStore = async (d: PublishDestination): Promise<Outcome> => {
     try {
       const r = await publishShopify({
+        connection_id: d.connection_id,
         title: title.trim(), description: desc.trim() || title.trim(),
         price: basePrice, tags, images,
         colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
@@ -544,16 +743,6 @@ export function PublishProductDialog({
         design_id: prefill?.designId, design_data: prefill?.designUrl, design_pos: prefill?.designPos,
       })
       if (r.error) throw new Error(r.error)
-      setResult({
-        ok: true,
-        text: PUBLISH_OK,
-        // Say when photos didn't all land. The product exists either way — the server
-        // deliberately doesn't fail a publish over an image — so silence here would leave a
-        // draft with missing photos and no hint why.
-        note: r.images_uploaded != null && r.images_uploaded < images.length
-          ? `${r.images_uploaded} of ${images.length} photos uploaded — add the rest in Shopify.`
-          : undefined,
-      })
       onPublished?.(r.url, r.primary_image || images[0], {
         platform: "shopify",
         title: title.trim(), price: basePrice, image: r.primary_image || images[0],
@@ -566,41 +755,26 @@ export function PublishProductDialog({
         variants_applied: r.variants_applied,
         variant_skus: r.variant_skus,
       })
+      return {
+        state: "ok",
+        text: "Draft product created",
+        url: r.url,
+        // Say when photos didn't all land. The product exists either way — the server
+        // deliberately doesn't fail a publish over an image — so silence here would leave a
+        // draft with missing photos and no hint why.
+        note: r.images_uploaded != null && r.images_uploaded < images.length
+          ? `${r.images_uploaded} of ${images.length} photos uploaded — add the rest in Shopify.`
+          : undefined,
+      }
     } catch (e) {
-      setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })
-    } finally { setBusy(false) }
+      return { state: "fail", text: e instanceof Error ? e.message : "Publish failed." }
+    }
   }
 
-  const publish = async () => {
-    if (!title.trim() || !priceReady) {
-      // Say WHICH is missing, and — when it's the price — name the two ways to supply it,
-      // because "a retail price is required" on a screen where every size shows a price is
-      // exactly what made this look broken.
-      const msg = !title.trim()
-        ? (priceReady ? "A title is required." : "A title and a retail price are required.")
-        : pickedSizes.length > 0
-          ? "Every size needs a price — fill each row, or set the Retail price above to cover the blank ones."
-          : "A retail price is required."
-      setResult({ ok: false, text: msg })
-      return
-    }
-    // A listing needs a photo, and since the competitor's are reference-only there may now
-    // be none. Say so HERE — the alternative is Etsy rejecting it with a message about
-    // image requirements that reads like our bug rather than a missing step.
-    if (!images.length) {
-      setResult({
-        ok: false,
-        text: referencePhotos.length
-          ? "Add at least one photo of your own. The reference shots below belong to the seller who took them and aren't published."
-          : "Add at least one photo.",
-      })
-      return
-    }
-    if (channel === "tiktok") { publishToTiktok(); return }
-    if (channel === "shopify") { publishToShopify(); return }
-    setBusy(true); setResult(null)
+  const publishToEtsyShop = async (d: PublishDestination): Promise<Outcome> => {
     try {
       const r = await publishEtsy({
+        connection_id: d.connection_id,
         title: title.trim(), description: desc.trim() || title.trim(),
         // basePrice, not retailN — a per-size-priced product has a 0 in the Retail field
         // but a real cheapest-size floor, and sending retailN would list it at $0.
@@ -652,16 +826,6 @@ export function PublishProductDialog({
         } catch { /* the listing is live; a failed sku write is recoverable by republishing */ }
       }
 
-      setResult({
-        ok: true,
-        text: PUBLISH_OK,
-        // The one thing worth interrupting for: the listing exists but has no variants, so
-        // it is a flat listing and somebody has to decide whether that will do.
-        note: r.variants_error
-          ? `Variants were rejected (${r.variants_error}), so it listed flat.`
-          : undefined,
-        url: r.url,
-      })
       // Etsy's hosted url for the cover, falling back to what we sent. The fallback is only
       // reached when the photo upload failed, in which case there IS no published image and
       // showing the source we tried is the honest thing.
@@ -679,9 +843,100 @@ export function PublishProductDialog({
         variants_error: r.variants_error ?? null,
         images_uploaded: r.images_uploaded ?? 0,
       })
+      return {
+        state: "ok",
+        text: "Draft listing created",
+        url: r.url,
+        // The one thing worth interrupting for: the listing exists but has no variants, so
+        // it is a flat listing and somebody has to decide whether that will do.
+        note: r.variants_error ? `Variants were rejected (${r.variants_error}), so it listed flat.` : undefined,
+      }
     } catch (e) {
-      setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })
-    } finally { setBusy(false) }
+      return { state: "fail", text: e instanceof Error ? e.message : "Publish failed." }
+    }
+  }
+
+  /** What this shop still needs before it can be sent. Empty for Etsy and Shopify. */
+  const missingFor = (d: PublishDestination): string[] => {
+    if (d.platform !== "tiktok") return []
+    const f = tt[d.connection_id] ?? TT_EMPTY
+    return [
+      !f.category && "a category",
+      !f.warehouse && "a warehouse",
+      !(Number(f.weight) > 0) && "a package weight",
+    ].filter(Boolean) as string[]
+  }
+
+  const pickedDests = useMemo(
+    () => (dests ?? []).filter((d) => picked.includes(d.connection_id)),
+    [dests, picked]
+  )
+  /** Already sent, so it must not be sent again — a retry re-sends failures only. */
+  const isDone = (id: string) => outcomes[id]?.state === "ok" || outcomes[id]?.state === "dry"
+  const allDone = pickedDests.length > 0 && pickedDests.every((d) => isDone(d.connection_id))
+  const anyFailed = pickedDests.some((d) => outcomes[d.connection_id]?.state === "fail")
+
+  /**
+   * Publish to every ticked shop, one after another.
+   *
+   * SHARED fields are validated once, up front — a missing title is missing everywhere, so
+   * stopping the whole run is right. A shop's OWN missing field stops only that shop: it
+   * becomes that row's outcome and the rest still go, which is the difference between a
+   * publish-all that's useful and one that's hostage to its most demanding channel.
+   *
+   * Sequential rather than parallel: each publish uploads photos, and three shops uploading
+   * the same nine images at once is how a rate limit turns one slow publish into three
+   * failed ones.
+   */
+  const publish = async () => {
+    if (!title.trim() || !priceReady) {
+      // Say WHICH is missing, and — when it's the price — name the two ways to supply it,
+      // because "a retail price is required" on a screen where every size shows a price is
+      // exactly what made this look broken.
+      const msg = !title.trim()
+        ? (priceReady ? "A title is required." : "A title and a retail price are required.")
+        : pickedSizes.length > 0
+          ? "Every size needs a price — fill each row, or set the Retail price above to cover the blank ones."
+          : "A retail price is required."
+      setResult({ ok: false, text: msg })
+      return
+    }
+    // A listing needs a photo, and since the competitor's are reference-only there may now
+    // be none. Say so HERE — the alternative is Etsy rejecting it with a message about
+    // image requirements that reads like our bug rather than a missing step.
+    if (!images.length) {
+      setResult({
+        ok: false,
+        text: referencePhotos.length
+          ? "Add at least one photo of your own. The reference shots below belong to the seller who took them and aren't published."
+          : "Add at least one photo.",
+      })
+      return
+    }
+    if (!pickedDests.length) {
+      setResult({ ok: false, text: "Pick at least one shop to publish to." })
+      return
+    }
+
+    setBusy(true); setResult(null)
+    // Anything already published is skipped, so pressing Publish twice cannot create a
+    // second listing in a shop that already has one.
+    for (const d of pickedDests.filter((x) => !isDone(x.connection_id))) {
+      const cid = d.connection_id
+      const missing = missingFor(d)
+      if (missing.length) {
+        setOutcomes((o) => ({ ...o, [cid]: { state: "fail", text: `Needs ${missing.join(", ")}` } }))
+        continue
+      }
+      setOutcomes((o) => ({ ...o, [cid]: { state: "running", text: "Publishing…" } }))
+      const out = d.platform === "etsy"
+        ? await publishToEtsyShop(d)
+        : d.platform === "tiktok"
+          ? await publishToTiktokShop(d)
+          : await publishToShopifyStore(d)
+      setOutcomes((o) => ({ ...o, [cid]: out }))
+    }
+    setBusy(false)
   }
 
   return (
@@ -690,35 +945,88 @@ export function PublishProductDialog({
       <DialogContent className="sm:max-w-5xl">
         <DialogHeader><DialogTitle>{dialogTitle}</DialogTitle></DialogHeader>
 
-        {result?.ok ? (
+        {/* THE DONE SCREEN, only when every ticked shop is actually finished. With one shop
+            this is the same panel it always was; with four it lists what happened at each,
+            because "published" over a run that included a dry run would be a claim about
+            three shops and a lie about the fourth. Any failure keeps the form on screen so
+            it can be fixed without retyping the listing. */}
+        {allDone && !busy ? (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <div className="font-semibold text-success">{result.text}</div>
-            {result.note && <p className="max-w-sm text-sm text-muted-foreground">{result.note}</p>}
-            {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">View the listing →</a>}
+            <div className="font-semibold text-success">
+              {pickedDests.every((d) => outcomes[d.connection_id]?.state === "ok")
+                ? PUBLISH_OK
+                : "Finished — with one shop that sent nothing"}
+            </div>
+            <div className="w-full max-w-md space-y-1 text-left">
+              {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} />)}
+            </div>
             <Button onClick={() => onOpenChange(false)}>Done</Button>
           </div>
         ) : (
           <div className="grid max-h-[72vh] gap-5 overflow-y-auto pr-1 md:grid-cols-[1.1fr_1fr]">
             {/* LEFT — what the listing looks like */}
             <div className="space-y-4">
-              {/* Where this draft goes. TikTok reveals its extra required fields on the right. */}
+              {/* WHERE THIS GOES — the seller's connected shops.
+                  One shop: a sentence, no checkbox. There is no choice to make, and a
+                  single tick-box you must tick before publishing is ceremony.
+                  Several: a row each, ticked deliberately. Two shops on the SAME platform
+                  are two rows that differ by name — the case the old platform toggle
+                  couldn't express at all. */}
               <div className="space-y-1.5">
                 <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Publish to</div>
-                <div className="inline-flex rounded-lg border border-border p-0.5">
-                  {(["etsy", "tiktok", "shopify"] as const).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => { setChannel(c); setResult(null) }}
-                      className={
-                        "rounded-md px-3 py-1 text-xs font-semibold capitalize transition-colors " +
-                        (channel === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
-                      }
-                    >
-                      {c === "tiktok" ? "TikTok Shop" : c === "shopify" ? "Shopify" : "Etsy"}
-                    </button>
-                  ))}
-                </div>
+                {dests === null ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CircleNotch size={12} className="animate-spin" /> Finding your shops…
+                  </div>
+                ) : destErr ? (
+                  <p className="text-xs text-destructive">{destErr}</p>
+                ) : dests.length === 0 ? (
+                  // Not an empty picker — an empty picker looks like a broken feature.
+                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    No shop is connected to your account yet, so there&apos;s nowhere to publish this.
+                    Connect one under <a href="/stores" className="font-medium text-primary hover:underline">Stores</a>.
+                  </div>
+                ) : dests.length === 1 ? (
+                  <div className="flex flex-wrap items-center gap-x-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                    <span className="font-medium">{dests[0].shop_name}</span>
+                    <span className="text-xs text-muted-foreground">· {dests[0].platform_label}</span>
+                    {dests[0].dry_run && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">dry run — nothing is sent</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {dests.map((d) => {
+                      const on = picked.includes(d.connection_id)
+                      return (
+                        <label
+                          key={d.connection_id}
+                          className={"flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors " +
+                            (on ? "border-primary/40 bg-primary/5" : "border-border hover:border-primary/30")}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            disabled={isDone(d.connection_id)}
+                            onChange={(e) => {
+                              setResult(null)
+                              setPicked((p) => e.target.checked ? [...p, d.connection_id] : p.filter((x) => x !== d.connection_id))
+                            }}
+                            className="size-3.5 accent-[var(--primary)]"
+                          />
+                          <span className="font-medium">{d.shop_name}</span>
+                          <span className="text-xs text-muted-foreground">{d.platform_label}</span>
+                          {d.dry_run && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">dry run</span>
+                          )}
+                          {isDone(d.connection_id) && (
+                            <span className="ml-auto text-2xs font-medium text-success">published</span>
+                          )}
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-baseline gap-x-2">
@@ -834,62 +1142,18 @@ export function PublishProductDialog({
               </div>
 
 
-              {/* TikTok Shop needs these three; Etsy doesn't. Shown only for the TikTok channel. */}
-              {channel === "tiktok" && (
-                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-                  <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">TikTok Shop requirements</div>
-                  {ttLoadErr && <p className="text-xs text-destructive">{ttLoadErr}</p>}
-
-                  {/* Leaf category — required. Search then pick from the tree. */}
-                  <div className="space-y-1">
-                    <div className="text-xs font-medium">Category {ttCategory && <span className="text-muted-foreground">· {ttCategory.local_name}</span>}</div>
-                    <Input value={ttCatQuery} onChange={(e) => setTtCatQuery(e.target.value)} /* An empty list after a FAILED load is not a loading list. Showing the error above
-                         while the field still said "Loading categories…" left the two halves of the
-                         screen contradicting each other, and the spinner-ish wording is the one people
-                         believe — so it read as slow rather than broken. */
-                      placeholder={ttCategories.length ? "Search categories…" : ttLoadErr ? "Couldn't load categories" : "Loading categories…"}
-                      disabled={!ttCategories.length && !!ttLoadErr} className="h-8 text-xs" />
-                    {ttCatQuery.trim() && (
-                      <div className="max-h-36 overflow-y-auto rounded-md border border-border">
-                        {ttCatMatches.length === 0 ? (
-                          <div className="px-2 py-1.5 text-xs text-muted-foreground">No leaf category matches.</div>
-                        ) : ttCatMatches.map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => { setTtCategory(c); setTtCatQuery("") }}
-                            className={"flex w-full items-center justify-between px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted " + (ttCategory?.id === c.id ? "bg-primary/10 text-primary" : "")}
-                          >
-                            <span className="truncate">{c.local_name || c.id}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Warehouse — per-SKU inventory is booked against it. */}
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium">Warehouse</span>
-                    <select value={ttWarehouse} onChange={(e) => setTtWarehouse(e.target.value)} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                      {!ttWarehouses.length && <option value="">No warehouse found</option>}
-                      {ttWarehouses.map((w) => <option key={w.id} value={w.id}>{w.name || w.id}</option>)}
-                    </select>
-                  </label>
-
-                  {/* Package weight — required for physical products. */}
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-medium">Package weight</span>
-                    <div className="flex gap-1.5">
-                      <Input value={ttWeight} onChange={(e) => setTtWeight(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.5" inputMode="decimal" className="h-8 flex-1 text-xs" />
-                      <select value={ttWeightUnit} onChange={(e) => setTtWeightUnit(e.target.value)} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs">
-                        <option value="POUND">lb</option>
-                        <option value="KILOGRAM">kg</option>
-                      </select>
-                    </div>
-                  </label>
-                  <p className="text-2xs text-muted-foreground">Creates a <span className="font-medium text-foreground">draft</span> product on your TikTok Shop for you to review, then list.</p>
-                </div>
-              )}
+              {/* ONE BLOCK PER TICKED TIKTOK SHOP. A category tree is read against a shop's
+                  cipher and a warehouse belongs to one shop, so two TikTok shops get two
+                  sets of fields rather than one shared set that would be wrong for one of
+                  them. Etsy and Shopify rows expand to nothing — ticking them adds no work. */}
+              {pickedDests.filter((d) => d.platform === "tiktok").map((d) => (
+                <TiktokFields
+                  key={d.connection_id}
+                  dest={d}
+                  fields={tt[d.connection_id] ?? TT_EMPTY}
+                  onChange={(patch) => setTt((m) => ({ ...m, [d.connection_id]: { ...(m[d.connection_id] ?? TT_EMPTY), ...patch } }))}
+                />
+              ))}
 
               {/* No "size priced" picker any more — the table below prices every size, so
                   choosing one to represent the rest was the thing hiding the others. */}
@@ -1034,25 +1298,45 @@ export function PublishProductDialog({
 
               {result && !result.ok && <p className="text-sm text-destructive">{result.text}</p>}
 
+              {/* PER-SHOP RESULTS, live as the run walks the list. Shown here and not in a
+                  banner because partial success has no single sentence: two drafts and one
+                  refusal is three facts, and folding them into one would have to pick which
+                  to tell you. */}
+              {pickedDests.some((d) => outcomes[d.connection_id]) && (
+                <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
+                  {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} />)}
+                </div>
+              )}
+
               {/* IP warning — only for the competitor's OWN photos, and only until the
                   seller acknowledges it. Publishing someone else's images to your shop can
                   get a listing pulled and, repeated, put the shop at risk. */}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                <Button onClick={publish} disabled={busy}>
-                  {busy ? <CircleNotch size={15} className="animate-spin" /> : <><Storefront size={14} weight="bold" /> Publish draft</>}
+                {/* The label says what will actually happen. "Publish draft" over four ticked
+                    shops understates it, and after a partial failure the button's job has
+                    changed to retrying only what failed — which the label has to admit, or
+                    it reads as "publish everything again" and nobody presses it. */}
+                <Button onClick={publish} disabled={busy || !dests?.length}>
+                  {busy ? <CircleNotch size={15} className="animate-spin" /> : (
+                    <><Storefront size={14} weight="bold" />
+                      {anyFailed
+                        ? "Retry the ones that failed"
+                        : pickedDests.length > 1 ? `Publish draft to ${pickedDests.length} shops` : "Publish draft"}
+                    </>
+                  )}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                {channel === "tiktok"
-                  ? "Creates a DRAFT product on your connected TikTok Shop for you to review, then list."
-                  : channel === "shopify"
-                    // Says the one thing that will otherwise waste a click. write_products
-                    // was added to the OAuth scopes after most shops connected, and scopes
-                    // are fixed at grant time — so a shop connected before that refuses
-                    // every publish until it is reconnected, however correct the payload.
-                    ? "Creates a DRAFT product in your connected Shopify store. A store connected before publishing was supported must be reconnected first — Shopify grants the permission at connect time, not per request."
-                    : "Creates a DRAFT in your connected Etsy shop, reusing an existing listing’s category & shipping profile."}
+                {/* One sentence about what publishing does, plus only the caveats that apply
+                    to the shops actually ticked. The Shopify one is worth its length:
+                    write_products was added to the OAuth scopes after most shops connected,
+                    and scopes are fixed at grant time, so a store connected before that
+                    refuses every publish however correct the payload is. */}
+                Creates a DRAFT in each shop for you to review, then list.
+                {pickedDests.some((d) => d.platform === "etsy") && " Etsy reuses an existing listing’s category & shipping profile."}
+                {pickedDests.some((d) => d.platform === "shopify") && " A Shopify store connected before publishing was supported must be reconnected first — Shopify grants the permission at connect time, not per request."}
+                {pickedDests.some((d) => d.dry_run) && " One shop is in dry-run mode: it will be validated and nothing will be sent."}
               </p>
             </div>
           </div>
