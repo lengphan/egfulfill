@@ -127,13 +127,14 @@ const TONE: Record<"wait" | "warn" | "ok" | "part", string> = {
 const TONE_ICON = { wait: Clock, warn: Warning, ok: CheckCircle, part: Barcode } as const
 
 /**
- * THE drop card — one definition, rendered in two places.
+ * THE drop card — drawn ONLY while a file is over the window.
  *
- * "Why are there two drop zones?" was a fair question with a bad answer: there was one
- * target, drawn two different ways. The resting panel was a full-width grey band and the
- * drag overlay a centred primary card, so they looked like separate features. Sharing the
- * class string and the body makes the drag state read as this card lifting off the page,
- * which is what it actually is.
+ * There is no resting version of it any more. The page itself is the drop target (see
+ * PageDropZone), so a dashed rectangle sitting there at rest was never something you aimed
+ * at — it was an announcement, and it took a whole band at the top of the screen to make
+ * one. It got reshaped three times trying to be a better target, which was the wrong
+ * problem to solve. The announcement is a button in the toolbar now; this card appears
+ * under your cursor at the moment it means something.
  */
 const DROP_CARD =
   "flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/60 bg-primary/[0.02] px-6 py-8 text-center"
@@ -144,67 +145,52 @@ function DropCardBody() {
       <UploadSimple size={28} weight="duotone" className="text-primary" />
       <span className="text-base font-semibold">Drop label PDFs here</span>
       {/* Two facts, and only two: anywhere works, and dropping is not sending. Everything
-          else this used to carry now lives in the row it creates. */}
+          else this used to carry now lives in the row it creates. "or click to choose" went
+          with the resting panel — this card only exists mid-drag now, where there is
+          nothing to click; the picker is "Add label PDF" in the toolbar. */}
       <span className="max-w-md text-sm text-muted-foreground">
-        Anywhere on this page works — or click to choose. They join the queue below and
-        nothing is sent to byeastside until you press Send.
+        Anywhere on this page works. They join the queue below and nothing is sent to
+        byeastside until you press Send.
       </span>
     </>
   )
 }
 
 /**
- * THE DROP TARGET — the panel, at rest, at the top of the screen.
+ * ADD A LABEL PDF — a control in the toolbar, the size of the job it does.
  *
- * It has been three shapes. A tall dashed box buried under both lists, which put the one
- * thing you DO on this screen below everything else. Then a one-line strip at the top,
- * which fixed the position and made it too small to aim a dragged file at. Now: the panel
- * shape, at the top, and the same shape the full-window overlay uses while you drag — so
- * the thing you see at rest and the thing that lights up under your cursor are recognisably
- * one target rather than two unrelated dashed rectangles.
+ * This was a full-width dashed panel above the list. It has been three shapes now (a tall
+ * box under both lists, a one-line strip, a panel at the top) and all three were attempts
+ * to make it a better DROP TARGET — which it never needed to be, because PageDropZone
+ * makes the whole window one and lifts a card under your cursor while you drag. What was
+ * left at rest was an announcement occupying a band of a screen whose actual work is rows.
  *
- * The old objection — a rare action taking more room than the day's work — was answered by
- * moving it above the list rather than by shrinking it. It costs one band at the top of a
- * screen that scrolls, and it is the only control here that isn't a row.
+ * So it sits with the other things you can press. Dragging is unchanged and still the
+ * primary gesture; this is the keyboard-and-mouse way in, and the place the feature admits
+ * it exists when no file is being dragged.
  */
-export function LabelDropBar({ onStage }: { onStage: (files: File[]) => void }) {
-  const [over, setOver] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  /** Caught here, before anything leaves, so dropping a photo by accident answers instantly.
-   *  The server checks the bytes as well — this one is about the wait, that one is the truth. */
-  const stage = (files: FileList | File[] | null) => {
-    const list = Array.from(files ?? [])
-    if (!list.length) return
-    const bad = list.filter((f) => !isPdf(f))
-    const good = list.filter(isPdf)
-    setErr(bad.length ? `${bad.map((f) => f.name).join(", ")} — only PDFs can be pre-scanned, that's what carriers issue.` : null)
-    if (good.length) onStage(good)
-  }
-
+export function AddLabelButton({ onStage, onError }: { onStage: (files: File[]) => void; onError?: (msg: string | null) => void }) {
   return (
-    <div className="space-y-2">
-      {/* ONE DROP ZONE, not two. This is DROP_CARD — the identical card the full-window
-          overlay renders while you drag. It was reasonable-looking but different: a
-          full-width grey band here, a centred primary card there, which read as two
-          separate drop zones that happened to do the same thing. Same card, two places:
-          at rest it sits here, and while you drag it lifts onto a dimmed page. */}
-      <label
-        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-        onDragLeave={() => setOver(false)}
-        onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
-        className={DROP_CARD + " mx-auto w-full max-w-lg cursor-pointer transition-colors "
-          + (over ? "bg-primary/5" : "hover:bg-primary/[0.03]")}
-      >
-        <DropCardBody />
-        <input
-          type="file" multiple className="sr-only"
-          accept="application/pdf"
-          onChange={(e) => { stage(e.target.files); e.target.value = "" }}
-        />
-      </label>
-      {err && <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">{err}</div>}
-    </div>
+    <label
+      title="Choose label PDFs — or just drop them anywhere on this page"
+      className="eg-tap inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent focus-within:outline-none focus-within:ring-2 focus-within:ring-ring/50"
+    >
+      <UploadSimple size={14} weight="bold" /> Add label PDF
+      <input
+        type="file" multiple className="sr-only" accept="application/pdf"
+        onChange={(e) => {
+          const list = Array.from(e.target.files ?? [])
+          e.target.value = ""
+          if (!list.length) return
+          // Caught before anything leaves, so picking a photo by accident answers instantly.
+          // The server checks the bytes too — this one is about the wait, that one is truth.
+          const bad = list.filter((f) => !isPdf(f))
+          const good = list.filter(isPdf)
+          onError?.(bad.length ? `${bad.map((f) => f.name).join(", ")} — only PDFs can be pre-scanned, that's what carriers issue.` : null)
+          if (good.length) onStage(good)
+        }}
+      />
+    </label>
   )
 }
 

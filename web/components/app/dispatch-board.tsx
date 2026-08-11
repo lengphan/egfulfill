@@ -13,7 +13,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
-import { StagedLabelRow, UploadLabelRow, useLabelPullBack, LabelDropBar, PageDropZone, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
+import { StagedLabelRow, UploadLabelRow, useLabelPullBack, AddLabelButton, PageDropZone, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
 import { DISPATCH_GRID, DISPATCH_HEAD } from "@/components/app/dispatch-grid"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
@@ -870,28 +870,18 @@ export function DispatchBoard() {
         </div>
       )}
 
-      {/* ABOVE THE LIST. Dropping a file is the only thing on this screen that isn't
-          done to a row, and it was buried under it — see LabelDropBar. Hidden in
-          history, which is a record and takes no new work. */}
-      {view !== "history" && (
-        <div className="space-y-2">
-          <LabelDropBar onStage={stageFiles} />
-          {/* The one thing someone could reasonably assume wrong, said once, next to the
-              gesture that creates these rows. It used to be the External-labels card's
-              opening paragraph; that card is gone, and the sentence is what has to survive
-              it — sharing a table with orders makes "this is not an order" MORE worth
-              saying, not less. */}
-          {(staged.length > 0 || uploads.length > 0) && (
-            <p className="px-1 text-xs text-muted-foreground">
-              {/* The explicit spaces are load-bearing: the compiler drops the one after a
-                  closing tag mid-line, which shipped as "Externalare labels from outside". */}
-              Rows tagged <b>External</b>{" "}
-              are labels from outside — they&apos;re not attached to an
-              EGFULFILL order and nothing is charged for them. Tick one and press{" "}
-              <b>Send to byeastside</b> to put it in their pre-scan queue.
-            </p>
-          )}
-        </div>
+      {/* The one thing someone could reasonably assume wrong, said once, next to the rows
+          it describes. Sharing a table with orders makes "this is not an order" MORE worth
+          saying, not less — and it only appears once such a row exists. */}
+      {view !== "history" && (staged.length > 0 || uploads.length > 0) && (
+        <p className="px-1 text-xs text-muted-foreground">
+          {/* The explicit spaces are load-bearing: the compiler drops the one after a
+              closing tag mid-line, which shipped as "Externalare labels from outside". */}
+          Rows tagged <b>External</b>{" "}
+          are labels from outside — they&apos;re not attached to an
+          EGFULFILL order and nothing is charged for them. Tick one and press{" "}
+          <b>Send to byeastside</b> to put it in their pre-scan queue.
+        </p>
       )}
 
       <SectionCard
@@ -921,6 +911,11 @@ export function DispatchBoard() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Dropping a file anywhere on this page is the primary gesture (PageDropZone);
+                this is the same thing for a mouse, at the weight it deserves — one control
+                among the others rather than a band above them. */}
+            <AddLabelButton onStage={stageFiles} onError={setErr} />
 
             {/* Label + slip in one click — the two documents that leave with the parcel. */}
             <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={labelAndSlip}
