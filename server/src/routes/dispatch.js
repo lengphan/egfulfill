@@ -714,6 +714,21 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
        created_by     text,
        created_at     timestamptz not null default now(),
        synced_at      timestamptz)`).catch(() => {});
+  // WHO THE PARCEL IS FOR, read off the label in the browser before it was sent.
+  //
+  // Not from byeastside — their extractor returns tracking numbers and nothing else. The
+  // label itself prints the addressee, and the uploader parses it out of the PDF, so these
+  // are the only reason an external row can fill the same Customer and Ship-to columns as
+  // a real order instead of two dashes.
+  //
+  // A separate ALTER because `create table if not exists` is a no-op on a deployment that
+  // already has the table — which is every deployment that has ever pre-scanned a label.
+  // Nullable on purpose: an image-only label has nothing to read, and that is a normal row,
+  // not a broken one.
+  q(`alter table dispatch_uploads
+       add column if not exists recipient  text,
+       add column if not exists ship_to    text,
+       add column if not exists tracking   text`).catch(() => {});
 
   /** Their words for a batch that will never change again — nothing left to poll for. */
   const settled = (row) => Number(row.total_labels || 0) > 0
@@ -766,11 +781,18 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     }
     const d = r.data || {};
     const row = await q(
-      `insert into dispatch_uploads (pdf_id, file_name, public_url, status, total_pages, total_labels, note, created_by, synced_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8, now()) returning *`,
+      `insert into dispatch_uploads (pdf_id, file_name, public_url, status, total_pages, total_labels, note, created_by,
+                                     recipient, ship_to, tracking, synced_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now()) returning *`,
       [String(d.id ?? ''), fileName, d.publicUrl || null, d.status || 'PENDING',
        d.totalPages ?? null, d.totalLabels ?? null,
-       b.note ? String(b.note).slice(0, 200) : null, String((req.user && req.user.email) || '')]);
+       b.note ? String(b.note).slice(0, 200) : null, String((req.user && req.user.email) || ''),
+       // Read off the label by the uploader. Trimmed to sane lengths and otherwise stored
+       // verbatim — this is what the label PRINTS, and a value we tidy is a value that no
+       // longer matches the parcel someone is holding.
+       b.recipient ? String(b.recipient).slice(0, 120) : null,
+       b.shipTo ? String(b.shipTo).slice(0, 160) : null,
+       b.tracking ? String(b.tracking).replace(/[^\w]/g, '').slice(0, 40) : null]);
     audit(req, 'dispatch.upload', { entityType: 'dispatch_upload', entityId: String(d.id ?? ''),
       after: { file: fileName, pages: d.totalPages ?? null }, note: `External label ${fileName} sent for pre-scan` });
     return { ok: true, upload: row.rows[0] };

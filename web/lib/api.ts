@@ -1684,6 +1684,15 @@ export type DispatchUpload = {
   total_labels: number | null
   scanned_labels: number
   labels: { trackingNumber?: string; status?: string; pickedAt?: string }[]
+  /** Read off the label PDF by the uploader before it was sent — see lib/label-pdf.ts.
+   *  Null whenever the label was an image with no text layer, which is common enough that
+   *  the row has to say so rather than show a blank. */
+  recipient: string | null
+  /** "CITY, ST, ZIP", the same shape the queue prints for a real order's ship-to. */
+  ship_to: string | null
+  /** The number printed on the label. Distinct from `labels[].trackingNumber`, which is
+   *  what byeastside's extractor found — this one exists before they have looked. */
+  tracking: string | null
   note: string | null
   created_by: string | null
   created_at: string
@@ -1695,7 +1704,13 @@ export function getDispatchUploads() {
 /** `dataUrl` is a PDF or a JPEG. Anything else the browser can display should be drawn to
  *  a canvas and exported as JPEG first — the server has no image decoder, and their API
  *  refuses images outright, so a JPEG is wrapped in a one-page PDF server-side. */
-export function uploadDispatchLabel(body: { fileName: string; dataUrl: string; note?: string }) {
+export function uploadDispatchLabel(body: {
+  fileName: string; dataUrl: string; note?: string
+  /** What the browser read off the label. Sent because byeastside never returns it — their
+   *  extractor deals in tracking numbers — so if we don't carry it across the send, the row
+   *  loses its customer and ship-to the moment it stops being a staged file. */
+  recipient?: string; shipTo?: string; tracking?: string
+}) {
   return api<{ ok?: boolean; upload?: DispatchUpload; error?: string }>(`/api/dispatch/uploads`, {
     method: "POST", body: JSON.stringify(body),
   })

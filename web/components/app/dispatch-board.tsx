@@ -13,7 +13,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
-import { ExternalLabels, LabelDropBar, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
+import { ExternalLabelRows, LabelDropBar, PageDropZone, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
 import { DISPATCH_GRID, DISPATCH_HEAD } from "@/components/app/dispatch-grid"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
@@ -312,11 +312,21 @@ export function DispatchBoard() {
   const stageSeq = useRef(0)
   // Newly dropped files arrive TICKED. Dropping is already the statement of intent — the
   // box exists so you can change your mind, not so you have to say it twice.
-  const stageFiles = (files: File[]) => {
-    const rows = files.map((f) => ({ key: String(++stageSeq.current), name: f.name, file: f }))
+  const stageFiles = useCallback((files: File[]) => {
+    const rows: StagedLabel[] = files.map((f) => ({ key: String(++stageSeq.current), name: f.name, file: f, parse: null }))
     setStaged((p) => [...p, ...rows])
     setExtPicked((p) => { const n = new Set(p); for (const r of rows) n.add(stagedKeyOf(r)); return n })
-  }
+    // READ THE LABEL, in the background, one file at a time.
+    //
+    // The row appears immediately saying "Reading the label…" and fills in when the parse
+    // lands, rather than the drop blocking on a PDF parse — a multi-page label takes long
+    // enough to feel like the drop didn't register. Each result is merged by `key` so a
+    // file discarded mid-parse doesn't come back from the dead.
+    for (const r of rows) {
+      void readStagedLabel(r).then((parse) =>
+        setStaged((p) => p.map((s) => (s.key === r.key ? { ...s, parse } : s))))
+    }
+  }, [])
   const discardStaged = (k: string) => {
     setStaged((p) => p.filter((s) => stagedKeyOf(s) !== k))
     setExtPicked((p) => { const n = new Set(p); n.delete(k); return n })
@@ -326,8 +336,6 @@ export function DispatchBoard() {
   const extKeys = useMemo(
     () => [...staged.map(stagedKeyOf), ...uploads.map(uploadKeyOf)],
     [staged, uploads])
-  const toggleAllExt = () =>
-    setExtPicked((p) => (p.size === extKeys.length ? new Set() : new Set(extKeys)))
   const stagedChosen = staged.filter((s) => extPicked.has(stagedKeyOf(s)))
   const uploadsChosen = uploads.filter((u) => extPicked.has(uploadKeyOf(u)))
 
@@ -374,8 +382,21 @@ export function DispatchBoard() {
 
   const toggle = (id: string) =>
     setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
-  const toggleAll = () =>
-    setPicked((p) => (p.size === withLabel.length ? new Set() : new Set(withLabel.map((o) => o.id))))
+  /**
+   * SELECT ALL means all of one table now that there is only one.
+   *
+   * Orders keep the "has a label" rule — an order with nothing to scan cannot join a batch,
+   * which is why this was never simply `queue.length`. External rows have no such rule:
+   * every one of them either can be sent or can be pulled back, so all of them are
+   * selectable. The button reports the sum, and clearing clears both.
+   */
+  const selectableAll = withLabel.length + extKeys.length
+  const allSelected = selectableAll > 0 && picked.size === withLabel.length && extPicked.size === extKeys.length
+  const toggleAllRows = () => {
+    const clear = allSelected
+    setPicked(clear ? new Set() : new Set(withLabel.map((o) => o.id)))
+    setExtPicked(clear ? new Set() : new Set(extKeys))
+  }
 
   /** Advance a whole batch once it's been scanned. Per-order so one failure can't strand the rest. */
   /**
@@ -777,10 +798,29 @@ export function DispatchBoard() {
         </div>
       )}
 
-      {/* ABOVE BOTH LISTS. Dropping a file is the only thing on this screen that isn't
-          done to a row, and it was buried under both of them — see LabelDropBar. Hidden in
+      {/* ABOVE THE LIST. Dropping a file is the only thing on this screen that isn't
+          done to a row, and it was buried under it — see LabelDropBar. Hidden in
           history, which is a record and takes no new work. */}
-      {view !== "history" && <LabelDropBar onStage={stageFiles} />}
+      {view !== "history" && (
+        <div className="space-y-2">
+          <LabelDropBar onStage={stageFiles} />
+          {/* The one thing someone could reasonably assume wrong, said once, next to the
+              gesture that creates these rows. It used to be the External-labels card's
+              opening paragraph; that card is gone, and the sentence is what has to survive
+              it — sharing a table with orders makes "this is not an order" MORE worth
+              saying, not less. */}
+          {(staged.length > 0 || uploads.length > 0) && (
+            <p className="px-1 text-xs text-muted-foreground">
+              {/* The explicit spaces are load-bearing: the compiler drops the one after a
+                  closing tag mid-line, which shipped as "Externalare labels from outside". */}
+              Rows tagged <b>External</b>{" "}
+              are labels from outside — they&apos;re not attached to an
+              EGFULFILL order and nothing is charged for them. Tick one and press{" "}
+              <b>Send to byeastside</b> to put it in their pre-scan queue.
+            </p>
+          )}
+        </div>
+      )}
 
       <SectionCard
         title="Dispatch"
@@ -898,10 +938,15 @@ export function DispatchBoard() {
               ))}
             </div>
           )}
-          {view === "queue" && chosen.length > 0 && <span className="text-xs text-muted-foreground">{chosen.length} in this batch</span>}
+          {view === "queue" && chosen.length + extPicked.size > 0 && (
+            <span className="text-xs text-muted-foreground">{chosen.length + extPicked.size} in this batch</span>
+          )}
+          {/* ONE select-all for one table. It used to be two — this one for orders, another
+              in the external card's header — which meant "select all" never selected all of
+              what was on screen, and the count in each button was a count of half the list. */}
           {view === "queue" && (
-            <Button size="sm" variant="outline" disabled={!withLabel.length} onClick={toggleAll}>
-              {picked.size === withLabel.length && withLabel.length ? "Clear selection" : `Select all ${withLabel.length}`}
+            <Button size="sm" variant="outline" disabled={!selectableAll} onClick={toggleAllRows}>
+              {allSelected ? "Clear selection" : `Select all ${selectableAll}`}
             </Button>
           )}
         </div>
@@ -1071,11 +1116,11 @@ export function DispatchBoard() {
               </div>
             </div>
           )
-        ) : queue.length === 0 ? (
+        ) : queue.length === 0 && !staged.length && !uploads.length ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
             <Truck size={26} weight="duotone" className="opacity-50" />
             <div className="text-sm font-medium text-foreground">Nothing waiting to go out</div>
-            <div className="text-xs">Orders appear here once production marks them awaiting scan.</div>
+            <div className="text-xs">Orders appear here once production marks them awaiting scan — or drop a label PDF anywhere on this page.</div>
           </div>
         ) : (
           /* ONE COLUMN PER FACT — the same nine the external-label list uses, so the two
@@ -1171,24 +1216,27 @@ export function DispatchBoard() {
                 </label>
               )
             })}
+            {/* THE SAME TABLE, after the orders. A label from outside is still a parcel
+                going out today, so it belongs in the list of parcels going out today —
+                last, because it is the exception rather than the day's work, and tagged,
+                because it is not an order and nothing is charged for it. */}
+            <ExternalLabelRows
+              uploads={uploads}
+              staged={staged}
+              picked={extPicked}
+              onDiscard={discardStaged}
+              onToggle={toggleExt}
+              busy={busy}
+              onChanged={loadUploads}
+            />
             </div>
           </div>
         )}
       </SectionCard>
 
-      {/* A label that ISN'T one of our orders — someone else's system, or a buyer's own
-          postage. Below the queue because it is the exception, not the day's work, and
-          deliberately its own card: it touches no order and bills nothing. */}
-      <ExternalLabels
-        uploads={uploads}
-        staged={staged}
-        picked={extPicked}
-        onDiscard={discardStaged}
-        onToggle={toggleExt}
-        onToggleAll={toggleAllExt}
-        busy={busy}
-        onChanged={loadUploads}
-      />
+      {/* Drag a file anywhere over this screen and the target is the whole window. Rendered
+          last and fixed-position, so it sits over everything without any layout of its own. */}
+      <PageDropZone onStage={stageFiles} />
 
       {/* Keyed on the selection so reopening after a different pick can't show the
           previous batch's preview for a frame. */}
