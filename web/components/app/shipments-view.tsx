@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { MagnifyingGlass, CircleNotch, ArrowSquareOut, Package, ArrowClockwise, DownloadSimple, X, Plus, Truck } from "@phosphor-icons/react"
+import { MagnifyingGlass, CircleNotch, Package, DownloadSimple, Plus, Truck } from "@phosphor-icons/react"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
+import { ShipmentDetailDialog } from "@/components/app/shipment-detail-dialog"
 import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -90,26 +91,6 @@ const REFUND_TONE: Record<string, string> = {
   refused: "bg-red-600 text-white",
 }
 
-/** Who recorded the scan. Worth naming rather than a bare tick: the three routes carry
- *  different weight, and only one of them is the carrier's own word. */
-const VIA: Record<string, string> = {
-  "in-house": "scanned here",
-  partner: "scanned by byeastside",
-  carrier: "accepted by the carrier",
-}
-/** WHERE the scan happened, in one word. The column reads status-then-time like the one
- *  beside it, so a scan down the table is a scan down one column of words — a timestamp on
- *  top made the eye do arithmetic before it knew what had happened.
- *
- *  One word rather than a sentence because this was the widest column in the table and it
- *  was pushing the Refund button off the right edge of the card. "Carrier accepted" and
- *  "Carrier" answer the same question; the long form is still on the title attribute. */
-const VIA_SHORT: Record<string, string> = {
-  "in-house": "Here",
-  partner: "Partner",
-  carrier: "Carrier",
-}
-
 export function ShipmentsView() {
   const [rows, setRows] = useState<ShipmentRow[] | null>(null)
   const [spend, setSpend] = useState(0)
@@ -120,6 +101,9 @@ export function ShipmentsView() {
   // a different number depending on what you last typed.
   const [tally, setTally] = useState({ bought: 0, voided: 0, test: 0 })
   const [status, setStatus] = useState("all")
+  // The row someone stopped on. The table shows what you SCAN; this holds what you stop
+  // for — every field, and the three actions, which all act on exactly one parcel.
+  const [detail, setDetail] = useState<ShipmentRow | null>(null)
   const [q, setQ] = useState("")
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -134,6 +118,10 @@ export function ShipmentsView() {
         setRows(r.shipments ?? [])
         setSpend(r.labelSpend ?? 0); setRefunded(r.labelRefunded ?? 0); setTestSpend(r.labelSpendTest ?? 0)
         setTally({ bought: r.labelsBought ?? 0, voided: r.labelsVoided ?? 0, test: r.labelsTest ?? 0 })
+        // Re-point the open panel at the fresh row. Refunding from inside it changes what
+        // it should say, and a panel showing pre-refund values over a refunded row is the
+        // kind of stale that gets acted on twice.
+        setDetail((d) => (d ? (r.shipments ?? []).find((x) => x.id === d.id) ?? null : null))
         setErr(null)
       })
       .catch((e: Error) => { setErr(e.message); setRows([]) })
@@ -377,15 +365,17 @@ export function ShipmentsView() {
                     argue it, and it read as a sentence fragment. The badge below already
                     says whose claim it is by being the carrier's vocabulary. */}
                 <th className="whitespace-nowrap px-4 py-2 font-medium">Delivery status</th>
-                <th className="whitespace-nowrap px-4 py-2 font-medium">Pre-scan</th>
-                <th className="px-3 py-2 text-right font-medium">Label</th>
               </tr>
             </thead>
             <tbody>
               {shown.map((s) => {
                 const d = s.delivery ? DELIVERY[s.delivery] : null
                 return (
-                  <tr key={s.id} className="border-b border-border/60 last:border-0 hover:bg-accent/40">
+                  <tr
+                    key={s.id}
+                    onClick={() => setDetail(s)}
+                    className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-accent/40"
+                  >
                     {/* An order number is the thing you read first and read most, so it gets
                         the body font at body size. Mono at text-xs was two handicaps at once:
                         a narrower face AND the smallest step on the page. tabular-nums keeps
@@ -476,78 +466,6 @@ export function ShipmentsView() {
                         <div className="mt-1 text-2xs text-muted-foreground">checked {when(s.deliveryCheckedAt)}</div>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2.5">
-                      {s.scannedAt ? (
-                        <>
-                          <div className="text-xs font-medium" title={VIA[s.scannedVia ?? ""] ?? "scanned"}>{VIA_SHORT[s.scannedVia ?? ""] ?? "Scanned"}</div>
-                          <div className="mt-0.5 text-2xs text-muted-foreground">{when(s.scannedAt)}</div>
-                        </>
-                      ) : (
-                        // Same reasoning as the status beside it: a refund clears the scan
-                        // (the parcel it claimed to hand over is gone), so "Not scanned"
-                        // would read as work still pending on something that ended.
-                        <span className="text-xs text-muted-foreground">{(s.refunded ?? 0) > 0 ? "—" : "Not scanned"}</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                      {/* WORDS, NOT THREE ANONYMOUS GLYPHS. A circular arrow, a box-with-arrow
-                          and an X sat in a row at 13px, and telling "re-check the carrier"
-                          from "open the PDF" from "refund $6.24" meant hovering each one to
-                          read a tooltip. Two of the three are harmless and the third moves
-                          money, which is the worst possible thing to leave to a guess. */}
-                      <div className="inline-flex items-center gap-1.5">
-                        {/* Re-asking the carrier costs an API call and can move money
-                            nowhere, so it's open to any staffer — unlike anything that
-                            asserts a scan. */}
-                        <button
-                          onClick={() => recheck(s.id)}
-                          disabled={checking === s.id}
-                          className="eg-tap inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-                          title="Ask the carrier for the latest status"
-                          aria-label={`Re-check tracking for ${s.num}`}
-                        >
-                          {checking === s.id
-                            ? <CircleNotch size={12} className="animate-spin" />
-                            : <ArrowClockwise size={12} weight="bold" />}
-                          Check
-                        </button>
-                        {s.labelUrl ? (
-                          <a
-                            href={s.labelUrl} target="_blank" rel="noopener noreferrer"
-                            className="eg-tap inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                            title="Open the label PDF"
-                            aria-label={`Open label for ${s.num}`}
-                          >
-                            <ArrowSquareOut size={12} weight="bold" />
-                            Label
-                          </a>
-                        ) : (
-                          // The label was bought but its file wasn't stored — which is a
-                          // real gap on older orders, not "no label". Saying so stops
-                          // someone hunting for a button that was never going to be there.
-                          <span className="px-1.5 text-2xs text-muted-foreground" title="This label predates storing the PDF">
-                            not stored
-                          </span>
-                        )}
-                        {/* "Refund", not "Void". Void is the carrier's word for cancelling
-                            the label; what the person pressing it wants is the postage back,
-                            and that is also what the row shows afterwards. One word for one
-                            outcome. Hidden once it HAS been refunded — a second press can
-                            only ever collect the carrier's refusal. */}
-                        {canVoid && s.labelUrl && (s.refunded ?? 0) === 0 && (
-                          <button
-                            onClick={() => doVoid(s)}
-                            disabled={voiding === s.id}
-                            className="eg-tap inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                            title="Cancel the label and get the postage credited back"
-                            aria-label={`Refund the label for ${s.num}`}
-                          >
-                            {voiding === s.id ? <CircleNotch size={12} className="animate-spin" /> : <X size={12} weight="bold" />}
-                            Refund
-                          </button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 )
               })}
@@ -569,6 +487,17 @@ export function ShipmentsView() {
       )}
     </SectionCard>
     <NewLabelDialog open={newLabelOpen} onOpenChange={setNewLabelOpen} onCreated={() => load(q)} />
+    {/* Everything the table no longer carries, for the one row someone stopped on — plus
+        the three actions, which all act on exactly one parcel. */}
+    <ShipmentDetailDialog
+      shipment={detail}
+      onOpenChange={(o) => { if (!o) setDetail(null) }}
+      onRecheck={recheck}
+      onRefund={doVoid}
+      checking={checking}
+      voiding={voiding}
+      canRefund={canVoid}
+    />
     <RateCheckerDialog open={rateCheckOpen} onOpenChange={setRateCheckOpen} />
     </>
   )
