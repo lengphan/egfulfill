@@ -60,6 +60,7 @@ const FILTERS: { key: string; label: string; match: (s: ShipmentRow) => boolean 
   { key: "problem", label: "Needs a look", match: (s) => s.delivery === "returned" || s.delivery === "failed" },
   { key: "unchecked", label: "Not checked", match: (s) => !s.delivery },
   { key: "refunded", label: "Refunded", match: (s) => (s.refunded ?? 0) > 0 },
+  { key: "test", label: "Test", match: (s) => s.test },
 ]
 
 /** Who recorded the scan. Worth naming rather than a bare tick: the three routes carry
@@ -74,6 +75,7 @@ export function ShipmentsView() {
   const [rows, setRows] = useState<ShipmentRow[] | null>(null)
   const [spend, setSpend] = useState(0)
   const [refunded, setRefunded] = useState(0)
+  const [testSpend, setTestSpend] = useState(0)
   const [status, setStatus] = useState("all")
   const [q, setQ] = useState("")
   const [busy, setBusy] = useState(false)
@@ -85,7 +87,7 @@ export function ShipmentsView() {
     if (!getUser()) { setRows([]); return }
     setBusy(true)
     getShipments({ search: search?.trim() || undefined, limit: 300 })
-      .then((r) => { setRows(r.shipments ?? []); setSpend(r.labelSpend ?? 0); setRefunded(r.labelRefunded ?? 0); setErr(null) })
+      .then((r) => { setRows(r.shipments ?? []); setSpend(r.labelSpend ?? 0); setRefunded(r.labelRefunded ?? 0); setTestSpend(r.labelSpendTest ?? 0); setErr(null) })
       .catch((e: Error) => { setErr(e.message); setRows([]) })
       .finally(() => setBusy(false))
   }, [])
@@ -183,6 +185,15 @@ export function ShipmentsView() {
             <span className="text-xs">
               <span className="text-muted-foreground">Label spend </span>
               <span className="font-semibold tabular-nums">${spend.toFixed(2)}</span>
+              {/* Named, not deducted. The ledger is append-only and these rows are settled,
+                  so a total that quietly subtracted them would reconcile against nothing.
+                  Saying how much of it was never charged lets the real figure be read
+                  without either number being false. */}
+              {testSpend > 0 && (
+                <span className="text-muted-foreground">
+                  {" "}(<span className="tabular-nums">${testSpend.toFixed(2)}</span> on a test key, never charged)
+                </span>
+              )}
               {/* Only when there IS one. "refunded $0.00" beside every total is a column of
                   zeroes pretending to be information, and it buries the case that matters. */}
               {refunded > 0 && (
@@ -305,7 +316,16 @@ export function ShipmentsView() {
                         the digits in a column, which is the only part mono was earning. */}
                     <td className="whitespace-nowrap px-5 py-2.5 text-sm font-semibold tabular-nums">{s.num}</td>
                     <td className="px-3 py-2.5">
-                      <div className="max-w-[14rem] truncate">{s.customer ?? "—"}</div>
+                      <div className="flex max-w-[14rem] items-center gap-1.5">
+                        <span className="truncate">{s.customer ?? "—"}</span>
+                        {/* On the row, not just in a filter. A test label has real-shaped
+                            tracking and a real-looking price, so without saying so on the
+                            row itself there is nothing to tell it from a parcel that is
+                            actually going somewhere. */}
+                        {s.test && (
+                          <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-2xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">TEST</span>
+                        )}
+                      </div>
                       {s.state && <div className="text-2xs text-muted-foreground">{s.state}</div>}
                     </td>
                     <td className="px-3 py-2.5">

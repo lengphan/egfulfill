@@ -152,6 +152,11 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   // Their PDF id + when we pushed. On the ORDER rather than a join table: we upload one
   // label per PDF, so the relationship is 1:1 and a table would add joins for nothing.
   q('alter table orders add column if not exists dispatch_pdf_id text').catch(() => {});
+  // Was this label bought against a TEST key? Recorded rather than inferred, because the
+  // only moment it is knowable is the buy response — afterwards a test label looks exactly
+  // like a real one: real-shaped tracking, a real PDF, a real-looking price, and no charge.
+  // Null means "bought before we asked", which is not the same as false.
+  q('alter table orders add column if not exists label_test boolean').catch(() => {});
   q('alter table orders add column if not exists dispatch_pushed_at timestamptz').catch(() => {});
   q('alter table orders add column if not exists dispatch_error text').catch(() => {});
   // Scan provenance — who scanned a label out and via which channel (in-house / partner /
@@ -275,7 +280,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     const r = await softQ('shipments',
       `select o.id, o.seq, o.tracking, o.carrier, o.tracking_label_url,
               o.factory_status, o.delivery_status, o.delivery_detail, o.delivery_checked_at,
-              o.label_scanned_at, o.scanned_via, o.created_at, o.ship_service,
+              o.label_scanned_at, o.scanned_via, o.created_at, o.ship_service, o.label_test,
               -- price from the order column if stored, else the label-cost ledger row (so
               -- labels bought before the column existed still show what they cost).
               coalesce(o.label_cost,
@@ -296,10 +301,17 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     // Gross and refunded are reported SEPARATELY rather than netted: "we spent $65.90" and
     // "we spent $71.90 and got $6 back" are different facts about how the week went, and a
     // single net figure hides the second one entirely. The screen does the subtraction.
+    // The test slice is reported alongside rather than deducted. The ledger is append-only
+    // and those rows are settled history — a screen that quietly subtracted them would be
+    // showing a number that reconciles against nothing. Naming it lets someone read the
+    // real figure without either total being a lie.
     const totals = await q(
-      `select coalesce(-sum(delta) filter (where ref not like 'label-void-%'), 0)::float as spend,
-              coalesce( sum(delta) filter (where ref like 'label-void-%'), 0)::float as refunded
-         from wallet_ledger where type='label-cost'`)
+      `select coalesce(-sum(w.delta) filter (where w.ref not like 'label-void-%'), 0)::float as spend,
+              coalesce( sum(w.delta) filter (where w.ref like 'label-void-%'), 0)::float as refunded,
+              coalesce(-sum(w.delta) filter (where w.ref not like 'label-void-%' and o.label_test is true), 0)::float as test_spend
+         from wallet_ledger w
+         left join orders o on w.ref = 'label-' || o.id
+        where w.type='label-cost'`)
       .then((x) => x.rows[0] || {}).catch(() => ({}));
     const spend = totals.spend || 0;
     // Fill in any missing label fees in the background. It runs off the critical path so the
@@ -311,6 +323,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     return {
       labelSpend: spend,
       labelRefunded: totals.refunded || 0,
+      labelSpendTest: totals.test_spend || 0,
       shipments: r.rows.map((x) => ({
         id: x.id, num: x.seq ? '#' + x.seq : x.id,
         customer: x.customer || null, state: x.state || null,
@@ -322,6 +335,8 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         // rather than a boolean: "voided" and "voided, $6.24 back" answer different questions,
         // and a refund that came back short is the one worth seeing.
         refunded: x.label_refund != null ? Number(x.label_refund) : null,
+        // true = bought on a test key and never charged. Null is "we didn't ask", not "no".
+        test: x.label_test === true,
         stage: x.factory_status || null,
         // Two DIFFERENT facts, kept apart on purpose: `stage` is what the floor says,
         // `delivery` is what the carrier says. They disagree, and which one is wrong is

@@ -3515,6 +3515,8 @@ export type ShipmentRow = {
   method: string | null; price: number | null
   /** Postage credited back by a void, as an amount. Null/0 = never voided. */
   refunded: number | null
+  /** Bought on a TEST key: real-shaped tracking and price, never actually charged. */
+  test: boolean
   stage: string | null
   /** What the CARRIER says, as distinct from `stage` which is what the floor says. When
    *  they disagree, which one is wrong is the thing being worked out. */
@@ -3525,7 +3527,7 @@ export function getShipments(p: { search?: string; limit?: number } = {}) {
   const s = new URLSearchParams()
   if (p.search) s.set("search", p.search)
   if (p.limit) s.set("limit", String(p.limit))
-  return api<{ shipments: ShipmentRow[]; labelSpend?: number; labelRefunded?: number }>(`/api/shipments?${s.toString()}`)
+  return api<{ shipments: ShipmentRow[]; labelSpend?: number; labelRefunded?: number; labelSpendTest?: number }>(`/api/shipments?${s.toString()}`)
 }
 // Void/refund a bought label — cancels it with the carrier AND credits the label cost
 // back in the ledger (so it shows in Billing under the carrier). Staff only, server-side.

@@ -343,12 +343,16 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
   const advance = PRE_SCAN.includes(cur);
   await q(
     `update orders set tracking=$1, carrier=$2, tracking_label_url=coalesce($3, tracking_label_url),
-       label_cost=coalesce($4, label_cost), ship_service=coalesce(nullif($5,''), ship_service)
+       label_cost=coalesce($4, label_cost), ship_service=coalesce(nullif($5,''), ship_service),
+       label_test=coalesce($6, label_test)
        ${advance ? ", factory_status='awaiting_scan'" : ''}
-     where id=$6`,
+     where id=$7`,
     [tracking, carrier || 'USPS', labelUrl || null,
      (cost != null && isFinite(Number(cost))) ? Number(cost) : null,
      (ref && ref.service) ? String(ref.service) : null,
+     // Only written when the buy actually told us. A path that can't know (USPS direct)
+     // passes null and leaves whatever is there, rather than asserting "not a test".
+     (ref && typeof ref.test === 'boolean') ? ref.test : null,
      orderId]).catch(() => {});
 
   // Backfill the destination, only into an order that hasn't got one. Separate statement
