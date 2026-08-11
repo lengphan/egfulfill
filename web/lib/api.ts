@@ -3542,7 +3542,14 @@ export function getShipments(p: { search?: string; limit?: number } = {}) {
   const s = new URLSearchParams()
   if (p.search) s.set("search", p.search)
   if (p.limit) s.set("limit", String(p.limit))
-  return api<{ shipments: ShipmentRow[]; labelSpend?: number; labelRefunded?: number; labelSpendTest?: number }>(`/api/shipments?${s.toString()}`)
+  return api<{
+    shipments: ShipmentRow[]
+    /** All-time, straight off the ledger — NOT a sum of the rows on screen, which are
+     *  capped and search-filtered. Gross: the test slice is reported beside it, not
+     *  deducted, because those ledger rows are settled and still say what they say. */
+    labelSpend?: number; labelRefunded?: number; labelSpendTest?: number
+    labelsBought?: number; labelsVoided?: number; labelsTest?: number
+  }>(`/api/shipments?${s.toString()}`)
 }
 // Void/refund a bought label — cancels it with the carrier AND credits the label cost
 // back in the ledger (so it shows in Billing under the carrier). Staff only, server-side.

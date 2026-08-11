@@ -308,7 +308,10 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     const totals = await q(
       `select coalesce(-sum(w.delta) filter (where w.ref not like 'label-void-%'), 0)::float as spend,
               coalesce( sum(w.delta) filter (where w.ref like 'label-void-%'), 0)::float as refunded,
-              coalesce(-sum(w.delta) filter (where w.ref not like 'label-void-%' and o.label_test is true), 0)::float as test_spend
+              coalesce(-sum(w.delta) filter (where w.ref not like 'label-void-%' and o.label_test is true), 0)::float as test_spend,
+              count(*) filter (where w.ref not like 'label-void-%')                          as bought,
+              count(*) filter (where w.ref like 'label-void-%')                              as voided,
+              count(*) filter (where w.ref not like 'label-void-%' and o.label_test is true) as test_count
          from wallet_ledger w
          left join orders o on w.ref = 'label-' || o.id
         where w.type='label-cost'`)
@@ -324,6 +327,12 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       labelSpend: spend,
       labelRefunded: totals.refunded || 0,
       labelSpendTest: totals.test_spend || 0,
+      // COUNTS, not just money. "We spent $65.90" and "we bought 11 labels" answer different
+      // questions, and a spend figure with no volume behind it can't be sanity-checked —
+      // $65.90 across 11 labels is normal, across 2 is a problem worth seeing.
+      labelsBought: Number(totals.bought || 0),
+      labelsVoided: Number(totals.voided || 0),
+      labelsTest: Number(totals.test_count || 0),
       shipments: r.rows.map((x) => ({
         id: x.id, num: x.seq ? '#' + x.seq : x.id,
         customer: x.customer || null, state: x.state || null,

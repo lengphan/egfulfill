@@ -5,6 +5,7 @@ import { MagnifyingGlass, CircleNotch, ArrowSquareOut, Package, ArrowClockwise, 
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
 import { SectionCard } from "@/components/app/section-card"
+import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getShipments, refreshTracking, voidLabel, type ShipmentRow } from "@/lib/api"
@@ -76,6 +77,10 @@ export function ShipmentsView() {
   const [spend, setSpend] = useState(0)
   const [refunded, setRefunded] = useState(0)
   const [testSpend, setTestSpend] = useState(0)
+  // All-time totals off the ledger, kept apart from `rows` on purpose: the list is capped
+  // at 200 and narrowed by the search box, so summing what's on screen would quietly report
+  // a different number depending on what you last typed.
+  const [tally, setTally] = useState({ bought: 0, voided: 0, test: 0 })
   const [status, setStatus] = useState("all")
   const [q, setQ] = useState("")
   const [busy, setBusy] = useState(false)
@@ -87,7 +92,12 @@ export function ShipmentsView() {
     if (!getUser()) { setRows([]); return }
     setBusy(true)
     getShipments({ search: search?.trim() || undefined, limit: 300 })
-      .then((r) => { setRows(r.shipments ?? []); setSpend(r.labelSpend ?? 0); setRefunded(r.labelRefunded ?? 0); setTestSpend(r.labelSpendTest ?? 0); setErr(null) })
+      .then((r) => {
+        setRows(r.shipments ?? [])
+        setSpend(r.labelSpend ?? 0); setRefunded(r.labelRefunded ?? 0); setTestSpend(r.labelSpendTest ?? 0)
+        setTally({ bought: r.labelsBought ?? 0, voided: r.labelsVoided ?? 0, test: r.labelsTest ?? 0 })
+        setErr(null)
+      })
       .catch((e: Error) => { setErr(e.message); setRows([]) })
       .finally(() => setBusy(false))
   }, [])
@@ -165,8 +175,46 @@ export function ShipmentsView() {
     }
   }, [rows])
 
+  const money = (n: number) => `$${n.toFixed(2)}`
+  // Real spend is gross minus the test slice. The subtraction happens HERE rather than in
+  // the ledger query, so the number on the tile can be the one you actually paid while the
+  // ledger keeps saying what it has always said. Both stay true; neither is edited.
+  const realSpend = Math.max(0, spend - testSpend)
+
   return (
     <>
+    {/* The tiles that used to be a parenthetical. Bought and refunded are the pair someone
+        checks — a spend figure with no volume behind it can't be sanity-checked, and a
+        refund total with no count doesn't say whether it was one void or ten. Each tile
+        that names a slice of the table below it filters to that slice when clicked. */}
+    <StatGrid>
+      <StatCard
+        label="Labels bought"
+        value={String(tally.bought)}
+        sub={tally.bought ? `${money(spend)} recorded` : "none recorded yet"}
+      />
+      <StatCard
+        label="Label spend"
+        value={money(realSpend)}
+        sub={testSpend > 0 ? `plus ${money(testSpend)} on a test key` : "actually charged"}
+      />
+      <StatCard
+        label="Refunded"
+        value={money(refunded)}
+        sub={tally.voided ? `${tally.voided} label${tally.voided === 1 ? "" : "s"} voided` : "nothing voided"}
+        tone={refunded > 0 ? "pos" : "mut"}
+        onClick={tally.voided ? () => setStatus("refunded") : undefined}
+        active={status === "refunded"}
+      />
+      <StatCard
+        label="Test labels"
+        value={String(tally.test)}
+        sub={tally.test ? `${money(testSpend)}, never charged` : "none — all live"}
+        onClick={tally.test ? () => setStatus("test") : undefined}
+        active={status === "test"}
+      />
+    </StatGrid>
+
     <SectionCard
       title="Shipments"
       actions={
@@ -181,31 +229,9 @@ export function ShipmentsView() {
             {counts.stuck > 0 && ` · ${counts.stuck} not collected`}
             {counts.problem > 0 && ` · ${counts.problem} need attention`}
           </span>
-          {spend > 0 && (
-            <span className="text-xs">
-              <span className="text-muted-foreground">Label spend </span>
-              <span className="font-semibold tabular-nums">${spend.toFixed(2)}</span>
-              {/* Named, not deducted. The ledger is append-only and these rows are settled,
-                  so a total that quietly subtracted them would reconcile against nothing.
-                  Saying how much of it was never charged lets the real figure be read
-                  without either number being false. */}
-              {testSpend > 0 && (
-                <span className="text-muted-foreground">
-                  {" "}(<span className="tabular-nums">${testSpend.toFixed(2)}</span> on a test key, never charged)
-                </span>
-              )}
-              {/* Only when there IS one. "refunded $0.00" beside every total is a column of
-                  zeroes pretending to be information, and it buries the case that matters. */}
-              {refunded > 0 && (
-                <>
-                  <span className="text-muted-foreground"> · refunded </span>
-                  <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">${refunded.toFixed(2)}</span>
-                  <span className="text-muted-foreground"> · net </span>
-                  <span className="font-semibold tabular-nums">${(spend - refunded).toFixed(2)}</span>
-                </>
-              )}
-            </span>
-          )}
+          {/* The money was crammed in here as a parenthetical beside the row count, which is
+              how a figure someone checks daily ended up smaller than the search placeholder.
+              It has its own tiles above the table now. */}
           <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows || rows.length === 0}>
             <DownloadSimple size={14} weight="bold" /> Export CSV
           </Button>
