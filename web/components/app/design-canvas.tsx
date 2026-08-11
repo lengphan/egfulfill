@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
+import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
@@ -722,15 +723,22 @@ export function DesignCanvasDialog({
    * a seller simply gets nothing here rather than a factory lane name.
    */
   const [boardCard, setBoardCard] = useState<OrderDesignCard | null>(null)
+  /** The partner send, for print methods. A dialog rather than an inline form because it
+   *  asks for Pink's own fields (product type, design type, board) that mean nothing here. */
+  const [pinkOpen, setPinkOpen] = useState(false)
+  /** Re-read this line's board card. Exposed so a partner push can refresh the subtitle
+   *  without a second copy of the query. */
+  const loadCards = useCallback(() => {
+    if (!isStaff) return
+    getOrderDesignCards(orderId)
+      .then((cards) => setBoardCard(cardForLine(cards ?? [], { line_id: item.line_id, sku: item.sku }) ?? null))
+      .catch(() => setBoardCard(null))
+  }, [isStaff, orderId, item.line_id, item.sku])
   useEffect(() => {
-    if (!open || !isStaff) return
-    const t = setTimeout(() => {
-      getOrderDesignCards(orderId)
-        .then((cards) => setBoardCard(cardForLine(cards ?? [], { line_id: item.line_id, sku: item.sku }) ?? null))
-        .catch(() => setBoardCard(null))
-    }, 0)
+    if (!open) return
+    const t = setTimeout(loadCards, 0)
     return () => clearTimeout(t)
-  }, [open, isStaff, orderId, item.line_id, item.sku])
+  }, [open, loadCards])
 
   // Put THIS line on the design board. Reuses createDesignCard + assignDesignCard, the same
   // pair the digitizer uses — the card carries the line's own artwork and sku so it lands
@@ -1386,7 +1394,7 @@ export function DesignCanvasDialog({
                     title={designUrl ? undefined : "Add an image first — a designer needs something to work from"}
                     onClick={() => void sendToBoard()}
                   >
-                    {sending ? "Sending…" : "Send to a designer"}
+                    {sending ? "Sending…" : "Send to Board"}
                   </Button>
                 )}
                 {/* DOWNLOAD. The file could be attached, named and confirmed here with no way
@@ -1437,6 +1445,39 @@ export function DesignCanvasDialog({
 </div>
               {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
             </div>
+            )}
+            {/* 2, THE OTHER HALF — print methods go to the PARTNER, not our board.
+                Our designers digitise; DTG/DTF is print artwork and Pink Design does it.
+                That split is already recorded on every card (`vendor` — "our designers do
+                embroidery, so DTG/DTF goes out"); this is the button that acts on it.
+                A DTG line used to get an embroidery step it had no use for, and once that
+                was gated off it had no route to a designer at all.
+                Staff only, like its embroidery counterpart: opening a partner task spends
+                money, and the person being charged must not be the one who spends it. */}
+            {!isEmb && isStaff && (
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-2.5">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-background text-2xs font-bold text-muted-foreground">2</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium">Print artwork</div>
+                    <div className="truncate text-2xs text-muted-foreground">
+                      {boardCard
+                        ? `On the board · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
+                        : "Our designers do embroidery — print work goes to Pink Design"}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Button
+                    size="sm"
+                    disabled={!designUrl}
+                    title={designUrl ? undefined : "Add an image first — the partner needs something to work from"}
+                    onClick={() => setPinkOpen(true)}
+                  >
+                    Send to Pink Design
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
           {/* LAST, because it is a shortcut rather than a decision: "do this line" is the
@@ -1651,6 +1692,20 @@ export function DesignCanvasDialog({
         </div>
         </div>
         <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }} />
+        {/* The partner route for print methods. Anchored to the LINE (orderId + sku), which
+            pushToPink accepts directly — no board card has to exist first, so this is one
+            click rather than "create a card, then push the card". */}
+        <PushToPartnerDialog
+          open={pinkOpen}
+          onOpenChange={setPinkOpen}
+          orderId={orderId}
+          sku={item.sku || undefined}
+          itemName={item.name}
+          qty={item.qty}
+          printType={item.print_type}
+          artworkUrl={designUrl || undefined}
+          onPushed={() => { setPinkOpen(false); void loadCards() }}
+        />
       </DialogContent>
     </Dialog>
   )
