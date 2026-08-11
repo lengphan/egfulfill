@@ -12,14 +12,60 @@ import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
 import { decodeEntities, usd } from "@/lib/order-format"
-import { matchThreadColors, nearestThread, hexToRgb, matchThreadRegions, canvasReadableSrc, type Thread, type ThreadRegion } from "@/lib/thread-match"
+import { matchThreadColors, nearestThread, nearestThreads, matchQuality, hexToRgb, matchThreadRegions, canvasReadableSrc, type Thread, type ThreadRegion } from "@/lib/thread-match"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
-import { Eyedropper, MapPinSimple } from "@phosphor-icons/react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Eyedropper } from "@phosphor-icons/react"
 
 export type Pos = { x: number; y: number; w: number; r: number }
 export type TextLayer = { id: string; text: string; x: number; y: number; size: number; r: number; color: string; bold?: boolean }
 export const DEFAULT_POS: Pos = { x: 50, y: 50, w: 45, r: 0 }
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+
+/**
+ * The colour picker for one part of a design — a dropdown that SHOWS the colours.
+ *
+ * A native `<select>` cannot, which is the whole reason the swatches used to live in a
+ * separate chip row above: "Orange 434342 · Black 000000" sat in one place and
+ * "434342 · Orange (closest)" in another, and the reader had to pair them up by eye to
+ * learn anything. One list, with the swatch on the button and on every option, says the
+ * same thing once. Module-level, not defined inside the panel: `react-hooks/static-components`.
+ *
+ * `options` arrives nearest-first from the matcher, so index 0 is the suggestion and the
+ * rest are the alternatives — labelled "best match" rather than "(closest)", which read as
+ * a measurement a seller was expected to trust rather than a suggestion they can overrule.
+ */
+function ThreadSelect({ value, options, onChange }: {
+  value: string
+  options: Thread[]
+  onChange: (code: string) => void
+}) {
+  const current = options.find((o) => o.code === value) ?? options[0]
+  if (!current) return null
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex h-8 w-full min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+        <span className="size-3.5 shrink-0 rounded-full border border-black/15" style={{ background: current.hex }} />
+        <span className="truncate font-medium">{current.name}</span>
+        <span className="shrink-0 font-mono text-3xs text-muted-foreground">{current.code}</span>
+        <CaretDown size={11} weight="bold" className="ml-auto shrink-0 text-muted-foreground" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-64 min-w-56 overflow-y-auto">
+        {options.map((o, i) => (
+          <DropdownMenuItem key={o.code} onClick={() => onChange(o.code)} className="gap-1.5 text-xs">
+            <span className="size-3.5 shrink-0 rounded-full border border-black/15" style={{ background: o.hex }} />
+            <span className="truncate">{o.name}</span>
+            {i === 0 && (
+              <span className="shrink-0 rounded bg-muted px-1 py-px text-3xs font-medium text-muted-foreground">best match</span>
+            )}
+            <span className="ml-auto shrink-0 font-mono text-3xs text-muted-foreground">{o.code}</span>
+            {o.code === value && <Check size={12} weight="bold" className="shrink-0 text-primary" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 // Reusable place/size/rotate surface — used by the order customizer, the studio, and the
 // full maker. Renders a mockup + a draggable image layer + optional draggable text layers.
@@ -452,10 +498,11 @@ export function DesignCanvasDialog({
   const isEmb = /emb/i.test(String(item.print_type || ""))
   const [threads, setThreads] = useState<Thread[]>([])
   const [picking, setPicking] = useState(false)
-  // The thread MAP: which cone covers which part. Off by default (the chip row is the
-  // at-a-glance answer); computed only when opened, and never persisted — the crops are
-  // derived from artwork we already hold.
-  const [mapOpen, setMapOpen] = useState(false)
+  // The thread MAP: which colour covers which part. ALWAYS on now — it was behind a "Map"
+  // toggle next to a row of colour chips, which is two ways of saying the same thing where
+  // only one of them (the crop + the dropdown) can actually be acted on. The chips were the
+  // toggle's whole justification and they are gone, so there is nothing left to switch
+  // between. Still never persisted — the crops derive from artwork we already hold.
   const [regions, setRegions] = useState<ThreadRegion[] | null>(null)
   // The cone chosen for each sampled colour, keyed by the ARTWORK hex. The auto-match
   // is only a suggestion — the nearest cone by maths is not always the one you want on
@@ -502,14 +549,22 @@ export function DesignCanvasDialog({
   // Eyedropper: a sampled pixel → its nearest in-stock thread, appended (deduped) so the
   // operator can add a colour the auto-match missed. One pick, then the tool turns off.
   useEffect(() => {
-    if (!mapOpen || !designUrl) return
     let alive = true
+    // Deferred, like the cone list above: a synchronous setState in an effect body
+    // cascades a render before paint (react-hooks/set-state-in-effect).
     const id = setTimeout(() => {
+      if (!alive) return
       setRegions(null)
-      matchThreadRegions(designUrl).then((r) => { if (alive) setRegions(r) }).catch(() => { if (alive) setRegions([]) })
+      if (!isEmb || !designUrl) return
+      // Same order as the cone list above: the factory's real stock first, or the rows
+      // would offer colours nobody has on a shelf and then quietly re-match under them.
+      loadThreadPalette()
+        .then(() => matchThreadRegions(designUrl))
+        .then((r) => { if (alive) setRegions(r) })
+        .catch(() => { if (alive) setRegions([]) })
     }, 0)
     return () => { alive = false; clearTimeout(id) }
-  }, [mapOpen, designUrl])
+  }, [isEmb, designUrl])
 
   // The eyedropper adds the nearest cone and says nothing about how near it is.
   //
@@ -523,6 +578,24 @@ export function DesignCanvasDialog({
     const { r, g, b } = hexToRgb(hex)
     const t = nearestThread(r, g, b)
     if (t) setThreads((prev) => (prev.some((x) => x.code === t.code) ? prev : [...prev, t]))
+    // AND a row for it. The chip row used to be the only place a picked colour appeared;
+    // with the chips gone, a pick that only bumped a counter would look like nothing had
+    // happened — and it would be unchangeable, since the dropdowns are per row. No crop
+    // (we sampled one pixel, not a region), so the row shows a solid block of the colour,
+    // which the renderer already falls back to.
+    if (t) {
+      const opts = nearestThreads(r, g, b, 6)
+      setRegions((prev) => {
+        const rows = prev ?? []
+        if (rows.some((o) => o.srcHex.toLowerCase() === hex.toLowerCase())) return rows
+        return [...rows, {
+          thread: t,
+          options: opts.some((o) => o.code === t.code) ? opts : [t, ...opts],
+          srcHex: hex, pct: 0, box: { x: 0, y: 0, w: 0, h: 0 }, swatch: "",
+          ...matchQuality(r, g, b, t),
+        }]
+      })
+    }
     setPicking(false)
   }
   const [err, setErr] = useState<string | null>(null)
@@ -722,7 +795,7 @@ export function DesignCanvasDialog({
       // success line, no fee explainer.
       setAttached(isStaff
         ? `${f.name} filed as the machine file. Add an image too so it shows on the mockup.`
-        : `Machine file uploaded — ${f.name}.`)
+        : `Embroidery file added — ${f.name}.`)
     } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
   }, [orderId, item.line_id, item.sku, isStaff])
 
@@ -998,103 +1071,91 @@ export function DesignCanvasDialog({
             read-out belongs. */}
         {isEmb && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                Thread match {threads.length ? `· ${threads.length} cone${threads.length === 1 ? "" : "s"}` : ""}
-              </span>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                {/* Count the ROWS, not the saved cone list. They are not the same number:
+                    the cone list keeps the background colour the region pass discards, so
+                    the header read "· 4" over three rows — a count of something the reader
+                    cannot see is worse than no count. */}
+                <div className="text-xs font-medium text-foreground">
+                  Thread colours {regions?.length ? `· ${regions.length}` : ""}
+                </div>
+                {/* Says what the seller is looking at and what it is FOR, in their words.
+                    "Thread match · 2 cones" was a factory read-out: a cone is a spool on our
+                    machine, not something they bought. */}
+                <div className="text-3xs text-muted-foreground">
+                  We embroider your design in these colours — change any that look wrong.
+                </div>
+              </div>
               {designUrl && (
-                <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setMapOpen((v) => !v)}
-                  title="Show which cone covers which part of the design"
-                  className={"inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors " + (mapOpen ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}
-                >
-                  <MapPinSimple size={13} weight="bold" /> Map
-                </button>
                 <button
                   type="button"
                   onClick={() => setPicking((v) => !v)}
-                  title="Eyedropper — then click the design to sample a colour and add its nearest thread"
-                  className={"inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors " + (picking ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}
+                  title="Click this, then click anywhere on your design to add that colour"
+                  className={"inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors " + (picking ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}
                 >
-                  <Eyedropper size={13} weight="bold" /> {picking ? "Click the design…" : "Pick"}
+                  <Eyedropper size={13} weight="bold" /> {picking ? "Click your design…" : "Add a colour"}
                 </button>
-                </div>
               )}
             </div>
-            {threads.length === 0 ? (
-              <div className="text-xs text-muted-foreground/70">
-                {!designUrl ? "Upload artwork to match embroidery threads."
-                  : threadErr ? "Couldn't read this artwork's colours — pick them with the eyedropper instead."
-                  : "Reading colours…"}
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {threads.map((t) => (
-                  <span key={t.code} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-0.5 pl-1 pr-2 text-xs">
-                    <span className="size-4 shrink-0 rounded-full border border-black/15" style={{ background: t.hex }} />
-                    <span className="font-medium">{t.name}</span>
-                    <span className="font-mono text-3xs text-muted-foreground">{t.code}</span>
-                  </span>
-                ))}
-              </div>
-            )}
 
-            {/* The map. Each row is a crop of the artwork taken from where that colour
-                actually sits — the half a digitiser was previously guessing at. */}
+            {/* The map, always on. Each row is a crop of the artwork taken from where that
+                colour actually sits — the half a digitiser was previously guessing at — beside
+                the dropdown that changes it. */}
             {/* The eyedropper's "not a real match" banner is gone too, for the same reason as
                 the per-row warning: it judged the sample against a 16-colour palette that does
                 not describe the cones actually on the floor, so it cried wolf about colours we
-                stock. The cone is added and shown; the human picks a different one if it is
+                stock. The colour is added and shown; the human picks a different one if it is
                 wrong. */}
-            {mapOpen && (
-              <div className="mt-2 rounded-md border border-border bg-card">
-                {regions === null ? (
-                  <div className="px-3 py-4 text-center text-xs text-muted-foreground">Reading the artwork…</div>
-                ) : regions.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                    Couldn&apos;t read this artwork&apos;s colours — use the eyedropper instead.
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {regions.map((r) => (
-                      <div key={r.thread.code} className="flex items-center gap-2.5 px-2.5 py-2">
-                        {r.swatch ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={r.swatch} alt={`Detail using ${r.thread.name}`} className="size-14 shrink-0 rounded border border-border object-cover" />
-                        ) : (
-                          <span className="size-14 shrink-0 rounded border border-border" style={{ background: r.srcHex }} />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          {/* THE CROP AND THE CONE, nothing else.
-                              The hex, the sampled percentage, the two colour dots and the
-                              "no close match" warning have all gone. Every one of them was a
-                              claim about a 16-cone palette that does not describe the stock
-                              actually on the floor — a colour we hold but the palette has
-                              never heard of was reported as "no close match", which is worse
-                              than saying nothing. The crop on the left already shows the
-                              colour truthfully, straight from the artwork, and the dropdown
-                              is where the human decides. */}
-                          <div className="flex items-center gap-1.5">
-                            <select
-                              value={picks[r.srcHex] ?? r.thread.code}
-                              onChange={(e) => chooseThread(r, e.target.value)}
-                              className="eg-select h-7 min-w-0 flex-1 rounded-md border border-border bg-card px-1.5 text-2xs"
-                              title="Choose the cone for this colour"
-                            >
-                              {r.options.map((o, i) => (
-                                <option key={o.code} value={o.code}>
-                                  {o.code} · {o.name}{i === 0 ? " (closest)" : ""}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
+            {!designUrl ? (
+              <div className="text-xs text-muted-foreground/70">Add your image above and we&apos;ll pick the thread colours for it.</div>
+            ) : regions === null ? (
+              <div className="rounded-md border border-border bg-card px-3 py-4 text-center text-xs text-muted-foreground">Reading the colours in your image…</div>
+            ) : regions.length === 0 ? (
+              <div className="rounded-md border border-border bg-card px-3 py-4 text-center text-xs text-muted-foreground">
+                {/* Which of the two it is, not one message for both: "we couldn't open it"
+                    is a different problem for the seller than "we opened it and found
+                    nothing". */}
+                {threadErr
+                  ? "We couldn't open this image to read its colours — use “Add a colour” to pick them yourself."
+                  : "We didn't find any solid colours in this image — use “Add a colour” to pick them yourself."}
+              </div>
+            ) : (
+              <div className="rounded-md border border-border bg-card">
+                <div className="divide-y divide-border">
+                  {/* Keyed on the ARTWORK colour, not the cone: two colours can be sent to
+                      the same cone by an override, and keying on the cone made them collide
+                      into one row. srcHex is what `picks` is keyed on too. */}
+                  {regions.map((r) => (
+                    <div key={r.srcHex} className="flex items-center gap-2.5 px-2.5 py-2">
+                      {r.swatch ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={r.swatch} alt={`The part of your design in ${r.thread.name}`} className="size-14 shrink-0 rounded border border-border object-cover" />
+                      ) : (
+                        <span className="size-14 shrink-0 rounded border border-border" style={{ background: r.srcHex }} />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        {/* THE CROP AND THE COLOUR, nothing else.
+                            The hex, the sampled percentage and the "no close match" warning
+                            have all gone. Every one of them was a claim about a 16-cone
+                            palette that does not describe the stock actually on the floor — a
+                            colour we hold but the palette has never heard of was reported as
+                            "no close match", which is worse than saying nothing. The crop on
+                            the left already shows the colour truthfully, straight from the
+                            artwork, and the dropdown is where the human decides.
+                            The swatch that used to sit in a chip row above now rides INSIDE
+                            the dropdown — on its button and on every option — so the colour
+                            is beside the choice it belongs to instead of in a separate list
+                            the reader has to pair up by eye. */}
+                        <ThreadSelect
+                          value={picks[r.srcHex] ?? r.thread.code}
+                          options={r.options}
+                          onChange={(code) => chooseThread(r, code)}
+                        />
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1163,8 +1224,10 @@ export function DesignCanvasDialog({
                   {designUrl ? <Check size={12} weight="bold" /> : "1"}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium">Design image</div>
-                  <div className="text-2xs text-muted-foreground">{designUrl ? "Added — shows on the mockup" : "The artwork we print / embroider"}</div>
+                  <div className="text-sm font-medium">Your design</div>
+                  {/* Plain words, seller's point of view. "The artwork we print / embroider"
+                      described OUR job; a seller is deciding what goes on the product. */}
+                  <div className="text-2xs text-muted-foreground">{designUrl ? "Added — drag it on the preview to move it" : "The picture that goes on the product"}</div>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1179,16 +1242,30 @@ export function DesignCanvasDialog({
                   {hasMachineFile ? <Check size={12} weight="bold" /> : "2"}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium">Machine file</div>
+                  {/* "Machine file" is our word for it. Every format this step accepts is an
+                      embroidery format (MACHINE_EXT_LIST), so naming it that is both plainer
+                      and more accurate. */}
+                  {/* Optional for a SELLER — we cut it for them — but not for staff, who
+                      cannot make the line without it. So the word only appears for the
+                      reader it is true for. */}
+                  <div className="text-sm font-medium">
+                    Embroidery file{!isStaff && <span className="font-normal text-muted-foreground"> (optional)</span>}
+                  </div>
                   {/* This one line carries the whole state of the step, including "a
                       designer has it" — which is why there is no longer a separate board
-                      strip underneath competing to say the same thing. */}
+                      strip underneath competing to say the same thing.
+                      Two audiences read it. Staff need the lane and who claimed it, because
+                      that is how they chase the card; a seller needs to know it is being
+                      handled and nothing more — the lane names are our internal board, and
+                      a designer's name is not theirs to be given. */}
                   <div className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || undefined}>
                     {hasMachineFile
-                      ? (latestMachine ? `${latestMachine.name} — ready to make` : "Added — ready to make")
-                      : boardCard ? `With a designer · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
-                      : designUrl ? "Not cut yet — attach one, or send the image to a designer"
-                      : "The stitch file — .emb / .pes / .dst …"}
+                      ? (latestMachine ? `${latestMachine.name} — ready to stitch` : "Added — ready to stitch")
+                      : boardCard ? (isStaff
+                          ? `With a designer · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
+                          : "Our design team is preparing it")
+                      : designUrl ? "We make this for you — or attach your own"
+                      : "Only if you already have one (.emb, .pes, .dst…)"}
                   </div>
                 </div>
               </div>
@@ -1442,33 +1519,41 @@ export function DesignCanvasDialog({
                 </span>
               ) : threads.length >= 6 ? (
                 <span className="text-muted-foreground">
-                  <span className="font-medium text-foreground">Design fee being calculated…</span> Your artwork is detailed ({threads.length} colours), so we&apos;ll confirm the quote before charging.
+                  <span className="font-medium text-foreground">Design fee being calculated…</span> Your design has a lot of detail ({threads.length} colours), so we&apos;ll send you the price to approve before anything is charged.
                 </span>
               ) : (
                 <span className="text-muted-foreground">
-                  <span className="font-medium text-foreground">Standard design fee{fees?.standard ? ` · ${usd(fees.standard)}` : ""}</span> — we&apos;ll make the print file from your artwork.
+                  {/* Explicit {" "}: the leading space of the next text node was being eaten,
+                      printing "design fee— we'll". */}
+                  <span className="font-medium text-foreground">Standard design fee{fees?.standard ? ` · ${usd(fees.standard)}` : ""}</span>{" "}
+                  — we&apos;ll prepare your design for the machine.
                 </span>
               )}
             </div>
           )}
 
-          {/* The reason sits ABOVE the buttons, not beside them. Inline in a 380px rail it
-              pushed Cancel and Save onto separate lines, which read as two unrelated controls
-              rather than one choice. */}
-          <div className="space-y-2">
-            {/* Say WHY Save is disabled. A machine file without an image is the common case —
-                the stitch file is saved, but there's no picture to place on the mockup yet. */}
-            {!designUrl && (
-              <p className="text-xs text-muted-foreground">
-                {hasMachineFile
-                  ? "Add an image so your file shows in the right spot on the product mockup."
-                  : "Add artwork above to save this design."}
-              </p>
-            )}
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button onClick={() => void save()} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
-            </div>
+        </div>
+        {/* The reason sits ABOVE the buttons, not beside them. Inline in a 380px rail it
+            pushed Cancel and Save onto separate lines, which read as two unrelated controls
+            rather than one choice. */}
+        {/* order-last, and AFTER the thread panel in the markup so it lands after it: two
+            children carrying the same order value keep document order. Save used to sit
+            mid-column with the thread panel below it — survivable when that panel was one
+            row of chips, plainly wrong now it is a list of rows you can change. Nothing is
+            below the button that ends the job. */}
+        <div className="order-last space-y-2">
+          {/* Say WHY Save is disabled. A machine file without an image is the common case —
+              the stitch file is saved, but there's no picture to place on the mockup yet. */}
+          {!designUrl && (
+            <p className="text-xs text-muted-foreground">
+              {hasMachineFile
+                ? "Add an image so we can show where your file sits on the product."
+                : "Add your design above, then save."}
+            </p>
+          )}
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={() => void save()} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
           </div>
         </div>
         </div>
