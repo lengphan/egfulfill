@@ -374,20 +374,6 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   /** Back — to the stored path, never history. See lib/publish-draft.ts. */
   const leave = () => router.push(returnTo)
 
-  /**
-   * Tell SpyDeck what we published, from here.
-   *
-   * In the dialog this was an `onPublished` prop: SpyDeck held the competitor listing in
-   * state and recorded the upload against it. A page has no parent to call, so the source
-   * listing travels in the draft and the record is written here instead — the same
-   * server-side call SpyDeck made, so the Uploaded card is there when you go back.
-   */
-  const onPublished = (url?: string, primaryImage?: string, published?: PublishedRecord) => {
-    if (!source) return
-    const merged = primaryImage ? { ...source, image: primaryImage, thumb: primaryImage } : source
-    recordSpydeckUpload(merged, { url, listing_id: published?.listing_id, published }).catch(() => {})
-  }
-
   // The page resolves a picked blank itself rather than asking each caller for a
   // lookup — the combobox hands back a flattened shape, and pricing needs the full row.
   const catalogRef = useRef<CatalogProduct[]>([])
@@ -735,6 +721,10 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       }
       onPublished?.(undefined, images[0], {
         platform: "tiktok",
+        // TikTok's own id for the draft. It was dropped, which is how this destination came
+        // to write an upload record with no listing id at all — and, before the coalesce on
+        // the server, to erase whatever Etsy had put there.
+        listing_id: r.product_id ?? undefined,
         title: title.trim(), price: basePrice, image: images[0],
         state: "draft",
         blank_sku: blank?.sku ?? undefined, blank_name: blank?.name ?? undefined,
@@ -918,6 +908,48 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * the same nine images at once is how a rate limit turns one slow publish into three
    * failed ones.
    */
+  /**
+   * Tell SpyDeck what we published, from here.
+   *
+   * DECLARED HERE, not at the top of the component, because it reads the form's state —
+   * title, tags, images, blank, the picked axes. A closure sitting above its own
+   * dependencies reads to React Compiler as "these may be modified later", and it answers
+   * by refusing to memoise the whole component.
+   *
+   * In the dialog this was an `onPublished` prop: SpyDeck held the competitor listing in
+   * state and recorded the upload against it. A page has no parent to call, so the source
+   * listing travels in the draft and the record is written here instead — the same
+   * server-side call SpyDeck made, so the Uploaded card is there when you go back.
+   */
+  const onPublished = (url?: string, primaryImage?: string, published?: PublishedRecord) => {
+    if (!source) return
+    const merged = primaryImage ? { ...source, image: primaryImage, thumb: primaryImage } : source
+    // THE FORM ITSELF, sent with every destination and identical each time.
+    //
+    // Reopening a published listing used to rebuild the form from published_listings, which
+    // is written per platform and carries different fields on each — TikTok's row has no
+    // title, description or tags at all. Publishing to three shops therefore produced three
+    // writes of this record, and whichever ran last decided what you got back. That is why
+    // the form came up empty: TikTok finished last, so its row (and its absent url) is what
+    // the Uploaded card joined to.
+    //
+    // One key, one shape, written the same way by every destination, so the answer no longer
+    // depends on which shop was slowest.
+    recordSpydeckUpload(merged, {
+      url, listing_id: published?.listing_id, published,
+      // COPIES, not the state arrays themselves. Handing the live references to a function
+      // the compiler can't see into reads as "these may be mutated later", which makes
+      // React Compiler give up memoising this whole component.
+      submitted: {
+        title: title.trim(), description: desc, tags: [...tags], price: basePrice,
+        images: [...images],
+        colors: blank ? [...pickedColors] : [], sizes: blank ? [...pickedSizes] : [],
+        blank_sku: blank?.sku ?? undefined, print_type: method || undefined,
+        design_id: prefill?.designId, design_data: prefill?.designUrl, design_pos: prefill?.designPos,
+      },
+    }).catch(() => {})
+  }
+
   const publish = async () => {
     if (!title.trim() || !priceReady) {
       // Say WHICH is missing, and — when it's the price — name the two ways to supply it,

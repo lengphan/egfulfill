@@ -685,7 +685,7 @@ export function spydeckRoutes(app, requireAuth) {
       const d = row.data || {};
       // `published` rides inside data (the POST folds it in) — lift it to the top level so
       // the client doesn't have to know where it was stored.
-      const { published, ...source } = d;
+      const { published, submitted, ...source } = d;
       // design_* rides along so the card can REOPEN the publish dialog with the artwork
       // already attached. Without it a re-publish would produce a listing with the right
       // blank and variants and no design on it, which is worse than not offering the button.
@@ -711,7 +711,7 @@ export function spydeckRoutes(app, requireAuth) {
       return {
         ...source, listing_id: row.listing_id,
         our_listing_id: row.our_listing_id, our_url: row.url, uploaded_at: row.created_at,
-        published: published || undefined, product,
+        published: published || undefined, submitted: submitted || undefined, product,
       };
     });
   });
@@ -726,11 +726,31 @@ export function spydeckRoutes(app, requireAuth) {
     // things, and flattening them is exactly how a competitor's figures end up read as ours.
     const source = b.data ? { ...b.data } : { ...b };
     if (b.published && typeof b.published === 'object') source.published = b.published;
+    // The form as it was sent. One key, written once per destination with identical
+    // contents, so it survives whichever shop finishes last — unlike published_listings,
+    // which is per platform and carries different fields on each.
+    if (b.submitted && typeof b.submitted === 'object') source.submitted = b.submitted;
     await q(
+      /**
+       * A LATER SHOP MUST NOT ERASE AN EARLIER ONE.
+       *
+       * One publish run now writes this row once per destination, and the row has a single
+       * our_listing_id/url. TikTok has neither — its publish returns no listing url — so
+       * whenever it ran last it overwrote Etsy's id and url with NULL, and the Uploaded
+       * card lost the only key that joins it back to published_listings. That is why
+       * reopening a listing published to three shops showed an empty form: the words were
+       * stored correctly on three rows and nothing could reach them.
+       *
+       * coalesce keeps the first real answer. `data` is merged rather than replaced for the
+       * same reason — each destination sends the same submitted form plus its own result,
+       * and a plain overwrite would drop whatever the previous one had learned.
+       */
       `insert into spydeck_uploads (seller_id, listing_id, our_listing_id, url, data)
        values ($1,$2,$3,$4,$5)
        on conflict (seller_id, listing_id) do update set
-         our_listing_id=excluded.our_listing_id, url=excluded.url, data=excluded.data`,
+         our_listing_id=coalesce(excluded.our_listing_id, spydeck_uploads.our_listing_id),
+         url=coalesce(excluded.url, spydeck_uploads.url),
+         data=coalesce(spydeck_uploads.data, '{}'::jsonb) || excluded.data`,
       [String(req.user.sub), listingId,
        b.our_listing_id != null ? String(b.our_listing_id) : null,
        b.url ? String(b.url) : null,

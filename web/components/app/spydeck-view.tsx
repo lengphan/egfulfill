@@ -704,21 +704,33 @@ export function SpyDeckView() {
     if (!editing) return
     const l = editing
     const id = setTimeout(() => {
+      /**
+       * `submitted` FIRST — it is the form as it was sent, written once and identically by
+       * every destination. Everything after it is reassembly from per-platform rows, which
+       * is what made this unreliable: those rows differ by shop (TikTok's carries no title,
+       * description or tags), so the answer depended on which shop finished last.
+       *
+       * The fallbacks stay for every listing published before this was recorded.
+       */
+      const sub = l.l.submitted
       const draftId = stashPublishDraft({
         prefill: {
-          title: l.l.product?.title || l.l.published?.title || l.l.title,
-          description: l.l.product?.description || "",
-          price: l.l.published?.price ?? undefined,
-          tags: l.l.product?.tags ?? [],
+          title: sub?.title || l.l.product?.title || l.l.published?.title || l.l.title,
+          description: sub?.description || l.l.product?.description || "",
+          price: sub?.price ?? l.l.published?.price ?? undefined,
+          tags: sub?.tags ?? l.l.product?.tags ?? [],
           // published_listings keeps only the FIRST colour/size, so the full axes come from
           // the publish blob, falling back to the single columns for older rows.
-          colors: l.l.published?.colors ?? (l.l.product?.color ? [l.l.product.color] : []),
-          sizes: l.l.published?.sizes ?? (l.l.product?.size ? [l.l.product.size] : []),
-          images: l.images,
+          colors: sub?.colors ?? l.l.published?.colors ?? (l.l.product?.color ? [l.l.product.color] : []),
+          sizes: sub?.sizes ?? l.l.published?.sizes ?? (l.l.product?.size ? [l.l.product.size] : []),
+          // The photos we SENT, when we still have their urls. A photo picked off the
+          // seller's machine was a data: URL and is deliberately not persisted, so those
+          // come back from the shop's own listing instead (startEdit fetches them).
+          images: sub?.images?.length ? sub.images : l.images,
           blank: l.blank,
-          designUrl: l.l.product?.design_data || undefined,
-          designPos: l.l.product?.design_pos ?? undefined,
-          designId: l.l.product?.design_id ?? undefined,
+          designUrl: sub?.design_data || l.l.product?.design_data || undefined,
+          designPos: sub?.design_pos ?? l.l.product?.design_pos ?? undefined,
+          designId: sub?.design_id ?? l.l.product?.design_id ?? undefined,
         },
         source: l.l,
         returnTo: "/spydeck",

@@ -2709,6 +2709,9 @@ export type PublishedRecord = {
 }
 export type UploadedListing = EtsyListing & {
   uploaded_at?: string
+  /** The form as it was sent — the whole of it, from one write. Preferred over `product`
+   *  when reopening, because that one is reassembled from per-platform rows. */
+  submitted?: SubmittedListing
   our_listing_id?: string
   our_url?: string
   /** Sent by the publish dialog at upload time. */
@@ -2742,9 +2745,37 @@ const KEEP_INLINE_MAX = 64 * 1024
 const persistableImage = (u?: string | null) =>
   (u && u.startsWith("data:") && u.length > KEEP_INLINE_MAX) ? undefined : (u ?? undefined)
 
+/**
+ * WHAT WAS ON THE FORM WHEN SEND WAS PRESSED.
+ *
+ * Kept whole, on the upload row, so reopening a listing restores what you typed rather than
+ * what three per-platform rows can be reassembled into. Those rows are written per shop and
+ * per shop they differ — TikTok's carries no title, description or tags at all — so the
+ * answer to "show me what I sent" was whichever destination happened to run last.
+ *
+ * Photos are URLs only. A photo picked off the seller's machine is a `data:` URL of several
+ * megabytes and persisting one writes a base64 blob into the row (see persistableImage);
+ * those are dropped here and re-read from the shop's own listing when the record is opened.
+ */
+export type SubmittedListing = {
+  title?: string
+  description?: string
+  tags?: string[]
+  price?: number | null
+  images?: string[]
+  colors?: string[]
+  sizes?: string[]
+  blank_sku?: string
+  print_type?: string
+  design_id?: string | number
+  design_data?: string
+  design_pos?: unknown
+  at?: string
+}
+
 export function recordSpydeckUpload(
   listing: EtsyListing,
-  our?: { listing_id?: number | string; url?: string; published?: PublishedRecord },
+  our?: { listing_id?: number | string; url?: string; published?: PublishedRecord; submitted?: SubmittedListing },
 ) {
   const data = {
     ...listing,
@@ -2757,13 +2788,20 @@ export function recordSpydeckUpload(
   const published = our?.published
     ? { ...our.published, image: persistableImage(our.published.image) }
     : undefined
+  // The form as sent, minus anything too big to keep. Rides in `data` (the server folds it
+  // under its own key), so it survives every later destination writing its own result.
+  const submitted = our?.submitted && {
+    ...our.submitted,
+    images: (our.submitted.images ?? []).filter((u) => persistableImage(u) !== undefined),
+    design_data: persistableImage(our.submitted.design_data),
+  }
   return api<{ ok?: boolean; error?: string }>(`/api/spydeck/uploads`, {
     method: "POST",
     body: JSON.stringify({
       listing_id: String(listing.listing_id), data,
       our_listing_id: our?.listing_id != null ? String(our.listing_id) : undefined,
       url: our?.url,
-      published,
+      published, submitted,
     }),
   })
 }
