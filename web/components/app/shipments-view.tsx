@@ -97,6 +97,18 @@ const VIA: Record<string, string> = {
   partner: "scanned by byeastside",
   carrier: "accepted by the carrier",
 }
+/** WHERE the scan happened, in one word. The column reads status-then-time like the one
+ *  beside it, so a scan down the table is a scan down one column of words — a timestamp on
+ *  top made the eye do arithmetic before it knew what had happened.
+ *
+ *  One word rather than a sentence because this was the widest column in the table and it
+ *  was pushing the Refund button off the right edge of the card. "Carrier accepted" and
+ *  "Carrier" answer the same question; the long form is still on the title attribute. */
+const VIA_SHORT: Record<string, string> = {
+  "in-house": "Here",
+  partner: "Partner",
+  carrier: "Carrier",
+}
 
 export function ShipmentsView() {
   const [rows, setRows] = useState<ShipmentRow[] | null>(null)
@@ -359,7 +371,6 @@ export function ShipmentsView() {
                 <th className="px-5 py-2 font-medium">Order</th>
                 <th className="px-3 py-2 font-medium">Customer</th>
                 <th className="px-3 py-2 font-medium">Tracking</th>
-                <th className="px-3 py-2 font-medium">Method</th>
                 <th className="px-3 py-2 text-right font-medium">Price</th>
                 {/* "Carrier says" was written to keep it distinct from the floor's own
                     stage — a real distinction, but the column header is the wrong place to
@@ -379,7 +390,13 @@ export function ShipmentsView() {
                         the body font at body size. Mono at text-xs was two handicaps at once:
                         a narrower face AND the smallest step on the page. tabular-nums keeps
                         the digits in a column, which is the only part mono was earning. */}
-                    <td className="whitespace-nowrap px-5 py-2.5 text-sm font-semibold tabular-nums">{s.num}</td>
+                    {/* Truncated, not shrunk. A tiktok-577492964174958679 id is 24 characters
+                        of which the last six identify it, and letting it set the column width
+                        pushed the action buttons off the right edge of the card. The full
+                        value is on the title, and the search box reaches it either way. */}
+                    <td className="px-5 py-2.5">
+                      <div className="max-w-[9.5rem] truncate text-sm font-semibold tabular-nums" title={s.num}>{s.num}</div>
+                    </td>
                     <td className="px-3 py-2.5">
                       <div className="flex max-w-[14rem] items-center gap-1.5">
                         <span className="truncate">{s.customer ?? "—"}</span>
@@ -397,7 +414,6 @@ export function ShipmentsView() {
                       {s.tracking ? (
                         <>
                           <div className="text-sm tabular-nums">{s.tracking}</div>
-                          {s.carrier && <div className="text-2xs text-muted-foreground">{s.carrier}</div>}
                         </>
                       ) : s.voidedTracking ? (
                         // STRUCK THROUGH, NOT REMOVED. The parcel this named no longer
@@ -413,11 +429,6 @@ export function ShipmentsView() {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
-                    {/* nowrap: "Ground Advantage" was breaking across two lines in a narrow
-                        cell, which set the height of every row that had a service name and
-                        made the whole table look ragged. The table already scrolls
-                        horizontally, so width here is cheaper than height on every row. */}
-                    <td className="whitespace-nowrap px-3 py-2.5 text-xs">{s.method || <span className="text-muted-foreground">—</span>}</td>
                     {/* Struck through when it came back, rather than carrying a "refunded
                         $6.24" line underneath. The amount was the same number twice, and the
                         row already says refunded twice over — the crossed-out tracking above
@@ -453,9 +464,6 @@ export function ShipmentsView() {
                           <span className={"inline-block rounded px-2 py-1 text-xs font-medium " + (REFUND_TONE[refundState(s)] ?? REFUND_TONE.pending)}>
                             {REFUND_LABEL[refundState(s)] ?? "Refund pending"}
                           </span>
-                          {s.refundStatus && (
-                            <div className="mt-1 text-2xs uppercase tracking-wide text-muted-foreground opacity-70">{s.refundStatus}</div>
-                          )}
                         </>
                       ) : d ? (
                         <span className={"inline-block rounded px-2 py-1 text-xs font-medium " + d.cls}>{d.label}</span>
@@ -471,8 +479,8 @@ export function ShipmentsView() {
                     <td className="whitespace-nowrap px-4 py-2.5">
                       {s.scannedAt ? (
                         <>
-                          <div className="text-xs">{when(s.scannedAt)}</div>
-                          <div className="mt-0.5 text-2xs text-muted-foreground">{VIA[s.scannedVia ?? ""] ?? "scanned"}</div>
+                          <div className="text-xs font-medium" title={VIA[s.scannedVia ?? ""] ?? "scanned"}>{VIA_SHORT[s.scannedVia ?? ""] ?? "Scanned"}</div>
+                          <div className="mt-0.5 text-2xs text-muted-foreground">{when(s.scannedAt)}</div>
                         </>
                       ) : (
                         // Same reasoning as the status beside it: a refund clears the scan
