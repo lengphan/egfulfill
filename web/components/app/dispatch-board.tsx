@@ -98,12 +98,15 @@ const DISP_MARK: Record<DispKey, { icon: Icon; cls: string; weight?: "fill" | "b
  * `total_labels` null and 0 are different facts and stay different here: null is "their
  * extractor hasn't read it yet", 0 is "it read it and there was no label on the page". The
  * first is a wait, the second is a file to re-send.
+ *
+ * The scanned/total ratio is deliberately NOT shown — one PDF is one parcel, so it only
+ * ever read "0 of 1" or "1 of 1". See progressOf in external-labels.tsx.
  */
 function extDisposition(u: DispatchUpload): { key: DispKey; label: string } {
   if (u.total_labels == null) return { key: "awaiting", label: "Reading the file" }
   if (u.total_labels === 0) return { key: "attention", label: "No label found" }
   if (u.scanned_labels >= u.total_labels) return { key: "scanned", label: "Picked" }
-  return { key: "awaiting", label: `${u.scanned_labels} of ${u.total_labels} picked` }
+  return { key: "awaiting", label: "Waiting to be picked" }
 }
 
 /**

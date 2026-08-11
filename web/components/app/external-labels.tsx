@@ -77,12 +77,19 @@ const dt = (iso: string | null) =>
  * extractor hasn't looked yet", 0 is "it looked and found no label on the page". One is a
  * wait, the other is a file to re-shoot, and collapsing them would have someone waiting
  * forever on a photo that will never produce anything.
+ *
+ * NO COUNTS ON SCREEN. We upload one PDF per parcel, so the ratio was "0 of 1" or "1 of 1"
+ * on every row it ever appeared on — a yes/no dressed up as a fraction, and precision that
+ * looks like it means something is worse than none. A dropped file COULD carry a carrier's
+ * multi-label sheet, and that is the only case where the numbers say anything the words
+ * don't, so they moved to the row's hover title where they cost no one a reading.
  */
-function progressOf(u: DispatchUpload): { label: string; tone: "wait" | "warn" | "ok" | "part" } {
+function progressOf(u: DispatchUpload): { label: string; tone: "wait" | "warn" | "ok" | "part"; title?: string } {
   if (u.total_labels == null) return { label: "Reading the file", tone: "wait" }
   if (u.total_labels === 0) return { label: "No label found", tone: "warn" }
-  if (u.scanned_labels >= u.total_labels) return { label: `Picked · ${u.scanned_labels}/${u.total_labels}`, tone: "ok" }
-  return { label: `${u.scanned_labels} of ${u.total_labels} picked`, tone: "part" }
+  const many = u.total_labels > 1 ? `${u.scanned_labels} of ${u.total_labels} labels on this file picked` : undefined
+  if (u.scanned_labels >= u.total_labels) return { label: "Picked", tone: "ok", title: many }
+  return { label: "Waiting to be picked", tone: "part", title: many }
 }
 
 const TONE: Record<"wait" | "warn" | "ok" | "part", string> = {
@@ -294,7 +301,7 @@ export function ExternalLabels({
                     <span className="block truncate">{dt(u.created_at)}</span>
                     {u.created_by ? <span className="block truncate text-2xs">{u.created_by}</span> : null}
                   </span>
-                  <span className={"min-w-0 text-xs font-medium " + TONE[p.tone]}>
+                  <span className={"min-w-0 text-xs font-medium " + TONE[p.tone]} title={p.title}>
                     <span className="flex items-center gap-1.5">
                       <PI size={13} weight="bold" className="shrink-0" />
                       <span className="truncate">{p.label}</span>
