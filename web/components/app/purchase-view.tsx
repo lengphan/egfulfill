@@ -1211,7 +1211,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           {(tracking[po.num] as SsShipment[]).map((t, i) => (
                             <div key={i} className="flex flex-wrap items-center gap-2 py-1">
                               <span className="font-medium">{t.carrier}</span>
-                              <span className="font-mono text-foreground">{t.tracking}</span>
+                              <span className="tabular-nums text-foreground">{t.tracking}</span>
                               {/* A box number only appears on split shipments — which is
                                   exactly when you need to know there's more than one. */}
                               {t.box && <span className="rounded bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">box {t.box}</span>}

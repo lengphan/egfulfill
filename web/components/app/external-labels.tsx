@@ -121,16 +121,18 @@ const TONE: Record<"wait" | "warn" | "ok" | "part", string> = {
 const TONE_ICON = { wait: Clock, warn: Warning, ok: CheckCircle, part: Barcode } as const
 
 /**
- * THE DROP TARGET, as a strip at the top of the screen rather than a panel in the middle.
+ * THE DROP TARGET — the panel, at rest, at the top of the screen.
  *
- * It was a tall dashed box inside the external-labels card, which put the one thing you DO
- * on this screen underneath both lists, and gave a rare action more room than the day's
- * work. It is also the only control here that isn't a row, so it belongs above the rows
- * rather than between them.
+ * It has been three shapes. A tall dashed box buried under both lists, which put the one
+ * thing you DO on this screen below everything else. Then a one-line strip at the top,
+ * which fixed the position and made it too small to aim a dragged file at. Now: the panel
+ * shape, at the top, and the same shape the full-window overlay uses while you drag — so
+ * the thing you see at rest and the thing that lights up under your cursor are recognisably
+ * one target rather than two unrelated dashed rectangles.
  *
- * One line, because that is all it has to say. The small print it used to carry — PDF only,
- * and dropping does not send — is now in the strip's own wording and in the row it creates,
- * which says "Waiting to send" in the status column and is the honest place for it.
+ * The old objection — a rare action taking more room than the day's work — was answered by
+ * moving it above the list rather than by shrinking it. It costs one band at the top of a
+ * screen that scrolls, and it is the only control here that isn't a row.
  */
 export function LabelDropBar({ onStage }: { onStage: (files: File[]) => void }) {
   const [over, setOver] = useState(false)
@@ -149,23 +151,23 @@ export function LabelDropBar({ onStage }: { onStage: (files: File[]) => void }) 
 
   return (
     <div className="space-y-2">
-      {/* THE WHOLE SCREEN IS THE TARGET; this strip is only what you CLICK.
-          The strip was too small to aim a dragged file at, and the obvious fix — grow it
-          back into a tall dashed panel — is the thing that was removed for taking more
-          room than the day's work. Both can be true instead: the strip stays one line at
-          rest, and dragging a file anywhere over the page raises a full-window drop zone
-          (see PageDropZone). A target you cannot miss, costing no space at all. */}
+      {/* Dashed border-2, the icon, the heading and the subline in the same order and the
+          same sizes as PageDropZone's overlay. Deliberately: dragging a file should look
+          like this panel growing to fill the window, not like a second feature appearing. */}
       <label
         onDragOver={(e) => { e.preventDefault(); setOver(true) }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
-        className={"flex cursor-pointer items-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm transition-colors "
-          + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
+        className={"flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-colors "
+          + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/60 hover:bg-primary/[0.03]")}
       >
-        <UploadSimple size={15} className="shrink-0 text-muted-foreground" />
-        <span className="shrink-0 font-medium">Drop a label PDF anywhere</span>
-        <span className="truncate text-xs text-muted-foreground">
-          or click to choose — it joins the queue below and waits until you send it
+        <UploadSimple size={28} weight="duotone" className={over ? "text-primary" : "text-muted-foreground"} />
+        <span className="text-base font-semibold">Drop label PDFs here</span>
+        <span className="max-w-md text-sm text-muted-foreground">
+          {/* Two facts, and only two: anywhere works, and dropping is not sending. Everything
+              else this used to carry now lives in the row it creates. */}
+          Anywhere on this page works — or click to choose. They join the queue below and
+          nothing is sent to byeastside until you press Send.
         </span>
         <input
           type="file" multiple className="sr-only"
@@ -338,7 +340,7 @@ export function ExternalLabelRows({
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Clock size={13} weight="bold" className="shrink-0" /> Waiting to send
             </span>
-            <span className="truncate font-mono text-xs text-muted-foreground" title={p?.tracking || undefined}>
+            <span className="truncate text-xs tabular-nums text-muted-foreground" title={p?.tracking || undefined}>
               {p?.tracking || "—"}
             </span>
             <span className="flex justify-end">
@@ -388,7 +390,10 @@ export function ExternalLabelRows({
             <span className="min-w-0">
               {u.recipient
                 ? <span className="truncate text-sm">{u.recipient}</span>
-                : <span className="truncate text-xs italic text-muted-foreground">Not read from the label</span>}
+                : <span
+                    className="truncate text-xs italic text-muted-foreground"
+                    title="Either the label is a picture with no text in it, or it was sent before we started reading names off labels. Open the label to see who it's for."
+                  >No name on file</span>}
             </span>
             <span className="truncate text-xs text-muted-foreground">byeastside</span>
             <span className="text-xs text-muted-foreground">{u.total_pages ?? "—"}</span>
@@ -405,7 +410,7 @@ export function ExternalLabelRows({
             <span className="min-w-0 text-xs">
               {trackText ? (
                 <>
-                  <span className="flex items-center gap-1 font-mono">
+                  <span className="flex items-center gap-1 tabular-nums">
                     <Barcode size={11} className="shrink-0 opacity-60" /><span className="truncate">{trackText}</span>
                   </span>
                   {tracked.length > 1 && <span className="block text-muted-foreground">+{tracked.length - 1} more</span>}

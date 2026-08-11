@@ -161,7 +161,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: { open:
         {result ? (
           <div className="space-y-3 py-2">
             <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
-              Label bought — <span className="font-mono">{result.trackingNumber}</span>
+              Label bought — <span className="tabular-nums">{result.trackingNumber}</span>
               {result.service ? ` · ${result.service}` : ""}{result.cost != null ? ` · $${result.cost.toFixed(2)}` : ""}
             </div>
             <div className="flex flex-wrap gap-2">

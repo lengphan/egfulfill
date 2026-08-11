@@ -629,7 +629,7 @@ export default function OrderDetailPage() {
                     )
                   })()}
                   {order.carrier && <div className="font-medium">{order.carrier}</div>}
-                  {order.tracking && <div className="font-mono text-xs text-muted-foreground">{order.tracking}</div>}
+                  {order.tracking && <div className="text-xs tabular-nums text-muted-foreground">{order.tracking}</div>}
                   {canFetchTiktokLabel(order) && (
                     <>
                       <button

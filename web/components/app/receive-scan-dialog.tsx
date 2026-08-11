@@ -158,7 +158,7 @@ export function ReceiveScanDialog({
                 <span className="text-muted-foreground">Invoice <span className="font-mono text-foreground">{box.invoiceNumber}</span></span>
                 {box.poNumber && <span className="text-muted-foreground">PO <span className="font-mono text-foreground">{box.poNumber}</span></span>}
                 {box.warehouse && <span className="text-muted-foreground">from {box.warehouse}</span>}
-                {box.tracking && <span className="text-muted-foreground">{box.carrier} <span className="font-mono text-foreground">{box.tracking}</span></span>}
+                {box.tracking && <span className="text-muted-foreground">{box.carrier} <span className="tabular-nums text-foreground">{box.tracking}</span></span>}
               </div>
 
               {/* A short line is the reason to look before putting away. Called out here

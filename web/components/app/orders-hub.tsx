@@ -1397,7 +1397,7 @@ export function OrdersHub() {
                 tracking: (
                   <div className="flex min-w-0 items-center gap-1.5">
                     {track ? (
-                      <a href={trackUrl(o.carrier || label?.carrier, track)} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 font-mono text-xs font-medium text-success hover:underline" title={`${o.carrier || label?.carrier || "USPS"} ${track}`}>
+                      <a href={trackUrl(o.carrier || label?.carrier, track)} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-xs font-medium tabular-nums text-success hover:underline" title={`${o.carrier || label?.carrier || "USPS"} ${track}`}>
                         <span className="truncate">{track}</span><ArrowSquareOut size={9} weight="bold" className="shrink-0" />
                       </a>
                     ) : (

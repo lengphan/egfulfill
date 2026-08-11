@@ -69,7 +69,7 @@ function renderCell(id: OrderColId, o: OrderRow, designs?: Record<string, OrderD
     )
     case "status": return <SellerStatusBadge order={o} />
     case "tracking": return o.tracking
-      ? <span className="truncate font-mono text-xs text-muted-foreground">{o.tracking}</span>
+      ? <span className="truncate text-xs tabular-nums text-muted-foreground">{o.tracking}</span>
       : <span className="text-xs text-muted-foreground/60">—</span>
     case "total": return <span className="font-medium tabular-nums">{usd(totalOf(o))}</span>
     case "date": return <span className="text-muted-foreground">{fmtDate(o.created_at)}</span>

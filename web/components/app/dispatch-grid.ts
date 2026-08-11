@@ -7,19 +7,30 @@
  * single wrapping line under the order number, while external labels were a four-column
  * table with different widths, so the eye had to re-learn the layout halfway down the page.
  *
- * Both now render the same nine tracks. Where a row has nothing for a column it says so
- * (or spans, in the case of a file name, which is an identity and not an order number);
- * neither invents a value to fill the gap.
+ * They are one list now, not two cards, but the template stays shared: the header strip and
+ * the rows are separate elements and only a single column definition keeps them lined up.
+ * Where a row has nothing for a column it says so; neither kind invents a value to fill
+ * the gap.
  *
- *   ☐ · Order/File · Customer · Channel · Units · Ship-to/Sent · Status · Tracking · actions
+ *   ☐ · Order/File · Customer · Channel · Units · Ship-to · Status · Tracking · actions
  *
- * Fixed widths rather than fractions for everything except the two that hold free text, so
- * the two cards align even though they never share a scroll container. Wider than a phone
- * on purpose — each card scrolls horizontally inside itself, the same way the history
- * table already does, rather than reflowing into the pile this replaced.
+ * Fixed widths rather than fractions for everything except the two that hold free text.
+ * Wider than a phone on purpose — the list scrolls horizontally inside itself, the same way
+ * the history table does, rather than reflowing into the pile this replaced.
+ *
+ * TRACKING IS 12rem BECAUSE A TRACKING NUMBER IS 22 DIGITS. It was 9rem, which cut every
+ * USPS number to "930012084550000038…" — and the one thing anyone reads a tracking number
+ * for is to compare it against a parcel, which a truncated one cannot do. Measured against
+ * the real thing rather than eyeballed: 22 digits of Inter tabular at 12px is ~148px, plus
+ * the barcode glyph and its gap.
+ *
+ * STATUS IS 10.5rem for the same reason, found the same way: "Waiting to be scanned" plus
+ * its icon is ~9.5rem and the pill does not wrap, so at 8rem it simply printed over the
+ * tracking number beside it. A column sized to its shortest label is a column that lies
+ * about how much room the longest one needs.
  */
 export const DISPATCH_GRID =
-  "grid items-center gap-3 px-5 grid-cols-[1rem_8rem_minmax(6.5rem,1fr)_6.5rem_3.5rem_minmax(8.5rem,1.4fr)_8rem_9rem_4rem]"
+  "grid items-center gap-3 px-5 grid-cols-[1rem_8rem_minmax(6.5rem,1fr)_6.5rem_3.5rem_minmax(8.5rem,1.4fr)_10.5rem_12rem_4rem]"
 
 /** Header strip shared by both lists — same type, same rule, same rhythm. */
 export const DISPATCH_HEAD =
