@@ -5,6 +5,18 @@
 import { resolveProduct } from "@/lib/variant-resolve"
 import type { CatalogProduct, OrderItem } from "@/lib/api"
 
+/**
+ * MIRRORS server/src/replenish.js — change both.
+ *
+ * An order line carries a print-method suffix that the shelf doesn't: the line is
+ * "LA6-EMB", the stock row is "LA6". The server strips it before matching (stripMethod,
+ * exported there for exactly this reason); this file did not, so a line would read
+ * "not stocked" here while replenishment found plenty — the two halves of the same
+ * question disagreeing, which is worse than either answer.
+ */
+const METHOD_SUFFIX = /-(EMB|DTG|DTF|APL|LSR|SUB|SCR)$/i
+const stripMethod = (s: string) => s.trim().replace(METHOD_SUFFIX, "")
+
 export type StockState = "in" | "out" | "unknown"
 
 /**
@@ -43,7 +55,7 @@ export type OrderStock = {
 // blank), uppercased to match the stock map. "" when nothing resolves — an unstocked or
 // not-yet-assigned line, which reads as the grey "unknown" state, not "out".
 export function stockSkuOf(item: OrderItem, catalog: CatalogProduct[]): string {
-  return String(resolveProduct(item, catalog)?.sku || item.blank || "").toUpperCase()
+  return stripMethod(String(resolveProduct(item, catalog)?.sku || item.blank || "")).toUpperCase()
 }
 
 /**
@@ -58,7 +70,7 @@ export function stockSkuOf(item: OrderItem, catalog: CatalogProduct[]): string {
 export function orderStock(items: OrderItem[], catalog: CatalogProduct[], stock: Record<string, number>): OrderStock {
   const lines: StockLine[] = (items ?? []).map((it) => {
     const product = resolveProduct(it, catalog)
-    const productSku = String(product?.sku || "").trim().toUpperCase()
+    const productSku = stripMethod(String(product?.sku || "")).toUpperCase()
     /**
      * FALL BACK TO THE LINE'S OWN BLANK ONLY WHEN NO PRODUCT RESOLVED.
      *
@@ -69,7 +81,7 @@ export function orderStock(items: OrderItem[], catalog: CatalogProduct[], stock:
      * dressed as instruction. When a product resolved, its sku is the only valid key; when
      * none did, the blank may genuinely be one (a line carrying EG-5000).
      */
-    const sku = productSku || (product ? "" : String(it.blank || "").trim().toUpperCase())
+    const sku = productSku || (product ? "" : stripMethod(String(it.blank || "")).toUpperCase())
     const have = sku && Object.prototype.hasOwnProperty.call(stock, sku) ? stock[sku] : null
     // Which link broke, in the order the chain runs. A product that resolved but carries no
     // sku is the interesting one: it looks set up from every other screen, and is the exact
