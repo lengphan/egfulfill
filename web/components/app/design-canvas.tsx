@@ -9,7 +9,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
-import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
+import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
 import { decodeEntities, usd } from "@/lib/order-format"
 import { matchThreadColors, nearestThread, nearestThreads, matchQuality, hexToRgb, matchThreadRegions, canvasReadableSrc, type Thread, type ThreadRegion } from "@/lib/thread-match"
@@ -495,7 +495,9 @@ export function DesignCanvasDialog({
 
   // Thread match (EMB only): sample the artwork's dominant colours → nearest in-stock
   // threads, so the factory knows which cones to load. Re-runs when the design changes.
-  const isEmb = /emb/i.test(String(item.print_type || ""))
+  // One shared rule (lib/variant-resolve) — the thread module and the machine-file step
+  // below both read it, so they cannot drift apart again.
+  const isEmb = isEmbroidery(item.print_type)
   const [threads, setThreads] = useState<Thread[]>([])
   const [picking, setPicking] = useState(false)
   // The thread MAP: which colour covers which part. ALWAYS on now — it was behind a "Map"
@@ -1317,7 +1319,14 @@ export function DesignCanvasDialog({
                 <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>Library</Button>
               </div>
             </div>
-            {/* 2 — Machine file (the seller's own-file route, now discoverable) */}
+            {/* 2 — Machine file (the seller's own-file route, now discoverable).
+                EMBROIDERY ONLY. Every part of this step is stitch apparatus: the formats it
+                accepts (.emb/.pes/.dst), the words "ready to stitch", the EMB- id it files
+                under, and a "Send to a designer" that puts the card on the digitising board.
+                On a DTG line none of it applies — the image in step 1 IS the print file —
+                and showing it sent print artwork to an embroidery designer. Same rule as the
+                thread module above, from the same place, so the two can't drift. */}
+            {isEmb && (
             <div className={cn("rounded-lg border p-2.5", hasMachineFile ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20" : "border-dashed border-border bg-muted/20")}>
               <div className="flex items-start gap-2">
                 <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold", hasMachineFile ? "bg-emerald-600 text-white" : "border border-border bg-background text-muted-foreground")}>
@@ -1428,6 +1437,7 @@ export function DesignCanvasDialog({
 </div>
               {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
             </div>
+            )}
           </div>
           {/* LAST, because it is a shortcut rather than a decision: "do this line" is the
               question, "and the other nine" is the follow-up.

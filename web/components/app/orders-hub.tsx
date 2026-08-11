@@ -2122,10 +2122,15 @@ export function OrdersHub() {
                               <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                             ) : (
                               <>
+                              {/* ONE ROW, not two. The make-spec pills below used to open
+                                  their own line, so a line's own details — sku, method,
+                                  colourway, qty — sat above and "25 in stock" sat under them
+                                  looking like a separate statement about the order. They are
+                                  all facts about the same line; they wrap together now and
+                                  break only when the width actually runs out. */}
                               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                 <VariantStrip sku={resolveProduct(it, catalog)?.sku || it.blank || undefined} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} />
                                 {it.qty ? <span className="text-2xs text-muted-foreground">×{it.qty}</span> : null}
-                              </div>
 
                               {/* What the floor needs to actually MAKE this line: how much
                                   blank we hold, which cones to load, and the machine file.
@@ -2157,7 +2162,7 @@ export function OrdersHub() {
                                 // thread + file pills are neutral info, not status.
                                 const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium"
                                 return (
-                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  <>
                                     {have != null && (
                                       <span
                                         className={pill + " " + (have >= need ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-800")}
@@ -2185,9 +2190,10 @@ export function OrdersHub() {
                                         <FileArrowDown size={10} weight="bold" /> {file.designId}
                                       </span>
                                     )}
-                                  </div>
+                                  </>
                                 )
                               })()}
+                              </div>
                               </>
                             )}
                           </div>

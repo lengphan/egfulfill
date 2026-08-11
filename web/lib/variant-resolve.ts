@@ -41,6 +41,23 @@ export function colorsOf(p: CatalogProduct | null): string[] {
   return [...set]
 }
 
+/**
+ * DOES THIS LINE GET STITCHED?
+ *
+ * One rule, because two things depend on it and they must never disagree: the thread-match
+ * module, and the machine-file step that sends artwork to a designer to be digitised. Both
+ * are embroidery apparatus — a stitch file, a cone of thread — and neither means anything on
+ * a DTG line, where the artwork IS the print file and there is nothing to cut.
+ *
+ * They HAD disagreed. Thread match was gated on this test and the machine-file step was
+ * gated on nothing, so a DTG line showed "Embroidery file · Attach file (.emb, .pes, .dst)"
+ * and its "Send to a designer" put print artwork on the digitising board.
+ *
+ * Reads the line's chosen METHOD, not the sku suffix: the suffix is inventory's business and
+ * a marketplace line often has neither.
+ */
+export const isEmbroidery = (printType?: string | null): boolean => /emb/i.test(String(printType || ""))
+
 export function methodsOf(p: CatalogProduct | null): string[] {
   if (!p) return []
   // SPLIT the method string: `method` commonly lists several techniques in one field
