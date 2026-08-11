@@ -2314,6 +2314,9 @@ export function createOrder(order: {
   items?: NewOrderItem[]
   store?: string
   meta?: Record<string, unknown>
+  /** This row exists only to hold a standalone label — no lines, nothing to produce. It
+   *  stays off the production boards and appears in Shipments instead. */
+  labelOnly?: boolean
 }) {
   return api<{ ok?: boolean; id?: string; error?: string }>(`/api/orders`, {
     method: "POST",
@@ -3546,6 +3549,10 @@ export type ShipmentRow = {
   /** The number this label carried before it was refunded. `tracking` is cleared on a
    *  refund because it is what asserts the order shipped; this keeps the digits. */
   voidedTracking: string | null
+  /** THE PROVIDER'S own word — QUEUED / PENDING / SUCCESS / ERROR. Accepting a refund is
+   *  not receiving one: Shippo settles up to 14 days later and can still refuse, so a flat
+   *  "Refunded" the moment the request lands overstates it. */
+  refundStatus: string | null
   stage: string | null
   /** What the CARRIER says, as distinct from `stage` which is what the floor says. When
    *  they disagree, which one is wrong is the thing being worked out. */

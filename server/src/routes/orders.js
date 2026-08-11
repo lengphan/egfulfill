@@ -514,6 +514,12 @@ export function ordersRoutes(app, requireAuth) {
    * falls back to the age threshold, which is what every manual order will always do.
    */
   q('alter table orders add column if not exists ship_by timestamptz').catch(() => {});
+  // This row exists ONLY to hold a standalone label — a re-ship, a sample, someone else's
+  // parcel. It has no lines and nothing to produce, so it stays off the production boards
+  // and lives in Shipments instead. Kept as a flag on orders rather than a separate
+  // shipments table because manifests, dispatch, tracking and the ledger all key off
+  // order_id today; splitting that is a much larger change than the problem warrants.
+  q('alter table orders add column if not exists label_only boolean not null default false').catch(() => {});
   // Per-seller display number ("#1, #2 …" for manual orders). The id stays the
   // globally-unique PK; this is just the friendly number the seller sees.
   q('alter table orders add column if not exists seq integer').catch(() => {});
@@ -964,14 +970,22 @@ export function ordersRoutes(app, requireAuth) {
       // factory boards (seller-managed). factory_order rows show regardless of status.
       const r = await q(
         `select o.*, ${machineFile}, ${designBoard}, ${agg} from orders o ${join}
-         where o.factory_order = true
+         -- A LABEL IS NOT AN ORDER. Buying a standalone label (re-ship, sample, someone
+         -- else's parcel) mints an FF-* row purely so the label has somewhere to live —
+         -- it has no lines, nothing to make, and nothing to dispatch, but it was landing
+         -- on the production board as a Draft with Label/Scan/Design/Stock chips it can
+         -- never satisfy. ShipStation's equivalent creates a SHIPMENT and no order at all;
+         -- this is the same separation without a second table. It still appears in
+         -- Shipments, which is the list it belongs to.
+         where coalesce(o.label_only, false) = false
+           and (o.factory_order = true
             or coalesce(o.factory_status, '') not in ('new', 'draft', '')
             -- ...OR the order belongs to a STAFF account, i.e. the factory created it
             -- itself. Without this a manual order made on a factory board was invisible
             -- to the board that made it: factory_order is derived from the id (etsy-%),
             -- so a manual FF-* order can never set it, and a brand-new order is still at
             -- '' / 'new', which the push filter excludes.
-            or exists (select 1 from users u where u.id = o.seller_id and u.role <> 'seller')
+            or exists (select 1 from users u where u.id = o.seller_id and u.role <> 'seller'))
          group by o.id order by o.created_at desc`);
       await Promise.all(r.rows.map(healOrphanLines));
       return r.rows;
@@ -1083,8 +1097,8 @@ export function ordersRoutes(app, requireAuth) {
     // `(xmax = 0) as inserted` distinguishes a fresh INSERT from an ON CONFLICT
     // UPDATE — needed so editing an order doesn't re-alert the floor as if it were new.
     const up = await q(
-      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, seq, meta, factory_order, created_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, false, $16)
+      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, seq, meta, factory_order, created_by, label_only)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, false, $16, $17)
        on conflict (id) do update set
          store=excluded.store, customer=excluded.customer, address=excluded.address,
          status=excluded.status, factory_status=excluded.factory_status,
@@ -1092,13 +1106,18 @@ export function ordersRoutes(app, requireAuth) {
          carrier=excluded.carrier, tracking=excluded.tracking,
          seq=coalesce(orders.seq, excluded.seq),
          meta=coalesce(excluded.meta, orders.meta), factory_order=false,
-         created_by=coalesce(orders.created_by, excluded.created_by)
+         created_by=coalesce(orders.created_by, excluded.created_by),
+         -- Never un-flags an existing order: a label-only row that later gains real work
+         -- is a decision someone makes, not something an edit should do by accident.
+         label_only=orders.label_only or excluded.label_only
        returning (xmax = 0) as inserted`,
       [o.id, ownerId, o.store || null, o.source || 'manual', o.customer || {}, o.address || {},
        o.status || 'new', o.factoryStatus || o.status || 'new', o.total || 0, o.profit || 0,
        o.delivery || null, o.carrier || null, o.tracking || null,
        (o.seq != null && o.seq !== '') ? parseInt(o.seq, 10) : null,
-       (o.meta && typeof o.meta === 'object') ? o.meta : {}, req.user.sub || null]
+       (o.meta && typeof o.meta === 'object') ? o.meta : {}, req.user.sub || null,
+       // Only ever set by the standalone-label flow. Anything else omits it and gets false.
+       o.labelOnly === true]
     );
     const isNew = !!(up.rows[0] && up.rows[0].inserted);
     if (Array.isArray(o.items)) await replaceItems(o.id, o.items);

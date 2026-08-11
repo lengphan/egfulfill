@@ -64,6 +64,32 @@ const FILTERS: { key: string; label: string; match: (s: ShipmentRow) => boolean 
   { key: "test", label: "Test", match: (s) => s.test },
 ]
 
+/**
+ * Where a refund has actually got to, in our words — their word is printed beneath it.
+ *
+ * QUEUED and PENDING are both "asked for, not yet had": Shippo waits on carrier tracking
+ * data to prove the label went unused, which takes up to 14 days. ERROR is the one that
+ * matters — it means the carrier found the label HAD been used, so the money is not coming
+ * and the parcel really shipped. Anything unrecognised is treated as pending, because
+ * claiming a refund we can't confirm is the failure worth avoiding.
+ */
+const refundState = (s: ShipmentRow): "settled" | "pending" | "refused" => {
+  const w = String(s.refundStatus || "").toUpperCase()
+  if (w === "SUCCESS") return "settled"
+  if (w === "ERROR") return "refused"
+  return "pending"
+}
+const REFUND_LABEL: Record<string, string> = {
+  settled: "Refunded",
+  pending: "Refund pending",
+  refused: "Refund refused",
+}
+const REFUND_TONE: Record<string, string> = {
+  settled: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
+  pending: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  refused: "bg-red-600 text-white",
+}
+
 /** Who recorded the scan. Worth naming rather than a bare tick: the three routes carry
  *  different weight, and only one of them is the carrier's own word. */
 const VIA: Record<string, string> = {
@@ -417,9 +443,20 @@ export function ShipmentsView() {
                           move. The strike-through on the row says it happened; this says
                           what the row IS. */}
                       {(s.refunded ?? 0) > 0 ? (
-                        <span className="inline-block rounded bg-rose-100 px-2 py-1 text-xs font-medium text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
-                          Refunded
-                        </span>
+                        // THE PROVIDER'S STATE, not a flat "Refunded". Shippo accepts the
+                        // request immediately and settles up to 14 days later, and can still
+                        // come back ERROR ("the shipment was found to be used"). Saying
+                        // "Refunded" the moment it's accepted claims money that hasn't
+                        // arrived — so a pending one says so, and their own word sits
+                        // underneath where it can be matched against their dashboard.
+                        <>
+                          <span className={"inline-block rounded px-2 py-1 text-xs font-medium " + (REFUND_TONE[refundState(s)] ?? REFUND_TONE.pending)}>
+                            {REFUND_LABEL[refundState(s)] ?? "Refund pending"}
+                          </span>
+                          {s.refundStatus && (
+                            <div className="mt-1 text-2xs uppercase tracking-wide text-muted-foreground opacity-70">{s.refundStatus}</div>
+                          )}
+                        </>
                       ) : d ? (
                         <span className={"inline-block rounded px-2 py-1 text-xs font-medium " + d.cls}>{d.label}</span>
                       ) : (

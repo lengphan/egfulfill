@@ -24,7 +24,7 @@ import { q, softQ } from '../db.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 import { refundOrder } from './order_refunds.js';
-import { aggregatorRefundLabel, aggregatorFetchCost } from './shipping.js';
+import { aggregatorRefundLabel, aggregatorFetchCost, aggregatorRefundStatus, refreshTrackingFor } from './shipping.js';
 
 /**
  * Undo the money booked by a successful push, when a label is cancelled BEFORE it's picked.
@@ -120,6 +120,105 @@ const isRetryable = (r) => r.status === 0 || r.status === 429 || r.status >= 500
 // module-level lock stops overlapping loads from firing duplicate provider calls, and the
 // candidate query is cheap and returns nothing once everything is recovered, so a page that
 // has no gaps does one throwaway SELECT and no provider calls.
+/**
+ * SETTLE THE REFUNDS WE ASKED FOR.
+ *
+ * A refund request is accepted immediately and settles later — Shippo waits on carrier
+ * tracking data, which can take up to 14 days, and it can come back ERROR: "the shipment was
+ * found to be used". That means the parcel actually shipped and the postage is not coming
+ * back, so a credit we already booked is wrong and a tracking number we already removed was
+ * real.
+ *
+ * On SUCCESS: nothing moves. The credit booked at request time was correct; we just stop
+ * calling it pending.
+ *
+ * On ERROR: the credit is REVERSED with a new append-only row (never an edit — see the
+ * money rules), and the tracking number is put back, because the buyer is holding a parcel
+ * with that number on it. The order stops claiming a refund it did not get.
+ *
+ * Runs off the shipments list read, like the fee recovery beside it: no button, converges to
+ * nothing once every refund has settled, and a lock stops two page loads racing.
+ */
+let _refundPollRunning = false;
+async function reconcileRefunds(limit = 50) {
+  if (_refundPollRunning) return { checked: 0, settled: 0, reversed: 0 };
+  _refundPollRunning = true;
+  try {
+    const rows = (await q(
+      `select id, label_provider, refund_ref, voided_tracking
+         from orders
+        where refund_ref is not null
+          and upper(coalesce(refund_status,'QUEUED')) in ('QUEUED','PENDING')
+        limit $1`, [limit]).catch(() => ({ rows: [] }))).rows;
+    let settled = 0, reversed = 0;
+    for (const o of rows) {
+      const r = await aggregatorRefundStatus(o.label_provider || 'shippo', o.refund_ref).catch(() => null);
+      if (!r || r.status === 'pending' || r.status === 'unknown') continue;   // still waiting, or unreadable
+      const word = String((r.raw && r.raw.status) || r.status || '').toUpperCase();
+      if (r.status === 'success') {
+        await q('update orders set refund_status=$2 where id=$1', [o.id, word || 'SUCCESS']).catch(() => {});
+        settled++;
+        continue;
+      }
+      // ERROR — the label was used. Put the money back on the cost side and restore the
+      // number, because both were only ever provisional.
+      const credited = (await q(
+        "select sum(delta)::float as c from wallet_ledger where type='label-cost' and ref=$1",
+        [`label-void-${o.id}`]).catch(() => ({ rows: [] }))).rows[0]?.c || 0;
+      if (credited > 0) {
+        await q(`insert into wallet_ledger (account, delta, type, ref, note, order_id)
+                 values ('factory', $1, 'label-cost', $2, $3, $4) on conflict do nothing`,
+          [-credited, `label-refund-failed-${o.id}`,
+           `Refund refused — the carrier found the label had been used · order ${o.id}`, o.id]).catch(() => {});
+      }
+      await q(`update orders set refund_status=$2,
+                 tracking=coalesce(nullif(tracking,''), voided_tracking)
+               where id=$1`, [o.id, word || 'ERROR']).catch(() => {});
+      reversed++;
+    }
+    if (settled || reversed) egBroadcast({ type: 'orders' });
+    return { checked: rows.length, settled, reversed };
+  } finally { _refundPollRunning = false; }
+}
+
+/**
+ * REFRESH THE PARCELS MOST LIKELY TO HAVE MOVED.
+ *
+ * The delivery column is filled by refreshTracking, which until now only ran when a human
+ * pressed the button on a row or when Shippo called our webhook. There is no webhook —
+ * checked against the live account, zero subscriptions — so in practice it only ever ran by
+ * hand, and every parcel sat at "Not checked" forever. A status nobody updates is worse than
+ * no column: it reads as "the carrier has nothing", when the truth is we never asked.
+ *
+ * Ordered by how stale the check is, NULLs first, so a parcel nobody has ever looked at is
+ * seen before one checked an hour ago. Delivered parcels are excluded — that state is final
+ * and re-asking spends a call to be told the same thing.
+ *
+ * Deliberately small per page load: this runs on every read of the shipments list, and the
+ * point is a steady trickle that converges, not a stampede when someone opens the page.
+ */
+let _trackPollRunning = false;
+async function refreshStaleTracking(limit = 12) {
+  if (_trackPollRunning) return { checked: 0 };
+  _trackPollRunning = true;
+  try {
+    const rows = (await q(
+      `select id from orders
+        where coalesce(tracking,'') <> ''
+          and coalesce(delivery_status,'') not in ('delivered','returned','failed')
+          and (delivery_checked_at is null or delivery_checked_at < now() - interval '6 hours')
+        order by delivery_checked_at asc nulls first
+        limit $1`, [limit]).catch(() => ({ rows: [] }))).rows;
+    let moved = 0;
+    for (const o of rows) {
+      const r = await refreshTrackingFor(o.id).catch(() => null);
+      if (r && r.ok) moved++;
+    }
+    if (moved) egBroadcast({ type: 'orders' });
+    return { checked: rows.length, moved };
+  } finally { _trackPollRunning = false; }
+}
+
 let _feeBackfillRunning = false;
 async function recoverLabelCosts(limit = 200) {
   if (_feeBackfillRunning) return { skipped: true, updated: 0 };
@@ -162,6 +261,12 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   // label from pushing to the marketplace, so it has to go — but the number itself is
   // history, and a row that silently loses it reads as a row that lost the parcel.
   q('alter table orders add column if not exists voided_tracking text').catch(() => {});
+  // The refund's own id at the provider, and where it has got to. Both are needed because
+  // ACCEPTING a refund is not receiving one: Shippo answers QUEUED/PENDING and settles up to
+  // 14 days later, and it can still end in ERROR ("the shipment was found to be used").
+  // Without these there was nothing to re-read and nothing on screen but a flat "Refunded".
+  q('alter table orders add column if not exists refund_ref text').catch(() => {});
+  q("alter table orders add column if not exists refund_status text").catch(() => {});
   q('alter table orders add column if not exists dispatch_pushed_at timestamptz').catch(() => {});
   q('alter table orders add column if not exists dispatch_error text').catch(() => {});
   // Scan provenance — who scanned a label out and via which channel (in-house / partner /
@@ -300,7 +405,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       `select o.id, o.seq, o.tracking, o.carrier, o.tracking_label_url,
               o.factory_status, o.delivery_status, o.delivery_detail, o.delivery_checked_at,
               o.label_scanned_at, o.scanned_via, o.created_at, o.ship_service, o.label_test,
-              o.voided_tracking,
+              o.voided_tracking, o.refund_status,
               -- price from the order column if stored, else the label-cost ledger row (so
               -- labels bought before the column existed still show what they cost).
               coalesce(o.label_cost,
@@ -343,6 +448,13 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     // once every label with a provider reference has its fee, this does a cheap SELECT and
     // stops. (Rows with no reference, e.g. externally-scanned parcels, stay blank by design.)
     recoverLabelCosts(50).then((res) => { if (res && res.updated) egBroadcast({ type: 'orders' }); }).catch(() => {});
+    // Settle any refund we're still waiting on — see reconcileRefunds.
+    reconcileRefunds(50).catch(() => {});
+    // ASK THE CARRIER, rather than waiting to be told. No Shippo webhook is registered
+    // (checked live: zero subscriptions), so nothing ever pushed a status change and every
+    // parcel read "Not checked" until someone clicked the button on its row. This refreshes
+    // the ones most likely to have moved, off the critical path, oldest-checked first.
+    refreshStaleTracking(12).catch(() => {});
     return {
       labelSpend: spend,
       labelRefunded: totals.refunded || 0,
@@ -357,6 +469,10 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         id: x.id, num: x.seq ? '#' + x.seq : x.id,
         customer: x.customer || null, state: x.state || null,
         tracking: x.tracking, carrier: x.carrier || null,
+        // The PROVIDER'S own word for where the refund got to (QUEUED / PENDING / SUCCESS /
+        // ERROR), not a flattened version — the screen should be able to show what their
+        // dashboard shows. 'Refunded' the instant a request is accepted overstates it.
+        refundStatus: x.refund_status || null,
         // The number this label carried before it was refunded. The row shows it struck
         // through — the parcel it named is gone, but the digits are still the answer to
         // "what was that number", which is what a buyer holding it will ask.
@@ -444,11 +560,21 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     // keeps the digits because someone will still be asked "what was that number" — by a
     // buyer holding it, or by the carrier. Losing state and losing the record are different
     // things, and only the first one is wanted here.
+    // label_provider is kept — it is how the refund gets re-read later, and losing it would
+    // strand the poll with an id it can't address. Everything else that asserts a live
+    // shipment goes.
+    // THEIR word, not ours. Shippo says QUEUED / PENDING / SUCCESS / ERROR, and storing a
+    // flattened version of it means the screen can never show what their dashboard shows —
+    // the same reasoning as dispatch_uploads.status. The UI maps it for reading; this
+    // column stays quotable.
+    const refundRef = (refund.raw && refund.raw.object_id) || null;
+    const refundState = String((refund.raw && refund.raw.status) || refund.status || 'QUEUED').toUpperCase();
     await q(`update orders set voided_tracking=coalesce(nullif(tracking,''), voided_tracking),
+               refund_ref=$2, refund_status=$3,
                tracking_label_url=null, tracking=null, carrier=null,
-               label_ref=null, label_provider=null, label_scanned_at=null,
+               label_ref=null, label_scanned_at=null,
                marketplace_fulfilled_at=null
-             where id=$1`, [id]).catch(() => {});
+             where id=$1`, [id, refundRef, refundState]).catch(() => {});
     audit(req, 'label.void', { entityType: 'order', entityId: id, after: { refundStatus: refund.status || 'submitted', refunded } });
     egBroadcast({ type: 'orders' });
     /**

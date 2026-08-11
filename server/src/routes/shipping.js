@@ -26,6 +26,12 @@ const EP_BASE = 'https://api.easypost.com/v2';
 const SH_BASE = 'https://api.goshippo.com';
 
 let export_refreshTracking;
+/** The tracking refresher, reachable from other routes. Assigned when shippingRoutes runs
+ *  (it closes over the app's config), so callers must tolerate it being undefined before
+ *  registration — hence the guard rather than a bare call. */
+export function refreshTrackingFor(orderId) {
+  return export_refreshTracking ? export_refreshTracking(orderId) : Promise.resolve({ ok: false, reason: 'not-ready' });
+}
 const epAuth = () => 'Basic ' + Buffer.from(epKey() + ':').toString('base64');
 const shAuth = () => 'ShippoToken ' + shToken();
 
@@ -314,6 +320,38 @@ export async function aggregatorRefundLabel(provider, providerId) {
     return { ok: true, status: (d.status || 'QUEUED').toLowerCase(), raw: d };
   }
   return { ok: false, message: `Labels bought via ${provider || 'this provider'} can't be voided automatically — refund it in the carrier's dashboard.` };
+}
+
+/**
+ * RE-READ A REFUND, because accepting one is not the same as getting the money.
+ *
+ * Shippo answers a refund request with QUEUED or PENDING and settles later — up to 14 days,
+ * because they wait on carrier tracking data to prove the label was never used. It can end
+ * in SUCCESS, or in ERROR, which means "the shipment was found to be used": the parcel
+ * actually shipped and the postage is NOT coming back.
+ *
+ * We book the credit on acceptance, which is right — the request was made and the money is
+ * expected. But nothing re-checked it, so an ERROR left the ledger claiming a refund that
+ * never arrived and the row claiming a shipment that had, in fact, gone out. This is what
+ * closes that loop.
+ *
+ * Returns a normalized status: 'success' | 'pending' | 'error' | 'unknown'.
+ */
+export async function aggregatorRefundStatus(provider, refundId) {
+  if (!refundId) return { ok: false, status: 'unknown' };
+  if (provider === 'shippo') {
+    if (!shToken()) return { ok: false, status: 'unknown' };
+    const r = await fetch(SH_BASE + '/refunds/' + encodeURIComponent(refundId), { headers: { Authorization: shAuth() } });
+    if (!r.ok) return { ok: false, status: 'unknown' };
+    const d = await r.json().catch(() => ({}));
+    const s = String(d.status || '').toUpperCase();
+    // QUEUED and PENDING are both "still waiting" — the difference is theirs, not ours.
+    const status = s === 'SUCCESS' ? 'success' : s === 'ERROR' ? 'error' : (s === 'QUEUED' || s === 'PENDING') ? 'pending' : 'unknown';
+    return { ok: true, status, raw: d };
+  }
+  // EasyPost reports refund_status on the shipment; it is inert here and not worth a
+  // speculative implementation — an unknown status simply leaves the row alone.
+  return { ok: false, status: 'unknown' };
 }
 
 /**
