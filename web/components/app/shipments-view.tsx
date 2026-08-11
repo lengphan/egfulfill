@@ -410,14 +410,24 @@ export function ShipmentsView() {
                         caption stays small, which is what makes it a caption. px-4 and a
                         nowrap date do the rest; the date was wrapping inside its cell. */}
                     <td className="whitespace-nowrap px-4 py-2.5">
-                      {d ? (
+                      {/* REFUNDED IS THE STATUS. It outranks whatever the carrier last said,
+                          because there is no longer a parcel to say anything about — and
+                          "Not checked" on a refunded label is actively wrong: it reads as
+                          "we might check later and find something", when nothing will ever
+                          move. The strike-through on the row says it happened; this says
+                          what the row IS. */}
+                      {(s.refunded ?? 0) > 0 ? (
+                        <span className="inline-block rounded bg-rose-100 px-2 py-1 text-xs font-medium text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                          Refunded
+                        </span>
+                      ) : d ? (
                         <span className={"inline-block rounded px-2 py-1 text-xs font-medium " + d.cls}>{d.label}</span>
                       ) : (
                         // Never blank. "Not checked" and "checked, nothing yet" are
                         // different facts and the difference decides whether to chase.
                         <span className="text-xs text-muted-foreground">Not checked</span>
                       )}
-                      {s.deliveryCheckedAt && (
+                      {s.deliveryCheckedAt && (s.refunded ?? 0) === 0 && (
                         <div className="mt-1 text-2xs text-muted-foreground">checked {when(s.deliveryCheckedAt)}</div>
                       )}
                     </td>
@@ -428,7 +438,10 @@ export function ShipmentsView() {
                           <div className="mt-0.5 text-2xs text-muted-foreground">{VIA[s.scannedVia ?? ""] ?? "scanned"}</div>
                         </>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Not scanned</span>
+                        // Same reasoning as the status beside it: a refund clears the scan
+                        // (the parcel it claimed to hand over is gone), so "Not scanned"
+                        // would read as work still pending on something that ended.
+                        <span className="text-xs text-muted-foreground">{(s.refunded ?? 0) > 0 ? "—" : "Not scanned"}</span>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right">
