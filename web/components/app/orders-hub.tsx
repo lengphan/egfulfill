@@ -480,9 +480,22 @@ export function OrdersHub() {
       if (to && to !== "shipped") await advanceItem(order, it, to)
     }
   }
-  // Warehouse intake: move every unstarted item into the scan flow.
+  /**
+   * Warehouse intake — "Start order": move every unstarted item into the scan flow, AND
+   * the order with them.
+   *
+   * The order-level write is the half that was missing. Nothing rolls item stages up to
+   * `orders.factory_status` — the column has exactly one writer, this PATCH — so moving
+   * only the lines left the order reading `new` while its rows read Awaiting scan. The row
+   * here looked right (the hub derives its stage from the items) and the Dispatch board,
+   * which filters on the ORDER's column, never showed it. Same two writes the Approve/Start
+   * button on the order page makes, so the two doors now land in the same place.
+   */
   const receiveOrder = async (order: OrderRow) => {
     for (const it of order.items ?? []) if (it.sku && !normalizeStage(it.factory_status)) await advanceItem(order, it, "awaiting_scan")
+    try { await updateOrder(order.id, { factoryStatus: "awaiting_scan" }) }
+    catch (e) { setActionErr(e instanceof Error ? e.message : "Couldn't start that order.") }
+    load()
   }
   // Ship: mark every line shipped + record tracking/carrier on the order.
   const shipOrder = async (order: OrderRow) => {
@@ -1588,7 +1601,13 @@ export function OrdersHub() {
                        */
                       const next = nextStage(stage, fac)
                       const canAdvance = !!next && canSetStage(role, stage, next, fac)
-                      const canStart = canFulfill && stage === "" && !stopped
+                      // Offered only when the move it makes is one the API would accept.
+                      // "Start order" jumps Draft → Awaiting scan, which is legal for the
+                      // factory's own order and a SKIP for a seller's — on those it 403'd
+                      // per line and the row simply didn't move. A seller order at Draft
+                      // falls through to "Next stage" instead, which is Pending: the right
+                      // next move for an order somebody paid for and we haven't accepted.
+                      const canStart = canFulfill && stage === "" && !stopped && canSetStage(role, stage, "awaiting_scan", fac)
                       const canLabels = canFulfill && items.some((it) => it.sku && variantOf(it))
                       // Primary = the one obvious next move. Intake → Start; ready → ship;
                       // otherwise advance a stage.
