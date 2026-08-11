@@ -72,10 +72,18 @@ export function isException(id?: string | null): boolean {
   return EXCEPTIONS.has(normalizeStage(id))
 }
 
-// The next linear stage to advance an item to (null once shipped or in an exception).
-export function nextStage(current?: string | null): string | null {
+/**
+ * The next linear stage to advance an item to (null once shipped or in an exception).
+ *
+ * `isFactory` matters at exactly one point, and it's the first: a factory order leaves
+ * Draft for Awaiting scan, because Pending is a seller stage it can never occupy. A legacy
+ * factory row sitting AT in_review also advances to Awaiting scan, which is how those get
+ * out. See FACTORY_LINE below.
+ */
+export function nextStage(current?: string | null, isFactory?: boolean): string | null {
   const v = normalizeStage(current)
   if (EXCEPTIONS.has(v)) return null
+  if (isFactory && (!v || v === "in_review")) return "awaiting_scan"
   if (!v) return "in_review"
   const i = ORDER.indexOf(v)
   return i >= 0 && i < ORDER.length - 1 ? ORDER[i + 1] : null
@@ -115,8 +123,32 @@ const MONEY_STAGES = new Set(["cancelled", "refunded"])
 // The linear order, '' (Received) first, for adjacency. Exceptions are deliberately absent:
 // a stop is not a position on this line, which is why it can be entered from anywhere and
 // never counts as a skip. MIRRORS `LINE`/`skipsPipeline` in server/src/routes/orders.js.
-const LINE = ["", ...FACTORY_STAGES.map((s) => s.id)]
-const posOf = (s: string | null | undefined) => LINE.indexOf(normalizeStage(s))
+//
+// TWO LINES, BECAUSE "Pending" IS A SELLER STAGE AND NOT A STEP OF MAKING ANYTHING.
+//
+// in_review means: the seller submitted, we charged them, and we haven't accepted the job
+// yet. A factory-owned order has no seller and is never charged, so the stage can say
+// nothing true about one — it was only ever passed through to satisfy the one-step rule,
+// and any that stopped there sat in the seller queue looking like work someone was waiting
+// on us for. For those orders the stage is simply not on the line, so Draft → Awaiting scan
+// is one move. The skip rule is untouched otherwise: it exists so nobody can assert
+// physical work that didn't happen, and in_review isn't work.
+const SELLER_LINE = ["", ...FACTORY_STAGES.map((s) => s.id)]
+const FACTORY_LINE = SELLER_LINE.filter((s) => s !== "in_review")
+const lineFor = (isFactory?: boolean) => (isFactory ? FACTORY_LINE : SELLER_LINE)
+// -1 for anything off this order's line — a stop, or a legacy in_review row on a factory
+// order. Off-line is not a position, so it is never a skip in either direction, which is
+// what lets those existing rows be moved straight on.
+const posOf = (s: string | null | undefined, isFactory?: boolean) => lineFor(isFactory).indexOf(normalizeStage(s))
+
+/**
+ * Is this the factory's own order rather than a seller's?
+ *
+ * One reading of one server-derived column (orders.factory_order, derived from the owner's
+ * role), so every caller asks the same question the same way. An order the client hasn't
+ * been told about defaults to false — the stricter line.
+ */
+export const isFactoryOrder = (o?: { factory_order?: boolean | null } | null) => !!o?.factory_order
 const LABEL_OF = (id: string) => (id === "" ? "Draft" : FACTORY_STAGES.find((s) => s.id === id)?.label ?? id)
 
 /**
@@ -125,17 +157,21 @@ const LABEL_OF = (id: string) => (id === "" ? "Draft" : FACTORY_STAGES.find((s) 
  * Mirrors `stageDenial` in server/src/routes/orders.js — the server is what enforces this;
  * this exists so the UI can grey an option and say why, instead of silently dropping it
  * from the menu and leaving the rule unlearnable.
+ *
+ * `isFactory` — the factory's own order rather than a seller's (see isFactoryOrder). It
+ * chooses which line the adjacency rules read; omitting it holds the caller to the
+ * stricter, seller-shaped one.
  */
-export function stageDenialReason(role: string, current: string | null | undefined, target: string): string | null {
+export function stageDenialReason(role: string, current: string | null | undefined, target: string, isFactory?: boolean): string | null {
   const at = normalizeStage(current)
   const to = normalizeStage(target)
 
   // Skipping is denied for EVERYONE, admin included — it isn't a permission, it's what the
   // pipeline means. Nobody has the authority to make an order have been printed when it
   // wasn't. Backwards is not a skip: it claims LESS has happened, which is always safe.
-  const ai = posOf(at), ti = posOf(to)
+  const ai = posOf(at, isFactory), ti = posOf(to, isFactory)
   if (ai >= 0 && ti >= 0 && ti > ai + 1) {
-    return `That would skip ${LINE.slice(ai + 1, ti).map(LABEL_OF).join(", ")}. Move it one stage at a time.`
+    return `That would skip ${lineFor(isFactory).slice(ai + 1, ti).map(LABEL_OF).join(", ")}. Move it one stage at a time.`
   }
 
   // A shipped order is done — the only change left is a Refund. Un-shipping would claim the
@@ -155,7 +191,10 @@ export function stageDenialReason(role: string, current: string | null | undefin
     // Tested on the DESTINATION, not the origin. As `at === "in_review"` it blocked only
     // the direct hop, and OP_ZONE also holds awaiting_scan — so the same move went through
     // in two clicks via Awaiting scan. Anything past Received has been PAID for.
-    if ((to === "" || to === "new" || to === "draft") && ai > 0) {
+    // The justification is the CHARGE, so it can't apply to a factory order — nothing was
+    // taken, and saying "this order has been paid for" about the floor's own order would
+    // be untrue. Custody is still covered by the OP_ZONE tests below.
+    if (!isFactory && (to === "" || to === "new" || to === "draft") && ai > 0) {
       return "This order has been paid for — only warehouse or admin can send it back."
     }
     if (!OP_ZONE.has(at)) return "The warehouse has this item — only warehouse or admin can change its status now."
@@ -165,8 +204,8 @@ export function stageDenialReason(role: string, current: string | null | undefin
   return "Your role cannot change production status."
 }
 
-export function canSetStage(role: string, current: string | null | undefined, target: string): boolean {
-  return stageDenialReason(role, current, target) === null
+export function canSetStage(role: string, current: string | null | undefined, target: string, isFactory?: boolean): boolean {
+  return stageDenialReason(role, current, target, isFactory) === null
 }
 
 /**
@@ -175,10 +214,10 @@ export function canSetStage(role: string, current: string | null | undefined, ta
  * null when the move isn't a forward walk along the line — either end being a stop, or the
  * target being backwards or the current stage. Those are single moves, not catch-ups.
  */
-export function stagePath(current: string | null | undefined, target: string): string[] | null {
-  const ai = posOf(current), ti = posOf(target)
+export function stagePath(current: string | null | undefined, target: string, isFactory?: boolean): string[] | null {
+  const ai = posOf(current, isFactory), ti = posOf(target, isFactory)
   if (ai < 0 || ti < 0 || ti <= ai) return null
-  return LINE.slice(ai + 1, ti + 1)
+  return lineFor(isFactory).slice(ai + 1, ti + 1)
 }
 
 /**
@@ -192,12 +231,12 @@ export function stagePath(current: string | null | undefined, target: string): s
  * Only true for a genuine SKIP (two or more steps). One step is an ordinary move and
  * doesn't need a confirmation.
  */
-export function canWalk(role: string, current: string | null | undefined, target: string): boolean {
-  const path = stagePath(current, target)
+export function canWalk(role: string, current: string | null | undefined, target: string, isFactory?: boolean): boolean {
+  const path = stagePath(current, target, isFactory)
   if (!path || path.length < 2) return false
   let at = normalizeStage(current)
   for (const s of path) {
-    if (stageDenialReason(role, at, s) !== null) return false
+    if (stageDenialReason(role, at, s, isFactory) !== null) return false
     at = s
   }
   return true
@@ -205,8 +244,16 @@ export function canWalk(role: string, current: string | null | undefined, target
 
 // Does this role get a status CONTROL for an item at this stage, or a read-only badge?
 // An operator past Awaiting scan keeps only the stop options, never the pipeline.
-export function stageOptionsFor(role: string, current: string | null | undefined): FactoryStage[] {
-  return ALL_STATUSES.filter((s) => canSetStage(role, current, s.id))
+//
+// Pending is dropped outright for a factory order rather than offered-and-disabled, which
+// is the one place this file breaks its own "never hide, explain" rule — and deliberately.
+// A greyed row is for a move this role may not make; this stage doesn't EXIST for this
+// order, and listing it would put the seller queue's name in the menu of an order that can
+// never belong there. Every other stage still shows with its reason.
+export function stageOptionsFor(role: string, current: string | null | undefined, isFactory?: boolean): FactoryStage[] {
+  return ALL_STATUSES
+    .filter((s) => !(isFactory && s.id === "in_review"))
+    .filter((s) => canSetStage(role, current, s.id, isFactory))
 }
 
 export const TONE_CLASS: Record<FactoryTone, string> = {

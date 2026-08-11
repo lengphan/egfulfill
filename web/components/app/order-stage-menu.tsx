@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { DotsThree, SkipForward, Truck } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, canSetStage, stageDenialReason, canWalk } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, canSetStage, stageDenialReason, canWalk, isFactoryOrder } from "@/lib/factory-status"
 import { postItemStatus, updateOrder, type OrderRow } from "@/lib/api"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
@@ -31,8 +31,11 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   const items = order.items ?? []
   const stage = orderStage(items)
   const stopped = isException(stage)
-  const next = nextStage(stage)
-  const canAdvance = !!next && canSetStage(role, stage, next)
+  // The factory's own order runs a line without Pending on it — see FACTORY_LINE. Every
+  // rule below reads it, so the menu offers the same moves the API would accept.
+  const fac = isFactoryOrder(order)
+  const next = nextStage(stage, fac)
+  const canAdvance = !!next && canSetStage(role, stage, next, fac)
   const canShip = !!canFulfill && !stopped && !!onNewLabel
 
   const setOrderStatus = async (to: string) => {
@@ -50,10 +53,14 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   // legally WALK to it (a confirmed catch-up rather than an outright refusal).
   const withReason = (list: typeof FACTORY_STAGES) =>
     list.map((s) => {
-      const deny = stageDenialReason(role, stage, s.id)
-      return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id) }
+      const deny = stageDenialReason(role, stage, s.id, fac)
+      return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id, fac) }
     })
-  const prod = withReason([{ id: "", label: "Draft", tone: "new" as const }, ...FACTORY_STAGES])
+  // Pending is left OUT for a factory order rather than greyed: a disabled row means "you
+  // may not", and this is "this order can't be there at all". Every other stage still lists
+  // with its reason.
+  const prod = withReason([{ id: "", label: "Draft", tone: "new" as const },
+    ...FACTORY_STAGES.filter((s) => !(fac && s.id === "in_review"))])
   const exc = withReason(EXCEPTION_STAGES)
 
   const onStage = async (s: { id: string; label: string; deny: string | null; walk: boolean }) => {

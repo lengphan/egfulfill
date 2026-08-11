@@ -90,8 +90,29 @@ const MONEY_STAGES = new Set(['cancelled', 'refunded']);
 // The linear order, '' (Received) first, for adjacency checks. EXCEPTIONS are deliberately
 // absent: a stop is not a position on this line, which is why it can be entered from
 // anywhere and never counts as a skip.
-const LINE = ['', ...PIPELINE];
-const posOf = (s) => LINE.indexOf(normalizeStage(s));
+//
+// TWO LINES, BECAUSE `in_review` IS A SELLER STAGE, NOT A STEP OF MAKING ANYTHING.
+//
+// "Pending" means: the seller submitted, we took their money, and we have not accepted the
+// job yet. A factory-owned order has no seller, is never charged (the charge lives in the
+// `if (sel)` block, and staff resolve to sel = null) and approves itself — so the stage
+// cannot describe anything true about it. It was only ever passed THROUGH, to satisfy the
+// one-step rule: the floor's own orders were walked new → in_review → awaiting_scan in
+// under a second, and any that stopped halfway sat in the seller queue looking like work
+// someone was waiting on us for.
+//
+// So for those orders the stage simply isn't on the line: '' → awaiting_scan is one step.
+// This does not weaken the skip rule. That rule exists so nobody can assert PHYSICAL WORK
+// that didn't happen — printed, scanned, shipped. in_review is a payment-and-approval
+// state that cannot exist for a factory order, so stepping over it asserts nothing at all.
+// Every other hop stays one-at-a-time, for every role, exactly as before.
+const SELLER_LINE = ['', ...PIPELINE];
+const FACTORY_LINE = SELLER_LINE.filter((s) => s !== 'in_review');
+const lineFor = (isFactory) => (isFactory ? FACTORY_LINE : SELLER_LINE);
+// -1 for anything off this order's line — a stop, or (for a factory order) the legacy
+// in_review rows written before this. Off-line means "not a position", so it is never a
+// skip in either direction, which is what lets those rows be moved anywhere forward.
+const posOf = (s, isFactory = false) => lineFor(isFactory).indexOf(normalizeStage(s));
 // Human names, so a refusal can say which stages would be skipped rather than printing
 // the internal ids at someone.
 const STAGE_LABEL = {
@@ -113,22 +134,28 @@ const STAGE_LABEL = {
  * and stepping back to any earlier stage is a claim that less has happened, which is
  * always safe to assert. Entering or leaving a stop is likewise never a skip.
  */
-function skipsPipeline(current, target) {
-  const at = posOf(current), to = posOf(target);
+function skipsPipeline(current, target, isFactory = false) {
+  const at = posOf(current, isFactory), to = posOf(target, isFactory);
   if (at < 0 || to < 0) return false;      // a stop at either end — not on the line
   return to > at + 1;
 }
 
-// null = allowed; a string = the refusal shown to the user.
-export function stageDenial(role, current, target) {
+/**
+ * null = allowed; a string = the refusal shown to the user.
+ *
+ * `isFactory` — this order belongs to the factory rather than to a seller (orders.factory_order,
+ * derived from the owner's role). It selects which line the adjacency rules read; see the note
+ * on FACTORY_LINE. Defaults false, so a caller that doesn't know is held to the stricter line.
+ */
+export function stageDenial(role, current, target, isFactory = false) {
   const at = normalizeStage(current), to = normalizeStage(target);
 
   // SKIPPING IS DENIED FOR EVERYONE, admin included. This is not a permission — it is
   // what the pipeline MEANS. An admin has the authority to correct any record; nobody has
   // the authority to make an order have been printed when it wasn't. Admin keeps every
   // other freedom: backwards, stops, money stages, one step at a time as far as they like.
-  if (skipsPipeline(at, to)) {
-    const missed = LINE.slice(posOf(at) + 1, posOf(to));
+  if (skipsPipeline(at, to, isFactory)) {
+    const missed = lineFor(isFactory).slice(posOf(at, isFactory) + 1, posOf(to, isFactory));
     return `That would skip ${missed.map((s) => STAGE_LABEL[s] || s).join(', ')}. Move it one stage at a time.`;
   }
 
@@ -165,7 +192,12 @@ export function stageDenial(role, current, target) {
     // Anything that has reached in_review has been PAID for; sending it back to Received
     // makes a paid order read as untouched and editable while the money stays taken. That
     // is true whichever stage it is sent back FROM, so the rule is about where it lands.
-    if ((to === '' || to === 'new' || to === 'draft') && posOf(at) > posOf('')) {
+    // The whole justification is the CHARGE, so it cannot apply to a factory order —
+    // nothing was ever taken, and refusing an operator with "this order has been paid for"
+    // would be telling them something untrue about their own floor's order. Custody is
+    // still protected: the OP_ZONE tests above already stop them touching anything the
+    // warehouse holds, so the most this permits is walking back a mis-click of their own.
+    if (!isFactory && (to === '' || to === 'new' || to === 'draft') && posOf(at, isFactory) > posOf('', isFactory)) {
       return 'This order has been paid for — only warehouse or admin can send it back.';
     }
     return null;
@@ -490,12 +522,19 @@ export function ordersRoutes(app, requireAuth) {
   q('alter table orders add column if not exists rushed_at timestamptz').catch(() => {});
   // Overdue and rush are both list-wide filters on every board, so they get an index.
   q('create index if not exists orders_rush_idx on orders (rush) where rush = true').catch(() => {});
-  // Classify factory_order by OWNER ROLE, not by id: an Etsy order is factory-owned
-  // ONLY when its connection owner is staff (the admin/factory shop). A seller's own
-  // Etsy shop → factory_order=false so it shows on their dashboard (seller-managed
-  // until pushed). Manual seller orders stay false. Idempotent (only fixes wrong rows).
-  q(`update orders set factory_order = (id like 'etsy-%' and exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller'))
-      where factory_order is distinct from (id like 'etsy-%' and exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller'))`).catch(() => {});
+  // Classify factory_order by OWNER ROLE ALONE. It used to also require `id like 'etsy-%'`,
+  // which made the flag answer "is this an order on the factory's own Etsy shop" when every
+  // reader of it is asking "does this order belong to a seller who pays us". A manual FF-*
+  // order raised on a factory board, and a TikTok/Shopify order on a factory-owned shop,
+  // both had factory_order = FALSE while being as factory-owned as anything gets — which is
+  // why the staff board query carries an `or exists (… role <> 'seller')` clause bolted on
+  // beside this flag, and why the design-fee exemption missed them.
+  //
+  // One derivation, owner role, everywhere. A seller's own Etsy/Shopify shop stays false, so
+  // their orders still show on their dashboard and are still charged for. Idempotent — the
+  // where clause only touches rows whose flag disagrees.
+  q(`update orders set factory_order = exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller')
+      where factory_order is distinct from exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller')`).catch(() => {});
   // Composite design position {x,y,w,h} per line item — persisted so the mockup
   // overlay lands in the same spot on every board + the mobile app after a sync.
   // schema.sql already declares it for fresh DBs; this covers older ones.
@@ -1446,11 +1485,18 @@ export function ordersRoutes(app, requireAuth) {
     if (!lineId && !sku) { reply.code(400); return { error: 'line_id or sku required' }; }
     const key = lineId ? 'line_id' : 'sku';
     const val = lineId || sku;
-    const pre = await q(`select factory_status from order_items where order_id=$1 and ${key}=$2 limit 1`, [req.params.id, val]);
+    // The order's OWNER comes back with the line: which line the stage rules read depends
+    // on whether this is a seller's order or the factory's own (see FACTORY_LINE). Read in
+    // the same round trip rather than a second query — this runs once per line item, and a
+    // batch move walks every line of the order.
+    const pre = await q(
+      `select i.factory_status, coalesce(o.factory_order, false) as factory_order
+         from order_items i join orders o on o.id = i.order_id
+        where i.order_id=$1 and i.${key}=$2 limit 1`, [req.params.id, val]);
     if (!pre.rows[0]) { reply.code(404); return { error: 'item not found' }; }
     // Role gate — see stageDenial. Read the CURRENT stage first: an operator's reach
     // depends on where the item already is, not just where they're sending it.
-    const denial = stageDenial(String(req.user.role || ''), pre.rows[0].factory_status, status);
+    const denial = stageDenial(String(req.user.role || ''), pre.rows[0].factory_status, status, pre.rows[0].factory_order);
     if (denial) { reply.code(403); return { error: denial }; }
     // Shipping is an ORDER-level claim even when set per item: a parcel can't go out
     // half-made. Everything before shipped stays per-item and unrestricted.

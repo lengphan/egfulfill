@@ -1321,6 +1321,13 @@ export type OrderRow = {
   address?: Record<string, unknown> | null
   status?: string | null
   factory_status?: string | null
+  /**
+   * THE FACTORY'S OWN ORDER, not a seller's — derived server-side from the owner's role,
+   * never sent by a client. It decides two things the UI can't work out for itself: that
+   * nothing here is charged to anyone, and that the Pending stage doesn't apply (see
+   * FACTORY_LINE in lib/factory-status.ts — those orders go Draft → Awaiting scan).
+   */
+  factory_order?: boolean | null
   total?: number | string | null
   profit?: number | string | null
   /** Who uploaded it — resolved server-side ONLY when it's the shop owner or one of their

@@ -22,7 +22,7 @@ import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
-import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
@@ -557,7 +557,7 @@ export function OrdersHub() {
   const runCatchUp = async () => {
     if (!catchUp) return
     const { order, to } = catchUp
-    const path = stagePath(order.factory_status ?? orderStage(order.items ?? []), to)
+    const path = stagePath(order.factory_status ?? orderStage(order.items ?? []), to, isFactoryOrder(order))
     if (!path) { setCatchUp(null); return }
     setCatchingUp(true)
     try {
@@ -1526,16 +1526,25 @@ export function OrdersHub() {
                        * text is the SERVER's own sentence (stageDenialReason mirrors
                        * stageDenial), so what the tooltip says is what the API would say.
                        */
+                      // The factory's own order runs a line with no Pending on it (see
+                      // FACTORY_LINE) — every rule below has to read the same line the
+                      // server will, or the menu offers moves the API refuses.
+                      const fac = isFactoryOrder(o)
                       const withReason = (list: typeof FACTORY_STAGES) =>
                         list.map((s) => {
-                          const deny = stageDenialReason(role, stage, s.id)
+                          const deny = stageDenialReason(role, stage, s.id, fac)
                           // A skip this role could legally WALK isn't refused outright — it
                           // becomes a catch-up, behind a confirmation. Every other refusal
                           // stands: canWalk requires each intermediate hop to be permitted,
                           // so an operator can't reach Shipped by calling it a catch-up.
-                          return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id) }
+                          return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id, fac) }
                         })
-                      const prod = withReason([{ id: "", label: "Draft", tone: "new" as const }, ...FACTORY_STAGES])
+                      // The ONE exception to "list everything, disable what's refused": a
+                      // factory order doesn't get Pending at all. Disabled means "you may
+                      // not"; this is "this order can never be there", and showing the
+                      // seller queue's stage on the floor's own order is what we're removing.
+                      const prod = withReason([{ id: "", label: "Draft", tone: "new" as const },
+                        ...FACTORY_STAGES.filter((s) => !(fac && s.id === "in_review"))])
                       const exc = withReason(EXCEPTION_STAGES)
                       /**
                        * A STOPPED order has no obvious next move — that is what stopping it
@@ -1577,8 +1586,8 @@ export function OrdersHub() {
                        * produce a wrong answer, so the existence of the step is checked
                        * first and the permission second.
                        */
-                      const next = nextStage(stage)
-                      const canAdvance = !!next && canSetStage(role, stage, next)
+                      const next = nextStage(stage, fac)
+                      const canAdvance = !!next && canSetStage(role, stage, next, fac)
                       const canStart = canFulfill && stage === "" && !stopped
                       const canLabels = canFulfill && items.some((it) => it.sku && variantOf(it))
                       // Primary = the one obvious next move. Intake → Start; ready → ship;
@@ -2115,7 +2124,10 @@ export function OrdersHub() {
                             // It keeps FILTERING rather than greying, unlike that menu — a
                             // native <option> has nowhere to put the reason, and a greyed
                             // line you can't interrogate is worse than a shorter list.
-                            const opts = stageOptionsFor(role, it.factory_status)
+                            // Pending is absent from a factory order's options for the same
+                            // reason it's absent from its ⋯ menu — the stage isn't on that
+                            // order's line at all (see FACTORY_LINE).
+                            const opts = stageOptionsFor(role, it.factory_status, isFactoryOrder(o))
                             const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
                             const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
                             if (!opts.length) return <StageBadge status={it.factory_status} />
@@ -2323,7 +2335,7 @@ export function OrdersHub() {
           </DialogHeader>
           {catchUp && (() => {
             const from = catchUp.order.factory_status ?? orderStage(catchUp.order.items ?? [])
-            const path = stagePath(from, catchUp.to) ?? []
+            const path = stagePath(from, catchUp.to, isFactoryOrder(catchUp.order)) ?? []
             return (
               <div className="space-y-3 text-sm">
                 <p className="text-muted-foreground">
