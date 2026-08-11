@@ -11,6 +11,7 @@ import { clampDays, windowStartSec } from '../backfill.js';
 import { imageBytesFrom } from '../images.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll as readSettings } from './factory_settings.js';
+import { resolveDestination } from '../destinations.js';
 
 const APP_KEY    = process.env.TIKTOK_APP_KEY || '';
 const APP_SECRET = process.env.TIKTOK_APP_SECRET || '';
@@ -880,7 +881,10 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
     }
     let conn;
     try {
-      conn = await connectionForPublish(req.user);
+      // The shop named on the request, else the caller's default — see destinations.js.
+      // With two TikTok shops connected, `connection_id` is the only thing that says
+      // which one, and warehouse_id below belongs to a SHOP, not to TikTok.
+      conn = await resolveDestination('tiktok', b, req.user, connectionForPublish);
       if (!conn) { reply.code(400); return { error: 'No TikTok shop connected to publish to.' }; }
       await getShopCipher(conn);   // proves the shop is reachable + caches the cipher
     } catch (e) { reply.code(400); return { error: e.message }; }
@@ -942,16 +946,21 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       //    ready to make — best-effort, mirrors the Etsy publish path.
       if (productId) {
         q(`insert into published_listings
-             (listing_id, platform, seller_id, blank_sku, design_id, design_data, design_pos, print_type, color, size)
-           values ($1,'tiktok',$2,$3,$4,$5,$6,$7,$8,$9)
+             (listing_id, platform, seller_id, blank_sku, design_id, design_data, design_pos, print_type, color, size,
+              connection_id, shop_id)
+           values ($1,'tiktok',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
            on conflict (listing_id) do update set
              blank_sku=excluded.blank_sku, print_type=excluded.print_type,
-             color=excluded.color, size=excluded.size`,
+             color=excluded.color, size=excluded.size,
+             connection_id=excluded.connection_id, shop_id=excluded.shop_id`,
           [String(productId), req.user.sub || null, b.blank || b.sku || null, b.designId || null,
            b.designUrl || b.design || null, b.designPos ? JSON.stringify(b.designPos) : null,
            b.printType || b.method || null,
            (Array.isArray(b.colors) && b.colors.length === 1) ? b.colors[0] : null,
-           (Array.isArray(b.sizes) && b.sizes.length === 1) ? b.sizes[0] : null]
+           (Array.isArray(b.sizes) && b.sizes.length === 1) ? b.sizes[0] : null,
+           // Which shop it went to — warehouses and category ids are per-shop, so an edit
+           // that reached the wrong one would be wrong in more than just the token.
+           conn.id, conn.shop_id || null]
         ).catch(() => {});
       }
       return { ok: true, product_id: productId, skus: d.skus || [], warnings: d.warnings || [] };

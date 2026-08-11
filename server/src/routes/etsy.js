@@ -10,6 +10,7 @@ import { requireSpydeck } from '../entitlements.js';
 import { fetchSheetRows } from './sheets.js';
 import { imageBytesFrom } from '../images.js';
 import { clampDays, windowStartSec } from '../backfill.js';
+import { resolveDestination } from '../destinations.js';
 import { hashOf } from '../fingerprint.js';
 
 const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
@@ -677,11 +678,20 @@ export function mapListing(l, imgsById = {}, rangeById = {}) {
 }
 
 /** The Etsy connection to act as: a seller's own, or (for staff, who have no shop
- *  of their own) the first connected shop — matching /api/etsy/connected. */
+ *  of their own) the first connected shop — matching /api/etsy/connected.
+ *
+ *  STAFF NEVER RESOLVE TO A SELLER'S SHOP. The staff branch was `order by created_at
+ *  limit 1` across the WHOLE table, so the oldest Etsy row won whoever owned it — one
+ *  seller connection older than the factory's and staff would have been publishing into
+ *  someone else's shop with someone else's token. tiktok.js already excluded seller-owned
+ *  rows here; this is the same exclusion, and it is §2.6, not a preference. */
 export async function connectionFor(user) {
   const staff = !!(user && user.role && user.role !== 'seller');
   const r = await q(
-    staff ? `select * from platform_connections where platform='etsy' order by created_at limit 1`
+    staff ? `select pc.* from platform_connections pc
+               where pc.platform='etsy'
+                 and not exists (select 1 from users u where u.id=pc.connected_by and u.role='seller')
+             order by pc.created_at limit 1`
           : `select * from platform_connections where platform='etsy' and connected_by=$1 order by created_at limit 1`,
     staff ? [] : [user.sub]
   );
@@ -1589,6 +1599,29 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   q('alter table published_listings add column if not exists description text').catch(() => {});
   q('alter table published_listings add column if not exists tags text[]').catch(() => {});
   q('alter table published_listings add column if not exists title text').catch(() => {});
+  /**
+   * WHICH SHOP this listing lives in.
+   *
+   * The record carried `platform` only, which was enough while one seller could reach
+   * exactly one shop per platform. With two Etsy shops it stops being enough in both
+   * directions: we can't tell where a listing went, and "edit this listing" would reach
+   * for whichever connection came back first — the wrong shop's token against the right
+   * shop's listing id, which Etsy answers with a 404 that reads like a deleted listing.
+   *
+   * Backfilled below for rows written before this existed, where there was only one
+   * possible answer.
+   */
+  q('alter table published_listings add column if not exists connection_id uuid').catch(() => {});
+  q('alter table published_listings add column if not exists shop_id text').catch(() => {});
+  // One-time, self-healing: a row can only have come from the single connection that
+  // existed for its platform. Where a platform has more than one connection today, the
+  // answer is genuinely unknown and the row is LEFT NULL rather than guessed — a wrong
+  // shop recorded as fact is worse than an honest blank.
+  q(`update published_listings pl
+        set connection_id = c.id, shop_id = c.shop_id
+       from (select platform, min(id::text)::uuid as id, min(shop_id) as shop_id
+               from platform_connections group by platform having count(*) = 1) c
+      where c.platform = pl.platform and pl.connection_id is null`).catch(() => {});
 
   app.post('/api/etsy/publish', { preHandler: requireAuth }, async (req, reply) => {
     try {
@@ -1600,9 +1633,12 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // recorded published_listings.seller_id = the caller, so a sale on it attached the
       // caller's artwork to the wrong shop's order. Writing to a shop you don't own is
       // exactly what §2.6 forbids.
-      const conn = await connectionFor(req.user);
-      if (!conn) { reply.code(400); return { error: 'No Etsy shop connected to your account.' }; }
+      // The shop named on the request, else the caller's default — see destinations.js.
+      // A connection_id that doesn't resolve is an ERROR, never a quiet fallback: sending
+      // a listing to a different shop than the one that was picked is the whole problem.
       const b = req.body || {};
+      const conn = await resolveDestination('etsy', b, req.user, connectionFor);
+      if (!conn) { reply.code(400); return { error: 'No Etsy shop connected to your account.' }; }
       const title = String(b.title || '').trim();
       const price = Number(b.price) || 0;
       if (!title) { reply.code(400); return { error: 'A listing title is required.' }; }
@@ -1690,20 +1726,24 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // must not fail because we couldn't write a note about it.
       q(`insert into published_listings
            (listing_id, platform, seller_id, blank_sku, design_id, design_data, design_pos, print_type, color, size,
-            title, description, tags)
-         values ($1,'etsy',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            title, description, tags, connection_id, shop_id)
+         values ($1,'etsy',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          on conflict (listing_id) do update set
            blank_sku=excluded.blank_sku, design_id=excluded.design_id,
            design_data=excluded.design_data, design_pos=excluded.design_pos,
            print_type=excluded.print_type, color=excluded.color, size=excluded.size,
-           title=excluded.title, description=excluded.description, tags=excluded.tags`,
+           title=excluded.title, description=excluded.description, tags=excluded.tags,
+           connection_id=excluded.connection_id, shop_id=excluded.shop_id`,
         [String(listingId), req.user.sub || null, b.blank || b.sku || null, b.designId || null,
          b.designUrl || b.design || null,
          b.designPos ? JSON.stringify(b.designPos) : null,
          b.printType || b.method || null, b.color || null, b.size || null,
          // The words, so reopening this listing doesn't ask for them a second time.
          title || null, b.description ? String(b.description) : null,
-         Array.isArray(uniqueTags) && uniqueTags.length ? uniqueTags : null]
+         Array.isArray(uniqueTags) && uniqueTags.length ? uniqueTags : null,
+         // Which shop it went to, so a re-publish uses that shop's token rather than
+         // whichever connection sorts first.
+         conn.id, conn.shop_id || null]
       ).catch(() => {});
 
       // Upload the photo(s). Sources are data: URLs (local uploads) OR remote Etsy-CDN

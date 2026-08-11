@@ -8,6 +8,7 @@ import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 import { clampDays, windowStartSec } from '../backfill.js';
 import { audit } from '../audit.js';
+import { resolveDestination } from '../destinations.js';
 
 const API_KEY     = process.env.SHOPIFY_API_KEY || '';
 const API_SECRET  = process.env.SHOPIFY_API_SECRET || '';
@@ -590,16 +591,32 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
     const title = String(b.title || '').trim();
     if (!title) { reply.code(400); return { error: 'A title is required.' }; }
 
-    const conn = (await q(
-      `select * from platform_connections where platform='shopify' and connected_by=$1 limit 1`,
-      [req.user.sub])).rows[0];
+    // The store named on the request, else the caller's own — see destinations.js. The
+    // fallback keeps the previous behaviour exactly: the caller's first connected store.
+    let conn;
+    try {
+      conn = await resolveDestination('shopify', b, req.user, async (user) => (await q(
+        `select * from platform_connections where platform='shopify' and connected_by=$1 order by created_at limit 1`,
+        [user.sub])).rows[0] || null);
+    } catch (e) { reply.code(e.status || 400); return { error: e.message }; }
     if (!conn) { reply.code(400); return { error: 'No Shopify shop is connected to your account.' }; }
 
     const base = `https://${conn.shop_id}/admin/api/${API_VERSION}`;
+    /**
+     * REFRESH FIRST — this route used `conn.access_token` raw while every other Shopify
+     * call in this file goes through freshToken(). Shopify's tokens now expire in ~60
+     * minutes, so publishing worked only inside the hour after a connect and answered
+     * every later attempt with a 401 that reads "reconnect the shop" — advice that was
+     * never the actual problem. Fetched ONCE here and reused for the product and each
+     * image, rather than per call.
+     */
+    let token;
+    try { token = await freshToken(conn); }
+    catch (e) { reply.code(401); return { error: e.message }; }
     const call = async (path, init = {}) => {
       const r = await fetch(base + path, {
         ...init,
-        headers: { 'X-Shopify-Access-Token': conn.access_token, 'Content-Type': 'application/json', ...(init.headers || {}) },
+        headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json', ...(init.headers || {}) },
       });
       const text = await r.text();
       let data = null;
@@ -694,16 +711,19 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
 
     await q(
       `insert into published_listings (listing_id, platform, seller_id, blank_sku, design_id, design_data, design_pos, print_type, color, size,
-                                       title, description, tags)
-       values ($1,'shopify',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+                                       title, description, tags, connection_id, shop_id)
+       values ($1,'shopify',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        on conflict (listing_id) do update set blank_sku=excluded.blank_sku, print_type=excluded.print_type,
-         title=excluded.title, description=excluded.description, tags=excluded.tags`,
+         title=excluded.title, description=excluded.description, tags=excluded.tags,
+         connection_id=excluded.connection_id, shop_id=excluded.shop_id`,
       [String(p.id), req.user.sub, b.blank_sku || null, b.design_id || null, b.design_data || null,
        b.design_pos ? JSON.stringify(b.design_pos) : null, b.print_type || null,
        colors[0] || null, sizes[0] || null,
        // Same as Etsy: kept so an edit-and-send-again doesn't ask for the words twice.
        title || null, b.description ? String(b.description) : null,
-       (Array.isArray(b.tags) && b.tags.length) ? b.tags.map(String) : null]
+       (Array.isArray(b.tags) && b.tags.length) ? b.tags.map(String) : null,
+       // Which store it went to — the record has to survive a second connected store.
+       conn.id, conn.shop_id || null]
     ).catch(() => {});
 
     audit(req, 'shopify.publish', {
