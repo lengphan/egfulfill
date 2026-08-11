@@ -128,7 +128,13 @@ async function shRates(to, from, pc, extra) {
     token: enc({ p: 'sh', r: rt.object_id }),
     provider: 'shippo', carrier: rt.provider, service: (rt.servicelevel && rt.servicelevel.name) || rt.servicelevel_name || '',
     amount: Number(rt.amount), currency: rt.currency || 'USD',
-    days: rt.estimated_days != null ? rt.estimated_days : null
+    days: rt.estimated_days != null ? rt.estimated_days : null,
+    // THE RATE IS THE ONLY PLACE THIS EXISTS. Shippo puts carrier_account on the rate and
+    // then returns `rate` as a bare id STRING on the bought transaction, so shBuy cannot
+    // read it back afterwards — it has to be carried from here to the buy or it is lost.
+    // Dropping it is why every label ever bought recorded an empty account and every one
+    // of them is refused by the SCAN form (manifests.js:119).
+    carrierAccount: rt.carrier_account || ''
   }));
 }
 // `sel` is the rate we picked at rate-shop time ({amount, carrier, service}). Shippo
@@ -160,7 +166,12 @@ async function shBuy(rateObjectId, sel) {
     // The carrier account this rate was bought under. A manifest (USPS SCAN form) is
     // scoped to ONE carrier account, and there is no way to recover which one a
     // transaction used after the fact — so it is captured here or not at all.
-    carrierAccount: (rate && rate.carrier_account) || ''
+    //
+    // `rate` is a bare id string on the transaction, so the first term is almost never
+    // the one that fires; the value actually arrives on `sel`, the rate we chose at
+    // rate-shop time. Without that fallback this was ALWAYS '', which is exactly what
+    // the 35 labels in the database show: 11 with a Shippo ref, 0 with an account.
+    carrierAccount: (rate && rate.carrier_account) || sel.carrierAccount || ''
   };
 }
 
@@ -391,6 +402,11 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
     const b = req.body || {};
     try {
       let t = b.rateToken ? dec(b.rateToken) : null;
+      // The rate we picked, kept so the buy can be told what it bought. Shippo's
+      // transaction answers with `rate` as an id string, so cost, carrier, service and
+      // carrier account all have to come from here — a smoke-test buy through this route
+      // came back with cost null and carrier blank precisely because it didn't.
+      let sel = null;
       if (!t) {
         // No token → rate-shop and pick the cheapest.
         if (!epKey() && !shToken()) { reply.code(400); return { error: 'No shipping provider configured' }; }
@@ -405,11 +421,15 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
         if (b.service) { const want = String(b.service).toLowerCase(); const f = all.filter((r) => (r.service || '').toLowerCase().includes(want)); if (f.length) pool = f; }
         pool.sort((a, c) => a.amount - c.amount);
         if (!pool.length) { reply.code(400); return { error: 'No rates returned for this shipment' }; }
-        t = dec(pool[0].token);
+        sel = pool[0];
+        t = dec(sel.token);
       }
       let out;
       if (t.p === 'ep') out = await epBuy(t.s, t.r);
-      else if (t.p === 'sh') out = await shBuy(t.r);
+      // `b.rate` lets a caller that already rate-shopped hand back what it chose, the same
+      // way aggregatorBuyRate does. Absent both, this degrades to the old empty fields
+      // rather than failing — a label that buys is worth more than a tidy cost column.
+      else if (t.p === 'sh') out = await shBuy(t.r, sel || b.rate || {});
       else { reply.code(400); return { error: 'Bad rate token' }; }
       return Object.assign({ ok: true }, out);
     } catch (e) { reply.code(400); return { error: e.message }; }
