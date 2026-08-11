@@ -508,12 +508,17 @@ export function DesignCanvasDialog({
   // is only a suggestion — the nearest cone by maths is not always the one you want on
   // the garment — so this records the human's override and wins over region.thread.
   const [picks, setPicks] = useState<Record<string, string>>({})
+  /** Has anyone edited this list by hand — removed a row, overridden a cone, sampled a
+   *  colour? Only then is there anything for "Start over" to undo, and only then is it
+   *  offered. Cleared whenever the matcher rebuilds the list from the artwork. */
+  const [touched, setTouched] = useState(false)
 
   /** Swap the cone for one sampled colour, keeping the saved thread list in step. */
   const chooseThread = (r: ThreadRegion, code: string) => {
     const next = r.options.find((o) => o.code === code)
     if (!next) return
     const current = picks[r.srcHex] ?? r.thread.code
+    setTouched(true)
     setPicks((p) => ({ ...p, [r.srcHex]: code }))
     setThreads((prev) => {
       // Drop the cone this colour used to claim, then add the new one — but only if no
@@ -523,6 +528,50 @@ export function DesignCanvasDialog({
       const without = stillUsed ? prev : prev.filter((t) => t.code !== current)
       return without.some((t) => t.code === next.code) ? without : [...without, next]
     })
+  }
+
+  /**
+   * Drop one colour off the design.
+   *
+   * The matcher finds colours; it doesn't know which of them matter. A stray anti-aliased
+   * edge, a background the artwork was exported on, or a second shade the digitiser intends
+   * to stitch in the first one's cone — all of them arrive as rows, and until now the only
+   * way to deal with one was to leave it there and hope the floor ignored it. The list is
+   * what the factory loads, so a row nobody wants stitched has to be removable.
+   *
+   * Removes the CONE too, unless another remaining colour still resolves to it — the same
+   * rule chooseThread uses, and for the same reason: unloading a cone another part of the
+   * design needs would be a silent change to what gets made.
+   */
+  const dropRegion = (r: ThreadRegion) => {
+    const code = picks[r.srcHex] ?? r.thread.code
+    const rest = (regions ?? []).filter((o) => o.srcHex !== r.srcHex)
+    setTouched(true)
+    setRegions(rest)
+    setPicks((p) => { const n = { ...p }; delete n[r.srcHex]; return n })
+    const stillUsed = rest.some((o) => (picks[o.srcHex] ?? o.thread.code) === code)
+    if (!stillUsed) setThreads((prev) => prev.filter((t) => t.code !== code))
+  }
+
+  /**
+   * Put the auto-match back.
+   *
+   * Removing rows and picking cones are both destructive to a read-out that was DERIVED —
+   * the artwork still says what it says. Without this, undoing a mistaken removal meant
+   * re-uploading the design, because nothing else re-runs the matcher. Rebuilds the rows
+   * from the artwork and drops every override, which is exactly "how it arrived".
+   */
+  const [rematching, setRematching] = useState(false)
+  const rematch = () => {
+    if (!designUrl) return
+    setRematching(true)
+    setPicks({})
+    setTouched(false)
+    loadThreadPalette()
+      .then(() => Promise.all([matchThreadRegions(designUrl), matchThreadColors(designUrl)]))
+      .then(([rs, ts]) => { setRegions(rs); setThreads(ts); setThreadErr(ts.length === 0) })
+      .catch(() => { setRegions([]); setThreadErr(true) })
+      .finally(() => setRematching(false))
   }
   // null = not attempted, [] = attempted and found nothing (which is a real outcome worth
   // saying out loud — it previously looked identical to "no artwork yet").
@@ -555,6 +604,7 @@ export function DesignCanvasDialog({
     const id = setTimeout(() => {
       if (!alive) return
       setRegions(null)
+      setTouched(false)
       if (!isEmb || !designUrl) return
       // Same order as the cone list above: the factory's real stock first, or the rows
       // would offer colours nobody has on a shelf and then quietly re-match under them.
@@ -584,6 +634,7 @@ export function DesignCanvasDialog({
     // (we sampled one pixel, not a region), so the row shows a solid block of the colour,
     // which the renderer already falls back to.
     if (t) {
+      setTouched(true)
       const opts = nearestThreads(r, g, b, 6)
       setRegions((prev) => {
         const rows = prev ?? []
@@ -1088,14 +1139,31 @@ export function DesignCanvasDialog({
                 </div>
               </div>
               {designUrl && (
-                <button
-                  type="button"
-                  onClick={() => setPicking((v) => !v)}
-                  title="Click this, then click anywhere on your design to add that colour"
-                  className={"inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors " + (picking ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}
-                >
-                  <Eyedropper size={13} weight="bold" /> {picking ? "Click your design…" : "Add a colour"}
-                </button>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {/* Offered only once it would CHANGE something — after a removal or an
+                      override. On an untouched list it is a button that does nothing, and a
+                      button that does nothing is one you learn to distrust. */}
+                  {touched && (
+                    <button
+                      type="button"
+                      onClick={rematch}
+                      disabled={rematching}
+                      title="Read the colours off your design again, undoing anything removed or changed here"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                    >
+                      <ArrowClockwise size={13} weight="bold" className={rematching ? "animate-spin" : ""} />
+                      {rematching ? "Reading…" : "Start over"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPicking((v) => !v)}
+                    title="Click this, then click anywhere on your design to add that colour"
+                    className={"inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors " + (picking ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}
+                  >
+                    <Eyedropper size={13} weight="bold" /> {picking ? "Click your design…" : "Add a colour"}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1153,6 +1221,20 @@ export function DesignCanvasDialog({
                           onChange={(code) => chooseThread(r, code)}
                         />
                       </div>
+                      {/* The SAME X the artwork and the machine file use. A colour the
+                          matcher found but nobody wants stitched — an anti-aliased edge, the
+                          background it was exported on — was previously permanent: this list
+                          is what the floor loads, so a row you can't remove is a cone you
+                          can't stop them loading. */}
+                      <button
+                        type="button"
+                        onClick={() => dropRegion(r)}
+                        title={`Remove ${r.thread.name} — we won't stitch this colour`}
+                        aria-label={`Remove ${r.thread.name}`}
+                        className="eg-tap shrink-0 rounded-md border border-border p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X size={12} weight="bold" />
+                      </button>
                     </div>
                   ))}
                 </div>
