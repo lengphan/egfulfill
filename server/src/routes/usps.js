@@ -198,13 +198,31 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
   // manual-order modal. Read-only USPS lookup, no payment scope.
   app.get('/api/usps/validate-address', { preHandler: requireAuth }, async (req, reply) => {
     const qy = req.query || {};
-    // Falls back to EasyPost/Shippo when USPS can't answer. USPS gates its Addresses API
-    // behind a separate approval from Labels, so while that application is pending this
-    // is what keeps validation working — and the moment USPS approves, the primary path
-    // below succeeds and takes over with no code or client change. The response shape is
-    // identical either way, so callers never learn which provider replied.
+    /**
+     * VALIDATION IS USPS'S JOB — the aggregator fallback is OFF unless asked for.
+     *
+     * USPS has granted this app the `addresses` scope (checked against the live API on
+     * 2026-08-11), so the primary path below answers, and it answers with more than an
+     * aggregator does: ZIP+4, delivery point and carrier route arrive on the same call.
+     *
+     * The Shippo fallback carried this while the licence was pending and is now off by
+     * default, because "harmless to leave in place" was only true while it was free.
+     * Shippo's API price sheet lists US validation at 2¢ a lookup, metered separately
+     * from labels — and since the response shape here is deliberately identical whoever
+     * answers, a fallback that fires silently is a bill that arrives silently. That is
+     * exactly the kind of cost nobody goes looking for.
+     *
+     * ADDRESS_FALLBACK_SHIPPO=1 turns it back on for a USPS outage. Left off, a USPS
+     * failure is reported as a USPS failure, which is the honest thing to tell someone
+     * whose address just wouldn't validate.
+     *
+     * Nothing is lost by this: every caller sends a US address (streetAddress / city /
+     * state / ZIPCode, no country field anywhere), and the USPS Addresses API covers
+     * exactly that.
+     */
+    const fallbackOn = String(process.env.ADDRESS_FALLBACK_SHIPPO || '') === '1';
     const viaAggregator = async (uspsError) => {
-      if (!shippingEnabled()) return null;
+      if (!fallbackOn || !shippingEnabled()) return null;
       try {
         const r = await aggregatorVerifyAddress({
           street: qy.streetAddress, street2: qy.secondaryAddress,
@@ -231,7 +249,7 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
         if (/not authorized|access control|addresses api/i.test(String(msg))) {
           const alt = await viaAggregator(msg);
           if (alt) return alt;
-          msg = 'USPS hasn\'t granted this app access to the Addresses API. In the USPS Developer Portal, add the "Addresses" API to your app (separate from Labels), then retry — the server already requests the addresses OAuth scope.';
+          msg = 'USPS hasn\'t granted this app access to the Addresses API. In the USPS Developer Portal, add the "Addresses" API to your app (separate from Labels), then retry — the server already requests the addresses OAuth scope. To validate through Shippo meanwhile, set ADDRESS_FALLBACK_SHIPPO=1; that is billed per lookup, which is why it is not the default.';
         }
         reply.code(400); return { error: msg };
       }
