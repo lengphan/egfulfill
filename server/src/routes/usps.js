@@ -18,6 +18,7 @@ import { recordUsage } from '../usage.js';
 import { recordCost } from '../costs.js';
 import { shipFromForOrder } from './factory_settings.js';
 import { shippingEnabled, aggregatorBuyCheapest, aggregatorBuyRate, aggregatorVerifyAddress } from './shipping.js';
+import { recordShipment } from '../shipments-store.js';
 import { missingArtwork } from './orders.js';
 
 // Map a USPS mailClass to a service-name hint for the aggregator rate filter.
@@ -316,7 +317,38 @@ q('alter table orders add column if not exists label_cost numeric').catch(() => 
 q('alter table orders add column if not exists ship_service text').catch(() => {});
 
 async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, req) {
-  if (!orderId) return { shipped: false };
+  /**
+   * NO ORDER? THEN IT IS A SHIPMENT, and no order gets invented for it.
+   *
+   * This used to return empty-handed, so the caller minted an FF-* order first purely to
+   * have somewhere to put the label — and that order then sat on the production board as a
+   * Draft with no lines, nothing to make and chips it could never satisfy. A re-ship or a
+   * sample is not an order; it is a parcel. ShipStation draws the same line.
+   *
+   * Everything below this point that only makes sense for an order — advancing the factory
+   * stage, telling the marketplace, charging a seller — is simply absent here, which is the
+   * point: there is nobody to tell and nothing to make.
+   */
+  if (!orderId) {
+    const isTest = !!(ref && ref.test);
+    const id = await recordShipment({
+      tracking, carrier, service: (ref && ref.service) || null, cost,
+      labelUrl, provider: (ref && ref.provider) || null, providerId: (ref && ref.providerId) || null,
+      carrierAccount: (ref && ref.carrierAccount) || null, test: isTest, to,
+      createdBy: (req && req.user && req.user.email) || null,
+    }).catch(() => null);
+    // Postage books exactly as it does for an order — `ref` is a string, so label-sh_* sums
+    // into the same totals as label-<order>. A test label still books nothing.
+    if (id && !isTest) {
+      recordCost('label', cost, `label-${id}`, `Postage · ${carrier || 'carrier'} · ${id}`, {}).catch(() => {});
+    }
+    audit(req, 'shipping.label_bought', {
+      entityType: 'shipment', entityId: id || '',
+      after: { tracking, carrier: carrier || '', cost: cost ?? null, test: isTest, standalone: true },
+      note: `Standalone label · ${carrier || 'carrier'} · ${tracking || 'no tracking'}${isTest ? ' · TEST MODE, not charged' : ''}`,
+    });
+    return { shipped: false, shipmentId: id };
+  }
   // WHO bought postage against WHICH order, and what it cost. The one chokepoint every
   // buy path goes through, so auditing here covers the aggregator, the direct-USPS and
   // the rate-token routes without three near-identical calls. Fire-and-forget.

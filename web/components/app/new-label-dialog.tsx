@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
 import { STOCK_SIZES, DEFAULT_SIZE, customSizes, addCustomSize, sizeKey, sizeLabel, type ParcelSize } from "@/lib/parcel-sizes"
 import { parcelFromOrder, parcelBasisNote } from "@/lib/parcel-from-order"
-import { createOrder, updateOrder, validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, getCatalogProducts, type ShipAddress, type UspsLabelResult, type ShippingRate, type OrderItem } from "@/lib/api"
+import { validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, getCatalogProducts, type ShipAddress, type UspsLabelResult, type ShippingRate, type OrderItem } from "@/lib/api"
 
 const BLANK: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
 const DEFAULT_CARRIERS = ["usps", "ups"]
@@ -174,28 +174,13 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
     try {
       // Existing order → buy against it. No order → mint a manual FF-order so the label is
       // recorded in Shipments the same way marketplace labels are.
-      let orderId = order?.id
-      // Remembered so a FAILED buy doesn't leave the row behind. Creating the order first is
-      // unavoidable — recordLabel books the cost and tracking against an order id — but a
-      // buy that never happened must not leave a permanent empty order in the system, which
-      // is exactly what a rejected UPS attempt did.
-      let mintedId: string | null = null
-      if (!orderId) {
-        const id = `FF-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
-        const co = await createOrder({
-          id, source: "manual", status: "new",
-          customer: { name: to.name || "" },
-          address: { name: to.name || "", street: to.street, street2: to.street2, city: to.city, state: to.state, zip: to.zip },
-          // NOT A PRODUCTION ORDER. It exists so the label has somewhere to live; it has no
-          // lines and nothing to make. ShipStation's equivalent creates a shipment and no
-          // order at all — this is the same separation, and it keeps the row out of the
-          // boards while leaving it in Shipments where it belongs.
-          labelOnly: true,
-        })
-        if (!co.ok) { setErr(co.error || "Couldn't create the order."); return }
-        orderId = id
-        mintedId = id
-      }
+      // NO ORDER IS CREATED. A standalone label is a SHIPMENT — a re-ship, a sample,
+      // someone else's parcel — and inventing an order to hold it put a Draft on the
+      // production board with no lines and nothing to make. The server records it in
+      // `shipments` instead and it shows up in this list, which is where it belongs.
+      // ShipStation draws exactly this line: a label without an order creates a shipment
+      // record and no order.
+      const orderId = order?.id
       setFactorySettings({ ship_from: from }).catch(() => {})
       try {
         const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
@@ -204,10 +189,8 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
       const r = await buyUspsLabel({ to, from, orderId, weightOz, length: pkg.length, width: pkg.width, height: pkg.height, signature: svc.signature, insurance: svc.insurance || undefined, rateToken: picked.token, rate: { amount: picked.amount, carrier: picked.carrier, service: picked.service, carrierAccount: picked.carrierAccount } })
       if (!r.ok) {
         setErr(r.error || "Couldn't buy the label.")
-        // Cancel the row we just minted. Not deleted — there is no delete path on orders and
-        // adding one to serve this case would be a permanent capability for a temporary
-        // problem. Cancelled + label_only keeps it out of every list without inventing one.
-        if (mintedId) updateOrder(mintedId, { status: "cancelled" }).catch(() => {})
+        // Nothing to clean up: a failed buy created nothing. That is the whole point of
+        // not minting an order up front.
         return
       }
       setResult(r)

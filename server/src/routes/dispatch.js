@@ -25,6 +25,7 @@ import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 import { refundOrder } from './order_refunds.js';
 import { aggregatorRefundLabel, aggregatorFetchCost, aggregatorRefundStatus, refreshTrackingFor } from './shipping.js';
+import { ensureShipments, isShipmentId } from '../shipments-store.js';
 
 /**
  * Undo the money booked by a successful push, when a label is cancelled BEFORE it's picked.
@@ -455,6 +456,28 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     // parcel read "Not checked" until someone clicked the button on its row. This refreshes
     // the ones most likely to have moved, off the critical path, oldest-checked first.
     refreshStaleTracking(12).catch(() => {});
+
+    /**
+     * The OTHER half of this list: labels that belong to no order.
+     *
+     * Read separately rather than SQL-UNIONed because the two shapes barely overlap — an
+     * order carries a customer, a stage and line items; a standalone shipment carries a
+     * parcel and nothing else. A UNION would need a dozen NULL columns on one side and
+     * would make both halves harder to read than the two queries it replaced.
+     *
+     * Merged by created_at so the list stays one chronology, which is the only thing
+     * someone scanning it actually relies on.
+     */
+    await ensureShipments().catch(() => {});
+    const sh = (await q(
+      `select *,
+              (select sum(w.delta) from wallet_ledger w
+                where w.type='label-cost' and w.ref='label-void-'||shipments.id)::float as refund_credit
+         from shipments
+        ${search ? "where lower(coalesce(tracking,'')||' '||coalesce(voided_tracking,'')||' '||coalesce(id,'')||' '||coalesce(carrier,'')||' '||coalesce(to_name,'')) like $1" : ''}
+        order by created_at desc limit 300`,
+      search ? ['%' + search + '%'] : []).catch(() => ({ rows: [] }))).rows;
+
     return {
       labelSpend: spend,
       labelRefunded: totals.refunded || 0,
@@ -465,7 +488,29 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       labelsBought: Number(totals.bought || 0),
       labelsVoided: Number(totals.voided || 0),
       labelsTest: Number(totals.test_count || 0),
-      shipments: r.rows.map((x) => ({
+      shipments: [
+        // Standalone shipments carry no customer, stage or scan — those columns read "—"
+        // rather than being faked, because a parcel with no order genuinely has none.
+        ...sh.map((x) => ({
+          id: x.id, num: x.id,
+          customer: x.to_name || null, state: x.to_state || null,
+          tracking: x.tracking, carrier: x.carrier || null,
+          voidedTracking: x.voided_tracking || null,
+          refundStatus: x.refund_status || null,
+          labelUrl: x.label_url || null,
+          method: x.service || null,
+          price: x.cost != null ? Number(x.cost) : null,
+          refunded: x.refund_credit != null ? Number(x.refund_credit) : null,
+          test: x.test === true,
+          stage: null,
+          delivery: x.delivery_status || null,
+          deliveryDetail: x.delivery_detail || null,
+          deliveryCheckedAt: x.delivery_checked_at,
+          scannedAt: null, scannedVia: null,
+          createdAt: x.created_at,
+          standalone: true,
+        })),
+        ...r.rows.map((x) => ({
         id: x.id, num: x.seq ? '#' + x.seq : x.id,
         customer: x.customer || null, state: x.state || null,
         tracking: x.tracking, carrier: x.carrier || null,
@@ -495,7 +540,9 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         deliveryCheckedAt: x.delivery_checked_at,
         scannedAt: x.label_scanned_at, scannedVia: x.scanned_via || null,
         createdAt: x.created_at,
-      })),
+          standalone: false,
+        })),
+      ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     };
   });
 
@@ -519,6 +566,39 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
    */
   app.post('/api/shipments/:id/void', { preHandler: requireWarehouse }, async (req, reply) => {
     const id = String(req.params.id);
+    /**
+     * A STANDALONE SHIPMENT refunds by the same rules, against its own row.
+     *
+     * Split rather than generalised: the order path also has to clear a factory stage, a
+     * marketplace stamp and a scan, and none of those exist here. Forcing one function to
+     * serve both would mean a string of `if (isShipment)` guards through logic that is
+     * mostly about orders — and this half is short enough to read in one go.
+     */
+    if (isShipmentId(id)) {
+      await ensureShipments().catch(() => {});
+      const s = (await q('select id, provider, provider_ref, tracking from shipments where id=$1', [id]).catch(() => ({ rows: [] }))).rows[0];
+      if (!s) { reply.code(404); return { error: 'Shipment not found' }; }
+      if (!s.provider_ref) { reply.code(400); return { error: "No provider reference stored for this label — refund it in the carrier's dashboard." }; }
+      const rf = await aggregatorRefundLabel(s.provider, s.provider_ref).catch((e) => ({ ok: false, message: e.message }));
+      if (!rf.ok) { reply.code(400); return { error: rf.message || 'The carrier refused the refund.' }; }
+      let refunded = 0;
+      try {
+        const paid = (await q("select -sum(delta)::float as paid from wallet_ledger where account='factory' and type='label-cost' and ref=$1", [`label-${id}`])).rows[0]?.paid || 0;
+        if (paid > 0) {
+          await q(`insert into wallet_ledger (account, delta, type, ref, note)
+                   values ('factory', $1, 'label-cost', $2, $3) on conflict do nothing`,
+            [paid, `label-void-${id}`, `Label refunded (${rf.status || 'submitted'}) · ${id}`]);
+          refunded = paid;
+        }
+      } catch { /* best-effort: the carrier refund already happened */ }
+      await q(`update shipments set voided_tracking=coalesce(nullif(tracking,''), voided_tracking),
+                 tracking=null, refund_ref=$2, refund_status=$3 where id=$1`,
+        [id, (rf.raw && rf.raw.object_id) || null,
+         String((rf.raw && rf.raw.status) || rf.status || 'QUEUED').toUpperCase()]).catch(() => {});
+      audit(req, 'label.void', { entityType: 'shipment', entityId: id, after: { refundStatus: rf.status || 'submitted', refunded } });
+      egBroadcast({ type: 'orders' });
+      return { ok: true, refunded, status: rf.status || 'submitted' };
+    }
     const o = (await q('select id, label_provider, label_ref, tracking_label_url from orders where id=$1', [id]).catch(() => ({ rows: [] }))).rows[0];
     if (!o) { reply.code(404); return { error: 'Order not found' }; }
     if (!o.label_ref) { reply.code(400); return { error: "No provider reference stored for this label — void it in the carrier's dashboard." }; }
