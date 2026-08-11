@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { CircleNotch, Storefront, UploadSimple, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight } from "@phosphor-icons/react"
+import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -276,31 +276,58 @@ function TiktokFields({ dest, fields, onChange }: {
   )
 }
 
-/** One shop's status after a run — the row that makes partial success readable. */
+/**
+ * One shop's status after a run — the row that makes partial success readable.
+ *
+ * It was a single run-on sentence: "CustomBabeUSA · Etsy — Draft listing created View →",
+ * wrapped by whatever width was left, so the link fell onto a second line under the text
+ * and each of the three rows was a different shape. Three facts written as one sentence
+ * cannot line up with the row beneath it.
+ *
+ * Columns now: mark · shop · platform · what happened · the link. Read down any one of
+ * them and it answers a single question — which shops, on what, did what.
+ *
+ * The mark is an ICON, not an emoji. ✅/⚠️/❌ render as the operating system's own glyphs
+ * at their own size and baseline, which is why the tick sat as a hard green SQUARE next to
+ * lettering it was supposed to belong with — and why it read as a checkbox. These are the
+ * same four marks the dispatch board uses for the same four states.
+ */
+const OUTCOME_MARK = {
+  ok: { Icon: CheckCircle, cls: "text-success", weight: "fill" as const },
+  dry: { Icon: Warning, cls: "text-amber-600 dark:text-amber-400", weight: "fill" as const },
+  fail: { Icon: XCircle, cls: "text-destructive", weight: "fill" as const },
+}
+
 function OutcomeLine({ dest, outcome }: { dest: PublishDestination; outcome?: Outcome }) {
   if (!outcome) return null
-  const tone =
-    outcome.state === "ok" ? "text-success"
-    : outcome.state === "fail" ? "text-destructive"
-    : outcome.state === "dry" ? "text-amber-700"
-    : "text-muted-foreground"
+  const mark = outcome.state === "ok" ? OUTCOME_MARK.ok
+    : outcome.state === "dry" ? OUTCOME_MARK.dry
+    : outcome.state === "fail" ? OUTCOME_MARK.fail
+    : null
   return (
-    <div className="flex items-start gap-2 text-xs">
-      <span className="mt-0.5 shrink-0">
-        {outcome.state === "running" ? <CircleNotch size={12} className="animate-spin" />
-          : outcome.state === "ok" ? "✅"
-          : outcome.state === "dry" ? "⚠️" : "❌"}
+    <div className="grid grid-cols-[0.9rem_minmax(4rem,1fr)_auto] items-center gap-x-2 gap-y-0.5 py-1 text-xs sm:grid-cols-[0.9rem_minmax(5rem,1fr)_6.5rem_minmax(6rem,1.3fr)_auto]">
+      <span className="flex items-center justify-center">
+        {mark
+          ? <mark.Icon size={13} weight={mark.weight} className={mark.cls} />
+          : <CircleNotch size={12} className="animate-spin text-muted-foreground" />}
       </span>
-      <span className="min-w-0">
-        <span className="font-medium">{dest.shop_name}</span>
-        <span className="text-muted-foreground"> · {dest.platform_label} — </span>
-        <span className={tone}>{outcome.text}</span>
+      <span className="truncate font-medium" title={dest.shop_name ?? undefined}>{dest.shop_name}</span>
+      {/* The platform is its own column on desktop; on a narrow screen it joins the outcome
+          line beneath, because a 6.5rem column of "TikTok Shop" is what forces the wrap. */}
+      <span className="hidden truncate text-muted-foreground sm:block">{dest.platform_label}</span>
+      <span
+        className={"col-span-2 col-start-2 truncate sm:col-span-1 sm:col-start-4 " + (mark ? mark.cls : "text-muted-foreground")}
+        title={[dest.platform_label, outcome.text, outcome.note].filter(Boolean).join(" — ")}
+      >
+        <span className="text-muted-foreground sm:hidden">{dest.platform_label} · </span>
+        {outcome.text}
         {outcome.note && <span className="text-muted-foreground"> {outcome.note}</span>}
+      </span>
+      {/* Right-hand column, so every link on the panel starts at the same x — a column of
+          "View" is scannable in a way one trailing per sentence is not. */}
+      <span className="col-start-3 row-start-1 justify-self-end sm:col-start-5">
         {outcome.url && (
-          <>
-            {" "}
-            <a href={outcome.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View →</a>
-          </>
+          <a href={outcome.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">View →</a>
         )}
       </span>
     </div>
@@ -996,7 +1023,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 ? PUBLISH_OK
                 : "Finished — with one shop that sent nothing"}
             </div>
-            <div className="w-full max-w-md space-y-1 px-6 text-left">
+            <div className="w-full max-w-md divide-y divide-border/60 px-6 text-left">
               {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} />)}
             </div>
             <Button onClick={leave}>{returnLabel}</Button>
@@ -1036,6 +1063,23 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     auto-fill at 10rem keeps a thumbnail recognisable at any count and wraps
                     when there are enough to need it. */}
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2">
+                  {/* FIRST, ALWAYS — and a bare +.
+                      It used to sit after the photos, so its position moved every time one
+                      was added or removed and the reference photos pushed it into the middle
+                      of the row, where it read as a gap in the set rather than a control.
+                      A fixed corner is findable without looking. The icon and the word "Add"
+                      both said the same thing at 3xs; a + says it at a glance and leaves the
+                      tile quiet next to the photographs it sits among. */}
+                  {images.length < MAX_IMAGES && (
+                    <button
+                      onClick={() => fileRef.current?.click()}
+                      aria-label="Add a photo"
+                      title="Add a photo"
+                      className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                    >
+                      <Plus size={22} weight="bold" />
+                    </button>
+                  )}
                   {images.map((src, i) => (
                     <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1047,11 +1091,6 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                       </div>
                     </div>
                   ))}
-                  {images.length < MAX_IMAGES && (
-                    <button onClick={() => fileRef.current?.click()} className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary">
-                      <UploadSimple size={16} weight="bold" /><span className="text-3xs font-medium">Add</span>
-                    </button>
-                  )}
                   {/* THE COMPETITOR'S PHOTOS, IN THE SAME GRID BUT MARKED ON THE IMAGE.
                       They are not in `images`, so nothing here can reach a marketplace — the
                       watermark is what makes that legible rather than something the seller has
@@ -1377,7 +1416,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   refusal is three facts, and folding them into one would have to pick which
                   to tell you. */}
               {pickedDests.some((d) => outcomes[d.connection_id]) && (
-                <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
+                <div className="divide-y divide-border/60 rounded-lg border border-border bg-muted/30 px-3 py-1">
                   {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} />)}
                 </div>
               )}
