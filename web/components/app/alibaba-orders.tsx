@@ -54,7 +54,10 @@ const PILL: Record<Exclude<Filter, "all">, string> = {
   closed: "bg-muted text-muted-foreground",
 }
 
-export function AlibabaOrders() {
+/** `refreshKey` — bumped by the tab shell when this view is re-shown, since it stays
+ *  mounted between visits. Alibaba's own statuses move on their side, so re-reading on
+ *  each visit is what the remount used to do; the list is replaced in place. */
+export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
   const [orders, setOrders] = useState<AlibabaOrderSummary[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>("all")
@@ -78,7 +81,7 @@ export function AlibabaOrders() {
       .then((r) => { if (r.error) { setErr(r.error); setOrders([]) } else setOrders(r.orders ?? []) })
       .catch((e) => { setErr(e instanceof Error ? e.message : "Couldn't reach Alibaba."); setOrders([]) })
   }, [])
-  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load, refreshKey])
 
   const toggle = (tradeId: string) => {
     setOpen((prev) => {

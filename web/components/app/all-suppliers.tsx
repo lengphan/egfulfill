@@ -59,7 +59,11 @@ type Item =
 // One feed across ALL suppliers — no tab-switching. Each card is badged S&S / Otto / SanMar
 // and shows its brand. S&S streams from the full live catalog; Otto and SanMar from their
 // imported sets (SanMar's is the SDL/EPDD flat file, ingested into sanmar_products).
-export function AllSuppliers() {
+/** `refreshKey` — bumped by the tab shell when this view is re-shown. It stays mounted
+ *  between tab switches (that's what makes switching instant), so this is what re-reads
+ *  the catalogue after a heart was changed on the Favorites tab. `reload` keeps the
+ *  current grid on screen while it refetches, so the refresh doesn't flash. */
+export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   const isAdmin = getUser()?.role === "admin"
   const [search, setSearch] = useState("")
   const [debounced, setDebounced] = useState("")
@@ -136,7 +140,7 @@ export function AllSuppliers() {
     fetchPage(q, 0, 0, 0).then((m) => setItems(m)).catch(() => setItems([])).finally(() => setLoading(false))
   }, [fetchPage])
 
-  useEffect(() => { const id = setTimeout(() => reload(debounced), 0); return () => clearTimeout(id) }, [debounced, reload])
+  useEffect(() => { const id = setTimeout(() => reload(debounced), 0); return () => clearTimeout(id) }, [debounced, reload, refreshKey])
 
   const loadMore = async () => {
     setLoading(true)

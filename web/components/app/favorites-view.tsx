@@ -24,7 +24,11 @@ const driveMap = (m?: Record<string, string>) => Object.fromEntries(Object.entri
 type FavItem = { supplier: "ss" | "otto"; id: string; title: string; brand?: string | null; subtitle?: string | null; image?: string | null; price?: number | string | null; colors?: string[] | null; raw: SsStyle | OttoFav }
 
 // Combined saved-blanks view across BOTH suppliers (the hearts save server-side).
-export function FavoritesView() {
+/** `refreshKey` — bumped by the tab shell each time this view is re-shown. It stays
+ *  mounted between visits now, so nothing else would re-read the hearts after they were
+ *  changed on the All-suppliers tab. The reload replaces the list in place, so it is
+ *  invisible: the old cards stay on screen until the new ones land. */
+export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
   const [items, setItems] = useState<FavItem[] | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [addingId, setAddingId] = useState<string | null>(null)
@@ -42,7 +46,7 @@ export function FavoritesView() {
       ])
     })
   }, [])
-  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load, refreshKey])
 
   const keyOf = (f: FavItem) => `${f.supplier}:${f.id}`
 

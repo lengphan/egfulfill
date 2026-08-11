@@ -9,27 +9,61 @@ import { AlibabaOrders } from "@/components/app/alibaba-orders"
 
 type Tab = "all" | "favorites" | "purchase" | "alibaba"
 
+const TABS = [
+  { id: "all", label: "All suppliers" },
+  { id: "favorites", label: "Favorites" },
+  { id: "purchase", label: "Orders" },
+  { id: "alibaba", label: "Sample" },
+] as const
+
 /**
  * Purchasing — the one home for buying blanks. Flattened to a SINGLE tab row —
  * All suppliers · Favorites · Cart & orders — instead of a Browse/Cart toggle stacked over
  * a suppliers' All/Favorites toggle. The browse catalogue views and the cart/orders view
  * are peers; their tested logic is untouched, just reparented. `browse` is a legacy ?tab=
  * alias for `all`; switching updates the URL in place.
+ *
+ * A TAB IS NOT THROWN AWAY WHEN YOU LEAVE IT.
+ *
+ * Switching used to unmount the whole view, so every toggle started the next one from
+ * nothing: `items === null` renders a centred spinner, which collapses the page to a
+ * couple of hundred pixels, and a moment later the real content pushes it back out. Going
+ * All suppliers → Orders → All suppliers refetched three suppliers' catalogues to show you
+ * the same grid you were looking at two seconds earlier — and threw away your search, your
+ * scroll and every extra page you'd loaded on the way.
+ *
+ * So a visited tab stays mounted and is hidden with `display:none`. Nothing re-mounts,
+ * nothing re-renders from null, and there is no spinner and no jump on any tab you have
+ * already opened.
+ *
+ * Keeping it mounted DOES mean keeping its data, which would go stale — these tabs act on
+ * each other (favourite a blank in All suppliers and it belongs in Favorites; add to cart
+ * and it belongs in Orders). So re-showing a tab bumps its `refreshKey` and the view
+ * re-reads in the background. Each of their loaders replaces its list in place rather than
+ * blanking it first, so the refresh is invisible: you see the old rows until the new ones
+ * arrive, which is the point.
  */
 export function PurchasingView() {
   const [tab, setTab] = useState<Tab>("purchase")
+  /** Every tab ever opened, and how many times it has been RE-shown. The count is the
+   *  refresh signal; a tab absent from here has never been opened and isn't mounted. */
+  const [shown, setShown] = useState<Partial<Record<Tab, number>>>({ purchase: 0 })
+  const open = (v: Tab) => {
+    setTab(v)
+    setShown((p) => ({ ...p, [v]: (p[v] ?? -1) + 1 }))
+  }
 
   useEffect(() => {
     const id = setTimeout(() => {
       const p = new URLSearchParams(window.location.search).get("tab")
-      if (p === "all" || p === "favorites" || p === "purchase" || p === "alibaba") setTab(p)
-      else if (p === "browse") setTab("all")   // legacy alias
+      if (p === "all" || p === "favorites" || p === "purchase" || p === "alibaba") open(p)
+      else if (p === "browse") open("all")   // legacy alias
     }, 0)
     return () => clearTimeout(id)
   }, [])
 
   const pick = (v: Tab) => {
-    setTab(v)
+    open(v)
     try {
       const u = new URL(window.location.href)
       u.searchParams.set("tab", v)
@@ -54,7 +88,7 @@ export function PurchasingView() {
             are placed and paid on their site and only ever read back. Same page, different
             things — folding them together would put rows with no Receive action into a
             table whose whole point is receiving. */}
-        {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }, { id: "purchase", label: "Orders" }, { id: "alibaba", label: "Sample" }] as const).map((t) => (
+        {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => pick(t.id)}
@@ -65,10 +99,17 @@ export function PurchasingView() {
         ))}
       </div>
 
-      {tab === "all" ? <AllSuppliers />
-        : tab === "favorites" ? <FavoritesView />
-        : tab === "alibaba" ? <AlibabaOrders />
-        : <PurchaseView embedded />}
+      {/* Mounted on first visit, hidden thereafter — never unmounted. `hidden` and not a
+          zero-height wrapper: the inactive views must take no space and, more to the point,
+          must not be scrolled past by a keyboard user. */}
+      {TABS.map((t) => shown[t.id] === undefined ? null : (
+        <div key={t.id} className={tab === t.id ? undefined : "hidden"} aria-hidden={tab !== t.id}>
+          {t.id === "all" ? <AllSuppliers refreshKey={shown.all} />
+            : t.id === "favorites" ? <FavoritesView refreshKey={shown.favorites} />
+            : t.id === "alibaba" ? <AlibabaOrders refreshKey={shown.alibaba} />
+            : <PurchaseView embedded refreshKey={shown.purchase} />}
+        </div>
+      ))}
     </div>
   )
 }

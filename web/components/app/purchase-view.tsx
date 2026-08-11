@@ -149,7 +149,11 @@ function ottoQty(r: unknown): number | null {
 }
 
 // `embedded` hides the mobile hero when this sits inside the Purchasing tab shell.
-export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
+/** `refreshKey` — bumped by the Purchasing tab shell when this view is re-shown. It stays
+ *  mounted between tab switches, so this is what picks up a blank added to the cart from
+ *  the All-suppliers tab. `load` overwrites the lists in place, never blanking them, so
+ *  the refresh never flashes a spinner over a cart you're reading. */
+export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: boolean; refreshKey?: number }) {
   const prompt = usePrompt()
   const confirm = useConfirm()
   const [inv, setInv] = useState<InventoryItem[] | null>(null)
@@ -222,7 +226,7 @@ export function PurchaseView({ embedded = false }: { embedded?: boolean }) {
     getPurchaseOrders().then((r) => setPos(r ?? [])).catch(() => setPos([]))
     getFactoryList<SavedPOLine[]>("po_saved").then((r) => setSaved(Array.isArray(r) ? r : [])).catch(() => {})
   }, [])
-  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load, refreshKey])
 
   // Low-stock items grouped by supplier → reorder suggestions.
   const suggestions = useMemo(() => {
