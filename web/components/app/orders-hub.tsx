@@ -2188,23 +2188,13 @@ export function OrdersHub() {
                             )}
                           </div>
                           <div className="mt-2 flex w-full flex-wrap items-center gap-2 sm:absolute sm:right-2.5 sm:top-2.5 sm:z-10 sm:mt-0 sm:w-auto">
-                          {/* Own icon + a visible word. The pen-nib is the sidebar's
-                              Board/Design Lab glyph — reusing it here made one symbol
-                              mean three different things. */}
-                          {canDesign && (
-                            <Button
-                              size="sm" variant="outline" className="shrink-0"
-                              title={art
-                                ? "Create a card for this item on the Designer board"
-                                : "No artwork on this line yet — it has to be synced from the marketplace or uploaded before a designer has anything to work from"}
-                              disabled={!art || busy === `dsn:${key}` || sent.has(key)}
-                              onClick={() => sendToDesigner(o, it)}
-                            >
-                              {busy === `dsn:${key}` ? <CircleNotch size={13} className="animate-spin" />
-                                : sent.has(key) ? <><CheckCircle size={13} weight="fill" className="text-success" /> {tl("ui", "Sent")}</>
-                                : <><PaperPlaneTilt size={13} weight="bold" /> {tl("ui", "Board")}</>}
-                            </Button>
-                          )}
+                          {/* The per-line "Board" button is GONE. Sending a card to the
+                              designer is already reachable from the open order and from the
+                              mini designer, and repeating it on every item row put a third
+                              copy of one action next to two others that do different things
+                              — so the row's most-used controls (Start, stage) were competing
+                              with the one used least. sendToDesigner itself stays; the other
+                              two entry points call it. */}
                           {/* START THIS ONE LINE.
                               The dropdown beside it can already set any stage, but a
                               dropdown is a "set a value" control — you have to know what
