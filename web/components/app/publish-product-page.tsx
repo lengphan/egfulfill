@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
 import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -11,7 +12,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
-import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getPublishDestinations, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord, type PublishDestination, recordSpydeckUpload } from "@/lib/api"
+import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getPublishDestinations, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord, type PublishDestination, recordSpydeckUpload, keepListingPhoto} from "@/lib/api"
 import { readPublishDraft, clearPublishDraft, type PublishDraft, type PublishPrefill } from "@/lib/publish-draft"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -921,6 +922,36 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * listing travels in the draft and the record is written here instead — the same
    * server-side call SpyDeck made, so the Uploaded card is there when you go back.
    */
+  /**
+   * THE PICTURES, KEPT — once per run, before the first destination reports.
+   *
+   * Two different jobs, and they need different things. The card needs a picture that draws
+   * instantly and still draws when the marketplace draft is long deleted: a ~8KB WebP, small
+   * enough to sit in the row. Re-publishing needs the ORIGINALS, which are far too big for
+   * the row and go to object storage instead, leaving a same-origin url behind.
+   *
+   * A ref rather than state: this runs inside the publish and its result is read by the
+   * record write a moment later, in the same pass — a setState wouldn't have landed yet.
+   */
+  const coverThumbRef = useRef<string | null>(null)
+  const keptImagesRef = useRef<string[] | null>(null)
+  const keepPhotos = async () => {
+    if (keptImagesRef.current) return keptImagesRef.current
+    coverThumbRef.current = images[0] ? await thumbnail(images[0]).catch(() => images[0]) : null
+    const kept: string[] = []
+    for (const src of images) {
+      // Already a url — nothing to store, and re-uploading it would only make a second copy
+      // of something the marketplace is already hosting.
+      if (!src.startsWith("data:")) { kept.push(src); continue }
+      const r = await keepListingPhoto(src).catch(() => null)
+      // A photo we couldn't store is simply left out of the record rather than written in
+      // as a megabyte of base64 — that is the failure this whole path exists to avoid.
+      if (r?.url) kept.push(r.url)
+    }
+    keptImagesRef.current = kept
+    return kept
+  }
+
   const onPublished = (url?: string, primaryImage?: string, published?: PublishedRecord) => {
     if (!source) return
     const merged = primaryImage ? { ...source, image: primaryImage, thumb: primaryImage } : source
@@ -942,7 +973,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       // React Compiler give up memoising this whole component.
       submitted: {
         title: title.trim(), description: desc, tags: [...tags], price: basePrice,
-        images: [...images],
+        images: keptImagesRef.current ? [...keptImagesRef.current] : [...images],
+        cover_thumb: coverThumbRef.current ?? undefined,
         colors: blank ? [...pickedColors] : [], sizes: blank ? [...pickedSizes] : [],
         blank_sku: blank?.sku ?? undefined, print_type: method || undefined,
         design_id: prefill?.designId, design_data: prefill?.designUrl, design_pos: prefill?.designPos,
@@ -981,6 +1013,10 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
     }
 
     setBusy(true); setResult(null)
+    // The pictures first, once — before any destination reports, so every write of the
+    // record carries the same kept urls and the same thumbnail. Best-effort: a photo that
+    // won't store must not stop the listing going out.
+    await keepPhotos().catch(() => {})
     // Anything already published is skipped, so pressing Publish twice cannot create a
     // second listing in a shop that already has one.
     for (const d of pickedDests.filter((x) => !isDone(x.connection_id))) {

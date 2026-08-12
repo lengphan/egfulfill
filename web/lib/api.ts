@@ -2712,6 +2712,10 @@ export type UploadedListing = EtsyListing & {
   /** The form as it was sent — the whole of it, from one write. Preferred over `product`
    *  when reopening, because that one is reassembled from per-platform rows. */
   submitted?: SubmittedListing
+  /** Who pressed publish. Recorded from the first row and surfaced only now — a factory
+   *  running several people through one set of shops has to be able to ask. */
+  by_name?: string | null
+  by_role?: string | null
   our_listing_id?: string
   our_url?: string
   /** Sent by the publish dialog at upload time. */
@@ -2732,8 +2736,10 @@ export type UploadedListing = EtsyListing & {
     title?: string | null; description?: string | null; tags?: string[] | null
   }
 }
-export function getSpydeckUploads() {
-  return api<UploadedListing[]>(`/api/spydeck/uploads`)
+/** `all` — everyone's, for staff. The server refuses it for a seller, so passing it is
+ *  a request rather than a claim: a seller asking still gets only their own. */
+export function getSpydeckUploads(all?: boolean) {
+  return api<UploadedListing[]>(`/api/spydeck/uploads${all ? "?all=1" : ""}`)
 }
 /**
  * A locally-uploaded photo reaches us as a `data:` URL that is routinely 2–5MB. Persisting
@@ -2762,7 +2768,12 @@ export type SubmittedListing = {
   description?: string
   tags?: string[]
   price?: number | null
+  /** URLs, never bytes — a locally-picked photo is put in object storage first and this
+   *  holds the /api/spydeck/photo link it came back with. */
   images?: string[]
+  /** ~8KB WebP of the cover, so the history card draws instantly and keeps drawing after
+   *  the marketplace draft is deleted. See lib/thumbnail.ts. */
+  cover_thumb?: string
   colors?: string[]
   sizes?: string[]
   blank_sku?: string
@@ -2805,6 +2816,19 @@ export function recordSpydeckUpload(
     }),
   })
 }
+/**
+ * Keep a photo we published — the bytes to object storage, a URL back.
+ *
+ * The one thing standing between the upload history and its pictures: a photo picked off
+ * the seller's machine is a multi-megabyte data: URL that must never go in the row. Sent
+ * here it becomes an /api/spydeck/photo/<content-hash> link, which is same-origin (so a
+ * canvas can still read it) and cannot expire.
+ */
+export function keepListingPhoto(data: string, name?: string) {
+  return api<{ ok?: boolean; url?: string; bytes?: number; error?: string }>(
+    `/api/spydeck/photo`, { method: "POST", body: JSON.stringify({ data, name }) })
+}
+
 export function deleteSpydeckUpload(listingId: number | string) {
   return api<{ ok?: boolean }>(`/api/spydeck/uploads/${encodeURIComponent(String(listingId))}`, { method: "DELETE" })
 }

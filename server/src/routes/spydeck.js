@@ -7,6 +7,10 @@ import { searchListings, connectionFor, shopListings, etsyPublicGet, mapListing 
 import { aiComplete } from './support_ai.js';
 import { requireSpydeck } from '../entitlements.js';
 
+/** Where a kept listing photo lives. Content-hashed under here, so the object name alone
+ *  rebuilds the key and no table is needed to find it again. */
+const PHOTO_PREFIX = 'listing-photos/';
+
 let _ready = null;
 function ensure() {
   if (_ready) return _ready;
@@ -647,6 +651,18 @@ export function spydeckRoutes(app, requireAuth) {
   // research listing to it, so there was no way to answer "did I already make this?".
   app.get('/api/spydeck/uploads', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
     await ensure();
+    /**
+     * `?all=1` — EVERYONE'S, for staff.
+     *
+     * The list is scoped to the caller, which is right for a seller and useless for running
+     * the factory: an admin asking "what went out to our shops, and who sent it" could only
+     * see what they had published themselves. Staff-only, and it carries the name of whoever
+     * pressed publish — which was recorded from the first row (seller_id = req.user.sub) and
+     * never surfaced anywhere.
+     */
+    const wantAll = String((req.query || {}).all || '') === '1';
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const everyone = wantAll && staff;
     // LEFT JOIN published_listings: what we BUILT (blank, print method, colour, size) is
     // recorded there by the publish route itself. Without the join an Uploaded card could
     // only render `data` — the competitor listing — which is why a published product showed
@@ -658,8 +674,16 @@ export function spydeckRoutes(app, requireAuth) {
     // deployment where that hasn't run yet the join would 42P01 and take the whole tab
     // down. Fall back to the plain read rather than trading a missing detail for a
     // missing page.
-    const BASE = 'select u.listing_id, u.our_listing_id, u.url, u.data, u.created_at';
-    const TAIL = 'where u.seller_id=$1 order by u.created_at desc limit 500';
+    // `by_name`: whoever pressed publish. LEFT JOIN so a row whose account has since been
+    // removed still lists — the upload happened, and hiding it because the person left is a
+    // worse answer than an unnamed row.
+    const BASE = `select u.listing_id, u.our_listing_id, u.url, u.data, u.created_at, u.seller_id,
+                         coalesce(nullif(usr.name, ''), usr.email) as by_name, usr.role as by_role`;
+    const JOIN_USER = 'left join users usr on usr.id = u.seller_id::uuid';
+    const TAIL = everyone
+      ? 'order by u.created_at desc limit 500'
+      : 'where u.seller_id=$1 order by u.created_at desc limit 500';
+    const ARGS = everyone ? [] : [String(req.user.sub)];
     let r;
     try {
       // coalesce(our_listing_id, <id parsed out of our_url>): the column was never
@@ -673,13 +697,14 @@ export function spydeckRoutes(app, requireAuth) {
                 p.design_id, p.design_data, p.design_pos,
                 p.title as published_title, p.description as published_description, p.tags as published_tags
            from spydeck_uploads u
+           ${JOIN_USER}
            left join published_listings p
              on p.listing_id = coalesce(u.our_listing_id, substring(u.url from 'listing/([0-9]+)'))
           ${TAIL}`,
-        [String(req.user.sub)]
+        ARGS
       );
     } catch {
-      r = await q(`${BASE} from spydeck_uploads u ${TAIL}`, [String(req.user.sub)]);
+      r = await q(`${BASE} from spydeck_uploads u ${JOIN_USER} ${TAIL}`, ARGS);
     }
     return r.rows.map((row) => {
       const d = row.data || {};
@@ -712,6 +737,7 @@ export function spydeckRoutes(app, requireAuth) {
         ...source, listing_id: row.listing_id,
         our_listing_id: row.our_listing_id, our_url: row.url, uploaded_at: row.created_at,
         published: published || undefined, submitted: submitted || undefined, product,
+        by_name: row.by_name || null, by_role: row.by_role || null,
       };
     });
   });
@@ -757,6 +783,57 @@ export function spydeckRoutes(app, requireAuth) {
        JSON.stringify(source)]
     );
     return { ok: true };
+  });
+
+  /**
+   * KEEP THE PHOTO, NOT THE BYTES.
+   *
+   * A photo picked off a seller's machine reaches us as a data: URL of several megabytes.
+   * Writing one into spydeck_uploads.data means a base64 blob per photo per listing, which
+   * is why persistableImage drops them — and why the upload history had no pictures on it.
+   *
+   * So the bytes go to object storage and the row keeps a URL. The KEY IS THE CONTENT HASH,
+   * which means no table: re-publishing the same photo collapses onto one object, and the
+   * reader below can rebuild the key from the url without a lookup. (design_cards needed a
+   * table because its keys predate this scheme and are arbitrary.)
+   *
+   * Served through us rather than as a bucket URL: same-origin so a canvas can read it
+   * (canvasReadableSrc's whole reason), and it can't expire the way a presigned link does —
+   * a history that stops rendering after a month is not a history.
+   */
+  app.post('/api/spydeck/photo', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
+    const b = req.body || {};
+    const { storageEnabled, putObject, fromDataUrl } = await import('../storage.js');
+    if (!storageEnabled()) { reply.code(400); return { error: 'Object storage isn\'t configured, so there\'s nowhere to put the photo.' }; }
+    const parsed = fromDataUrl(b.data);
+    if (!parsed || !parsed.buffer.length) { reply.code(400); return { error: 'Couldn\'t read that image.' }; }
+    const { createHash } = await import('crypto');
+    const hash = createHash('sha256').update(parsed.buffer).digest('hex').slice(0, 32);
+    const m = String(parsed.mime || '').toLowerCase();
+    const ext = m.includes('png') ? '.png' : m.includes('webp') ? '.webp' : m.includes('gif') ? '.gif' : '.jpg';
+    const name = hash + ext;
+    try {
+      await putObject(`${PHOTO_PREFIX}${name}`, parsed.buffer, parsed.mime, 'public-read');
+    } catch (e) {
+      reply.code(502); return { error: `Couldn't store the photo: ${e.message}` };
+    }
+    return { ok: true, url: `/api/spydeck/photo/${name}`, bytes: parsed.buffer.length };
+  });
+
+  /** Read one back. No auth: these are product photos that are public on the marketplace
+   *  anyway, and the url is a content hash — unguessable without having had the file. */
+  app.get('/api/spydeck/photo/:name', async (req, reply) => {
+    const name = String(req.params.name || '').toLowerCase();
+    if (!/^[0-9a-f]{16,64}\.(png|jpg|jpeg|webp|gif)$/.test(name)) { reply.code(404); return { error: 'not found' }; }
+    const { getObject } = await import('../storage.js');
+    const obj = await getObject(`${PHOTO_PREFIX}${name}`).catch(() => null);
+    if (!obj || !obj.body) { reply.code(404); return { error: 'not found' }; }
+    const ext = name.split('.').pop();
+    const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+    // Immutable: the name IS the hash of the bytes, so this object can never change.
+    reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+    reply.header('Content-Type', obj.contentType || MIME[ext] || 'application/octet-stream');
+    return reply.send(obj.body);
   });
 
   app.delete('/api/spydeck/uploads/:listingId', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {

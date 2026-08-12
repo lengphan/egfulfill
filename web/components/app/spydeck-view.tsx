@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, PencilSimple, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash } from "@phosphor-icons/react"
+import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, PencilSimple, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -141,7 +141,15 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
   const blankSku = l.product?.blank_sku || p?.blank_sku
   const printType = l.product?.print_type || p?.print_type
   const platform = (p?.platform || l.product?.platform || "etsy") as string
-  const cover = p?.image || l.thumb || l.image
+  /**
+   * OUR picture, in the order it can be trusted.
+   *
+   * `submitted.cover_thumb` is the ~8KB WebP kept at publish — ours, instant, and still
+   * there when the marketplace draft is deleted. Then the published cover. `l.thumb`/
+   * `l.image` are the COMPETITOR's photos and come last: they are the wrong picture for a
+   * card about what WE published, and were only ever a stand-in for having none.
+   */
+  const cover = l.submitted?.cover_thumb || l.submitted?.images?.[0] || p?.image || l.thumb || l.image
   const [shotsErr, setShotsErr] = useState<string | null>(null)
   /**
    * Fetch once per open, and only for OUR listing. `our_listing_id` is the id on our shop;
@@ -263,6 +271,28 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
               </div>
             )}
           </>
+        )}
+
+        {/* WHO SENT IT, AND WHEN — the two questions a history is for.
+            Only shown when the server named someone, which it does on the staff-wide list.
+            A seller reading their own uploads knows who published them; an admin looking at
+            everyone's cannot tell without this, and the name was recorded from the very
+            first row and surfaced nowhere. */}
+        {(l.by_name || l.uploaded_at) && (
+          <div className="mt-2 flex items-center gap-1.5 truncate text-3xs text-muted-foreground">
+            {l.by_name && (
+              <>
+                <UserIcon size={11} weight="bold" className="shrink-0 opacity-70" />
+                <span className="truncate" title={l.by_role ? `${l.by_name} · ${l.by_role}` : l.by_name}>{l.by_name}</span>
+              </>
+            )}
+            {l.by_name && l.uploaded_at && <span className="opacity-50">·</span>}
+            {l.uploaded_at && (
+              <span className="shrink-0" title={new Date(l.uploaded_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}>
+                {new Date(l.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </span>
+            )}
+          </div>
         )}
 
         <div className="mt-auto flex gap-1.5 pt-3">
@@ -902,10 +932,17 @@ export function SpyDeckView() {
   // Same for what's already been turned into a draft. Without this the Uploaded tab was
   // empty on every refresh and each card offered "Make product" again for something
   // already published — duplicate drafts in the shop.
+  /**
+   * STAFF SEE EVERYONE'S. A factory running several people through one set of shops has to
+   * be able to ask "what went out, and who sent it" — and the list was scoped to whoever was
+   * looking, so an admin saw only their own. The server refuses `all` for a seller, so this
+   * is a request rather than a claim.
+   */
+  const isStaff = (getUser()?.role || "seller") !== "seller"
   useEffect(() => {
     if (!entitled) return
     const id = setTimeout(() => {
-      getSpydeckUploads()
+      getSpydeckUploads(isStaff)
         .then((rows) => {
           const list = rows ?? []
           setUploaded(list)
