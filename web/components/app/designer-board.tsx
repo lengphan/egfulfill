@@ -288,6 +288,19 @@ export function DesignerBoard() {
   // This is the gate the designer portal needs: the same /designer route serves both, and
   // the viewer's role — not the card — decides whether outsourced work is visible.
   const isDesigner = getUser()?.role === "designer"
+  /**
+   * AN ADMIN MOVES PARTNER CARDS; NOBODY ELSE DOES.
+   *
+   * The tile blocked dragging any vendor card, for everyone — but the server only ever
+   * guarded them against DESIGNERS (`guarded` stays null for other roles), and Approved is
+   * admin-only precisely because landing there books the partner's cost. So the one person
+   * the rules exist to let through was the one the UI stopped: a delivered Pink design could
+   * not be approved at all, and approving is what pays for it.
+   *
+   * Everyone else keeps the old behaviour — the partner drives the status, and an operator
+   * dragging their card through our lanes says something we have no business claiming.
+   */
+  const isAdmin = getUser()?.role === "admin"
   const boardCards = useMemo(
     // Designers see design WORK, not files-to-check. A card that already carries a stitch
     // file (design_id — a seller's supplied .emb, or a factory check) is a verification job,
@@ -596,8 +609,8 @@ export function DesignerBoard() {
                         // dragged through our lanes — the same gate the card dialog applies,
                         // enforced on the tile so a drag can't route around it. Renaming also
                         // suspends drag so text selection in the name works.
-                        draggable={!c.vendor && editNameId !== c.id}
-                        onDragStart={() => { if (!c.vendor) setDragId(c.id) }}
+                        draggable={(!c.vendor || isAdmin) && editNameId !== c.id}
+                        onDragStart={() => { if (!c.vendor || isAdmin) setDragId(c.id) }}
                         onDragEnd={() => setDragId(null)}
                         // shrink-0 is load-bearing: the card area is a flex column, and without
                         // it flexbox COMPRESSES every card to fit the fixed-height lane instead
@@ -607,7 +620,7 @@ export function DesignerBoard() {
                         // the image (a button can't be nested inside the image button).
                         // EMB-check cards get a distinct amber frame so the floor spots "already
                         // digitised — verify only", set apart from normal and pink vendor cards.
-                        className={"group relative shrink-0 overflow-hidden rounded-xl border text-left shadow-sm transition-shadow hover:shadow " + (isEmbCard(c) ? "border-amber-400 bg-amber-50/60 " : "border-border bg-background ") + (c.vendor ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
+                        className={"group relative shrink-0 overflow-hidden rounded-xl border text-left shadow-sm transition-shadow hover:shadow " + (isEmbCard(c) ? "border-amber-400 bg-amber-50/60 " : "border-border bg-background ") + (c.vendor && !isAdmin ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
                       >
                         {/* IMAGE = open full details on a single click. FIXED-height cover (h-48)
                             so every card is the same height; object-cover fills the frame at any
