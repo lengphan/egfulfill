@@ -147,9 +147,14 @@ const isRetryable = (r) => r.status === 0 || r.status === 429 || r.status >= 500
 
 
 /**
- * Send one line item out for design. Returns a plain result — no reply object — because
- * two very different callers need it: the staff-initiated push route, and the automatic
- * routing that fires when a DTG/DTF line enters the design stage.
+ * Send one line item out for design. Returns a plain result — no reply object — rather
+ * than replying itself, so a caller decides its own status code.
+ *
+ * ONE CALLER TODAY: the staff-initiated push route. This used to name a second — automatic
+ * routing when a DTG/DTF line entered the design stage — and that path is gone
+ * (autoPushDesigns in orders.js is dormant, and nothing else calls this). Sending
+ * automatically would open, and pay for, a task for every line whose seller had already
+ * supplied print-ready artwork, which is most of them; outsourcing stays a human decision.
  *
  * The artwork has to be reachable by THEM, so this requires a stored URL — a design still
  * inline as base64 has no address. Rather than fail vaguely, it says exactly that.
