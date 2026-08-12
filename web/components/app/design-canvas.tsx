@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, DownloadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, ArrowsOutCardinal, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve
 import { perceptualHash } from "@/lib/phash"
 import { decodeEntities, usd } from "@/lib/order-format"
 import { matchThreadColors, nearestThread, nearestThreads, matchQuality, hexToRgb, matchThreadRegions, canvasReadableSrc, type Thread, type ThreadRegion } from "@/lib/thread-match"
+import { useBackgroundRemoval } from "@/lib/remove-background"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Eyedropper } from "@phosphor-icons/react"
@@ -480,6 +481,8 @@ export function DesignCanvasDialog({
   onSendToDesigner?: () => void
 }) {
   const [designUrl, setDesignUrl] = useState(initialDesign ?? "")
+  // Background removal, shared with the Design maker so the two behave identically.
+  const bg = useBackgroundRemoval(designUrl, setDesignUrl)
   const [pos, setPos] = useState<Pos>(initialPos ? { x: initialPos.x, y: initialPos.y, w: initialPos.w, r: initialPos.r } : DEFAULT_POS)
   const [saving, setSaving] = useState(false)
   const confirm = useConfirm()
@@ -1328,7 +1331,27 @@ export function DesignCanvasDialog({
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>{designUrl ? "Replace" : "Upload image"}</Button>
                 <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>Library</Button>
+                {/* RIGHT HERE, not only in the Design maker. Buyer artwork arrives on a white
+                    or grey plate more often than not, and this dialog is where someone is
+                    looking when they notice — sending them to another page to fix it is how
+                    it gets printed with the plate still on. Same hook, same behaviour.
+
+                    What it produces is a data: url, so `save` below persists the CUT-OUT and
+                    the removal travels with the design everywhere afterwards. Leave it alone
+                    and the artwork is saved exactly as it arrived. */}
+                {designUrl && (
+                  <Button variant="outline" size="sm" onClick={bg.run} disabled={bg.busy} title="Clear a flat backdrop — no AI, nothing leaves your browser">
+                    {bg.busy ? <CircleNotch size={14} className="animate-spin" /> : <Eraser size={14} weight="bold" />}
+                    {bg.busy ? "Working…" : "Remove background"}
+                  </Button>
+                )}
+                {bg.canUndo && (
+                  <Button variant="ghost" size="sm" onClick={bg.undo} title="Put the background back">
+                    <ArrowCounterClockwise size={14} weight="bold" /> Undo
+                  </Button>
+                )}
               </div>
+              {bg.msg && <p className="mt-1.5 text-2xs text-muted-foreground">{bg.msg}</p>}
             </div>
             {/* 2 — Machine file (the seller's own-file route, now discoverable).
                 EMBROIDERY ONLY. Every part of this step is stitch apparatus: the formats it

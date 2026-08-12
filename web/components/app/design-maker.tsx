@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack, MagnifyingGlass, Eraser } from "@phosphor-icons/react"
+import { Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack, MagnifyingGlass, Eraser, ArrowCounterClockwise } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } from "@/components/app/design-canvas"
@@ -11,7 +11,7 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, type CatalogProduct, type SellerImage, type OrderUpload } from "@/lib/api"
 import { canvasReadableSrc } from "@/lib/thread-match"
-import { removeBackground } from "@/lib/remove-background"
+import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
 import { mockupFaces, setTypeMockups, typeMockupOf, typeSidesOf } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
@@ -183,11 +183,8 @@ export function DesignMaker() {
   // Which image source the browse dialog is showing, or null when it's closed. One piece of
   // state rather than two booleans: they are the same dialog and can never both be open.
   const [browse, setBrowse] = useState<null | "uploads" | "orders">(null)
-  // Background removal runs on the main thread over every pixel, so the button has to say
-  // it is working; `bgMsg` carries the refusal when the image can't be separated.
-  const [bgBusy, setBgBusy] = useState(false)
-  const [bgMsg, setBgMsg] = useState("")
-  const [bgTol, setBgTol] = useState(12)
+  // Background removal — the same hook the mini designer uses, so the two can't drift.
+  const bg = useBackgroundRemoval(designUrl, setDesignUrl)
   // Only the failure needs state now: publishing navigates away, so there is nothing
   // "open" to track — but a draft too large to stash has to be said, not swallowed.
   const [pubErr, setPubErr] = useState("")
@@ -293,28 +290,7 @@ export function DesignMaker() {
   const removeText = (id: string) => { setTexts((prev) => prev.filter((t) => t.id !== id)); setSelected(null) }
   const selText = texts.find((t) => t.id === selected)
 
-  /**
-   * Strip a flat backdrop off the placed artwork. No model, no API, no per-image cost —
-   * a colour flood inward from the edges (see lib/remove-background.ts).
-   *
-   * It rewrites designUrl with a data: URL, which also fixes the export path: the result is
-   * same-origin, so composing and publishing keep working on art that arrived from a
-   * marketplace. The ORIGINAL is not touched — the library row and the order still hold it,
-   * so this is undoable by placing the image again.
-   */
-  const stripBackground = async () => {
-    if (!designUrl) return
-    setBgBusy(true); setBgMsg("")
-    try {
-      const r = await removeBackground(designUrl, bgTol)
-      if ("error" in r) { setBgMsg(r.error); return }
-      setDesignUrl(r.url)
-      setBgMsg("")
-    } finally {
-      setBgBusy(false)
-    }
-  }
-  const clearArtwork = () => { setDesignUrl(""); setBgMsg(""); setSelected(null) }
+  const clearArtwork = () => { setDesignUrl(""); setSelected(null) }
 
   // What the browse dialog shows. Buyer art needs the proxy to DISPLAY (Etsy blocks
   // hotlinking) but the raw url to PLACE — same split the rail thumbnails make.
@@ -543,18 +519,23 @@ export function DesignMaker() {
               <div className="space-y-1.5">
                 <label className="flex items-center justify-between gap-2 text-sm">
                   <span className="text-muted-foreground">Tolerance</span>
-                  <input type="range" min={4} max={40} value={bgTol} onChange={(e) => { setBgTol(Number(e.target.value)); setBgMsg("") }} className="flex-1" aria-label="Background removal tolerance" />
-                  <span className="w-6 text-right text-xs tabular-nums text-muted-foreground">{bgTol}</span>
+                  <input type="range" min={4} max={40} value={bg.tolerance} onChange={(e) => bg.changeTolerance(Number(e.target.value))} className="flex-1" aria-label="Background removal tolerance" />
+                  <span className="w-6 text-right text-xs tabular-nums text-muted-foreground">{bg.tolerance}</span>
                 </label>
-                <Button variant="outline" size="sm" className="w-full justify-start" onClick={stripBackground} disabled={bgBusy}>
-                  {bgBusy ? <CircleNotch size={15} className="animate-spin" /> : <Eraser size={15} weight="bold" />}
-                  {bgBusy ? "Working…" : "Remove background"}
+                <Button variant="outline" size="sm" className="w-full justify-start" onClick={bg.run} disabled={bg.busy}>
+                  {bg.busy ? <CircleNotch size={15} className="animate-spin" /> : <Eraser size={15} weight="bold" />}
+                  {bg.busy ? "Working…" : "Remove background"}
                 </Button>
+                {bg.canUndo && (
+                  <Button variant="ghost" size="sm" className="w-full justify-start" onClick={bg.undo}>
+                    <ArrowCounterClockwise size={15} weight="bold" /> Undo removal
+                  </Button>
+                )}
                 {/* Said out loud, because "nothing happened" and "this image has no flat
                     backdrop to remove" look identical otherwise. */}
-                {bgMsg && <p className="text-2xs text-muted-foreground">{bgMsg}</p>}
+                {bg.msg && <p className="text-2xs text-muted-foreground">{bg.msg}</p>}
                 <p className="text-2xs text-muted-foreground">
-                  Clears the backdrop connected to the edges — no AI, nothing leaves your browser. Place the image again to undo.
+                  Clears the backdrop connected to the edges — no AI, nothing leaves your browser.
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={clearArtwork} className="text-red-600 hover:text-red-700"><Trash size={14} weight="bold" /> Remove artwork</Button>

@@ -15,6 +15,9 @@
 // matches its own backdrop will not separate, and the caller is told so rather than handed
 // a mangled image.
 
+import { useState } from "react"
+import { canvasReadableSrc } from "./thread-match"
+
 /** Longest side we will process. Above this the flood is slow enough to lock the tab. */
 const MAX_PIXELS = 40_000_000
 
@@ -150,4 +153,66 @@ export function removeBackground(src: string, tolerance = 12): Promise<RemoveBgR
     }
     img.src = src
   })
+}
+
+/**
+ * The whole Remove-background control, minus the markup.
+ *
+ * TWO surfaces run this — the Design maker's right panel and the mini designer's "Your
+ * design" card — and they need identical behaviour: the same tolerance, the same refusals,
+ * and the same undo. Writing it twice is how they drift, so the state lives here and each
+ * surface only decides what the buttons look like.
+ *
+ * UNDO, not "place it again". Removal rewrites the artwork in place, and the honest way to
+ * offer a way back is to keep the bytes we replaced rather than telling someone to go and
+ * find the original. `canUndo` is DERIVED, not stored: it holds only while the artwork is
+ * still the one we produced, so replacing the image or picking a new one from the library
+ * silently retires an undo that would otherwise restore the wrong picture.
+ *
+ * @param url    The artwork currently placed.
+ * @param apply  How the surface sets its artwork. Called with the new data URL, or with the
+ *               previous one on undo.
+ */
+export function useBackgroundRemoval(url: string, apply: (next: string) => void) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  const [tolerance, setTolerance] = useState(12)
+  /** What we replaced, and what we replaced it WITH — the pair is what makes undo safe. */
+  const [swap, setSwap] = useState<{ before: string; after: string } | null>(null)
+
+  const canUndo = swap !== null && url === swap.after
+
+  const run = async () => {
+    if (!url || busy) return
+    setBusy(true); setMsg("")
+    try {
+      // Buyer artwork on an order line is a MARKETPLACE url, and reading pixels off one taints
+      // the canvas — the mini designer would refuse on exactly the images sellers most want to
+      // clean up. Route anything that isn't already a data: url through the img proxy so it
+      // arrives same-origin, the same rule the thread matcher and the design maker follow.
+      const readable = url.startsWith("data:") ? url : canvasReadableSrc(url)
+      const r = await removeBackground(readable, tolerance)
+      if ("error" in r) { setMsg(r.error); return }
+      // The result is a data: url, so whatever saves next persists the CUT-OUT rather than a
+      // link back to the original — which is what makes the removal stick everywhere the
+      // design travels afterwards (the board, the factory, publish). Leave it alone and the
+      // artwork is untouched; that is the "if no remove BG then keep the same" half.
+      setSwap({ before: url, after: r.url })
+      apply(r.url)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const undo = () => {
+    if (!canUndo || !swap) return
+    apply(swap.before)
+    setSwap(null)
+    setMsg("")
+  }
+
+  /** Nudging the slider retires the message — it described the previous attempt. */
+  const changeTolerance = (v: number) => { setTolerance(v); setMsg("") }
+
+  return { busy, msg, tolerance, changeTolerance, run, undo, canUndo }
 }
