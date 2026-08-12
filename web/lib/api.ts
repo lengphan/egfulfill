@@ -29,6 +29,55 @@ function baseFor(): string {
   return SERVER_API_ORIGIN
 }
 
+/**
+ * BIG BODIES GO STRAIGHT TO THE API, NOT THROUGH VERCEL.
+ *
+ * Attaching a photo to a design and sending the line to the board failed with
+ * `{"code":"502","message":"An error occurred with this application."}` — Vercel's own
+ * envelope, not ours. The API's log for that request reads:
+ *
+ *     res 400  err {"message":"aborted","code":"ECONNRESET"}  msg "aborted"
+ *
+ * The body never finished arriving. Artwork is carried as a base64 data URL, which is ~33%
+ * larger than the file, and the app accepts up to 32MB of it. Streamed through the
+ * `/api/:path*` rewrite the upload outlived the proxy, which hung up mid-request and
+ * answered the browser itself. Nothing was wrong with the route — it never got the request.
+ *
+ * IT IS NOT A BODY-SIZE CAP — that was the obvious guess and production disproves it:
+ * 5.7MB and 28MB both pass through the rewrite and reach Fastify. What times out is the
+ * RESPONSE. `aborted`/`ECONNRESET` is Fastify noticing the client has gone, and the client
+ * here is the proxy: this route may fetch the artwork from a marketplace URL (up to 15s)
+ * and then write it to object storage before it answers, and the proxy stops waiting.
+ *
+ * So the threshold is not a size limit, it is a cheap way to recognise "this request
+ * carries artwork". 1MB, not 3MB: a base64 data URL of any real print file clears it
+ * easily, and an ordinary JSON write never comes close — the gap between the two is three
+ * orders of magnitude, so the exact number is not load-bearing.
+ *
+ * `api.egful.store` exists for exactly this — one Caddy hop to Fastify, no proxy in
+ * between — and until now nothing in the app used it. CORS already allows the app's origin,
+ * so this needs no server change.
+ *
+ * Deliberately automatic rather than a flag on the handful of routes that upload today:
+ * a flag is something the next artwork route has to remember, and forgetting it fails as a
+ * cut-off upload with an error naming the wrong system.
+ *
+ * Only in the browser, and only when we are same-origin in production. If
+ * NEXT_PUBLIC_API_BASE is set the developer has named an API and we must not silently talk
+ * to a different one.
+ */
+const DIRECT_API_ORIGIN = process.env.NEXT_PUBLIC_DIRECT_API_BASE ?? "https://api.egful.store"
+const DIRECT_BODY_BYTES = 1024 * 1024
+
+function originFor(body: BodyInit | null | undefined): string {
+  const base = baseFor()
+  if (typeof window === "undefined" || base !== "" || !DIRECT_API_ORIGIN) return base
+  // Only a string body has a length we can read without consuming it. Blob/FormData uploads
+  // don't come through this client today; if one does, it keeps the normal path.
+  if (typeof body === "string" && body.length > DIRECT_BODY_BYTES) return DIRECT_API_ORIGIN
+  return base
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -91,7 +140,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json")
   if (token) headers.set("Authorization", `Bearer ${token}`)
 
-  const res = await fetch(`${baseFor()}${path}`, { ...init, headers })
+  const res = await fetch(`${originFor(init.body)}${path}`, { ...init, headers })
   // Anything that isn't a GET may have changed what a cached list holds. Clearing on EVERY
   // write — rather than mapping each mutation to the lists it touches — is deliberate: that
   // map would have to be updated by every future route, and the first time someone forgot,
