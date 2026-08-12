@@ -208,7 +208,24 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
       {/* Two columns: what you are sending on the left, what it costs on the right.
           One column meant the rates — the thing you came to choose — sat below the fold
           under the parcel fields, so buying a label always began with a scroll. */}
-      <DialogContent className="max-w-3xl">
+      {/* sm:max-w-3xl, NOT max-w-3xl. DialogContent's own class list ends with
+          `sm:max-w-md`, and tailwind-merge keeps a bare utility and a `sm:` one side by
+          side — they are different variants, so nothing is dropped. Above 640px the
+          responsive rule then wins on source order and the window was capped at 448px,
+          three-quarters narrower than asked for. Worse, `md:grid-cols-2` keys off the
+          VIEWPORT, so on any normal screen the two columns still split — a 448px popup
+          divided into two ~190px tracks, which is why every field sat alone on its own
+          line and the Buy button was pushed off the bottom. Matching the modifier is what
+          actually raises the cap.
+
+          3xl (768px) was still not enough for two real columns. Split in half it left
+          ~360px a side: the ship-to helper wrapped to four lines, the parcel fields each
+          took their own row, and the rates column — the wider half by nature, since a rate
+          row is carrier + service + transit + price — sat empty beside a tall stack. The
+          result read as one long form with a blank margin. 5xl gives each side ~480px,
+          which is where the helper text settles onto two lines and a rate row fits without
+          truncating the service name. */}
+      <DialogContent className="sm:max-w-5xl">
         <DialogHeader><DialogTitle>{order ? `New label · ${order.num || order.id}` : "New label"}</DialogTitle></DialogHeader>
 
         {result ? (
