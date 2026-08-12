@@ -160,7 +160,23 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   const [inv, setInv] = useState<InventoryItem[] | null>(null)
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string; tone?: "warn" } | null>(null)
+  /**
+   * `lines` is the per-supplier outcome, kept APART from `text`.
+   *
+   * Placing four orders used to join four sentences with " · " into one paragraph — each
+   * carrying the supplier's own error verbatim, which for a refused card is itself two
+   * sentences — so the banner became a wall nobody reads to the end of. One short line per
+   * supplier is scannable; the provider's exact words sit behind Details, where they matter
+   * only once you have decided which supplier to look at.
+   *
+   * `cardRetry` is set when a failure was about PAYMENT rather than the order — the one
+   * failure with an obvious next action, so it gets a button instead of a paragraph.
+   */
+  const [msg, setMsg] = useState<{
+    ok: boolean; text: string; tone?: "warn"
+    lines?: { supplier: string; ok: boolean; short: string; detail?: string }[]
+    cardRetry?: boolean
+  } | null>(null)
   // Set when S&S declines the saved card, so we can offer a "Change payment" shortcut
   // instead of sending the buyer off to Settings.
   const [declineFix, setDeclineFix] = useState<{ profiles: PaymentProfile[]; current: string; email: string } | null>(null)
@@ -793,6 +809,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     const ottoMissingParty = !(opts.defaults.otto_customer && opts.defaults.otto_contact)
 
     setBusy("place-all"); setMsg(null)
+    const outcomes: { supplier: string; ok: boolean; short: string; detail?: string }[] = []
     const results: string[] = []
     const placedSkus = new Set<string>()
     // The Otto lines held back for a card — the SKUs themselves, not a flag. A flag can
@@ -899,6 +916,20 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         // here, on the placement, because it changes the freight and the arrival date.
         const fb = rr.shippingFallback as { used?: string; why?: string } | null | undefined
         const shipNote = fb?.used ? ` · shipping on ${fb.used}${fb.why ? ` — ${fb.why}` : ""}` : ""
+        // The short line is what goes on screen; `clarified` is the supplier's own wording
+        // and goes behind Details. A refused card is singled out because it is the one
+        // failure with an obvious next step.
+        const isCardFail = !ok && /card|payment|declin|invalid_client|cvv|expir/i.test(String(clarified))
+        outcomes.push({
+          supplier: g.supplier ?? "Unassigned",
+          ok,
+          short: ok
+            ? (g.api
+                ? (dry ? "dry run — not sent" : sandbox ? `placed in SANDBOX${ottoNo ? ` · ${ottoNo}` : ""}` : `placed${ssNo || ottoNo ? ` · #${ssNo ?? ottoNo}` : ""}`)
+                : "recorded — order it by hand")
+            : isCardFail ? "payment refused" : "failed",
+          detail: ok ? (shipNote ? shipNote.replace(/^ · /, "") : undefined) : String(clarified),
+        })
         results.push(ok
           ? (g.api
               ? (dry
@@ -912,10 +943,19 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       // AWAITED, and before load(). See putSaved: the reload re-reads this list, so an
       // un-awaited write here can be overtaken and put the ordered lines back in the pool.
       if (placedSkus.size) await putSaved(saved.filter((l) => !placedSkus.has(l.sku)))
-      const anyFailed = results.some((r) => r.includes("failed"))
-      if (results.length) {
-        setMsg({ ok: !anyFailed, tone: anyFailed && placedSkus.size ? "warn" : undefined,
-                 text: (anyFailed && placedSkus.size ? "Partly placed. " : "") + results.join(" · ") })
+      const anyFailed = outcomes.some((o) => !o.ok)
+      if (outcomes.length) {
+        const done = outcomes.filter((o) => o.ok).length
+        setMsg({
+          ok: !anyFailed,
+          tone: anyFailed && placedSkus.size ? "warn" : undefined,
+          // A one-line summary; the per-supplier detail is the list below it.
+          text: anyFailed
+            ? (done ? `${done} of ${outcomes.length} placed.` : "Nothing was placed.")
+            : outcomes.length > 1 ? `All ${outcomes.length} orders placed.` : "Order placed.",
+          lines: outcomes,
+          cardRetry: outcomes.some((o) => !o.ok && o.short === "payment refused"),
+        })
       }
       load()
       // Everything that could place now has. If the only thing left to do is enter Otto's
@@ -1339,13 +1379,45 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       </StatGrid>
 
       {msg && (
-        <div ref={msgRef} className={"flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-2 text-sm " + (
+        <div ref={msgRef} className={"rounded-lg border px-4 py-2 text-sm " + (
           msg.tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-800"
             : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
               : "border-destructive/30 bg-destructive/10 text-destructive")}>
-          <span className="min-w-0">{msg.text}</span>
-          {declineFix && !msg.ok && (
-            <Button size="sm" variant="outline" className="shrink-0" onClick={() => { setPickCard(declineFix.current); setPickerOpen(true) }}>Change payment</Button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="min-w-0 font-medium">{msg.text}</span>
+            <span className="flex shrink-0 gap-2">
+              {/* THE ONE FAILURE WITH AN OBVIOUS NEXT STEP gets a button rather than a
+                  paragraph. Re-opening the card window puts the saved card in front of you
+                  with the option to type a different one, and placing again only retries
+                  what is STILL in the pool — the orders that went through were removed from
+                  it, so a retry cannot double-order them. */}
+              {msg.cardRetry && (
+                <Button size="sm" variant="outline" onClick={() => setNeedCard(true)}>Enter card &amp; retry</Button>
+              )}
+              {declineFix && !msg.ok && (
+                <Button size="sm" variant="outline" onClick={() => { setPickCard(declineFix.current); setPickerOpen(true) }}>Change payment</Button>
+              )}
+            </span>
+          </div>
+          {/* ONE LINE PER SUPPLIER. Four outcomes joined into a paragraph — each carrying a
+              supplier's verbatim error — was a wall nobody read to the end of. The exact
+              wording is still here, one <details> away, which is where it belongs: it only
+              matters after you have decided which supplier to look at. */}
+          {msg.lines && msg.lines.length > 0 && (
+            <ul className="mt-1.5 space-y-1">
+              {msg.lines.map((l, i) => (
+                <li key={i} className="text-xs">
+                  <span className="font-medium">{l.supplier}</span>
+                  <span className="opacity-70"> — {l.short}</span>
+                  {l.detail && (
+                    <details className="mt-0.5">
+                      <summary className="cursor-pointer select-none opacity-60 hover:opacity-100">Details</summary>
+                      <p className="mt-0.5 whitespace-pre-wrap opacity-80">{l.detail}</p>
+                    </details>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}
