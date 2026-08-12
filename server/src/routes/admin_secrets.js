@@ -33,8 +33,16 @@ const SECRET_DEFS = [
   { name: 'USPS_CONSUMER_KEY',     label: 'Consumer key',     integration: 'usps' },
   { name: 'USPS_CONSUMER_SECRET',  label: 'Consumer secret',  integration: 'usps' },
   { name: 'SS_API_KEY',            label: 'API key',          integration: 'ss' },
+  // Otto needs FOUR credentials, not two: ocConfigured() requires the account email and
+  // password as well as the client pair. Listing only the client pair meant a live account
+  // arriving as "here is your email and password" had nowhere to be typed.
+  { name: 'OTTOCAP_USERNAME',      label: 'Account email',    integration: 'otto' },
+  { name: 'OTTOCAP_PASSWORD',      label: 'Account password', integration: 'otto' },
   { name: 'OTTOCAP_CLIENT_ID',     label: 'Client ID',        integration: 'otto' },
   { name: 'OTTOCAP_CLIENT_SECRET', label: 'Client secret',    integration: 'otto' },
+  // The one that actually flips sandbox to live. It defaults to sandbox-api.ottocap.com,
+  // so live credentials alone change nothing — they just authenticate against the sandbox.
+  { name: 'OTTOCAP_API_BASE',      label: 'API base URL',     integration: 'otto' },
   { name: 'SANMAR_CUSTOMER_NUMBER', label: 'Customer number', integration: 'sanmar' },
   { name: 'SANMAR_USERNAME',       label: 'Web username',     integration: 'sanmar' },
   { name: 'SANMAR_PASSWORD',       label: 'Web password',     integration: 'sanmar' },

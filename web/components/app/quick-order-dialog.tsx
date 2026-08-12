@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { cartChanged } from "@/lib/cart-events"
 import { CircleNotch, ShoppingCart, Warning } from "@phosphor-icons/react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -107,6 +108,8 @@ export function QuickOrderDialog({
         return
       }
       await saveFactoryList("po_saved", next)
+      // The badge in the header is listening for exactly this.
+      cartChanged()
       onAdded?.()
       if (skipped) setErr(`Added — but ${skipped} size${skipped === 1 ? "" : "s"} had no supplier sku and were left out.`)
       else onClose()

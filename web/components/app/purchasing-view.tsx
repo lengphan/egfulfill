@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { ShoppingCart } from "@phosphor-icons/react"
+import { getFactoryList } from "@/lib/api"
 import { AllSuppliers } from "@/components/app/all-suppliers"
 import { FavoritesView } from "@/components/app/favorites-view"
 import { PurchaseView } from "@/components/app/purchase-view"
@@ -62,6 +63,27 @@ export function PurchasingView() {
     return () => clearTimeout(id)
   }, [])
 
+  /**
+   * How many lines are waiting in the cart, on the tab that holds them.
+   *
+   * The header badge answers "is there anything in the cart" from anywhere in the app; this
+   * answers "how much is waiting" while you are standing in the place that fills it. Adding
+   * a blank from All suppliers should visibly move a number on the tab you are about to
+   * click, and until now nothing on this page acknowledged the add at all.
+   *
+   * Same `eg-cart-changed` event the header listens to, so the two can never disagree.
+   */
+  const [cartCount, setCartCount] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    const load = () => getFactoryList<unknown[]>("po_saved")
+      .then((r) => { if (!cancelled) setCartCount(Array.isArray(r) ? r.length : 0) })
+      .catch(() => {})
+    load()
+    window.addEventListener("eg-cart-changed", load)
+    return () => { cancelled = true; window.removeEventListener("eg-cart-changed", load) }
+  }, [])
+
   const pick = (v: Tab) => {
     open(v)
     try {
@@ -95,6 +117,13 @@ export function PurchasingView() {
             className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
           >
             {t.label}
+            {/* Only on the tab it belongs to, and only when there IS something. A zero
+                beside every tab is a row of noughts pretending to be information. */}
+            {t.id === "purchase" && cartCount > 0 && (
+              <span className={"ml-1.5 rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums " + (tab === t.id ? "bg-primary-foreground/20" : "bg-primary/10 text-primary")}>
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
           </button>
         ))}
       </div>

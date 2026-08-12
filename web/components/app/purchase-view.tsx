@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { cartChanged } from "@/lib/cart-events"
 import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise, Barcode } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
@@ -297,7 +298,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   // one mistake here that costs real money, so the ordering is not optional.
   const putSaved = (next: SavedPOLine[]) => {
     setSaved(next)
-    return saveFactoryList("po_saved", next).catch(() => {})
+    return saveFactoryList("po_saved", next).then(cartChanged).catch(() => {})
   }
   /** Pull a line OUT of the draft but keep it — the common "not this order, next one" case. */
   const saveForLater = (po: PurchaseOrder, l: POLine) => {

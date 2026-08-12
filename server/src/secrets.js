@@ -20,7 +20,11 @@ export const SECRET_NAMES = [
   'SHIPPO_API_TOKEN',
   'USPS_CONSUMER_KEY', 'USPS_CONSUMER_SECRET',
   'SS_ACCOUNT_NUMBER', 'SS_API_KEY',
-  'OTTOCAP_CLIENT_ID', 'OTTOCAP_CLIENT_SECRET',
+  // All FOUR are required — ocConfigured() checks username, password, client id AND
+  // secret — plus the base URL, which decides sandbox vs live. Only the client pair was
+  // editable, so a live account handed over as an email and password could not be entered
+  // anywhere, and even once it was, the base still pointed at sandbox-api.ottocap.com.
+  'OTTOCAP_USERNAME', 'OTTOCAP_PASSWORD', 'OTTOCAP_CLIENT_ID', 'OTTOCAP_CLIENT_SECRET', 'OTTOCAP_API_BASE',
   'SANMAR_CUSTOMER_NUMBER', 'SANMAR_USERNAME', 'SANMAR_PASSWORD',
   'GOOGLE_SHEETS_API_KEY', 'ANTHROPIC_API_KEY',
   'BYEASTSIDE_API_KEY', 'PINKDESIGN_API_KEY', 'PINKDESIGN_BOARD_ID', 'PINKDESIGN_WEBHOOK_SECRET',
@@ -63,7 +67,9 @@ export const RESTART_REQUIRED = new Set([
   // Found by the 2026-08-11 audit. Each is read into a module constant and then baked
   // straight into an auth header, so the running process never sees a new value.
   'ETSY_KEYSTRING', 'ETSY_SHARED_SECRET',           // etsy.js:15-16, and API_KEY_HEADER at :24 is itself computed at import
+  'OTTOCAP_USERNAME', 'OTTOCAP_PASSWORD',           // ottocap.js:14-15
   'OTTOCAP_CLIENT_ID', 'OTTOCAP_CLIENT_SECRET',     // ottocap.js:17-18 -> basic auth at :47
+  'OTTOCAP_API_BASE',                               // ottocap.js:19 — also decides sandbox vs live
   'SS_ACCOUNT_NUMBER', 'SS_API_KEY',                // ss.js:17-18 -> basic auth at :55, :140, :834
   'VIETQR_API_USERNAME', 'VIETQR_API_PASSWORD',     // vietqr.js:26-27 -> basic auth at :30
 ]);
