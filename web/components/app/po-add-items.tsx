@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { driveImg } from "@/lib/supplier-catalog"
 import {
   getSsProducts, getOttoProducts, getSsStyleSkus, getSsStylesAll, type SsStyle, type OttoVariant, getOttoStyle,
-  getSanmarCatalog, getSanmarCatalogStyle, type SanmarCatalogStyle,
+  getSanmarCatalog, getSanmarCatalogStyle, type SanmarCatalogStyle, resolveSuppliers,
   type InventoryItem, type PurchaseOrder, type POLine, type SsProduct, type OttoStyle,
 } from "@/lib/api"
 
@@ -125,6 +125,20 @@ export function POAddItems({
    * style expands to its variants and you pick the sku, because a style is not orderable.
    */
   const [sanmar, setSanmar] = useState<SanmarCatalogStyle[] | null>(null)
+  /**
+   * WHAT A STOCKED BLANK ACTUALLY IS — picture, supplier, variant.
+   *
+   * Inventory rows carry sku, name, variant and a count; no image, so every row in this tab
+   * was a dashed grey square. That is the tab you reach for when restocking something you
+   * have bought before, and it was the one place that showed you the least: you could not
+   * tell a black hoodie from a white tee, or which supplier it came from, without going
+   * away and looking it up — which is the search this tab exists to save.
+   *
+   * resolve-suppliers already answers all three from a list of skus (it is what prices the
+   * PO lines), so this asks it for the rows on screen. Best-effort: no answer just leaves
+   * the row as it was, because a missing picture must not cost you the ability to order.
+   */
+  const [skuMeta, setSkuMeta] = useState<Record<string, { image?: string | null; supplier?: string | null; variant?: string | null }>>({})
   const [openStyle, setOpenStyle] = useState<string | null>(null)
   // Full variant rows per style, not bare skus. A sku on its own isn't orderable
   // information — you can't tell which colourway you're buying from a code.
@@ -233,6 +247,33 @@ export function POAddItems({
     })
 
   /** Pull one S&S style's orderable skus live, and cache them so it's searchable after. */
+  useEffect(() => {
+    if (tab !== "inventory") return
+    const skus = invRows.slice(0, 60).map((i) => i.sku).filter(Boolean)
+    const missing = skus.filter((k) => skuMeta[k] === undefined)
+    if (!missing.length) return
+    let alive = true
+    const t = setTimeout(() => {
+      resolveSuppliers(missing)
+        .then((r) => {
+          if (!alive) return
+          // Every sku asked for gets a key, even when the answer is empty — otherwise the
+          // effect re-fires forever on rows the resolver has nothing to say about.
+          const add: Record<string, { image?: string | null; supplier?: string | null; variant?: string | null }> = {}
+          for (const k of missing) add[k] = (r?.bySku ?? {})[k] ?? {}
+          setSkuMeta((m) => ({ ...m, ...add }))
+        })
+        .catch(() => {
+          if (!alive) return
+          const add: Record<string, Record<string, never>> = {}
+          for (const k of missing) add[k] = {}
+          setSkuMeta((m) => ({ ...m, ...add }))
+        })
+    }, 0)
+    return () => { alive = false; clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, invRows])
+
   const expandSs = async (styleId: string) => {
     setOpenSsStyle((s) => (s === styleId ? null : styleId))
     if (ssStyleSkus[styleId]) return
@@ -353,10 +394,16 @@ export function POAddItems({
               : invRows.map((i) => (
                 <PickRow key={i.sku}
                   line={{ sku: i.sku, name: i.name ?? undefined, variant: i.variant ?? undefined, qty: 1 }}
-                  // Stocked blanks carry no image of their own — inventory rows are
-                  // sku/name/qty. The dashed placeholder says "no picture", not "loading".
                   title={i.name || i.sku}
-                  sub={[i.variant, i.sku].filter(Boolean).join(" · ")}
+                  // Variant, sku, and WHO STOCKS IT — the last one is why this row exists.
+                  // Restocking a blank you have bought before should not require remembering
+                  // which supplier it came from.
+                  sub={[i.variant || skuMeta[i.sku]?.variant, i.sku, skuMeta[i.sku]?.supplier]
+                    .filter(Boolean).join(" · ")}
+                  // Resolved from the supplier catalogue by sku, since an inventory row has
+                  // no picture of its own. Absent → PickRow's own dashed placeholder, which
+                  // says "no picture" rather than "loading".
+                  image={skuMeta[i.sku]?.image || null}
                   right={`${num(i.in_stock)} in stock`}
                   on={!!picked[i.sku]} onToggle={toggle} />
               ))
