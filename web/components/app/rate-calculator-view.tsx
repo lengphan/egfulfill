@@ -95,8 +95,6 @@ export function RateCalculatorView() {
     const t = setTimeout(() => setMine(customSizes()), 0)
     return () => clearTimeout(t)
   }, [])
-  /** Optional: what another platform charged, so the saving is a number rather than a vibe. */
-  const [paid, setPaid] = useState("")
 
   const [rates, setRates] = useState<ShippingRate[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -165,8 +163,6 @@ export function RateCalculatorView() {
     setBusy(false)
   }
 
-  const paidN = Number(paid) || 0
-  const cheapest = rates && rates.length ? rates[0] : null
 
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
@@ -248,11 +244,6 @@ export function RateCalculatorView() {
               </label>
             ))}
           </div>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">What you were charged (optional)</span>
-            <Input value={paid} onChange={(e) => setPaid(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="7.69" className="h-9 font-mono" />
-            <span className="text-2xs text-muted-foreground">Compares another platform&apos;s price against the cheapest here.</span>
-          </label>
           <Button onClick={run} disabled={busy} className="w-full">
             {busy ? <CircleNotch size={15} className="animate-spin" /> : <Calculator size={15} weight="bold" />} Get rates
           </Button>
@@ -303,9 +294,7 @@ export function RateCalculatorView() {
             <p className="p-4 text-sm text-muted-foreground">No rates came back for that parcel.</p>
           ) : (
             <div className="divide-y divide-border">
-              {rates.map((r, i) => {
-                const delta = paidN > 0 ? paidN - r.amount : null
-                return (
+              {rates.map((r, i) => (
                   <div key={r.token || i} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
                     <span className={"w-16 shrink-0 font-mono tabular-nums " + (i === 0 ? "font-semibold text-success" : "")}>{usd(r.amount)}</span>
                     <span className="min-w-0 flex-1 truncate">
@@ -314,22 +303,8 @@ export function RateCalculatorView() {
                     </span>
                     {r.days != null && <span className="shrink-0 text-xs text-muted-foreground">{r.days}d</span>}
                     {i === 0 && <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-2xs font-medium text-success">cheapest</span>}
-                    {delta != null && delta > 0 && i === 0 && (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">
-                        {usd(delta)} under what you paid
-                      </span>
-                    )}
                   </div>
-                )
-              })}
-              {paidN > 0 && cheapest && (
-                <div className="bg-muted/30 px-4 py-2.5 text-sm">
-                  You were charged <strong>{usd(paidN)}</strong>; the cheapest here is <strong>{usd(cheapest.amount)}</strong> ({cheapest.carrier} {cheapest.service}) —{" "}
-                  {paidN > cheapest.amount
-                    ? <span className="font-medium text-amber-700">{usd(paidN - cheapest.amount)} per parcel more than it needs to be.</span>
-                    : <span className="font-medium text-success">already at or under the market here.</span>}
-                </div>
-              )}
+              ))}
             </div>
           )}
         </SectionCard>
