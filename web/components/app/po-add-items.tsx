@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input"
 import { driveImg } from "@/lib/supplier-catalog"
 import {
   getSsProducts, getOttoProducts, getSsStyleSkus, getSsStylesAll, type SsStyle, type OttoVariant, getOttoStyle,
+  getSanmarCatalog, getSanmarCatalogStyle, type SanmarCatalogStyle,
   type InventoryItem, type PurchaseOrder, type POLine, type SsProduct, type OttoStyle,
 } from "@/lib/api"
 
-type Tab = "inventory" | "ss" | "otto"
+type Tab = "inventory" | "ss" | "otto" | "sanmar"
 
 // Defined at module scope, not inside the component: a component created during
 // render gets a new identity every pass, so React unmounts and remounts the whole
@@ -115,6 +116,15 @@ export function POAddItems({
 
   const [ss, setSs] = useState<SsProduct[] | null>(null)
   const [otto, setOtto] = useState<OttoStyle[] | null>(null)
+  /**
+   * SANMAR, browsable from a PO at last.
+   *
+   * The catalogue has been imported and searchable elsewhere for weeks — 4,081 styles — but
+   * this picker hardcoded three tabs, so the one supplier whose ordering is still a DRY RUN
+   * was also the only one you could not put on a purchase order. Same shape as Otto: a
+   * style expands to its variants and you pick the sku, because a style is not orderable.
+   */
+  const [sanmar, setSanmar] = useState<SanmarCatalogStyle[] | null>(null)
   const [openStyle, setOpenStyle] = useState<string | null>(null)
   // Full variant rows per style, not bare skus. A sku on its own isn't orderable
   // information — you can't tell which colourway you're buying from a code.
@@ -191,6 +201,8 @@ export function POAddItems({
   const loadOtto = useCallback(() => {
     setOtto(null)
     getOttoProducts({ search: q, limit: 200 }).then((r) => setOtto(r?.items ?? [])).catch(() => setOtto([]))
+    setSanmar(null)
+    getSanmarCatalog({ search: q, limit: 200 }).then((r) => setSanmar(r?.items ?? [])).catch(() => setSanmar([]))
   }, [q])
 
   // Deferred by a 0ms timer (the pattern used across the app pages): both loaders
@@ -228,6 +240,17 @@ export function POAddItems({
       const d = await getSsStyleSkus(styleId)
       setSsStyleSkus((m) => ({ ...m, [styleId]: d?.products ?? [] }))
     } catch { setSsStyleSkus((m) => ({ ...m, [styleId]: [] })) }
+  }
+
+  const [openSanmar, setOpenSanmar] = useState<string | null>(null)
+  const [sanmarSkus, setSanmarSkus] = useState<Record<string, { color: string | null; size: string | null; sku: string; price: number | null; image: string | null }[]>>({})
+  const expandSanmar = async (style: string) => {
+    setOpenSanmar((s) => (s === style ? null : style))
+    if (sanmarSkus[style]) return
+    try {
+      const d = await getSanmarCatalogStyle(style)
+      setSanmarSkus((m) => ({ ...m, [style]: d?.variants ?? [] }))
+    } catch { setSanmarSkus((m) => ({ ...m, [style]: [] })) }
   }
 
   const expand = async (style: string) => {
@@ -301,7 +324,7 @@ export function POAddItems({
         </DialogHeader>
 
         <div className="flex gap-1 rounded-lg bg-muted p-1">
-          {([["inventory", "Inventory"], ["ss", "S&S"], ["otto", "Otto Cap"]] as [Tab, string][]).map(([k, label]) => (
+          {([["inventory", "Inventory"], ["ss", "S&S"], ["otto", "Otto Cap"], ["sanmar", "SanMar"]] as [Tab, string][]).map(([k, label]) => (
             <button
               key={k}
               type="button"
@@ -391,6 +414,45 @@ export function POAddItems({
               : <Empty>{q ? "No S&S products match, and no style of that name either." : "Search a style name, number or colour — anything S&S sell is reachable."}</Empty>
           )}
 
+          {tab === "sanmar" && (
+            sanmar === null ? <Loading />
+              : sanmar.length === 0 ? <Empty>{q ? "No SanMar styles match." : "Import the SanMar catalogue first, or search for a style."}</Empty>
+                : sanmar.map((s2) => (
+                  <div key={s2.style}>
+                    <button type="button" onClick={() => expandSanmar(s2.style)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
+                      {s2.image
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={s2.image} alt="" loading="lazy" className="size-14 shrink-0 rounded border border-border bg-white object-contain" />
+                        : <span className="size-14 shrink-0 rounded border border-dashed border-border" aria-hidden />}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{s2.name || s2.style}</span>
+                        {/* Brand as well as style: SanMar carry other people's labels, so
+                            "PC61" alone doesn't say Port & Company the way an Otto code does. */}
+                        <span className="block truncate text-xs text-muted-foreground">{[s2.brand, s2.style].filter(Boolean).join(" · ")}</span>
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{money(s2.price)}</span>
+                      <Plus size={13} weight="bold" className={"shrink-0 transition-transform " + (openSanmar === s2.style ? "rotate-45" : "")} />
+                    </button>
+                    {openSanmar === s2.style && (
+                      <div className="border-t border-border bg-muted/30 pl-6">
+                        {sanmarSkus[s2.style] === undefined ? <Loading />
+                          : sanmarSkus[s2.style].length === 0 ? <Empty>No skus listed for this style.</Empty>
+                            : sanmarSkus[s2.style].map((v) => (
+                              <PickRow key={v.sku}
+                                line={{ sku: v.sku, name: s2.name ?? undefined,
+                                        variant: [v.color, v.size].filter(Boolean).join(" / ") || undefined,
+                                        qty: 1, price: num(v.price ?? s2.price) }}
+                                title={[v.color, v.size].filter(Boolean).join(" / ") || v.sku}
+                                sub={s2.name ?? undefined}
+                                meta={[{ k: "SKU", v: v.sku }]}
+                                image={v.image || s2.image || null}
+                                on={!!picked[v.sku]} onToggle={toggle} />
+                            ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+          )}
           {tab === "otto" && (
             otto === null ? <Loading />
               : otto.length === 0 ? <Empty>{q ? "No Otto Cap styles match." : "Sync the Otto Cap catalog first, or search for a style."}</Empty>
