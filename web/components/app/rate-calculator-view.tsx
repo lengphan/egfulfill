@@ -197,11 +197,14 @@ export function RateCalculatorView() {
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Or pick a city</span>
             <select
-              value={DEST_PRESETS.find((d) => d.zip === toZip)?.zip ?? ""}
-              onChange={(e) => { if (e.target.value) setToZip(e.target.value) }}
+              value={DEST_PRESETS.find((d) => d.zip === toZip) ? toZip : "custom"}
+              onChange={(e) => { if (e.target.value !== "custom") setToZip(e.target.value) }}
               className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
             >
-              <option value="">Typed ZIP</option>
+              {/* Reads "Select" until there IS something, then says what was typed — a
+                  dropdown showing a city name while the ZIP beside it is somewhere else
+                  is the one thing this control must never do. */}
+              <option value="custom">{/^\d{5}$/.test(toZip) ? `Typed · ${toZip}` : "Select"}</option>
               {DEST_PRESETS.map((d) => <option key={d.zip} value={d.zip}>{d.label}</option>)}
             </select>
           </label>
@@ -237,7 +240,10 @@ export function RateCalculatorView() {
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Package</span>
             <select
-              value={matchedSize ? sizeKey(matchedSize) : "custom"}
+              /* `custom` wins over a coincidental match. Picking "Custom size…" while the
+                 boxes still held 13/10/1 snapped the label straight back to "10 × 13 poly
+                 mailer" — dropdown and open boxes disagreeing about which mode you're in. */
+              value={custom || !matchedSize ? "custom" : sizeKey(matchedSize)}
               onChange={(e) => {
                 const hit = allSizes.find((z) => sizeKey(z) === e.target.value)
                 if (!hit) { setCustom(true); return }
