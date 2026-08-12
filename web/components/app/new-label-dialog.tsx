@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { CircleNotch, ArrowSquareOut, CheckCircle, Warning, Truck, Package } from "@phosphor-icons/react"
+import { useEffect, useRef, useState } from "react"
+import { CircleNotch, ArrowSquareOut, CheckCircle, Warning, Truck, Package, Printer } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
 import { STOCK_SIZES, DEFAULT_SIZE, customSizes, addCustomSize, sizeKey, sizeLabel, type ParcelSize } from "@/lib/parcel-sizes"
 import { parcelFromOrder, parcelBasisNote } from "@/lib/parcel-from-order"
-import { validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, getCatalogProducts, type ShipAddress, type UspsLabelResult, type ShippingRate, type OrderItem } from "@/lib/api"
+import { validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, getCatalogProducts, fetchShipmentLabel, type ShipAddress, type UspsLabelResult, type ShippingRate, type OrderItem } from "@/lib/api"
 
 const BLANK: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
 const DEFAULT_CARRIERS = ["usps", "ups"]
@@ -101,6 +101,43 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
     }, 600)
     return () => { alive = false; clearTimeout(t) }
   }, [to.street, to.street2, to.city, to.state, to.zip])
+
+  /**
+   * STRAIGHT TO THE PRINTER once the label exists.
+   *
+   * Buying a label has exactly one next step, and making that step a hunt — close this,
+   * find the row, open it, print — is three clicks to reach the only thing anyone does.
+   *
+   * The bytes come from our own route rather than the carrier's URL, because a blob:
+   * inherits this page's origin and is therefore printable; a cross-origin PDF in a frame
+   * throws the moment print() touches it. Same reason the detail window fetches it this way.
+   *
+   * Only for a label bought AGAINST AN ORDER: the shipment's id is the order's id, and a
+   * standalone label's id is not returned by the buy. That case keeps "Open label", which
+   * is what it had before — no worse, and honestly labelled.
+   */
+  const [labelSrc, setLabelSrc] = useState<string | null>(null)
+  const frameRef = useRef<HTMLIFrameElement>(null)
+  const printedRef = useRef<string | null>(null)
+  const printLabel = () => {
+    const w = frameRef.current?.contentWindow
+    if (!w) return
+    w.focus()
+    w.print()
+  }
+  useEffect(() => {
+    let url: string | null = null
+    let alive = true
+    const t = setTimeout(() => {
+      if (!alive) return
+      setLabelSrc(null)
+      if (!result?.labelUrl || !order?.id) return
+      fetchShipmentLabel(String(order.id))
+        .then((blob) => { if (!alive) return; url = URL.createObjectURL(blob); setLabelSrc(url) })
+        .catch(() => { /* the Open-label link and the Shipments row both still work */ })
+    }, 0)
+    return () => { alive = false; clearTimeout(t); if (url) URL.revokeObjectURL(url) }
+  }, [result?.labelUrl, result?.trackingNumber, order?.id])
 
   const reset = () => { setPasteText(""); setTo({ ...BLANK }); setSvc({ signature: false, insurance: 0 }); setResult(null); setErr(null); setAddrCheck({ status: "idle" }); setRates(null); setPickedToken(null) }
   // Any change to the parcel or add-ons invalidates the quoted rates — you can't buy a rate
@@ -234,7 +271,32 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               Label bought — <span className="tabular-nums">{result.trackingNumber}</span>
               {result.service ? ` · ${result.service}` : ""}{result.cost != null ? ` · $${result.cost.toFixed(2)}` : ""}
             </div>
+            {/* Offscreen, not display:none — a hidden frame is not laid out, and a frame that
+                was never laid out has nothing to print. */}
+            {labelSrc && (
+              <iframe
+                ref={frameRef}
+                src={labelSrc}
+                title="Shipping label"
+                aria-hidden
+                className="pointer-events-none fixed left-[-9999px] top-0 size-[1px] opacity-0"
+                onLoad={() => {
+                  // ONCE per label. Keyed on the tracking number rather than a boolean so
+                  // buying a second label with "Another" prints that one too, and a re-render
+                  // of the same label does not fire the dialog again.
+                  const key = result?.trackingNumber ?? labelSrc
+                  if (printedRef.current === key) return
+                  printedRef.current = key
+                  printLabel()
+                }}
+              />
+            )}
             <div className="flex flex-wrap gap-2">
+              {/* It has already gone to the printer — this is the retry, for the jam, the
+                  wrong tray, or the second copy. */}
+              {labelSrc && (
+                <Button onClick={printLabel}><Printer size={14} weight="bold" /> Print again</Button>
+              )}
               {result.labelUrl && (
                 <a href={result.labelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent">
                   <ArrowSquareOut size={14} weight="bold" /> Open label

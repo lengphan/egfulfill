@@ -1,9 +1,9 @@
 "use client"
 
-import { ArrowSquareOut, CircleNotch, X, Package, DownloadSimple, FilePdf } from "@phosphor-icons/react"
+import { ArrowSquareOut, CircleNotch, X, Package, DownloadSimple, FilePdf, Printer } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { fetchShipmentLabel, type ShipmentRow } from "@/lib/api"
 
 /**
@@ -70,6 +70,7 @@ export function ShipmentDetailDialog({
    * its token in storage. So the bytes come through the API client and become a blob: URL —
    * which a frame renders and `download` saves, with no token anywhere in a URL.
    */
+  const frameRef = useRef<HTMLIFrameElement>(null)
   const [labelSrc, setLabelSrc] = useState<string | null>(null)
   const [labelErr, setLabelErr] = useState<string | null>(null)
   useEffect(() => {
@@ -93,6 +94,26 @@ export function ShipmentDetailDialog({
     // is opened once per parcel down a long list.
     return () => { alive = false; clearTimeout(t); if (url) URL.revokeObjectURL(url) }
   }, [id, hasLabel])
+
+  /**
+   * PRINT THE FRAME, not a new tab.
+   *
+   * This works only because the label is already a blob: URL — a blob inherits this page's
+   * origin, so the frame's document is reachable and `print()` on it is allowed. Pointing a
+   * frame at the carrier's PDF and calling print() throws a cross-origin error, which is the
+   * whole reason the bytes come through our API in the first place.
+   *
+   * Printing the frame the user is LOOKING AT is also the point: what comes out of the
+   * printer is provably the label on screen, not a second fetch that could differ.
+   */
+  const printLabel = () => {
+    const w = frameRef.current?.contentWindow
+    if (!w) return
+    // focus() first — a print() on an unfocused frame is silently ignored by some builds
+    // of Chrome, which looks exactly like a dead button.
+    w.focus()
+    w.print()
+  }
 
   if (!s) return null
   const refunded = (s.refunded ?? 0) > 0
@@ -133,6 +154,7 @@ export function ShipmentDetailDialog({
                   // #toolbar=0 asks the built-in viewer for the page and not its chrome —
                   // honoured by Chrome and Edge, ignored elsewhere, harmless either way.
                   <iframe
+                    ref={frameRef}
                     src={`${labelSrc}#toolbar=0&navpanes=0&view=Fit`}
                     title={`Shipping label for ${s.num}`}
                     className="size-full bg-white"
@@ -249,6 +271,11 @@ export function ShipmentDetailDialog({
                 </a>
                 {/* The same blob the frame is showing — so what you save is provably what
                     you just looked at, and it needs no second authenticated request. */}
+                {/* PRIMARY. A bought label's next step is almost always the printer —
+                    Download is the fallback for when it has to go somewhere else. */}
+                <Button size="sm" onClick={printLabel} disabled={!labelSrc}>
+                  <Printer size={13} weight="bold" /> Print
+                </Button>
                 <a
                   href={labelSrc ?? undefined}
                   download={`label-${s.num}.pdf`}
