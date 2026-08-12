@@ -30,6 +30,46 @@ const USPS_DIVISOR = 166
 const USPS_DIM_THRESHOLD_CU_IN = 1728   // 1 cubic foot — below this USPS ignores size
 
 /**
+ * WHERE IT'S GOING, as one click.
+ *
+ * A quote needs the ZIP and nothing else — rates are zone-based, so a street address adds
+ * typing and changes no number. Listed west to east from a California origin, which is
+ * also cheapest to dearest: the spread between the first and last of these IS the zone
+ * effect, without a table of zone numbers that goes wrong the day the warehouse moves.
+ */
+const DEST_PRESETS: { label: string; zip: string }[] = [
+  { label: "Los Angeles", zip: "90015" },
+  { label: "San Diego", zip: "92101" },
+  { label: "Las Vegas", zip: "89101" },
+  { label: "Phoenix", zip: "85003" },
+  { label: "Seattle", zip: "98101" },
+  { label: "Denver", zip: "80202" },
+  { label: "Dallas", zip: "75201" },
+  { label: "Chicago", zip: "60606" },
+  { label: "Atlanta", zip: "30303" },
+  { label: "Miami", zip: "33130" },
+  { label: "New York", zip: "10118" },
+]
+
+/**
+ * The weights actually shipped, in ounces.
+ *
+ * Chosen around the USPS bands (0–4, 4–8, 8–12, 12–16, then per pound) rather than round
+ * numbers, because the band edge is where the price steps: 8 oz and 9 oz are different
+ * money, 5 oz and 7 oz are the same.
+ */
+const WEIGHT_PRESETS: { label: string; oz: number }[] = [
+  { label: "4 oz", oz: 4 },
+  { label: "6 oz", oz: 6 },
+  { label: "8 oz", oz: 8 },
+  { label: "12 oz", oz: 12 },
+  { label: "1 lb", oz: 16 },
+  { label: "1.5 lb", oz: 24 },
+  { label: "2 lb", oz: 32 },
+  { label: "3 lb", oz: 48 },
+]
+
+/**
  * The rate calculator — what a parcel costs, why, and where the cheapest line is.
  *
  * It answers the question a bare quote cannot: WHY this price — the dim-weight arithmetic,
@@ -143,6 +183,19 @@ export function RateCalculatorView() {
               <Input value={toZip} onChange={(e) => setToZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="10118" className="h-9 font-mono" />
             </label>
           </div>
+          <div className="flex flex-wrap gap-1.5">
+            {DEST_PRESETS.map((d) => (
+              <button
+                key={d.zip}
+                type="button"
+                onClick={() => setToZip(d.zip)}
+                className={"rounded-full border px-2.5 py-1 text-2xs font-medium transition-colors " +
+                  (toZip === d.zip ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">Weight lb</span>
@@ -153,6 +206,20 @@ export function RateCalculatorView() {
               <Input value={oz} onChange={(e) => setOz(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 font-mono" />
             </label>
           </div>
+          <div className="flex flex-wrap gap-1.5">
+            {WEIGHT_PRESETS.map((w) => (
+              <button
+                key={w.oz}
+                type="button"
+                onClick={() => { setLb(String(Math.floor(w.oz / 16))); setOz(String(w.oz % 16)) }}
+                className={"rounded-full border px-2.5 py-1 text-2xs font-medium transition-colors " +
+                  (weightOz === w.oz ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
+
           {/* ONE CLICK PER MAILER. The bench reaches for a stock size, not three numbers —
               and typing them is where a 10 × 13 poly mailer becomes a 9 × 8 × 6 box that
               bills as four pounds. Custom sizes come from the same per-user list the label
