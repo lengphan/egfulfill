@@ -9,7 +9,6 @@ import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
-import { PackagingHint } from "@/components/app/packaging-hint"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
@@ -38,6 +37,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
+import { NewLabelDialog } from "@/components/app/new-label-dialog"
 
 const nowId = () => Date.now()
 const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
@@ -272,6 +272,15 @@ export function OrdersHub() {
   // send-to-PO action can append to an existing draft rather than mint a new one each click.
   const [pos, setPos] = useState<PurchaseOrder[]>([])
   const [poBusy, setPoBusy] = useState<string | null>(null)  // order id being sent to a PO
+  /**
+   * "Also put this on the other lines?" — offered AFTER a drop has landed on one line,
+   * never before. Asking first would make every single-line drop answer a question it
+   * doesn't have; offering after means the common case (this line only) costs nothing and
+   * the bulk case is one click, with the artwork already visible so you can see what you
+   * are about to copy.
+   */
+  const [applyAll, setApplyAll] = useState<{ order: OrderRow; item: OrderItem; data: string; siblings: OrderItem[] } | null>(null)
+  const [applyAllBusy, setApplyAllBusy] = useState(false)
   // Placed artwork per order, keyed by sku — what the row avatars composite onto the blank.
   const [designs, setDesigns] = useState<Record<string, Record<string, OrderDesign>>>({})
   /**
@@ -1857,119 +1866,14 @@ export function OrdersHub() {
                   </div>
 
                   {/* Fulfill panel (warehouse/admin): buy a USPS-direct label, or record tracking manually */}
-                  {canFulfill && shipOpen === o.id && (
-                    <div className="mb-3 space-y-3 rounded-xl border border-border bg-muted/30 p-4">
-                      <div>
-                        {/* Ship to — ONE paste box that parses itself. Ship-from is the saved
-                            warehouse address (Settings › Platform), so it isn't shown or edited
-                            here. The address is validated live — see the badge by the header. */}
-                        <div className="space-y-2">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Ship to")}</div>
-                          {/* Live validation status sits INSIDE the box, bottom-right. */}
-                          <div className="relative">
-                            <textarea
-                              value={pasteText}
-                              onChange={(e) => {
-                                setPasteText(e.target.value)
-                                const { name, addr } = parseBlock(e.target.value)
-                                setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
-                              }}
-                              rows={4}
-                              placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
-                              className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-                            />
-                            <div className="pointer-events-none absolute bottom-2 right-2.5">
-                              {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> {tl("ui", "Checking…")}</span>}
-                              {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {tl("ui", "Validated")}</span>}
-                              {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
-                            </div>
-                          </div>
-                          <p className="text-3xs text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
-                        </div>
-                      </div>
-
-                      {/* Package + service */}
-                      <div className="flex flex-wrap items-end gap-2">
-                        <label className="flex flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">{tl("ui", "Service")}</span>
-                          <select value={pkg.mailClass} onChange={(e) => setPkg({ ...pkg, mailClass: e.target.value })} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                            {MAIL_CLASSES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                          </select>
-                        </label>
-                        <label className="flex w-20 flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">{tl("ui", "Weight oz")}</span>
-                          <Input type="number" min={1} value={pkg.weightOz} onChange={(e) => setPkg({ ...pkg, weightOz: Number(e.target.value) })} className="h-9" />
-                        </label>
-                        <label className="flex w-16 flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">{tl("ui", "L in")}</span>
-                          <Input type="number" min={1} value={pkg.length} onChange={(e) => setPkg({ ...pkg, length: Number(e.target.value) })} className="h-9" />
-                        </label>
-                        <label className="flex w-16 flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">{tl("ui", "W in")}</span>
-                          <Input type="number" min={1} value={pkg.width} onChange={(e) => setPkg({ ...pkg, width: Number(e.target.value) })} className="h-9" />
-                        </label>
-                        <label className="flex w-16 flex-col gap-1">
-                          <span className="text-xs text-muted-foreground">{tl("ui", "H in")}</span>
-                          <Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" />
-                        </label>
-                        {/* No ml-auto. This button buys a label FROM the five fields to its
-                            left, so flinging it to the far edge (x≈1655, 846px past the
-                            last field at 1920) separated it from its own inputs. It reads
-                            as the end of the form now, because it is. */}
-                        {(() => {
-                          // Can't ship what can't be made: block the label while any line still
-                          // needs its blank / colour / size / method picked.
-                          const unset = orderNeedsSetup(o.items, catalog)
-                          return (
-                            <Button size="sm" onClick={() => buyLabel(o)} disabled={busy === `label:${o.id}` || unset > 0}
-                              title={unset > 0 ? `${unset} item${unset === 1 ? "" : "s"} still ${unset === 1 ? "needs" : "need"} setup — pick every variant before buying a label.` : undefined}>
-                              {busy === `label:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Printer size={14} weight="bold" /> {tl("ui", "Buy USPS label")}</>}
-                            </Button>
-                          )
-                        })()}
-                      </div>
-
-                      {(() => {
-                        const unset = orderNeedsSetup(o.items, catalog)
-                        return unset > 0 ? (
-                          <div className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-2xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-                            <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
-                            <span>{unset} item{unset === 1 ? "" : "s"} still {unset === 1 ? "needs" : "need"} a blank, colour, size &amp; method — finish setup before shipping.</span>
-                          </div>
-                        ) : null
-                      })()}
-
-                      {/* Dim-weight packaging suggestion for this parcel (÷166) — the box guidance,
-                          shown right under the dimensions it reasons about. */}
-                      <PackagingHint weightOz={pkg.weightOz} length={pkg.length} width={pkg.width} height={pkg.height} />
-
-                      {labelErr && <div className="flex items-center gap-1.5 text-sm text-destructive"><Warning size={14} weight="fill" /> {labelErr}</div>}
-
-                      {/* Manual fallback — record a label bought elsewhere */}
-                      <details className="rounded-lg border border-border bg-card">
-                        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted-foreground">{tl("ui", "Already have a label? Record tracking manually")}</summary>
-                        <div className="flex flex-wrap items-end gap-2 border-t border-border p-3">
-                          <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">{tl("ui", "Carrier")}</span>
-                            <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                              {CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                          </label>
-                          <label className="flex flex-1 flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">{tl("ui", "Tracking number")}</span>
-                            <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" className="h-9" />
-                          </label>
-                          <Button size="sm" variant="outline" onClick={() => shipOrder(o)} disabled={busy === `ship:${o.id}`}>
-                            {busy === `ship:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Truck size={14} weight="bold" /> {tl("ui", "Mark shipped")}</>}
-                          </Button>
-                        </div>
-                      </details>
-
-                      <div className="flex justify-end">
-                        <Button size="sm" variant="ghost" onClick={() => setShipOpen(null)}>{tl("ui", "Close")}</Button>
-                      </div>
-                    </div>
-                  )}
+                  {/* THE IN-ROW LABEL FORM IS GONE — see NewLabelDialog at the foot of this
+                      component. It was a second, poorer implementation of the same job: one
+                      carrier, no rate list, a parcel typed from scratch every time, and a
+                      dim-weight lecture underneath objecting to numbers nobody had chosen.
+                      The dialog rate-shops every enabled carrier, opens on the mailer this
+                      factory actually stocks, and fills the parcel in from the blanks on the
+                      order. Two places to buy a label is also two places for the rules about
+                      buying one to drift apart. */}
 
                   {/* Order detail — the things a board needs but the header can't hold:
                       the full ship-to, the buyer's personalisation instructions, and any
@@ -2069,10 +1973,28 @@ export function OrdersHub() {
                             catalog={catalog}
                             size={canDesign && stage === "" ? 104 : 64}
                             onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
+                            /**
+                             * A DROP LANDS ON THIS LINE, AND ONLY THIS LINE.
+                             *
+                             * It used to land on the SKU: two shirts of one sku shared a
+                             * single design row, so artwork dropped on the second appeared
+                             * on both and there was nowhere to put a different design. That
+                             * is the wrong default for the common case — a customer ordering
+                             * three colours who wants three different customisations.
+                             *
+                             * line_id is what makes it per-line, and every order line now
+                             * carries one. The confirmation says WHICH line so the scope is
+                             * visible at the moment it happens, and "apply to every line"
+                             * is a deliberate second action rather than the default.
+                             */
                             onDropImage={canDesign && it.sku ? (dataUrl) => {
+                              const siblings = (o.items ?? []).filter((x) => x.line_id !== it.line_id)
                               postOrderDesign(o.id, { sku: it.sku!, line_id: it.line_id, data: dataUrl, name: it.name })
                                 .then(() => {
-                                  setNote(`Artwork attached to ${it.name || it.sku}.`)
+                                  setNote(siblings.length
+                                    ? `Artwork attached to this line only (${it.name || it.sku}) — ${siblings.length} other ${siblings.length === 1 ? "line" : "lines"} unchanged.`
+                                    : `Artwork attached to ${it.name || it.sku}.`)
+                                  if (siblings.length) setApplyAll({ order: o, item: it, data: dataUrl, siblings })
                                   return getOrderDesigns(o.id)
                                 })
                                 .then((r) => {
@@ -2304,6 +2226,75 @@ export function OrdersHub() {
             })}
           </div>
           </div>{/* /overflow-x-auto */}
+          {/* AFTER a per-line drop: the offer to copy it across, never the default.
+              Lists the lines it would touch by name so "all items" is a set you can see
+              rather than a promise — the whole complaint was artwork silently landing on
+              lines nobody chose. */}
+          <Dialog open={!!applyAll} onOpenChange={(v) => { if (!v) setApplyAll(null) }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader><DialogTitle>Put this on the other lines too?</DialogTitle></DialogHeader>
+              <div className="space-y-3 px-1 pb-1">
+                <p className="text-sm text-muted-foreground">
+                  The artwork is on <strong className="text-foreground">{applyAll?.item.name || applyAll?.item.sku}</strong> only.
+                  This order has {applyAll?.siblings.length} other {applyAll?.siblings.length === 1 ? "line" : "lines"} —
+                  copy it to {applyAll?.siblings.length === 1 ? "it" : "them"} as well?
+                </p>
+                <ul className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border bg-muted/30 p-2 text-xs">
+                  {(applyAll?.siblings ?? []).map((sib) => (
+                    <li key={sib.line_id || sib.sku} className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate">{sib.name || sib.sku}</span>
+                      {(sib.color || sib.size) && (
+                        <span className="shrink-0 text-muted-foreground">{[sib.color, sib.size].filter(Boolean).join(" · ")}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {/* Said plainly: a colourway usually wants its OWN artwork, which is the
+                    reason this is a question rather than a default. */}
+                <p className="text-xs text-muted-foreground">
+                  Leave it if each line needs its own customisation — that&apos;s the usual case for a
+                  multi-colour order.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setApplyAll(null)} disabled={applyAllBusy}>
+                    This line only
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={applyAllBusy}
+                    onClick={async () => {
+                      if (!applyAll) return
+                      setApplyAllBusy(true)
+                      const { order, data, siblings } = applyAll
+                      // One at a time: each is its own row keyed on its own line, and a
+                      // failure part-way through must leave the ones that landed alone.
+                      let done = 0
+                      for (const sib of siblings) {
+                        if (!sib.sku) continue
+                        const r = await postOrderDesign(order.id, { sku: sib.sku, line_id: sib.line_id, data, name: sib.name }).catch(() => null)
+                        if (r && !r.error) done++
+                      }
+                      const fresh = await getOrderDesigns(order.id).catch(() => null)
+                      if (fresh) {
+                        const list = Array.isArray(fresh) ? fresh : (fresh?.designs ?? [])
+                        const bySku: Record<string, OrderDesign> = {}
+                        Object.assign(bySku, indexDesigns(list))
+                        setDesigns((p) => ({ ...p, [order.id]: bySku }))
+                      }
+                      setApplyAllBusy(false)
+                      setApplyAll(null)
+                      setNote(done === siblings.length
+                        ? `Artwork copied to ${done} more ${done === 1 ? "line" : "lines"}.`
+                        : `Copied to ${done} of ${siblings.length} — the rest kept what they had.`)
+                    }}
+                  >
+                    {applyAllBusy ? <><CircleNotch size={13} className="animate-spin" /> Copying…</> : `Apply to all ${(applyAll?.siblings.length ?? 0) + 1} lines`}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* "We may already have made this." Exact and similar are kept visually
               separate on purpose: identical artwork is a safe reuse, whereas a
               lookalike is a lead to check. Attaching a fuzzy match automatically
@@ -2367,6 +2358,26 @@ export function OrdersHub() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* ONE label window for the whole board, mounted once and pointed at whichever
+              order asked for it — the same dialog the Shipments page uses.
+              It brings what the in-row form could not: every enabled carrier's rates side by
+              side rather than USPS alone, the mailer sizes this factory stocks, and a parcel
+              worked out from the blanks on the order (weight summed, footprint from the
+              largest line) instead of three numbers typed from memory. Ship-to comes from the
+              order, so the common case is open → pick a rate → buy. */}
+          {shipOpen && (() => {
+            const o = (orders ?? []).find((x) => x.id === shipOpen)
+            if (!o) return null
+            return (
+              <NewLabelDialog
+                open
+                onOpenChange={(v) => { if (!v) setShipOpen(null) }}
+                order={{ id: o.id, num: numOf(o), to: toAddrOf(o), items: o.items ?? [] }}
+                onCreated={() => { setShipOpen(null); reload() }}
+              />
+            )
+          })()}
 
           {/* One editor for the whole board — mounted once, pointed at whichever line was
               clicked. Reloads the order's designs on save so the row avatar rehydrates
