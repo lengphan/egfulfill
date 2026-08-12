@@ -240,7 +240,7 @@ const WORDMARK_FONT = "Georgia,'Times New Roman',serif";
 // Configurable because it's a business fact, not a code constant; the fallback is a legal
 // stopgap, not a real address (see the note surfaced to the user).
 function postalAddress() {
-  return process.env.MAIL_POSTAL_ADDRESS || 'EGFULFILL · egful.store';
+  return process.env.MAIL_POSTAL_ADDRESS || 'EGFUL · egful.store';
 }
 
 // Autolink bare http(s) URLs AFTER escaping, so the source is still fully escaped and only
@@ -270,7 +270,7 @@ function cleanBranding(v) {
     accent: typeof o.accent === 'string' && /^#[0-9a-f]{6}$/i.test(o.accent) ? o.accent : BRAND.accent,
     // https only: storage URLs are https, and it lands unescaped in a src attribute.
     logoUrl: typeof o.logoUrl === 'string' && /^https:\/\//i.test(o.logoUrl) ? o.logoUrl : '',
-    heading: typeof o.heading === 'string' && o.heading.trim() ? o.heading.trim().slice(0, 40) : 'egfulfill',
+    heading: typeof o.heading === 'string' && o.heading.trim() ? o.heading.trim().slice(0, 40) : 'egful',
     footerNote: typeof o.footerNote === 'string' ? o.footerNote.trim().slice(0, 200) : '',
   };
 }
@@ -319,7 +319,7 @@ function emailShell(innerHtml, unsubUrl, preheader, brand) {
   <tr><td style="padding:22px 32px 30px 32px;border-top:1px solid ${BRAND.line}">
     ${footerNote}
     <p style="margin:0 0 6px;font-family:${FONT};font-size:12px;line-height:1.55;color:${BRAND.muted}">
-      You're receiving this because you have an EGFULFILL seller account.
+      You're receiving this because you have an EGFUL seller account.
       <a href="${esc(unsubUrl)}" style="color:${BRAND.muted};text-decoration:underline">Unsubscribe from updates like this</a>.
       Emails about your account and orders will still reach you.
     </p>
@@ -342,7 +342,7 @@ function renderHtml(body, name, unsubUrl, brand) {
 }
 
 function renderText(body, name, unsubUrl) {
-  return `${name ? 'Hi ' + name + ',' : 'Hi,'}\n\n${body}\n\n---\nYou're receiving this because you have an EGFULFILL seller account.\nUnsubscribe from updates like this: ${unsubUrl}\nAccount and order emails will still reach you.`;
+  return `${name ? 'Hi ' + name + ',' : 'Hi,'}\n\n${body}\n\n---\nYou're receiving this because you have an EGFUL seller account.\nUnsubscribe from updates like this: ${unsubUrl}\nAccount and order emails will still reach you.`;
 }
 
 /**
@@ -412,12 +412,12 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
     reply.type('text/html');
     const msg = ok
       ? `<h1 style="font-size:20px;margin:0 0 10px">You're unsubscribed</h1>
-         <p>You won't get product updates or announcements from EGFULFILL any more.</p>
+         <p>You won't get product updates or announcements from EGFUL any more.</p>
          <p style="color:#71717a">Emails about your account and your orders — password resets, top-up receipts, shipping notices — will still reach you. Those aren't marketing, and turning them off would break your account.</p>`
       : `<h1 style="font-size:20px;margin:0 0 10px">That link didn't work</h1>
-         <p>It may have been altered in transit. You can turn off updates from Settings inside your EGFULFILL account.</p>`;
+         <p>It may have been altered in transit. You can turn off updates from Settings inside your EGFUL account.</p>`;
     reply.code(ok ? 200 : 400);
-    return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EGFULFILL — unsubscribe</title>
+    return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EGFUL — unsubscribe</title>
 <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:12vh auto;padding:0 22px;line-height:1.55;color:#18181b">${msg}</div>`;
   });
 

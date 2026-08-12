@@ -90,7 +90,8 @@ export async function signup({ email, password, role = 'seller', name = '', stor
   if (!EMAIL_RE.test(String(email).trim())) {
     throw new Error('Enter a real email address — it\'s how you reset your password.');
   }
-  if (password.length < 8) throw new Error('Password must be at least 8 characters');
+  const weak = passwordProblem(password, { email, name, username });
+  if (weak) throw new Error(weak);
   // Optional at signup — throws with a readable message if the shape is wrong.
   const uname = username ? normalizeUsername(username) : null;
   await ensureUsernameColumn().catch(() => {});
@@ -254,6 +255,42 @@ export async function resolveEntitlements(user) {
 
 // Reusable bcrypt hasher for admin-created users / password resets.
 export async function hashPassword(plain) { return bcrypt.hash(plain, 10); }
+
+/**
+ * ONE password rule, for every door that writes users.password_hash.
+ *
+ * There were three different floors — 8 at signup, 8 for an admin-created user, and SIX on
+ * the reset route — which meant the weakest one set the real policy: anyone could downgrade
+ * their own password to six characters through "forgot password". That is the hole this
+ * closes, and it is why the check lives here rather than being retyped at each call site.
+ *
+ * The specific numbers are Amazon's Selling Partner API credential-management control (12
+ * characters, mixed case, a digit, a symbol, and no part of the user's own name), because
+ * marketplace API access is assessed against it and the strictest connected platform sets
+ * the bar for everyone. It is also just a sane 2026 floor.
+ *
+ * Returns null when the password is acceptable, or a message to show the person. It does not
+ * throw — callers reply with different status codes and shapes.
+ */
+export function passwordProblem(plain, { email = '', name = '', username = '' } = {}) {
+  const p = String(plain || '');
+  if (p.length < 12) return 'Password must be at least 12 characters';
+  if (!/[a-z]/.test(p)) return 'Password must include a lower-case letter';
+  if (!/[A-Z]/.test(p)) return 'Password must include a capital letter';
+  if (!/[0-9]/.test(p)) return 'Password must include a number';
+  if (!/[^A-Za-z0-9]/.test(p)) return 'Password must include a symbol';
+  // "must not include any part of the user's name" — split the identity into words and
+  // reject any run of 4+ characters that appears in the password. 4, not 3, because short
+  // fragments ("ann", "lee") collide with ordinary English often enough to reject good
+  // passwords; the local part of the address counts, since that is the usual near-miss.
+  const lc = p.toLowerCase();
+  const parts = `${String(email).split('@')[0]} ${name} ${username}`
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 4);
+  if (parts.some((w) => lc.includes(w))) return 'Password must not contain your name or email';
+  return null;
+}
 
 // Sign in with Google: the caller has already VERIFIED the Google ID token (see
 // the /api/auth/google route). Here we just find-or-create the user by email and

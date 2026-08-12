@@ -1,6 +1,6 @@
 import { Reveal } from "@/components/motion/reveal"
 
-export const metadata = { title: "Privacy Policy — EGFULFILL" }
+export const metadata = { title: "Privacy Policy — EGFUL" }
 
 const sections = [
   {
@@ -29,11 +29,11 @@ const sections = [
   },
   {
     h: "Sharing & third parties",
-    p: "We share data only with processors that help us run the service, under data-protection terms, or where required by law. Buyer name and address go to our shipping aggregators (Shippo, EasyPost) to buy a label, to the delivering carrier (USPS, UPS), and to our dispatch partner who hands parcels to the carrier. Our infrastructure sub-processors are DigitalOcean (hosting), Cloudflare (encrypted backups and file storage) and Vercel (front end). Our seller support assistant sends order status, totals and tracking to Anthropic's API to draft replies; buyer names and addresses are excluded from those requests. We never sell personal data.",
+    p: "We share data only with processors that help us run the service, under data-protection terms, or where required by law. Buyer name and address go to our shipping aggregators (Shippo, EasyPost) to buy a label, to the delivering carrier (USPS, UPS), and to our dispatch partner who hands parcels to the carrier. Our infrastructure sub-processors are Hostinger (server hosting), Cloudflare (encrypted backups and file storage) and Vercel (front end). Our seller support assistant sends order status, totals and tracking to Anthropic's API to draft replies; buyer names and addresses are excluded from those requests. We never sell personal data.",
   },
   {
     h: "Security contact",
-    p: "To report a vulnerability or a suspected data incident, email security@embroiderygoods.com. We acknowledge reports promptly and notify affected customers and the relevant marketplaces in line with our incident response plan.",
+    p: "To report a vulnerability or a suspected data incident, email linh@embroiderygoods.com. We acknowledge reports promptly and notify affected customers and the relevant marketplaces in line with our incident response plan.",
   },
   {
     h: "Your rights",
@@ -50,9 +50,9 @@ export default function PrivacyPage() {
     <div className="mx-auto max-w-3xl px-6 py-20 sm:py-24">
       <Reveal>
         <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: June 2, 2026</p>
+        <p className="mt-2 text-sm text-muted-foreground">Last updated: August 12, 2026</p>
         <p className="mt-6 text-muted-foreground text-pretty">
-          EGFULFILL (&ldquo;we&rdquo;, &ldquo;us&rdquo;) respects your privacy. This policy explains what information we
+          EGFUL (&ldquo;we&rdquo;, &ldquo;us&rdquo;) respects your privacy. This policy explains what information we
           collect, how we use it, and the choices you have. It applies to our website, dashboards, and services.
         </p>
       </Reveal>
@@ -69,8 +69,8 @@ export default function PrivacyPage() {
       <Reveal>
         <p className="mt-10 border-t border-border pt-6 text-sm text-muted-foreground">
           Questions or data requests? Contact us at{" "}
-          <a href="mailto:phanmylinh0410@gmail.com" className="font-medium text-foreground hover:underline">
-            phanmylinh0410@gmail.com
+          <a href="mailto:linh@embroiderygoods.com" className="font-medium text-foreground hover:underline">
+            linh@embroiderygoods.com
           </a>
           .
         </p>

@@ -1524,7 +1524,7 @@ function PlatformPanel() {
           <label className="block space-y-1">
             <span className="text-sm font-medium">Name on the cover</span>
             <Input value={lookbookTitle} onChange={(e) => setLookbookTitle(e.target.value)}
-                   placeholder="EGFULFILL" className="h-9" />
+                   placeholder="EGFUL" className="h-9" />
             <span className="block text-2xs text-muted-foreground">Also the wordmark in each page footer.</span>
           </label>
           <label className="block space-y-1">
@@ -1987,7 +1987,7 @@ function UsersPanel() {
   }
   const resetPassword = async () => {
     if (!pwFor) return
-    if (pwValue.length < 8) { setPwErr("Password must be at least 8 characters."); return }
+    if (pwValue.length < 12) { setPwErr("Password must be at least 12 characters, with upper and lower case, a number and a symbol."); return }
     setBusy(pwFor.id); setPwErr(null)
     try {
       const r = await updateUserAdmin(pwFor.id, { password: pwValue })
@@ -2031,7 +2031,7 @@ function UsersPanel() {
     // told, and it joins the broadcast audience. The server enforces the same rule — this
     // copy exists so you learn it while typing rather than after pressing the button.
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nu.email.trim())) { setNuErr("Enter an email address — a username can't receive the password or any mail we send."); return }
-    if (nu.password.length < 8) { setNuErr("The password needs at least 8 characters."); return }
+    if (nu.password.length < 12) { setNuErr("The password needs at least 12 characters, with upper and lower case, a number and a symbol."); return }
     setBusy("new"); setNuErr(null)
     try {
       const r = await createUserAdmin({ email: nu.email.trim(), password: nu.password, role: nu.role })

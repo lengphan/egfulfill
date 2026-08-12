@@ -65,7 +65,7 @@ async function fetchPrice(url) {
       // No redirects: a public URL that 302s to 169.254.169.254 walks straight past the
       // check above, and that is the whole trick.
       redirect: 'manual',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EGFULFILL/1.0)', Accept: 'text/html' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EGFUL/1.0)', Accept: 'text/html' },
       signal: AbortSignal.timeout(12000),
     });
     if (r.status >= 300 && r.status < 400) {

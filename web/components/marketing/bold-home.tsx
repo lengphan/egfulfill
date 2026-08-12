@@ -358,7 +358,12 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ───────────────────────────────────────────────────────── */}
+      {/* ── TESTIMONIALS ───────────────────────────────────────────────────────────
+              Guarded on the list, not just mapped over it. An unattributable quote is a
+              marketing claim a marketplace reviewer will read as invented, so the honest
+              default is NO testimonials — and an unguarded section would then render a
+              headline over an empty grid, which looks broken rather than empty. */}
+      {testimonials.items.length > 0 && (
       <section className="mx-auto max-w-6xl px-6 py-20">
         <h2 className="max-w-3xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
           {testimonials.heading}
@@ -385,6 +390,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           ))}
         </div>
       </section>
+      )}
 
       {/* ── FAQ — plain disclosure elements: keyboard and screen-reader behaviour for
               free, and no state to get wrong. ─────────────────────────────────────── */}

@@ -152,7 +152,7 @@ export function CardEntryDialog({
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <Lock size={13} weight="fill" className="mt-0.5 shrink-0" />
             {remember
-              ? "Kept in this browser only — never on EGFULFILL's server, never written to the purchase order, and stripped from anything the supplier sends back."
+              ? "Kept in this browser only — never on EGFUL's server, never written to the purchase order, and stripped from anything the supplier sends back."
               : "Sent with this order only. Not saved here, not written to the purchase order, and stripped from anything the supplier sends back — so the next Otto order will ask again."}
           </p>
         </div>

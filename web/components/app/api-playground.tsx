@@ -175,7 +175,7 @@ export function ApiPlayground() {
             ))}
           </div>
           <div className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
-            Two directions: pull orders <span className="font-medium text-foreground">from</span> a sales channel (Etsy/Shopify — Stores page), or let another system push orders <span className="font-medium text-foreground">to</span> EGFULFILL via this API. The sandbox is for the second.
+            Two directions: pull orders <span className="font-medium text-foreground">from</span> a sales channel (Etsy/Shopify — Stores page), or let another system push orders <span className="font-medium text-foreground">to</span> EGFUL via this API. The sandbox is for the second.
           </div>
         </div>
       </details>

@@ -113,7 +113,7 @@ export function SupportBubble() {
   return (
     <div className="fixed bottom-5 right-5 z-50 flex h-[30rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl">
       <div className="flex items-center justify-between px-4 py-3 text-[#FAF8F3]" style={{ background: ACCENT }}>
-        <span className="text-sm font-bold">Ask EGFULFILL</span>
+        <span className="text-sm font-bold">Ask EGFUL</span>
         <button onClick={() => setOpen(false)} aria-label="Close"><X size={16} weight="bold" /></button>
       </div>
 

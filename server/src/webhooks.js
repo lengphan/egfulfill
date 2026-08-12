@@ -103,7 +103,7 @@ async function deliver(endpoint, event, payload) {
           'Content-Type': 'application/json',
           'X-EG-Event': event,
           'X-EG-Signature': `sha256=${sig}`,
-          'User-Agent': 'EGFULFILL-Webhooks/1',
+          'User-Agent': 'EGFUL-Webhooks/1',
         },
         body,
         signal: ctrl.signal,

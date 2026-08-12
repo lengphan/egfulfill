@@ -105,7 +105,7 @@ export function stripeRoutes(app, requireAuth) {
         amount: String(Math.round(amt * 100)),
         currency: 'usd',
         'automatic_payment_methods[enabled]': 'true',
-        description: 'EGFULFILL wallet top-up',
+        description: 'EGFUL wallet top-up',
         'metadata[seller]': (req.user && (req.user.email || req.user.sub)) || ''
       });
       return { clientSecret: pi.client_secret, id: pi.id };
@@ -174,7 +174,7 @@ export function stripeRoutes(app, requireAuth) {
       const customer = await customerFor(req.user);
       const pi = await stripe('/payment_intents', {
         amount: String(Math.round(amt * 100)), currency: 'usd', customer, payment_method: pmId,
-        confirm: 'true', description: 'EGFULFILL wallet top-up (saved card)',
+        confirm: 'true', description: 'EGFUL wallet top-up (saved card)',
         // Off-session saved-card charge: enable automatic methods but DISALLOW
         // redirect-based ones, so Stripe doesn't require a return_url (was throwing
         // "you must provide a `return_url`" on confirm).

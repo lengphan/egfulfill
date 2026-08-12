@@ -879,7 +879,7 @@ export function DispatchBoard() {
               closing tag mid-line, which shipped as "Externalare labels from outside". */}
           Rows tagged <b>External</b>{" "}
           are labels from outside — they&apos;re not attached to an
-          EGFULFILL order and nothing is charged for them. Tick one and press{" "}
+          EGFUL order and nothing is charged for them. Tick one and press{" "}
           <b>Send to byeastside</b> to put it in their pre-scan queue.
         </p>
       )}
@@ -1138,7 +1138,7 @@ export function DispatchBoard() {
                             </div>
                           )}
                           <div className="pt-1 text-2xs text-muted-foreground">
-                            Not attached to an EGFULFILL order{u.created_by ? ` · sent by ${u.created_by}` : ""}.
+                            Not attached to an EGFUL order{u.created_by ? ` · sent by ${u.created_by}` : ""}.
                           </div>
                         </div>
                       )}

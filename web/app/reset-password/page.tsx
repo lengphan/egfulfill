@@ -23,8 +23,8 @@ function ResetForm() {
       setError("This reset link is missing its token. Request a new one.")
       return
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.")
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters, with upper and lower case, a number and a symbol.")
       return
     }
     setLoading(true)
@@ -43,7 +43,7 @@ function ResetForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">New password</span>
-        <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete="new-password" required />
+        <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 12 characters" autoComplete="new-password" required />
       </label>
       {error && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
       <Button type="submit" className="w-full" disabled={loading}>

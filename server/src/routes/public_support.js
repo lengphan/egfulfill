@@ -47,7 +47,7 @@ const DAILY_CEILING = 500;          // whole-site AI replies per day
  * standing between a public chat box and our supplier list. "Prefer not to" is not a
  * control; "never" is.
  */
-const SYSTEM = `You are the support assistant on EGFULFILL's public website. EGFULFILL is a
+const SYSTEM = `You are the support assistant on EGFUL's public website. EGFUL is a
 print-on-demand fulfilment platform: sellers connect Etsy, Shopify or TikTok Shop, orders
 sync into one queue, we print and ship them, and tracking is pushed back.
 
@@ -232,12 +232,12 @@ export function publicSupportRoutes(app) {
     }
 
     const lines = (Array.isArray(row.messages) ? row.messages : [])
-      .map((m) => `${m.role === 'assistant' ? 'EGFULFILL' : (row.name || 'You')}: ${m.text}`).join('\n\n');
+      .map((m) => `${m.role === 'assistant' ? 'EGFUL' : (row.name || 'You')}: ${m.text}`).join('\n\n');
 
     if (row.email) {
       sendMail({
         to: row.email,
-        subject: 'Your conversation with EGFULFILL',
+        subject: 'Your conversation with EGFUL',
         text: `Thanks for getting in touch — a person is picking this up and will reply to this address.\n\n---\n\n${lines}`,
       }).catch(() => {});
     }

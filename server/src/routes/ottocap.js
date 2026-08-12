@@ -491,7 +491,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
       // case refused the normal way this business pays Otto and pushed people to change
       // their payment terms to suit our software, which is backwards.
       //
-      // Typing a card into EGFULFILL is different — that PROCESSES and TRANSMITS a PAN,
+      // Typing a card into EGFUL is different — that PROCESSES and TRANSMITS a PAN,
       // which is PCI DSS SAQ D. Not storing it avoids one of the three verbs, not the
       // obligation, and Otto expose no saved-card token the way S&S do, so there's nothing
       // safer to send instead. That stays off unless someone deliberately sets
@@ -505,7 +505,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
           return {
             error: 'Entering a card here is turned off.',
             code: 'card_orders_disabled',
-            detail: 'Typing a card into EGFULFILL would put this server inside PCI DSS scope, so it is disabled unless someone sets OTTO_CARD_ORDERS=1. You can still pay Otto by card — leave the card fields empty and Otto bills the card held on your account.',
+            detail: 'Typing a card into EGFUL would put this server inside PCI DSS scope, so it is disabled unless someone sets OTTO_CARD_ORDERS=1. You can still pay Otto by card — leave the card fields empty and Otto bills the card held on your account.',
           };
         }
         const number = String(raw.card_number || '').replace(/\D/g, '');

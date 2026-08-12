@@ -1,7 +1,7 @@
 import { BoldCatalog } from "@/components/marketing/bold-catalog"
 import { getPublicProducts } from "@/lib/api"
 
-export const metadata = { title: "Products — EGFULFILL" }
+export const metadata = { title: "Products — EGFUL" }
 // Re-read periodically rather than baking the catalogue into the build: publishing a product
 // should put it on the marketing site without a redeploy.
 export const revalidate = 300

@@ -73,5 +73,5 @@ export const navTitle = (pathname: string): string => {
       if (pathname === item.href || pathname.startsWith(item.href + "/")) return item.label
     }
   }
-  return "EGFULFILL"
+  return "EGFUL"
 }

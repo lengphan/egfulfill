@@ -31,23 +31,36 @@ export default async function MarketingLayout({ children }: { children: React.Re
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
+          {/* The identity block. It names the company, the app and a reachable human in one
+              place because a marketplace reviewing us for API access looks for exactly that,
+              and a support widget is not a published contact method. */}
           <div>
             <div className="font-display text-xl font-semibold tracking-tight">egful</div>
-            <div className="mt-1 text-sm text-muted-foreground">Hands-off print-on-demand fulfillment.</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              EGFUL — hands-off print-on-demand fulfillment.
+            </div>
+            <a
+              href="mailto:linh@embroiderygoods.com"
+              className="mt-2 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              linh@embroiderygoods.com
+            </a>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <Link href="/catalog" className="hover:text-foreground">Products</Link>
             <Link href="/pricing" className="hover:text-foreground">Pricing</Link>
             <Link href="/how-it-works" className="hover:text-foreground">How it works</Link>
             <Link href="/features" className="hover:text-foreground">Features</Link>
+            <Link href="/integrations/amazon" className="hover:text-foreground">Amazon</Link>
             <Link href="/docs" className="hover:text-foreground">API</Link>
+            <Link href="/contact" className="hover:text-foreground">Contact</Link>
             <Link href="/login" className="hover:text-foreground">Log in</Link>
             <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link href="/terms" className="hover:text-foreground">Terms</Link>
           </nav>
         </div>
         <div className="flex flex-col items-center justify-between gap-2 border-t border-border py-4 text-xs text-muted-foreground sm:flex-row sm:px-6">
-          <span>© 2026 EGFULFILL. All rights reserved.</span>
+          <span>© 2026 EGFUL. All rights reserved.</span>
           <span className="flex gap-4">
             <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-foreground">Terms of Service</Link>

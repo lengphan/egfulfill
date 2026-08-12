@@ -1,6 +1,6 @@
 import { Reveal } from "@/components/motion/reveal"
 
-export const metadata = { title: "Terms of Service — EGFULFILL" }
+export const metadata = { title: "Terms of Service — EGFUL" }
 
 const sections = [
   {
@@ -21,7 +21,7 @@ const sections = [
   },
   {
     h: "Connected sales channels",
-    p: "EGFULFILL lets you connect third-party marketplaces such as Etsy so we can import your orders for fulfillment. By connecting a store you authorize us to access that platform's data on your behalf through its official API, and you confirm you are permitted to grant that access. Your use of each connected platform remains subject to that platform's own terms. We access connected-platform data only to provide the fulfillment service to you, and handle it in line with our Privacy Policy.",
+    p: "EGFUL lets you connect third-party marketplaces such as Etsy so we can import your orders for fulfillment. By connecting a store you authorize us to access that platform's data on your behalf through its official API, and you confirm you are permitted to grant that access. Your use of each connected platform remains subject to that platform's own terms. We access connected-platform data only to provide the fulfillment service to you, and handle it in line with our Privacy Policy.",
   },
   {
     h: "Service availability",
@@ -40,7 +40,7 @@ export default function TermsPage() {
         <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Terms of Service</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated: June 2, 2026</p>
         <p className="mt-6 text-muted-foreground text-pretty">
-          These terms govern your use of EGFULFILL. By creating an account or using the service, you agree to them.
+          These terms govern your use of EGFUL. By creating an account or using the service, you agree to them.
           Please read them carefully.
         </p>
       </Reveal>
@@ -57,8 +57,8 @@ export default function TermsPage() {
       <Reveal>
         <p className="mt-10 border-t border-border pt-6 text-sm text-muted-foreground">
           Questions? Contact us at{" "}
-          <a href="mailto:phanmylinh0410@gmail.com" className="font-medium text-foreground hover:underline">
-            phanmylinh0410@gmail.com
+          <a href="mailto:linh@embroiderygoods.com" className="font-medium text-foreground hover:underline">
+            linh@embroiderygoods.com
           </a>
           .
         </p>

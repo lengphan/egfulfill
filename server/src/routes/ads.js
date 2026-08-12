@@ -1,5 +1,5 @@
 // ads.js — Meta (Facebook/Instagram) + Google Ads campaigns: read spend/results, and
-// create campaigns from EGFULFILL.
+// create campaigns from EGFUL.
 //
 // Reuses `platform_connections` (same table as Etsy/Shopify) with
 // platform='meta_ads' | 'google_ads' and shop_id = the ad-account id, so tokens,

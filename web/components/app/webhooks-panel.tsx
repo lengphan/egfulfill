@@ -129,7 +129,7 @@ export function WebhooksPanel() {
             <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://your-app.example.com/hooks/egfulfill"
+              placeholder="https://your-app.example.com/hooks/egful"
               className="flex-1"
             />
             <Button onClick={add} disabled={busy === "add"}>

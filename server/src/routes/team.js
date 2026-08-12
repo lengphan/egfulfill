@@ -15,9 +15,9 @@ function emailInvite(toEmail, ownerName) {
   const base = process.env.APP_URL || 'https://app.egful.store';
   sendMail({
     to: toEmail,
-    subject: (ownerName ? (ownerName + ' invited you') : 'You\'ve been invited') + ' to a team on EGFULFILL',
+    subject: (ownerName ? (ownerName + ' invited you') : 'You\'ve been invited') + ' to a team on EGFUL',
     html: '<div style="font-family:Inter,Arial,sans-serif;color:#191918;line-height:1.6">'
-      + '<p><b>' + (ownerName || 'A team') + '</b> invited you to join their team on EGFULFILL.</p>'
+      + '<p><b>' + (ownerName || 'A team') + '</b> invited you to join their team on EGFUL.</p>'
       + '<p>Sign in with this email, then open <a href="' + base + '/settings" style="color:#111827;font-weight:600">Settings → Team</a> and click <b>Accept invite</b>.</p>'
       + '<p style="color:#9ca3af;font-size:13px">If you don\'t have an account yet, sign up first at ' + base + '/signup</p></div>'
   }).catch(() => {});
@@ -34,8 +34,8 @@ export function teamRoutes(app, requireAuth) {
     try {
       sent = await sendMail({
         to,
-        subject: 'EGFULFILL · email test',
-        html: '<div style="font-family:Inter,Arial,sans-serif">If you can read this, your EGFULFILL email is working. 🎉</div>'
+        subject: 'EGFUL · email test',
+        html: '<div style="font-family:Inter,Arial,sans-serif">If you can read this, your EGFUL email is working. 🎉</div>'
       });
     } catch (e) { error = e.message; }
     // sendMail never throws, so `error` was ALWAYS null here — the real reason lived
@@ -45,7 +45,7 @@ export function teamRoutes(app, requireAuth) {
     return {
       mailConfigured: mailConfigured(),
       transport: process.env.BREVO_API_KEY ? 'brevo-api' : (process.env.SMTP_HOST ? 'smtp' : 'none'),
-      from: process.env.SMTP_FROM || process.env.MAIL_FROM || '(unset → EGFULFILL <no-reply@egful.store>)',
+      from: process.env.SMTP_FROM || process.env.MAIL_FROM || '(unset → EGFUL <no-reply@egful.store>)',
       to, sent, error,
       hint: sent ? undefined : 'A Brevo 400/401 here is almost always an unverified sender or a bad key. The From address above must be verified under Senders, Domains & Dedicated IPs → Senders.',
     };

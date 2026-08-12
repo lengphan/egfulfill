@@ -43,9 +43,9 @@ const fontMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: { default: "EGFULFILL", template: "%s · EGFULFILL" },
+  title: { default: "EGFUL", template: "%s · EGFUL" },
   // Lets iOS run the installed app full-screen (Android reads the manifest).
-  appleWebApp: { capable: true, title: "EGFULFILL Staff", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "EGFUL Staff", statusBarStyle: "black-translucent" },
 }
 // viewport-fit=cover so the scanner overlay reaches under the iPhone notch.
 export const viewport: Viewport = {

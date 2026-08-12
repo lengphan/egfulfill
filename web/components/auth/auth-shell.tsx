@@ -44,7 +44,7 @@ export function AuthShell({ subtitle, children }: { subtitle: string; children: 
           className="font-display text-3xl font-semibold tracking-tight"
           style={{ color: INK }}
         >
-          egfulfill
+          egful
         </Link>
 
         {/* The page's own heading. Each auth page passes its own copy, so this one component
@@ -99,7 +99,7 @@ export function AuthShell({ subtitle, children }: { subtitle: string; children: 
           className="mt-8 inline-block text-xs transition-opacity hover:opacity-100"
           style={{ color: AUTH_MUTED }}
         >
-          ← Back to egfulfill
+          ← Back to egful
         </Link>
       </div>
     </div>

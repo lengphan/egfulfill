@@ -103,7 +103,7 @@ async function downloadXlsxTemplate() {
   const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
   const a = document.createElement("a")
   a.href = url
-  a.download = "EGFULFILL Order Import.xlsx"
+  a.download = "EGFUL Order Import.xlsx"
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -439,7 +439,7 @@ export function ImportOrdersDialog({
                 >
                   <UploadSimple size={24} className="text-muted-foreground" />
                   <span className="text-sm font-medium">Drop a .csv, .xlsx or .xls — or <span className="text-primary">browse</span></span>
-                  <span className="text-xs text-muted-foreground">All three work here · uses the egfulfill template format</span>
+                  <span className="text-xs text-muted-foreground">All three work here · uses the egful template format</span>
                   <input type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => takeFile(e.target.files?.[0])} />
                 </label>
               </TabsContent>

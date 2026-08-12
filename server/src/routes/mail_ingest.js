@@ -98,7 +98,7 @@ export function parseSaleEmail(text) {
  * Which account does a forwarding address belong to?
  *
  * Three legitimate sources, because the address a sale email arrives at is usually NOT
- * the seller's EGFULFILL login:
+ * the seller's EGFUL login:
  *   1. their account email
  *   2. the Etsy SHOP email captured from receipts (seller_email) — no setup needed
  *   3. an address they registered themselves (a personal inbox, a shared ops mailbox)

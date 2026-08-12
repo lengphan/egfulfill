@@ -33,7 +33,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
   // ── Getting started ───────────────────────────────────────────────────────
   {
     slug: "create-account", category: "getting-started",
-    title: "How to create your EGFULFILL account",
+    title: "How to create your EGFUL account",
     summary: "Sign up as a seller and land on your dashboard.",
     body: [
       { type: "p", text: "Signing up creates a seller account — the side that places orders and connects stores. Staff roles (operator, warehouse, designer, admin) are assigned internally, not through signup." },
@@ -51,10 +51,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: "Connecting your first store",
     summary: "Link Etsy so orders and listings sync automatically.",
     body: [
-      { type: "p", text: "Connecting a store lets EGFULFILL pull your orders in automatically and push tracking back once they ship. Etsy is fully wired today." },
+      { type: "p", text: "Connecting a store lets EGFUL pull your orders in automatically and push tracking back once they ship. Etsy is fully wired today." },
       { type: "steps", items: [
         "Go to Stores and pick the channel you want to connect.",
-        "You’ll be sent to the channel to authorize EGFULFILL, then returned here.",
+        "You’ll be sent to the channel to authorize EGFUL, then returned here.",
         "Your recent orders and listings sync in; new orders arrive automatically from then on.",
       ] },
       { type: "note", text: "Some Etsy buyer addresses may show as hidden — that’s an Etsy data-access policy, not a bug. See “Why some buyer addresses are hidden.”" },

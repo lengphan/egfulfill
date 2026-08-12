@@ -251,7 +251,7 @@ async function attachKnownMachineFile({ orderId, sku, lineId, artHash, sellerId 
 async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
   const id = 'etsy-' + rc.receipt_id;
   // Etsy's sale notifications go to the SHOP's email, which is usually not the seller's
-  // EGFULFILL login. Capture it so a forwarded sale email can be traced back to the right
+  // EGFUL login. Capture it so a forwarded sale email can be traced back to the right
   // seller without them registering anything.
   if (rc.seller_email) {
     q(`update platform_connections set seller_email=$1 where id=$2 and (seller_email is null or seller_email <> $1)`,

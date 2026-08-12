@@ -648,7 +648,7 @@ export function sandboxRoutes(app, requireAuth) {
     return {
       error: `${what} is not available through the API yet.`,
       code: 'not_implemented',
-      detail: 'EGFULFILL buys carrier labels internally when it ships your order; it does not resell label purchasing. Fulfilment orders placed via POST /api/v1/orders are shipped and tracked for you — read tracking back from GET /api/v1/orders/{id}.',
+      detail: 'EGFUL buys carrier labels internally when it ships your order; it does not resell label purchasing. Fulfilment orders placed via POST /api/v1/orders are shipped and tracked for you — read tracking back from GET /api/v1/orders/{id}.',
       sandbox: 'The /api/test/ equivalents return sample payloads if you are building against the shape.',
     };
   };

@@ -32,11 +32,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   try {
     const { product } = await getPublicProduct(slug)
-    return { title: `${product.name} — EGFULFILL` }
+    return { title: `${product.name} — EGFUL` }
   } catch {
     // Metadata must never be the thing that takes a page down, and it must not invent a
     // name for a product it couldn't read.
-    return { title: "Product — EGFULFILL" }
+    return { title: "Product — EGFUL" }
   }
 }
 

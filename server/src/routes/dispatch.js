@@ -993,7 +993,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   // place to look, and no record on our side of what was sent.
   //
   // DELIBERATELY UNLINKED, and that is the whole design. Earlier this feature was declined
-  // precisely because a dropped label has no EGFULFILL order to hang scans on — so it does
+  // precisely because a dropped label has no EGFUL order to hang scans on — so it does
   // not pretend to have one. It gets its own table and its own list, touches no order, and
   // bills nothing: the expedite fee exists because a seller asked us to rush THEIR order,
   // and there is no seller and no order here.

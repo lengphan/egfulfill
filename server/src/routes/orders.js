@@ -2289,7 +2289,7 @@ export function ordersRoutes(app, requireAuth) {
       if (isStaff(user)) return role !== 'designer';
       // A seller sees only their OWN channel. Deliberately NOT resolveSeller(): a team
       // member acts on the owner's board for orders, but the owner's conversation with
-      // EGFULFILL can cover billing and account matters the owner never delegated. The
+      // EGFUL can cover billing and account matters the owner never delegated. The
       // member gets their own channel instead. Same rule as before this refactor.
       return id === ('support-' + user.sub);
     }
@@ -2314,7 +2314,7 @@ export function ordersRoutes(app, requireAuth) {
   }
 
   // Staff-only: list every seller support thread (one row per seller) with its last message, so the
-  // staff chat can show "EGFULFILL Support" conversations that sellers started. Sellers never hit this.
+  // staff chat can show "EGFUL Support" conversations that sellers started. Sellers never hit this.
   app.get('/api/support/threads', { preHandler: requireAuth }, async (req, reply) => {
     // Designers excluded: they don't answer sellers, so seller conversations aren't theirs
     // to read. See canSeeThread.
@@ -2449,7 +2449,7 @@ export function ordersRoutes(app, requireAuth) {
       } else {
         notify({
           userIds: [channel.slice(8)], excludeUserId: req.user.sub,
-          type: 'support-message', title: `EGFULFILL replied${about}`,
+          type: 'support-message', title: `EGFUL replied${about}`,
           body, href: ref ? `/orders/${ref}` : '/chat', entityId: ref || channel,
         });
         // Email the seller too, so a human's reply reaches them off-app — the "a teammate

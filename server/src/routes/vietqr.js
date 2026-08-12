@@ -411,7 +411,7 @@ export function vietqrRoutes(app, requireAuth) {
     try { token = await vqOutboundToken(); out.step1_getToken = 'ok'; }
     catch (e) { out.step1_getToken = 'FAILED: ' + e.message; return out; }
 
-    const bankCode = qy.bankCode, account = qy.account, name = qy.name || 'EGFULFILL';
+    const bankCode = qy.bankCode, account = qy.account, name = qy.name || 'EGFUL';
     const amount = Number(qy.amount) || 10000;
     if (!bankCode || !account) { out.note = 'Pass ?bankCode=MB&account=0369053640&name=LE THI MAI HUONG&amount=10000'; return out; }
 

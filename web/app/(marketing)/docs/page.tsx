@@ -5,7 +5,7 @@ import { EndpointCard } from "./endpoint-card"
 import { Block, Code } from "./code-block"
 
 export const metadata: Metadata = {
-  title: "API — EGFULFILL",
+  title: "API — EGFUL",
   description: "Push orders into our factory and get status and tracking back. REST, API-key auth, signed webhooks.",
 }
 
@@ -71,7 +71,7 @@ export default function DocsPage() {
       <header className="max-w-2xl space-y-3 pb-10">
         {/* Lowercase, and only the brand word carries the display serif — that echoes the
             wordmark in the header instead of competing with it, which is what "The
-            EGFULFILL API" in all-caps Fraunces was doing. "API" stays in the body face so
+            EGFUL API" in all-caps Fraunces was doing. "API" stays in the body face so
             the line reads as a label, not a second logo. */}
         <h1 className="text-3xl font-semibold tracking-tight">
           <span className="font-display">egful</span> API
@@ -221,7 +221,7 @@ export default function DocsPage() {
               </tbody>
             </table>
           </div>
-          <Block>{`POST https://your-app.example.com/hooks/egfulfill
+          <Block>{`POST https://your-app.example.com/hooks/egful
 X-EG-Event: order.shipped
 X-EG-Signature: sha256=<hex>
 
@@ -258,7 +258,7 @@ X-EG-Signature: sha256=<hex>
 
 // express.raw() — NOT express.json(). Re-serialising the body
 // changes whitespace and key order, and the digest will not match.
-app.post("/hooks/egfulfill", express.raw({ type: "application/json" }), (req, res) => {
+app.post("/hooks/egful", express.raw({ type: "application/json" }), (req, res) => {
   const presented = String(req.headers["x-eg-signature"] || "").replace("sha256=", "")
   const expected  = crypto.createHmac("sha256", SECRET).update(req.body).digest("hex")
 

@@ -15,7 +15,7 @@
 // /api/auth/forgot never reveals whether an email exists (same response either way).
 import crypto from 'crypto';
 import { q } from '../db.js';
-import { hashPassword, canManageUsers } from '../auth.js';
+import { hashPassword, passwordProblem, canManageUsers } from '../auth.js';
 import { limited } from '../ratelimit.js';
 import { sendMail } from '../mailer.js';
 
@@ -26,16 +26,16 @@ const APP_URL = (process.env.APP_URL || 'https://app.egful.store').replace(/\/+$
 // transactional, not marketing, so it's exempt from CAN-SPAM's address/unsubscribe rules —
 // and letting someone "unsubscribe" from their own account security would be a mistake.
 function resetEmail(link) {
-  const text = 'Reset your EGFULFILL password using this link (valid for 1 hour):\n\n' + link
+  const text = 'Reset your EGFUL password using this link (valid for 1 hour):\n\n' + link
     + '\n\nIf you did not request this, ignore this email — your password stays the same.';
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>
 <body style="margin:0;padding:0;background:#f4f4f5">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:28px 16px">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #e4e4e7;border-radius:14px;overflow:hidden">
   <tr><td style="height:4px;background:#604cfa;line-height:4px;font-size:4px">&nbsp;</td></tr>
-  <tr><td style="padding:26px 32px 6px 32px"><span style="font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:600;letter-spacing:-0.5px;color:#0b0b0c">egfulfill</span></td></tr>
+  <tr><td style="padding:26px 32px 6px 32px"><span style="font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:600;letter-spacing:-0.5px;color:#0b0b0c">egful</span></td></tr>
   <tr><td style="padding:12px 32px 8px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#18181b">
-    <p style="margin:0 0 15px">Someone asked to reset the password for your EGFULFILL account.</p>
+    <p style="margin:0 0 15px">Someone asked to reset the password for your EGFUL account.</p>
     <p style="margin:0 0 20px">Click below to set a new one. The link is valid for <strong>one hour</strong>.</p>
     <p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#604cfa;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:11px 22px;border-radius:10px">Reset your password</a></p>
     <p style="margin:0 0 6px;font-size:13px;color:#71717a">Or paste this link into your browser:</p>
@@ -112,7 +112,7 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
         const { text, html } = resetEmail(link);
         // sendMail is best-effort and never throws — a false return (no transport) still
         // leaves the admin-mediated row in place as the fallback path.
-        const sent = await sendMail({ to: user.email, subject: 'Reset your EGFULFILL password', text, html });
+        const sent = await sendMail({ to: user.email, subject: 'Reset your EGFUL password', text, html });
         if (!sent) app.log.warn('password reset email not sent (no transport / send failed) for ' + user.email);
       }
     } catch (e) { /* never leak failures */ }
@@ -124,10 +124,16 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
     const b = req.body || {};
     const token = String(b.token || '').trim();
     const password = String(b.password || '');
-    if (!token || password.length < 6) { reply.code(400); return { error: 'A token and a password of at least 6 characters are required' }; }
+    if (!token) { reply.code(400); return { error: 'A token and a new password are required' }; }
     const r = await q("select * from password_resets where token=$1 and status='pending' and expires_at > now() limit 1", [token]);
     const row = r.rows[0];
     if (!row) { reply.code(400); return { error: 'This reset link is invalid or has expired. Request a new one.' }; }
+    // Validated AFTER the token is resolved, so the rule can be checked against the account's
+    // own name and address. The old floor here was six characters — three below signup's —
+    // which made "forgot password" the cheapest way to weaken any account on the platform.
+    const u = await q('select email, name, username from users where id=$1', [row.user_id]).then((x) => x.rows[0] || {});
+    const weak = passwordProblem(password, u);
+    if (weak) { reply.code(400); return { error: weak }; }
     const hash = await hashPassword(password);
     await q('update users set password_hash=$1 where id=$2', [hash, row.user_id]);
     await q("update password_resets set status='used', resolved_at=now() where id=$1", [row.id]);
@@ -143,11 +149,15 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
   // STAFF: set a new password for a request's user + mark resolved.
   app.post('/api/auth/reset-requests/:id/resolve', { preHandler: requireUserManager }, async (req, reply) => {
     const password = String((req.body || {}).password || '');
-    if (password.length < 6) { reply.code(400); return { error: 'Password must be at least 6 characters' }; }
     const r = await q("select * from password_resets where id=$1 and status='pending' limit 1", [req.params.id]);
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'Not found or already handled' }; }
     if (await adminTargetBlocked(req, reply, row.user_id)) return;
+    // Same rule as every other door, checked against the TARGET's identity — a staff-set
+    // password is still that person's password.
+    const u = await q('select email, name, username from users where id=$1', [row.user_id]).then((x) => x.rows[0] || {});
+    const weak = passwordProblem(password, u);
+    if (weak) { reply.code(400); return { error: weak }; }
     const hash = await hashPassword(password);
     await q('update users set password_hash=$1 where id=$2', [hash, row.user_id]);
     await q("update password_resets set status='resolved', resolved_at=now(), resolved_by=$2 where id=$1", [req.params.id, req.user.sub]);

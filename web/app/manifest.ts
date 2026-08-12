@@ -6,7 +6,7 @@ import type { MetadataRoute } from "next"
 // merged Inventory section (the old /scan route also redirects here).
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "EGFULFILL — Staff",
+    name: "EGFUL — Staff",
     short_name: "Staff",
     description: "Warehouse floor app: barcode scan for stock in/out, inventory, and orders.",
     start_url: "/inventory?tab=scan",

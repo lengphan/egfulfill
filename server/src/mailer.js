@@ -5,10 +5,10 @@
 // Fully dormant until one is configured; sendMail() is then a silent best-effort no-op.
 
 function parseFrom(s) {
-  s = s || 'EGFULFILL <no-reply@egful.store>';
+  s = s || 'EGFUL <no-reply@egful.store>';
   const m = String(s).match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
-  if (m) return { name: m[1] || 'EGFULFILL', email: m[2] };
-  return { name: 'EGFULFILL', email: String(s).trim() };
+  if (m) return { name: m[1] || 'EGFUL', email: m[2] };
+  return { name: 'EGFUL', email: String(s).trim() };
 }
 
 // ── 1) Brevo transactional HTTP API (preferred on SMTP-blocked hosts) ──────────
@@ -94,7 +94,7 @@ export async function sendMail(opts) {
       return false;
     }
     await m.sendMail(Object.assign(
-      { from: opts.from || process.env.SMTP_FROM || ('EGFULFILL <no-reply@' + process.env.SMTP_HOST + '>') }, opts));
+      { from: opts.from || process.env.SMTP_FROM || ('EGFUL <no-reply@' + process.env.SMTP_HOST + '>') }, opts));
     return true;
   } catch (e) {
     _lastError = (_lastError ? _lastError + ' | ' : '') + 'smtp: ' + (e && e.message ? e.message : String(e));

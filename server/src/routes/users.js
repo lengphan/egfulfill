@@ -1,7 +1,7 @@
 // User management API — ADMIN ONLY. Backs the "Users" admin screen so you
 // add/promote/reset/delete accounts from the app instead of editing the DB.
 import { q } from '../db.js';
-import { hashPassword, isStaff, canManageUsers } from '../auth.js';
+import { hashPassword, passwordProblem, isStaff, canManageUsers } from '../auth.js';
 import { audit } from '../audit.js';
 import { readAll } from './factory_settings.js';
 
@@ -119,7 +119,8 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
       reply.code(400);
       return { error: 'Enter an email address — a username can’t receive the password or any mail we send' };
     }
-    if (password.length < 8) { reply.code(400); return { error: 'Password must be at least 8 characters' }; }
+    const weak = passwordProblem(password, { email, name });
+    if (weak) { reply.code(400); return { error: weak }; }
     if (!ROLES.includes(role)) { reply.code(400); return { error: 'Invalid role' }; }
     try {
       const hash = await hashPassword(password);
@@ -156,7 +157,15 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
       if (!active && req.params.id === req.user.sub) { reply.code(400); return { error: "You can't deactivate your own account" }; }
       sets.push(`active=$${n++}`); vals.push(active);
     }
-    if (password) { if (password.length < 8) { reply.code(400); return { error: 'Password too short' }; } sets.push(`password_hash=$${n++}`); vals.push(await hashPassword(password)); }
+    if (password) {
+      // The target's own identity, not the caller's — the rule is "must not contain YOUR
+      // name", and an admin setting someone else's password would otherwise be checked
+      // against the wrong person.
+      const target = await q('select email, name from users where id=$1', [req.params.id]).then((r) => r.rows[0] || {});
+      const weak = passwordProblem(password, { email: target.email, name: name ?? target.name });
+      if (weak) { reply.code(400); return { error: weak }; }
+      sets.push(`password_hash=$${n++}`); vals.push(await hashPassword(password));
+    }
     // Per-seller order limit — a capacity/operations setting, so a user-manager (admin or
     // warehouse) may set it, not just an admin. Empty/null clears it back to the platform
     // default; a number floors at 0.

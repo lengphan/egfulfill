@@ -128,7 +128,7 @@ async function runSupportNudges() {
       await q(
         `insert into order_messages (order_id, sender_id, sender_role, body, meta)
          values ($1, null, 'assistant', $2, $3)`,
-        [r.order_id, body, JSON.stringify({ by: 'EGFULFILL Support', system: true, waitAck: true, ts: Date.now() })]);
+        [r.order_id, body, JSON.stringify({ by: 'EGFUL Support', system: true, waitAck: true, ts: Date.now() })]);
     } catch { /* one thread failing must not stop the rest */ }
   }
 }
@@ -200,7 +200,7 @@ function sellerStatus(o) {
   return 'Draft';   // new / draft / '' — created, not submitted
 }
 
-const SYSTEM = `You are the EGFULFILL support assistant. EGFULFILL is a print-on-demand fulfillment platform for online sellers (Etsy/Shopify/etc.). You help sellers with orders, fulfillment status, shipping, billing/wallet top-ups (VietQR, card, or manual transfer), store connections, plans (Starter/Pro/Enterprise + SpyDeck research add-on), and the developer API sandbox.
+const SYSTEM = `You are the EGFUL support assistant. EGFUL is a print-on-demand fulfillment platform for online sellers (Etsy/Shopify/etc.). You help sellers with orders, fulfillment status, shipping, billing/wallet top-ups (VietQR, card, or manual transfer), store connections, plans (Starter/Pro/Enterprise + SpyDeck research add-on), and the developer API sandbox.
 
 Rules:
 - Reply in the SAME language the seller wrote in. Our sellers write in English or Vietnamese: answer Vietnamese messages in natural Vietnamese, English messages in English. If a message mixes both or is ambiguous, mirror the seller's most recent message. Status labels in ACCOUNT DATA are English — translate them to match your reply.
@@ -312,13 +312,13 @@ async function generateReply(key, model, sellerId, messages) {
 // Workbench = the user's PRIVATE personal assistant (desk-<uid>). Only they can read it, so
 // it's a scratch space: ask things, keep notes. No live order/wallet data here (that's
 // Support) — it works over the conversation plus the user's own saved notes.
-const DESK_SYSTEM = `You are Workbench, a private personal assistant for one EGFULFILL user. This space is theirs alone — no one else can read it. Help them think, answer questions, and remember what they've saved.
+const DESK_SYSTEM = `You are Workbench, a private personal assistant for one EGFUL user. This space is theirs alone — no one else can read it. Help them think, answer questions, and remember what they've saved.
 
 Rules:
 - Reply in the same language the user writes in (English or Vietnamese).
 - Be concise and practical. Use markdown (**bold**, lists) when it helps.
 - When SAVED NOTES are provided, treat them as facts the user asked you to remember, and cite them when relevant ("from your notes, …").
-- You don't have live order, wallet, or shipping data here — if they need that, point them to EGFULFILL Support or the relevant board.
+- You don't have live order, wallet, or shipping data here — if they need that, point them to EGFUL Support or the relevant board.
 - Never claim to have taken actions in the system.`;
 
 export function supportAiRoutes(app, requireAuth, requireStaff) {
@@ -540,7 +540,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     if (!text) return { ok: false, empty: true };
 
     const clientId = 'ai-' + crypto.randomBytes(8).toString('hex');
-    const meta = { by: 'EGFULFILL Assistant', ai: true, ts: Date.now() };
+    const meta = { by: 'EGFUL Assistant', ai: true, ts: Date.now() };
     await q(
       `insert into order_messages (order_id, sender_id, sender_role, body, meta, client_id)
        values ($1,$2,$3,$4,$5,$6) on conflict (client_id) where client_id is not null do nothing`,

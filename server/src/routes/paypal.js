@@ -67,11 +67,11 @@ export function paypalRoutes(app, requireAuth) {
       // without it the SDK popup flow still works, so only attach it when URLs are given.
       const order = {
         intent: 'CAPTURE',
-        purchase_units: [{ amount: { currency_code: 'USD', value: amt.toFixed(2) }, description: 'EGFULFILL wallet top-up' }]
+        purchase_units: [{ amount: { currency_code: 'USD', value: amt.toFixed(2) }, description: 'EGFUL wallet top-up' }]
       };
       if (body.returnUrl && body.cancelUrl) {
         order.application_context = {
-          brand_name: 'EGFULFILL', user_action: 'PAY_NOW', shipping_preference: 'NO_SHIPPING',
+          brand_name: 'EGFUL', user_action: 'PAY_NOW', shipping_preference: 'NO_SHIPPING',
           return_url: String(body.returnUrl), cancel_url: String(body.cancelUrl)
         };
       }

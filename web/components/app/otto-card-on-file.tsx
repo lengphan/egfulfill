@@ -169,7 +169,7 @@ export function OttoCardOnFile({ compact = false }: { compact?: boolean }) {
       <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
         <Lock size={13} weight="fill" className="mt-0.5 shrink-0" />
         <span>
-          Kept in <strong>this browser only</strong>{" "}— never saved on EGFULFILL&apos;s server,
+          Kept in <strong>this browser only</strong>{" "}— never saved on EGFUL&apos;s server,
           never written to a purchase order, and stripped from anything Otto send back. It&apos;s
           attached to the order request itself, which is the one thing Otto give us no way
           around. Another computer needs it entered there too.

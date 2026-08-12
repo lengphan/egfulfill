@@ -1,4 +1,4 @@
-// EGFULFILL API — Fastify entry point.
+// EGFUL API — Fastify entry point.
 import crypto from 'node:crypto';
 import { limited } from './ratelimit.js';
 import Fastify from 'fastify';
@@ -249,7 +249,7 @@ app.get('/api/admin/mail-diag', { preHandler: requireAdmin }, async (req) => {
   const sent = await sendMail({
     to,
     from: asFrom,
-    subject: `EGFULFILL mail test (${which})`,
+    subject: `EGFUL mail test (${which})`,
     text: `If you are reading this, ${which} email is working.`,
     html: `<p>If you are reading this, ${which} email is working.</p>`,
   });
@@ -515,5 +515,5 @@ piiRetentionRoutes(app, requireAdmin);                 // buyer-PII retention pu
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })
-  .then(() => app.log.info(`EGFULFILL API listening on :${port}`))
+  .then(() => app.log.info(`EGFUL API listening on :${port}`))
   .catch((e) => { app.log.error(e); process.exit(1); });

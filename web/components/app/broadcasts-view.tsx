@@ -130,7 +130,7 @@ function EmailBrandingCard() {
     const id = setTimeout(() => {
       getEmailBranding()
         .then((r) => setB(r.branding))
-        .catch(() => setB({ preset: "branded", accent: "#604cfa", logoUrl: "", heading: "egfulfill", footerNote: "" }))
+        .catch(() => setB({ preset: "branded", accent: "#604cfa", logoUrl: "", heading: "egful", footerNote: "" }))
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -224,7 +224,7 @@ function EmailBrandingCard() {
           {!b.logoUrl && (
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">Wordmark</label>
-              <Input value={b.heading} onChange={(e) => patch({ heading: e.target.value })} placeholder="egfulfill" />
+              <Input value={b.heading} onChange={(e) => patch({ heading: e.target.value })} placeholder="egful" />
             </div>
           )}
           <div>
@@ -246,7 +246,7 @@ function EmailBrandingCard() {
               ) : (
                 <span className="text-2xl font-semibold tracking-tight"
                   style={{ color: b.preset === "bold" ? "#ffffff" : "#0b0b0c", fontFamily: "Georgia, 'Times New Roman', serif" }}>
-                  {b.heading || "egfulfill"}
+                  {b.heading || "egful"}
                 </span>
               )}
             </div>
@@ -256,7 +256,7 @@ function EmailBrandingCard() {
             </div>
             <div className="border-t border-zinc-200 px-5 py-3 text-2xs leading-relaxed text-zinc-400">
               {b.footerNote && <p className="mb-1.5 text-zinc-500">{b.footerNote}</p>}
-              <p>You&apos;re receiving this because you have an EGFULFILL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
+              <p>You&apos;re receiving this because you have an EGFUL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
             </div>
           </div>
         </div>
@@ -277,7 +277,7 @@ function EmailBrandingCard() {
 // but populated with the real copy so you compose against the finished layout — not a bare
 // textarea. `branding` may be null while it loads; a sane default keeps the preview stable.
 function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | null; body: string }) {
-  const b = branding ?? { preset: "branded", accent: "#604cfa", logoUrl: "", heading: "egfulfill", footerNote: "" }
+  const b = branding ?? { preset: "branded", accent: "#604cfa", logoUrl: "", heading: "egful", footerNote: "" }
   const paras = body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
@@ -289,7 +289,7 @@ function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | nul
         ) : (
           <span className="text-2xl font-semibold tracking-tight"
             style={{ color: b.preset === "bold" ? "#ffffff" : "#0b0b0c", fontFamily: "Georgia, 'Times New Roman', serif" }}>
-            {b.heading || "egfulfill"}
+            {b.heading || "egful"}
           </span>
         )}
       </div>
@@ -301,7 +301,7 @@ function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | nul
       </div>
       <div className="border-t border-zinc-200 px-5 py-3 text-2xs leading-relaxed text-zinc-400">
         {b.footerNote && <p className="mb-1.5 text-zinc-500">{b.footerNote}</p>}
-        <p>You&apos;re receiving this because you have an EGFULFILL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
+        <p>You&apos;re receiving this because you have an EGFUL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
       </div>
     </div>
   )

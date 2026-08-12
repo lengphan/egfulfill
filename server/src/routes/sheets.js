@@ -468,7 +468,7 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
   // column order, band merges, dropdown ranges — instead of discovering a bad range as a
   // 400 from Google with a half-built sheet already in someone's Drive.
   app.get('/api/sheets/template-preview', { preHandler: requireAuth }, async () => {
-    const tpl = buildTemplate('EGFULFILL Orders — preview');
+    const tpl = buildTemplate('EGFUL Orders — preview');
     const reqs = tpl.requests(0);
     const kind = (r) => Object.keys(r)[0];
     return {
@@ -515,7 +515,7 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
     try { token = await getServiceToken(); }
     catch (e) { reply.code(e.message === 'no_service_account' ? 503 : 502); return { error: e.message === 'no_service_account' ? 'Auto-create is not configured (no service account).' : ('Service account auth failed: ' + e.message) }; }
     const who = (req.user && (req.user.name || req.user.email)) || 'Seller';
-    const tpl = buildTemplate('EGFULFILL Orders — ' + who);
+    const tpl = buildTemplate('EGFUL Orders — ' + who);
     const cr = await fetch('https://sheets.googleapis.com/v4/spreadsheets', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(tpl.createBody) });
     const cd = await cr.json().catch(() => ({}));
     if (!cr.ok || !cd.spreadsheetId) {

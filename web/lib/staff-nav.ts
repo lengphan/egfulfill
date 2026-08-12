@@ -149,7 +149,7 @@ export function staffNav(role?: string | null): StaffNavItem[] {
 // Title for the top bar. Covers EVERY staff-reachable page — the board items, the tools
 // (Products/SpyDeck/Design Lab/Stores/Wallet/…) AND the shared pages — not just
 // STAFF_ITEMS, so a detail route like /products/16468 shows "Products" instead of falling
-// through to the bare "EGFULFILL" brand. Longest-prefix wins so /products/x beats /.
+// through to the bare "EGFUL" brand. Longest-prefix wins so /products/x beats /.
 const SHARED_TITLES: Record<string, string> = { "/chat": "Chat", "/settings": "Settings", "/help": "Help", "/orders": "Orders", "/notifications": "Notifications", "/publish": "Publish" }
 export function staffNavTitle(pathname: string): string {
   const all = [...STAFF_ITEMS, ...STAFF_TOOLS, ...Object.entries(SHARED_TITLES).map(([href, label]) => ({ href, label }))]
@@ -157,5 +157,5 @@ export function staffNavTitle(pathname: string): string {
   for (const i of all) {
     if ((pathname === i.href || pathname.startsWith(i.href + "/")) && i.href.length > bestLen) { best = i.label; bestLen = i.href.length }
   }
-  return best || "EGFULFILL"
+  return best || "EGFUL"
 }

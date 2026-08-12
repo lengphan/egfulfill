@@ -51,7 +51,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
   const [saved, setSaved] = useState<string | null>(null)
   const [title, setTitle] = useState<string | null>(null)
   const [brand, setBrand] = useState<{ title: string; tagline: string; accent: string; contact: string }>({
-    title: "EGFULFILL", tagline: "Print-on-demand, made to order", accent: HOUSE.accent, contact: "",
+    title: "EGFUL", tagline: "Print-on-demand, made to order", accent: HOUSE.accent, contact: "",
   })
   // Best-effort: a settings read that fails must not stop a catalogue printing. The
   // defaults above are the house brand, so a failure prints the house cover.
@@ -60,7 +60,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
       getFactorySettings().then((s) => {
         const g = (k: string) => String((s as Record<string, unknown>)[k] ?? "").trim()
         setBrand({
-          title: g("lookbook_title") || "EGFULFILL",
+          title: g("lookbook_title") || "EGFUL",
           tagline: g("lookbook_tagline") || "Print-on-demand, made to order",
           accent: hexOr(g("lookbook_accent"), HOUSE.accent),
           contact: g("lookbook_contact"),

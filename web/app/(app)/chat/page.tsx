@@ -110,7 +110,7 @@ export default function ChatPage() {
     cidBase.current = Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
   }, [])
 
-  // Everyone gets an EGFULFILL Support thread (support-<uid>); staff ALSO get the shared
+  // Everyone gets an EGFUL Support thread (support-<uid>); staff ALSO get the shared
   // internal Factory channel and default to it. Sellers additionally see their orders.
   useEffect(() => {
     let alive = true
@@ -135,9 +135,9 @@ export default function ChatPage() {
   const convos = useMemo<Convo[]>(() => {
     const list: Convo[] = []
     if (isStaffUser) list.push({ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "All boards — production & artwork" })
-    if (supportId) list.push({ id: supportId, kind: "support", title: isStaffUser ? "My EG" : "EGFULFILL Support", sub: isStaffUser ? "Your AI assistant" : "Assistant + team" })
+    if (supportId) list.push({ id: supportId, kind: "support", title: isStaffUser ? "My EG" : "EGFUL Support", sub: isStaffUser ? "Your AI assistant" : "Assistant + team" })
     // Admin writes, everyone else reads. Designers aren't part of seller-facing comms.
-    if (!isDesigner) list.push({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: isAdmin ? "Broadcast to all sellers" : "From EGFULFILL" })
+    if (!isDesigner) list.push({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: isAdmin ? "Broadcast to all sellers" : "From EGFUL" })
     // Threads with an unanswered "talk to a human" sort above the rest — an explicit
     // request for help shouldn't be buried under newer small talk.
     if (isStaffUser) for (const t of [...inbox].sort((a, b) => Number(!!b.escalated) - Number(!!a.escalated))) {
@@ -361,7 +361,7 @@ export default function ChatPage() {
     const att = pendingAtt; setPendingAtt(null)
     const clientId = `c-${cidBase.current}-${cidSeq.current++}`
     // Staff post as 'staff' ONLY when answering SOMEONE ELSE's support thread — that's what
-    // lets the seller see a named teammate replied. But on their OWN "Ask EGFULFILL" thread
+    // lets the seller see a named teammate replied. But on their OWN "Ask EGFUL" thread
     // the staffer is the ASKER, so they post as 'seller'; otherwise the AI mapper reads it as
     // an assistant turn and never answers (the regression this fixes).
     const myRole = (isStaffUser && activeId !== supportId) ? "staff" : "seller"
@@ -591,7 +591,7 @@ export default function ChatPage() {
               <div className="max-w-xs text-sm text-muted-foreground">
                 {isSupport ? "Ask about an order, billing, integrations — mention an order with @ to pull it in. Our assistant answers from your account, and a teammate follows up when needed."
                   : active?.kind === "staff" ? "Internal team chat — production, artwork, and orders in one room. Mention an order with @ to pull it in."
-                  : active?.kind === "announce" ? "Product news and service updates from EGFULFILL."
+                  : active?.kind === "announce" ? "Product news and service updates from EGFUL."
                   : "Everything this seller has asked about, in one thread."}
               </div>
               {isSupport && (
@@ -680,7 +680,7 @@ export default function ChatPage() {
                           </a>
                         )}
                         <span>
-                          {!mine ? `${m.by || (isAi ? "EGFULFILL Assistant" : isSupport ? "Support" : "Factory")} · ` : ""}
+                          {!mine ? `${m.by || (isAi ? "EGFUL Assistant" : isSupport ? "Support" : "Factory")} · ` : ""}
                           {fmtTime(m.ts)}
                         </span>
                       </span>
@@ -819,7 +819,7 @@ export default function ChatPage() {
                 }
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() }
               }}
-              placeholder={signedOut ? "Sign in to send a message" : readOnly ? "Only EGFULFILL can post announcements" : "Type a message…  @ to tag an order"}
+              placeholder={signedOut ? "Sign in to send a message" : readOnly ? "Only EGFUL can post announcements" : "Type a message…  @ to tag an order"}
               disabled={signedOut || !activeId || readOnly}
               className="h-10 w-full"
             />

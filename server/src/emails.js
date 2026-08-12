@@ -26,7 +26,7 @@ function transactionalShell(innerHtml, preheader) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.pageBg}"><tr><td align="center" style="padding:28px 16px">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:${BRAND.card};border:1px solid ${BRAND.line};border-radius:14px;overflow:hidden">
   <tr><td style="height:4px;background:${BRAND.accent};line-height:4px;font-size:4px">&nbsp;</td></tr>
-  <tr><td style="padding:26px 32px 6px 32px"><span style="font-family:${WORDMARK_FONT};font-size:26px;font-weight:600;letter-spacing:-0.5px;color:${BRAND.head}">egfulfill</span></td></tr>
+  <tr><td style="padding:26px 32px 6px 32px"><span style="font-family:${WORDMARK_FONT};font-size:26px;font-weight:600;letter-spacing:-0.5px;color:${BRAND.head}">egful</span></td></tr>
   <tr><td style="padding:12px 32px 24px 32px;font-family:${FONT};font-size:15px;line-height:1.6;color:${BRAND.ink}">${innerHtml}</td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -43,7 +43,7 @@ function button(href, label) {
  * a seller: what to do first is connect a store, since nothing flows until one is linked.
  */
 export function welcomeEmail(name) {
-  const hi = name ? `Welcome, ${esc(name)}` : 'Welcome to EGFULFILL';
+  const hi = name ? `Welcome, ${esc(name)}` : 'Welcome to EGFUL';
   const inner =
     `<p style="margin:0 0 15px;font-size:19px;font-weight:600;color:${BRAND.head}">${hi} 👋</p>
      <p style="margin:0 0 15px">Your seller account is ready. Here's how fulfilment goes hands-off from here:</p>
@@ -55,14 +55,14 @@ export function welcomeEmail(name) {
      <p style="margin:0 0 22px">${button(APP_URL + '/dashboard', 'Connect your first store')}</p>
      <p style="margin:0;font-size:13px;color:${BRAND.muted}">Signed in already? Everything starts from your dashboard. Reply to this email if you get stuck — a real person reads it.</p>`;
   return {
-    subject: 'Welcome to EGFULFILL — let\'s connect your first store',
-    text: `${name ? 'Welcome, ' + name : 'Welcome to EGFULFILL'}!\n\n`
+    subject: 'Welcome to EGFUL — let\'s connect your first store',
+    text: `${name ? 'Welcome, ' + name : 'Welcome to EGFUL'}!\n\n`
       + `Your seller account is ready. To go hands-off:\n\n`
       + `1. Connect a store (Etsy, Shopify or TikTok Shop) — orders sync into one queue.\n`
       + `2. Add your designs — map artwork to products once.\n`
       + `3. Fund your wallet — orders print, ship, and tracking is pushed back for you.\n\n`
       + `Start here: ${APP_URL}/dashboard\n\nReply to this email if you get stuck — a real person reads it.`,
-    html: transactionalShell(inner, 'Your EGFULFILL seller account is ready — connect a store to start.'),
+    html: transactionalShell(inner, 'Your EGFUL seller account is ready — connect a store to start.'),
   };
 }
 
@@ -78,13 +78,13 @@ export function supportReplyEmail(name, snippet) {
     ? `<p style="margin:0 0 20px;padding:12px 14px;border-left:3px solid ${BRAND.accent};background:${BRAND.pageBg};color:${BRAND.ink};font-size:14px">${esc(snippet)}</p>`
     : '';
   const inner =
-    `<p style="margin:0 0 15px;font-size:19px;font-weight:600;color:${BRAND.head}">You have a reply from EGFULFILL support</p>
+    `<p style="margin:0 0 15px;font-size:19px;font-weight:600;color:${BRAND.head}">You have a reply from EGFUL support</p>
      <p style="margin:0 0 15px">Hi ${hi}, a teammate just replied to your support conversation:</p>
      ${quote}
      <p style="margin:0 0 22px">${button(APP_URL + '/chat', 'Open the conversation')}</p>
      <p style="margin:0;font-size:13px;color:${BRAND.muted}">Reply right in the chat and we'll pick it up there.</p>`;
   return {
-    subject: 'You have a reply from EGFULFILL support',
+    subject: 'You have a reply from EGFUL support',
     text: `Hi ${name || 'there'},\n\nA teammate replied to your support conversation`
       + (snippet ? `:\n\n"${snippet}"\n\n` : '.\n\n')
       + `Open it here: ${APP_URL}/chat`,

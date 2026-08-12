@@ -168,7 +168,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     id: "webhooks-list",
     response: `[
   { "id": 3,
-    "url": "https://your-app.example.com/hooks/egfulfill",
+    "url": "https://your-app.example.com/hooks/egful",
     "events": ["order.received", "order.shipped"],
     "active": true,
     "created_at": "2026-07-21T14:00:00.000Z" }
@@ -183,7 +183,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     id: "webhooks-create",
     response: `{
   "id": 4,
-  "url": "https://your-app.example.com/hooks/egfulfill",
+  "url": "https://your-app.example.com/hooks/egful",
   "events": ["order.shipped"],
   "active": true,
   "secret": "egwh_2f9c1d4b…",
@@ -196,7 +196,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
       "Register an https endpoint to be notified on. Returns a signing secret ONCE — store it. Omit `events` to receive all of them. Every delivery carries X-EG-Event and X-EG-Signature (sha256=<hex>), an HMAC-SHA256 of the raw body using that secret; compare it in constant time before trusting a payload.",
     body: JSON.stringify(
       {
-        url: "https://your-app.example.com/hooks/egfulfill",
+        url: "https://your-app.example.com/hooks/egful",
         events: ["order.received", "order.status_changed", "order.shipped", "order.cancelled"],
       },
       null,

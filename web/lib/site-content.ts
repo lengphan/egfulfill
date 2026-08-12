@@ -57,14 +57,26 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     ctaPrimary: "Start for free",
     ctaSecondary: "See how it works",
     worksWithLabel: "Works with",
-    integrations: ["Etsy", "Shopify", "TikTok Shop", "WooCommerce"],
+    // Only channels a seller can actually connect today. WooCommerce was listed here and is
+    // not built; Amazon is in developer onboarding and is described on /integrations/amazon
+    // rather than implied here, because a reviewer who signs up counts what's on the page.
+    integrations: ["Etsy", "Shopify", "TikTok Shop"],
     image: "",
   },
+  /**
+   * Every figure here must be one WE CAN POINT AT in the product.
+   *
+   * These used to read "2.4M+ orders shipped" and "99.2% on-time fulfillment" — numbers
+   * nobody could source. A marketplace assessing us for API access reads unattributable
+   * performance claims as a policy problem (Amazon's website guidelines bar them outright),
+   * and it is the same rule the app already follows: no invented numbers. Counts of things
+   * that exist are safe; rates and totals are not, unless something measures them.
+   */
   stats: [
-    { value: "2.4M+", label: "orders shipped" },
     { value: "3", label: "marketplaces synced" },
-    { value: "99.2%", label: "on-time fulfillment" },
-    { value: "48hrs", label: "avg to doorstep" },
+    { value: "7", label: "print methods" },
+    { value: "$0", label: "monthly platform fee" },
+    { value: "1", label: "queue for every store" },
   ],
   features: {
     heading: "Everything after the sale, handled.",
@@ -84,18 +96,22 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       { n: "03", title: "We fulfill, hands-off", body: "Print, pack, ship, and track. You just watch orders go out." },
     ],
   },
+  /**
+   * EMPTY ON PURPOSE, and the homepage skips the whole section when it is.
+   *
+   * The three that used to live here — "Maya R.", "Devon K.", "Priya S." — were written, not
+   * collected. Attributed quotes from people who do not exist are the single easiest thing for
+   * a marketplace reviewer to catch, and we ask real sellers for real ones instead. Add them
+   * here (or in Settings › Site content) only with the seller's permission.
+   */
   testimonials: {
     heading: "Sellers who stopped touching orders.",
-    items: [
-      { quote: "I went from spending three hours a day on orders to basically zero. They just ship. I check tracking sometimes for fun.", name: "Maya R.", role: "Etsy · 4k orders/mo" },
-      { quote: "The wallet made it click for me — I can see exactly what each order costs before it prints. No mystery invoices.", name: "Devon K.", role: "Shopify apparel" },
-      { quote: "TikTok Shop blew up overnight and egfulfill just absorbed it. Same queue, same flow, tracking pushed back automatically.", name: "Priya S.", role: "TikTok Shop" },
-    ],
+    items: [],
   },
   faq: {
     heading: "Questions, answered.",
     items: [
-      { q: "Which marketplaces do you sync with?", a: "Etsy, Shopify, TikTok Shop and WooCommerce today, with more on the way. Orders flow into one queue automatically and tracking is pushed back to each marketplace." },
+      { q: "Which marketplaces do you sync with?", a: "Etsy, Shopify and TikTok Shop today. Orders flow into one queue automatically and tracking is pushed back to each marketplace. Amazon is in developer onboarding — see the Amazon integration page." },
       { q: "Is there a monthly fee?", a: "No. The platform is free — you only pay the per-order fulfillment cost when an order ships, funded from your prepaid wallet." },
       { q: "How does shipping pricing work?", a: "We rate-shop across carriers and buy the cheapest available label, billed at cost. You always see the exact charge on each order." },
       { q: "Can I use my own designs?", a: "Yes. Upload artwork to your library, map it to products once, and our mini designer handles placement and print-ready files." },
