@@ -925,8 +925,20 @@ export function ordersRoutes(app, requireAuth) {
           from order_designs d
           left join design_ids di on di.art_hash = d.art_hash
          where d.order_id = i.order_id
-           and coalesce('L:' || d.line_id, 'S:' || d.sku) = coalesce('L:' || i.line_id, 'S:' || i.sku)
-         order by d.updated_at desc nulls last
+           and (
+             -- Properly line-keyed.
+             (d.line_id is not null and d.line_id = i.line_id)
+             -- Legacy, before order_designs learned line_id: the row is keyed by sku,
+             -- which in practice holds EITHER the real sku or — on rows written by the
+             -- older client — the line id itself. indexDesigns() on the client files such
+             -- a row under both keys for exactly this reason; matching only one of them
+             -- left real artwork invisible to the list (verified against order 12345,
+             -- whose design row carries the line id in its sku column).
+             or (d.line_id is null and (d.sku = i.sku or d.sku = i.line_id))
+           )
+         order by (d.line_id is not null) desc,   -- a line-keyed row beats a guess
+                  (d.sku = i.line_id) desc,       -- then one naming this exact line
+                  d.updated_at desc nulls last
          limit 1
       ) dz on true`;
     // ORDER BY i.id keeps line-item order stable across every board, so the per-line
