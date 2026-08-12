@@ -105,10 +105,29 @@ export function designFilesRoutes(app, requireAuth) {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const orderId = String(req.query.orderId || '');
     const sku = String(req.query.sku || '');
+    // The LINE, when the caller knows it. Optional so older callers keep working, and
+    // load-bearing when they pass it — see the key shapes below.
+    const lineId = req.query.lineId ? String(req.query.lineId) : null;
     if (!orderId || !sku) { reply.code(400); return { error: 'orderId + sku required' }; }
 
-    const src = await q('select art_hash, art_phash from order_designs where order_id=$1 and sku=$2 and art_hash is not null limit 1',
-      [orderId, sku]).then((r) => r.rows[0]).catch(() => null);
+    /**
+     * THE SOURCE ARTWORK, matched on all three key shapes rather than sku alone.
+     *
+     * `where sku=$2` missed any design row written by the older client, which stores the
+     * LINE ID in the sku column (verified: order 12345's row carries line_id NULL and its
+     * line id in `sku`). A missed source returns hashed:false and shows nothing — and a
+     * failed lookup is indistinguishable from "no matches", which is why this never
+     * looked broken. Same three cases the order list join uses, most specific first.
+     */
+    const src = await q(
+      `select art_hash, art_phash from order_designs
+        where order_id = $1
+          and art_hash is not null
+          and ( ($3::text is not null and line_id = $3)
+             or (line_id is null and (sku = $2 or ($3::text is not null and sku = $3))) )
+        order by (line_id is not null) desc, (sku = $3) desc, updated_at desc nulls last
+        limit 1`,
+      [orderId, sku, lineId]).then((r) => r.rows[0]).catch(() => null);
     if (!src || !src.art_hash) return { exact: [], similar: [], hashed: false };
 
     // Files whose ORDER LINE carried the same artwork. Excludes this order's own files —
@@ -117,7 +136,18 @@ export function designFilesRoutes(app, requireAuth) {
       `select f.design_id, f.file_name, f.kind, f.order_id, f.created_at,
               coalesce(u.store_name, u.name, u.email, '—') as seller
          from design_file_data f
-         join order_designs d on d.order_id = f.order_id and d.sku = f.sku
+         join order_designs d on d.order_id = f.order_id
+           and (
+             f.sku = d.sku
+             -- A FILE WITH NO SKU still belongs to its order's artwork. 6 of 19 machine
+             -- files carry none, so d.sku = f.sku dropped them and they could never be
+             -- offered for reuse. Attributed only when that order has exactly ONE distinct
+             -- artwork — with two, we would be guessing which design the file is for, and
+             -- a false positive here puts the wrong artwork on someone's order.
+             or (f.sku is null and (
+                   select count(distinct x.art_hash) from order_designs x
+                    where x.order_id = f.order_id and x.art_hash is not null) = 1)
+           )
          left join users u on u.id = f.seller_id
         where d.art_hash = $1 and f.order_id <> $2 and f.kind in ('pes','emb')
         order by f.created_at desc limit 20`,
@@ -131,7 +161,18 @@ export function designFilesRoutes(app, requireAuth) {
         `select f.design_id, f.file_name, f.kind, f.order_id, f.created_at, d.art_phash,
                 coalesce(u.store_name, u.name, u.email, '—') as seller
            from design_file_data f
-           join order_designs d on d.order_id = f.order_id and d.sku = f.sku
+           join order_designs d on d.order_id = f.order_id
+           and (
+             f.sku = d.sku
+             -- A FILE WITH NO SKU still belongs to its order's artwork. 6 of 19 machine
+             -- files carry none, so d.sku = f.sku dropped them and they could never be
+             -- offered for reuse. Attributed only when that order has exactly ONE distinct
+             -- artwork — with two, we would be guessing which design the file is for, and
+             -- a false positive here puts the wrong artwork on someone's order.
+             or (f.sku is null and (
+                   select count(distinct x.art_hash) from order_designs x
+                    where x.order_id = f.order_id and x.art_hash is not null) = 1)
+           )
            left join users u on u.id = f.seller_id
           where d.art_phash is not null and f.order_id <> $1 and f.kind in ('pes','emb')
           order by f.created_at desc limit 500`,

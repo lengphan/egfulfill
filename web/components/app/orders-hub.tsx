@@ -658,7 +658,7 @@ export function OrdersHub() {
     // are shown to a human rather than acted on. `force` is the human saying "push anyway".
     if (!force && it.sku) {
       try {
-        const r = await getDesignReuse(o.id, it.sku)
+        const r = await getDesignReuse(o.id, it.sku, it.line_id)
         if (r && (r.exact.length || r.similar.length)) {
           setReuse({ order: o, item: it, exact: r.exact, similar: r.similar })
           setBusy(null)

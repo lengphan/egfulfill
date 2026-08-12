@@ -1071,9 +1071,12 @@ export function reuseDesignFile(designId: string, body: { orderId: string; sku: 
     `/api/design_files/${encodeURIComponent(designId)}/reuse`,
     { method: "POST", body: JSON.stringify(body) })
 }
-export function getDesignReuse(orderId: string, sku: string) {
+/** `lineId` matters: a design row written by the older client stores the LINE ID in its
+ *  sku column, so a lookup by sku alone misses it and reports "no matches" — which is
+ *  indistinguishable from a failed lookup. Optional, so older callers still work. */
+export function getDesignReuse(orderId: string, sku: string, lineId?: string | null) {
   return api<{ exact: ReuseMatch[]; similar: ReuseMatch[]; hashed: boolean }>(
-    `/api/design_files/reuse?orderId=${encodeURIComponent(orderId)}&sku=${encodeURIComponent(sku)}`)
+    `/api/design_files/reuse?orderId=${encodeURIComponent(orderId)}&sku=${encodeURIComponent(sku)}${lineId ? `&lineId=${encodeURIComponent(lineId)}` : ""}`)
 }
 export function getDesignFiles(orderId: string) {
   return api<DesignFileRow[]>(`/api/design_files?orderId=${encodeURIComponent(orderId)}`)
