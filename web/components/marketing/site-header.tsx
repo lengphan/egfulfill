@@ -65,13 +65,17 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
+        {/* TWO DOORS, AND THEY GO TO DIFFERENT PLACES. "Start free" pointed at /login, so
+            the loudest control on the marketing site asked a first-time visitor for a
+            password they had never set. Log in is for people who have an account; Start
+            free is for people who don't, and it opens the form that makes one. */}
         <div className="ml-auto flex items-center gap-2">
                       <>
               <Link href="/login" className={"rounded-full px-4 py-2 text-sm font-semibold transition-colors " + muted}>
                 Log in
               </Link>
               <Link
-                href="/login"
+                href="/signup"
                 // Violet fill, lime label — the one loud thing in the bar, and the same pair
                 // the app's primary button uses. Acid alone cannot work here: on paper it is
                 // 1.05:1 and the button would have no shape at all.

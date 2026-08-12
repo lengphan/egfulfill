@@ -66,7 +66,12 @@ export default function LoginPage() {
       // Fill in who you are, so the only thing left to type is the secret. Deferred with
       // the rest: reading localStorage at useState-init time would make the server and
       // client markup disagree.
-      const last = getRememberedIdentifier()
+      //
+      // `?id=` wins: it is carried by signup's "Log in as <name>" link, and it is the same
+      // machine's remembered identifier anyway — but honouring it explicitly means the link
+      // keeps its promise even if the two ever disagree.
+      const asked = new URLSearchParams(window.location.search).get("id")
+      const last = asked || getRememberedIdentifier()
       if (last) setEmail(last)
     }, 0)
     return () => clearTimeout(id)

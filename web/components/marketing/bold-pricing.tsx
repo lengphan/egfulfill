@@ -62,7 +62,7 @@ export function BoldPricing() {
                 </li>
               ))}
             </ul>
-            <Pill href="/login" tone="ink" className="mt-9 w-full">Start free</Pill>
+            <Pill href="/signup" tone="ink" className="mt-9 w-full">Start free</Pill>
           </Rise>
 
           {/* What an order costs — the second question, and the honest caveat with it. */}
@@ -94,7 +94,7 @@ export function BoldPricing() {
             Only pay when it ships.
           </h2>
           <div className="mt-8 flex justify-center">
-            <Pill href="/login" tone="ink">Start free</Pill>
+            <Pill href="/signup" tone="ink">Start free</Pill>
           </div>
         </Rise>
       </section>

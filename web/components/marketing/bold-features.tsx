@@ -97,7 +97,7 @@ export function BoldFeatures() {
             All of it, from the first order.
           </h2>
           <div className="mt-8 flex justify-center">
-            <Pill href="/login" tone="ink">Start free</Pill>
+            <Pill href="/signup" tone="ink">Start free</Pill>
           </div>
         </Rise>
       </section>
