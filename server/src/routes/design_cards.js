@@ -450,6 +450,11 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     if (!orderId) return [];
     const r = await q(
       `select c.id, c.line_id, c.sku, c.col, c.title, c.claimed_by,
+              -- WHO IS DOING IT, and their reference. Without these the order screen could
+              -- not tell a card our designers hold from one already sent to a partner, so a
+              -- line that had gone to Pink still offered "Send to Pink Design" — one click
+              -- from a duplicate task, and a duplicate charge.
+              c.vendor, c.vendor_ref,
               coalesce(l.label, c.col) as lane_label
          from design_cards c
          left join design_lanes l on l.id = c.col

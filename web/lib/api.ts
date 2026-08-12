@@ -2126,6 +2126,10 @@ export type OrderDesignCard = {
   lane_label?: string | null
   title?: string | null
   claimed_by?: string | null
+  /** Set once the card has been handed to an outside partner ("pinkdesign"), with their
+   *  own task reference. Null while our designers hold it. */
+  vendor?: string | null
+  vendor_ref?: string | null
 }
 export function getOrderDesignCards(orderId: string) {
   return api<OrderDesignCard[]>(`/api/design_cards/for-order/${encodeURIComponent(orderId)}`)

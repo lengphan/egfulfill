@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, DownloadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -723,6 +723,9 @@ export function DesignCanvasDialog({
    * a seller simply gets nothing here rather than a factory lane name.
    */
   const [boardCard, setBoardCard] = useState<OrderDesignCard | null>(null)
+  /** Already with an outside partner. `vendor` is only ever set by a successful push, so
+   *  this is the fact that a task exists on their board — not a guess from the lane. */
+  const sentToPartner = !!boardCard?.vendor
   /** The partner send, for print methods. A dialog rather than an inline form because it
    *  asks for Pink's own fields (product type, design type, board) that mean nothing here. */
   const [pinkOpen, setPinkOpen] = useState(false)
@@ -1455,28 +1458,45 @@ export function DesignCanvasDialog({
                 Staff only, like its embroidery counterpart: opening a partner task spends
                 money, and the person being charged must not be the one who spends it. */}
             {!isEmb && isStaff && (
-              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-2.5">
+              <div className={"rounded-lg border p-2.5 " + (sentToPartner
+                ? "border-success/40 bg-success/5"
+                : "border-dashed border-border bg-muted/20")}>
                 <div className="flex items-start gap-2">
-                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-background text-2xs font-bold text-muted-foreground">2</span>
+                  {/* SENT LOOKS LIKE DONE, the same way step 1 does. This step reported "On
+                      the board · In progress" whether or not it had actually gone to the
+                      partner, and still offered the send button underneath — so a card
+                      already with Pink was one click from a SECOND task and a second charge,
+                      with nothing on screen to say the first had worked. */}
+                  {sentToPartner ? (
+                    <CheckCircle size={20} weight="fill" className="mt-0.5 shrink-0 text-success" />
+                  ) : (
+                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-background text-2xs font-bold text-muted-foreground">2</span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium">Print artwork</div>
                     <div className="truncate text-2xs text-muted-foreground">
-                      {boardCard
-                        ? `On the board · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
-                        : "Our designers do embroidery — print work goes to Pink Design"}
+                      {sentToPartner
+                        ? `Sent to Pink Design${boardCard?.vendor_ref ? ` · ref ${boardCard.vendor_ref}` : ""}${boardCard?.lane_label || boardCard?.col ? ` · ${boardCard.lane_label || boardCard.col}` : ""}`
+                        : boardCard
+                          ? `On the board · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
+                          : "Our designers do embroidery — print work goes to Pink Design"}
                     </div>
                   </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Button
-                    size="sm"
-                    disabled={!designUrl}
-                    title={designUrl ? undefined : "Add an image first — the partner needs something to work from"}
-                    onClick={() => setPinkOpen(true)}
-                  >
-                    Send to Pink Design
-                  </Button>
-                </div>
+                {/* No button once it has gone. Re-sending is not an undo — it opens a second
+                    task on their board that nobody asked for. */}
+                {!sentToPartner && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <Button
+                      size="sm"
+                      disabled={!designUrl}
+                      title={designUrl ? undefined : "Add an image first — the partner needs something to work from"}
+                      onClick={() => setPinkOpen(true)}
+                    >
+                      Send to Pink Design
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
