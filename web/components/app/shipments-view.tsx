@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getShipments, refreshTracking, voidLabel, type ShipmentRow } from "@/lib/api"
+import { getShipments, voidLabel, type ShipmentRow } from "@/lib/api"
 import { onLive } from "@/lib/live"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -108,7 +108,6 @@ export function ShipmentsView() {
   const [q, setQ] = useState("")
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [checking, setChecking] = useState<string | null>(null)
   const role = getUser()?.role ?? ""
 
   const load = useCallback((search?: string) => {
@@ -156,14 +155,10 @@ export function ShipmentsView() {
   }, [q, load])
   useEffect(() => onLive("orders", () => load(q)), [load, q])
 
-  /** Ask the carrier again, for one parcel. The page otherwise shows whatever the last
-   *  webhook or poll recorded, which can be hours old on a quiet parcel. */
-  const recheck = async (id: string) => {
-    setChecking(id)
-    try { await refreshTracking(id); load(q) }
-    catch (e) { setErr((e as Error).message) }
-    finally { setChecking(null) }
-  }
+  /* NO PER-PARCEL RECHECK. It asked the carrier again for one row, and the server already
+     does it for everyone: refreshStaleTracking runs on every read of this list, trickling
+     twelve stale rows a page load — anything unchecked for six hours. The button spent a
+     carrier call to repeat work that loading the page had just done. */
 
   // Void a label: refund the postage with the carrier + credit the cost back in the ledger
   // (so it shows in Billing). Warehouse/admin only — the server enforces it too.
@@ -490,9 +485,7 @@ export function ShipmentsView() {
     <ShipmentDetailDialog
       shipment={detail}
       onOpenChange={(o) => { if (!o) setDetail(null) }}
-      onRecheck={recheck}
       onRefund={doVoid}
-      checking={checking}
       voiding={voiding}
       canRefund={canVoid}
     />

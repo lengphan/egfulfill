@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowSquareOut, ArrowClockwise, CircleNotch, X, Package, DownloadSimple, FilePdf } from "@phosphor-icons/react"
+import { ArrowSquareOut, CircleNotch, X, Package, DownloadSimple, FilePdf } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useEffect, useState } from "react"
@@ -50,13 +50,11 @@ function Row({ label, children, mono }: { label: string; children: React.ReactNo
 }
 
 export function ShipmentDetailDialog({
-  shipment, onOpenChange, onRecheck, onRefund, checking, voiding, canRefund,
+  shipment, onOpenChange, onRefund, voiding, canRefund,
 }: {
   shipment: ShipmentRow | null
   onOpenChange: (o: boolean) => void
-  onRecheck: (id: string) => void
   onRefund: (s: ShipmentRow) => void
-  checking: string | null
   voiding: string | null
   canRefund: boolean
 }) {
@@ -147,31 +145,6 @@ export function ShipmentDetailDialog({
                   </div>
                 )}
               </div>
-              <div className="flex gap-1.5">
-                {/* The same blob the frame is showing — so what you save is provably what
-                    you just looked at, and it needs no second authenticated request. */}
-                <a
-                  href={labelSrc ?? undefined}
-                  download={`label-${s.num}.pdf`}
-                  aria-disabled={!labelSrc}
-                  className={"eg-tap inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent "
-                    + (labelSrc ? "" : "pointer-events-none opacity-50")}
-                >
-                  <DownloadSimple size={13} weight="bold" /> Download
-                </a>
-                {/* The carrier's own copy still has a use — printing from their viewer, or
-                    checking ours against theirs — so the old route stays, demoted. */}
-                <a
-                  href={s.labelUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Open the carrier's own copy in a new tab"
-                  aria-label="Open the carrier's own copy in a new tab"
-                  className="eg-tap inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <ArrowSquareOut size={13} weight="bold" />
-                </a>
-              </div>
             </div>
           ) : (
             // Says WHICH: no label was ever bought, or it was refunded and the file with it.
@@ -240,20 +213,52 @@ export function ShipmentDetailDialog({
             <Row label="Created">{when(s.createdAt) ?? "—"}</Row>
           </div>
 
-          <div className="flex flex-nowrap items-center gap-2 border-t border-border pt-3">
-            <Button size="sm" variant="outline" onClick={() => onRecheck(s.id)} disabled={checking === s.id || !s.tracking}>
-              {checking === s.id ? <CircleNotch size={13} className="animate-spin" /> : <ArrowClockwise size={13} weight="bold" />}
-              Check
-            </Button>
+          {/* EVERY ACTION IN ONE PLACE, at the end, right-aligned.
+              Download sat under the label on the left while Refund sat on the right, so the
+              window had two action areas facing each other across the middle and no single
+              answer to "what can I do here".
+
+              CHECK IS GONE. It asked the carrier again for one parcel — which the server
+              already does on every read of this list: refreshStaleTracking trickles twelve
+              rows a page load, anything unchecked for six hours. Opening the page you
+              pressed it from had already done the work. */}
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
             {/* Only while it can still work: a second refund can only ever collect the
                 carrier's refusal, and a label with no stored PDF has no reference to refund
                 against. */}
             {canRefund && s.labelUrl && !refunded && (
               <Button size="sm" variant="outline" onClick={() => onRefund(s)} disabled={voiding === s.id}
-                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                      className="mr-auto text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
                 {voiding === s.id ? <CircleNotch size={13} className="animate-spin" /> : <X size={13} weight="bold" />}
                 Refund
               </Button>
+            )}
+            {s.labelUrl && (
+              <>
+                {/* The carrier's own copy still has a use — printing from their viewer, or
+                    checking ours against theirs — so the old route stays, demoted. */}
+                <a
+                  href={s.labelUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open the carrier's own copy in a new tab"
+                  aria-label="Open the carrier's own copy in a new tab"
+                  className="eg-tap inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <ArrowSquareOut size={13} weight="bold" />
+                </a>
+                {/* The same blob the frame is showing — so what you save is provably what
+                    you just looked at, and it needs no second authenticated request. */}
+                <a
+                  href={labelSrc ?? undefined}
+                  download={`label-${s.num}.pdf`}
+                  aria-disabled={!labelSrc}
+                  className={"eg-tap inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent "
+                    + (labelSrc ? "" : "pointer-events-none opacity-50")}
+                >
+                  <DownloadSimple size={13} weight="bold" /> Download
+                </a>
+              </>
             )}
           </div>
         </div>
