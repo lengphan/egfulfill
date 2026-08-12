@@ -5,6 +5,7 @@ import { MagnifyingGlass, UploadSimple, ArrowsClockwise, CircleNotch } from "@ph
 import { SectionCard } from "@/components/app/section-card"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { SupplierDetailDialog } from "@/components/app/supplier-detail-dialog"
 import { QuickOrderDialog, type QuickOrderProduct } from "@/components/app/quick-order-dialog"
 import { SsSyncPanel } from "@/components/app/ss-sync-panel"
 import { SupplierProductCard } from "@/components/app/supplier-product-card"
@@ -318,6 +319,8 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   // limit and far over Vercel's ~4.5MB proxy cap — so it can never travel through the browser.
   // The server reads the copy already on its disk instead.
   const [importOpen, setImportOpen] = useState(false)
+  /** The blank whose full detail is open. Null = closed. */
+  const [detail, setDetail] = useState<{ supplier: "ss" | "otto" | "sanmar"; styleId: string; seed: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null } } | null>(null)
 
   /**
    * The one refresh worth a button.
@@ -443,6 +446,13 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
             border and 3rem of padding to hold one button. Progress still appears, but
             below, and only while there is progress to show. */}
         <SsSyncPanel />
+      <SupplierDetailDialog
+        open={!!detail}
+        onOpenChange={(o) => { if (!o) setDetail(null) }}
+        supplier={detail?.supplier ?? null}
+        styleId={detail?.styleId ?? null}
+        seed={detail?.seed}
+      />
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Import a supplier catalogue</DialogTitle></DialogHeader>
@@ -510,6 +520,15 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
                   key={keyOf(it)}
                   data={cardData(it)}
                   supplierLabel={it.supplier === "ss" ? "S&S" : it.supplier === "otto" ? "Otto" : "SanMar"}
+                  onOpenDetail={() => {
+                    const c = cardData(it)
+                    setDetail({
+                      supplier: it.supplier,
+                      styleId: String(c.id),
+                      seed: { name: c.title, brand: c.brand, image: c.image,
+                              price: c.price != null ? (c.priceMax != null && c.priceMax !== c.price ? `$${c.price}–$${c.priceMax}` : `$${c.price}`) : null },
+                    })
+                  }}
                   added={added.has(keyOf(it))}
                   adding={addingId === keyOf(it)}
                   onAdd={() => addToCatalog(it)}

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { SupplierFlag } from "@/components/app/supplier-flag"
+import { clickableProps } from "@/lib/a11y"
 import { Heart, Plus, CheckCircle, CircleNotch, ShoppingCart, ArrowsClockwise } from "@phosphor-icons/react"
 import { swatchBg } from "@/lib/color-swatch"
 import { prettyColorName } from "@/lib/color-name"
@@ -41,7 +42,7 @@ export type SupplierCardData = {
 }
 
 export function SupplierProductCard({
-  data, added, adding, onAdd, onFavorite, loadColors, supplierLabel, onQuickOrder, onSync,
+  data, added, adding, onAdd, onFavorite, loadColors, supplierLabel, onQuickOrder, onSync, onOpenDetail,
 }: {
   data: SupplierCardData
   /**
@@ -63,6 +64,8 @@ export function SupplierProductCard({
   onFavorite?: (on: boolean) => void
   loadColors?: () => Promise<Record<string, string>> // color → photo (fetched on first chip click)
   supplierLabel?: string // e.g. "S&S" / "Otto" — shown as a badge when browsing both at once
+  /** Open the full-detail window. Absent → the picture is inert, as before. */
+  onOpenDetail?: () => void
   /** Order this straight from the browse grid, without importing it to the catalogue
    *  first. Separate from onAdd on purpose: adding to the CATALOGUE is about what we
    *  sell, ordering is about what we buy, and conflating them is how a blank ends up
@@ -127,7 +130,14 @@ export function SupplierProductCard({
           back most of that width — more even across the grid, which is the actual ask.
           Cropping remains off the table: a catalogue tile whose job is "is this the blank
           I want" has to show the whole product. */}
-      <div className="relative aspect-[4/5] shrink-0 overflow-hidden bg-white">
+      {/* The picture is the way IN to the detail window — it is the thing the eye lands on
+          and the thing that cannot answer "will this do". Not a <button>: the favourite
+          control lives inside this frame, and a button inside a button is invalid. Same
+          keyboard behaviour via the shared helper. */}
+      <div
+        {...(onOpenDetail ? clickableProps(onOpenDetail, `Open ${data.title ?? "this blank"}`) : {})}
+        className={"relative aspect-[4/5] shrink-0 overflow-hidden bg-white " + (onOpenDetail ? "cursor-zoom-in" : "")}
+      >
         {img ? (
           // absolute inset-0 is load-bearing. As an in-flow child, `size-full` means
           // height:100% against a parent whose height comes from aspect-ratio — an
