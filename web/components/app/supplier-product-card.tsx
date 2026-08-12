@@ -160,32 +160,18 @@ export function SupplierProductCard({
           // want" must show the whole product, so the whitespace stays and the crop goes.
           // If they still read small, the fix is the tile's aspect ratio for every
           // supplier, not a crop for one.
-          // SANMAR CAPS ONLY.
+          // NO PER-SUPPLIER ZOOM. Measured against the live CDN, SanMar publish caps in
+          // two shapes: 1200x1800 portraits (DT629, TM1MY393) and ~1212x1199 squares (the
+          // "Flat" shots, e.g. CP95). In a 4:5 bed those fit along OPPOSITE axes — the
+          // portrait fits to height and can absorb a zoom by eating its vertical white
+          // margin, while the square fits to width and clips the moment scale passes 1.0.
+          // One number cannot serve both, which is why only SanMar caps misbehaved.
           //
-          // The zoom is a different move from the object-cover tried and reverted here:
-          // that cropped a third of the image and took the tops off caps. This scales
-          // inside the same contain fit, so what it eats is the WHITE MARGIN SanMar bake
-          // into their shots.
-          //
-          // But that margin is not uniform across their catalogue — it is generous on
-          // headwear, where a cap floats in a wide white field and reads small beside the
-          // Otto and S&S tiles either side of it, and ordinary on apparel, where the same
-          // 1.25 simply made shirts too big. So it is scoped to the category that has the
-          // problem rather than the supplier that happens to contain it.
-          //
-          // Word-boundaried: SanMar's category is literally "Caps" (363 styles, checked
-          // against the live table), and a bare /hat/ would have matched any category that
-          // merely contained those letters. Their other 3,700 styles — Sweatshirts/Fleece,
-          // Bags, T-Shirts, Polos/Knits — are untouched, which is the correction being made.
+          // So the bed shape does the work and nothing is scaled. That is the same
+          // conclusion this file reached the first time: fix the tile for every supplier,
+          // never crop for one.
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={img}
-            alt=""
-            loading="lazy"
-            className={"absolute inset-0 size-full object-contain "
-              + (supplierLabel === "SanMar" && /\b(caps?|hats?|headwear|beanies?|visors?)\b/i.test(String(data.subtitle ?? ""))
-                ? "scale-125" : "")}
-          />
+          <img src={img} alt="" loading="lazy" className="absolute inset-0 size-full object-contain" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50">No image</div>
         )}
