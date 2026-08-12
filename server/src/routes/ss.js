@@ -1165,15 +1165,20 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     _full.stopped = true; _full.running = false; return { ok: true };
   });
 
-  app.post('/api/ss/sync-all', { preHandler: requireStaff }, async (req, reply) => {
-    if (!creds()) { reply.code(400); return { error: 'S&S not configured — set SS_ACCOUNT_NUMBER and SS_API_KEY.' }; }
-    if (_full.running) return { ok: true, already: true, ..._full };
-    const refresh = !!(req.body && req.body.refresh);
-
+  /**
+   * THE FULL CATALOGUE PULL, callable from the button AND from the nightly schedule.
+   *
+   * It was an anonymous IIFE inside the route, which meant the only way to run it was for a
+   * human to press Sync — and S&S was the one supplier with no automatic refresh at all
+   * (SanMar has a host cron, Otto has no catalogue API to schedule). So the catalogue aged
+   * until somebody noticed, which is the failure mode nobody notices.
+   *
+   * Skips styles already stored unless `refresh`, so the nightly run costs minutes rather
+   * than the full hour, and returns immediately if one is already going.
+   */
+  async function runFullSync(refresh) {
+    if (_full.running) return { already: true };
     _full = { running: true, total: 0, done: 0, skipped: 0, products: 0, startedAt: Date.now(), error: null, stopped: false };
-    // Fire and forget: this takes the better part of an hour, so the request returns now
-    // and progress is polled. Holding the connection open would just time out.
-    (async () => {
       try {
         const styles = await fetchStyles();
         _full.total = styles.length;
@@ -1212,11 +1217,39 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       } finally {
         _full.running = false;
       }
-    })();
+    return { ok: true };
+  }
+
+  app.post('/api/ss/sync-all', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured — set SS_ACCOUNT_NUMBER and SS_API_KEY.' }; }
+    if (_full.running) return { ok: true, already: true, ..._full };
+    const refresh = !!(req.body && req.body.refresh);
+
+    // Fire and forget: this takes the better part of an hour, so the request returns now
+    // and progress is polled. Holding the connection open would just time out.
+    void runFullSync(refresh);
 
     return { ok: true, started: true, total: _full.total || null,
              note: 'Runs in the background — poll /api/ss/sync-all/status. Safe to leave; already-synced styles are skipped.' };
   });
+
+  /**
+   * NIGHTLY, so nobody has to remember.
+   *
+   * SanMar refreshes from a host cron and Otto has no catalogue API to schedule at all —
+   * their catalogue is a file export someone uploads. S&S was the gap: a live API with no
+   * timer on it, refreshed only when a human pressed a button, which is how a supplier
+   * catalogue quietly goes months out of date.
+   *
+   * Non-refresh, so it only fetches styles we do not already hold — minutes, not the hour a
+   * full re-pull takes — and it no-ops when a sync is already running. Guarded on globalThis
+   * so `node --watch` reloading the module cannot stack a second timer on the first.
+   */
+  if (creds() && !globalThis.__egSsNightly) {
+    globalThis.__egSsNightly = setInterval(() => { runFullSync(false).catch(() => {}); }, 24 * 60 * 60 * 1000);
+    // Not on boot: a deploy would otherwise start an hour of supplier calls at the moment
+    // the process is least able to spare them. First run is a day after start.
+  }
 
   let _warm = { running: false, total: 0, done: 0, startedAt: 0, error: null };
   app.post('/api/ss/warm', { preHandler: requireStaff }, async (req, reply) => {
