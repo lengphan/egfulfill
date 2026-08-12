@@ -1134,6 +1134,41 @@ export function DesignCanvasDialog({
             // rather than null — the stage falls back on nullish, so null would restore it.
             emptyHint={<></>}
           />
+          {/* THE BACKGROUND TOOLS, ON THE ARTWORK.
+              Buyer artwork arrives on a white or grey plate more often than not, and this
+              is where someone is looking when they notice. What it produces is a data: url,
+              so `save` persists the CUT-OUT and the removal travels with the design
+              afterwards; leave it alone and the artwork saves exactly as it arrived.
+
+              Bottom-left, over the stage: the top corners hold the stage's own remove and
+              the artwork usually sits centred, so this is the one corner it doesn't cover. */}
+          {designUrl && (
+            <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={bg.run}
+                disabled={bg.busy}
+                title="Clear a flat backdrop — no AI, nothing leaves your browser"
+                className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur transition-colors hover:bg-accent disabled:opacity-60"
+              >
+                {bg.busy ? <CircleNotch size={12} className="animate-spin" /> : <Eraser size={12} weight="bold" />}
+                {bg.busy ? "Working…" : "Remove background"}
+              </button>
+              {bg.canUndo && (
+                <button
+                  type="button"
+                  onClick={bg.undo}
+                  title="Put the background back"
+                  className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur transition-colors hover:bg-accent"
+                >
+                  <ArrowCounterClockwise size={12} weight="bold" /> Undo
+                </button>
+              )}
+              {bg.msg && (
+                <span className="pointer-events-auto rounded-lg bg-card/95 px-2 py-1 text-2xs text-muted-foreground shadow-sm backdrop-blur">{bg.msg}</span>
+              )}
+            </div>
+          )}
           {!designUrl && (
             <button
               type="button"
@@ -1377,27 +1412,11 @@ export function DesignCanvasDialog({
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>{designUrl ? "Replace" : "Upload image"}</Button>
                 <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>Library</Button>
-                {/* RIGHT HERE, not only in the Design maker. Buyer artwork arrives on a white
-                    or grey plate more often than not, and this dialog is where someone is
-                    looking when they notice — sending them to another page to fix it is how
-                    it gets printed with the plate still on. Same hook, same behaviour.
-
-                    What it produces is a data: url, so `save` below persists the CUT-OUT and
-                    the removal travels with the design everywhere afterwards. Leave it alone
-                    and the artwork is saved exactly as it arrived. */}
-                {designUrl && (
-                  <Button variant="outline" size="sm" onClick={bg.run} disabled={bg.busy} title="Clear a flat backdrop — no AI, nothing leaves your browser">
-                    {bg.busy ? <CircleNotch size={14} className="animate-spin" /> : <Eraser size={14} weight="bold" />}
-                    {bg.busy ? "Working…" : "Remove background"}
-                  </Button>
-                )}
-                {bg.canUndo && (
-                  <Button variant="ghost" size="sm" onClick={bg.undo} title="Put the background back">
-                    <ArrowCounterClockwise size={14} weight="bold" /> Undo
-                  </Button>
-                )}
+                {/* Remove background is NOT here — it acts on the artwork, so it lives on
+                    the artwork (see the stage overlay). A control in this row described a
+                    step; on the image it describes the thing under your cursor, and you can
+                    see the result the moment it lands without looking away. */}
               </div>
-              {bg.msg && <p className="mt-1.5 text-2xs text-muted-foreground">{bg.msg}</p>}
             </div>
             {/* 2 — Machine file (the seller's own-file route, now discoverable).
                 EMBROIDERY ONLY. Every part of this step is stitch apparatus: the formats it

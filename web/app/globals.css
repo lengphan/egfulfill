@@ -141,6 +141,9 @@
    * This is distinct from the emerald that means SHIPPED on the floor — that stays a status
    * chip. This is the ink for "a number moved the right way". */
     --success: oklch(0.48 0.135 158);
+    /* The design stage's ground — see .eg-studio-bed. Near-neutral, a touch cool so it
+       cannot warm the artwork it sits behind. */
+    --studio-bed: oklch(0.895 0.004 255);
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.888 0.013 91);
     --input: oklch(0.928 0.015 91);
@@ -238,6 +241,7 @@
     --accent: oklch(0.243 0.050 285);
     --accent-foreground: oklch(0.92 0.08 285);
     --success: oklch(0.80 0.155 158);
+    --studio-bed: oklch(0.245 0.008 255);
     --destructive: oklch(0.704 0.191 22.216);
     /* The ONLY thing separating a card from the canvas now, so it stays strong. */
     --border: oklch(0.370 0.030 285);
@@ -476,7 +480,15 @@
    painted on the square stage it stopped at the square's edge and left bare panel
    around it, which read as the grid failing to extend. */
 .eg-studio-bed {
-  background-color: var(--muted);
+  /* ITS OWN COLOUR, not --muted.
+     The bed borrowed the app's muted surface, which in this theme is a warm cream — and a
+     warm ground is the wrong thing to judge artwork on. It tints how you read whites, and a
+     natural or ivory garment (half the Comfort Colors range) sits on it almost invisibly.
+     Neutral grey is what every design tool uses here for the same reason: it takes no side
+     on hue, so the artwork and the blank are the only colours in the frame. Slightly deeper
+     than the panel around it, so the stage reads as a surface you work ON rather than more
+     page. */
+  background-color: var(--studio-bed);
   background-image:
     radial-gradient(circle at 50% 36%, rgba(255, 255, 255, 0.55), transparent 62%),
     linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
