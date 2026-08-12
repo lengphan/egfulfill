@@ -404,13 +404,33 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
    * Guarded on `loading` so a fast click-through fires one fetch, not five, and on
    * canLoadMore so it stops at the true end rather than asking forever.
    */
-  useEffect(() => {
-    if (!canLoadMore || loading) return
-    if (paged.pageCount === 0 || paged.page < paged.pageCount) return
-    const t = setTimeout(() => { void loadMore() }, 0)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paged.page, paged.pageCount, canLoadMore, loading])
+  /**
+   * FETCHING MORE IS AN EVENT, NEVER AN EFFECT. This was an effect that fired whenever
+   * `page >= pageCount`, and it ate a machine's RAM.
+   *
+   * `usePaged` CLAMPS page to pageCount, so `page >= pageCount` is true at page 1 of 1 —
+   * it does not mean "you paged past the end", it means "there is one page". With any
+   * filter on, `visible` stays under one page no matter how much arrives, so pageCount
+   * stayed 1, the fetch landed, `loading` flipped false, the effect re-ran on its own
+   * output and fired again. An unbounded loop pulling all three catalogues into one tab,
+   * 90 rows and a batch of image lookups at a time, with nothing ever released.
+   *
+   * An effect that re-triggers on the state its own fetch writes has no natural end. So
+   * the pager offers ONE page beyond what is loaded while the server still has rows, and
+   * only a click on it fetches. A click cannot recur on its own.
+   *
+   * `setPage` stores the raw number and `usePaged` clamps it on render, so asking for a
+   * page that does not exist yet is safe: it shows the last real page now and settles on
+   * the requested one as the rows arrive.
+   */
+  const pagesWithMore = paged.pageCount + (canLoadMore ? 1 : 0)
+  const goToPage = (n: number) => {
+    if (n > paged.pageCount) {
+      if (!canLoadMore || loading) return
+      void loadMore()
+    }
+    paged.setPage(n)
+  }
 
   return (
     // No title — the "All suppliers" tab already names it. The toolbar is the top of the card.
@@ -581,17 +601,20 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
               ))}
             </div>
           )}
-          {visible.length > paged.perPage && (
-            <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage}
+          {/* Shown whenever there is more to reach, not only when what is loaded overflows
+              one page — under a filter the loaded rows often fit on one page while the
+              server still holds thousands, and hiding the pager there left no way forward. */}
+          {(visible.length > paged.perPage || canLoadMore) && (
+            <Pagination page={paged.page} pageCount={pagesWithMore} perPage={paged.perPage}
               total={paged.total} start={paged.start}
-              onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[48, 96, 192]} />
+              onPage={goToPage} onPerPage={paged.setPerPage} perPageOptions={[48, 96, 192]} />
           )}
           {/* The "Load more (180/9,239)" row is gone — but NOT because pagination replaced
               it. They did different jobs: the pager walks what is already loaded, the
               button fetched the next chunk from the server. Deleting it alone would have
               capped browsing at the first 180 of 9,239 blanks.
-              So paging to the last loaded page now fetches the next chunk itself (see the
-              effect above), and the only thing left is a quiet line saying it is happening. */}
+              So Next reaches one page past what is loaded and fetches the chunk on click,
+              and the only thing left is a quiet line saying it is happening. */}
           {loading && items.length > 0 && (
             <div className="flex items-center justify-center gap-2 border-t border-border p-3 text-xs text-muted-foreground">
               <CircleNotch size={13} className="animate-spin" /> Loading more blanks…
