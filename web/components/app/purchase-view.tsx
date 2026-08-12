@@ -813,6 +813,34 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     return [...g.values()]
   }, [saved, supByS])
   const toOrderTotal = toOrderGroups.reduce((s, g) => s + g.total, 0)
+
+  /**
+   * WHAT FREIGHT ACTUALLY COST LAST TIME, per supplier.
+   *
+   * It cannot be quoted before placing. Otto expose no rate endpoint (nine candidate paths
+   * probed against their live API — none), and S&S bill it on the invoice; both only tell
+   * us the number in the ORDER RESPONSE, which is why grand_total is read from there.
+   *
+   * So the cart shows history, labelled as history, rather than an estimate dressed as a
+   * quote. On a $1.50 cap that arrived billed at $18.91 the freight is the whole decision,
+   * and "we don't know yet" with last month's real figure beside it is far more use than a
+   * confident number nobody can stand behind.
+   */
+  const lastFreightBySupplier = useMemo(() => {
+    const out: Record<string, { freight: number; goods: number; at: string }> = {}
+    for (const po of pos ?? []) {
+      const r = (po.meta as { response?: { ottoResponse?: { sub_total?: string; shipping_total?: string }[] }; placedAt?: string } | null)?.response
+      const o = r?.ottoResponse?.[0]
+      const freight = Number(o?.shipping_total)
+      const goods = Number(o?.sub_total)
+      if (!Number.isFinite(freight) || freight <= 0) continue
+      const key = (po.supplier || "").trim()
+      const at = String((po.meta as { placedAt?: string } | null)?.placedAt || po.created_at || "")
+      // Most recent wins — an older freight figure is a worse guide than a newer one.
+      if (!out[key] || at > out[key].at) out[key] = { freight, goods: Number.isFinite(goods) ? goods : 0, at }
+    }
+    return out
+  }, [pos])
   // What the Active tab actually shows: lines waiting to be ordered, plus orders in
   // flight. Counting anything else makes the badge a claim you can't verify on screen.
   const activeCount = saved.length + placed.length
@@ -1545,8 +1573,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         </TabsList>
 
         {/* CART — what is short and about to be bought. Nothing here is a purchase order:
-            none exists until you place one. */}
-        <TabsContent value="cart" className="mt-4 space-y-4">
+            none exists until you place one.
+
+            Two columns: the lines on the left, the money on the right. The totals used to
+            be a single "N units · $X" caption in the card header, which is the wrong place
+            for the figure that decides whether you place the order at all. */}
+        <TabsContent value="cart" className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="space-y-4">
 
         {/* ── TO ORDER ─────────────────────────────────────────────────────────
             One panel, always open. This is the working surface, and something you're
@@ -1727,6 +1760,74 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             </div>
           )}
         </SectionCard>
+          </div>
+
+          {/* ── WHAT IT COSTS ────────────────────────────────────────────────────
+              Goods are known now. Freight is NOT: no supplier here quotes it before the
+              order exists, so the panel says so and shows what it actually came to last
+              time rather than an invented estimate. */}
+          <aside className="space-y-4 xl:sticky xl:top-20">
+            <SectionCard title="Order total" bodyClassName="space-y-3 p-4 text-sm">
+              {toOrderGroups.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nothing in the cart yet.</p>
+              ) : (
+                <>
+                  <dl className="space-y-1.5">
+                    {toOrderGroups.map((g) => {
+                      const units = g.lines.reduce((n, l) => n + num(l.qty), 0)
+                      return (
+                        <div key={g.key} className="flex items-baseline justify-between gap-3">
+                          <dt className="min-w-0 truncate text-muted-foreground">
+                            {g.supplier ?? "Unassigned"}
+                            <span className="ml-1 text-2xs">· {units} {units === 1 ? "unit" : "units"}</span>
+                          </dt>
+                          <dd className="shrink-0 tabular-nums">{usd(g.total)}</dd>
+                        </div>
+                      )
+                    })}
+                  </dl>
+
+                  <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2 font-medium">
+                    <dt>Goods</dt>
+                    <dd className="tabular-nums">{usd(toOrderTotal)}</dd>
+                  </div>
+
+                  {/* THE HONEST LINE. A number here would be a guess; the supplier decides
+                      it when the order is created, and on small orders it dwarfs the goods
+                      — $17.41 of freight on a $1.50 cap. */}
+                  <div className="space-y-1 rounded-lg bg-muted/40 p-2.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs font-medium">Shipping</span>
+                      <span className="text-xs text-muted-foreground">added when you place</span>
+                    </div>
+                    <p className="text-2xs text-muted-foreground">
+                      No supplier here quotes freight before the order exists — it arrives in their
+                      confirmation and lands on the card.
+                    </p>
+                    {toOrderGroups.map((g) => {
+                      const seen = lastFreightBySupplier[(g.supplier || "").trim()]
+                      if (!seen) return null
+                      return (
+                        <p key={g.key} className="text-2xs text-muted-foreground">
+                          <span className="font-medium text-foreground">{g.supplier}</span> last charged{" "}
+                          <span className="font-medium text-foreground tabular-nums">{usd(seen.freight)}</span>
+                          {seen.goods > 0 ? ` on ${usd(seen.goods)} of goods` : ""}.
+                        </p>
+                      )
+                    })}
+                  </div>
+
+                  <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2 text-base font-semibold">
+                    <dt>Total so far</dt>
+                    <dd className="tabular-nums">{usd(toOrderTotal)}</dd>
+                  </div>
+                  <p className="text-2xs text-muted-foreground">
+                    Goods only. Freight and any tax are added by the supplier at placement.
+                  </p>
+                </>
+              )}
+            </SectionCard>
+          </aside>
         </TabsContent>
 
         {/* ONGOING — placed and in flight, plus any draft still to finish. Money is already
