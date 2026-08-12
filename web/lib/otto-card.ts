@@ -75,6 +75,25 @@ export function cardExpired(exp: string): boolean {
   return new Date(yr, month, 1).getTime() <= Date.now()
 }
 
+/**
+ * EXPIRY, TYPED AS DIGITS.
+ *
+ * Nobody should have to reach for "/" on a phone keypad to enter a date, and every card
+ * form in the world takes the slash for granted. Type 0528 and get 05/28; the separator is
+ * inserted as soon as the month is complete and removed again if you backspace into it.
+ *
+ * A leading digit above 1 is a month on its own — typing 5 means May, so it becomes 05/
+ * rather than waiting for a second digit that would make no valid month.
+ */
+export function formatExpiry(raw: string): string {
+  const d = String(raw || "").replace(/\D/g, "").slice(0, 6)
+  if (!d) return ""
+  if (d.length === 1) return Number(d) > 1 ? `0${d}/` : d
+  const mm = d.slice(0, 2)
+  const yy = d.slice(2)
+  return yy ? `${mm}/${yy}` : `${mm}/`
+}
+
 /** Last four only — the most that ever needs to be on screen to recognise a card. */
 export function maskNumber(n: string): string {
   const d = (n ?? "").replace(/\D/g, "")

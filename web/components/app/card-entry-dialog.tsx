@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { cardExpired, cardProblems, loadCard, saveCard, type CardDetails } from "@/lib/otto-card"
+import { cardExpired, cardProblems, formatExpiry, loadCard, saveCard, type CardDetails } from "@/lib/otto-card"
 
 export type { CardDetails }
 
@@ -147,7 +147,7 @@ export function CardEntryDialog({
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1">
               <span className="text-sm font-medium">Expiry</span>
-              <Input value={exp} onChange={(e) => setExp(e.target.value.replace(/[^0-9/]/g, "").slice(0, 7))}
+              <Input value={exp} onChange={(e) => setExp(formatExpiry(e.target.value))}
                      placeholder="03/28" inputMode="numeric" autoComplete="cc-exp" name="cc-exp" className="h-9 font-mono" />
             </label>
             <label className="block space-y-1">

@@ -520,7 +520,18 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
           reply.code(400);
           return { error: `Otto need ${problems.join(', ')} for a credit-card order.` };
         }
-        card = { name: String(raw.name), card_number: number, cvv, exp_date: exp };
+        /**
+         * OTTO WANT MM/YYYY, FULL STOP.
+         *
+         * They answer a two-digit year with "card_details.exp_date: Must be in the format
+         * MM/YYYY" and reject the whole order — which is what refused a real purchase. Every
+         * card form on earth takes MM/YY, so the fix belongs HERE, at the one place that
+         * talks to them, rather than in each place a card is typed: a two-digit year is
+         * expanded to this century, four digits pass through untouched.
+         */
+        const [expMm, expYy] = exp.split('/');
+        const expDate = `${expMm}/${expYy.length === 2 ? '20' + expYy : expYy}`;
+        card = { name: String(raw.name), card_number: number, cvv, exp_date: expDate };
       }
       // else: no card typed. The comment above assumed Otto would then bill the card held
       // on the account — Otto's live API says otherwise:
