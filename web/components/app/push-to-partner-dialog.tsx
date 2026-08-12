@@ -177,9 +177,30 @@ function PushToPartnerPanel({
        */
       let directImage: string | undefined
       if (!artworkUrl && lineImage) {
-        if (/^https?:\/\//i.test(lineImage)) directImage = lineImage
-        else {
-          const up = await uploadPinkAttachment({ data: lineImage, name: `${sku || "artwork"}.png` })
+        if (/^https?:\/\//i.test(lineImage)) {
+          directImage = lineImage
+        } else {
+          // THREE SHAPES ARRIVE HERE, not two. An order fetched on its own inlines the
+          // artwork as `data:`; the order LIST swaps that for a `/api/order_items/:id/img`
+          // reference to keep the payload small (a real board measured 4.4MB of inlined
+          // thumbnails). Whichever one this page happened to render from, the partner needs
+          // bytes — so a reference is fetched same-origin first and turned into one.
+          let data = lineImage
+          if (!/^data:/i.test(data)) {
+            try {
+              const blob = await (await fetch(lineImage, { credentials: "include" })).blob()
+              data = await new Promise<string>((res, rej) => {
+                const fr = new FileReader()
+                fr.onload = () => res(String(fr.result || ""))
+                fr.onerror = () => rej(new Error("unreadable"))
+                fr.readAsDataURL(blob)
+              })
+            } catch {
+              setMsg({ ok: false, text: "Couldn't read the order's image to send as the design. Attach it below instead." })
+              return
+            }
+          }
+          const up = await uploadPinkAttachment({ data, name: `${sku || "artwork"}.png` })
           if (up.error || !up.url) { setMsg({ ok: false, text: up.error || "Couldn't upload the order's image to send as the design." }); return }
           directImage = up.url
         }
