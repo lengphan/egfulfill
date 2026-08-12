@@ -22,9 +22,10 @@ import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrd
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
+import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
-import { filterOrders, matchesStatus, isRush, isOverdue, shipByOf, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
+import { filterOrders, matchesStatus, isRush, isOverdue, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
@@ -765,24 +766,62 @@ export function OrdersHub() {
    * still marked on its row and still one click away on the Rush pill, which is how every
    * other platform handles a flag: a marker plus a view, never a sort override.
    */
+  /**
+   * Click-to-sort, on top of the default. Null means "the default order" — a real state,
+   * not `age/desc` dressed up, so a third click on a column returns the list to how it
+   * opened rather than stranding you in an order you have to undo by hand.
+   */
+  const [sort, setSort] = useState<{ key: FactoryColId; dir: "asc" | "desc" } | null>(null)
+  const toggleSort = (id: FactoryColId) => setSort((s) =>
+    s?.key !== id ? { key: id, dir: "asc" } : s.dir === "asc" ? { key: id, dir: "desc" } : null)
+
   const filtered = useMemo(() => {
     const list = filterOrders(orders ?? [], query, filterCtx)
     const at = (o: OrderRow) => String(o.created_at ?? "")
     const newestFirst = (a: OrderRow, b: OrderRow) => at(b).localeCompare(at(a))
+
     /**
-     * How late, not how old. An order's deadline is its ship-by date when Etsy gave us
-     * one; otherwise it falls due `overdueDays` after it arrived, which is the same rule
-     * isOverdue applies — so the list is sorted by the very thing that put each row on it.
+     * NEWEST FIRST EVERYWHERE, including Overdue.
+     *
+     * Overdue used to sort most-late-first, on the reasoning that a list should be ordered
+     * by the thing that put each row on it. That reasoning is sound and the result was
+     * still wrong: the tab opened on five-year-old drafts. The oldest thing on an overdue
+     * list is not the most urgent, it is the most abandoned — nothing is going to ship it
+     * today — so the head of the list was permanently occupied by rows nobody would act on,
+     * and the orders that just went late sat where no one looks.
+     *
+     * That ordering is not gone, it is now a click: Age ascending is oldest-first. Which is
+     * the general rule here — the DEFAULT is the same on every tab so the top of the list
+     * always means the same thing, and any other order is something you asked for.
      */
-    const dueAt = (o: OrderRow) => {
-      const promised = shipByOf(o)
-      if (promised != null) return promised
-      const created = o.created_at ? new Date(o.created_at).getTime() : NaN
-      return Number.isFinite(created) ? created + overdueDays * 86400_000 : Infinity
+    const cmp: Partial<Record<FactoryColId, (a: OrderRow, b: OrderRow) => number>> = {
+      // Age sorts on the timestamp, not the rendered token: `6w` and `1y` are strings, and
+      // comparing them puts 1y before 6w. Ascending = youngest, matching the column's name.
+      age: (a, b) => at(b).localeCompare(at(a)),
+      order: (a, b) => String(numOf(a)).localeCompare(String(numOf(b)), undefined, { numeric: true }),
+      status: (a, b) => orderStage(a.items ?? []).localeCompare(orderStage(b.items ?? [])),
+      store: (a, b) => platformOf(a).localeCompare(platformOf(b)),
+      customer: (a, b) => (a.customer?.name ?? "").localeCompare(b.customer?.name ?? ""),
+      // Blank tracking sorts last in BOTH directions — "not shipped yet" is the absence of
+      // a value, so letting it lead one direction would hand half the sorts an empty screen.
+      tracking: (a, b) => {
+        const x = a.tracking ?? "", y = b.tracking ?? ""
+        if (!x !== !y) return x ? -1 : 1
+        return x.localeCompare(y)
+      },
+      items: (a, b) => (a.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0)
+                     - (b.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0),
     }
-    const mostLateFirst = (a: OrderRow, b: OrderRow) => dueAt(a) - dueAt(b)
-    return [...list].sort(query.status === "overdue" ? mostLateFirst : newestFirst)
-  }, [orders, query, filterCtx, overdueDays])
+
+    const chosen = sort && cmp[sort.key]
+    if (chosen) {
+      const signed = sort.dir === "desc" ? (a: OrderRow, b: OrderRow) => -chosen(a, b) : chosen
+      // Ties fall back to newest-first rather than to input order, so re-sorting on a column
+      // most rows share (Status, Store) doesn't shuffle them differently every render.
+      return [...list].sort((a, b) => signed(a, b) || newestFirst(a, b))
+    }
+    return [...list].sort(newestFirst)
+  }, [orders, query, filterCtx, sort])
 
   const paged = usePaged(filtered, 25)
 
@@ -1276,16 +1315,28 @@ export function OrdersHub() {
                 // and read as a column named "Columns".
                 <span key={id} />
               ) : (
+                // A header now does two jobs: DRAG reorders the column, CLICK sorts by it.
+                // They coexist because a drag never ends in a click. `ready` (the List
+                // chips) is the one data column with nothing to order by — it is a set of
+                // flags, not a value — so it stays a plain draggable label.
                 <span
                   key={id}
                   draggable
                   onDragStart={() => { dragCol.current = id }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => onColDrop(id)}
-                  className="cursor-grab select-none truncate"
-                  title={tl("ui", "Drag to reorder")}
+                  {...(id === "ready" ? {} : clickableProps(() => toggleSort(id)))}
+                  className={"flex select-none items-center gap-1 truncate " + (id === "ready" ? "cursor-grab" : "cursor-pointer hover:text-foreground ") + (sort?.key === id ? "text-foreground" : "")}
+                  title={id === "ready" ? tl("ui", "Drag to reorder") : tl("ui", "Click to sort · drag to reorder")}
                 >
-                  {tl("col", FACTORY_COLS[id].label)}
+                  <span className="truncate">{tl("col", FACTORY_COLS[id].label)}</span>
+                  {/* The caret marks the sorted column only. Showing a faint one on every
+                      header to advertise the affordance would put eight arrows in a row
+                      and make the sorted one harder to find, which is the one fact the
+                      header has to carry. */}
+                  {sort?.key === id && (
+                    <CaretRight size={10} weight="bold" className={sort.dir === "asc" ? "-rotate-90" : "rotate-90"} />
+                  )}
                 </span>
               )
             )}
