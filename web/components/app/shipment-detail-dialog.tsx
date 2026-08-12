@@ -3,7 +3,8 @@
 import { ArrowSquareOut, ArrowClockwise, CircleNotch, X, Package, DownloadSimple, FilePdf } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import type { ShipmentRow } from "@/lib/api"
+import { useEffect, useState } from "react"
+import { fetchShipmentLabel, type ShipmentRow } from "@/lib/api"
 
 /**
  * ONE PARCEL, IN FULL — so the table doesn't have to be.
@@ -60,6 +61,41 @@ export function ShipmentDetailDialog({
   canRefund: boolean
 }) {
   const s = shipment
+  const id = s?.id
+  const hasLabel = !!s?.labelUrl
+
+  /**
+   * The label, fetched WITH the session's token and held as an object URL.
+   *
+   * A frame pointed straight at the route showed `{"error":"Not signed in"}`: an <iframe
+   * src> is a plain navigation and carries no Authorization header, while this app keeps
+   * its token in storage. So the bytes come through the API client and become a blob: URL —
+   * which a frame renders and `download` saves, with no token anywhere in a URL.
+   */
+  const [labelSrc, setLabelSrc] = useState<string | null>(null)
+  const [labelErr, setLabelErr] = useState<string | null>(null)
+  useEffect(() => {
+    let url: string | null = null
+    let alive = true
+    // Deferred, not synchronous: a setState in an effect body cascades a render before
+    // paint, which this repo lints against (react-hooks/set-state-in-effect).
+    const t = setTimeout(() => {
+      if (!alive) return
+      setLabelSrc(null); setLabelErr(null)
+      if (!id || !hasLabel) return
+      fetchShipmentLabel(id)
+        .then((blob) => {
+          if (!alive) return
+          url = URL.createObjectURL(blob)
+          setLabelSrc(url)
+        })
+        .catch((e) => { if (alive) setLabelErr(e instanceof Error ? e.message : "Couldn't load the label.") })
+    }, 0)
+    // Revoked on close: an object URL pins its blob in memory until it is, and this window
+    // is opened once per parcel down a long list.
+    return () => { alive = false; clearTimeout(t); if (url) URL.revokeObjectURL(url) }
+  }, [id, hasLabel])
+
   if (!s) return null
   const refunded = (s.refunded ?? 0) > 0
   const refundWord = String(s.refundStatus || "").toUpperCase()
@@ -88,23 +124,38 @@ export function ShipmentDetailDialog({
             url: a cross-origin PDF can be refused an iframe outright, and `download` is
             ignored across origins — the browser navigates instead, which is the tab this
             replaces. Same-origin, both work. */}
-        <div className="grid gap-4 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
+        <div className="grid gap-5 md:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
           {s.labelUrl ? (
             <div className="flex flex-col gap-2">
-              <div className="relative overflow-hidden rounded-lg border border-border bg-muted/30">
-                {/* #toolbar=0 asks the built-in viewer for the page and not its chrome —
-                    honoured by Chrome and Edge, ignored elsewhere, harmless either way. */}
-                <iframe
-                  src={`/api/shipments/${encodeURIComponent(s.id)}/label#toolbar=0&navpanes=0&view=FitH`}
-                  title={`Shipping label for ${s.num}`}
-                  className="h-[22rem] w-full bg-white"
-                />
+              {/* 4x6 is the shape every carrier label is printed at, so the frame is that
+                  ratio — a 22rem-tall box in a 17rem column left a band of grey down each
+                  side of the page and made the label smaller than it needed to be. */}
+              <div className="relative aspect-[4/6] overflow-hidden rounded-lg border border-border bg-white">
+                {labelSrc ? (
+                  // #toolbar=0 asks the built-in viewer for the page and not its chrome —
+                  // honoured by Chrome and Edge, ignored elsewhere, harmless either way.
+                  <iframe
+                    src={`${labelSrc}#toolbar=0&navpanes=0&view=Fit`}
+                    title={`Shipping label for ${s.num}`}
+                    className="size-full bg-white"
+                  />
+                ) : (
+                  <div className="flex size-full items-center justify-center px-4 text-center">
+                    {labelErr
+                      ? <span className="text-xs text-destructive">{labelErr}</span>
+                      : <CircleNotch size={20} className="animate-spin text-muted-foreground" />}
+                  </div>
+                )}
               </div>
               <div className="flex gap-1.5">
+                {/* The same blob the frame is showing — so what you save is provably what
+                    you just looked at, and it needs no second authenticated request. */}
                 <a
-                  href={`/api/shipments/${encodeURIComponent(s.id)}/label?download=1`}
-                  download
-                  className="eg-tap inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent"
+                  href={labelSrc ?? undefined}
+                  download={`label-${s.num}.pdf`}
+                  aria-disabled={!labelSrc}
+                  className={"eg-tap inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent "
+                    + (labelSrc ? "" : "pointer-events-none opacity-50")}
                 >
                   <DownloadSimple size={13} weight="bold" /> Download
                 </a>
@@ -125,7 +176,7 @@ export function ShipmentDetailDialog({
           ) : (
             // Says WHICH: no label was ever bought, or it was refunded and the file with it.
             // A blank panel here reads as a load that failed.
-            <div className="flex h-[22rem] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-4 text-center">
+            <div className="flex aspect-[4/6] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-4 text-center">
               <FilePdf size={22} className="text-muted-foreground/60" />
               <span className="text-xs text-muted-foreground">
                 {refunded ? "The label was refunded — its file is gone with it." : "No label bought for this parcel."}

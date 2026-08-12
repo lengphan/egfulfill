@@ -2736,6 +2736,30 @@ export type UploadedListing = EtsyListing & {
     title?: string | null; description?: string | null; tags?: string[] | null
   }
 }
+/**
+ * THE LABEL'S BYTES, WITH THE TOKEN ATTACHED.
+ *
+ * An <iframe src> and an <a href> are plain browser navigations: they carry cookies, and
+ * this app authenticates with a Bearer header out of localStorage. So pointing a frame at
+ * the label route rendered the route's own refusal — `{"error":"Not signed in"}` — inside
+ * the window, which is exactly what a reader would take for a broken label.
+ *
+ * Fetched properly and handed back as a Blob. The caller makes an object URL from it, which
+ * a frame can show and `download` can save, and no token ever appears in a URL.
+ */
+export async function fetchShipmentLabel(id: string): Promise<Blob> {
+  const token = getToken()
+  const res = await fetch(`${baseFor()}/api/shipments/${encodeURIComponent(id)}/label`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!res.ok) {
+    let msg = res.statusText
+    try { msg = (await res.json())?.error || msg } catch { /* not json */ }
+    throw new ApiError(res.status, msg)
+  }
+  return res.blob()
+}
+
 /** `all` — everyone's, for staff. The server refuses it for a seller, so passing it is
  *  a request rather than a claim: a seller asking still gets only their own. */
 export function getSpydeckUploads(all?: boolean) {
