@@ -141,9 +141,14 @@
    * This is distinct from the emerald that means SHIPPED on the floor — that stays a status
    * chip. This is the ink for "a number moved the right way". */
     --success: oklch(0.48 0.135 158);
-    /* The design stage's ground — see .eg-studio-bed. Near-neutral, a touch cool so it
-       cannot warm the artwork it sits behind. */
-    --studio-bed: oklch(0.895 0.004 255);
+    /* The design stage's ground — see .eg-studio-bed.
+       NEAR-WHITE, not grey. A mid grey is what design tools use, but this stage sits inside
+       a white app canvas: a grey slab in the middle of white panels reads as a hole in the
+       page rather than a surface. So it matches the canvas and keeps only a whisper of
+       neutral — enough that a white garment still has an edge, and that the grid is legible
+       as a grid. Neutral rather than the warm cream it used to borrow from --muted, because
+       this is the one surface whose job is judging artwork colour. */
+    --studio-bed: oklch(0.982 0.002 255);
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.888 0.013 91);
     --input: oklch(0.928 0.015 91);
