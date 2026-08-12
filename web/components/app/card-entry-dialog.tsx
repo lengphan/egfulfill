@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { cardProblems, saveCard, type CardDetails } from "@/lib/otto-card"
+import { cardExpired, cardProblems, loadCard, saveCard, type CardDetails } from "@/lib/otto-card"
 
 export type { CardDetails }
 
@@ -44,6 +44,30 @@ export function CardEntryDialog({
   // means it opens again on the next order — the thing being fixed.
   const [remember, setRemember] = useState(true)
 
+  /**
+   * PREFILL FROM THE CARD ON FILE, when there is one.
+   *
+   * This window used to mean "there is no card", so starting empty was right. It no longer
+   * does: a payment refusal reopens it with "Enter card & retry", and an EXPIRED card also
+   * brings it back — in both cases a card exists and the person is being asked to retype
+   * sixteen digits they already gave us. Filling them in makes the common fix "change the
+   * expiry" or "just press place again", which is what those two cases actually need.
+   */
+  const [onFile, setOnFile] = useState<CardDetails | null>(null)
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(() => {
+      const c = loadCard()
+      setOnFile(c)
+      if (!c) return
+      setName(c.name)
+      setNumber(c.card_number.replace(/(.{4})/g, "$1 ").trim())
+      setExp(c.exp_date)
+      setCvv(c.cvv)
+    }, 0)
+    return () => clearTimeout(t)
+  }, [open])
+
   useEffect(() => {
     if (open) return
     // Clear on close, always. A card left in state after the dialog shuts is a card
@@ -75,8 +99,12 @@ export function CardEntryDialog({
             {/* WHY IT OPENED. It no longer appears on every order, so "Otto require a card"
                 alone doesn't explain this particular window — the answer is that this
                 browser has no usable card on file. */}
-            No card is saved in this browser, so this order needs one. Otto require it on
-            every order and have no saved-card API.
+            {onFile
+              ? (cardExpired(onFile.exp_date)
+                  ? "The card saved in this browser has expired, so Otto won't take it. Update the expiry — the rest is filled in."
+                  : "The card saved in this browser is filled in below. Change it if you're paying with a different one, or just place the order again.")
+              : "No card is saved in this browser, so this order needs one."}{" "}
+            Otto require it on every order and have no saved-card API.
             {/* The figure we hold is the PRODUCT subtotal, and Otto bill freight on top of
                 it: a $3.60 order of caps came back charged at $21.35. Presenting the
                 subtotal as "this order is $3.60" understates the card by the whole of the

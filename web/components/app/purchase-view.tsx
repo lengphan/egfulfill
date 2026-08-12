@@ -919,7 +919,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         // The short line is what goes on screen; `clarified` is the supplier's own wording
         // and goes behind Details. A refused card is singled out because it is the one
         // failure with an obvious next step.
-        const isCardFail = !ok && /card|payment|declin|invalid_client|cvv|expir/i.test(String(clarified))
+        // OTTO ONLY. S&S pay by stored payment PROFILE — their order payload has a
+        // profileID field and no field for a card number — so typing a card cannot fix an
+        // S&S decline, and offering it would send someone to enter a PAN that never
+        // reaches S&S at all. Their fix is "Change payment": pick a different saved
+        // profile, which the decline handler above already surfaces.
+        const isCardFail = !ok && g.api === "otto" && /card|payment|declin|cvv|expir/i.test(String(clarified))
         outcomes.push({
           supplier: g.supplier ?? "Unassigned",
           ok,
@@ -927,7 +932,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             ? (g.api
                 ? (dry ? "dry run — not sent" : sandbox ? `placed in SANDBOX${ottoNo ? ` · ${ottoNo}` : ""}` : `placed${ssNo || ottoNo ? ` · #${ssNo ?? ottoNo}` : ""}`)
                 : "recorded — order it by hand")
-            : isCardFail ? "payment refused" : "failed",
+            : /declin|payment|card/i.test(String(clarified)) ? "payment refused" : "failed",
           detail: ok ? (shipNote ? shipNote.replace(/^ · /, "") : undefined) : String(clarified),
         })
         results.push(ok
