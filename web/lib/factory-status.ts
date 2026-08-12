@@ -306,5 +306,7 @@ export const TONE_CLASS: Record<FactoryTone, string> = {
   prod: "bg-violet-100 text-violet-700",
   shipped: "bg-emerald-100 text-emerald-700",
   hold: "bg-amber-100 text-amber-800",
-  closed: "bg-muted text-muted-foreground line-through",
+  // No strikethrough. The word already says it — "Cancelled" struck through is the same
+  // fact twice, and struck text is harder to read for no gain. Muted carries "settled".
+  closed: "bg-muted text-muted-foreground",
 }

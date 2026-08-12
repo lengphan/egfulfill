@@ -1641,11 +1641,13 @@ export function OrdersHub() {
                               Carrier delivery status was removed: tracking rides Shippo + the
                               pipeline stage, so a "No carrier update" chip on every row was
                               noise, not information. */}
-                          {/* SAYS the row is stopped, rather than just going blank where
-                              every other row has a button. A missing control and a broken
-                              one look identical; this names which it is, and points at the
-                              ⋯ menu that resolves it. Muted, not primary — it is a state,
-                              not something to click. */}
+                          /* THE ACTION CELL HOLDS ACTIONS. It used to repeat the stage here
+                              — an amber "⚠ Cancelled" beside a Cancelled chip in the status
+                              column, and the same again for On hold and Refunded — which is
+                              the same fact three columns apart. What survives is the one
+                              thing that is a CONTROL rather than a label: taking an order
+                              off hold. Cancelled and refunded rows show nothing, because
+                              nothing is left to do from here; the ⋯ menu still has them. */
                           {stopped && (() => {
                             const norm = normalizeStage(stage)
                             const stLabel = stageMeta(norm)?.label || "On hold"
@@ -1656,9 +1658,6 @@ export function OrdersHub() {
                             const backLabel = holdFrom != null ? (stageMeta(holdFrom)?.label || "Draft") : null
                             return (
                               <span className="inline-flex shrink-0 items-center gap-1.5">
-                                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
-                                  <Warning size={13} weight="fill" /> {stLabel}
-                                </span>
                                 {norm === "on_hold" && (backLabel != null ? (
                                   <Button
                                     size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs"
