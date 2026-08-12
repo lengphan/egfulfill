@@ -41,7 +41,7 @@ const vendorLabel = (v?: string | null) => (v ? VENDOR_NAMES[v] ?? v : "")
  * shown in both places, never two that can disagree.
  */
 export function ItemDesignActions({
-  orderId, sku, itemName, qty, printType, artworkUrl, state, onChanged,
+  orderId, sku, itemName, qty, printType, artworkUrl, lineImage, state, onChanged,
 }: {
   orderId: string
   sku: string
@@ -49,6 +49,8 @@ export function ItemDesignActions({
   qty?: number | null
   printType?: string | null
   artworkUrl?: string | null
+  /** The line's own picture, used as the design when nothing has been stored yet. */
+  lineImage?: string | null
   state?: CardState
   onChanged?: () => void
 }) {
@@ -99,6 +101,7 @@ export function ItemDesignActions({
         qty={qty}
         printType={printType}
         artworkUrl={artworkUrl}
+        lineImage={lineImage}
         onPushed={() => { setPushOpen(false); onChanged?.() }}
       />
     </>

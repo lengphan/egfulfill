@@ -482,6 +482,7 @@ export default function OrderDetailPage() {
                                   qty={qty}
                                   printType={it.print_type}
                                   artworkUrl={artwork}
+                                  lineImage={it.img ?? undefined}
                                   state={designStatus.bySku[String(it.sku)]}
                                   onChanged={loadDesignStatus}
                                 />

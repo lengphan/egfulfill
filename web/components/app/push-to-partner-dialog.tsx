@@ -44,6 +44,13 @@ type PushProps = {
   qty?: number | null
   printType?: string | null
   artworkUrl?: string | null
+  /** THE LINE'S OWN IMAGE, when no design has been stored yet.
+   *
+   *  Marketplace orders arrive with the buyer's artwork inlined as a `data:` URL, and Pink
+   *  accept URLs ONLY — so a line that plainly HAS a picture reported "no artwork to send"
+   *  and asked you to attach the file you were already looking at. It is uploaded on push
+   *  and sent as the design. Absolute http(s) values pass straight through. */
+  lineImage?: string | null
   // The card's own description/notes, pre-filled so the notes typed on the card carry into
   // the push rather than being retyped in a second window.
   initialDescription?: string | null
@@ -65,7 +72,7 @@ type PushProps = {
  * always active once mounted (mounted only when its section is opened).
  */
 function PushToPartnerPanel({
-  orderId, sku, cardId, itemName, qty, printType, artworkUrl, initialDescription, presetExtras,
+  orderId, sku, cardId, itemName, qty, printType, artworkUrl, lineImage, initialDescription, presetExtras,
   compact = false, active = true, onPushed, onCancel,
 }: PushProps & { compact?: boolean; active?: boolean; onCancel?: () => void }) {
   const [status, setStatus] = useState<{ configured: boolean; ok?: boolean; error?: string } | null>(null)
@@ -159,8 +166,27 @@ function PushToPartnerPanel({
       // (via props) rather than the hidden local state.
       const effTitle = (compact ? defaultTitle : title).trim()
       const effDesc = (compact ? ((initialDescription ?? "").trim() || defaultDesc) : desc).trim()
+      /**
+       * PROMOTE THE LINE'S IMAGE, uploading it if it isn't already an address.
+       *
+       * Pink fetch the artwork over HTTP, so a `data:` URL — which is how marketplace
+       * artwork arrives — is not something they can be handed. Rather than telling you to
+       * re-attach a file you can already see on screen, it goes to object storage here and
+       * the resulting URL is sent as the design. Done at PUSH time, not on open, so merely
+       * looking at this dialog uploads nothing.
+       */
+      let directImage: string | undefined
+      if (!artworkUrl && lineImage) {
+        if (/^https?:\/\//i.test(lineImage)) directImage = lineImage
+        else {
+          const up = await uploadPinkAttachment({ data: lineImage, name: `${sku || "artwork"}.png` })
+          if (up.error || !up.url) { setMsg({ ok: false, text: up.error || "Couldn't upload the order's image to send as the design." }); return }
+          directImage = up.url
+        }
+      }
       const r = await pushToPink({
         orderId, sku, cardId,
+        imageUrl: directImage,
         title: effTitle || undefined,
         // The order's real quantity is still sent as context (server falls back to the line's
         // qty when absent); it just isn't an editable field, because a design is one job.
@@ -182,7 +208,10 @@ function PushToPartnerPanel({
   }
 
   const notReady = !!status && (!status.configured || status.ok === false)
-  const noArtwork = !artworkUrl && !effExtras.length
+  // What the partner will actually receive as the design, in the order the server resolves
+  // it: a stored design, else the line's own image, else the first attachment.
+  const sendableArt = artworkUrl || lineImage || null
+  const noArtwork = !sendableArt && !effExtras.length
 
   return (
     <div className={compact ? "space-y-3" : "max-h-[60vh] space-y-4 overflow-y-auto py-2"}>
@@ -198,9 +227,9 @@ function PushToPartnerPanel({
       {!compact && (
         <div className="flex gap-3">
           <div className="size-24 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
-            {artworkUrl
+            {sendableArt
               // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={artworkUrl} alt="" className="size-full object-contain" />
+              ? <img src={sendableArt} alt="" className="size-full object-contain" />
               : <div className="flex size-full items-center justify-center px-2 text-center text-2xs text-muted-foreground">No artwork on this line</div>}
           </div>
           <div className="min-w-0 flex-1 space-y-1 text-sm">
@@ -210,9 +239,11 @@ function PushToPartnerPanel({
             </div>
             {!artworkUrl && (
               <p className="text-xs text-muted-foreground">
-                {extras.length
-                  ? "No stored artwork — the image you attached below will be sent as the design."
-                  : "No stored artwork here. Attach an image under Reference files below and it'll be sent as the design."}
+                {lineImage
+                  ? "No stored design yet — the order's own image above will be uploaded and sent as the design."
+                  : extras.length
+                    ? "No stored artwork — the image you attached below will be sent as the design."
+                    : "No stored artwork here. Attach an image under Reference files below and it'll be sent as the design."}
               </p>
             )}
           </div>

@@ -316,10 +316,19 @@ export default function NewOrderPage() {
                 <ProductCombobox
                   value={l.name}
                   onText={(v) => setLine(i, { name: v })}
+                  // Picking here and picking from "Add from catalog" must land the SAME
+                  // line. This one dropped `methods`, so choosing a blank in the row set
+                  // `blank` — which switches the Method field from the standard list to the
+                  // product's own — while leaving that list empty. The result read "None on
+                  // this blank" for a product whose catalogue entry plainly says DTG, and
+                  // the identical product picked through the dialog offered it fine.
                   onPick={(p) => setLine(i, {
                     name: p.name, sku: p.sku, blank: p.name, img: p.img,
                     price: p.price ? String(p.price) : "",
                     color: p.color, size: p.sizes[0] ?? "", colors: p.colors, sizes: p.sizes,
+                    methods: p.methods ?? [],
+                    // One technique is not a choice — pre-select it, as applyPick does.
+                    method: (p.methods ?? []).length === 1 ? p.methods[0] : "",
                   })}
                   onBrowse={() => openPicker(i)}
                   placeholder="e.g. Classic Tee"
