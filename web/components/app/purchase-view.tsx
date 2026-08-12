@@ -357,25 +357,45 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   /** Pull a line OUT of the draft but keep it — the common "not this order, next one" case. */
   const saveForLater = (po: PurchaseOrder, l: POLine) => {
     removeLine(po, l.sku)
-    if (saved.some((s) => s.sku === l.sku)) return          // already parked
+    if (saved.some((s) => lineKey(s) === lineKey(l))) return   // already parked, same sku AND variant
     putSaved([...saved, { ...l, supplier: po.supplier ?? null, savedAt: new Date().toISOString() }])
   }
   /** Put a parked line back on a draft, merging the qty if the sku is already there. */
   const restore = (l: SavedPOLine) => {
     const target = drafts.find((p) => supKey(p.supplier) === supKey(l.supplier)) ?? drafts[0]
     if (!target) { setMsg({ ok: false, text: "No draft PO open — create one first, then restore into it." }); return }
-    const hit = target.items.find((x) => x.sku === l.sku)
+    const hit = target.items.find((x) => lineKey(x) === lineKey(l))
     patchPO(target, hit
-      ? target.items.map((x) => (x.sku === l.sku ? { ...x, qty: num(x.qty) + num(l.qty) } : x))
+      ? target.items.map((x) => (lineKey(x) === lineKey(l) ? { ...x, qty: num(x.qty) + num(l.qty) } : x))
       : [...target.items, { sku: l.sku, name: l.name, variant: l.variant, qty: num(l.qty) || 1, price: l.price }])
     putSaved(saved.filter((s) => s.sku !== l.sku))
   }
   /** Merge lines into an existing set, combining quantities on a repeated sku. Pure, so
    *  the "add items" path and the reorder path can't drift apart. */
+  /**
+   * WHAT MAKES TWO LINES THE SAME LINE — sku AND variant, never sku alone.
+   *
+   * Everything here used to match on sku only, and a supplier sku is frequently a STYLE
+   * ("EG-1003", "G500"), not a colour and size. So 10 White / XL and 2 Black / 2XL of the
+   * same style collapsed into a single 12-unit line wearing whichever variant happened to
+   * be first — and that line is what gets ordered. You would receive twelve of one thing
+   * and none of the other, and nothing on screen would ever have said so.
+   *
+   * The same key governs the cart, the draft merge, the reorder, and which lines a
+   * successful placement removes from the pool. Any one of them keyed on sku alone
+   * reintroduces the fault from a different direction: placing White / XL would clear
+   * Black / 2XL out of the cart unordered.
+   *
+   * Trimmed and case-folded because "Black / 2XL" and "black / 2xl" are one variant typed
+   * by two people, and treating them as two would split a line that should merge.
+   */
+  const lineKey = (l: { sku?: string | null; variant?: string | null }) =>
+    `${String(l.sku ?? "").trim().toUpperCase()}|${String(l.variant ?? "").trim().toLowerCase()}`
+
   const mergeLines = (existing: POLine[], add: POLine[]): POLine[] => {
     const next = existing.map((l) => ({ ...l }))
     for (const l of add) {
-      const hit = next.find((x) => x.sku === l.sku)
+      const hit = next.find((x) => lineKey(x) === lineKey(l))
       if (hit) hit.qty = num(hit.qty) + (num(l.qty) || 1)
       else next.push({ ...l, qty: num(l.qty) || 1 })
     }
@@ -525,11 +545,15 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   const receive = async (po: PurchaseOrder) => {
     setBusy(po.num); setMsg(null)
     try {
-      const bySku = new Map((inv ?? []).map((it) => [it.sku, it]))
+      // Stock rows are matched on sku AND variant for the same reason the PO lines are:
+      // receiving 10 White/XL and 2 Black/2XL of one style must produce TWO stock rows, or
+      // the floor is told it has 12 of whichever variant was already there — and picks the
+      // wrong garment off the shelf with the system agreeing.
+      const byKey = new Map((inv ?? []).map((it) => [lineKey(it), it]))
       const next = [...(inv ?? [])]
       for (const l of po.items) {
-        const existing = bySku.get(l.sku)
-        if (existing) { const i = next.findIndex((x) => x.sku === l.sku); next[i] = { ...existing, in_stock: num(existing.in_stock) + num(l.qty) } }
+        const existing = byKey.get(lineKey(l))
+        if (existing) { const i = next.findIndex((x) => lineKey(x) === lineKey(l)); next[i] = { ...existing, in_stock: num(existing.in_stock) + num(l.qty) } }
         else next.push({ sku: l.sku, name: l.name, variant: l.variant, in_stock: num(l.qty), reorder_at: 25, supplier: po.supplier })
       }
       await saveInventory(next)
@@ -849,7 +873,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     setBusy("place-all"); setMsg(null)
     const outcomes: { supplier: string; ok: boolean; short: string; detail?: string }[] = []
     const results: string[] = []
-    const placedSkus = new Set<string>()
+    const placedKeys = new Set<string>()
     // The Otto lines held back for a card — the SKUs themselves, not a flag. A flag can
     // only say "something was deferred"; what has to be true before re-opening the card
     // dialog is that those particular lines are still unplaced.
@@ -862,7 +886,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
           // Only lines that would ACTUALLY be ordered. A group sitting entirely at qty 0
           // places nothing, and asking for a card number to pay for nothing is how the
           // dialog kept re-appearing with no order behind it.
-          for (const l of g.lines) if (num(l.qty) > 0) deferredForCard.add(l.sku)
+          for (const l of g.lines) if (num(l.qty) > 0) deferredForCard.add(lineKey(l))
           continue
         }
         if (g.api === "otto" && ottoMissingParty) {
@@ -914,7 +938,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
           num: poNum, supplier: g.supplier ?? null, items: g.lines, status: ok ? "placed" : "draft",
           meta: { response: resp, placedAt: new Date().toISOString(), api: g.api },
         }).catch(() => {})
-        if (ok) g.lines.forEach((l) => placedSkus.add(l.sku))
+        if (ok) g.lines.forEach((l) => placedKeys.add(lineKey(l)))
         const failMsg = (resp as { error?: string }).error || "failed"
         // A card decline on an S&S order is S&S's OWN saved payment profile (Order settings ›
         // Payment) — never the card typed for Otto, which S&S never receives. Spell that out,
@@ -985,13 +1009,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       }
       // AWAITED, and before load(). See putSaved: the reload re-reads this list, so an
       // un-awaited write here can be overtaken and put the ordered lines back in the pool.
-      if (placedSkus.size) await putSaved(saved.filter((l) => !placedSkus.has(l.sku)))
+      if (placedKeys.size) await putSaved(saved.filter((l) => !placedKeys.has(lineKey(l))))
       const anyFailed = outcomes.some((o) => !o.ok)
       if (outcomes.length) {
         const done = outcomes.filter((o) => o.ok).length
         setMsg({
           ok: !anyFailed,
-          tone: anyFailed && placedSkus.size ? "warn" : undefined,
+          tone: anyFailed && placedKeys.size ? "warn" : undefined,
           // A one-line summary; the per-supplier detail is the list below it.
           text: anyFailed
             ? (done ? `${done} of ${outcomes.length} placed.` : "Nothing was placed.")
@@ -1007,7 +1031,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       // Asked line by line rather than on a flag: the dialog may only re-open for lines
       // that are STILL unplaced. Re-opening after an order that went through reads as
       // "that failed, pay again", and the honest response to that is a second Otto order.
-      if ([...deferredForCard].some((sku) => !placedSkus.has(sku))) setNeedCard(true)
+      if ([...deferredForCard].some((k) => !placedKeys.has(k))) setNeedCard(true)
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place these orders." })
     } finally { setBusy(null) }
@@ -1755,12 +1779,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         po={addTo}
         onClose={() => setAddTo(null)}
         inventory={inv ?? []}
-        // Picked items go into the POOL, merged by sku — the same merge the shortage
-        // path uses, so something both short and hand-picked doesn't appear twice.
+        // Picked items go into the POOL, merged by sku AND VARIANT — the same key the
+        // shortage path uses, so something both short and hand-picked doesn't appear twice
+        // while two colours of one style still stay two lines.
         onAdd={(lines) => {
           const next = saved.map((l) => ({ ...l }))
           for (const l of lines) {
-            const hit = next.find((x) => x.sku === l.sku)
+            const hit = next.find((x) => lineKey(x) === lineKey(l))
             if (hit) hit.qty = num(hit.qty) + (num(l.qty) || 1)
             else next.push({ ...l, qty: num(l.qty) || 1, savedAt: new Date().toISOString() })
           }
