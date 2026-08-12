@@ -1690,8 +1690,29 @@ export function OrdersHub() {
                        * Moving a stage is now one thing in one place, the ⋯ menu, where
                        * every stage is listed by name with the reason it can't be used.
                        */
+                      /**
+                       * SHIP IS NOT THE FALLBACK FOR "CAN'T START".
+                       *
+                       * This read `canStart ? "start" : canShip ? "ship" : null`, so any
+                       * order that merely FAILED the start test offered "Create new label"
+                       * as its one obvious move — including an order sitting at `new` that
+                       * nobody has made. A tiktok-* order hits this every time, because
+                       * factory_order is derived from an `etsy-%` id and isApprovable holds
+                       * seller orders at in_review, so it can neither start nor be approved
+                       * and lands on ship by elimination.
+                       *
+                       * Buying a label for unstarted work is not harmless: it spends postage
+                       * and puts a tracking number on a parcel that does not exist. The
+                       * server refuses to mark such an order SHIPPED (artwork is checked),
+                       * but nothing stops the purchase.
+                       *
+                       * So ship is offered only once the order is actually in production or
+                       * past it. Anything earlier gets no primary — the ⋯ menu still lists
+                       * every move by name, which is where an unusual one belongs.
+                       */
+                      const inProduction = ["working", "shipped"].includes(normalizeStage(stage))
                       const primary: "start" | "ship" | null =
-                        canStart ? "start" : canShip ? "ship" : null
+                        canStart ? "start" : (canShip && inProduction) ? "ship" : null
                       const busyO = busy?.startsWith(o.id)
                       return (
                         <div className="flex items-center justify-end gap-2 sm:shrink-0">
@@ -2374,7 +2395,7 @@ export function OrdersHub() {
                 open
                 onOpenChange={(v) => { if (!v) setShipOpen(null) }}
                 order={{ id: o.id, num: numOf(o), to: toAddrOf(o), items: o.items ?? [] }}
-                onCreated={() => { setShipOpen(null); reload() }}
+                onCreated={() => { setShipOpen(null); load() }}
               />
             )
           })()}
