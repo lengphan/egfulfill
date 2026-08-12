@@ -35,6 +35,38 @@ const webhookSecret = () => (process.env.PINKDESIGN_WEBHOOK_SECRET || '').trim()
 
 export function pinkEnabled() { return !!apiKey(); }
 
+/**
+ * WHAT ONE OF THEIR EVENTS MEANS FOR OUR CARD.
+ *
+ *   'fix'    they want a revision — our fix lane
+ *   'review' they delivered something — ours to check, never auto-approved
+ *   null     anything else. LEAVE THE CARD ALONE.
+ *
+ * That third answer is the point. This was `status.includes('fix') ? 'fix' : 'review'`, so
+ * every event Pink might ever send that wasn't one of those two — a deleted task, a
+ * cancellation, an assignment, a comment, a status we have no word for — moved the card
+ * into "ready for you to review". A deleted task announced itself as finished work.
+ *
+ * `gone` is the subset worth saying out loud on the card: their task no longer exists, so
+ * nothing further is coming. They have no delete API for us to call, so an event is the
+ * only way we could ever learn it — and their payload vocabulary is undocumented, which is
+ * exactly why the default is to do nothing rather than to guess.
+ *
+ * Matched on substrings because the same fact arrives spelled several ways: `task_status`
+ * ("done"), `event` ("idea.done"), and whatever a future field is called.
+ */
+const PINK_DELIVERED = ['done', 'inreview', 'in_review', 'review', 'check', 'complete', 'finish', 'deliver'];
+const PINK_GONE = ['delet', 'cancel', 'archiv', 'remove', 'void'];
+export function classifyPinkStatus(raw) {
+  const status = String(raw ?? '').toLowerCase();
+  const gone = PINK_GONE.some((w) => status.includes(w));
+  // A stop beats a delivery: "done, then deleted" is gone, not delivered.
+  if (gone) return { col: null, gone: true };
+  if (status.includes('fix')) return { col: 'fix', gone: false };
+  if (PINK_DELIVERED.some((w) => status.includes(w))) return { col: 'review', gone: false };
+  return { col: null, gone: false };
+}
+
 // Who may send work to a partner. Everyone on the factory side EXCEPT designers: it
 // spends money and gives away a job they would otherwise do themselves.
 const canOutsource = (u) => !!u && ['admin', 'warehouse', 'operator'].includes(u.role);
@@ -483,8 +515,40 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
     // that manual approval is what books the partner cost (design_cards.js on the approved
     // transition) and runs our credit flow. So ANY delivery lands in our "review" lane; only
     // a "needfix" is distinct. We book nothing here.
-    const col = status.includes('fix') ? 'fix' : 'review';
-    await q('update design_cards set col=$1, updated_at=now() where id=$2', [col, card.id]).catch(() => {});
+    //
+    // BUT ONLY ON AN EVENT THAT ACTUALLY SAYS SO.
+    //
+    // This read `status.includes('fix') ? 'fix' : 'review'`, so EVERY other event they might
+    // ever send — a task deleted, cancelled, assigned, commented on, a status we don't have a
+    // word for — moved the card into "ready for you to review". A deleted task would have
+    // announced itself as finished work, which is the most misleading thing this endpoint
+    // could say, and the only trace was a line in the container log.
+    //
+    // Their payload shape is undocumented and has surprised this integration before (every
+    // call silently no-op'd until someone noticed the real body is nested under `data`), so
+    // the safe default is to leave the card where the humans put it and say what arrived.
+    const { col, gone: isGone } = classifyPinkStatus(status);
+
+    if (col) {
+      await q('update design_cards set col=$1, updated_at=now() where id=$2', [col, card.id]).catch(() => {});
+    } else {
+      // Left where it is, and SAID on the card rather than only in the log — the board is
+      // where someone would otherwise sit waiting for work that is no longer coming.
+      // Pink has no delete API to call back, so this is the whole of what we can know.
+      console.log('[pinkdesign webhook] card', card.id, '· status', JSON.stringify(status), isGone
+        ? '· their task is GONE — card left where it is'
+        : '· unrecognised, card left where it is');
+      const note = { message: isGone
+        ? `Pink Design reports this task as "${status}" — it is no longer on their board. Nothing further will arrive; decide here what happens to the card.`
+        : `Pink Design sent an event we have no rule for: "${status}". The card was left where it is.`,
+        by: 'Pink Design', at: new Date().toISOString() };
+      await q(`update design_cards
+                 set partner_notes = coalesce(partner_notes, '[]'::jsonb) || $2::jsonb, updated_at = now()
+               where id = $1`, [card.id, JSON.stringify([note])]).catch(() => {});
+      audit(req, 'design.partner_event', { entityType: 'order', entityId: card.order_id,
+        after: { cardId: card.id, ref: refs[0], status, gone: isGone } });
+      egBroadcast('design-cards', { id: card.id });
+    }
 
     // Deliverables arrive as URLs on THEIR servers. Storing the link alone would leave
     // our production files hostage to someone else's retention policy — a link that dies
