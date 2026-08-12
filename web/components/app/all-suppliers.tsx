@@ -320,7 +320,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   // The server reads the copy already on its disk instead.
   const [importOpen, setImportOpen] = useState(false)
   /** The blank whose full detail is open. Null = closed. */
-  const [detail, setDetail] = useState<{ supplier: "ss" | "otto" | "sanmar"; styleId: string; seed: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null } } | null>(null)
+  const [detail, setDetail] = useState<{ item: Item; supplier: "ss" | "otto" | "sanmar"; styleId: string; seed: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null } } | null>(null)
 
   /**
    * The one refresh worth a button.
@@ -452,6 +452,26 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
         supplier={detail?.supplier ?? null}
         styleId={detail?.styleId ?? null}
         seed={detail?.seed}
+        added={detail ? added.has(keyOf(detail.item)) : false}
+        onAddToCatalog={detail ? () => addToCatalog(detail.item) : undefined}
+        /* Hands off to the SAME quick-order flow the tile uses, rather than writing a
+           second path into the cart. That flow is what resolves a colour and size to the
+           sku the supplier will actually accept — a cart line carrying our own guess at a
+           code is a purchase order that gets rejected. The variant chosen here rides along
+           as the preselection. */
+        onAddToCart={detail ? async (sel) => {
+          const it = detail.item
+          const base = quickOrderFor(it)
+          setDetail(null)
+          const r = it.supplier === "otto"
+            ? await loadOttoVariants(it.id)
+            : it.supplier === "sanmar"
+              ? await loadSanmarVariants(it.id)
+              : await loadSsVariants(it.id)
+          setQuickOrder(r.sizes.length
+            ? { ...base, sizes: r.sizes, preselect: { color: sel.colour, size: sel.size, qty: sel.qty } }
+            : { ...base, loadError: r.error ?? undefined })
+        } : undefined}
       />
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent>
@@ -523,6 +543,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
                   onOpenDetail={() => {
                     const c = cardData(it)
                     setDetail({
+                      item: it,
                       supplier: it.supplier,
                       styleId: String(c.id),
                       seed: { name: c.title, brand: c.brand, image: c.image,

@@ -26,6 +26,9 @@ export type QuickOrderProduct = {
   /** Why the variant lookup came back empty. Distinguishes a failed request from a
    *  product that genuinely has no sizes — they are not the same fact. */
   loadError?: string
+  /** The variant already chosen in the detail window, so it is not chosen twice. Absent
+   *  when opened from a tile, where nothing has been chosen yet. */
+  preselect?: { color?: string | null; size?: string | null; qty?: number }
 }
 
 /**
