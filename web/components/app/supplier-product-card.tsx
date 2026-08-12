@@ -118,7 +118,16 @@ export function SupplierProductCard({
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
       {/* White image bed so S&S lifestyle shots sit on the same background as Otto's
           white product shots — product photography reads as white regardless of UI theme. */}
-      <div className="relative aspect-square shrink-0 overflow-hidden bg-white">
+      {/* PORTRAIT BED, for every supplier — the fix this file's own note prescribed.
+          A square bed suits Otto (square art) and punishes SanMar, whose photos are
+          1200x1800 portrait: contain fits them to the HEIGHT and leaves a third of the
+          width white, so a cap reads small beside an S&S model shot that happens to fill
+          the frame. That unevenness is a bed-shape problem, not a per-supplier one.
+          4:5 costs Otto's squares a thin band top and bottom and gives SanMar's portraits
+          back most of that width — more even across the grid, which is the actual ask.
+          Cropping remains off the table: a catalogue tile whose job is "is this the blank
+          I want" has to show the whole product. */}
+      <div className="relative aspect-[4/5] shrink-0 overflow-hidden bg-white">
         {img ? (
           // absolute inset-0 is load-bearing. As an in-flow child, `size-full` means
           // height:100% against a parent whose height comes from aspect-ratio — an

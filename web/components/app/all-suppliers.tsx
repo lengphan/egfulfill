@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { MagnifyingGlass, UploadSimple, ArrowsClockwise, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { usePaged, Pagination } from "@/components/app/pagination"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { QuickOrderDialog, type QuickOrderProduct } from "@/components/app/quick-order-dialog"
 import { SsSyncPanel } from "@/components/app/ss-sync-panel"
 import { SupplierProductCard } from "@/components/app/supplier-product-card"
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { parseCSV } from "@/lib/order-import"
 import {
-  getSsStylesAll, getSsStyleImgs, getSsStyle, toggleSsFavorite, ssWarm, ssSync,
+  getSsStylesAll, getSsStyleImgs, getSsStyle, toggleSsFavorite, ssSync, startSsSyncAll,
   getOttoProducts, getOttoStyle, getSsStyleSkus, getCatalogFilters, toggleOttoFavorite, importOttoProducts,
   getSanmarCatalog, getSanmarCatalogStyle, toggleSanmarFavorite, syncSanmarCatalog,
   getCatalogProducts, saveCatalogProducts, colorNames,
@@ -316,15 +317,46 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   // SanMar is a SERVER-side sync, not an upload. The SDL is ~195MB — over the API's 60MB body
   // limit and far over Vercel's ~4.5MB proxy cap — so it can never travel through the browser.
   // The server reads the copy already on its disk instead.
-  const onSyncSanmar = async () => {
-    setImporting(true); setMsg(null)
+  const [importOpen, setImportOpen] = useState(false)
+
+  /**
+   * The one refresh worth a button.
+   *
+   * SanMar re-reads itself nightly from the host cron, and S&S now has its own daily pull —
+   * so the only reason left to press anything is impatience: a style you have just been told
+   * about and want in the grid NOW. That is a full S&S sync, which is what this does.
+   */
+  const onSyncAll = async () => {
+    setRefreshing(true); setMsg(null)
     try {
-      const r = await syncSanmarCatalog()
-      if (r.error) throw new Error(r.available?.length ? `${r.error} Found: ${r.available.join(", ")}` : r.error)
-      setMsg(`SanMar synced — ${(r.styles ?? 0).toLocaleString()} styles from ${(r.variantRows ?? 0).toLocaleString()} rows in ${r.seconds ?? "?"}s.`)
-      reload(debounced)
-    } catch (e) { setMsg(e instanceof Error ? e.message : "SanMar sync failed.") } finally { setImporting(false) }
+      const r = await startSsSyncAll(false)
+      setMsg(r?.already ? "A catalogue sync is already running — leave it going." : "Syncing the S&S catalogue in the background; new styles appear as they land.")
+      // SanMar's re-read is cheap and server-side, so it rides along rather than needing
+      // its own button.
+      syncSanmarCatalog().then(() => reload(debounced)).catch(() => {})
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't start the sync.") } finally { setRefreshing(false) }
   }
+
+
+  /**
+   * WHICH SUPPLIERS NEED A FILE, said once instead of implied by a button label.
+   *
+   * Only Otto does. S&S has a live catalogue API and now a nightly pull; SanMar's SDL is
+   * ~195MB and can never travel through a browser (60MB body limit, ~4.5MB proxy cap), so
+   * the server reads the copy on its own disk and a host cron refreshes it at 04:20.
+   *
+   * Naming all three — including the two with nothing to upload — is the point. "Import
+   * Otto" made a file look like Otto's quirk; the truth is that the other two refresh
+   * themselves, which is worth knowing before someone goes hunting for an export.
+   */
+  const IMPORT_SOURCES = [
+    { key: "otto", name: "Otto Cap", needsFile: true,
+      how: "Otto publish no catalogue API. Download their Product Data export (CSV or XLSX) from the Otto dealer portal and drop it here." },
+    { key: "ss", name: "S&S Activewear", needsFile: false,
+      how: "Live API — pulls itself nightly, and Refresh all styles forces it now. Nothing to upload." },
+    { key: "sanmar", name: "SanMar", needsFile: false,
+      how: "The SDL catalogue file is ~195MB, far past what a browser upload allows, so the server reads its own copy. A nightly job refreshes it at 04:20." },
+  ] as const
 
   // Filters (supplier / brand / category / price) — applied to what's loaded, like SpyDeck.
   const brandOf = (it: Item) => (it.supplier === "ss" ? it.ss.brand || "" : it.supplier === "otto" ? it.otto.brand || "Otto Cap" : it.sanmar.brand || "SanMar")
@@ -370,15 +402,20 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
         {isAdmin && (
           <>
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,text/csv" className="hidden" onChange={(e) => onImport(e.target.files?.[0])} />
-            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
-              {importing ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />} Import Otto
+            {/* ONE IMPORT, not one per supplier. Only Otto actually needs a file — they
+                publish no catalogue API, just a Product Data export — but a button labelled
+                "Import Otto" made that look like Otto's quirk rather than the rule it is.
+                The window says which suppliers need a file and which refresh themselves. */}
+            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} disabled={importing}>
+              {importing ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />} Import
             </Button>
-            <Button size="sm" variant="outline" onClick={onSyncSanmar} disabled={importing}
-                    title="Re-read the SanMar SDL catalog the server holds on disk">
-              {importing ? <CircleNotch size={14} className="animate-spin" /> : <ArrowsClockwise size={14} weight="bold" />} Sync SanMar
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => { setRefreshing(true); ssWarm().catch(() => {}).finally(() => setRefreshing(false)) }} disabled={refreshing}>
-              <ArrowsClockwise size={14} weight="bold" className={refreshing ? "animate-spin" : ""} /> Refresh
+            {/* ONE refresh. "Sync SanMar" re-read a file a host cron already re-reads at
+                04:20, and "Refresh" only warmed the S&S image cache — two buttons for work
+                that now happens on a schedule. What is left is the deliberate one: a full
+                S&S catalogue pull, which is the only sync a person has any reason to force. */}
+            <Button size="sm" variant="outline" onClick={onSyncAll} disabled={importing || refreshing}
+                    title="Force a full S&S catalogue pull now. SanMar refreshes nightly on the server; Otto is a file import.">
+              <ArrowsClockwise size={14} weight="bold" className={refreshing ? "animate-spin" : ""} /> Refresh all styles
             </Button>
           </>
         )}
@@ -387,6 +424,28 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
             border and 3rem of padding to hold one button. Progress still appears, but
             below, and only while there is progress to show. */}
         <SsSyncPanel />
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Import a supplier catalogue</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            {IMPORT_SOURCES.map((src) => (
+              <div key={src.key} className="rounded-lg border border-border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium">{src.name}</span>
+                  {src.needsFile ? (
+                    <Button size="sm" onClick={() => { setImportOpen(false); fileRef.current?.click() }} disabled={importing}>
+                      <UploadSimple size={13} weight="bold" /> Choose file
+                    </Button>
+                  ) : (
+                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-medium text-emerald-700">Automatic</span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{src.how}</p>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
 
       {/* Filters — brand / category / price, applied to what's loaded */}
