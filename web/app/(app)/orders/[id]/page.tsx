@@ -417,7 +417,14 @@ export default function OrderDetailPage() {
                           item={it}
                           designs={designs}
                           catalog={catalog}
-                          size={56}
+                          // Tall enough to run from the item name down through the variant
+                          // strip. At 56 it read as a bullet beside the text rather than as
+                          // the thing being ordered — the smallest element in its own row,
+                          // next to a two-line title, a SKU and a set of variant fields,
+                          // when it is the one thing you actually check the order against.
+                          // At 144 the composite (blank + placed artwork) is legible without
+                          // opening the preview.
+                          size={144}
                           onEdit={() => setCustomize(it)}
                         />
                         {artwork && (
