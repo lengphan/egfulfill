@@ -12,7 +12,7 @@ import { Barcode } from "@/components/app/barcode"
 import { ScanQr } from "@/components/app/scan-code"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, type InventoryItem, type ScanRow, type SkuVisibility } from "@/lib/api"
+import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, type InventoryItem, type ScanRow, type SkuVisibility } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -38,6 +38,11 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
   const [search, setSearch] = useState("")
   const [cat, setCat] = useState("")
   const [vis, setVis] = useState<"" | SkuVisibility>("")
+  /** Show only the rows no supplier catalogue still lists — the ones to review and clear. */
+  const [onlyUnavailable, setOnlyUnavailable] = useState(false)
+  /** Supplier/variant resolved per sku — see the effect below. Declared here because
+   *  the filter reads it, and the filter is computed before that effect is defined. */
+  const [meta, setMeta] = useState<Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>>({})
   const [saving, setSaving] = useState(false)
   // When the Inventory shell drives the pool (its single Our stock · Seller stock · Scan
   // nav), follow it and hide the in-view toggle; standalone, keep our own.
@@ -107,9 +112,12 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
   const filtered = useMemo(() => (items ?? []).filter((it) => {
     if (cat && it.category !== cat) return false
     if (vis && visOf(it) !== vis) return false
+    // Only rows we have ASKED about and been told nothing for. A row still resolving is
+    // unknown, not unavailable, and must not be swept into a list headed "remove these".
+    if (onlyUnavailable && !(meta[it.sku] !== undefined && !meta[it.sku]?.supplier && !it.supplier)) return false
     if (!search) return true
     return `${it.sku} ${it.name ?? ""} ${it.variant ?? ""}`.toLowerCase().includes(search.toLowerCase())
-  }), [items, cat, vis, search])
+  }), [items, cat, vis, search, onlyUnavailable, meta])
 
   const stats = useMemo(() => {
     const list = items ?? []
@@ -117,6 +125,42 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
   }, [items])
 
   const paged = usePaged(filtered, 25)
+
+  /**
+   * WHO SELLS THIS, AND CAN WE STILL GET IT.
+   *
+   * An inventory row records what we hold, not where it came from — `supplier` is free text
+   * someone may or may not have typed. So restocking meant looking the blank up again in a
+   * supplier catalogue, every time, which is the search this table should be ending.
+   *
+   * resolve-suppliers answers it from the sku (the same call that prices a PO line), and the
+   * answer doubles as an availability check: a sku that resolves to NOTHING is no longer in
+   * any catalogue we can buy from — discontinued, renamed, or from a supplier we dropped.
+   *
+   * NOT auto-deleted. A resolver that is briefly down would otherwise wipe the shelf, and
+   * stock we physically hold is real whether or not the supplier still lists it. It is
+   * flagged, and removing it stays a decision someone makes per row.
+   */
+  useEffect(() => {
+    const skus = paged.pageItems.map((i) => i.sku).filter(Boolean)
+    const missing = skus.filter((k) => meta[k] === undefined)
+    if (!missing.length) return
+    let alive = true
+    const t = setTimeout(() => {
+      resolveSuppliers(missing)
+        .then((r) => {
+          if (!alive) return
+          // Cache a key for every sku ASKED, including the ones with no answer — otherwise
+          // the effect re-fires forever on exactly the rows we most want to flag.
+          const add: Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }> = {}
+          for (const k of missing) add[k] = (r?.bySku ?? {})[k] ?? {}
+          setMeta((m) => ({ ...m, ...add }))
+        })
+        .catch(() => { /* leave them unknown — unknown is not the same as unavailable */ })
+    }, 0)
+    return () => { alive = false; clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paged.pageItems])
 
   return (
     <div className="space-y-4">
@@ -175,6 +219,13 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               {cats.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           )}
+          {/* The clean-up filter. Off by default: this table's job is what we HOLD, and a
+              blank we can no longer buy is still stock on a shelf until someone decides
+              otherwise. */}
+          <label className="flex h-9 cursor-pointer items-center gap-1.5 rounded-2xl border border-border bg-card px-3 text-sm">
+            <input type="checkbox" checked={onlyUnavailable} onChange={(e) => setOnlyUnavailable(e.target.checked)} className="size-3.5 accent-[var(--primary)]" />
+            No longer stocked
+          </label>
           <select
             value={vis}
             onChange={(e) => setVis(e.target.value as "" | SkuVisibility)}
@@ -275,7 +326,26 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 py-2"><div className="max-w-[220px] truncate font-medium">{it.name || "—"}</div>{it.variant && <div className="max-w-[220px] truncate text-xs text-muted-foreground">{it.variant}</div>}</td>
+                      <td className="px-4 py-2">
+                        <div className="max-w-[220px] truncate font-medium">{it.name || "—"}</div>
+                        {/* Variant first — it is what tells two rows of one style apart.
+                            Then who sells it: typed if someone typed it, else resolved from
+                            the supplier catalogues by sku, so the next restock does not
+                            start with a search. */}
+                        {(it.variant || meta[it.sku]?.variant) && (
+                          <div className="max-w-[220px] truncate text-xs text-muted-foreground">{it.variant || meta[it.sku]?.variant}</div>
+                        )}
+                        {(it.supplier || meta[it.sku]?.supplier) && (
+                          <div className="max-w-[220px] truncate text-2xs text-muted-foreground">{it.supplier || meta[it.sku]?.supplier}</div>
+                        )}
+                        {/* Only once we have ASKED and been told nothing — `meta[sku]` is
+                            undefined while unresolved, and an empty object once answered. */}
+                        {meta[it.sku] !== undefined && !meta[it.sku]?.supplier && !it.supplier && (
+                          <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-medium text-amber-700">
+                            Not in any supplier catalogue
+                          </div>
+                        )}
+                      </td>
                       <td className="px-2 py-2 text-center">
                         {/* How many stickers for THIS variant. Only meaningful once it's
                             ticked, so it's disabled until then. */}
