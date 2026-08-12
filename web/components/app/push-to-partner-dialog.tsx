@@ -175,20 +175,32 @@ function PushToPartnerPanel({
        * the resulting URL is sent as the design. Done at PUSH time, not on open, so merely
        * looking at this dialog uploads nothing.
        */
+      /**
+       * SENDABLE, not merely PRESENT — the distinction this got wrong.
+       *
+       * Pink fetch artwork over HTTP, so the only question that matters is whether we hold
+       * an ADDRESS. A stored design is normally base64 in order_designs, which designSrc
+       * hands back as a `data:` URL — truthy, renderable, and completely unsendable. Keying
+       * the upload off "is artworkUrl set" therefore skipped promotion exactly when a design
+       * existed, and the push failed with "no URL to send" while the preview sat there
+       * showing the artwork. Line images have the same property.
+       *
+       * So: take the best image we have, and if it is not already an address, make one.
+       * Absolute http(s) passes straight through; `data:` is uploaded as-is; a
+       * /api/order_items/:id/img reference is fetched same-origin and turned into bytes
+       * first (the order LIST serves references rather than inlining megabytes of
+       * thumbnails, and this page renders from whichever response landed first).
+       */
       let directImage: string | undefined
-      if (!artworkUrl && lineImage) {
-        if (/^https?:\/\//i.test(lineImage)) {
-          directImage = lineImage
+      const candidate = artworkUrl || lineImage
+      if (candidate) {
+        if (/^https?:\/\//i.test(candidate)) {
+          directImage = candidate
         } else {
-          // THREE SHAPES ARRIVE HERE, not two. An order fetched on its own inlines the
-          // artwork as `data:`; the order LIST swaps that for a `/api/order_items/:id/img`
-          // reference to keep the payload small (a real board measured 4.4MB of inlined
-          // thumbnails). Whichever one this page happened to render from, the partner needs
-          // bytes — so a reference is fetched same-origin first and turned into one.
-          let data = lineImage
+          let data = candidate
           if (!/^data:/i.test(data)) {
             try {
-              const blob = await (await fetch(lineImage, { credentials: "include" })).blob()
+              const blob = await (await fetch(candidate, { credentials: "include" })).blob()
               data = await new Promise<string>((res, rej) => {
                 const fr = new FileReader()
                 fr.onload = () => res(String(fr.result || ""))
@@ -196,12 +208,12 @@ function PushToPartnerPanel({
                 fr.readAsDataURL(blob)
               })
             } catch {
-              setMsg({ ok: false, text: "Couldn't read the order's image to send as the design. Attach it below instead." })
+              setMsg({ ok: false, text: "Couldn't read this line's image to send as the design. Attach it below instead." })
               return
             }
           }
           const up = await uploadPinkAttachment({ data, name: `${sku || "artwork"}.png` })
-          if (up.error || !up.url) { setMsg({ ok: false, text: up.error || "Couldn't upload the order's image to send as the design." }); return }
+          if (up.error || !up.url) { setMsg({ ok: false, text: up.error || "Couldn't upload the artwork to send as the design." }); return }
           directImage = up.url
         }
       }
@@ -261,7 +273,7 @@ function PushToPartnerPanel({
             {!artworkUrl && (
               <p className="text-xs text-muted-foreground">
                 {lineImage
-                  ? "No stored design yet — the order's own image above will be uploaded and sent as the design."
+                  ? "The image above will be uploaded and sent as the design."
                   : extras.length
                     ? "No stored artwork — the image you attached below will be sent as the design."
                     : "No stored artwork here. Attach an image under Reference files below and it'll be sent as the design."}
