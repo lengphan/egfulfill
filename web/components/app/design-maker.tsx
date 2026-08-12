@@ -2,14 +2,16 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack } from "@phosphor-icons/react"
+import { Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack, MagnifyingGlass, Eraser } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } from "@/components/app/design-canvas"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
+import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, type CatalogProduct, type SellerImage, type OrderUpload } from "@/lib/api"
 import { canvasReadableSrc } from "@/lib/thread-match"
+import { removeBackground } from "@/lib/remove-background"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
 import { mockupFaces, setTypeMockups, typeMockupOf, typeSidesOf } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
@@ -72,19 +74,29 @@ const rid = () => "t" + Math.random().toString(36).slice(2, 8)
 // order it came from, and your own uploads carry a remove control. `src` is the DISPLAY
 // url (Etsy blocks hotlinking, so buyer art must come through the proxy); `url` is the raw
 // value handed to onPlace. R2 uploads pass raw — the proxy only allows etsystatic.
-function ImageThumb({ url, src, name, badge, onPlace, onDelete }: {
-  url: string; src?: string; name?: string; badge?: string; onPlace: () => void; onDelete?: () => void
+//
+// The order number used to sit in a black chip ON the thumbnail. At 60px wide that chip
+// covered the part of the picture you were trying to recognise, so every buyer upload
+// looked like a black bar with some art around it. It is a CAPTION now, under the image,
+// where it labels the thumbnail instead of hiding it — and the full-size view with the
+// order number is a click away in the browse dialog.
+function ImageThumb({ url, src, name, badge, title, onPlace, onDelete }: {
+  url: string; src?: string; name?: string; badge?: string; title?: string; onPlace: () => void; onDelete?: () => void
 }) {
   return (
     <div className="group/thumb relative">
       <button
-        type="button" onClick={onPlace} title={name || "Place on the design"}
-        className="block aspect-square w-full overflow-hidden rounded-md border border-border bg-muted transition-colors hover:border-primary/50"
+        type="button" onClick={onPlace} title={title || [badge, name].filter(Boolean).join(" · ") || "Place on the design"}
+        className="block w-full overflow-hidden rounded-md border border-border bg-muted transition-colors hover:border-primary/50"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src ?? url} alt={name || ""} className="size-full object-cover" />
+        <img src={src ?? url} alt={name || ""} className="aspect-square w-full object-cover" />
+        {badge && (
+          <span className="block truncate border-t border-border bg-card px-1 py-0.5 text-3xs font-medium text-muted-foreground">
+            {badge}
+          </span>
+        )}
       </button>
-      {badge && <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1 text-3xs font-medium text-white">{badge}</span>}
       {onDelete && (
         <button
           type="button" onClick={onDelete} title="Remove from your library"
@@ -95,6 +107,34 @@ function ImageThumb({ url, src, name, badge, onPlace, onDelete }: {
       )}
     </div>
   )
+}
+
+/**
+ * How many images each source shows in the rail before it defers to Browse.
+ *
+ * SIX — two rows of three. The rail is one column of a three-column workspace; it is a
+ * shortcut to the few you just used, not a file manager. It was rendering all 300 buyer
+ * uploads, which pushed Text and Layers so far down the panel that people did not know
+ * they were there.
+ */
+const RAIL_LIMIT = 6
+
+/**
+ * The order reference, shortened for a 60px caption.
+ *
+ * A marketplace ref is `etsy-4142313274`, and the rail has room for about ten characters —
+ * so the full value truncates to "etsy-4142…" on EVERY tile, which is a label that tells you
+ * nothing and looks like a bug. The channel prefix is the part they all share, so it is the
+ * part to drop: "4142313274" is what distinguishes one from the next. Manual orders (`FF-…`)
+ * and `#123` sequence numbers have no prefix and pass through untouched.
+ *
+ * The full value still rides on the tile's tooltip and shows in the browse dialog, which has
+ * the width for it.
+ */
+const shortRef = (ref?: string) => {
+  if (!ref) return ref
+  const m = /^(etsy|shopify|tiktok|amazon)-(.+)$/i.exec(ref)
+  return m ? m[2] : ref
 }
 
 export function DesignMaker() {
@@ -140,6 +180,14 @@ export function DesignMaker() {
   const [name, setName] = useState("")
   const [pickerOpen, setPickerOpen] = useState(false)
   const [libOpen, setLibOpen] = useState(false)
+  // Which image source the browse dialog is showing, or null when it's closed. One piece of
+  // state rather than two booleans: they are the same dialog and can never both be open.
+  const [browse, setBrowse] = useState<null | "uploads" | "orders">(null)
+  // Background removal runs on the main thread over every pixel, so the button has to say
+  // it is working; `bgMsg` carries the refusal when the image can't be separated.
+  const [bgBusy, setBgBusy] = useState(false)
+  const [bgMsg, setBgMsg] = useState("")
+  const [bgTol, setBgTol] = useState(12)
   // Only the failure needs state now: publishing navigates away, so there is nothing
   // "open" to track — but a draft too large to stash has to be said, not swallowed.
   const [pubErr, setPubErr] = useState("")
@@ -245,6 +293,38 @@ export function DesignMaker() {
   const removeText = (id: string) => { setTexts((prev) => prev.filter((t) => t.id !== id)); setSelected(null) }
   const selText = texts.find((t) => t.id === selected)
 
+  /**
+   * Strip a flat backdrop off the placed artwork. No model, no API, no per-image cost —
+   * a colour flood inward from the edges (see lib/remove-background.ts).
+   *
+   * It rewrites designUrl with a data: URL, which also fixes the export path: the result is
+   * same-origin, so composing and publishing keep working on art that arrived from a
+   * marketplace. The ORIGINAL is not touched — the library row and the order still hold it,
+   * so this is undoable by placing the image again.
+   */
+  const stripBackground = async () => {
+    if (!designUrl) return
+    setBgBusy(true); setBgMsg("")
+    try {
+      const r = await removeBackground(designUrl, bgTol)
+      if ("error" in r) { setBgMsg(r.error); return }
+      setDesignUrl(r.url)
+      setBgMsg("")
+    } finally {
+      setBgBusy(false)
+    }
+  }
+  const clearArtwork = () => { setDesignUrl(""); setBgMsg(""); setSelected(null) }
+
+  // What the browse dialog shows. Buyer art needs the proxy to DISPLAY (Etsy blocks
+  // hotlinking) but the raw url to PLACE — same split the rail thumbnails make.
+  const browseItems: ArtItem[] =
+    browse === "uploads"
+      ? sellerImages.map((im) => ({ url: im.url, name: im.name }))
+      : browse === "orders"
+        ? orderUploads.map((im) => ({ url: im.url, src: canvasReadableSrc(im.url), name: im.name, badge: im.orderRef }))
+        : []
+
   const saveAsTemplate = async () => {
     if (!designUrl && texts.length === 0) { setMsg({ tone: "err", text: "Add artwork or text first." }); return }
     setSaving(true); setMsg(null)
@@ -322,27 +402,42 @@ export function DesignMaker() {
               <>
                 {sellerImages.length > 0 && (
                   <>
-                    <div className="text-3xs font-medium text-muted-foreground">Your uploads</div>
+                    <div className="flex items-baseline justify-between">
+                      <div className="text-3xs font-medium text-muted-foreground">Your uploads</div>
+                      {sellerImages.length > RAIL_LIMIT && (
+                        <button type="button" onClick={() => setBrowse("uploads")} className="text-3xs font-medium text-primary hover:underline">
+                          All {sellerImages.length}
+                        </button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-3 gap-1.5">
-                      {sellerImages.map((im) => <ImageThumb key={im.id} url={im.url} name={im.name} onPlace={() => placeImage(im.url)} onDelete={() => removeImage(im.id)} />)}
+                      {sellerImages.slice(0, RAIL_LIMIT).map((im) => <ImageThumb key={im.id} url={im.url} name={im.name} onPlace={() => placeImage(im.url)} onDelete={() => removeImage(im.id)} />)}
                     </div>
                   </>
                 )}
                 {orderUploads.length > 0 && (
                   <>
-                    <div className="mt-1 text-3xs font-medium text-muted-foreground">From your orders</div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {orderUploads.map((im, i) => <ImageThumb key={im.url + i} url={im.url} src={canvasReadableSrc(im.url)} name={im.name} badge={im.orderRef} onPlace={() => placeImage(im.url)} />)}
+                    <div className="mt-1 flex items-baseline justify-between">
+                      <div className="text-3xs font-medium text-muted-foreground">From your orders</div>
+                      {orderUploads.length > RAIL_LIMIT && (
+                        <button type="button" onClick={() => setBrowse("orders")} className="text-3xs font-medium text-primary hover:underline">
+                          All {orderUploads.length}
+                        </button>
+                      )}
                     </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {orderUploads.slice(0, RAIL_LIMIT).map((im, i) => <ImageThumb key={im.url + i} url={im.url} src={canvasReadableSrc(im.url)} name={im.name} badge={shortRef(im.orderRef)} title={[im.orderRef, im.name].filter(Boolean).join(" · ")} onPlace={() => placeImage(im.url)} />)}
+                    </div>
+                    {orderUploads.length > RAIL_LIMIT && (
+                      <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setBrowse("orders")}>
+                        <MagnifyingGlass size={15} weight="bold" /> Browse order art
+                      </Button>
+                    )}
                   </>
                 )}
               </>
             )}
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setLibOpen(true)}><FolderOpen size={15} weight="bold" /> Saved designs</Button>
-          </div>
-          <div className="space-y-1.5">
-            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Text</div>
-            <Button variant="outline" size="sm" className="w-full justify-start" onClick={addText}><TextT size={15} weight="bold" /> Add text</Button>
           </div>
           <div className="space-y-1.5">
             <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Layers</div>
@@ -411,8 +506,19 @@ export function DesignMaker() {
 
         {/* Right: properties + actions */}
         <aside className="hidden w-72 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-4 lg:flex">
+          {/* ADD, at the top of the panel you are already looking at.
+              "Add text" used to sit in the left rail below the image grids, so once a seller
+              had a few hundred buyer uploads it was several screens down and read as missing.
+              Adding and editing a layer are one job; they belong on one side. */}
+          <div className="space-y-1.5">
+            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Add</div>
+            <Button variant="outline" size="sm" className="w-full justify-start" onClick={addText}>
+              <TextT size={15} weight="bold" /> Add text
+            </Button>
+          </div>
+
           {selText ? (
-            <div className="space-y-3">
+            <div className="space-y-3 border-t border-border pt-3">
               <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Text</div>
               <Input value={selText.text} onChange={(e) => updateText(selText.id, { text: e.target.value })} placeholder="Your text" />
               <label className="flex items-center justify-between gap-2 text-sm">
@@ -429,8 +535,32 @@ export function DesignMaker() {
               </div>
               <Button variant="outline" size="sm" onClick={() => removeText(selText.id)} className="text-red-600 hover:text-red-700"><Trash size={14} weight="bold" /> Delete text</Button>
             </div>
+          ) : designUrl ? (
+            <div className="space-y-3 border-t border-border pt-3">
+              <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Artwork</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={designUrl} alt="" className="eg-checker h-24 w-full rounded-md border border-border object-contain" />
+              <div className="space-y-1.5">
+                <label className="flex items-center justify-between gap-2 text-sm">
+                  <span className="text-muted-foreground">Tolerance</span>
+                  <input type="range" min={4} max={40} value={bgTol} onChange={(e) => { setBgTol(Number(e.target.value)); setBgMsg("") }} className="flex-1" aria-label="Background removal tolerance" />
+                  <span className="w-6 text-right text-xs tabular-nums text-muted-foreground">{bgTol}</span>
+                </label>
+                <Button variant="outline" size="sm" className="w-full justify-start" onClick={stripBackground} disabled={bgBusy}>
+                  {bgBusy ? <CircleNotch size={15} className="animate-spin" /> : <Eraser size={15} weight="bold" />}
+                  {bgBusy ? "Working…" : "Remove background"}
+                </Button>
+                {/* Said out loud, because "nothing happened" and "this image has no flat
+                    backdrop to remove" look identical otherwise. */}
+                {bgMsg && <p className="text-2xs text-muted-foreground">{bgMsg}</p>}
+                <p className="text-2xs text-muted-foreground">
+                  Clears the backdrop connected to the edges — no AI, nothing leaves your browser. Place the image again to undo.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={clearArtwork} className="text-red-600 hover:text-red-700"><Trash size={14} weight="bold" /> Remove artwork</Button>
+            </div>
           ) : (
-            <div className="text-sm text-muted-foreground">Select a layer to edit it, or add artwork/text from the left.</div>
+            <div className="border-t border-border pt-3 text-sm text-muted-foreground">Place artwork from the left, or add text above, then select a layer to edit it.</div>
           )}
 
           <div className="mt-auto space-y-2 border-t border-border pt-3">
@@ -479,6 +609,16 @@ export function DesignMaker() {
           setSide("front")
         }} />
       <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }} />
+      {/* One dialog for both sources — the rail decides which list it is showing. */}
+      <ArtPickerDialog
+        open={browse !== null}
+        onOpenChange={(v) => { if (!v) setBrowse(null) }}
+        title={browse === "uploads" ? "Your uploads" : "Artwork from your orders"}
+        items={browseItems}
+        onPick={placeImage}
+        emptyText={browse === "uploads" ? "You haven't uploaded anything yet." : "No buyer artwork has come in from your orders yet."}
+        searchPlaceholder={browse === "uploads" ? "Search your uploads…" : "Search by order number or item…"}
+      />
     </div>
   )
 }

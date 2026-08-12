@@ -490,6 +490,20 @@
     linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
 }
 
+/* Transparency checker, behind the artwork preview in the Design Maker's right panel.
+   Background removal is only legible against one: on a plain card, "the backdrop is gone"
+   and "the backdrop is white" render identically, so the tool would look broken every time
+   it worked on white. Kept mid-grey in both themes — a checker that inverts with the theme
+   reads as part of the artwork. */
+.eg-checker {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, rgba(0, 0, 0, 0.09) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.09) 75%),
+    linear-gradient(45deg, rgba(0, 0, 0, 0.09) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.09) 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 7px 7px;
+}
+
 /* Scroller for panels that scroll inside the layout (the left nav above all).
    HIDDEN AT REST, revealed on hover. The platform default is a wide, high-contrast bar; on a
    coloured sidebar it reads as a border someone drew by accident, and it is permanent for a
