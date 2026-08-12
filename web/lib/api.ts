@@ -1808,7 +1808,9 @@ export function getOrderDesigns(id: string) {
 /** Attach artwork to a LINE. Pass `line_id` — without it the design keys on sku alone
  *  and two lines of the same sku overwrite each other. */
 export function postOrderDesign(id: string, body: { sku: string; line_id?: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null }) {
-  return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/designs`, {
+  /** `design_no`/`design_id` come back from the save: the number minted for these exact
+   *  bytes, or the existing one if this artwork has been seen before (server/design-id.js). */
+  return api<{ ok?: boolean; error?: string; design_no?: number | null; design_id?: string | null }>(`/api/orders/${encodeURIComponent(id)}/designs`, {
     method: "POST",
     body: JSON.stringify(body),
   })

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, DownloadSimple, ArrowsOutCardinal, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, ArrowsOutCardinal, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, PaperPlaneTilt } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -729,6 +729,30 @@ export function DesignCanvasDialog({
   /** Already with an outside partner. `vendor` is only ever set by a successful push, so
    *  this is the fact that a task exists on their board — not a guess from the lane. */
   const sentToPartner = !!boardCard?.vendor
+  /**
+   * THE ARTWORK THE PARTNER ACTUALLY HAS.
+   *
+   * Captured when the dialog opens, then compared against what's on screen. Replacing the
+   * image left step 2 sitting there green and saying "Sent to Pink Design" — for a file
+   * they were never given. A finished tick over stale artwork is the worst kind of wrong:
+   * it reads as "handled", so nobody re-sends, and the partner returns a digitised version
+   * of the picture you replaced.
+   *
+   * State with a once-evaluated initialiser, not a ref: it holds the value as of open
+   * without being read during render, which the refs lint rule forbids — and rightly, a
+   * ref read while rendering is a value React can't promise is current.
+   */
+  /**
+   * THE DESIGN'S OWN NUMBER — DSN-1042.
+   *
+   * Seeded from the line (the order list carries it) and refreshed from whatever a save
+   * hands back, because a replaced image is different artwork and therefore a different
+   * number. Shown so a design can be referred to at all: most carry no name, and "the
+   * octopus one" is not something you can type into a search box.
+   */
+  const [designNo, setDesignNo] = useState<number | null>(item.design_no ?? null)
+  const [artAtOpen] = useState<string>(initialDesign ?? "")
+  const artworkChangedSinceSend = sentToPartner && designUrl !== artAtOpen
   /** The partner send, for print methods. A dialog rather than an inline form because it
    *  asks for Pink's own fields (product type, design type, board) that mean nothing here. */
   const [pinkOpen, setPinkOpen] = useState(false)
@@ -799,6 +823,16 @@ export function DesignCanvasDialog({
     return () => clearTimeout(t)
   }, [open, orderId, item.sku, item.line_id])
   const hasMachineFile = hasFile || !!attached
+  /**
+   * SENT IS NOT DONE, AND NOT NOTHING.
+   *
+   * The embroidery step had two looks — a dashed "2" and a green tick — so a line already
+   * WITH a designer rendered identically to one nobody had touched: same grey, same
+   * numbered bullet, only a subtitle to tell them apart. There was no sign it had been
+   * sent, which is how a second one gets sent.
+   */
+  const sentToDesigner = !!boardCard && !hasMachineFile
+
 
   const [tier, setTier] = useState<DesignTier | null>((item.design_tier as DesignTier | null) ?? null)
   const [tierBusy, setTierBusy] = useState<DesignTier | null>(null)
@@ -976,6 +1010,10 @@ export function DesignCanvasDialog({
       const phash = await perceptualHash(designUrl).catch(() => null)
       const r = await postOrderDesign(orderId, { sku: item.sku ?? "", line_id: item.line_id, data: designUrl, name: item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
       if (r.error) throw new Error(r.error)
+      // The number the save minted (or reused, if these exact bytes have been seen before).
+      // Replacing the image is different artwork and therefore a different number, so this
+      // has to follow every save rather than being read once on open.
+      if (r.design_no != null) setDesignNo(r.design_no)
       // Persist the matched threads alongside the design so the factory loads the right
       // cones. Best-effort — a design still saves even if the thread write hiccups. Keyed by
       // sku, so skip when the line has none yet (it can be re-matched after variant setup).
@@ -1316,16 +1354,24 @@ export function DesignCanvasDialog({
               with no dead band, where a short wide row left one. */}
           <div className="flex flex-col gap-2">
             {/* 1 — Design image */}
-            <div className={cn("rounded-lg border p-2.5", designUrl ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20" : "border-dashed border-border bg-muted/20")}>
+            {/* ONE GREEN. This step hand-picked emerald-300/50 while step 2 below used the
+                success token, so two adjacent "done" states were two different colours — and
+                emerald is separately spoken for as the SHIPPED status. Both use success. */}
+            <div className={cn("rounded-lg border p-2.5", designUrl ? "border-success/40 bg-success/5" : "border-dashed border-border bg-muted/20")}>
               <div className="flex items-start gap-2">
-                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold", designUrl ? "bg-emerald-600 text-white" : "border border-border bg-background text-muted-foreground")}>
+                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold", designUrl ? "bg-success text-white" : "border border-border bg-background text-muted-foreground")}>
                   {designUrl ? <Check size={12} weight="bold" /> : "1"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">Your design</div>
                   {/* Plain words, seller's point of view. "The artwork we print / embroider"
                       described OUR job; a seller is deciding what goes on the product. */}
-                  <div className="text-2xs text-muted-foreground">{designUrl ? "Added — drag it on the preview to move it" : "The picture that goes on the product"}</div>
+                  <div className="text-2xs text-muted-foreground">
+                    {designUrl ? "Added — drag it on the preview to move it" : "The picture that goes on the product"}
+                    {designUrl && designNo != null && (
+                      <> · <span className="font-mono font-medium text-foreground">DSN-{designNo}</span></>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1360,11 +1406,22 @@ export function DesignCanvasDialog({
                 On a DTG line none of it applies — the image in step 1 IS the print file —
                 and showing it sent print artwork to an embroidery designer. Same rule as the
                 thread module above, from the same place, so the two can't drift. */}
+            {/* One green, from the success token — this step hand-picked emerald while the
+                partner step beside it used success, so two "done" states were two colours.
+                The middle state is the brand tone, not green: it is under way, not finished. */}
             {isEmb && (
-            <div className={cn("rounded-lg border p-2.5", hasMachineFile ? "border-emerald-300 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20" : "border-dashed border-border bg-muted/20")}>
+            <div className={cn("rounded-lg border p-2.5",
+              hasMachineFile ? "border-success/40 bg-success/5"
+              : sentToDesigner ? "border-primary/40 bg-primary/5"
+              : "border-dashed border-border bg-muted/20")}>
               <div className="flex items-start gap-2">
-                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold", hasMachineFile ? "bg-emerald-600 text-white" : "border border-border bg-background text-muted-foreground")}>
-                  {hasMachineFile ? <Check size={12} weight="bold" /> : "2"}
+                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold",
+                  hasMachineFile ? "bg-success text-white"
+                  : sentToDesigner ? "bg-primary text-primary-foreground"
+                  : "border border-border bg-background text-muted-foreground")}>
+                  {hasMachineFile ? <Check size={12} weight="bold" />
+                    : sentToDesigner ? <PaperPlaneTilt size={11} weight="fill" />
+                    : "2"}
                 </span>
                 <div className="min-w-0 flex-1">
                   {/* "Machine file" is our word for it. Every format this step accepts is an
@@ -1386,9 +1443,12 @@ export function DesignCanvasDialog({
                   <div className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || undefined}>
                     {hasMachineFile
                       ? (latestMachine ? `${latestMachine.name} — ready to stitch` : "Added — ready to stitch")
+                      // The word SENT, first, because that is the fact someone is looking
+                      // for — "With a designer · Incoming" describes where it sits and never
+                      // says it left.
                       : boardCard ? (isStaff
-                          ? `With a designer · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
-                          : "Our design team is preparing it")
+                          ? `Sent to a designer · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
+                          : "Sent — our design team is preparing it")
                       : designUrl ? "We make this for you — or attach your own"
                       : "Only if you already have one (.emb, .pes, .dst…)"}
                   </div>
@@ -1481,24 +1541,31 @@ export function DesignCanvasDialog({
                 Staff only, like its embroidery counterpart: opening a partner task spends
                 money, and the person being charged must not be the one who spends it. */}
             {!isEmb && isStaff && (
-              <div className={"rounded-lg border p-2.5 " + (sentToPartner
-                ? "border-success/40 bg-success/5"
-                : "border-dashed border-border bg-muted/20")}>
+              <div className={"rounded-lg border p-2.5 " + (artworkChangedSinceSend
+                ? "border-amber-300 bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-950/20"
+                : sentToPartner
+                  ? "border-success/40 bg-success/5"
+                  : "border-dashed border-border bg-muted/20")}>
                 <div className="flex items-start gap-2">
                   {/* SENT LOOKS LIKE DONE, the same way step 1 does. This step reported "On
                       the board · In progress" whether or not it had actually gone to the
                       partner, and still offered the send button underneath — so a card
                       already with Pink was one click from a SECOND task and a second charge,
                       with nothing on screen to say the first had worked. */}
-                  {sentToPartner ? (
+                  {artworkChangedSinceSend ? (
+                    // NOT a tick. The step is no longer done: they hold the old file.
+                    <Warning size={20} weight="fill" className="mt-0.5 shrink-0 text-amber-600" />
+                  ) : sentToPartner ? (
                     <CheckCircle size={20} weight="fill" className="mt-0.5 shrink-0 text-success" />
                   ) : (
                     <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-background text-2xs font-bold text-muted-foreground">2</span>
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium">Print artwork</div>
-                    <div className="truncate text-2xs text-muted-foreground">
-                      {sentToPartner
+                    <div className={"text-2xs " + (artworkChangedSinceSend ? "text-amber-700 dark:text-amber-500" : "truncate text-muted-foreground")}>
+                      {artworkChangedSinceSend
+                        ? `You replaced the image — Pink Design still has the old one${boardCard?.vendor_ref ? ` (ref ${boardCard.vendor_ref})` : ""}. Send it again or tell them, or they'll digitise the wrong artwork.`
+                        : sentToPartner
                         ? `Sent to Pink Design${boardCard?.vendor_ref ? ` · ref ${boardCard.vendor_ref}` : ""}${boardCard?.lane_label || boardCard?.col ? ` · ${boardCard.lane_label || boardCard.col}` : ""}`
                         : boardCard
                           ? `On the board · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
@@ -1506,9 +1573,11 @@ export function DesignCanvasDialog({
                     </div>
                   </div>
                 </div>
-                {/* No button once it has gone. Re-sending is not an undo — it opens a second
-                    task on their board that nobody asked for. */}
-                {!sentToPartner && (
+                {/* No button once it has gone — re-sending is not an undo, it opens a second
+                    task nobody asked for. UNLESS the artwork has changed since: then they
+                    hold a file that is no longer the job, and sending again is the only way
+                    to fix it. Labelled so it's clear that's what it does. */}
+                {(!sentToPartner || artworkChangedSinceSend) && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <Button
                       size="sm"
@@ -1516,7 +1585,7 @@ export function DesignCanvasDialog({
                       title={designUrl ? undefined : "Add an image first — the partner needs something to work from"}
                       onClick={() => setPinkOpen(true)}
                     >
-                      Send to Pink Design
+                      {artworkChangedSinceSend ? "Send the new artwork" : "Send to Pink Design"}
                     </Button>
                   </div>
                 )}

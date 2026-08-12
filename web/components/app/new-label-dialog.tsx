@@ -43,6 +43,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
   const [pkg, setPkg] = useState({ lb: 0, oz: 6, length: DEFAULT_SIZE.length, width: DEFAULT_SIZE.width, height: DEFAULT_SIZE.height })
   // Stock sizes plus anything this person saved. Read after mount, because localStorage
   // doesn't exist during the server render and a mismatch there is a hydration error.
+  /** "Custom size…" is a MODE, not a size: it keeps the boxes open even if the numbers
+   *  land back on a stock size, so choosing it doesn't snap the label to a mailer. */
+  const [customSize, setCustomSize] = useState(false)
   const [sizes, setSizes] = useState<ParcelSize[]>(STOCK_SIZES)
   useEffect(() => {
     const t = setTimeout(() => setSizes([...STOCK_SIZES, ...customSizes()]), 0)
@@ -202,7 +205,10 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset() }}>
-      <DialogContent className="max-w-lg">
+      {/* Two columns: what you are sending on the left, what it costs on the right.
+          One column meant the rates — the thing you came to choose — sat below the fold
+          under the parcel fields, so buying a label always began with a scroll. */}
+      <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>{order ? `New label · ${order.num || order.id}` : "New label"}</DialogTitle></DialogHeader>
 
         {result ? (
@@ -223,7 +229,8 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
           </div>
         ) : (
           <>
-            <div className="space-y-3 py-1">
+            <div className="grid gap-x-5 gap-y-3 py-1 md:grid-cols-2">
+              <div className="space-y-3 md:col-span-1">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
               {/* Live validation status sits INSIDE the box, bottom-right; extra bottom padding
                   keeps the last address line clear of it. */}
@@ -248,57 +255,67 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               <p className="text-3xs text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
 
               <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Parcel</div>
+
+              {/* THE PACKAGE FIRST. It is the choice that fills three of the five numbers
+                  below, so asking for it last meant typing dimensions and then overwriting
+                  them. Same control and same "Custom size…" escape hatch as the rate
+                  calculator, so the two screens ask the question identically. */}
+              <label className="flex flex-col gap-1">
+                <span className="text-2xs text-muted-foreground">Package</span>
+                <select
+                  value={customSize ? "custom" : (sizes.find((z) => sizeKey(z) === sizeKey(pkg)) ? sizeKey(pkg) : "custom")}
+                  onChange={(e) => {
+                    const hit = sizes.find((z) => sizeKey(z) === e.target.value)
+                    if (!hit) { setCustomSize(true); return }
+                    setCustomSize(false)
+                    setPkg({ ...pkg, length: hit.length, width: hit.width, height: hit.height })
+                    invalidateRates()
+                  }}
+                  className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
+                >
+                  {sizes.map((z) => (
+                    <option key={sizeKey(z)} value={sizeKey(z)}>{z.label || sizeLabel(z)}</option>
+                  ))}
+                  <option value="custom">Custom size…</option>
+                </select>
+              </label>
+
+              {/* Weight always — it is the one thing no package can tell us. */}
               <div className="flex flex-wrap items-end gap-2">
-                <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">Weight lb</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => { setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
-                <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">oz</span><Input type="number" min={0} value={pkg.oz} onChange={(e) => { setPkg({ ...pkg, oz: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
-                <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">L in</span><Input type="number" min={1} value={pkg.length} onChange={(e) => { setPkg({ ...pkg, length: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
-                <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => { setPkg({ ...pkg, width: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
-                <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => { setPkg({ ...pkg, height: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
+                <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground">Weight lb</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => { setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
+                <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground">oz</span><Input type="number" min={0} value={pkg.oz} onChange={(e) => { setPkg({ ...pkg, oz: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
+                {/* The mailer's own size, stated rather than sitting in three boxes nobody
+                    needs to touch — five cramped inputs in a row was the "weird" part. */}
+                {!customSize && sizes.some((z) => sizeKey(z) === sizeKey(pkg)) && (
+                  <span className="pb-2 text-2xs text-muted-foreground">{pkg.length} × {pkg.width} × {pkg.height} in</span>
+                )}
               </div>
 
-              {/* THE MAILERS ACTUALLY ON THE SHELF, instead of a dim-weight lecture.
-                  The fields used to open on 10 × 8 × 1 — a size nobody stocks — so the hint
-                  underneath spent its life objecting to a placeholder, and every label began
-                  with the same three corrections. Picking the box you reached for is one
-                  click; the boxes above stay open for the exception. */}
-              {/* Where the numbers came from. A figure the machine derived and one someone
-                  typed must be tellable apart — that is what decides whether it's worth
-                  re-weighing the parcel before buying. */}
+              {(customSize || !sizes.some((z) => sizeKey(z) === sizeKey(pkg))) && (
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">L in</span><Input type="number" min={1} value={pkg.length} onChange={(e) => { setPkg({ ...pkg, length: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
+                  <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => { setPkg({ ...pkg, width: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
+                  <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => { setPkg({ ...pkg, height: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
+                  {/* Only offered when the dimensions are genuinely new — a button that saves
+                      a size you already have does nothing and says nothing. */}
+                  {!sizes.some((z) => sizeKey(z) === sizeKey(pkg)) && pkg.length > 0 && pkg.width > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSizes([...STOCK_SIZES, ...addCustomSize({ label: "", length: pkg.length, width: pkg.width, height: pkg.height })])}
+                      className="pb-2 text-xs font-medium text-primary hover:underline"
+                    >
+                      Save {sizeLabel(pkg)} as a size
+                    </button>
+                  )}
+                </div>
+              )}
+
               {basis && (
                 <p className="flex items-start gap-1.5 text-2xs text-muted-foreground">
                   <Package size={12} weight="fill" className="mt-0.5 shrink-0" />
                   {basis}
                 </p>
               )}
-
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={sizes.some((s) => sizeKey(s) === sizeKey(pkg)) ? sizeKey(pkg) : "custom"}
-                  onChange={(e) => {
-                    const hit = sizes.find((s) => sizeKey(s) === e.target.value)
-                    if (!hit) return   // "Custom" isn't a size — it just means the boxes are yours
-                    setPkg({ ...pkg, length: hit.length, width: hit.width, height: hit.height })
-                    invalidateRates()
-                  }}
-                  className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
-                >
-                  {sizes.map((s) => (
-                    <option key={sizeKey(s)} value={sizeKey(s)}>{s.label || sizeLabel(s)}</option>
-                  ))}
-                  <option value="custom">Custom size…</option>
-                </select>
-                {/* Only offered when the dimensions are genuinely new — a button that saves a
-                    size you already have is a button that does nothing and says nothing. */}
-                {!sizes.some((s) => sizeKey(s) === sizeKey(pkg)) && pkg.length > 0 && pkg.width > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setSizes([...STOCK_SIZES, ...addCustomSize({ label: "", length: pkg.length, width: pkg.width, height: pkg.height })])}
-                    className="text-xs font-medium text-primary hover:underline"
-                  >
-                    Save {sizeLabel(pkg)} as a size
-                  </button>
-                )}
-              </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -311,7 +328,14 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 </label>
               </div>
 
-              {/* Multi-carrier rates — quote across the enabled carriers, pick one to buy. */}
+              </div>{/* /left column */}
+
+              {/* ── RATES, beside the form rather than under it ─────────────────
+                  This is what the window is for; it was the one thing you had to scroll
+                  to reach. Its own column, its own scroll, so a long list of services
+                  never pushes the Buy button off screen. */}
+              <div className="space-y-3 md:col-span-1">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rates</div>
               <Button variant="outline" className="w-full" onClick={getRates} disabled={ratesLoading || !addrComplete(to) || !addrComplete(from)}>
                 {ratesLoading ? <><CircleNotch size={14} className="animate-spin" /> Getting rates…</> : rates ? "Refresh rates" : <><Truck size={14} weight="bold" /> Get rates</>}
               </Button>
@@ -320,7 +344,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   No rates for this parcel. Check the address and weight, or that the carrier is enabled on your Shippo account.
                 </div>
               ) : (
-                <div className="max-h-52 space-y-1.5 overflow-y-auto">
+                <div className="max-h-[26rem] space-y-1.5 overflow-y-auto pr-1">
                   {rates.map((r) => (
                     <label key={r.token} className={"flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors " + (pickedToken === r.token ? "border-primary bg-primary/5" : "border-border hover:bg-accent")}>
                       <input type="radio" name="rate" checked={pickedToken === r.token} onChange={() => setPickedToken(r.token)} className="size-4 accent-[var(--primary)]" />
@@ -340,6 +364,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 </div>
               )}
               {err && <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</div>}
+              </div>{/* /right column */}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
