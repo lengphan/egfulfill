@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { driveImg } from "@/lib/supplier-catalog"
+import { clickableProps } from "@/lib/a11y"
 import {
   getSsProducts, getOttoProducts, getSsStyleSkus, getSsStylesAll, type SsStyle, type OttoVariant, getOttoStyle,
   getSanmarCatalog, getSanmarCatalogStyle, type SanmarCatalogStyle, resolveSuppliers,
@@ -17,8 +18,11 @@ type Tab = "inventory" | "ss" | "otto" | "sanmar"
 // Defined at module scope, not inside the component: a component created during
 // render gets a new identity every pass, so React unmounts and remounts the whole
 // list on each keystroke (and eslint's react-hooks/static-components rejects it).
-function PickRow({ line, title, sub, right, meta, image, on, onToggle }: {
+function PickRow({ line, title, sub, right, meta, image, on, onToggle, qty, onQty }: {
   line: POLine; title: string; sub?: string; right?: string
+  /** Current quantity once the line is picked, and how to change it. Absent → no stepper,
+   *  which is how the callers that only ever add one still behave. */
+  qty?: number; onQty?: (n: number) => void
   /** Small (_fs) product thumbnail. S&S publish three sizes by filename suffix, so this
    *  costs no storage — it's a URL through our proxy, not a stored image. Picking a blank
    *  by name alone is how the wrong colourway ends up on a PO. */
@@ -29,20 +33,24 @@ function PickRow({ line, title, sub, right, meta, image, on, onToggle }: {
   meta?: { k: string; v: string }[]
   on: boolean; onToggle: (l: POLine) => void
 }) {
+  // A DIV, not a button: the row now carries a number input and its own Add control, and
+  // both inside a <button> is invalid markup. Same click-to-pick behaviour, same keyboard
+  // route, through the shared helper.
   return (
-    <button
-      type="button"
-      onClick={() => onToggle(image ? { ...line, image } : line)}
-      className={"flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors " + (on ? "bg-primary/5" : "hover:bg-muted/50")}
+    <div
+      {...clickableProps(() => onToggle(image ? { ...line, image } : line), `Select ${title}`)}
+      className={"flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors " + (on ? "bg-primary/5" : "hover:bg-muted/50")}
     >
       <span className={"flex size-5 shrink-0 items-center justify-center rounded border " + (on ? "border-primary bg-primary text-primary-foreground" : "border-border")}>
         {on && <Check size={12} weight="bold" />}
       </span>
       {image ? (
+        // Bigger, because this picture is doing real work: it is the only thing that tells
+        // Navy from Columbia Blue at a glance, and a 56px thumbnail of a cap does not.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt="" loading="lazy" className="size-14 shrink-0 rounded border border-border bg-white object-contain" />
+        <img src={image} alt="" loading="lazy" className="size-20 shrink-0 rounded border border-border bg-white object-contain" />
       ) : (
-        <span className="size-14 shrink-0 rounded border border-dashed border-border" aria-hidden />
+        <span className="size-20 shrink-0 rounded border border-dashed border-border" aria-hidden />
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{title}</span>
@@ -58,7 +66,33 @@ function PickRow({ line, title, sub, right, meta, image, on, onToggle }: {
         )}
       </span>
       {right && <span className="shrink-0 text-xs text-muted-foreground">{right}</span>}
-    </button>
+      {/* QUANTITY WHERE THE CHOICE IS MADE. Picking a colourway and then typing 24 is the
+          whole job; sending every line at 1 and correcting the numbers on the draft
+          afterwards is the same work done twice, in the screen with less context.
+          Only once the line is IN — a stepper on an unpicked row is a number that means
+          nothing yet. stopPropagation because the row itself is the pick target. */}
+      {on && onQty && (
+        <input
+          type="number"
+          min={1}
+          value={qty ?? 1}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onChange={(e) => onQty(parseInt(e.target.value, 10) || 1)}
+          aria-label={`Quantity for ${title}`}
+          className="h-8 w-16 shrink-0 rounded-lg border border-border bg-card px-2 text-sm tabular-nums"
+        />
+      )}
+      {/* A named control, rather than leaving the whole row as the only affordance. The row
+          still works; this says out loud what clicking it does. */}
+      <span
+        className={"shrink-0 rounded-lg border px-2.5 py-1 text-xs font-medium " + (on
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border text-muted-foreground")}
+      >
+        {on ? "Added" : "Add"}
+      </span>
+    </div>
   )
 }
 const Empty = ({ children }: { children: React.ReactNode }) => (
@@ -246,6 +280,12 @@ export function POAddItems({
       return next
     })
 
+  /** Set a picked line's quantity. Picking a colourway and then typing "24" is the whole
+   *  job here — sending every line at 1 and fixing the numbers on the draft afterwards is
+   *  the same work done twice, in the screen with less context. */
+  const setQty = (sku: string, qty: number) =>
+    setPicked((p) => (p[sku] ? { ...p, [sku]: { ...p[sku], qty: Math.max(1, qty || 1) } } : p))
+
   /** Pull one S&S style's orderable skus live, and cache them so it's searchable after. */
   useEffect(() => {
     if (tab !== "inventory") return
@@ -349,6 +389,7 @@ export function POAddItems({
                               title={[p.color, p.size].filter(Boolean).join(" / ") || p.sku}
                               meta={[{ k: "SKU", v: p.sku }]}
                               right={money(p.price)}
+                              qty={picked[p.sku]?.qty} onQty={(n) => setQty(p.sku, n)}
                               on={!!picked[p.sku]} onToggle={toggle} />
                           ))}
                         </div>
@@ -405,6 +446,7 @@ export function POAddItems({
                   // says "no picture" rather than "loading".
                   image={skuMeta[i.sku]?.image || null}
                   right={`${num(i.in_stock)} in stock`}
+                  qty={picked[i.sku]?.qty} onQty={(n) => setQty(i.sku, n)}
                   on={!!picked[i.sku]} onToggle={toggle} />
               ))
           )}
@@ -450,6 +492,7 @@ export function POAddItems({
                                   title={[p.color, p.size].filter(Boolean).join(" / ") || p.sku}
                                   sub={ssTitle(p)}
                                   meta={[{ k: "SKU", v: p.sku }]}
+                                  qty={picked[p.sku]?.qty} onQty={(n) => setQty(p.sku, n)}
                                   on={!!picked[p.sku]} onToggle={toggle} />
                               ))}
                         </div>
@@ -493,6 +536,7 @@ export function POAddItems({
                                 sub={s2.name ?? undefined}
                                 meta={[{ k: "SKU", v: v.sku }]}
                                 image={v.image || s2.image || null}
+                                qty={picked[v.sku]?.qty} onQty={(n) => setQty(v.sku, n)}
                                 on={!!picked[v.sku]} onToggle={toggle} />
                             ))}
                       </div>
@@ -533,6 +577,7 @@ export function POAddItems({
                                 // Per-COLOUR picture. Ordering a colourway from a photo of
                                 // a different colour is exactly the mistake to prevent.
                                 image={driveImg(v.image || s.image) || null}
+                                qty={picked[v.sku]?.qty} onQty={(n) => setQty(v.sku, n)}
                                 on={!!picked[v.sku]} onToggle={toggle} />
                             ))}
                       </div>
