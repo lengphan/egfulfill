@@ -20,7 +20,7 @@ import { isApprovable } from "@/components/app/approve-order-button"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
-import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
@@ -1641,16 +1641,15 @@ export function OrdersHub() {
                               Carrier delivery status was removed: tracking rides Shippo + the
                               pipeline stage, so a "No carrier update" chip on every row was
                               noise, not information. */}
-                          /* THE ACTION CELL HOLDS ACTIONS. It used to repeat the stage here
+                          {/* THE ACTION CELL HOLDS ACTIONS. It used to repeat the stage here
                               — an amber "⚠ Cancelled" beside a Cancelled chip in the status
                               column, and the same again for On hold and Refunded — which is
                               the same fact three columns apart. What survives is the one
                               thing that is a CONTROL rather than a label: taking an order
                               off hold. Cancelled and refunded rows show nothing, because
-                              nothing is left to do from here; the ⋯ menu still has them. */
+                              nothing is left to do from here; the ⋯ menu still has them. */}
                           {stopped && (() => {
                             const norm = normalizeStage(stage)
-                            const stLabel = stageMeta(norm)?.label || "On hold"
                             // On hold remembers the stage it interrupted (meta.hold_from), so
                             // it offers a one-click "Back to <that stage>" — clear how to come
                             // off hold. Without a stored prior (an old hold), fall back to ⋯.
@@ -2116,7 +2115,30 @@ export function OrdersHub() {
                             // order's line at all (see FACTORY_LINE).
                             const opts = stageOptionsFor(role, it.factory_status, isFactoryOrder(o))
                             const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
+                            /**
+                             * CANCEL AND REFUND ARE NOT OFFERED PER LINE — they are order
+                             * moves, and this control could not keep the promise.
+                             *
+                             * Picking Cancelled here POSTs item-status, which writes
+                             * order_items.factory_status and nothing else. No money comes
+                             * back (the reversal hangs off the order's PATCH), the order's
+                             * own column still says Working, and orderStage() lets any
+                             * exception line win — so one line of five turned the whole row
+                             * Cancelled while the seller was still charged for all five.
+                             * The word said one thing and the ledger said another.
+                             *
+                             * Cancelling part of an order is a real need and this was not
+                             * it; it belongs with the refund, which already splits by part.
+                             * Until then the honest place is the whole order: the ⋯ menu and
+                             * the order page's Cancel / Refund panel, both of which move the
+                             * money. On hold stays here — it is a stop, not a settlement.
+                             *
+                             * A line already sitting at a money stage keeps its own option,
+                             * or the select would show a blank box for a value it holds.
+                             */
+                            const here = normalizeStage(it.factory_status)
                             const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
+                              .filter((s) => !isMoneyStage(s.id) || s.id === here)
                             if (!opts.length) return <StageBadge status={it.factory_status} />
                             if (!prod.length) return (
                               <>
@@ -2143,6 +2165,15 @@ export function OrdersHub() {
                                 aria-label={`Status for ${it.name || it.sku}`}
                                 title={tl("ui", "Set this item's status — forward or back")}
                               >
+                                {/* A line sitting at a stage this role cannot set — a
+                                    Cancelled line under a warehouse account, now that the
+                                    money stages have left this control — still has to SHOW
+                                    it: a select whose value matches no option renders
+                                    blank, which reads as "no status at all". Disabled,
+                                    because it is a fact here, not a move. */}
+                                {![...prod, ...exc].some((s) => s.id === here) && (
+                                  <option value={here} disabled>{tl("stage", stageMeta(here)?.label ?? here)}</option>
+                                )}
                                 <optgroup label={tl("ui", "Production")}>
                                   {prod.map((s) => <option key={s.id || "new"} value={s.id}>{tl("stage", s.label)}</option>)}
                                 </optgroup>

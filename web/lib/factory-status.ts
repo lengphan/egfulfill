@@ -252,6 +252,18 @@ export function canSetStage(role: string, current: string | null | undefined, ta
 }
 
 /**
+ * Cancelled and Refunded — the two stages that MOVE MONEY.
+ *
+ * Exported because they are order-level moves, not line-level ones, and a control that
+ * offers them per line cannot keep that promise: the refund is worked out by the order's
+ * PATCH (refundForCancel in server/src/routes/orders.js), while a per-line write only sets
+ * order_items.factory_status. Setting one line to Cancelled therefore reverses nothing,
+ * charges nothing back, and — because orderStage() lets any exception win — makes the WHOLE
+ * order read Cancelled. Same set the role gate uses, so the two can't drift apart.
+ */
+export const isMoneyStage = (id?: string | null): boolean => MONEY_STAGES.has(normalizeStage(id))
+
+/**
  * The stages to WRITE, in order, to get from here to there one step at a time.
  *
  * null when the move isn't a forward walk along the line — either end being a stop, or the
