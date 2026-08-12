@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { CircleNotch, Calculator, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
@@ -113,8 +113,13 @@ export function RateCalculatorView() {
     return () => clearTimeout(t)
   }, [])
 
+  /** "Custom size…" is a MODE, not a size — picking it reveals the boxes and keeps them
+   *  revealed even if the numbers happen to land back on a stock size. */
+  const [custom, setCustom] = useState(false)
   const weightOz = (Number(lb) || 0) * 16 + (Number(oz) || 0)
   const dims = { l: Number(len) || 0, w: Number(wid) || 0, h: Number(hei) || 0 }
+  const allSizes = [...STOCK_SIZES, ...mine]
+  const matchedSize = allSizes.find((z) => sizeKey(z) === sizeKey({ length: dims.l, width: dims.w, height: dims.h }))
   const cuIn = dims.l * dims.w * dims.h
   const actualLb = weightOz / 16
 
@@ -135,12 +140,14 @@ export function RateCalculatorView() {
     }
   }, [cuIn, actualLb])
 
-  const addrs = useCallback((toZ: string) => ({
+  // Plain functions: both are only ever called from a click, so there is nothing to
+  // memoize for — and hand-rolled memos here are ones the compiler can't preserve.
+  const addrs = (toZ: string) => ({
     from: { street: "1 Main St", city: "", state: "", zip: fromZip },
     to: { street: "1 Main St", city: "", state: "", zip: toZ },
-  }), [fromZip])
+  })
 
-  const quote = useCallback(async (toZ: string, oz2: number): Promise<{ rates: ShippingRate[]; err?: string }> => {
+  const quote = async (toZ: string, oz2: number): Promise<{ rates: ShippingRate[]; err?: string }> => {
     const a = addrs(toZ)
     try {
       const r = await getShippingRates({ ...a, parcel: { weightOz: oz2, length: dims.l, width: dims.w, height: dims.h } })
@@ -149,7 +156,7 @@ export function RateCalculatorView() {
     } catch (e) {
       return { rates: [], err: e instanceof Error ? e.message : "Couldn't fetch rates." }
     }
-  }, [addrs, dims.l, dims.w, dims.h])
+  }
 
   const zipsOk = /^\d{5}$/.test(fromZip) && /^\d{5}$/.test(toZip)
 
@@ -169,6 +176,11 @@ export function RateCalculatorView() {
       {/* ── THE PARCEL ─────────────────────────────────────────────────────── */}
       <div className="space-y-4 xl:sticky xl:top-20">
         <SectionCard title="Parcel" bodyClassName="space-y-3 p-4">
+          {/* THREE CONTROLS, not six rows of pills.
+              Chips read as clutter once there are eleven cities and eight weights — the
+              same choice as a select, spending five times the height. The select is also
+              what the label dialog already uses for package size, so the two screens now
+              ask the question the same way. */}
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">From ZIP</span>
@@ -179,71 +191,77 @@ export function RateCalculatorView() {
               <Input value={toZip} onChange={(e) => setToZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="10118" className="h-9 font-mono" />
             </label>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {DEST_PRESETS.map((d) => (
-              <button
-                key={d.zip}
-                type="button"
-                onClick={() => setToZip(d.zip)}
-                className={"rounded-full border px-2.5 py-1 text-2xs font-medium transition-colors " +
-                  (toZip === d.zip ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
+
+          {/* The city list fills the ZIP beside it — a quote is zone-based, so the ZIP is
+              the only part of a destination that changes the price. */}
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Or pick a city</span>
+            <select
+              value={DEST_PRESETS.find((d) => d.zip === toZip)?.zip ?? ""}
+              onChange={(e) => { if (e.target.value) setToZip(e.target.value) }}
+              className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
+            >
+              <option value="">Typed ZIP</option>
+              {DEST_PRESETS.map((d) => <option key={d.zip} value={d.zip}>{d.label}</option>)}
+            </select>
+          </label>
+
+          <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Weight lb</span>
+              <span className="text-xs text-muted-foreground">lb</span>
               <Input value={lb} onChange={(e) => setLb(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 font-mono" />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">oz</span>
               <Input value={oz} onChange={(e) => setOz(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 font-mono" />
             </label>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {WEIGHT_PRESETS.map((w) => (
-              <button
-                key={w.oz}
-                type="button"
-                onClick={() => { setLb(String(Math.floor(w.oz / 16))); setOz(String(w.oz % 16)) }}
-                className={"rounded-full border px-2.5 py-1 text-2xs font-medium transition-colors " +
-                  (weightOz === w.oz ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Common</span>
+              <select
+                value={WEIGHT_PRESETS.find((w) => w.oz === weightOz)?.oz ?? ""}
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  if (!n) return
+                  setLb(String(Math.floor(n / 16))); setOz(String(n % 16))
+                }}
+                className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
               >
-                {w.label}
-              </button>
-            ))}
+                <option value="">Typed</option>
+                {WEIGHT_PRESETS.map((w) => <option key={w.oz} value={w.oz}>{w.label}</option>)}
+              </select>
+            </label>
           </div>
 
-          {/* ONE CLICK PER MAILER. The bench reaches for a stock size, not three numbers —
-              and typing them is where a 10 × 13 poly mailer becomes a 9 × 8 × 6 box that
-              bills as four pounds. Custom sizes come from the same per-user list the label
-              dialog writes, so one added there appears here. */}
-          <div className="flex flex-wrap gap-1.5">
-            {[...STOCK_SIZES, ...mine].map((sz) => {
-              const on = sizeKey({ length: Number(len) || 0, width: Number(wid) || 0, height: Number(hei) || 0 }) === sizeKey(sz)
-              return (
-                <button
-                  key={sz.label + sizeKey(sz)}
-                  type="button"
-                  onClick={() => { setLen(String(sz.length)); setWid(String(sz.width)); setHei(String(sz.height)) }}
-                  className={"rounded-full border px-2.5 py-1 text-2xs font-medium transition-colors " +
-                    (on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
-                >
-                  {sz.label}
-                </button>
-              )
-            })}
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {([["L", len, setLen], ["W", wid, setWid], ["H", hei, setHei]] as const).map(([k, v, set]) => (
-              <label key={k} className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">{k} in</span>
-                <Input value={v} onChange={(e) => set(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 font-mono" />
-              </label>
-            ))}
-          </div>
+          {/* Size, and the three boxes only when they're yours to fill — same control and
+              same "Custom size…" escape hatch as the label dialog. */}
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Package</span>
+            <select
+              value={matchedSize ? sizeKey(matchedSize) : "custom"}
+              onChange={(e) => {
+                const hit = allSizes.find((z) => sizeKey(z) === e.target.value)
+                if (!hit) { setCustom(true); return }
+                setCustom(false)
+                setLen(String(hit.length)); setWid(String(hit.width)); setHei(String(hit.height))
+              }}
+              className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
+            >
+              {allSizes.map((z) => <option key={sizeKey(z)} value={sizeKey(z)}>{z.label}</option>)}
+              <option value="custom">Custom size…</option>
+            </select>
+          </label>
+
+          {(custom || !matchedSize) && (
+            <div className="grid grid-cols-3 gap-2">
+              {([["L", len, setLen], ["W", wid, setWid], ["H", hei, setHei]] as const).map(([k, v, set]) => (
+                <label key={k} className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">{k} in</span>
+                  <Input value={v} onChange={(e) => set(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 font-mono" />
+                </label>
+              ))}
+            </div>
+          )}
+
           <Button onClick={run} disabled={busy} className="w-full">
             {busy ? <CircleNotch size={15} className="animate-spin" /> : <Calculator size={15} weight="bold" />} Get rates
           </Button>
