@@ -101,7 +101,26 @@ it didn't author. This outranks any feature.
 
 Never delete a static `.html` page until its React equivalent works in `web/`.
 
-### 2.8 Never reveal who supplies us — including through a URL
+### 2.8 An effect must never fetch on a condition its own fetch can satisfy
+
+This one took down a 16GB MacBook. Chrome, AnyDesk and ZaloCall all died, every app
+froze on "run out of application memory", and it needed two hard shutdowns. **A runaway
+loader is the only front-end bug that reaches past the browser and starves the whole
+machine** — so it is not a UI defect, it is an outage on someone's desk.
+
+`all-suppliers.tsx` auto-fetched the next chunk whenever `page >= pageCount`. But
+`usePaged` **CLAMPS** `page` to `pageCount`, so that is true at *page 1 of 1* — it means
+"there is one page", not "you reached the end". Under any filter the arriving rows stayed
+outside `visible`, `pageCount` stayed 1, `loading` flipped false, and the effect re-ran on
+the state its own fetch had written. 90 rows and a batch of image lookups per turn, aimed
+at every style S&S, Otto and SanMar have, with nothing released.
+
+- **Incremental loading is an EVENT** — a click on a page one past what is loaded. A click cannot recur on its own. Never an effect watching pagination or list length.
+- If an effect must fetch, **its condition has to be one the fetch's own result cannot re-satisfy.** No guard bolted onto the other shape is trustworthy; the shape is the bug.
+- **Run anything that loads in a loop before pushing it.** Open the page, apply a filter, and watch the network panel go quiet. This shipped with a comment claiming it "stops at the true end rather than asking forever" — the comment was confident and the code was not, because it was never run.
+- Suspect anything unbounded: `while`/recursive fetchers, `IntersectionObserver` sentinels, retry-on-failure without a ceiling, and appending to a list that is never trimmed.
+
+### 2.9 Never reveal who supplies us — including through a URL
 
 Who makes our blanks is commercial information. Publishing it lets anyone price against our
 supplier, and a buyer who can read "SanMar" off our product page can buy the same garment
