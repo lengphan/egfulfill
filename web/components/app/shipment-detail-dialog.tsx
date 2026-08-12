@@ -130,14 +130,14 @@ export function ShipmentDetailDialog({
             <Row label="Created">{when(s.createdAt) ?? "—"}</Row>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <div className="flex flex-nowrap items-center gap-2 border-t border-border pt-3">
             <Button size="sm" variant="outline" onClick={() => onRecheck(s.id)} disabled={checking === s.id || !s.tracking}>
               {checking === s.id ? <CircleNotch size={13} className="animate-spin" /> : <ArrowClockwise size={13} weight="bold" />}
-              Check the carrier
+              Check
             </Button>
             {s.labelUrl && (
               <Button size="sm" variant="outline" onClick={() => window.open(s.labelUrl as string, "_blank", "noopener")}>
-                <ArrowSquareOut size={13} weight="bold" /> Open the label
+                <ArrowSquareOut size={13} weight="bold" /> Label
               </Button>
             )}
             {/* Only while it can still work: a second refund can only ever collect the
@@ -147,7 +147,7 @@ export function ShipmentDetailDialog({
               <Button size="sm" variant="outline" onClick={() => onRefund(s)} disabled={voiding === s.id}
                       className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
                 {voiding === s.id ? <CircleNotch size={13} className="animate-spin" /> : <X size={13} weight="bold" />}
-                Refund the postage
+                Refund
               </Button>
             )}
           </div>

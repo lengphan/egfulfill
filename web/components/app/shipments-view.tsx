@@ -7,6 +7,7 @@ import { ShipmentDetailDialog } from "@/components/app/shipment-detail-dialog"
 import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getShipments, refreshTracking, voidLabel, type ShipmentRow } from "@/lib/api"
@@ -31,8 +32,8 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 /** What the CARRIER says. Kept visually distinct from the factory stage, because the whole
  *  reason to open this page is usually that the two disagree. */
 const DELIVERY: Record<string, { label: string; cls: string }> = {
-  awaiting_pickup: { label: "Not collected", cls: "bg-amber-100 text-amber-800" },
-  in_transit: { label: "In transit", cls: "bg-sky-100 text-sky-700" },
+  awaiting_pickup: { label: "Not collected", cls: "bg-amber-100 text-amber-700" },
+  in_transit: { label: "In transit", cls: "bg-blue-100 text-blue-700" },
   delivered: { label: "Delivered", cls: "bg-emerald-100 text-emerald-700" },
   returned: { label: "Returning", cls: "bg-rose-100 text-rose-700" },
   failed: { label: "Failed", cls: "bg-rose-100 text-rose-700" },
@@ -86,9 +87,9 @@ const REFUND_LABEL: Record<string, string> = {
   refused: "Refund refused",
 }
 const REFUND_TONE: Record<string, string> = {
-  settled: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-  pending: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
-  refused: "bg-red-600 text-white",
+  settled: "bg-neutral-100 text-neutral-600",
+  pending: "bg-amber-100 text-amber-700",
+  refused: "bg-rose-100 text-rose-700",
 }
 
 export function ShipmentsView() {
@@ -451,12 +452,12 @@ export function ShipmentsView() {
                         // arrived — so a pending one says so, and their own word sits
                         // underneath where it can be matched against their dashboard.
                         <>
-                          <span className={"inline-block rounded px-2 py-1 text-xs font-medium " + (REFUND_TONE[refundState(s)] ?? REFUND_TONE.pending)}>
+                          <Badge variant="secondary" className={REFUND_TONE[refundState(s)] ?? REFUND_TONE.pending}>
                             {REFUND_LABEL[refundState(s)] ?? "Refund pending"}
-                          </span>
+                          </Badge>
                         </>
                       ) : d ? (
-                        <span className={"inline-block rounded px-2 py-1 text-xs font-medium " + d.cls}>{d.label}</span>
+                        <Badge variant="secondary" className={d.cls}>{d.label}</Badge>
                       ) : (
                         // Never blank. "Not checked" and "checked, nothing yet" are
                         // different facts and the difference decides whether to chase.
