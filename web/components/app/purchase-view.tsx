@@ -267,6 +267,44 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   const pagedHistory = usePaged(history, 20)
 
   /**
+   * MOVE A PO TO HISTORY WITHOUT TOUCHING THE SUPPLIER.
+   *
+   * Not the same action as Cancel, and the difference is the whole point. Cancel calls the
+   * supplier and asks them to stop — the right thing for an order that is genuinely in
+   * flight. This is for orders that are simply OVER: placed months ago, already delivered
+   * or abandoned, sitting on the active board because nothing ever moved them off it. For
+   * those, calling S&S to cancel a fulfilled order is at best refused and at worst
+   * confusing to them.
+   *
+   * So it marks ours settled and says plainly that the supplier was not told. `cancelled`
+   * rather than `received` because receiving ADDS STOCK, and inventing stock for a parcel
+   * nobody can confirm arrived is the one outcome worse than a stale row.
+   */
+  const archive = async (list: PurchaseOrder[]) => {
+    if (!list.length) return
+    const many = list.length > 1
+    if (!(await confirm({
+      title: many ? `Move ${list.length} orders to history?` : `Move ${list[0].num} to history?`,
+      body: "This only clears our board — the supplier is NOT contacted and nothing is cancelled with them. Nothing is received into stock either. Use it for orders that are already over.",
+      confirmLabel: many ? `Move ${list.length} to history` : "Move to history",
+    }))) return
+    setBusy("archive"); setMsg(null)
+    try {
+      for (const po of list) {
+        await savePurchaseOrder({
+          ...po, status: "cancelled",
+          meta: { ...(po.meta || {}), archivedAt: new Date().toISOString(),
+                  archivedNote: "Moved to history from the board — the supplier was not contacted." },
+        })
+      }
+      setMsg({ ok: true, text: `Moved ${list.length} order${many ? "s" : ""} to history. The supplier wasn't contacted.` })
+      load()
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't move those to history." })
+    } finally { setBusy(null) }
+  }
+
+  /**
    * Start an empty PO and open the picker on it.
    *
    * Drafts could previously only be born from a low-stock suggestion, so with nothing
@@ -1184,6 +1222,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                     <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
                       <ArrowClockwise size={13} weight="bold" /> Reorder
                     </Button>
+                    {/* Only where it makes sense: an order already settled is IN history. */}
+                    {(po.status === "draft" || po.status === "placed") && (
+                      <Button size="sm" variant="outline" onClick={() => archive([po])} disabled={busy === "archive"}
+                              title="Clear it off the board — the supplier is not contacted">
+                        <ArrowUUpLeft size={13} weight="bold" /> To history
+                      </Button>
+                    )}
                     {po.status === "received" && (
                       <Button size="sm" variant="outline" onClick={() => setReturning(po)} disabled={busy === po.num}>
                         <ArrowUUpLeft size={13} weight="bold" /> Return
@@ -1646,7 +1691,18 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         </SectionCard>
 
           {placed.length > 0 && (
-            <SectionCard title="On order">
+            <SectionCard
+              title="On order"
+              // The bulk form of the same action, because a board that has drifted has
+              // drifted by more than one row — clearing them one at a time is how it got
+              // like this. Same confirm, same "the supplier is not contacted".
+              actions={placed.length > 1 ? (
+                <Button size="sm" variant="outline" onClick={() => archive(placed)} disabled={busy === "archive"}>
+                  {busy === "archive" ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
+                  Move all {placed.length} to history
+                </Button>
+              ) : undefined}
+            >
               <div className="divide-y divide-border">{placed.map(poRow)}</div>
             </SectionCard>
           )}
