@@ -551,6 +551,59 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
    * Kept as an escape hatch (force a sweep without waiting for a page load); the UI no longer
    * needs it. Warehouse/admin only — it moves money.
    */
+  /**
+   * THE LABEL ITSELF, THROUGH US.
+   *
+   * `tracking_label_url` points at the carrier's or the aggregator's own CDN, and a browser
+   * can do almost nothing with a cross-origin one: an <iframe> may be refused outright by
+   * their X-Frame-Options, and `<a download>` is IGNORED across origins — it navigates
+   * instead, which is the "opens in another tab" this exists to stop.
+   *
+   * Fetched server-side (dispatch already does exactly this to hand labels to byeastside)
+   * and streamed back same-origin, so the shipment window can show the label where you are
+   * standing and hand you the file.
+   *
+   * Staff only, and deliberately so: the PDF carries the buyer's full address, which is why
+   * pii_retention clears this url when a record ages out.
+   */
+  app.get('/api/shipments/:id/label', { preHandler: requireAuth }, async (req, reply) => {
+    if (!req.user || req.user.role === 'seller') { reply.code(403); return { error: 'Staff only' }; }
+    const id = String(req.params.id);
+    let url = null;
+    if (isShipmentId(id)) {
+      await ensureShipments().catch(() => {});
+      const row = (await q('select label_url from shipments where id=$1', [id]).catch(() => ({ rows: [] }))).rows[0];
+      url = row && row.label_url;
+    } else {
+      const row = (await q('select tracking_label_url from orders where id=$1', [id]).catch(() => ({ rows: [] }))).rows[0];
+      url = row && row.tracking_label_url;
+    }
+    if (!url) { reply.code(404); return { error: 'No stored label for this shipment.' }; }
+    // A label we already hold as bytes (a data: URL from the USPS-direct path) never needs
+    // a fetch — decode and serve it.
+    const inline = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(String(url));
+    let buf, type;
+    if (inline) {
+      type = inline[1] || 'application/pdf';
+      buf = Buffer.from(inline[3], inline[2] ? 'base64' : 'utf8');
+    } else {
+      const r = await fetch(String(url)).catch(() => null);
+      if (!r || !r.ok) { reply.code(502); return { error: "Couldn't fetch the label from the carrier." }; }
+      type = r.headers.get('content-type') || 'application/pdf';
+      buf = Buffer.from(await r.arrayBuffer());
+    }
+    const ext = /pdf/i.test(type) ? 'pdf' : /png/i.test(type) ? 'png' : /gif/i.test(type) ? 'gif' : 'jpg';
+    // `?download=1` is the only difference between showing it and saving it — same bytes,
+    // one header. Named for the parcel so a folder of them is readable.
+    if (String((req.query || {}).download || '') === '1') {
+      reply.header('Content-Disposition', `attachment; filename="label-${id.replace(/[^\w.-]+/g, '_')}.${ext}"`);
+    }
+    reply.header('Content-Type', type);
+    // Private: this is a buyer's address, and a shared cache must never keep it.
+    reply.header('Cache-Control', 'private, max-age=300');
+    return reply.send(buf);
+  });
+
   app.post('/api/shipments/backfill-costs', { preHandler: requireWarehouse }, async (req) => {
     const res = await recoverLabelCosts(200);
     audit(req, 'label.backfill_cost', { after: res });
