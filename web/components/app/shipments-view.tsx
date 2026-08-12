@@ -220,24 +220,22 @@ export function ShipmentsView() {
   return (
     <>
     {/* The tiles that used to be a parenthetical. Bought and refunded are the pair someone
-        checks — a spend figure with no volume behind it can't be sanity-checked, and a
-        refund total with no count doesn't say whether it was one void or ten. Each tile
-        that names a slice of the table below it filters to that slice when clicked. */}
+        checks. The second line under each figure is gone: four tiles carrying a caption
+        each turned a row meant to be read at a glance into a paragraph, and the number is
+        the point — the detail behind it lives in the table and the filters. Each tile that
+        names a slice of the table below it still filters to that slice when clicked. */}
     <StatGrid>
       <StatCard
         label="Labels bought"
         value={String(tally.bought)}
-        sub={tally.bought ? `${money(spend)} recorded` : "none recorded yet"}
       />
       <StatCard
         label="Label spend"
         value={money(realSpend)}
-        sub={testSpend > 0 ? `plus ${money(testSpend)} on a test key` : "actually charged"}
       />
       <StatCard
         label="Refunded"
         value={money(refunded)}
-        sub={tally.voided ? `${tally.voided} label${tally.voided === 1 ? "" : "s"} refunded` : "nothing refunded"}
         tone={refunded > 0 ? "pos" : "mut"}
         onClick={tally.voided ? () => setStatus("refunded") : undefined}
         active={status === "refunded"}
@@ -245,7 +243,6 @@ export function ShipmentsView() {
       <StatCard
         label="Test labels"
         value={String(tally.test)}
-        sub={tally.test ? `${money(testSpend)}, never charged` : "none — all live"}
         onClick={tally.test ? () => setStatus("test") : undefined}
         active={status === "test"}
       />
