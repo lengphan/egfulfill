@@ -18,6 +18,99 @@ type Tab = "inventory" | "ss" | "otto" | "sanmar"
 // Defined at module scope, not inside the component: a component created during
 // render gets a new identity every pass, so React unmounts and remounts the whole
 // list on each keystroke (and eslint's react-hooks/static-components rejects it).
+
+/**
+ * ONE ROW PER COLOUR, sizes inside it.
+ *
+ * A style with 20 colourways in 6 sizes is 120 rows, and finding "Bay in L" meant scrolling
+ * past Bay/S and Bay/M to reach it — the list was sorted by a key nobody searches on. The
+ * question is always colour FIRST ("do we want Bay?") and size second ("which of them?"),
+ * so the colour is the row and the sizes are chips within it.
+ *
+ * Quantity appears against each size actually chosen, because that is the only place a
+ * number means anything: 24 of Bay/L and 12 of Bay/M is one colour and two answers.
+ */
+function ColourGroups({ variants, name, picked, onToggle, onQty }: {
+  variants: { sku: string; color?: string | null; size?: string | null; price?: number | null; image?: string | null }[]
+  name?: string
+  picked: Record<string, POLine>
+  onToggle: (l: POLine) => void
+  onQty: (sku: string, n: number) => void
+}) {
+  // Insertion order, so the supplier's own colour ordering survives — they group families
+  // (all the blues together) and re-sorting alphabetically scatters them.
+  const groups = new Map<string, typeof variants>()
+  for (const v of variants) {
+    const key = String(v.color ?? "—")
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(v)
+  }
+
+  return (
+    <>
+      {[...groups.entries()].map(([colour, rows]) => {
+        const pickedHere = rows.filter((r) => picked[r.sku])
+        const thumb = rows.find((r) => r.image)?.image ?? null
+        return (
+          <div key={colour} className="flex gap-3 px-4 py-3">
+            {thumb ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={thumb} alt="" loading="lazy" className="size-20 shrink-0 rounded border border-border bg-white object-contain" />
+            ) : (
+              <span className="size-20 shrink-0 rounded border border-dashed border-border" aria-hidden />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{colour}</div>
+              {name && <div className="truncate text-xs text-muted-foreground">{name}</div>}
+              {/* Every size the colour comes in. Picked ones are filled — the chip IS the
+                  state, so there is no second control saying the same thing. */}
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {rows.map((r) => {
+                  const on = !!picked[r.sku]
+                  const label = r.size || r.sku
+                  return (
+                    <button
+                      key={r.sku}
+                      type="button"
+                      title={`SKU ${r.sku}`}
+                      onClick={() => onToggle({ sku: r.sku, name, variant: [r.color, r.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(r.price), image: r.image ?? undefined })}
+                      className={"rounded-md border px-2 py-0.5 text-xs font-medium transition-colors "
+                        + (on ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              {/* How many of each chosen size. Only what is chosen, so the row stays a row
+                  until you have actually decided something. */}
+              {pickedHere.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {pickedHere.map((r) => (
+                    <span key={r.sku} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1">
+                      <span className="text-2xs text-muted-foreground">{r.size || r.sku}</span>
+                      <input
+                        type="number" min={1}
+                        value={picked[r.sku]?.qty ?? 1}
+                        onChange={(e) => onQty(r.sku, parseInt(e.target.value, 10) || 1)}
+                        aria-label={`Quantity for ${colour} ${r.size ?? ""}`}
+                        className="h-6 w-14 rounded border border-border bg-background px-1.5 text-xs tabular-nums"
+                      />
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="shrink-0 text-xs text-muted-foreground">
+              {rows[0]?.price != null ? `$${num(rows[0].price).toFixed(2)}` : ""}
+            </div>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 function PickRow({ line, title, sub, right, meta, image, on, onToggle, qty, onQty }: {
   line: POLine; title: string; sub?: string; right?: string
   /** Current quantity once the line is picked, and how to change it. Absent → no stepper,
@@ -71,27 +164,22 @@ function PickRow({ line, title, sub, right, meta, image, on, onToggle, qty, onQt
           afterwards is the same work done twice, in the screen with less context.
           Only once the line is IN — a stepper on an unpicked row is a number that means
           nothing yet. stopPropagation because the row itself is the pick target. */}
-      {on && onQty && (
+      {onQty && (
         <input
           type="number"
           min={1}
-          value={qty ?? 1}
+          value={on ? (qty ?? 1) : 1}
+          disabled={!on}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           onChange={(e) => onQty(parseInt(e.target.value, 10) || 1)}
           aria-label={`Quantity for ${title}`}
-          className="h-8 w-16 shrink-0 rounded-lg border border-border bg-card px-2 text-sm tabular-nums"
+          className="h-8 w-16 shrink-0 rounded-lg border border-border bg-card px-2 text-sm tabular-nums disabled:opacity-40"
         />
       )}
-      {/* A named control, rather than leaving the whole row as the only affordance. The row
-          still works; this says out loud what clicking it does. */}
-      <span
-        className={"shrink-0 rounded-lg border px-2.5 py-1 text-xs font-medium " + (on
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border text-muted-foreground")}
-      >
-        {on ? "Added" : "Add"}
-      </span>
+      {/* No pill. It was a <span> styled as a button, so "Added" read as a control you had
+          already pressed and could press again — and it duplicated the tick on the left,
+          which is the actual state. The row is the control; the checkbox is the answer. */}
     </div>
   )
 }
@@ -485,16 +573,10 @@ export function POAddItems({
                         <div className="border-t border-border bg-muted/30 pl-6">
                           {ssStyleSkus[String(st.styleID)] === undefined ? <Loading />
                             : ssStyleSkus[String(st.styleID)].length === 0 ? <Empty>S&amp;S list no orderable skus for this style.</Empty>
-                              : ssStyleSkus[String(st.styleID)].map((p) => (
-                                <PickRow key={p.sku}
-                                  line={{ sku: p.sku, name: ssTitle(p), variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
-                                  image={p.image ?? null}
-                                  title={[p.color, p.size].filter(Boolean).join(" / ") || p.sku}
-                                  sub={ssTitle(p)}
-                                  meta={[{ k: "SKU", v: p.sku }]}
-                                  qty={picked[p.sku]?.qty} onQty={(n) => setQty(p.sku, n)}
-                                  on={!!picked[p.sku]} onToggle={toggle} />
-                              ))}
+                              : <ColourGroups
+                                  variants={ssStyleSkus[String(st.styleID)].map((p) => ({ sku: p.sku, color: p.color, size: p.size, price: num(p.price), image: p.image ?? null }))}
+                                  name={ssTitle(ssStyleSkus[String(st.styleID)][0])}
+                                  picked={picked} onToggle={toggle} onQty={setQty} />}
                         </div>
                       )}
                     </div>
@@ -527,18 +609,10 @@ export function POAddItems({
                       <div className="border-t border-border bg-muted/30 pl-6">
                         {sanmarSkus[s2.style] === undefined ? <Loading />
                           : sanmarSkus[s2.style].length === 0 ? <Empty>No skus listed for this style.</Empty>
-                            : sanmarSkus[s2.style].map((v) => (
-                              <PickRow key={v.sku}
-                                line={{ sku: v.sku, name: s2.name ?? undefined,
-                                        variant: [v.color, v.size].filter(Boolean).join(" / ") || undefined,
-                                        qty: 1, price: num(v.price ?? s2.price) }}
-                                title={[v.color, v.size].filter(Boolean).join(" / ") || v.sku}
-                                sub={s2.name ?? undefined}
-                                meta={[{ k: "SKU", v: v.sku }]}
-                                image={v.image || s2.image || null}
-                                qty={picked[v.sku]?.qty} onQty={(n) => setQty(v.sku, n)}
-                                on={!!picked[v.sku]} onToggle={toggle} />
-                            ))}
+                            : <ColourGroups
+                                variants={sanmarSkus[s2.style].map((v) => ({ sku: v.sku, color: v.color, size: v.size, price: num(v.price ?? s2.price), image: v.image || s2.image || null }))}
+                                name={s2.name ?? undefined}
+                                picked={picked} onToggle={toggle} onQty={setQty} />}
                       </div>
                     )}
                   </div>
@@ -566,20 +640,10 @@ export function POAddItems({
                       <div className="border-t border-border bg-muted/30 pl-6">
                         {styleSkus[s.style] === undefined ? <Loading />
                           : styleSkus[s.style].length === 0 ? <Empty>No skus listed for this style.</Empty>
-                            : styleSkus[s.style].map((v) => (
-                              <PickRow key={v.sku}
-                                line={{ sku: v.sku, name: s.name ?? undefined,
-                                        variant: [v.color, v.size].filter(Boolean).join(" / ") || undefined,
-                                        qty: 1, price: num(v.price ?? s.price) }}
-                                title={[v.color, v.size].filter(Boolean).join(" / ") || v.sku}
-                                sub={s.name ?? undefined}
-                                meta={[{ k: "SKU", v: v.sku }]}
-                                // Per-COLOUR picture. Ordering a colourway from a photo of
-                                // a different colour is exactly the mistake to prevent.
-                                image={driveImg(v.image || s.image) || null}
-                                qty={picked[v.sku]?.qty} onQty={(n) => setQty(v.sku, n)}
-                                on={!!picked[v.sku]} onToggle={toggle} />
-                            ))}
+                            : <ColourGroups
+                                variants={styleSkus[s.style].map((v) => ({ sku: v.sku, color: v.color, size: v.size, price: num(v.price ?? s.price), image: driveImg(v.image || s.image) || null }))}
+                                name={s.name ?? undefined}
+                                picked={picked} onToggle={toggle} onQty={setQty} />}
                       </div>
                     )}
                   </div>
