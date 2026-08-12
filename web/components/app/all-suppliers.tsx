@@ -384,11 +384,30 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
     return true
   })
   const paged = usePaged(visible, 48)
+
   const anyFilter = !!(sup || brand || cat || minP || maxP)
   const clearFilters = () => { setSup(""); setBrand(""); setCat(""); setMinP(""); setMaxP("") }
 
   const total = ssTotal + ottoTotal + sanmarTotal
   const canLoadMore = (items?.length ?? 0) < total
+
+  /**
+   * PAGING PAST THE END FETCHES MORE, so the pager is the only control needed.
+   *
+   * `paged` divides the rows already in memory; the server holds thousands more. Landing on
+   * the last page used to be the end of the catalogue unless you noticed a separate button
+   * underneath. Now it just loads the next chunk.
+   *
+   * Guarded on `loading` so a fast click-through fires one fetch, not five, and on
+   * canLoadMore so it stops at the true end rather than asking forever.
+   */
+  useEffect(() => {
+    if (!canLoadMore || loading) return
+    if (paged.pageCount === 0 || paged.page < paged.pageCount) return
+    const t = setTimeout(() => { void loadMore() }, 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paged.page, paged.pageCount, canLoadMore, loading])
 
   return (
     // No title — the "All suppliers" tab already names it. The toolbar is the top of the card.
@@ -527,11 +546,15 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
               total={paged.total} start={paged.start}
               onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[48, 96, 192]} />
           )}
-          {canLoadMore && (
-            <div className="flex justify-center border-t border-border p-4">
-              <Button variant="outline" size="sm" onClick={loadMore} disabled={loading}>
-                {loading ? <CircleNotch size={14} className="animate-spin" /> : `Load more (${items.length}/${total.toLocaleString()})`}
-              </Button>
+          {/* The "Load more (180/9,239)" row is gone — but NOT because pagination replaced
+              it. They did different jobs: the pager walks what is already loaded, the
+              button fetched the next chunk from the server. Deleting it alone would have
+              capped browsing at the first 180 of 9,239 blanks.
+              So paging to the last loaded page now fetches the next chunk itself (see the
+              effect above), and the only thing left is a quiet line saying it is happening. */}
+          {loading && items.length > 0 && (
+            <div className="flex items-center justify-center gap-2 border-t border-border p-3 text-xs text-muted-foreground">
+              <CircleNotch size={13} className="animate-spin" /> Loading more blanks…
             </div>
           )}
         </>
