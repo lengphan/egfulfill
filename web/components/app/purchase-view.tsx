@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { cartChanged } from "@/lib/cart-events"
-import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise, Barcode } from "@phosphor-icons/react"
+import { ShoppingCart, CircleNotch, Truck, CheckCircle, Trash, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -1421,16 +1421,24 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       )}
 
       <div className="flex items-center justify-end gap-2">
-        {/* Receiving is its own job, done at the bench with a scanner — not something
-            you reach through a purchase order. */}
+        {/* WORDS, NOT ICONS. A barcode, a truck and a plus sat in a row above the board and
+            each needed decoding before its label was read — three small pictures competing
+            with three short phrases that already said it. The spinner stays on the one
+            button that waits for something, because that is state rather than decoration.
+
+            Receiving is its own job, done at the bench with a scanner — not something you
+            reach through a purchase order. */}
         <Button size="sm" variant="outline" onClick={() => setScanOpen(true)}>
-          <Barcode size={13} weight="bold" /> Receive a box
+          Receive a box
         </Button>
+        {/* "Settings", not "Order settings": it sits on the purchasing board, where there is
+            nothing else it could be the settings for, and the extra word was the longest
+            thing in the row. */}
         <Button size="sm" variant="outline" onClick={() => setSupplierCfg(true)}>
-          <Truck size={13} weight="bold" /> Order settings
+          Settings
         </Button>
         <Button size="sm" onClick={startBlankDraft} disabled={busy === "new"}>
-          {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />}
+          {busy === "new" && <CircleNotch size={13} className="animate-spin" />}
           New purchase order
         </Button>
       </div>
@@ -1550,10 +1558,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                 {saved.reduce((s, l) => s + num(l.qty), 0)} units{toOrderTotal > 0 ? ` · ${usd(toOrderTotal)}` : ""}
               </span>
               <Button size="sm" variant="outline" onClick={() => setAddTo(POOL)}>
-                <Plus size={13} weight="bold" /> Add items
+                Add items
               </Button>
               <Button size="sm" onClick={() => void placeAllGroups()} disabled={!saved.length || busy === "place-all"}>
-                {busy === "place-all" ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} weight="bold" />}
+                {busy === "place-all" && <CircleNotch size={14} className="animate-spin" />}
                 {toOrderGroups.length > 1 ? `Place ${toOrderGroups.length} orders` : "Place order"}
               </Button>
             </div>
