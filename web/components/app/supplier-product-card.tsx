@@ -150,23 +150,31 @@ export function SupplierProductCard({
           // want" must show the whole product, so the whitespace stays and the crop goes.
           // If they still read small, the fix is the tile's aspect ratio for every
           // supplier, not a crop for one.
-          // SANMAR ONLY, and it is a different move from the object-cover that was tried
-          // and reverted here. That cropped a third of the IMAGE — it took the tops off
-          // caps. This scales up inside the same contain fit, and what it eats first is the
-          // WHITE MARGIN SanMar bake into their photos: their shots are the product floating
-          // in a wide field of white, so the garment renders visibly smaller than an Otto or
-          // S&S tile beside it even though the file is the largest of the three.
+          // SANMAR CAPS ONLY.
           //
-          // 1.25 is deliberately modest — enough to close the gap with the other two, not
-          // enough to reach the product at the centre. Nothing else is touched, because
-          // nothing else has the margin.
+          // The zoom is a different move from the object-cover tried and reverted here:
+          // that cropped a third of the image and took the tops off caps. This scales
+          // inside the same contain fit, so what it eats is the WHITE MARGIN SanMar bake
+          // into their shots.
+          //
+          // But that margin is not uniform across their catalogue — it is generous on
+          // headwear, where a cap floats in a wide white field and reads small beside the
+          // Otto and S&S tiles either side of it, and ordinary on apparel, where the same
+          // 1.25 simply made shirts too big. So it is scoped to the category that has the
+          // problem rather than the supplier that happens to contain it.
+          //
+          // Word-boundaried: SanMar's category is literally "Caps" (363 styles, checked
+          // against the live table), and a bare /hat/ would have matched any category that
+          // merely contained those letters. Their other 3,700 styles — Sweatshirts/Fleece,
+          // Bags, T-Shirts, Polos/Knits — are untouched, which is the correction being made.
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={img}
             alt=""
             loading="lazy"
             className={"absolute inset-0 size-full object-contain "
-              + (supplierLabel === "SanMar" ? "scale-125" : "")}
+              + (supplierLabel === "SanMar" && /\b(caps?|hats?|headwear|beanies?|visors?)\b/i.test(String(data.subtitle ?? ""))
+                ? "scale-125" : "")}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50">No image</div>
