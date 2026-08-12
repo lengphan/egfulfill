@@ -1,11 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, Calculator, Warning, ArrowRight } from "@phosphor-icons/react"
+import { CircleNotch, Calculator, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getShippingRates, getFactorySettings, type ShippingRate } from "@/lib/api"
+import { STOCK_SIZES, DEFAULT_SIZE, customSizes, sizeKey, type ParcelSize } from "@/lib/parcel-sizes"
 
 const usd = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
 
@@ -28,47 +29,11 @@ const UPS_DAILY_DIVISOR = 139
 const USPS_DIVISOR = 166
 const USPS_DIM_THRESHOLD_CU_IN = 1728   // 1 cubic foot — below this USPS ignores size
 
-/** Representative ZIPs spanning the domestic zones from a west-coast origin. Zones are
- *  computed from the ORIGIN, so these are labelled by city rather than by zone number —
- *  a "zone 5" label would be wrong the moment the warehouse moves. */
-const ZONE_SPREAD: { label: string; zip: string }[] = [
-  { label: "Los Angeles CA", zip: "90015" },
-  { label: "San Diego CA", zip: "92101" },
-  { label: "Las Vegas NV", zip: "89101" },
-  { label: "Phoenix AZ", zip: "85003" },
-  { label: "Denver CO", zip: "80202" },
-  { label: "Dallas TX", zip: "75201" },
-  { label: "Chicago IL", zip: "60606" },
-  { label: "Atlanta GA", zip: "30303" },
-  { label: "New York NY", zip: "10118" },
-]
-
-/** The rungs a parcel's price actually steps on. USPS Ground Advantage bands weight
- *  (0–4 oz, 4–8, 8–12, 12–16, then per pound), so the interesting question is never "what
- *  does 7 oz cost" but "where is the next cliff". */
-const WEIGHT_LADDER: { label: string; oz: number }[] = [
-  { label: "4 oz", oz: 4 },
-  { label: "8 oz", oz: 8 },
-  { label: "12 oz", oz: 12 },
-  { label: "15.9 oz", oz: 15.9 },
-  { label: "1 lb", oz: 16 },
-  { label: "2 lb", oz: 32 },
-  { label: "3 lb", oz: 48 },
-  { label: "5 lb", oz: 80 },
-]
-
-type Row = { label: string; rates: ShippingRate[]; err?: string }
-
 /**
  * The rate calculator — what a parcel costs, why, and where the cheapest line is.
  *
- * Three questions it answers that a single quote cannot:
- *   1. WHY this price — the dim-weight arithmetic, worked, so an oversized box declaration
- *      is visible before the invoice finds it.
- *   2. What it costs ACROSS the country — the same parcel to nine cities, because the
- *      cheapest carrier flips with distance (USPS wins near, UPS Ground Saver wins far).
- *   3. Where the WEIGHT cliffs are — the same route at eight weights, because crossing
- *      8 oz costs more than any box-size mistake.
+ * It answers the question a bare quote cannot: WHY this price — the dim-weight arithmetic,
+ * worked, so an oversized box declaration is visible before the invoice finds it.
  *
  * Nothing here buys anything. Every figure is a live quote from the same route the label
  * buyer uses, so what it shows is what a label would actually cost.
@@ -78,18 +43,24 @@ export function RateCalculatorView() {
   const [toZip, setToZip] = useState("")
   const [lb, setLb] = useState("0")
   const [oz, setOz] = useState("8")
-  const [len, setLen] = useState("10")
-  const [wid, setWid] = useState("8")
-  const [hei, setHei] = useState("4")
+  // Opens on the mailer reached for most, not an invented placeholder — same list the
+  // label dialog uses (lib/parcel-sizes.ts), so a size added there shows up here too.
+  const [len, setLen] = useState(String(DEFAULT_SIZE.length))
+  const [wid, setWid] = useState(String(DEFAULT_SIZE.width))
+  const [hei, setHei] = useState(String(DEFAULT_SIZE.height))
+  const [mine, setMine] = useState<ParcelSize[]>([])
+  useEffect(() => {
+    // localStorage, so after mount — reading it during render would differ from the server
+    // pass and hydrate wrong.
+    const t = setTimeout(() => setMine(customSizes()), 0)
+    return () => clearTimeout(t)
+  }, [])
   /** Optional: what another platform charged, so the saving is a number rather than a vibe. */
   const [paid, setPaid] = useState("")
 
   const [rates, setRates] = useState<ShippingRate[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState("")
-  const [zoneRows, setZoneRows] = useState<Row[] | null>(null)
-  const [ladderRows, setLadderRows] = useState<Row[] | null>(null)
-  const [running, setRunning] = useState("")
 
   // Default the origin to the warehouse — the answer is nearly always "from here".
   useEffect(() => {
@@ -146,41 +117,12 @@ export function RateCalculatorView() {
 
   const run = async () => {
     if (!zipsOk) { setErr("Enter a 5-digit From and To ZIP."); return }
-    setErr(""); setBusy(true); setRates(null); setZoneRows(null); setLadderRows(null)
+    setErr(""); setBusy(true); setRates(null)
     const r = await quote(toZip, weightOz)
     setRates(r.rates)
     if (r.err) setErr(r.err)
     else if (!r.rates.length) setErr("No rates came back for that parcel.")
     setBusy(false)
-  }
-
-  /**
-   * The two sweeps run SEQUENTIALLY, one quote at a time.
-   *
-   * Each one creates a shipment at the carrier aggregator; nine at once is a burst that
-   * rate-limits, and the answer arriving in order is what lets the table fill in as it
-   * goes rather than after a long blank wait.
-   */
-  const runZones = async () => {
-    if (!/^\d{5}$/.test(fromZip)) { setErr("Enter a From ZIP."); return }
-    setErr(""); setZoneRows([])
-    for (const d of ZONE_SPREAD) {
-      setRunning(d.label)
-      const r = await quote(d.zip, weightOz)
-      setZoneRows((prev) => [...(prev ?? []), { label: d.label, rates: r.rates, err: r.err }])
-    }
-    setRunning("")
-  }
-
-  const runLadder = async () => {
-    if (!zipsOk) { setErr("Enter a 5-digit From and To ZIP."); return }
-    setErr(""); setLadderRows([])
-    for (const w of WEIGHT_LADDER) {
-      setRunning(w.label)
-      const r = await quote(toZip, w.oz)
-      setLadderRows((prev) => [...(prev ?? []), { label: w.label, rates: r.rates, err: r.err }])
-    }
-    setRunning("")
   }
 
   const paidN = Number(paid) || 0
@@ -211,6 +153,26 @@ export function RateCalculatorView() {
               <Input value={oz} onChange={(e) => setOz(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 font-mono" />
             </label>
           </div>
+          {/* ONE CLICK PER MAILER. The bench reaches for a stock size, not three numbers —
+              and typing them is where a 10 × 13 poly mailer becomes a 9 × 8 × 6 box that
+              bills as four pounds. Custom sizes come from the same per-user list the label
+              dialog writes, so one added there appears here. */}
+          <div className="flex flex-wrap gap-1.5">
+            {[...STOCK_SIZES, ...mine].map((sz) => {
+              const on = sizeKey({ length: Number(len) || 0, width: Number(wid) || 0, height: Number(hei) || 0 }) === sizeKey(sz)
+              return (
+                <button
+                  key={sz.label + sizeKey(sz)}
+                  type="button"
+                  onClick={() => { setLen(String(sz.length)); setWid(String(sz.width)); setHei(String(sz.height)) }}
+                  className={"rounded-full border px-2.5 py-1 text-2xs font-medium transition-colors " +
+                    (on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
+                >
+                  {sz.label}
+                </button>
+              )
+            })}
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {([["L", len, setLen], ["W", wid, setWid], ["H", hei, setHei]] as const).map(([k, v, set]) => (
               <label key={k} className="flex flex-col gap-1">
@@ -230,13 +192,11 @@ export function RateCalculatorView() {
           {err && <p className="text-xs text-destructive">{err}</p>}
         </SectionCard>
 
-        {/* ── HOW IT'S BILLED — the formula, worked ────────────────────────── */}
+        {/* ── HOW IT'S BILLED ──────────────────────────────────────────────
+            The arithmetic and nothing else. The prose that used to sit around it
+            explained the rule three times over; the numbers say it once. */}
         <SectionCard title="How it's billed" bodyClassName="space-y-2 p-4 text-xs">
-          <p className="text-muted-foreground">
-            Carriers charge the <strong className="text-foreground">greater</strong> of what the parcel weighs
-            and what its size implies. Size wins whenever the box is big and light.
-          </p>
-          <div className="rounded-lg bg-muted/40 p-2 font-mono text-2xs">
+          <div className="rounded-lg bg-muted/40 p-2 text-center font-mono text-2xs">
             {dims.l} × {dims.w} × {dims.h} = <strong>{cuIn.toLocaleString()}</strong> cu in
           </div>
           <dl className="space-y-1">
@@ -247,37 +207,19 @@ export function RateCalculatorView() {
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">USPS dim</dt>
-              <dd className="tabular-nums">
-                {billing.uspsDimApplies ? `${billing.uspsDim.toFixed(2)} lb` : "n/a"}
-              </dd>
+              <dd className="tabular-nums">{billing.uspsDimApplies ? `${billing.uspsDim.toFixed(2)} lb` : "n/a"}</dd>
             </div>
             <div className="flex justify-between border-t border-border pt-1 font-semibold">
               <dt>Billed as</dt>
               <dd className="tabular-nums">UPS {Math.ceil(billing.upsBillable)} lb · USPS {Math.ceil(billing.uspsBillable)} lb</dd>
             </div>
           </dl>
-          {billing.upsSizeDriven ? (
+          {billing.upsSizeDriven && (
             <p className="flex items-start gap-1.5 text-amber-700">
               <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
-              <span>
-                The BOX is setting the UPS price, not the scale — {billing.upsDim.toFixed(1)} lb of dimensional
-                weight against {actualLb.toFixed(2)} lb of actual. A quote may not show this; the invoice will.
-              </span>
-            </p>
-          ) : (
-            <p className="text-muted-foreground">The scale is setting the price — these dimensions cost nothing extra.</p>
-          )}
-          {!billing.uspsDimApplies && (
-            <p className="text-muted-foreground">
-              USPS ignores size below {USPS_DIM_THRESHOLD_CU_IN.toLocaleString()} cu in (one cubic foot), so this parcel
-              is billed on weight alone there.
+              <span>The box sets the UPS price, not the scale.</span>
             </p>
           )}
-          <p className="text-2xs text-muted-foreground">
-            Divisors are the carriers&apos; published US domestic figures ({UPS_DAILY_DIVISOR} UPS daily,
-            {" "}{USPS_DIVISOR} USPS). A negotiated contract can differ — check yours before relying on the
-            exact pound.
-          </p>
         </SectionCard>
       </div>
 
@@ -325,91 +267,7 @@ export function RateCalculatorView() {
           )}
         </SectionCard>
 
-        {/* ── ACROSS THE COUNTRY ──────────────────────────────────────────── */}
-        <SectionCard
-          title="Across the country"
-          description="The same parcel to nine cities — the cheapest carrier flips with distance"
-          actions={<Button size="sm" variant="outline" onClick={runZones} disabled={!!running}>{running ? <><CircleNotch size={13} className="animate-spin" /> {running}</> : <>Run <ArrowRight size={12} weight="bold" /></>}</Button>}
-          bodyClassName="p-0"
-        >
-          {!zoneRows ? (
-            <p className="p-4 text-sm text-muted-foreground">Prices this parcel to a spread of destinations, so you can see where USPS stops winning.</p>
-          ) : (
-            <SweepTable rows={zoneRows} firstCol="Destination" />
-          )}
-        </SectionCard>
-
-        {/* ── WEIGHT CLIFFS ───────────────────────────────────────────────── */}
-        <SectionCard
-          title="Weight cliffs"
-          description="The same route at eight weights — where the price actually steps"
-          actions={<Button size="sm" variant="outline" onClick={runLadder} disabled={!!running}>{running ? <><CircleNotch size={13} className="animate-spin" /> {running}</> : <>Run <ArrowRight size={12} weight="bold" /></>}</Button>}
-          bodyClassName="p-0"
-        >
-          {!ladderRows ? (
-            <p className="p-4 text-sm text-muted-foreground">
-              USPS bands weight (0–4 oz, 4–8, 8–12, 12–16, then per pound), so shaving an ounce can matter more
-              than any box change. This shows where the steps are on your route.
-            </p>
-          ) : (
-            <SweepTable rows={ladderRows} firstCol="Weight" />
-          )}
-        </SectionCard>
       </div>
-    </div>
-  )
-}
-
-/**
- * One sweep, as a table: the cheapest rate per carrier for each row.
- *
- * Module-level, not defined in the parent's render — a component declared inside render is
- * a new type every frame and remounts its subtree (the repo's static-components rule).
- */
-function SweepTable({ rows, firstCol }: { rows: Row[]; firstCol: string }) {
-  // The columns are whatever actually came back, so a carrier that stops quoting simply
-  // stops having a column rather than showing a row of dashes.
-  const services = useMemo(() => {
-    const seen = new Map<string, number>()
-    for (const r of rows) for (const rt of r.rates) {
-      const k = `${rt.carrier} ${rt.service}`
-      seen.set(k, (seen.get(k) ?? 0) + 1)
-    }
-    // Only services quoted for MOST rows — a one-off doesn't earn a column.
-    return [...seen.entries()].filter(([, n]) => n >= Math.max(1, Math.floor(rows.length / 2))).map(([k]) => k).slice(0, 5)
-  }, [rows])
-
-  if (!rows.length) return <p className="p-4 text-sm text-muted-foreground">Running…</p>
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm tabular-nums">
-        <thead>
-          <tr className="border-b border-border text-left text-xs text-muted-foreground">
-            <th className="px-4 py-2 font-medium">{firstCol}</th>
-            {services.map((s) => <th key={s} className="px-3 py-2 text-right font-medium">{s}</th>)}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {rows.map((r) => {
-            const best = r.rates.length ? Math.min(...r.rates.map((x) => x.amount)) : null
-            return (
-              <tr key={r.label}>
-                <td className="px-4 py-2 font-medium">{r.label}</td>
-                {services.map((s) => {
-                  const hit = r.rates.find((x) => `${x.carrier} ${x.service}` === s)
-                  const isBest = hit && best != null && hit.amount === best
-                  return (
-                    <td key={s} className={"px-3 py-2 text-right " + (isBest ? "font-semibold text-success" : "")}>
-                      {hit ? usd(hit.amount) : <span className="text-muted-foreground">—</span>}
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
     </div>
   )
 }
