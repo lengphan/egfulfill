@@ -57,6 +57,28 @@ export function pinkEnabled() { return !!apiKey(); }
  */
 const PINK_DELIVERED = ['done', 'inreview', 'in_review', 'review', 'check', 'complete', 'finish', 'deliver'];
 const PINK_GONE = ['delet', 'cancel', 'archiv', 'remove', 'void'];
+/**
+ * THEIR TASK IS GONE — recorded on the card, wherever we learned it.
+ *
+ * Two ways in, and they must not say different things: a webhook that names a stop, and a
+ * 404 the first time we try to touch a task that no longer exists. Deleting on their board
+ * sends us NOTHING (confirmed by deleting one and watching the log), and their documented
+ * API has no way to read a task back — so the 404 is the only moment we can ever find out,
+ * and it must not be spent on a bare status code.
+ *
+ * The card is not moved and not deleted: the artwork, the conversation and the cost history
+ * are ours, and they shouldn't vanish because someone tidied a board.
+ */
+async function notePartnerGone(card, why, req) {
+  const note = { message: why, by: 'Pink Design', at: new Date().toISOString() };
+  await q(`update design_cards
+             set partner_notes = coalesce(partner_notes, '[]'::jsonb) || $2::jsonb, updated_at = now()
+           where id = $1`, [card.id, JSON.stringify([note])]).catch(() => {});
+  audit(req, 'design.partner_gone', { entityType: 'order', entityId: card.order_id,
+    after: { cardId: card.id, ref: card.vendor_ref ?? null, why } });
+  egBroadcast('design-cards', { id: card.id });
+}
+
 export function classifyPinkStatus(raw) {
   const status = String(raw ?? '').toLowerCase();
   const gone = PINK_GONE.some((w) => status.includes(w));
@@ -433,6 +455,16 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       method: 'POST', body: JSON.stringify({ message, images }),
     });
     if (!said.ok) {
+      // 404/410 is not a transport failure — it is the answer. Their task is gone, and
+      // since a deletion on their board notifies us of nothing, this is the only moment we
+      // could ever learn it. Said plainly, and written on the card so the next person
+      // doesn't have to rediscover it by pressing the same button.
+      if (said.status === 404 || said.status === 410) {
+        const why = 'Pink Design no longer has this task — it was deleted or archived on their board. Nothing further will arrive; close the card here or send it again as a new task.';
+        await notePartnerGone(card, why, req);
+        reply.code(409);
+        return { error: why, gone: true, cardId: card.id };
+      }
       reply.code(502);
       return { error: `Couldn't attach the revision note (${said.status}) — card left where it is.`,
                raw: typeof said.data === 'string' ? said.data.slice(0, 300) : said.data };
@@ -538,16 +570,9 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       console.log('[pinkdesign webhook] card', card.id, '· status', JSON.stringify(status), isGone
         ? '· their task is GONE — card left where it is'
         : '· unrecognised, card left where it is');
-      const note = { message: isGone
-        ? `Pink Design reports this task as "${status}" — it is no longer on their board. Nothing further will arrive; decide here what happens to the card.`
-        : `Pink Design sent an event we have no rule for: "${status}". The card was left where it is.`,
-        by: 'Pink Design', at: new Date().toISOString() };
-      await q(`update design_cards
-                 set partner_notes = coalesce(partner_notes, '[]'::jsonb) || $2::jsonb, updated_at = now()
-               where id = $1`, [card.id, JSON.stringify([note])]).catch(() => {});
-      audit(req, 'design.partner_event', { entityType: 'order', entityId: card.order_id,
-        after: { cardId: card.id, ref: refs[0], status, gone: isGone } });
-      egBroadcast('design-cards', { id: card.id });
+      await notePartnerGone(card, isGone
+        ? `Pink Design reports this task as "${status}" — it is no longer on their board. Nothing further will arrive; close the card here or send it again as a new task.`
+        : `Pink Design sent an event we have no rule for: "${status}". The card was left where it is.`, req);
     }
 
     // Deliverables arrive as URLs on THEIR servers. Storing the link alone would leave
