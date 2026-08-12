@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ArrowsClockwise, ShieldCheck, Sparkle, Check, PencilSimple, X, CircleNotch, Warning } from "@phosphor-icons/react"
+import { ArrowsClockwise, Sparkle, Check, PencilSimple, X, CircleNotch, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { PanelPicker, type PickerOption } from "@/components/app/panel-picker"
 import { Button } from "@/components/ui/button"
@@ -415,12 +415,12 @@ export function IntegrationsPanel() {
         </Button>
       }
     >
-      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-5 py-2.5 text-xs text-muted-foreground">
-        <ShieldCheck size={14} weight="fill" className="text-success" />
-        Set or replace a credential inside its row — saved to the database and used straight away. A few read
-        their credential once at boot and need a server restart to pick up a change.
-      </div>
-
+      {/* The standing "how this panel works" note is gone. It explained two things, and
+          each is now said where it matters instead of permanently at the top: a credential
+          row shows its own Save control, and a key that needs a restart says so on ITS row
+          the moment you save it — which is the only moment that fact is worth knowing.
+          A banner that never changes stops being read after the second visit and just
+          pushes the actual services further down the page. */}
       <div>
         {/* SECRETS THAT NAME A CARD THAT DOESN'T EXIST.
             Fields attach to a card by matching SECRET_DEFS' `integration` to the card's
