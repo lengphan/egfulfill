@@ -11,6 +11,7 @@ import { aiComplete } from './support_ai.js';
 import { sendMail, mailConfigured } from '../mailer.js';
 import { supportReplyEmail } from '../emails.js';
 import { audit } from '../audit.js';
+import { designNoFor, designLabel, ensureDesignIds } from '../design-id.js';
 import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll } from './factory_settings.js';
@@ -638,6 +639,9 @@ export function ordersRoutes(app, requireAuth) {
     // storage, not Postgres. Readers take url ?? data.
     .then(() => q('alter table order_designs add column if not exists storage_key text'))
     .then(() => q('create index if not exists order_designs_art_hash on order_designs (art_hash)'))
+    // GET /api/orders joins design_ids for the per-line design number, so it must exist
+    // before the first list request — not merely on the first upload that mints one.
+    .then(() => ensureDesignIds().catch(() => {}))
     // GET /api/orders ends `order by o.created_at desc` on every board, with no index behind
     // it — so each load sorted the whole table. The seller list additionally filters by
     // seller_id, and the existing orders_seller_idx can't serve both the filter and the sort.
@@ -902,7 +906,29 @@ export function ordersRoutes(app, requireAuth) {
   });
 
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {
-    const join = `left join order_items i on i.order_id = o.id`;
+    /**
+     * THE ARTWORK ON EACH LINE, so a board can be searched by design rather than only by
+     * order number or buyer.
+     *
+     * A LATERAL, not a plain join: order_designs is keyed (order, line, KIND), so one line
+     * can hold several rows (raster + vector) and a flat join would multiply that line in
+     * the aggregate below — the same order appearing to have four items when it has two.
+     * One row per line, newest first, is the only shape that can't corrupt the list.
+     *
+     * The key expression mirrors the unique index exactly, prefixes included: Etsy reuses
+     * one id shape for both line_id and sku, so an unprefixed coalesce matches across the
+     * two namespaces and attaches the wrong artwork.
+     */
+    const join = `left join order_items i on i.order_id = o.id
+      left join lateral (
+        select d.name, d.art_hash, di.design_no
+          from order_designs d
+          left join design_ids di on di.art_hash = d.art_hash
+         where d.order_id = i.order_id
+           and coalesce('L:' || d.line_id, 'S:' || d.sku) = coalesce('L:' || i.line_id, 'S:' || i.sku)
+         order by d.updated_at desc nulls last
+         limit 1
+      ) dz on true`;
     // ORDER BY i.id keeps line-item order stable across every board, so the per-line
     // design "slot" (1st vs 2nd same-SKU item) resolves to the same artwork everywhere.
     // IMAGE BYTES DO NOT TRAVEL IN THE LIST. Measured on a real board: 703 orders came to
@@ -944,6 +970,10 @@ export function ordersRoutes(app, requireAuth) {
           'factory_status', i.factory_status, 'unit_price', i.unit_price,
           'design_src', i.design_src, 'threads', i.threads,
           'personalization', i.personalization, 'created_at', i.created_at,
+          -- What the artwork on this line is called, and its automatic number (DSN-1042).
+          -- Both travel on the LIST because searching by design is the point: a name that
+          -- only arrives when a row is expanded can't be typed into a filter box.
+          'design_name', dz.name, 'design_no', dz.design_no,
           'design_tier', i.design_tier, 'design_quote_status', i.design_quote_status,
           'design_quote_make', i.design_quote_make, 'design_quote_download', i.design_quote_download,
           -- img / img_ref: see the note above the query.
@@ -1687,8 +1717,12 @@ export function ordersRoutes(app, requireAuth) {
          art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash), updated_at=now()`,
       [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId]
     );
-    audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null } });
-    return { ok: true };
+    // The artwork now has a number, minted on first sight of these exact bytes and reused
+    // every time they turn up again — see design-id.js. Handed back so the uploader sees it
+    // immediately rather than on the next load.
+    const designNo = await designNoFor(artHash, req.params.id);
+    audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null, design_no: designNo } });
+    return { ok: true, design_no: designNo, design_id: designLabel(designNo) };
   });
   /**
    * Charge a seller for design work on ONE line.

@@ -175,7 +175,13 @@ export function OrdersList() {
     return (orders ?? []).filter((o) => {
       if (!matchesFilter(o, filter)) return false
       if (!query) return true
-      const hay = `${numOf(o)} ${customerOf(o)} ${itemsLabel(o)} ${storeOf(o)}`.toLowerCase()
+      // The ARTWORK counts as searchable text here too, by name and by its automatic
+      // number — a seller looking for "the octopus one" or DSN-1042 is doing the same job
+      // the factory does, and this list was matching on order number and buyer alone.
+      const art = (o.items ?? [])
+        .flatMap((it) => [it.design_name || "", it.design_no != null ? `DSN-${it.design_no} ${it.design_no}` : ""])
+        .filter(Boolean).join(" ")
+      const hay = `${numOf(o)} ${customerOf(o)} ${itemsLabel(o)} ${storeOf(o)} ${art}`.toLowerCase()
       return hay.includes(query.toLowerCase())
     })
   }, [orders, filter, query])

@@ -2,6 +2,7 @@
 // a seller may read the cards tied to their own orders. Frontend sends the FULL
 // list (DB-shaped) on change → upsert all + drop removed (staff only).
 import { q } from '../db.js';
+import { designNoFor } from '../design-id.js';
 import { isStaff } from '../auth.js';
 import { moveFunds } from './wallet.js';
 import { audit } from '../audit.js';
@@ -255,12 +256,16 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       }
     }
 
+    // A card carries the SAME number as the artwork on it — issued here too, because a
+    // design can reach the board without ever passing through the order upload route.
+    const designNo = await designNoFor(artHash, null);
     const r = await q(
-      `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by)
-       values ($1,$2,'incoming',$3,null,null,$4,$5,$6,$7,$8)
+      `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by, design_id)
+       values ($1,$2,'incoming',$3,null,null,$4,$5,$6,$7,$8,$9)
        returning *`,
       [title, b.type ? String(b.type) : null, b.sku ? String(b.sku) : null,
-       artKey, artHash, artData, artKey ? null : (artData || thumbUrl), String((req.user && req.user.sub) || '')]
+       artKey, artHash, artData, artKey ? null : (artData || thumbUrl), String((req.user && req.user.sub) || ''),
+       designNo == null ? null : String(designNo)]
     ).catch((e) => { reply.code(500); return { error: e.message }; });
     if (!r || r.error) return r || { error: 'Could not create the card.' };
 

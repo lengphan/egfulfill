@@ -1325,6 +1325,11 @@ export type OrderItem = {
   // personalization text they entered. Distinct from the factory-placed design in
   // order_designs — this is what the customer sent, to adopt or reference.
   design_src?: string
+  /** What the artwork on this line is called, and its automatic number — issued by
+   *  ARTWORK, so the same design reused across orders carries one id (server/design-id.js).
+   *  Both ride on the list so a board can be searched by design, not only by order. */
+  design_name?: string | null
+  design_no?: number | null
   personalization?: string
   unit_price?: number | string
   print_type?: string

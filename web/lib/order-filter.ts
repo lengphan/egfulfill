@@ -293,7 +293,16 @@ function haystack(o: OrderRow): string {
     numOf(o), o.id, String(o.seq ?? ""),
     o.customer?.name, o.customer?.email,
     o.store, o.source, o.tracking, o.carrier,
-    ...(o.items ?? []).flatMap((it) => [it.sku, it.name, it.color, it.size, it.print_type, decodeEntities(it.personalization)]),
+    // The ARTWORK, by name and by number. Typing "dsn-1042" or a design's name finds every
+    // order printing it, which is how similar work gets batched — the reason this was
+    // asked for. Both forms of the number are indexed ("dsn-1042" and "1042") so neither
+    // spelling misses.
+    ...(o.items ?? []).flatMap((it) => [
+      it.sku, it.name, it.color, it.size, it.print_type,
+      it.design_name,
+      it.design_no != null ? `DSN-${it.design_no} ${it.design_no}` : "",
+      decodeEntities(it.personalization),
+    ]),
   ].filter(Boolean).join(" ").toLowerCase()
 }
 
