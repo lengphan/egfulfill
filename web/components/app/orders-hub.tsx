@@ -6,13 +6,11 @@ import { useRouter } from "next/navigation"
 import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, ArrowUUpLeft, BookmarkSimple } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
-import { parseBlock } from "@/lib/address-paste"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { Input } from "@/components/ui/input"
-import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, validateAddress, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
+import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
@@ -40,7 +38,6 @@ import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 
 const nowId = () => Date.now()
-const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
 
 // Per-order blank-stock chip for the warehouse, shown beside the readiness strip: is the
 // stock here (purple), short (amber → send to a PO), or untracked/unknown (grey)? Hovering
@@ -105,8 +102,6 @@ const MAIL_CLASSES: { id: string; label: string }[] = [
 // (settings.ship_from). It used to be localStorage-only, so it silently didn't exist for
 // anyone else and vanished on a different machine. localStorage is now just a warm cache
 // so the field isn't empty on first paint.
-const FROM_STORE = "eg_ship_from"
-const BLANK_ADDR: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
 
 // Pull a shippable recipient out of an order's stored address (handles Etsy + manual key shapes).
 const toAddrOf = (o: OrderRow): ShipAddress => {
@@ -123,10 +118,6 @@ const toAddrOf = (o: OrderRow): ShipAddress => {
 const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.zip)
 // Render an address back into the paste-box text, so opening a prefilled order shows the
 // block the way it was pasted in (and stays the single source of truth for the ship-to box).
-const addrToText = (a: ShipAddress): string =>
-  [a.name, a.street, a.street2, [[a.city, a.state].filter(Boolean).join(", "), a.zip].filter(Boolean).join(" ")]
-    .map((s) => (s || "").trim()).filter(Boolean).join("\n")
-
 /** Identity of ONE line. Two lines of the same SKU on an order (same product, different
  *  personalisation) are different jobs, so the sku alone is not an identity — keying on it
  *  made "send to board" flip every sibling line to Sent at once. */
@@ -260,8 +251,6 @@ export function OrdersHub() {
   // Non-error feedback from an action (what the auto-push did), cleared on the next one.
   const [note, setNote] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
-  // (pasteOpen removed — Ship-to is now a single, always-visible paste box.)
-  const [pasteText, setPasteText] = useState("")
   // Per-order production detail the floor needs but the board never showed: matched
   // thread cones, machine files, and how much of the blank we actually have. Fetched
   // lazily per order (on expand) so a 50-order page doesn't make 150 requests.
@@ -312,31 +301,8 @@ export function OrdersHub() {
     setExpandedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
 
-  const [carrier, setCarrier] = useState("USPS")
-  const [tracking, setTracking] = useState("")
 
   // ── Label buy (USPS-direct) ──
-  const [from, setFrom] = useState<ShipAddress>(BLANK_ADDR)
-  const [to, setTo] = useState<ShipAddress>(BLANK_ADDR)
-  const [pkg, setPkg] = useState({ weightOz: 6, length: 10, width: 8, height: 1, mailClass: "USPS_GROUND_ADVANTAGE" })
-  // Live recipient-address check for the ship panel — a visible ✓/⚠ before spending on a
-  // label. Debounced; warn-not-block (validation can be down or the USPS Addresses API may
-  // still be pending). All setState is inside the deferred timeout, never synchronous.
-  const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid"; msg?: string }>({ status: "idle" })
-  useEffect(() => {
-    const complete = !!(to.street && to.city && to.state && to.zip)
-    let alive = true
-    const t = setTimeout(() => {
-      if (!alive) return
-      if (!complete) { setAddrCheck({ status: "idle" }); return }
-      setAddrCheck({ status: "checking" })
-      validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
-        .then((v) => { if (alive) setAddrCheck(v && v.ok ? { status: "valid" } : { status: "invalid", msg: v?.error }) })
-        .catch(() => { if (alive) setAddrCheck({ status: "idle" }) })
-    }, 600)
-    return () => { alive = false; clearTimeout(t) }
-  }, [to.street, to.street2, to.city, to.state, to.zip])
-  const [labelErr, setLabelErr] = useState<string | null>(null)
   const [labels, setLabels] = useState<Record<string, UspsLabelResult>>({})
   // Barcode labels for an order's blanks — only lines whose variant is actually
   // defined, since a label for an unchosen blank is a mislabelled box.
@@ -441,21 +407,15 @@ export function OrdersHub() {
       setPoBusy(null)
     }
   }
-  // Restore the saved warehouse "from" address.
+  // Board settings. The warehouse ship-from used to be read here for the in-row label
+  // form; the label dialog reads it itself now, so only the board's own setting is left.
   useEffect(() => {
     const id = setTimeout(() => {
-      try { const raw = localStorage.getItem(FROM_STORE); if (raw) setFrom({ ...BLANK_ADDR, ...JSON.parse(raw) }) } catch {}
-      // Server wins over the local cache — it's what the label routes will actually use.
       getFactorySettings().then((s) => {
         // Admin-set age threshold. Falls back to the shared default so a settings failure
         // shows a plausible Overdue count rather than none at all.
         const d = Number((s as { overdue_days?: number } | null)?.overdue_days)
         if (Number.isFinite(d) && d > 0) setOverdueDays(d)
-        if (s?.ship_from && s.ship_from.street) {
-          const a = { ...BLANK_ADDR, ...s.ship_from } as ShipAddress
-          setFrom(a)
-          try { localStorage.setItem(FROM_STORE, JSON.stringify(a)) } catch {}
-        }
       }).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
@@ -534,55 +494,14 @@ export function OrdersHub() {
     } finally { setBusy(null); load() }
   }
   // Ship: mark every line shipped + record tracking/carrier on the order.
-  const shipOrder = async (order: OrderRow) => {
-    setBusy(`ship:${order.id}`)
-    try {
-      for (const it of order.items ?? []) if (it.sku || it.line_id) { patchItem(order.id, it.sku ?? "", "shipped"); await postItemStatus(order.id, it.sku ?? "", "shipped", it.line_id) }
-      await updateOrder(order.id, { tracking: tracking.trim() || undefined, carrier, factoryStatus: "shipped", status: "shipped" })
-      setShipOpen(null); setTracking(""); load()
-    } catch { load() } finally { setBusy(null) }
-  }
   // Open the fulfill panel for an order — prefill recipient from the order address.
-  const openFulfill = (o: OrderRow) => {
-    setShipOpen(o.id); setLabelErr(null); setCarrier("USPS"); setTracking("")
-    const a = toAddrOf(o)
-    setTo(a); setPasteText(addrToText(a))   // seed the single ship-to box from the order
-  }
+  /** Open the label window on this order. Everything it needs — ship-to, the parcel,
+   *  the rates — the dialog works out from the order itself. */
+  const openFulfill = (o: OrderRow) => setShipOpen(o.id)
   // Buy a real label. Goes through the aggregator (Shippo/EasyPost) when one is
   // configured, falling back to USPS-direct only if none is. On success the server stores
   // tracking + the label URL and moves the order to AWAITING SCAN — buying a label is not
   // shipping it; the parcel still has to be scanned and made.
-  const buyLabel = async (o: OrderRow) => {
-    setLabelErr(null)
-    if (orderNeedsSetup(o.items, catalog) > 0) { setLabelErr("Finish item setup (blank, colour, size, method) on every line before buying a label — we can't ship what isn't made."); return }
-    if (!addrComplete(to)) { setLabelErr("Recipient needs a street, city, state and ZIP."); return }
-    if (!addrComplete(from)) { setLabelErr("No warehouse 'From' address saved — set it in Settings › Platform, then try again."); return }
-    setBusy(`label:${o.id}`)
-    try {
-      try { localStorage.setItem(FROM_STORE, JSON.stringify(from)) } catch {}
-      // Persist for the whole team, not just this browser. Best-effort: a failed save
-      // must not block a label that's otherwise ready to buy.
-      setFactorySettings({ ship_from: from }).catch(() => {})
-      // Validate the recipient before spending — a bad address is a wasted label. A failure
-      // is a WARNING the user can override (validation can be down, or the USPS Addresses API
-      // may still be pending approval), never a hard block.
-      try {
-        const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
-        if (v && !v.ok && v.error && !(await confirm({ title: "Address couldn't be verified", body: `${v.error} — buy the label anyway?`, confirmLabel: "Buy anyway" }))) return
-      } catch { /* validation unavailable — proceed with the buy */ }
-      const r = await buyUspsLabel({ to, from, orderId: o.id, ...pkg })
-      if (!r.ok) { setLabelErr(r.error || "USPS couldn't create the label."); return }
-      setLabels((prev) => ({ ...prev, [o.id]: r }))
-      // A bought label means "ready to be scanned", NOT "gone". The parcel still has to be
-      // scanned and made; marking the lines shipped here claimed work that hadn't happened
-      // and skipped the order past the scan queue entirely. The server sets the stage; we
-      // just reload rather than guessing at it.
-      openLabel(r)
-      setShipOpen(null); load()
-    } catch (e) {
-      setLabelErr(e instanceof Error ? e.message : "Label request failed.")
-    } finally { setBusy(null) }
-  }
   // Order-level status: flag / hold / advance every line at once.
   /** The catch-up awaiting confirmation. Held rather than run, because skipping the
    *  pipeline is the one stage change nobody should make by a single click. */
