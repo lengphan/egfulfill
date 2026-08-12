@@ -3,26 +3,33 @@ import { Card } from "@/components/ui/card"
 
 export type Tone = "pos" | "neg" | "mut"
 
-const toneClass: Record<Tone, string> = {
-  pos: "text-success",
-  neg: "text-destructive",
-  mut: "text-muted-foreground",
-}
-
-/** Universal KPI tile — one metric per card. Reused across every dashboard page.
- *  `icon` is optional and off by default, so every existing caller is unchanged. */
+/**
+ * Universal KPI tile — one metric per card. Reused across every dashboard page.
+ * `icon` is optional and off by default, so every existing caller is unchanged.
+ *
+ * A tile is a LABEL and a NUMBER. It carried a caption under the figure as well, and with
+ * four tiles to a row that was four sentences restating four headings the reader already
+ * knew. `sub`/`tone` are still accepted so the ~200 call sites don't need touching, and
+ * they simply aren't drawn.
+ */
 export function StatCard({
   label,
   value,
-  sub,
-  tone = "mut",
   icon: Icon,
   onClick,
   active,
 }: {
   label: string
   value: string
+  /** NOT RENDERED. The caption under the number ("waiting to be placed", "sent to
+   *  suppliers") explained a label the reader already knows, on every tile of every board —
+   *  four of them per row, restating four headings. Removed at the owner's request.
+   *
+   *  The prop stays ACCEPTED rather than deleted from ~200 call sites: stripping it would
+   *  be a diff across most of the app for no behaviour change, and it is one line to put
+   *  back if a tile ever needs to say something the label genuinely can't. */
   sub?: string
+  /** Coloured the sub-line, so it is dormant alongside it. */
   tone?: Tone
   icon?: ElementType
   /** Makes the whole card a button. A number you can't act on is a number you read once —
@@ -46,7 +53,6 @@ export function StatCard({
         <span className="min-w-0 truncate">{label}</span>
       </div>
       <div className="mt-2.5 text-[2.125rem] font-black leading-none tracking-tight tabular-nums">{value}</div>
-      {sub && <div className={"mt-2 text-sm font-medium " + toneClass[tone]}>{sub}</div>}
     </>
   )
 
