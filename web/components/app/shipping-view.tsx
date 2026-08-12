@@ -4,8 +4,9 @@ import { useEffect, useState } from "react"
 import { Truck } from "@phosphor-icons/react"
 import { DispatchBoard } from "@/components/app/dispatch-board"
 import { ShipmentsView } from "@/components/app/shipments-view"
+import { RateCalculatorView } from "@/components/app/rate-calculator-view"
 
-type Tab = "dispatch" | "shipments"
+type Tab = "dispatch" | "shipments" | "rates"
 
 /**
  * Shipping — Dispatch (today's out-queue) and Shipments (the parcel archive) under one
@@ -22,7 +23,7 @@ export function ShippingView() {
   useEffect(() => {
     const id = setTimeout(() => {
       const p = new URLSearchParams(window.location.search).get("tab")
-      if (p === "dispatch" || p === "shipments") setTab(p)
+      if (p === "dispatch" || p === "shipments" || p === "rates") setTab(p)
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -43,11 +44,13 @@ export function ShippingView() {
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Truck size={18} weight="fill" /></span>
         <div className="min-w-0">
           <h1 className="font-title text-2xl font-semibold tracking-tight">Shipping</h1>
-          <p className="truncate text-sm text-muted-foreground">Today&apos;s dispatch queue and the shipment archive.</p>
+          <p className="truncate text-sm text-muted-foreground">Today&apos;s dispatch queue, the shipment archive, and what a parcel costs.</p>
         </div>
       </div>
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "dispatch", label: "Dispatch" }, { id: "shipments", label: "Shipments" }] as const).map((t) => (
+        {/* Rates is a THIRD tab rather than a dialog: pricing a parcel is work you do
+            repeatedly while quoting, and the sweeps below fill a page rather than a popup. */}
+        {([{ id: "dispatch", label: "Dispatch" }, { id: "shipments", label: "Shipments" }, { id: "rates", label: "Rates" }] as const).map((t) => (
           <button
             key={t.id}
             onClick={() => pick(t.id)}
@@ -58,7 +61,7 @@ export function ShippingView() {
         ))}
       </div>
 
-      {tab === "dispatch" ? <DispatchBoard /> : <ShipmentsView />}
+      {tab === "dispatch" ? <DispatchBoard /> : tab === "shipments" ? <ShipmentsView /> : <RateCalculatorView />}
     </div>
   )
 }
