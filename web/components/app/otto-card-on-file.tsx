@@ -21,7 +21,12 @@ import {
  * from this one component — two copies of a card form is how the two quietly disagree about
  * which one the order actually uses.
  */
-export function OttoCardOnFile({ compact = false }: { compact?: boolean }) {
+export function OttoCardOnFile({ compact = false, onSaved }: {
+  compact?: boolean
+  /** Fired once the card is stored. The window it sits in closes on it — saving a card IS
+   *  the errand, so leaving the dialog open afterwards makes you dismiss it yourself. */
+  onSaved?: () => void
+}) {
   const [saved, setSaved] = useState<CardDetails | null>(null)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState("")
@@ -62,6 +67,7 @@ export function OttoCardOnFile({ compact = false }: { compact?: boolean }) {
     setName(""); setNumber(""); setCvv(""); setExp("")
     setJustSaved(true)
     setTimeout(() => setJustSaved(false), 2500)
+    onSaved?.()
   }
 
   const remove = () => {
@@ -98,11 +104,7 @@ export function OttoCardOnFile({ compact = false }: { compact?: boolean }) {
               This card has expired, so it won&apos;t be sent — Otto orders will ask for a card again
               until it&apos;s replaced.
             </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Sent with every Otto credit-card order from this browser. No card dialog at placement.
-            </p>
-          )}
+          ) : null}
         </div>
       ) : (
         <div className="space-y-3">
@@ -162,20 +164,9 @@ export function OttoCardOnFile({ compact = false }: { compact?: boolean }) {
         </p>
       )}
 
-      {/* Said plainly, because "where does this go" is the reasonable question and the honest
-          answer is short. */}
-      {/* One SPAN around the text. A <strong> inside a flex row is its own flex item, which
-          columnises the sentence around it — the icon+text row has to hold exactly two
-          children. */}
-      <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-        <Lock size={13} weight="fill" className="mt-0.5 shrink-0" />
-        <span>
-          Kept in <strong>this browser only</strong>{" "}— never saved on EGFUL&apos;s server,
-          never written to a purchase order, and stripped from anything Otto send back. It&apos;s
-          attached to the order request itself, which is the one thing Otto give us no way
-          around. Another computer needs it entered there too.
-        </span>
-      </p>
+      {/* NO STANDING EXPLANATION HERE. Where the card lives and what we never keep is worth
+          saying once, in the code and in the docs — not on screen every time someone glances
+          at this panel. lib/otto-card.ts holds the reasoning. */}
     </div>
   )
 }

@@ -136,6 +136,10 @@ export function SupplierOrderingDialog({
       // Re-read: the S&S cards are looked up from the SAVED email, so a new address only
       // takes effect after this. Without it the Payment tab looked broken.
       load()
+      // AND CLOSE. Saving is the whole errand here; staying open made you dismiss the
+      // window yourself every time, and the confirmation had already done its job by the
+      // time you reached for the X. Long enough to see it, short enough not to wait.
+      setTimeout(() => onOpenChange(false), 700)
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't save." })
     } finally { setBusy(false) }
@@ -305,7 +309,7 @@ export function SupplierOrderingDialog({
                           same number for every purchase. Saved once in this browser, that
                           window never opens. */}
                       <div className="rounded-lg border border-border bg-muted/20 p-3">
-                        <OttoCardOnFile compact />
+                        <OttoCardOnFile compact onSaved={() => setTimeout(() => onOpenChange(false), 700)} />
                       </div>
                       {/* Otto REQUIRE both on every order and they come from their
                           Customer API, so they're picked here rather than typed. */}

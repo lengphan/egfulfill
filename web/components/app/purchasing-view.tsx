@@ -13,7 +13,9 @@ type Tab = "all" | "favorites" | "purchase" | "alibaba"
 const TABS = [
   { id: "all", label: "All suppliers" },
   { id: "favorites", label: "Favorites" },
-  { id: "purchase", label: "Orders" },
+  // "Cart", because that is what this tab opens on and what the header cart icon points
+  // at. It also holds Ongoing and History as its own tabs — see purchase-view.
+  { id: "purchase", label: "Cart" },
   { id: "alibaba", label: "Sample" },
 ] as const
 

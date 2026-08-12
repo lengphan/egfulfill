@@ -253,7 +253,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     return g
   }, [inv])
 
-  const [tab, setTab] = useState("active")  // controlled so reorder can jump to the draft
+  const [tab, setTab] = useState("cart")  // controlled so reorder can jump to what it changed
   const drafts = (pos ?? []).filter((p) => p.status === "draft")
   // In flight: placed and waiting on the supplier. These belong with the drafts, not in
   // history — an order you're still expecting is something to act on, and burying it
@@ -1186,7 +1186,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         const r = await savePurchaseOrder({ ...target, items: merged })
         if (r?.error) throw new Error(r.error)
         setPos((prev) => (prev ?? []).map((p) => (p.num === target.num ? { ...p, items: merged } : p)))
-        setTab("active")   // the draft lives on the Active tab — jump there so it's visible
+        setTab("ongoing")   // a draft is an order in progress — that is the Ongoing tab now
         setMsg({ ok: true, text: `Added ${lines.length} line${lines.length === 1 ? "" : "s"} to the open draft ${target.num} — review the quantities before placing.` })
       } else {
         const draft: PurchaseOrder = { num: nextNum(), supplier: po.supplier ?? null, items: lines, status: "draft" }
@@ -1194,7 +1194,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         // savePurchaseOrder resolves with {error} for some refusals rather than throwing,
         // so checking only for a thrown error reported a failure as a success.
         if (r?.error) throw new Error(r.error)
-        setTab("active")   // show the new draft on the Active tab
+        setTab("ongoing")   // show the new draft where orders in progress live
         setMsg({ ok: true, text: `Drafted ${draft.num} from ${po.num} — review the quantities before placing.` })
         load()
       }
@@ -1530,17 +1530,23 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
 
       {/* Reorder suggestions */}
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
+        {/* THREE TABS, because they are three different jobs.
+            Cart is what you are ABOUT to buy — a list you edit. Ongoing is money already
+            committed and goods you are waiting for — a list you chase. History is settled.
+            Cart and Ongoing shared one "Active" tab, so the thing you were mid-way through
+            deciding sat directly above orders that only needed watching, and neither read
+            cleanly. */}
         <TabsList>
-          <TabsTrigger value="active">Active{activeCount ? ` (${activeCount})` : ""}</TabsTrigger>
+          <TabsTrigger value="cart">Cart{saved.length ? ` (${saved.length})` : ""}</TabsTrigger>
+          <TabsTrigger value="ongoing">Ongoing{placed.length ? ` (${placed.length})` : ""}</TabsTrigger>
           {/* No count on History. It only grows — hundreds of POs eventually — and a
               number that always climbs and never needs acting on is decoration. */}
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
-        {/* ACTIVE — everything still owed something: a draft to finish, or an order to
-            arrive. Split from history because these are the ones that need doing, and a
-            working set buried under every PO ever received stops being read. */}
-        <TabsContent value="active" className="mt-4 space-y-4">
+        {/* CART — what is short and about to be bought. Nothing here is a purchase order:
+            none exists until you place one. */}
+        <TabsContent value="cart" className="mt-4 space-y-4">
 
         {/* ── TO ORDER ─────────────────────────────────────────────────────────
             One panel, always open. This is the working surface, and something you're
@@ -1721,7 +1727,11 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             </div>
           )}
         </SectionCard>
+        </TabsContent>
 
+        {/* ONGOING — placed and in flight, plus any draft still to finish. Money is already
+            committed here; the job is chasing, not deciding. */}
+        <TabsContent value="ongoing" className="mt-4 space-y-4">
           {placed.length > 0 && (
             <SectionCard
               title="On order"
