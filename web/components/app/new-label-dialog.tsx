@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
+import { printPackingSlips } from "@/lib/packing-slip"
 import { STOCK_SIZES, DEFAULT_SIZE, customSizes, addCustomSize, sizeKey, sizeLabel, type ParcelSize } from "@/lib/parcel-sizes"
 import { parcelFromOrder, parcelBasisNote } from "@/lib/parcel-from-order"
 import { validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, getCatalogProducts, fetchShipmentLabel, type ShipAddress, type UspsLabelResult, type ShippingRate, type OrderItem } from "@/lib/api"
@@ -135,13 +136,17 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
     const t = setTimeout(() => {
       if (!alive) return
       setLabelSrc(null)
-      if (!result?.labelUrl || !order?.id) return
-      fetchShipmentLabel(String(order.id))
+      // An order label is addressed by the ORDER id; a standalone one by the shipment the
+      // buy created. /api/shipments/:id/label resolves either, so both can print — which is
+      // the whole point: the next step after buying a label is always the printer.
+      const labelId = order?.id ?? result?.shipmentId
+      if (!result?.labelUrl || !labelId) return
+      fetchShipmentLabel(String(labelId))
         .then((blob) => { if (!alive) return; url = URL.createObjectURL(blob); setLabelSrc(url) })
         .catch(() => { /* the Open-label link and the Shipments row both still work */ })
     }, 0)
     return () => { alive = false; clearTimeout(t); if (url) URL.revokeObjectURL(url) }
-  }, [result?.labelUrl, result?.trackingNumber, order?.id])
+  }, [result?.labelUrl, result?.trackingNumber, result?.shipmentId, order?.id])
 
   const reset = () => { setPasteText(""); setTo({ ...BLANK }); setSvc({ signature: false, insurance: 0 }); setResult(null); setErr(null); setAddrCheck({ status: "idle" }); setRates(null); setPickedToken(null) }
   // Any change to the parcel or add-ons invalidates the quoted rates — you can't buy a rate
@@ -308,6 +313,22 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   wrong tray, or the second copy. */}
               {labelSrc && (
                 <Button onClick={printLabel}><Printer size={14} weight="bold" /> Print again</Button>
+              )}
+              {/* THE OTHER DOCUMENT A PACKER NEEDS, one click away from the label that was
+                  just bought — the same 4×6 slip the dispatch board prints, from the same
+                  module, so the two can never drift apart.
+
+                  Deliberately a button and not automatic: the label has already opened the
+                  browser's print dialog, and firing a second window at it immediately is
+                  what a popup blocker stops and what leaves two dialogs fighting. One click,
+                  right where you already are. */}
+              {order?.id && (
+                <Button variant="outline" onClick={() => {
+                  const msg = printPackingSlips([{ id: order.id, num: order.num, items: order.items, address: order.to } as never])
+                  if (msg) setErr(msg)
+                }}>
+                  <Package size={14} weight="bold" /> Packing slip
+                </Button>
               )}
               {result.labelUrl && (
                 <a href={result.labelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent">

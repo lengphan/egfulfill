@@ -1250,7 +1250,11 @@ export function undoScan(id: string) {
 
 // ── USPS-direct label (Labels 3.0) — buys a real label + writes tracking onto the order ──
 export type ShipAddress = { name?: string; street?: string; street2?: string; city?: string; state?: string; zip?: string }
-export type UspsLabelResult = { ok?: boolean; error?: string; mock?: boolean; trackingNumber?: string; labelUrl?: string; labelImage?: string; labelHtml?: string; imageType?: string; carrier?: string; service?: string; cost?: number }
+export type UspsLabelResult = { ok?: boolean; error?: string; mock?: boolean; trackingNumber?: string; labelUrl?: string; labelImage?: string; labelHtml?: string; imageType?: string; carrier?: string; service?: string; cost?: number
+  /** A label bought with NO order gets a shipment of its own, and this is its id. The
+   *  server has always returned it (usps.js recordLabel); the type simply dropped it, so
+   *  the print step had nothing to fetch and standalone labels never auto-printed. */
+  shipmentId?: string }
 // One quoted rate from the multi-carrier rate-shop. `token` is what you buy against.
 /** `carrierAccount` is the ONLY place this value exists. Shippo puts it on the rate and
  *  returns `rate` as a bare id string on the bought transaction, so it has to survive the
