@@ -8,7 +8,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
 import { printPackingSlips } from "@/lib/packing-slip"
-import { printLabelPacket } from "@/lib/label-packet"
+import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
 import { STOCK_SIZES, DEFAULT_SIZE, customSizes, addCustomSize, sizeKey, sizeLabel, type ParcelSize } from "@/lib/parcel-sizes"
 import { parcelFromOrder, parcelBasisNote } from "@/lib/parcel-from-order"
 import { validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, getCatalogProducts, fetchShipmentLabel, type ShipAddress, type UspsLabelResult, type ShippingRate, type OrderItem } from "@/lib/api"
@@ -145,9 +145,17 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    */
   const printPacket = async () => {
     if (!labelSrc || !order?.id) { printLabel(); return }
-    const msg = await printLabelPacket(labelSrc, { id: order.id, num: order.num, items: order.items, address: order.to } as never)
-    if (msg) { setErr(msg); printLabel() }
+    try {
+      const { html, skipped } = await packetHtml([{ labelBlobUrl: labelSrc, order: { id: order.id, items: order.items, address: order.to } as never }])
+      // Nothing rendered means no packet worth printing — fall back to the label frame,
+      // which is the path that has always worked.
+      if (skipped.length) { printLabel(); return }
+      await printHtmlViaIframe(html)
+    } catch {
+      printLabel()
+    }
   }
+
   useEffect(() => {
     let url: string | null = null
     let alive = true

@@ -15,7 +15,7 @@ import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
 import { labelableOrders, buyLabelsFor, summarise } from "@/lib/bulk-labels"
-import { printLabelPackets } from "@/lib/label-packet"
+import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
 import { isApprovable } from "@/components/app/approve-order-button"
@@ -972,9 +972,11 @@ export function OrdersHub() {
         .map((r) => ({ labelBlobUrl: r.labelBlobUrl as string, order: r.order }))
       let msg = summarise(results, blocked)
       if (printable.length) {
-        const { error, skipped } = await printLabelPackets(printable)
-        if (error) msg += ` · ${error}`
-        else if (skipped.length) msg += ` · ${skipped.length} couldn't be printed (${skipped.join(", ")})`
+        // Through an iframe, not a popup: by the time a batch of labels is bought the click
+        // that started it is minutes old and window.open would be blocked silently.
+        const { html, skipped } = await packetHtml(printable)
+        await printHtmlViaIframe(html)
+        if (skipped.length) msg += ` · ${skipped.length} couldn't be printed (${skipped.join(", ")})`
       }
       setPushMsg({ tone: results.some((r) => !r.ok) || blocked.length ? "err" : "ok", text: msg })
       setSelected(new Set())

@@ -40,20 +40,50 @@ const PACKET_CSS = `<style>
 </style>`
 
 /**
- * MANY parcels, still ONE print job.
+ * Print a document WITHOUT opening a window.
  *
- * A batch that opens ten print dialogs is worse than buying the labels one at a time, which
- * is the thing bulk buying exists to replace. Every label and its slip go into a single
- * document in order — label, slip, label, slip — so the stack comes off the printer already
- * paired.
+ * window.open only works inside a live user gesture. Buying a label takes seconds — the
+ * carrier round-trip, then rendering the PDF — so by the time a packet is ready the click
+ * that started it is long gone and Chrome blocks the popup silently. That is why the
+ * automatic print stopped happening at all: not an error, just nothing.
  *
- * A label that cannot be rendered is SKIPPED rather than aborting the batch, and its order
- * number is returned: the postage is already bought either way, so the packet's job is to
- * print what it can and say plainly what it couldn't.
+ * A same-origin iframe has no such restriction. It is written into this document, printed,
+ * and removed. srcdoc rather than document.write so the content is parsed as one unit and
+ * `load` genuinely means "ready to print".
  */
-export async function printLabelPackets(
-  items: { labelBlobUrl: string; order: OrderRow | null }[],
-): Promise<{ error: string | null; skipped: string[] }> {
+export function printHtmlViaIframe(html: string): Promise<void> {
+  return new Promise((resolve) => {
+    const f = document.createElement("iframe")
+    // Offscreen, NOT display:none — a frame that was never laid out has nothing to print.
+    f.setAttribute("aria-hidden", "true")
+    f.style.cssText = "position:fixed;left:-9999px;top:0;width:4in;height:6in;opacity:0;pointer-events:none"
+    f.srcdoc = html
+    f.onload = () => {
+      const w = f.contentWindow
+      if (!w) { f.remove(); resolve(); return }
+      const go = () => {
+        try { w.focus(); w.print() } catch { /* nothing more to try */ }
+        // Left in the DOM briefly: removing it while the print dialog is still reading the
+        // document gives a blank sheet in some browsers.
+        setTimeout(() => f.remove(), 60_000)
+        resolve()
+      }
+      const imgs = Array.from(w.document.images)
+      const pending = imgs.filter((i) => !i.complete)
+      if (!pending.length) go()
+      else {
+        let left = pending.length
+        pending.forEach((i) => i.addEventListener("load", () => { if (--left === 0) go() }, { once: true }))
+        // A decode that never finishes must not mean a label that never prints.
+        setTimeout(go, 8000)
+      }
+    }
+    document.body.appendChild(f)
+  })
+}
+
+/** The packet as markup, so it can be printed through an iframe (no popup) or embedded. */
+export async function packetHtml(items: { labelBlobUrl: string; order: OrderRow | null }[]): Promise<{ html: string; skipped: string[] }> {
   const pages: string[] = []
   const skipped: string[] = []
   for (const it of items) {
@@ -62,48 +92,8 @@ export async function printLabelPackets(
     pages.push(`<div class="page label"><img src="${png}" alt="Shipping label"/></div>`)
     if (it.order) pages.push(slipHtml([it.order]))
   }
-  if (!pages.length) return { error: "None of those labels could be read for printing.", skipped }
-
-  const w = window.open("", "_blank")
-  if (!w) return { error: "Your popup blocker stopped the print window — allow popups for this site.", skipped }
-  w.document.write(`<!doctype html><html><head><title>Labels + packing slips</title>${PACKET_CSS}</head><body>${pages.join("")}</body></html>`)
-  w.document.close()
-  w.focus()
-  const imgs = Array.from(w.document.querySelectorAll("img")) as HTMLImageElement[]
-  const pending = imgs.filter((i) => !i.complete)
-  const go = () => { try { w.print() } catch { /* still usable by hand */ } }
-  if (!pending.length) go()
-  else {
-    let left = pending.length
-    // Print once EVERY image has decoded. Printing at the first load event would put blank
-    // pages in the middle of a batch, which is the failure nobody notices until the parcels
-    // are already taped.
-    pending.forEach((i) => i.addEventListener("load", () => { if (--left === 0) go() }, { once: true }))
+  return {
+    html: `<!doctype html><html><head><title>Labels</title>${PACKET_CSS}</head><body>${pages.join("")}</body></html>`,
+    skipped,
   }
-  return { error: null, skipped }
-}
-
-export async function printLabelPacket(labelBlobUrl: string, order: OrderRow | null): Promise<string | null> {
-  // The label first: if it cannot be rendered there is no packet worth opening, and the
-  // caller still has its own "Print again" path to fall back on.
-  const labelPng = await pdfFirstPageDataUrl(labelBlobUrl, LABEL_PX)
-  if (!labelPng) return "Couldn't read the label file to print it."
-
-  const slip = order ? slipHtml([order]) : ""
-  const w = window.open("", "_blank")
-  if (!w) return "Your popup blocker stopped the print window — allow popups for this site."
-
-  w.document.write(`<!doctype html><html><head><title>Label + packing slip</title>${PACKET_CSS}</head><body>
-    <div class="page label"><img src="${labelPng}" alt="Shipping label"/></div>
-    ${slip}
-  </body></html>`)
-  w.document.close()
-  w.focus()
-  // Wait for the image to be decoded before printing — printing a document whose only
-  // element has not loaded yields a blank first page, which is worse than a slow one.
-  const go = () => { try { w.print() } catch { /* the window is still usable by hand */ } }
-  const img = w.document.querySelector("img")
-  if (img && !(img as HTMLImageElement).complete) img.addEventListener("load", go, { once: true })
-  else go()
-  return null
 }
