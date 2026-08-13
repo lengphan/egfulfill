@@ -35,7 +35,7 @@ export function VariantField({
   value,
   options,
   onChange,
-  placeholder = "Choose…",
+  placeholder,
   emptyLabel = "Any",
   disabled,
   required,
@@ -65,13 +65,38 @@ export function VariantField({
   // show the name — nobody should have to decode a warehouse SKU to pick a colour.
   const tl = useLabelT()
   const pretty = (v: string) => (swatches ? prettyColorName(v) : v)
-  const ph = tl("field", placeholder)
-  const shown = value ? pretty(value) : (hasOptions ? ph : tl("field", emptyLabel))
+  /**
+   * THE LABEL LIVES IN THE FIELD, not on a row above it.
+   *
+   * Four controls each carried an uppercase caption, so the strip cost a line of chrome to
+   * say "Colour" over a control whose empty state already said "Choose…" — two rows to
+   * communicate one thing, on every line of every expanded order. An empty field now names
+   * itself, which is the same information in no vertical space at all.
+   *
+   * The caption is not simply deleted: it moves to aria-label, so the control keeps an
+   * accessible name once a value replaces the placeholder text, and to the dropdown's own
+   * clear row — picking it returns the field to the state where the label is visible again.
+   */
+  const ph = tl("field", placeholder ?? label)
+  /**
+   * AN EMPTY FIELD MUST STILL SAY WHICH FIELD IT IS.
+   *
+   * The no-options state used to render `emptyLabel` alone — "Any" — which was fine while a
+   * caption sat above it. With the caption inside, three of these in a row became three
+   * identical "Any" controls with nothing to tell Colour from Size from Method. The label
+   * leads and the empty note follows it.
+   */
+  const shown = value
+    ? pretty(value)
+    : hasOptions ? ph : `${ph} · ${tl("field", emptyLabel)}`
   const unset = !value
 
   const trigger = (
     <DropdownMenuTrigger
       disabled={disabled || !hasOptions}
+      // The visible text becomes the VALUE once one is picked, and "Navy" does not say which
+      // field it belongs to. The caption that used to sit above survives here.
+      aria-label={tl("field", label)}
       className={cn(
         "flex w-full min-w-0 items-center gap-1.5 rounded-2xl border bg-card text-left font-medium transition-colors",
         "hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
@@ -91,6 +116,12 @@ export function VariantField({
         <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: swatchHex(value) }} />
       )}
       <span className={cn("min-w-0 flex-1 truncate", unset && "text-muted-foreground")}>{shown}</span>
+      {/* The required flag came off the caption row with everything else. It sits in the
+          control now, so the one field that blocks the line still says so — the tinted
+          border alone reads as decoration next to three untinted neighbours. */}
+      {required && unset && (
+        <span className="shrink-0 text-3xs font-medium text-primary">{tl("field", "Required")}</span>
+      )}
       {hasOptions && <CaretDown size={11} className="shrink-0 text-muted-foreground" />}
     </DropdownMenuTrigger>
   )
@@ -114,17 +145,10 @@ export function VariantField({
     </DropdownMenu>
   )
 
-  if (compact) return control
-
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <span className="flex items-center gap-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {tl("field", label)}
-        {required && !value && <span className="font-medium normal-case tracking-normal text-primary">{tl("field", "Required")}</span>}
-      </span>
-      {control}
-    </div>
-  )
+  // Compact and full are the same control now — the caption row was the only thing that
+  // separated them, and it lives inside the trigger. `compact` still differs in height and
+  // type size, which is the part that was ever about density.
+  return control
 }
 
 /**

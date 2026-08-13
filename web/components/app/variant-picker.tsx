@@ -104,9 +104,12 @@ export function VariantPicker({
       <div className="grid grid-cols-2 gap-x-2 gap-y-2.5 sm:grid-cols-[1.7fr_1.25fr_0.7fr_0.85fr]">
         {/* Blank — the load-bearing pick; nothing else can price without it, so it's the
             only field that flags itself when empty. */}
+        {/* No custom placeholder: the field names itself now, and "Blank" beside the
+            Required flag says the same thing "Pick a blank…" did, in the same space the
+            other three use. */}
         <VariantField
           label="Blank" value={blankLabel} required
-          options={blankOptions} placeholder="Pick a blank…"
+          options={blankOptions}
           disabled={busy === "blank"} onChange={pickBlank}
         />
         <VariantField
