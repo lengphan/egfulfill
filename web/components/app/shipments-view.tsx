@@ -488,6 +488,7 @@ export function ShipmentsView() {
       onRefund={doVoid}
       voiding={voiding}
       canRefund={canVoid}
+      onChanged={() => load()}
     />
     <RateCheckerDialog open={rateCheckOpen} onOpenChange={setRateCheckOpen} />
     </>

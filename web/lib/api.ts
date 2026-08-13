@@ -2810,6 +2810,46 @@ export type UploadedListing = EtsyListing & {
  * Fetched properly and handed back as a Blob. The caller makes an object URL from it, which
  * a frame can show and `download` can save, and no token ever appears in a URL.
  */
+/** One order this loose parcel might belong to. `score` is why it is ranked where it is —
+ *  2 for the address, 2 for an exact name, 1 for a partial — and the two `matched*` flags
+ *  are what the UI shows instead of the number, because "address + name" can be checked by
+ *  a human and a 4 cannot. `createdAt` is the order's import date: two orders for the same
+ *  buyer are told apart by when they arrived. */
+export type ShipmentCandidate = {
+  id: string
+  seq?: number | null
+  createdAt?: string | null
+  status?: string | null
+  factoryStatus?: string | null
+  customer?: string | null
+  tracking?: string | null
+  address: { street?: string; city?: string; state?: string; zip?: string }
+  score: number
+  matchedZip: boolean
+  matchedName: boolean
+}
+export function getShipmentCandidates(id: string) {
+  return api<{
+    shipment: { id: string; tracking?: string | null; orderId?: string | null; to: { name?: string; city?: string; state?: string; zip?: string } }
+    candidates: ShipmentCandidate[]
+    error?: string
+  }>(`/api/shipments/${encodeURIComponent(id)}/candidates`)
+}
+/** Move a loose label onto the order it was really for. The postage is NOT re-booked (it
+ *  was charged once already) and the marketplace is NOT told — telling the buyer is its own
+ *  decision, not a side effect of fixing our own records. */
+export function attachShipmentToOrder(id: string, orderId: string) {
+  return api<{ ok?: boolean; orderId?: string; tracking?: string; error?: string }>(
+    `/api/shipments/${encodeURIComponent(id)}/attach`,
+    { method: "POST", body: JSON.stringify({ orderId }) })
+}
+/** Take tracking off an order so a correct label can be bought. NOT a refund — the postage
+ *  stays bought and stays charged; voiding is the other button and cannot be undone. */
+export function detachOrderLabel(orderId: string) {
+  return api<{ ok?: boolean; removed?: string; marketplaceWasTold?: boolean; error?: string }>(
+    `/api/orders/${encodeURIComponent(orderId)}/label/detach`, { method: "POST" })
+}
+
 export async function fetchShipmentLabel(id: string): Promise<Blob> {
   const token = getToken()
   const res = await fetch(`${baseFor()}/api/shipments/${encodeURIComponent(id)}/label`, {

@@ -1,10 +1,11 @@
 "use client"
 
-import { ArrowSquareOut, CircleNotch, X, Package, DownloadSimple, FilePdf, Printer } from "@phosphor-icons/react"
+import { ArrowSquareOut, CircleNotch, X, Package, DownloadSimple, FilePdf, Printer, LinkSimple } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { MatchShipmentDialog } from "@/components/app/match-shipment-dialog"
 import { useEffect, useRef, useState } from "react"
-import { fetchShipmentLabel, type ShipmentRow } from "@/lib/api"
+import { fetchShipmentLabel, detachOrderLabel, type ShipmentRow } from "@/lib/api"
 
 /**
  * ONE PARCEL, IN FULL — so the table doesn't have to be.
@@ -50,13 +51,16 @@ function Row({ label, children, mono }: { label: string; children: React.ReactNo
 }
 
 export function ShipmentDetailDialog({
-  shipment, onOpenChange, onRefund, voiding, canRefund,
+  shipment, onOpenChange, onRefund, voiding, canRefund, onChanged,
 }: {
   shipment: ShipmentRow | null
   onOpenChange: (o: boolean) => void
   onRefund: (s: ShipmentRow) => void
   voiding: string | null
   canRefund: boolean
+  /** Reload the list — attaching a loose label moves it onto an order, so the row this
+   *  window was opened from is no longer what it was. */
+  onChanged?: () => void
 }) {
   const s = shipment
   const id = s?.id
@@ -71,6 +75,32 @@ export function ShipmentDetailDialog({
    * which a frame renders and `download` saves, with no token anywhere in a URL.
    */
   const frameRef = useRef<HTMLIFrameElement>(null)
+  // `sh_*` is the standalone namespace — see isShipmentId on the server. Every order id is
+  // etsy-*, tiktok-*, FF-* or a bare sequence, so the two can never be confused.
+  const isLoose = /^sh_/.test(String(id ?? ""))
+  const [matching, setMatching] = useState(false)
+  const [detaching, setDetaching] = useState(false)
+  const [detachErr, setDetachErr] = useState<string | null>(null)
+  /**
+   * WRONG ORDER is not the same as WRONG LABEL, and they must not share a button.
+   *
+   * This unlinks: the order gives the tracking back and can be labelled again, while the
+   * postage stays bought and stays charged. Refund is the other one, it goes to the carrier,
+   * and it cannot be undone. An operator reaching for "I put this on the wrong order" must
+   * not be able to destroy postage with the same click.
+   */
+  const detach = async () => {
+    if (!id) return
+    setDetaching(true); setDetachErr(null)
+    try {
+      const r = await detachOrderLabel(String(id))
+      if (r.error) throw new Error(r.error)
+      onOpenChange(false)
+      onChanged?.()
+    } catch (e) {
+      setDetachErr(e instanceof Error ? e.message : "Couldn't remove the tracking from this order.")
+    } finally { setDetaching(false) }
+  }
   const [labelSrc, setLabelSrc] = useState<string | null>(null)
   const [labelErr, setLabelErr] = useState<string | null>(null)
   useEffect(() => {
@@ -134,6 +164,26 @@ export function ShipmentDetailDialog({
             )}
           </DialogTitle>
         </DialogHeader>
+
+        {detachErr && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{detachErr}</div>
+        )}
+
+        {/* A LOOSE PARCEL SAYS SO, at the top, before the facts.
+            An `sh_*` id means this label was bought without an order — which is legitimate
+            for a re-ship or a sample, and a mistake the rest of the time. The difference
+            matters because in the mistaken case an order is sitting at "new" with no
+            tracking and its buyer has been told nothing, and nothing on this screen said so. */}
+        {isLoose && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            <span className="min-w-0 flex-1">
+              Not attached to an order — so no order shows this tracking, and the buyer has not been told.
+            </span>
+            <Button size="sm" variant="outline" onClick={() => setMatching(true)}>
+              <LinkSimple size={13} weight="bold" /> Find its order
+            </Button>
+          </div>
+        )}
 
         {/* THE LABEL BESIDE THE FACTS.
             It was a button that opened another tab — which is a whole context switch to
@@ -255,6 +305,19 @@ export function ShipmentDetailDialog({
                 Refund
               </Button>
             )}
+            {/* UNLINK, for a label that is fine but landed on the wrong order. Quiet and
+                text-only: it is the rare case, and it must not read as a peer of Print. */}
+            {!isLoose && !!s.tracking && (
+              <button
+                onClick={() => void detach()}
+                disabled={detaching}
+                title="Take this tracking off the order so a correct label can be bought. The postage is NOT refunded."
+                className="mr-auto inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
+              >
+                {detaching ? <CircleNotch size={12} className="animate-spin" /> : null}
+                Wrong order? Remove this tracking
+              </button>
+            )}
             {s.labelUrl && (
               <>
                 {/* The carrier's own copy still has a use — printing from their viewer, or
@@ -291,6 +354,13 @@ export function ShipmentDetailDialog({
         </div>
         </div>
       </DialogContent>
+
+      <MatchShipmentDialog
+        shipmentId={matching ? String(id) : null}
+        toName={s.customer}
+        onClose={() => setMatching(false)}
+        onAttached={() => { setMatching(false); onOpenChange(false); onChanged?.() }}
+      />
     </Dialog>
   )
 }
