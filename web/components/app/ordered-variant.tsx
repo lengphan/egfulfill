@@ -31,6 +31,11 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
   // message or a customer query will quote. Distinct from the blank sku we buy against, and
   // carrying the print-method suffix the listing was sold under.
   const sku = String(item.sku ?? "").trim()
+  // QUANTITY BELONGS WITH THE LINE, not only on the chip row that appears once a blank is
+  // picked. Before a blank is chosen — which is exactly when someone is reading this strip
+  // to decide — the count was nowhere on screen, and "how many" is the first thing you need
+  // in order to pull stock.
+  const qty = Math.max(1, Number(item.qty) || 1)
   if (!ordered && !sku) return null
 
   return (
@@ -38,6 +43,9 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
       {ordered && (
         <div className="text-muted-foreground">
           <span className="font-medium text-foreground/70">Ordered:</span> {ordered}
+          {/* Loud when it is more than one. A ×1 in the same weight as a ×6 is how a six
+              gets pulled as a one. */}
+          {qty > 1 && <span className="ml-1.5 font-semibold text-foreground">×{qty}</span>}
         </div>
       )}
       {/* Personalisation is deliberately NOT repeated here — the order panel above already
@@ -47,6 +55,7 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
         <div className="text-muted-foreground">
           <span className="font-medium text-foreground/70">Listing SKU:</span>{" "}
           <span className="font-mono">{sku}</span>
+          {!ordered && qty > 1 && <span className="ml-1.5 font-semibold text-foreground">×{qty}</span>}
         </div>
       )}
     </div>
