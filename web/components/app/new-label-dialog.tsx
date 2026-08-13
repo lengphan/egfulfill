@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
 import { printPackingSlips } from "@/lib/packing-slip"
+import { printLabelPacket } from "@/lib/label-packet"
 import { STOCK_SIZES, DEFAULT_SIZE, customSizes, addCustomSize, sizeKey, sizeLabel, type ParcelSize } from "@/lib/parcel-sizes"
 import { parcelFromOrder, parcelBasisNote } from "@/lib/parcel-from-order"
 import { validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, getCatalogProducts, fetchShipmentLabel, type ShipAddress, type UspsLabelResult, type ShippingRate, type OrderItem } from "@/lib/api"
@@ -129,6 +130,23 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
     if (!w) return
     w.focus()
     w.print()
+  }
+
+  /**
+   * The two documents a packer needs, as ONE print job.
+   *
+   * With an order there is a packing slip to go with the postage, so both go into a single
+   * document — page one the label, page two the pick list — and the printer is asked once.
+   * A standalone label has no order and nothing to pack, so it prints on its own through the
+   * frame, exactly as before.
+   *
+   * Falls back to the frame if the packet can't be built (a popup blocker, an unreadable
+   * label): a label that prints without its slip beats one that doesn't print at all.
+   */
+  const printPacket = async () => {
+    if (!labelSrc || !order?.id) { printLabel(); return }
+    const msg = await printLabelPacket(labelSrc, { id: order.id, num: order.num, items: order.items, address: order.to } as never)
+    if (msg) { setErr(msg); printLabel() }
   }
   useEffect(() => {
     let url: string | null = null
@@ -304,7 +322,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   const key = result?.trackingNumber ?? labelSrc
                   if (printedRef.current === key) return
                   printedRef.current = key
-                  printLabel()
+                  void printPacket()
                 }}
               />
             )}

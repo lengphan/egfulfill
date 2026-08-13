@@ -209,6 +209,21 @@ export type LedgerRow = {
   is_test?: boolean
 }
 
+/** The card Shippo charges postage to. Passthrough from Shippo's /billing — brand and last
+ *  four only, nothing stored our side. There is no BALANCE to report: Shippo's payment_type
+ *  is STRIPE, meaning a card charged per label rather than a prepaid account. */
+export type ShippoBilling = {
+  configured: boolean
+  paymentType?: string | null
+  blocked?: boolean
+  currency?: string | null
+  error?: string
+  methods: { brand: string | null; last4: string | null; expires: string | null; active: boolean; default: boolean; authorized: boolean }[]
+}
+export function getShippoBilling() {
+  return api<ShippoBilling>(`/api/shipping/billing`)
+}
+
 /** Mark a ledger row as test money, or restore it. Admin only; audited before/after,
  *  because it changes a balance someone has already been shown. Returns the account's
  *  recomputed balance so the screen can settle without a refetch. */

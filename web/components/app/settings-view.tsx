@@ -76,6 +76,7 @@ import {
   type BackupsState,
 } from "@/lib/api"
 import { TabLabel } from "@/components/app/tab-label"
+import { getShippoBilling, type ShippoBilling } from "@/lib/api"
 import { useLabelT } from "@/lib/i18n"
 
 const fmtDate = (s?: string | null) => {
@@ -1804,6 +1805,15 @@ function PlatformPanel() {
           one setting on this page that blocks work outright when it's blank — hence the
           warning rather than a silent empty form. */}
 
+      {/* WHICH CARD PAYS FOR POSTAGE. Read-only, and from Shippo rather than us: they charge
+          a card per label (payment_type STRIPE), so there is no balance to show and a figure
+          here would be invented. What is worth knowing before a label fails at the counter is
+          which card is active and when it expires — the card itself is changed in Shippo's
+          own dashboard, which is where card details belong. */}
+      <Fold title="Postage card" hint="the card Shippo charges each label to">
+        <ShippoBillingPanel />
+      </Fold>
+
       {/* Flat shipping by garment class. A product's own shippingFee still wins; these are
           what a product WITHOUT one falls back to, instead of one flat platform number. */}
       <Fold title="Shipping by product type" hint="flat rate per garment class">
@@ -2923,6 +2933,64 @@ function BackupsPanel() {
         </DialogContent>
       </Dialog>
     </SectionCard>
+  )
+}
+
+
+/**
+ * The card Shippo bills postage to — read-only.
+ *
+ * Deliberately NOT an editor. Storing or accepting card details would put us in scope for
+ * obligations we currently avoid entirely by never touching them; Shippo's dashboard already
+ * does that job. This answers "which card is being charged, and is it about to expire",
+ * which is the question that shows up as a failed label at the worst moment.
+ */
+function ShippoBillingPanel() {
+  const [b, setB] = useState<ShippoBilling | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      getShippoBilling().then(setB).catch((e) => setErr(e instanceof Error ? e.message : "Couldn't read Shippo billing."))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
+  if (err) return <p className="text-xs text-muted-foreground">{err}</p>
+  if (!b) return <p className="text-xs text-muted-foreground">Loading…</p>
+  if (!b.configured) return <p className="text-xs text-muted-foreground">No Shippo token set — add one in Integrations.</p>
+  if (b.error) return <p className="text-xs text-muted-foreground">Shippo didn&apos;t answer: {b.error}</p>
+
+  return (
+    <div className="space-y-2">
+      {b.blocked && (
+        <p className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+          Billing is blocked on this Shippo account — labels will fail until it&apos;s resolved in Shippo.
+        </p>
+      )}
+      {b.methods.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No card on the Shippo account.</p>
+      ) : (
+        <div className="rounded-lg border border-border">
+          {b.methods.map((m, i) => (
+            <div key={i} className="flex items-center gap-2 border-b border-border/60 px-3 py-2 text-sm last:border-b-0">
+              <span className="font-medium">{m.brand || "Card"}</span>
+              <span className="tabular-nums text-muted-foreground">•••• {m.last4 || "????"}</span>
+              {m.expires && <span className="text-xs text-muted-foreground">exp {m.expires}</span>}
+              <span className="ml-auto flex gap-1.5">
+                {m.default && <Badge variant="secondary" className="bg-primary/10 text-primary">Default</Badge>}
+                <Badge variant="secondary" className={m.active ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-muted text-muted-foreground"}>
+                  {m.active ? "Active" : "Inactive"}
+                </Badge>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-2xs text-muted-foreground">
+        Postage is charged per label to this card — Shippo keeps no prepaid balance, so there is none to show here.
+        Change the card in Shippo&apos;s dashboard. Your postage SPEND is in Finance › Wallet, as label costs.
+      </p>
+    </div>
   )
 }
 
