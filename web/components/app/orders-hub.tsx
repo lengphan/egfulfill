@@ -1877,8 +1877,14 @@ export function OrdersHub() {
                        * every move by name, which is where an unusual one belongs.
                        */
                       const inProduction = ["working", "shipped"].includes(normalizeStage(stage))
-                      const primary: "start" | "ship" | null =
-                        canStart ? "start" : (canShip && inProduction) ? "ship" : null
+                      /**
+                       * START, or nothing. "ship" is gone as a primary: buying a label is a
+                       * menu action now, so the one button on a row always means the same
+                       * thing. A control that changes what it does depending on the row's
+                       * state, in the position your hand already goes, is the shape of an
+                       * expensive mis-click.
+                       */
+                      const primary: "start" | null = canStart ? "start" : null
                       const busyO = busy?.startsWith(o.id)
                       return (
                         <div className="flex items-center justify-end gap-2 sm:shrink-0">
@@ -1927,7 +1933,6 @@ export function OrdersHub() {
                               {tl("ui", "Start")}
                             </Button>
                           )}
-                          {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}>{tl("ui", "Create new label")}</Button>}
                           <DropdownMenu>
                             <DropdownMenuTrigger
                               aria-label={tl("ui", "More actions")}
@@ -1948,7 +1953,16 @@ export function OrdersHub() {
                                   <SkipForward size={14} weight="fill" /> {tl("ui", "Move to")} {stageMeta(next)?.label ?? next}
                                 </DropdownMenuItem>
                               )}
-                              {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> {tl("ui", "Create new label")}</DropdownMenuItem>}
+                              {/* THE ONLY WAY TO BUY A LABEL FROM A ROW, on purpose.
+                                  It used to be promoted to a primary button whenever the
+                                  order looked ready, which put it exactly where Start sits
+                                  on every other row — one button changing identity by
+                                  context, in the place your hand already goes. Buying
+                                  postage is not something to hit by muscle memory.
+                                  Dropped the `primary !== "ship"` guard with it: that was
+                                  only there to avoid showing the item twice, and there is
+                                  no longer a primary to collide with. */}
+                              {canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> {tl("ui", "Create new label")}</DropdownMenuItem>}
                               {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> {tl("ui", "Reopen label")}</DropdownMenuItem>}
                               {/* TikTok orders can be shipped on TIKTOK'S label, which lives
                                   only in Seller Center — so it's fetched on demand, not a
