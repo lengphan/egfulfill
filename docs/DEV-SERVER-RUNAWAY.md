@@ -159,14 +159,27 @@ working first.
 So the fix is a ceiling on the dev server's own shell, not vigilance:
 
 ```json
-"dev": "ulimit -u 400; next dev",
+"dev": "ulimit -u 150; next dev",
 "dev:unlimited": "next dev",
 ```
 
-A capped shell hits `bash: fork: Resource temporarily unavailable` at 400 and stops there.
+A capped shell hits `bash: fork: Resource temporarily unavailable` at 150 and stops there.
 Verified: inside a `ulimit -u 120` subshell the storm walls itself while the parent shell
-keeps working. 400 is far above a healthy compile (single digits) and far below the 2,666
-that takes the Mac down. `dev:unlimited` exists for the day the cap is genuinely in the way.
+keeps working. `dev:unlimited` exists for the day the cap is genuinely in the way.
+
+**THE CAP IS PER SERVER, AND SERVERS MULTIPLY.** Several Claude Code agents or VS Code
+windows are several INDEPENDENT dev servers — port 3000 taken just makes Next move to 3001,
+3002, 3003 — each with its own workers, all watching the same folder, so one file save
+recompiles once per server. That is almost certainly what made this incident so fast.
+
+So the ceiling has to be divided by however many might run at once, not sized for one:
+
+| Cap | 1 agent | 5 agents | vs the 2,666 ceiling |
+|---|---|---|---|
+| 400 | 400 | **2,000** | too close — this was the first attempt, and it was wrong |
+| 150 | 150 | 750 | comfortable |
+
+A healthy compile is single digits, so 150 is already generous.
 
 **This does not fix the leak.** It stops the leak reaching the machine.
 

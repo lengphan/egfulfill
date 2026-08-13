@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "ulimit -u 400; next dev",
+    "dev": "ulimit -u 150; next dev",
     "dev:unlimited": "next dev",
     "build": "next build",
     "start": "next start",
