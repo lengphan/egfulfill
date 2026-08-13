@@ -266,12 +266,22 @@ export function walletRoutes(app, requireAuth) {
       revenue: pos('order-charge-in'),      // factory: what sellers paid in
       paid: absNeg('order-charge-out'),     // seller: what they paid out
       deposits: pos('topup'),               // top-ups (card / VietQR / transfer)
-      refundsIn: pos('order-refund-in'),    // seller: refunds received
-      refundsOut: absNeg('order-refund-out'), // factory: refunds paid back
+      // 'refund-in' / 'refund-out', NOT 'order-refund-*'. moveFunds writes `type + '-out'`
+      // and `type + '-in'`, so a refund moved with type 'refund' lands as refund-out/in —
+      // and the names looked for here never existed in the ledger at all. Every refund the
+      // platform has ever made was therefore absent from this summary while sitting in the
+      // balance: $18 out and $18 in, money visibly gone from the total and named nowhere.
+      refundsIn: pos('refund-in'),
+      refundsOut: absNeg('refund-out'),
+      // Subscription income (starter/SpyDeck plans). Real revenue, moved by the same
+      // paired-type mechanism, and likewise never listed.
+      subscriptions: pos('subscription-in'),
       payouts: absNeg('withdrawal'),        // withdrawals
       productCost: costOf('blanks-cost'),   // COGS — S&S/Otto POs, less supplier returns
       postage: costOf('label-cost'),        // Shippo/USPS labels, less voided ones
-      design: costOf('design-partner-cost'), // Pink Design
+      // Pink Design's invoice AND what we pay our own designers — both are what a finished
+      // design cost us, and listing only the partner made in-house work look free.
+      design: costOf('design-partner-cost') + absNeg('design-pay-out'),
       dispatch: costOf('expedite-cost'),    // byeastside pick fee
       // Sourcing samples. Named here for the reason this map exists at all: the balance is
       // SUM(delta), so a type nobody lists still LOWERS the total while appearing in no
@@ -282,6 +292,35 @@ export function walletRoutes(app, requireAuth) {
       // different people, and adding them together loses both answers.
       bankFees: costOf('bank-fee'),
     };
+
+    /**
+     * EVERY TYPE, NAMED OR NOT — so nothing can be spent and shown nowhere.
+     *
+     * The summary above is a hand-kept list, and a hand-kept list is how this broke: it
+     * looked for 'order-refund-in' while the ledger wrote 'refund-in', so every refund was
+     * missing from the breakdown and present in the balance. The type didn't have to be
+     * new to be invisible; it only had to be spelled differently once.
+     *
+     * The balance is SUM(delta) over ALL rows, so any type the summary omits still moves the
+     * total while appearing in no line — the money is gone and nothing accounts for it. That
+     * cannot be fixed by remembering harder, so it is fixed structurally: this returns the
+     * complete set, and marks which ones a named line already covers. Anything false is
+     * money the categories do not yet explain, and the UI can say so out loud instead of
+     * quietly failing to add up.
+     */
+    const NAMED = new Set([
+      'order-charge-in', 'order-charge-out', 'topup', 'refund-in', 'refund-out',
+      'subscription-in', 'withdrawal', 'blanks-cost', 'label-cost', 'design-partner-cost',
+      'design-pay-out', 'expedite-cost', 'sample-cost', 'bank-fee',
+    ]);
+    const byTypeDetail = sumRows
+      .map((r) => ({
+        type: r.type,
+        net: Number(r.total) || 0,
+        named: NAMED.has(r.type) || NAMED.has(String(r.type).replace(/-credit$/, '')),
+      }))
+      .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+    const unaccounted = byTypeDetail.filter((x) => !x.named);
 
     /**
      * PER SUPPLIER, because "suppliers: $4,102" answers no question anyone actually has.
@@ -325,7 +364,14 @@ export function walletRoutes(app, requireAuth) {
         lowBelow = Number.isFinite(n) && n > 0 ? n : null;
       } catch { lowBelow = null; }
     }
-    return { account, balance: bal, ledger: led.rows, summary, bySupplier, lowBelow, low: lowBelow != null && bal < lowBelow };
+    return {
+      account, balance: bal, ledger: led.rows, summary, bySupplier,
+      byType: byTypeDetail,
+      // Named separately so a client does not have to know the rule to warn about it.
+      unaccounted,
+      unaccountedNet: unaccounted.reduce((t, x) => t + x.net, 0),
+      lowBelow, low: lowBelow != null && bal < lowBelow,
+    };
   });
 
   // Append one ledger entry (idempotent by ref). Returns the new balance.
