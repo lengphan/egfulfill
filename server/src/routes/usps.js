@@ -457,7 +457,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
       // on the order identically — the only difference is which carrier's rate it is.
       if (b.rateToken) {
         try {
-          const buy = await aggregatorBuyRate(b.rateToken, b.rate || {});
+          const buy = await aggregatorBuyRate(b.rateToken, b.rate || {}, b.orderId);
           if (buy && buy.tracking) {
             const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy, b.to, req);
             return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
@@ -476,6 +476,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
           const buy = await aggregatorBuyCheapest(to, from,
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
             { carrierPref: 'usps', servicePref: _svcPref(b.mailClass),
+              orderId: b.orderId,
               extra: { signature: !!b.signature, insurance: Number(b.insurance) || 0 } });
           if (buy && buy.tracking) {
             const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy, b.to, req);

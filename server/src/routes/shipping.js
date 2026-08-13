@@ -148,10 +148,52 @@ async function shRates(to, from, pc, extra) {
 // d.rate.amount / d.rate.provider are undefined — which is why cost came back null and the
 // Price column stayed empty. Read the amount/carrier from the rate we already have; only
 // fall back to d.rate.* on the rare occasion Shippo expands it.
-async function shBuy(rateObjectId, sel) {
+/**
+ * OUR ORDER → THE ONE SHIPPO IMPORTED FROM THE CONNECTED SHOP.
+ *
+ * This is what makes tracking reach Etsy. Our own Etsy app is on a restricted tier, so
+ * POST /receipts/:id/tracking answers 403 and we cannot tell Etsy anything ourselves. Shippo
+ * can — but ONLY for an order it imported from a shop connected to it, and only when the
+ * label is linked to that order. Shippo support was explicit: a standalone transaction, or
+ * an order we create through their API with shop_app "Etsy", does NOT establish the
+ * relationship. So the link has to be to THEIR imported order, found by number.
+ *
+ * Matching is exact, not fuzzy: Shippo's `order_number` for an Etsy order is the bare
+ * receipt id and ours is that id behind an `etsy-` prefix (etsy-4143352005 → 4143352005).
+ *
+ * Their list endpoint cannot filter by order_number — only order_status and shop_app — so
+ * this reads a page and matches here, newest first, which is where a label being bought
+ * today will be. Cached per order id because a label is usually bought once and the answer
+ * cannot change.
+ *
+ * NEVER THROWS. A label that is already paid for must not fail because we couldn't find its
+ * counterpart; an unlinked label is a working label with no write-back, which is exactly
+ * where we are today.
+ */
+const shOrderCache = new Map();
+async function shFindOrder(orderId) {
+  const m = /^etsy-(.+)$/i.exec(String(orderId || ''));
+  if (!m) return null;                       // only marketplace orders Shippo can have imported
+  const number = m[1];
+  if (shOrderCache.has(number)) return shOrderCache.get(number);
+  try {
+    const r = await fetch(SH_BASE + '/orders?results=100', { headers: { Authorization: shAuth() } });
+    if (!r.ok) return null;
+    const d = await r.json().catch(() => ({}));
+    const hit = (d.results || []).find((o) => String(o.order_number || '').trim() === number);
+    const id = hit ? hit.object_id : null;
+    shOrderCache.set(number, id);
+    return id;
+  } catch { return null; }
+}
+
+async function shBuy(rateObjectId, sel, orderId) {
+  // Linked when we can find it, plain when we can't — see shFindOrder.
+  const shippoOrder = orderId ? await shFindOrder(orderId) : null;
   const r = await fetch(SH_BASE + '/transactions/', {
     method: 'POST', headers: { Authorization: shAuth(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rate: rateObjectId, label_file_type: 'PDF_4x6', async: false })
+    body: JSON.stringify({ rate: rateObjectId, label_file_type: 'PDF_4x6', async: false,
+                           ...(shippoOrder ? { order: shippoOrder } : {}) })
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || d.status !== 'SUCCESS') {
@@ -169,6 +211,10 @@ async function shBuy(rateObjectId, sel) {
     // booked to wallet_ledger as factory spend. Carried out so recordLabel can decline to
     // book money that does not exist.
     test: !!d.test,
+    // Whether this label was tied to Shippo's imported order — i.e. whether Etsy will be
+    // told. Surfaced rather than inferred so "did it push?" is answerable from the buy
+    // response instead of by waiting to see if a buyer complains.
+    shippoOrder: shippoOrder || null,
     carrier: (rate && rate.provider) || sel.carrier || '',
     service: (rate && rate.servicelevel && rate.servicelevel.name) || sel.service || '',
     cost: (rate && Number(rate.amount)) || Number(sel.amount) || null,
@@ -268,7 +314,9 @@ export async function aggregatorBuyCheapest(to, from, pc, opts) {
   all.sort((a, c) => a.amount - c.amount);
   const t = dec(all[0].token);
   if (t && t.p === 'ep') return await epBuy(t.s, t.r);
-  if (t && t.p === 'sh') return await shBuy(t.r, all[0]);   // pass the chosen rate for cost/carrier
+  // opts.orderId rides along so the Shippo transaction can be linked to the order Shippo
+  // imported from the connected shop — that link is what makes tracking reach Etsy.
+  if (t && t.p === 'sh') return await shBuy(t.r, all[0], opts.orderId);   // pass the chosen rate for cost/carrier
   return null;
 }
 
@@ -277,11 +325,11 @@ export async function aggregatorBuyCheapest(to, from, pc, opts) {
 // captured even though Shippo's transaction response doesn't expand the rate. Reused by
 // /api/usps/label so a UPS/USPS/any label records exactly like a USPS one (cost, PDF,
 // provider ref for voiding).
-export async function aggregatorBuyRate(rateToken, sel) {
+export async function aggregatorBuyRate(rateToken, sel, orderId) {
   const t = dec(rateToken);
   if (!t) throw new Error('That rate is unreadable or expired — fetch fresh rates and try again.');
   if (t.p === 'ep') return await epBuy(t.s, t.r);
-  if (t.p === 'sh') return await shBuy(t.r, sel || {});
+  if (t.p === 'sh') return await shBuy(t.r, sel || {}, orderId);
   throw new Error('Unknown rate provider on that rate.');
 }
 
@@ -473,7 +521,7 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
       // `b.rate` lets a caller that already rate-shopped hand back what it chose, the same
       // way aggregatorBuyRate does. Absent both, this degrades to the old empty fields
       // rather than failing — a label that buys is worth more than a tidy cost column.
-      else if (t.p === 'sh') out = await shBuy(t.r, sel || b.rate || {});
+      else if (t.p === 'sh') out = await shBuy(t.r, sel || b.rate || {}, b.orderId);
       else { reply.code(400); return { error: 'Bad rate token' }; }
       return Object.assign({ ok: true }, out);
     } catch (e) { reply.code(400); return { error: e.message }; }
