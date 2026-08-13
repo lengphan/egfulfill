@@ -14,7 +14,7 @@ import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrd
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
-import { labelableOrders, buyLabelsFor, summarise, DEFAULT_BULK_PARCEL } from "@/lib/bulk-labels"
+import { labelableOrders, buyLabelsFor, summarise, releaseLabelBlobs, DEFAULT_BULK_PARCEL } from "@/lib/bulk-labels"
 import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
@@ -1048,6 +1048,9 @@ export function OrdersHub() {
         await printHtmlViaIframe(html)
         if (skipped.length) msg += ` · ${skipped.length} couldn't be printed (${skipped.join(", ")})`
       }
+      // The packet holds its own rendered copies now, so the source blobs are finished with.
+      // Left un-revoked they pin one label PDF each until the tab closes.
+      releaseLabelBlobs(results)
       setPushMsg({ tone: results.some((r) => !r.ok) || blocked.length ? "err" : "ok", text: msg })
       setSelected(new Set())
       load()
@@ -1842,7 +1845,21 @@ export function OrdersHub() {
                        * Still checked against the guard: the move must be one the API would
                        * accept from here, or the button would offer a 403.
                        */
-                      const canStart = canFulfill && !stopped && isApprovable(o) && canSetStage(role, stage, "working", fac)
+                      /**
+                       * START IS FOR AN ORDER NOBODY HAS TOUCHED.
+                       *
+                       * orderStage() returns "" while ANY line is unstarted, so an order with
+                       * one item on the machine and one still waiting reads as unstarted and
+                       * kept offering Start — a button that would set the whole order to
+                       * Working, which it already effectively is. Pressing it said nothing
+                       * true and overwrote per-line state with a blanket one.
+                       *
+                       * So the moment a single item moves, the ORDER-level button goes: the
+                       * order is Working because its items are, and the remaining lines are
+                       * started individually from their own rows.
+                       */
+                      const anyLineStarted = lineProgress(items).started > 0
+                      const canStart = canFulfill && !stopped && !anyLineStarted && isApprovable(o) && canSetStage(role, stage, "working", fac)
                       const canLabels = canFulfill && items.some((it) => it.sku && variantOf(it))
                       /**
                        * Primary = the one obvious next move: start it, or ship it. There

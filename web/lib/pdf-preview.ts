@@ -32,7 +32,27 @@ export function isPdfSrc(src: string | null | undefined): boolean {
   return /\.pdf(?:[?#]|$)/i.test(s)
 }
 
+/**
+ * BOUNDED, and not keyed on blob: URLs.
+ *
+ * Every rendered page was kept forever, keyed on a per-purchase blob: URL that is unique to
+ * one buy — so nothing could ever hit the cache twice, and a 60-label batch retained sixty
+ * multi-megabyte PNG data URLs for the life of the tab. A store that only grows, holding
+ * the largest objects in the app, is the accumulation shape CLAUDE.md §2.8 is about.
+ *
+ * A blob: key is dropped as soon as it is used: it names one object that will never be
+ * asked for again. Everything else (a stable http/data URL, where a repeat IS likely) is
+ * kept, up to a cap, oldest evicted first.
+ */
+const CACHE_MAX = 12
 const cache = new Map<string, string>()
+const remember = (key: string, value: string) => {
+  // A blob: URL is single-use by construction — caching it wastes the slot and the memory.
+  if (/^blob:/i.test(key)) return
+  cache.delete(key)
+  cache.set(key, value)
+  while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string)
+}
 
 /**
  * First page of a PDF as a PNG data URL, or null if it can't be read.
@@ -76,7 +96,7 @@ export async function pdfFirstPageDataUrl(src: string, maxPx = 1200): Promise<st
     await page.render({ canvas: cv, canvasContext: ctx, viewport }).promise
 
     const out = cv.toDataURL("image/png")
-    cache.set(src, out)
+    remember(src, out)
     doc.destroy?.()
     return out
   } catch {

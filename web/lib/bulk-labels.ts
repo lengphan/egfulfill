@@ -109,6 +109,20 @@ export async function buyLabelsFor(
   return out
 }
 
+/**
+ * Release the label blobs a batch created.
+ *
+ * createObjectURL pins its Blob until it is revoked or the tab closes, so a sixty-label run
+ * held sixty label PDFs in memory indefinitely — and the printing is finished the moment the
+ * packet has been built. The caller revokes when it is done rather than the buyer loop,
+ * because printing happens after every buy has returned.
+ */
+export function releaseLabelBlobs(results: BulkLabelOutcome[]): void {
+  for (const r of results) {
+    if (r.labelBlobUrl) { try { URL.revokeObjectURL(r.labelBlobUrl) } catch { /* already gone */ } }
+  }
+}
+
 /** One line a human can act on: what was bought, what wasn't, and the first reason why. */
 export function summarise(results: BulkLabelOutcome[], blocked: { order: OrderRow; reason: string }[]): string {
   const ok = results.filter((r) => r.ok)

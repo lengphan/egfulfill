@@ -72,7 +72,18 @@ function supplierKey(name) {
   // regex on the raw string trips over: "S&S Activewear", "S&S ActiveWear", "ss activewear"
   // and "SSActivewear" are one supplier separated by an ampersand and a space.
   const flat = n.toLowerCase().replace(/[^a-z]/g, '');
-  if (flat.includes('otto')) return 'Otto Cap';
+  /**
+   * ANCHORED, not `includes`. `flat.includes('otto')` also matches "cotton" — so "Cotton
+   * Heritage", a different supplier entirely, was booking every purchase against Otto Cap
+   * and quietly corrupting the per-supplier spend breakdown that exists to answer "what do
+   * we spend with whom".
+   *
+   * A substring test is the right shape for the S&S variants (the name itself varies:
+   * "S&S Activewear", "SSActivewear"), and the wrong shape for a short word that lives
+   * inside other words. So `otto` must START the name — Otto Cap, Ottocap, "otto cap
+   * inc" — while "cottonheritage" no longer does.
+   */
+  if (/^otto/.test(flat)) return 'Otto Cap';
   if (flat.includes('sanmar')) return 'SanMar';
   if (flat.includes('activewear') || flat === 'ss') return 'S&S Activewear';
   return n;
