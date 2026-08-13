@@ -291,6 +291,17 @@ export function walletRoutes(app, requireAuth) {
       // the supplier charged" and "what it cost us to pay them" are negotiated with
       // different people, and adding them together loses both answers.
       bankFees: costOf('bank-fee'),
+      /**
+       * CORRECTIONS, as one line and never folded into a trading category.
+       *
+       * A balance correction, an opening balance and a cleanup reversal all move real money
+       * and none of them are trade — putting them into revenue or cost would misstate both.
+       * But leaving them nameless is worse: they were moving the balance while appearing in
+       * no line at all. Net, because corrections go both ways and a gross figure here would
+       * imply activity that never happened.
+       */
+      adjustments: (byType['manual-adjust-in'] || 0) + (byType['manual-adjust-out'] || 0)
+                 + (byType['adjust'] || 0) + (byType['opening'] || 0) + (byType['test-cleanup'] || 0),
     };
 
     /**
@@ -312,6 +323,7 @@ export function walletRoutes(app, requireAuth) {
       'order-charge-in', 'order-charge-out', 'topup', 'refund-in', 'refund-out',
       'subscription-in', 'withdrawal', 'blanks-cost', 'label-cost', 'design-partner-cost',
       'design-pay-out', 'expedite-cost', 'sample-cost', 'bank-fee',
+      'manual-adjust-in', 'manual-adjust-out', 'adjust', 'opening', 'test-cleanup',
     ]);
     const byTypeDetail = sumRows
       .map((r) => ({
