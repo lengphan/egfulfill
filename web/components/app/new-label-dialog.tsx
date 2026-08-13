@@ -123,6 +123,17 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * is what it had before — no worse, and honestly labelled.
    */
   const [labelSrc, setLabelSrc] = useState<string | null>(null)
+  /**
+   * WHERE THE PRINT GOT TO — shown, not logged.
+   *
+   * This has now failed four times in a row and every failure looked identical from the
+   * outside: postage bought, no print dialog, no error. An invisible pipeline cannot be
+   * debugged by the person watching it fail, so each step says where it is. It also earns
+   * its place permanently: "Preparing the label…" is the honest thing to show in the second
+   * where nothing has happened yet.
+   */
+  const [printStage, setPrintStage] = useState<
+    { at: "idle" | "fetching" | "rendering" | "printing" | "done"; why?: string }>({ at: "idle" })
   const frameRef = useRef<HTMLIFrameElement>(null)
   const printedRef = useRef<string | null>(null)
   const printLabel = () => {
@@ -144,15 +155,21 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * label): a label that prints without its slip beats one that doesn't print at all.
    */
   const printPacket = async () => {
-    if (!labelSrc || !order?.id) { printLabel(); return }
+    if (!labelSrc) { setPrintStage({ at: "idle", why: "no label bytes" }); return }
+    setPrintStage({ at: "rendering" })
     try {
-      const { html, skipped } = await packetHtml([{ labelBlobUrl: labelSrc, order: { id: order.id, items: order.items, address: order.to } as never }])
-      // Nothing rendered means no packet worth printing — fall back to the label frame,
-      // which is the path that has always worked.
-      if (skipped.length) { printLabel(); return }
+      const { html, skipped } = await packetHtml([{ labelBlobUrl: labelSrc, order: order?.id ? ({ id: order.id, items: order.items, address: order.to } as never) : null }])
+      if (skipped.length) {
+        // pdf.js couldn't read the label. Say so — the old code fell back to printing the
+        // PDF frame, which is the thing Chrome refuses to do, so the fallback was silence.
+        setPrintStage({ at: "idle", why: "couldn't render the label to print — use Print label below" })
+        return
+      }
+      setPrintStage({ at: "printing" })
       await printHtmlViaIframe(html)
-    } catch {
-      printLabel()
+      setPrintStage({ at: "done" })
+    } catch (e) {
+      setPrintStage({ at: "idle", why: e instanceof Error ? e.message : "printing failed" })
     }
   }
 
@@ -166,10 +183,14 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
       // buy created. /api/shipments/:id/label resolves either, so both can print — which is
       // the whole point: the next step after buying a label is always the printer.
       const labelId = order?.id ?? result?.shipmentId
-      if (!result?.labelUrl || !labelId) return
+      if (!result?.labelUrl || !labelId) {
+        if (result?.trackingNumber) setPrintStage({ at: "idle", why: "no label file to print — use Open label" })
+        return
+      }
+      setPrintStage({ at: "fetching" })
       fetchShipmentLabel(String(labelId))
         .then((blob) => { if (!alive) return; url = URL.createObjectURL(blob); setLabelSrc(url) })
-        .catch(() => { /* the Open-label link and the Shipments row both still work */ })
+        .catch((e) => { if (alive) setPrintStage({ at: "idle", why: `couldn't fetch the label (${e instanceof Error ? e.message : "failed"})` }) })
     }, 0)
     return () => { alive = false; clearTimeout(t); if (url) URL.revokeObjectURL(url) }
   }, [result?.labelUrl, result?.trackingNumber, result?.shipmentId, order?.id])
@@ -350,11 +371,25 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 className="pointer-events-none fixed left-[-9999px] top-0 size-[1px] opacity-0"
               />
             )}
+            {/* Says where the print got to, because four silent failures in a row is what
+                made this so hard to place. "Preparing…" is also simply the truth in the
+                second before anything can happen. */}
+            <div className="text-xs text-muted-foreground">
+              {printStage.at === "fetching" && "Fetching the label…"}
+              {printStage.at === "rendering" && "Preparing label + packing slip…"}
+              {printStage.at === "printing" && "Opening the print dialog…"}
+              {printStage.at === "done" && "Sent to the printer."}
+              {printStage.at === "idle" && printStage.why && (
+                <span className="text-amber-700 dark:text-amber-400">Didn&apos;t print automatically — {printStage.why}</span>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               {/* It has already gone to the printer — this is the retry, for the jam, the
                   wrong tray, or the second copy. */}
               {labelSrc && (
-                <Button onClick={printLabel}><Printer size={14} weight="bold" /> Print again</Button>
+                <Button onClick={() => void printPacket()}>
+                  <Printer size={14} weight="bold" /> {printStage.at === "done" ? "Print again" : "Print label"}
+                </Button>
               )}
               {/* THE OTHER DOCUMENT A PACKER NEEDS, one click away from the label that was
                   just bought — the same 4×6 slip the dispatch board prints, from the same
