@@ -176,6 +176,12 @@ async function shFindOrder(orderId) {
   if (!m) return null;                       // only marketplace orders Shippo can have imported
   const number = m[1];
   if (shOrderCache.has(number)) return shOrderCache.get(number);
+  // The column the address sync writes — one read, and it keeps working at any order count.
+  try {
+    const row = (await q('select shippo_order_id from orders where id = $1', [orderId])).rows[0];
+    if (row && row.shippo_order_id) { shOrderCache.set(number, row.shippo_order_id); return row.shippo_order_id; }
+  } catch { /* column may not exist yet on a database that has never synced */ }
+  // Fallback for an order synced into Shippo since our last address pass: ask directly.
   try {
     const r = await fetch(SH_BASE + '/orders?results=100', { headers: { Authorization: shAuth() } });
     if (!r.ok) return null;
@@ -211,12 +217,37 @@ export async function fillBlankAddressesFromShippo(limit = 100) {
     if (!r.ok) return { filled: 0, reason: 'shippo HTTP ' + r.status };
     const d = await r.json().catch(() => ({}));
     const byNumber = new Map();
+    const shippoIds = new Map();
     for (const o of (d.results || [])) {
       const n = String(o.order_number || '').trim();
-      if (n && o.to_address && o.to_address.street1) byNumber.set(n, o.to_address);
+      if (!n) continue;
+      if (o.object_id) shippoIds.set(n, o.object_id);
+      if (o.to_address && o.to_address.street1) byNumber.set(n, o.to_address);
     }
     if (!byNumber.size) return { filled: 0, seen: 0 };
     const ids = [...byNumber.keys()].map((n) => 'etsy-' + n);
+
+    /**
+     * REMEMBER WHICH SHIPPO ORDER IS WHICH, while we are holding the answer.
+     *
+     * The label buy needs this id to link a transaction, and Shippo's list endpoint cannot
+     * be filtered by order_number — so looking it up at buy time means listing orders and
+     * scanning, which works at 34 orders and silently stops working past the page size.
+     * Recorded here instead, for every order matched rather than only the ones missing an
+     * address, so the buy is a column read.
+     */
+    await q('alter table orders add column if not exists shippo_order_id text').catch(() => {});
+    let linked = 0;
+    for (const [num, addr] of byNumber) {
+      const shippoId = shippoIds.get(num);
+      if (!shippoId) continue;
+      const r2 = await q(
+        `update orders set shippo_order_id = $2 where id = $1 and shippo_order_id is distinct from $2`,
+        ['etsy-' + num, shippoId]).catch(() => null);
+      if (r2 && r2.rowCount) linked++;
+      void addr;
+    }
+
     const rows = (await q(`select id from orders where id = any($1::text[]) and ${blank}`, [ids])).rows;
     let filled = 0;
     for (const row of rows) {
@@ -231,7 +262,7 @@ export async function fillBlankAddressesFromShippo(limit = 100) {
         })]).catch(() => null);
       if (upd && upd.rowCount) filled++;
     }
-    return { filled, seen: byNumber.size, blank: rows.length };
+    return { filled, linked, seen: shippoIds.size, blank: rows.length };
   } catch (e) {
     return { filled: 0, reason: (e && e.message) || 'failed' };
   }
