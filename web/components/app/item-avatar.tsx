@@ -112,7 +112,17 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
    * Only where there is room. Below ~56px the inset card would be a smudge, so those sizes
    * keep the corner swap they already had.
    */
-  const showBoth = canSwap && !listingFirst && size >= 56
+  /**
+   * SHOW BOTH WHENEVER THERE ARE TWO THINGS TO COMPARE — which is not the same as canSwap.
+   *
+   * canSwap requires attached ARTWORK, because a swap between "the blank" and "the blank"
+   * is pointless. But the pair is answering a different question: the buyer's listing photo
+   * against what we are going to make. That is worth seeing before any artwork exists — it
+   * is exactly when someone is choosing the blank — and requiring `art` meant a line with no
+   * design yet fell back to a single image, so the treatment looked arbitrary from row to
+   * row on the same order.
+   */
+  const showBoth = !!(listing && (art || blank) && listing !== blank) && !listingFirst && size >= 56
   /** Which card is in front. The print leads, because it is what the floor makes. */
   const [listingFront, setListingFront] = useState(false)
   /** How far the second card sits along — 0.62 leaves a good third of the back card
