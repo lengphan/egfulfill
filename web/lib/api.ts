@@ -199,6 +199,11 @@ export type LedgerRow = {
   ref: string | null
   note: string | null
   created_at: string
+  /** The account's balance immediately AFTER this row, summed by the server over the whole
+   *  ledger rather than the returned window — so it stays correct however this list is
+   *  paged or filtered. Absent on older responses; the client falls back to walking back
+   *  from the current balance. */
+  balance_after?: number
 }
 
 /** P&L totals over the FULL ledger (not the 200-row window), grouped by ledger type.

@@ -215,9 +215,25 @@ export function walletRoutes(app, requireAuth) {
     if (shared && account === req.user.sub) account = shared;
     if (!canAccess(req.user, account) && account !== shared) { reply.code(403); return { error: 'forbidden' }; }
     const bal = await balanceOf(account);
+    /**
+     * THE BALANCE AFTER EACH ROW, computed over the WHOLE account, not the page.
+     *
+     * "−$6.24" answers what a row cost. It does not answer the question anyone reading a
+     * statement actually has, which is what the balance was before and after it — that is
+     * how you find the entry that took an account somewhere unexpected.
+     *
+     * The window runs over every row of the account and the newest 200 are taken AFTERWARDS.
+     * Ordering, limiting and then summing would restart the running total 200 rows ago and
+     * produce a column that looks authoritative and is wrong — the worst kind of wrong for a
+     * money screen. The client derives "before" as after − delta, so the two can never
+     * disagree with each other or with the balance.
+     */
     const led = await q(
-      `select id, delta, type, ref, note, created_by, created_at
-         from wallet_ledger where account=$1 order by created_at desc, id desc limit 200`, [account]);
+      `select * from (
+         select id, delta, type, ref, note, created_by, created_at,
+                sum(delta) over (order by created_at asc, id asc)::float as balance_after
+           from wallet_ledger where account=$1
+       ) t order by created_at desc, id desc limit 200`, [account]);
     // P&L summary over the FULL ledger (not the 200-row window) so the cards total everything,
     // grouped by the real ledger `type` — revenue, deposits, refunds and each cost category are
     // distinct facts, not "everything positive vs everything negative". This is the honest

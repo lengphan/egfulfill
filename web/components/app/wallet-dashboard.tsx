@@ -156,7 +156,11 @@ type Row = {
   at?: number
   date: string
   desc: string
+  /** Shortened for the cell. */
   ref: string
+  /** The untruncated handle, for the tooltip and the detail dialog — shortening is a
+   *  display decision and must never be the only copy we hold. */
+  refFull?: string
   method: string
   label: string
   tone: string
@@ -194,6 +198,29 @@ const DEMO: View = {
   ],
 }
 
+/**
+ * A REFERENCE YOU CAN READ AT A GLANCE.
+ *
+ * These are internal handles, printed in full under every description:
+ *
+ *   sub-48b59d7b-a915-47ca-aa3d-f4b102481610-starter-sd-2026-07
+ *   607694a1-63fa-4100-a2a6-8801cea6dace
+ *
+ * Every one of those characters is load-bearing to a database and none of them are to a
+ * person. Worse, the UUID is the least distinguishing part: it is the same seller on every
+ * row, so it pushes the part that DOES differ — "starter-sd-2026-07" — off the edge.
+ *
+ * So a UUID collapses to its first eight, which is far more than enough to tell two rows
+ * apart, and anything still long is middle-elided so its END survives — that is where the
+ * period, the plan and the order number live. The full string stays in the title attribute
+ * and in the detail dialog, so nothing is actually lost.
+ */
+const shortRef = (ref: string) => {
+  const collapsed = ref.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, (m) => m.slice(0, 8) + "…")
+  if (collapsed.length <= 34) return collapsed
+  return collapsed.slice(0, 16) + "…" + collapsed.slice(-14)
+}
+
 function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary): View {
   let run = balance
   let charges = 0
@@ -201,7 +228,10 @@ function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary
   let ordersCharged = 0
   const rows: Row[] = ledger.map((l) => {
     const delta = Number(l.delta) || 0
-    const balanceAfter = run
+    // The SERVER's running total when it sent one — it is summed over the whole account, so
+    // it stays right however this list is windowed. Walking back from the current balance
+    // only agrees while the newest row really is the newest, which a filter can break.
+    const balanceAfter = typeof l.balance_after === "number" ? l.balance_after : run
     run -= delta
     if (delta < 0) charges += Math.abs(delta)
     if (delta > 0) deposited += delta
@@ -212,7 +242,8 @@ function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary
       at: new Date(l.created_at).getTime(),
       date: new Date(l.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }),
       desc: l.note || meta.label,
-      ref: l.ref || "",
+      ref: shortRef(l.ref || ""),
+      refFull: l.ref || "",
       method: String(l.type).toLowerCase().startsWith("order-charge") ? "Wallet" : "—",
       label: meta.label,
       tone: meta.tone,
@@ -524,10 +555,16 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
               histRows.map((t) => (
                 <TableRow key={t.id} onClick={() => setDetail(t)} className="cursor-pointer hover:bg-muted/40">
                   <TableCell className="text-muted-foreground">{t.date}</TableCell>
-                  <TableCell className="font-medium">
-                    <div>{t.desc}</div>
+                  {/* BOUNDED. A description is free text — a marketplace product title runs
+                      to 140 characters — and an unbounded cell let one row set the width of
+                      the whole table, pushing the balance columns out to where nobody scrolls.
+                      Capped and truncated, with the full text on hover and in the row's own
+                      dialog, so the table keeps a shape a column of numbers can be read down. */}
+                  <TableCell className="max-w-[26rem] font-medium">
+                    <div className="truncate" title={t.desc}>{t.desc}</div>
                     {(t.ref || (t.method && t.method !== "—")) && (
-                      <div className="mt-0.5 truncate text-xs font-normal text-muted-foreground">
+                      <div className="mt-0.5 truncate text-xs font-normal text-muted-foreground"
+                           title={[t.refFull || t.ref, t.method && t.method !== "—" ? t.method : null].filter(Boolean).join(" · ")}>
                         {[t.ref, t.method && t.method !== "—" ? t.method : null].filter(Boolean).join(" · ")}
                       </div>
                     )}
