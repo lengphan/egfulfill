@@ -49,7 +49,11 @@ export const decodeEntities = (s: string | null | undefined) =>
  * on the row's second line, where it belongs.
  */
 const SOURCE_PREFIX = /^(etsy|shopify|amazon|ebay|tiktok|woo|walmart)-/i
-export const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : String(o.id).replace(SOURCE_PREFIX, ""))
+/** The id with its routing prefix taken off — what the buyer and the marketplace both call
+ *  this order. Takes a bare id, so screens that hold something narrower than an OrderRow
+ *  (Shipments holds a parcel, not an order) can read it without a private copy of the regex. */
+export const plainNum = (id: string) => String(id ?? "").replace(SOURCE_PREFIX, "")
+export const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : plainNum(String(o.id)))
 // Marketplaces capitalise their own names, and title-casing the raw source got two of them
 // wrong on every row and in every filter — "Tiktok" and "Ebay" are not how those brands are
 // written. Anything unlisted still falls back to title case, so a new source needs no entry.
@@ -57,10 +61,16 @@ const PLATFORM_NAMES: Record<string, string> = {
   etsy: "Etsy", shopify: "Shopify", tiktok: "TikTok", amazon: "Amazon",
   ebay: "eBay", woo: "WooCommerce", walmart: "Walmart", manual: "Manual",
 }
+/** The platform an id came from, read off the prefix alone. Same fallback as platformOf:
+ *  anything without one is ours, which is "Manual". */
+export const platformFromId = (id: string) => {
+  const raw = (String(id ?? "").match(SOURCE_PREFIX)?.[1] ?? "manual").toLowerCase()
+  return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
+}
 /** The platform an order came from, as the platform writes it — "Etsy", "TikTok", "Manual". */
 export const platformOf = (o: OrderRow) => {
-  const raw = String(o.source || (String(o.id).match(SOURCE_PREFIX)?.[1] ?? "") || "manual").toLowerCase()
-  return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
+  const raw = String(o.source || "").toLowerCase()
+  return raw ? (PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))) : platformFromId(String(o.id))
 }
 export const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
 export const customerOf = (o: OrderRow) => o.customer?.name || "—"

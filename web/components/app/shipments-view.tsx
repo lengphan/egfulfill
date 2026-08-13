@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getShipments, voidLabel, type ShipmentRow } from "@/lib/api"
+import { plainNum, platformFromId } from "@/lib/order-format"
 import { onLive } from "@/lib/live"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -28,6 +29,21 @@ import { useConfirm } from "@/components/app/confirm-dialog"
  * Search covers tracking, order number, customer and carrier — all four are things someone
  * arrives holding, and which one they have is not something they chose.
  */
+
+/**
+ * How a parcel identifies itself, in two lines rather than one prefixed string.
+ *
+ * A row here can be an ORDER (`etsy-4142905822`, `FF-1042`) or a LOOSE LABEL (`sh_…`) — a
+ * re-ship or a sample, bought with no order behind it. Both need saying, and the second
+ * line is where the difference belongs: the seller's own number is what gets read out, and
+ * "Etsy" or "no order yet" is the context for it.
+ *
+ * numOf/plainNum are NOT re-derived here — the prefix table lives in lib/order-format.
+ */
+const isLoose = (s: ShipmentRow) => /^sh_/.test(s.id)
+const shipNum = (s: ShipmentRow) =>
+  isLoose(s) ? s.id : s.num.startsWith("#") ? s.num : plainNum(s.id)
+const shipOrigin = (s: ShipmentRow) => (isLoose(s) ? "Label with no order" : platformFromId(s.id))
 
 /** What the CARRIER says. Kept visually distinct from the factory stage, because the whole
  *  reason to open this page is usually that the two disagree. */
@@ -136,8 +152,10 @@ export function ShipmentsView() {
     const r = shown
     if (!r.length) return
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`
-    const head = ["Order", "Customer", "State", "Tracking", "Carrier", "Method", "Price", "Refunded", "Stage", "Delivery", "Scanned at"]
-    const lines = [head.join(","), ...r.map((s) => [s.num, s.customer, s.state, s.tracking, s.carrier, s.method, s.price != null ? s.price.toFixed(2) : "", (s.refunded ?? 0) > 0 ? (s.refunded ?? 0).toFixed(2) : "", s.stage, s.delivery, s.scannedAt].map(esc).join(","))]
+    // Order and Platform are two columns for the same reason they are two lines on screen:
+    // a sheet that has to be filtered by marketplace should not need a formula to find it.
+    const head = ["Order", "Platform", "Customer", "State", "Tracking", "Carrier", "Method", "Price", "Refunded", "Stage", "Delivery", "Scanned at"]
+    const lines = [head.join(","), ...r.map((s) => [shipNum(s), shipOrigin(s), s.customer, s.state, s.tracking, s.carrier, s.method, s.price != null ? s.price.toFixed(2) : "", (s.refunded ?? 0) > 0 ? (s.refunded ?? 0).toFixed(2) : "", s.stage, s.delivery, s.scannedAt].map(esc).join(","))]
     const blob = new Blob([lines.join("\n")], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -377,8 +395,15 @@ export function ShipmentsView() {
                         of which the last six identify it, and letting it set the column width
                         pushed the action buttons off the right edge of the card. The full
                         value is on the title, and the search box reaches it either way. */}
+                    {/* THE NUMBER, THEN WHERE IT CAME FROM — not one string carrying both.
+                        "etsy-4142905822" is a routing id: the prefix is load-bearing for
+                        filtering and useless for reading, and it pushed the digits that
+                        actually match the Etsy dashboard into the middle of a word. The
+                        receipt number leads, and the marketplace becomes a caption, which is
+                        the same shape the Customer column beside it already uses. */}
                     <td className="px-5 py-2.5">
-                      <div className="max-w-[9.5rem] truncate text-sm font-semibold tabular-nums" title={s.num}>{s.num}</div>
+                      <div className="max-w-[9.5rem] truncate text-sm font-semibold tabular-nums" title={s.id}>{shipNum(s)}</div>
+                      <div className="text-2xs text-muted-foreground">{shipOrigin(s)}</div>
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex max-w-[14rem] items-center gap-1.5">

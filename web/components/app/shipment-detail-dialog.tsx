@@ -1,10 +1,11 @@
 "use client"
 
-import { ArrowUUpLeft, CircleNotch, LinkBreak, Package, Receipt, FilePdf, Printer, Warning } from "@phosphor-icons/react"
+import { ArrowSquareOut, ArrowUUpLeft, CircleNotch, DownloadSimple, LinkBreak, Package, Receipt, FilePdf, Printer, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { useEffect, useRef, useState } from "react"
 import { fetchShipmentLabel, detachOrderLabel, restoreOrderLabel, getShipmentCandidates, attachShipmentToOrder, type ShipmentRow, type ShipmentCandidate } from "@/lib/api"
+import { plainNum, platformFromId } from "@/lib/order-format"
 
 /**
  * ONE PARCEL, IN FULL — so the table doesn't have to be.
@@ -50,10 +51,9 @@ const VIA_WORD: Record<string, string> = {
  * what an unlinked-but-paid-for label is. A refund is finished, not held, so it stays muted.
  */
 function NoLabel({
-  kind, tracking, canRestore, restoring, onRestore,
+  kind, canRestore, restoring, onRestore,
 }: {
   kind: "refunded" | "unlinked" | "never"
-  tracking: string | null
   canRestore: "snapshot" | "carrier" | null
   restoring: boolean
   onRestore: () => void
@@ -61,9 +61,10 @@ function NoLabel({
   const unlinked = kind === "unlinked"
   const Icon = kind === "refunded" ? Receipt : unlinked ? LinkBreak : FilePdf
   return (
-    // Same 4:6 frame the label itself occupies, so the window doesn't change shape depending
-    // on what happened to the parcel.
-    <div className={"flex aspect-[4/6] flex-col items-center justify-center gap-3 rounded-xl border px-6 text-center "
+    // Same frame the label itself occupies — ratio on a narrow screen, the height of the
+    // facts beside it on a wide one — so the window doesn't change shape depending on what
+    // happened to the parcel.
+    <div className={"flex aspect-[4/6] flex-col items-center justify-center gap-3 rounded-xl border px-6 text-center md:aspect-auto md:h-full md:min-h-[30rem] "
       + (unlinked
         ? "border-amber-200 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10"
         : "border-border bg-muted/30")}>
@@ -84,9 +85,9 @@ function NoLabel({
               ? "It was taken off this order, not refunded. The postage is still bought and the parcel is still moving."
               : "Nothing has been bought for this parcel yet."}
         </p>
-        {unlinked && tracking && (
-          <p className="pt-0.5 font-mono text-2xs text-muted-foreground line-through decoration-destructive/60">{tracking}</p>
-        )}
+        {/* The number is NOT repeated here. It is four rows to the right, struck through, in
+            the facts column — printing it twice on one screen makes a reader check whether
+            they are two different numbers. */}
       </div>
       {unlinked && canRestore && (
         <Button size="sm" variant="outline" onClick={onRestore} disabled={restoring} className="mt-1 bg-card">
@@ -95,15 +96,13 @@ function NoLabel({
         </Button>
       )}
       {unlinked && canRestore === "carrier" && (
-        // Said before the click, not after it fails: this one has to go and ask the carrier,
-        // and it can come back with nothing.
+        // Said before the click, not after it fails. Both sentences are load-bearing: the
+        // lookup can come back with nothing, and whether the buyer was already told was
+        // destroyed with the label — pushing on a guess would email them twice. Saving the
+        // order pushes it once someone knows.
         <p className="max-w-[16rem] text-2xs leading-relaxed text-muted-foreground">
-          Looked up at the carrier by its number — if it isn&apos;t found, nothing changes.
-          {/* Stated because it is a real gap, not a detail: whether the buyer was already
-              told was destroyed along with the label, and pushing on a guess would email
-              them a second time. Saving the order pushes it when someone knows. */}
-          {" "}The marketplace is <span className="font-medium text-foreground">not</span> told automatically —
-          we no longer know whether the buyer already has this number.
+          If the carrier can&apos;t find it, nothing changes.
+          The marketplace isn&apos;t told either — we no longer know if the buyer has this number.
         </p>
       )}
     </div>
@@ -292,7 +291,12 @@ export function ShipmentDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package size={16} weight="fill" className="text-muted-foreground" />
-            <span className="truncate">{s.num}</span>
+            {/* The number the buyer and the marketplace both use, then where it came from —
+                the same split as the list. `etsy-` is routing, not reading. */}
+            <span className="truncate tabular-nums">{isLoose ? s.id : s.num.startsWith("#") ? s.num : plainNum(s.id)}</span>
+            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
+              {isLoose ? "Label with no order" : platformFromId(s.id)}
+            </span>
             {s.test && (
               <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-2xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">TEST</span>
             )}
@@ -323,13 +327,18 @@ export function ShipmentDetailDialog({
             url: a cross-origin PDF can be refused an iframe outright, and `download` is
             ignored across origins — the browser navigates instead, which is the tab this
             replaces. Same-origin, both work. */}
-        <div className="grid gap-5 md:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        {/* `items-stretch` and a full-height left column: the label and the facts are one
+            spread, and a 4:6 box that stopped two-thirds of the way down the facts left a
+            gap under the page and made the label smaller than the space allowed. The ratio
+            now only sets the floor on a narrow screen, where the columns stack and there is
+            no facing content to match. */}
+        <div className="grid items-stretch gap-5 md:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
           {s.labelUrl ? (
-            <div className="flex flex-col gap-2">
-              {/* 4x6 is the shape every carrier label is printed at, so the frame is that
-                  ratio — a 22rem-tall box in a 17rem column left a band of grey down each
-                  side of the page and made the label smaller than it needed to be. */}
-              <div className="relative aspect-[4/6] overflow-hidden rounded-lg border border-border bg-white">
+            <div className="flex flex-col gap-2 md:h-full">
+              {/* 4x6 is the shape every carrier label is printed at. `#view=Fit` keeps the
+                  page whole inside whatever height the facts give it, so a taller frame
+                  shows a bigger label rather than a cropped one. */}
+              <div className="relative aspect-[4/6] overflow-hidden rounded-lg border border-border bg-white md:aspect-auto md:h-full md:min-h-[30rem]">
                 {labelSrc ? (
                   // #toolbar=0 asks the built-in viewer for the page and not its chrome —
                   // honoured by Chrome and Edge, ignored elsewhere, harmless either way.
@@ -355,7 +364,6 @@ export function ShipmentDetailDialog({
             // when the postage is still bought, still paid for, and one click from coming back.
             <NoLabel
               kind={refunded ? "refunded" : s.restorable ? "unlinked" : "never"}
-              tracking={s.voidedTracking}
               canRestore={isLoose ? null : s.restorable}
               restoring={restoring}
               onRestore={() => void restore()}
@@ -480,23 +488,13 @@ export function ShipmentDetailDialog({
             </div>
           )}
 
-          {/* TWO BUTTONS, and everything else is a sentence.
-              This had five controls in four different shapes — an outline button, a square
-              icon-only button, a filled button, an outline anchor and a text link — wrapping
-              onto two lines, and nothing in the arrangement said which one you came here to
-              press. Shape was carrying no meaning, so it was just noise with corners.
+        </div>
+        </div>
 
-              Now weight states rank, and only the primary action keeps an icon. Print is the
-              thing you almost always want; Download is its fallback for when the file has to
-              go somewhere else. The rest — refund, unlink, the carrier's own copy — are rare,
-              and rare things read better as words than as buttons competing for the same eye.
-              Grouping them left and the actions right also ends the old fault where the
-              window had two action areas facing each other with no single answer to "what
-              can I do here". */}
-          {/* THE CONFIRM, in place of the click that used to be the whole action. It sits
-              above the buttons rather than in a second dialog: what it is asking about is
-              the tracking number three rows up, and a stacked modal would cover it. */}
-          {confirmDetach && (
+        {/* THE CONFIRM, in place of the click that used to be the whole action. It sits
+            above the buttons rather than in a second dialog: what it is asking about is the
+            tracking number in the column above, and a stacked modal would cover it. */}
+        {confirmDetach && (
             <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 dark:border-amber-500/30 dark:bg-amber-500/10">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
                 <Warning size={16} weight="fill" />
@@ -530,69 +528,81 @@ export function ShipmentDetailDialog({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-              {/* Only while it can still work: a second refund can only ever collect the
-                  carrier's refusal, and a label with no stored PDF has no reference to
-                  refund against. Destructive colour on hover only — it is the one action
-                  here that spends money and cannot be taken back, but it is also not what
-                  most people opened this window for. */}
-              {canRefund && s.labelUrl && !refunded && (
-                <button
-                  onClick={() => onRefund(s)}
-                  disabled={voiding === s.id}
-                  title="Refund the postage with the carrier. This cannot be undone."
-                  className="inline-flex items-center gap-1.5 text-muted-foreground underline-offset-2 transition-colors hover:text-destructive hover:underline disabled:opacity-50"
-                >
-                  {voiding === s.id ? <CircleNotch size={12} className="animate-spin" /> : null}
-                  Refund postage
-                </button>
-              )}
-              {/* UNLINK, for a label that is fine but landed on the wrong order. Deliberately
-                  sitting beside Refund and reading nothing like it: one frees the order, the
-                  other destroys the postage, and the title says so before the click. */}
-              {!isLoose && !!s.tracking && (
-                <button
-                  // Opens the confirm above; it does NOT act. See the note on confirmDetach.
-                  onClick={() => setConfirmDetach(true)}
-                  disabled={detaching || confirmDetach}
-                  title="Take this tracking off the order so a correct label can be bought. The postage is NOT refunded, and this can be undone."
-                  className="inline-flex items-center gap-1.5 text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
-                >
-                  Wrong order?
-                </button>
-              )}
-              {/* The carrier's own copy still has a use — checking ours against theirs — so
-                  it stays, as three words rather than a square icon nobody could name. */}
-              {s.labelUrl && (
-                <a href={s.labelUrl} target="_blank" rel="noopener noreferrer"
-                   className="text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline">
-                  Carrier&apos;s copy
-                </a>
-              )}
-            </div>
+          {/* ONE KIND OF CONTROL, five of them.
+              This row had five actions in four visual languages: two plain text links, an
+              anchor styled as a link, an anchor hand-styled as a square-cornered button, and
+              a pill Button — different heights, different corners, two of them not looking
+              clickable at all. Nothing in that arrangement could be scanned, because shape
+              was varying for reasons that had nothing to do with what the buttons do.
+
+              Now every one is the same pill at the same height and only the VARIANT states
+              rank: filled for the thing you came here to do, outline for its fallback, ghost
+              for the three rare ones. The anchors borrow buttonVariants rather than
+              approximating it, so "looks like a button" and "is a button" cannot drift.
+              Rare on the left, routine on the right, as before.
+
+              It also spans the WHOLE window now rather than sitting inside the facts column.
+              Five pills in a 24rem column wrapped onto three lines — which is most of why
+              the row looked like a pile rather than a set. Full width, they are one line. */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            {/* Only while it can still work: a second refund can only ever collect the
+                carrier's refusal, and a label with no stored PDF has no reference to refund
+                against. It is the one action here that cannot be taken back — which is what
+                the confirm it raises is for, not what its colour should be shouting all day. */}
+            {canRefund && s.labelUrl && !refunded && (
+              <Button
+                size="sm" variant="ghost"
+                onClick={() => onRefund(s)}
+                disabled={voiding === s.id}
+                title="Refund the postage with the carrier. This cannot be undone."
+              >
+                {voiding === s.id ? <CircleNotch size={13} className="animate-spin" /> : <Receipt size={13} />}
+                Refund postage
+              </Button>
+            )}
+            {/* UNLINK, for a label that is fine but landed on the wrong order. Sitting beside
+                Refund and reading nothing like it: one frees the order, the other destroys
+                the postage. It opens the confirm above; it does NOT act. */}
+            {!isLoose && !!s.tracking && (
+              <Button
+                size="sm" variant="ghost"
+                onClick={() => setConfirmDetach(true)}
+                disabled={detaching || confirmDetach}
+                title="Take this tracking off the order so a correct label can be bought. The postage is NOT refunded, and this can be undone."
+              >
+                <LinkBreak size={13} />
+                Wrong order?
+              </Button>
+            )}
+            {/* The carrier's own copy still has a use — checking ours against theirs. */}
+            {s.labelUrl && (
+              <a href={s.labelUrl} target="_blank" rel="noopener noreferrer"
+                 className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                <ArrowSquareOut size={13} />
+                Carrier&apos;s copy
+              </a>
+            )}
 
             {s.labelUrl && (
-              <div className="flex items-center gap-2">
+              <div className="ms-auto flex items-center gap-2">
                 {/* The same blob the frame is showing — so what you save is provably what you
                     just looked at, and it needs no second authenticated request. */}
                 <a
                   href={labelSrc ?? undefined}
-                  download={`label-${s.num}.pdf`}
+                  download={`label-${plainNum(s.id)}.pdf`}
                   aria-disabled={!labelSrc}
-                  className={"eg-tap inline-flex h-9 items-center justify-center rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent "
-                    + (labelSrc ? "" : "pointer-events-none opacity-50")}
+                  className={buttonVariants({ variant: "outline", size: "sm" })
+                    + (labelSrc ? "" : " pointer-events-none opacity-50")}
                 >
+                  <DownloadSimple size={13} />
                   Download
                 </a>
-                <Button onClick={printLabel} disabled={!labelSrc}>
-                  <Printer size={14} weight="bold" /> Print
+                <Button size="sm" onClick={printLabel} disabled={!labelSrc}>
+                  <Printer size={13} weight="bold" /> Print
                 </Button>
               </div>
             )}
           </div>
-        </div>
-        </div>
       </DialogContent>
 
     </Dialog>
