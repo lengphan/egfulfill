@@ -16,14 +16,22 @@ import { decodeEntities } from "@/lib/order-format"
  * tab. This is the second one, printed under the title and STAYING there through the picking
  * step, because its whole value is being read side by side with what you are selecting.
  *
+ * Personalisation is NOT repeated here: the order panel above already prints it once, and a
+ * copy under every line turns a four-line order into the same sentence four times. The
+ * listing SKU takes that slot instead — it is what a customer query or a marketplace message
+ * will quote, and it is not the blank sku we buy against.
+ *
  * Renders nothing when the line carries neither, so a manual order gains no empty strip.
  */
 export function OrderedVariant({ item, className = "" }: { item: OrderItem; className?: string }) {
   // Entities arrive HTML-encoded from the marketplaces (&amp;, &#39;) — the same decode the
   // order title gets, or "Men&#39;s" is what a packer reads.
   const ordered = decodeEntities(String(item.variant ?? "").trim())
-  const personal = decodeEntities(String(item.personalization ?? "").trim())
-  if (!ordered && !personal) return null
+  // The LISTING sku — the seller's own code for the thing sold, which is what a marketplace
+  // message or a customer query will quote. Distinct from the blank sku we buy against, and
+  // carrying the print-method suffix the listing was sold under.
+  const sku = String(item.sku ?? "").trim()
+  if (!ordered && !sku) return null
 
   return (
     <div className={"mt-0.5 space-y-0.5 text-xs leading-snug " + className}>
@@ -32,13 +40,13 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
           <span className="font-medium text-foreground/70">Ordered:</span> {ordered}
         </div>
       )}
-      {/* Personalisation is a LITERAL to reproduce — shown in mono and unquoted, so a
-          trailing space or a quote mark the buyer typed is visible rather than styled away.
-          Same rule the customer-file panel already follows. */}
-      {personal && (
+      {/* Personalisation is deliberately NOT repeated here — the order panel above already
+          prints it once, in full, and a second copy under every line turns a four-line order
+          into the same sentence four times. */}
+      {sku && (
         <div className="text-muted-foreground">
-          <span className="font-medium text-foreground/70">Personalisation:</span>{" "}
-          <span className="font-mono">{personal}</span>
+          <span className="font-medium text-foreground/70">Listing SKU:</span>{" "}
+          <span className="font-mono">{sku}</span>
         </div>
       )}
     </div>
