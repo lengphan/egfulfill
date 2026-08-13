@@ -634,6 +634,14 @@ const vi: Dict = {
   "settingsHint.sides + positioning outlines per category": "mặt in + khung định vị theo từng nhóm",
   "settingsHint.flat rate per garment class": "giá cố định theo nhóm trang phục",
   "settingsHint.added per unit by technique": "cộng thêm mỗi sản phẩm theo kỹ thuật",
+  "settingsHint.Charged separately, when they want to download the .pes/.emb. Paying for the work and owning the file are two transactions.": "Tính phí riêng, khi khách muốn tải tệp .pes/.emb. Trả cho công việc và sở hữu tệp là hai giao dịch khác nhau.",
+  "settingsHint.Money leaving us, not a seller charge — the only figure on this page that does.": "Tiền đi ra từ chúng tôi, không phải khoản thu của người bán — con số duy nhất trên trang này như vậy.",
+  "settingsHint.The limits a seller sees when cashing out their wallet. A payout can never exceed their balance regardless of these.": "Giới hạn người bán thấy khi rút tiền từ ví. Khoản rút không bao giờ vượt quá số dư của họ, bất kể các giá trị này.",
+  "settingsHint.Largest single request. Set 0 for no cap beyond the seller's balance.": "Yêu cầu lớn nhất một lần. Đặt 0 để không giới hạn ngoài số dư của người bán.",
+  "settingsHint.USD→VND. A seller picks a dollar amount to add; this converts it to the VND their QR charges, and that exact USD credits on payment.": "USD→VND. Người bán chọn số tiền đô để nạp; giá trị này quy đổi sang VND mà mã QR thu, và đúng số USD đó được cộng vào khi thanh toán.",
+  "settingsHint.Applies to EVERY method (Transfer, QR, Card). The minimum a seller may add, and the quick-amount buttons shown in Add Funds.": "Áp dụng cho MỌI phương thức (Chuyển khoản, QR, Thẻ). Số tiền tối thiểu người bán được nạp, và các nút chọn nhanh hiển thị trong phần Nạp tiền.",
+  "settingsHint.What a blank sells for, and what carriage adds. Unrelated to design — separated so the design decisions above can be read on their own.": "Giá bán của phôi và phần cước vận chuyển cộng thêm. Không liên quan đến thiết kế — tách riêng để các quyết định thiết kế phía trên đọc độc lập được.",
+  "settingsHint.Per TikTok-shipped order, charged on import. TikTok made the label, so there's no carriage to buy — this is handling. 0 = off.": "Mỗi đơn do TikTok vận chuyển, tính khi nhập đơn. TikTok đã tạo nhãn nên không phải mua cước — đây là phí xử lý. 0 = tắt.",
 
   // ── Help centre ───────────────────────────────────────────────────────────
   "help.title": "Chúng tôi có thể giúp gì?",
