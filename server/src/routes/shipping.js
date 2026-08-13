@@ -535,6 +535,40 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
    * On demand as well as on every Etsy sync, because the sync only reaches orders in its
    * window and someone staring at "Not available yet" on an older order wants it now.
    */
+  /**
+   * WHICH CARD POSTAGE IS BILLED TO.
+   *
+   * Shippo's payment_type is STRIPE — they charge a card per label rather than drawing down
+   * a prepaid balance — so there is no Shippo balance to report, and a screen claiming one
+   * would be inventing it. What there IS, and what is worth knowing before a label fails at
+   * the counter, is which card is active and when it expires.
+   *
+   * LAST FOUR AND BRAND ONLY. Shippo returns nothing more and we store nothing at all: this
+   * is a passthrough read, so no card detail ever lands in our database or our logs.
+   */
+  app.get('/api/shipping/billing', guard, async (reply) => {
+    if (!shToken()) return { configured: false, methods: [] };
+    try {
+      const r = await fetch(SH_BASE + '/billing/', { headers: { Authorization: shAuth() } });
+      if (!r.ok) return { configured: true, error: 'Shippo HTTP ' + r.status, methods: [] };
+      const d = await r.json().catch(() => ({}));
+      const cards = Array.isArray(d.payment_methods) ? d.payment_methods : [];
+      return {
+        configured: true,
+        paymentType: d.payment_type || null,
+        blocked: !!d.blocked_billing,
+        currency: d.payment_currency || null,
+        methods: cards.map((c) => ({
+          brand: c.cc_brand || null, last4: c.last_four || null,
+          expires: c.exp_month && c.exp_year ? `${c.exp_month}/${c.exp_year}` : null,
+          active: !!c.is_active, default: !!c.is_default, authorized: !!c.is_authorized,
+        })),
+      };
+    } catch (e) {
+      return { configured: true, error: (e && e.message) || 'failed', methods: [] };
+    }
+  });
+
   app.post('/api/shipping/backfill-addresses', guard, async (req) => {
     return await fillBlankAddressesFromShippo(Number((req.body || {}).limit) || 100);
   });

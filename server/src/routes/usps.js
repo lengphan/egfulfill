@@ -427,6 +427,23 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
       [ref.provider || null, ref.providerId, ref.carrierAccount || null, orderId]).catch(() => {});
   }
 
+  /**
+   * WHEN SHIPPO DID THE TELLING, RECORD THAT IT WAS TOLD.
+   *
+   * A label linked to Shippo's imported order IS the push: Shippo marks the order shipped
+   * on the marketplace and notifies the buyer, without our own push path running at all.
+   * marketplace_fulfilled_at was only stamped by that path, so etsy-4142905822 reached Etsy
+   * successfully and our own record still read "never pushed".
+   *
+   * That is not cosmetic. The stamp is the once-only guard: left null, a later status change
+   * fires our own Etsy push, which answers 403 on this app tier — harmless but noisy — and
+   * every report of what has been fulfilled is wrong in the safe-looking direction.
+   */
+  if (ref && ref.shippoOrder) {
+    await q('update orders set marketplace_fulfilled_at = coalesce(marketplace_fulfilled_at, now()) where id=$1', [orderId])
+      .catch(() => {});
+  }
+
   // Tell the marketplace, now that the order actually has a tracking number. This is the
   // moment tracking comes into existence for a label-bought order — waiting for someone to
   // separately mark it shipped is why Etsy orders sat with a number we never sent. Guarded
