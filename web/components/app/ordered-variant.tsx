@@ -47,9 +47,6 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
       {ordered && (
         <div className="text-muted-foreground">
           <span className="font-medium text-foreground/70">Ordered:</span> {ordered}
-          {/* Emphasised past one: every row carries a number so none is ambiguous, but a x6
-              has to catch the eye where a x1 should not. */}
-          <span className={"ml-1.5 " + (qty > 1 ? "font-semibold text-foreground" : "")}>×{qty}</span>
         </div>
       )}
       {/* Personalisation is deliberately NOT repeated here — the order panel above already
@@ -59,9 +56,16 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
         <div className="text-muted-foreground">
           <span className="font-medium text-foreground/70">Listing SKU:</span>{" "}
           <span className="font-mono">{sku}</span>
-          {!ordered && <span className={"ml-1.5 " + (qty > 1 ? "font-semibold text-foreground" : "")}>×{qty}</span>}
         </div>
       )}
+      {/* Its own labelled line, reading like the two above it rather than a bare xN tacked
+          onto the end of one. Emphasised past one so a 6 catches the eye where a 1 should
+          not — but always present, because an absent count and a count of one must never
+          look the same to someone pulling stock. */}
+      <div className="text-muted-foreground">
+        <span className="font-medium text-foreground/70">Quantity:</span>{" "}
+        <span className={qty > 1 ? "font-semibold text-foreground" : ""}>{qty}</span>
+      </div>
     </div>
   )
 }
