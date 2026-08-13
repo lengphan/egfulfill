@@ -1,10 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Bank, CreditCard, ArrowsClockwise, Plus, CircleNotch, Warning } from "@phosphor-icons/react"
-import { SectionCard } from "@/components/app/section-card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Bank, CreditCard, ArrowsClockwise, CircleNotch, Warning } from "@phosphor-icons/react"
+import { Card } from "@/components/ui/card"
 import { usePrompt } from "@/components/app/confirm-dialog"
 import {
   getCashAccounts, saveCashAccount, reconcileCashAccount, recordCashPayment,
@@ -91,106 +89,93 @@ export function CashAccountsPanel() {
     finally { setBusy(null) }
   }
 
+  // Both quiet states stay one line: this block sits above the P&L and must never push it
+  // down to report on itself.
   if (err && !view) {
     return (
-      <SectionCard title="Accounts">
-        <div className="flex items-start gap-2 px-5 py-4 text-sm text-muted-foreground">
-          <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-amber-500" />
-          <span>{err}</span>
-        </div>
-      </SectionCard>
+      <p className="flex items-center gap-1.5 text-2xs text-muted-foreground">
+        <Warning size={12} weight="fill" className="shrink-0 text-amber-500" /> {err}
+      </p>
     )
   }
   if (!view) {
     return (
-      <SectionCard title="Accounts">
-        <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
-      </SectionCard>
+      <p className="flex items-center gap-1.5 text-2xs text-muted-foreground">
+        <CircleNotch size={12} className="animate-spin" /> Accounts…
+      </p>
     )
   }
 
   const missing = SUGGESTED.filter((sg) => !view.accounts.some((a) => a.id === sg.id))
 
+  /**
+   * CARDS, matching the P&L row below — the page already speaks in cards, and a bordered
+   * list of full-width rows read as a settings table bolted on top of a dashboard.
+   *
+   * Deliberately SMALLER than those cards: p-3 against p-5, text-xl against text-3xl. These
+   * are reference figures checked occasionally; the P&L underneath is the headline. Same
+   * language, quieter voice — which is also why there is no SectionCard chrome around them,
+   * so they read as part of the page rather than a second panel competing with it.
+   */
   return (
-    <SectionCard
-      title="Accounts"
-      actions={<Button size="sm" variant="outline" onClick={() => add()}><Plus size={14} weight="bold" /> Add account</Button>}
-    >
-      <div className="px-5 py-4">
-        <p className="mb-3 text-xs text-muted-foreground">
-          Where the money actually sits. Balances are worked out from what has been attributed to each
-          account — reconcile one when the real balance has drifted.
-        </p>
-
-        {view.accounts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No accounts yet. Add the ones money arrives in and the card it goes out on.</p>
-        ) : (
-          <div className="rounded-lg border border-border">
-            {view.accounts.map((a) => (
-              <div key={a.id} className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2.5 last:border-b-0">
-                <span className="text-muted-foreground">
-                  {a.kind === "card" ? <CreditCard size={15} /> : <Bank size={15} />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{a.name}</span>
-                  <span className="text-2xs text-muted-foreground">
-                    {a.movements} movement{a.movements === 1 ? "" : "s"}
-                    {a.opening ? ` · opened at ${usd(a.opening)}` : ""}
-                  </span>
-                </span>
-                {a.is_postage && <Badge variant="secondary" className="bg-primary/10 text-primary">Postage card</Badge>}
-                <span className={"w-28 shrink-0 text-right text-sm font-semibold tabular-nums " + (a.balance < 0 ? "text-red-600 dark:text-red-400" : "")}>
-                  {usd(a.balance)}
-                </span>
-                <span className="flex shrink-0 gap-1">
-                  <Button size="sm" variant="ghost" disabled={busy === a.id} onClick={() => pay(a.id, a.name, "in")} title="Record money in">+</Button>
-                  <Button size="sm" variant="ghost" disabled={busy === a.id} onClick={() => pay(a.id, a.name, "out")} title="Record money out">−</Button>
-                  <Button size="sm" variant="ghost" disabled={busy === a.id} onClick={() => reconcile(a.id, a.name, a.balance)} title="Set the real balance">
-                    {busy === a.id ? <CircleNotch size={13} className="animate-spin" /> : <ArrowsClockwise size={13} />}
-                  </Button>
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* UNASSIGNED IS A LINE, not a silence. Money the platform has seen but nobody has
-            placed — counted in the total, because leaving it out would make the total look
-            complete while being wrong. */}
-        {view.unassigned.entries > 0 && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2.5 text-sm">
-            <span className="min-w-0 flex-1">
-              <span className="block font-medium">Unassigned</span>
-              <span className="text-2xs text-muted-foreground">
-                {view.unassigned.entries} entries with no account yet — attribute them from the ledger below
-              </span>
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Accounts
+        </span>
+        <span className="flex items-center gap-2">
+          {view.unassigned.entries > 0 && (
+            <span className="text-2xs text-muted-foreground">
+              {usd(view.unassigned.amount)} unassigned
             </span>
-            <span className="w-28 shrink-0 text-right font-semibold tabular-nums">{usd(view.unassigned.amount)}</span>
-          </div>
-        )}
-
-        <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-          <span className="text-sm font-medium">Across all accounts</span>
-          <span className="text-base font-bold tabular-nums">{usd(view.total)}</span>
-        </div>
-
-        {/* One-click setup for the rails, because their ids have to match what the server
-            maps a top-up's method onto — typing "Ping Pong" would create `ping-pong` and
-            silently never receive anything. */}
-        {missing.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            <span>Add a rail:</span>
-            {missing.map((sg) => (
-              <button key={sg.id} onClick={() => add(sg)} disabled={busy === sg.id}
-                className="eg-tap rounded-md border border-border px-2 py-1 font-medium transition-colors hover:bg-accent hover:text-foreground">
-                {sg.name}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {err && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{err}</p>}
+          )}
+          <button onClick={() => add()}
+            className="eg-tap text-2xs font-medium text-primary hover:underline">+ Account</button>
+        </span>
       </div>
-    </SectionCard>
+
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {view.accounts.map((a) => (
+          // group/acct so the actions can stay out of sight until this card is pointed at —
+          // three controls on every card is a wall of buttons on a reference figure.
+          <Card key={a.id} className="group/acct relative gap-0 p-3">
+            <div className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {a.kind === "card" ? <CreditCard size={12} /> : <Bank size={12} />}
+              <span className="truncate">{a.name}</span>
+              {a.is_postage && <span className="ml-auto shrink-0 rounded bg-primary/10 px-1 py-0.5 text-3xs normal-case text-primary">postage</span>}
+            </div>
+            <div className={"mt-1.5 text-xl font-extrabold tracking-tight tabular-nums " + (a.balance < 0 ? "text-red-600 dark:text-red-400" : "")}>
+              {usd(a.balance)}
+            </div>
+            <div className="mt-0.5 text-2xs text-muted-foreground">
+              {a.movements ? `${a.movements} movement${a.movements === 1 ? "" : "s"}` : "no movements yet"}
+            </div>
+            <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover/acct:opacity-100 focus-within:opacity-100">
+              <button onClick={() => pay(a.id, a.name, "in")} disabled={busy === a.id}
+                className="eg-tap rounded border border-border px-1.5 py-0.5 text-2xs hover:bg-accent" title="Money in">+</button>
+              <button onClick={() => pay(a.id, a.name, "out")} disabled={busy === a.id}
+                className="eg-tap rounded border border-border px-1.5 py-0.5 text-2xs hover:bg-accent" title="Money out">−</button>
+              <button onClick={() => reconcile(a.id, a.name, a.balance)} disabled={busy === a.id}
+                className="eg-tap ml-auto inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-2xs hover:bg-accent" title="Set the real balance">
+                {busy === a.id ? <CircleNotch size={10} className="animate-spin" /> : <ArrowsClockwise size={10} />} Reconcile
+              </button>
+            </div>
+          </Card>
+        ))}
+
+        {/* The rails, as empty cards rather than a row of links — an account you have not
+            added yet still occupies a place in the answer, and its id has to match what the
+            server maps a top-up's method onto. */}
+        {missing.map((sg) => (
+          <button key={sg.id} onClick={() => add(sg)} disabled={busy === sg.id}
+            className="eg-tap flex min-h-[5.25rem] flex-col items-start justify-center rounded-xl border border-dashed border-border p-3 text-left transition-colors hover:border-primary hover:bg-accent/40">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{sg.name}</span>
+            <span className="mt-1 text-xs text-muted-foreground">+ add this rail</span>
+          </button>
+        ))}
+      </div>
+
+      {err && <p className="text-2xs text-amber-700 dark:text-amber-400">{err}</p>}
+    </div>
   )
 }
