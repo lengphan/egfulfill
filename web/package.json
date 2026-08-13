@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "ulimit -u 400; next dev",
+    "dev:unlimited": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
