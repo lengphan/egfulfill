@@ -755,9 +755,16 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       .catch(() => ({ rows: [] }))).rows[0];
     if (!s) { reply.code(404); return { error: 'Shipment not found' }; }
 
-    // ZIP is the strong signal and name is the weak one, so they are scored rather than
-    // AND-ed: a buyer who typed their name differently on the marketplace still matches on
-    // where it is going, and a name match in the wrong state does not outrank it.
+    // Scored, not AND-ed, because either signal can be absent for an innocent reason.
+    //
+    // AN EXACT NAME OUTRANKS A SHARED ZIP (3 vs 2), which is the opposite of the obvious
+    // guess and comes from the real data: matching the first of these seven parcels, the
+    // CORRECT order carried no address at all — Etsy withholds it behind their PII gate —
+    // while four strangers in the same town tied with it on ZIP alone. A ZIP is shared by
+    // everyone on a street; a full name matching exactly is not. A partial name stays at 1,
+    // since "Anna" inside "Anna-Marie" is a coincidence waiting to happen.
+    //
+    // Both signals still beat either alone, which is the case that needs no thought.
     const zip5 = String(s.to_zip || '').replace(/[^0-9]/g, '').slice(0, 5);
     const name = String(s.to_name || '').trim().toLowerCase();
     const r = await softQ('shipment candidates',
@@ -768,7 +775,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
               coalesce(o.address->>'zip','')   as zip,
               coalesce(o.address->>'street', o.address->>'street1', o.address->>'line1','') as street,
               (case when $1 <> '' and left(regexp_replace(coalesce(o.address->>'zip',''), '[^0-9]', '', 'g'), 5) = $1 then 2 else 0 end)
-            + (case when $2 <> '' and lower(coalesce(o.customer->>'name','')) = $2 then 2
+            + (case when $2 <> '' and lower(coalesce(o.customer->>'name','')) = $2 then 3
                     when $2 <> '' and lower(coalesce(o.customer->>'name','')) like '%' || $2 || '%' then 1
                     else 0 end) as score
          from orders o
