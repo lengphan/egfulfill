@@ -174,6 +174,31 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
     return () => { alive = false; clearTimeout(t); if (url) URL.revokeObjectURL(url) }
   }, [result?.labelUrl, result?.trackingNumber, result?.shipmentId, order?.id])
 
+  /**
+   * PRINT WHEN THE BYTES ARRIVE, not when a frame says it loaded.
+   *
+   * This used to hang off the label iframe's onLoad. Chrome renders a PDF through its own
+   * viewer plugin, and that frequently never fires a load event the parent document can
+   * see — so printPacket() was simply never called. No error, no dialog, nothing: the exact
+   * silence that made this so hard to place.
+   *
+   * `labelSrc` being set is a fact we own — the fetch resolved and we made the blob — so it
+   * is a trigger that cannot be withheld by the renderer. Keyed on the tracking number so
+   * buying a second label with "Another" prints that one too, while a re-render of the same
+   * label does not fire the dialog again.
+   */
+  useEffect(() => {
+    if (!labelSrc) return
+    const key = result?.trackingNumber ?? labelSrc
+    if (printedRef.current === key) return
+    printedRef.current = key
+    const t = setTimeout(() => { void printPacket() }, 0)
+    return () => clearTimeout(t)
+    // printPacket reads the latest labelSrc/order via closure on each render; keying on the
+    // tracking number is what makes this fire once per label rather than once per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelSrc, result?.trackingNumber])
+
   const reset = () => { setPasteText(""); setTo({ ...BLANK }); setSvc({ signature: false, insurance: 0 }); setResult(null); setErr(null); setAddrCheck({ status: "idle" }); setRates(null); setPickedToken(null) }
   // Any change to the parcel or add-ons invalidates the quoted rates — you can't buy a rate
   // that was priced for a different box. Re-fetch after editing.
@@ -323,15 +348,6 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 title="Shipping label"
                 aria-hidden
                 className="pointer-events-none fixed left-[-9999px] top-0 size-[1px] opacity-0"
-                onLoad={() => {
-                  // ONCE per label. Keyed on the tracking number rather than a boolean so
-                  // buying a second label with "Another" prints that one too, and a re-render
-                  // of the same label does not fire the dialog again.
-                  const key = result?.trackingNumber ?? labelSrc
-                  if (printedRef.current === key) return
-                  printedRef.current = key
-                  void printPacket()
-                }}
               />
             )}
             <div className="flex flex-wrap gap-2">
