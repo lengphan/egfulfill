@@ -15,33 +15,6 @@ import {
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
-
-/**
- * The failure, in one short line a person can act on.
- *
- * The row used to print the transport's raw answer — `Brevo API 400
- * {"code":"invalid_parameter","message":"email is not valid in to"} | smtp: No recipients
- * defined` — wrapped across three lines of red in a table cell. It is the right text to
- * KEEP, and the wrong text to lead with: it reads as a system fault when the actual
- * meaning is usually "one address on your list is wrong".
- *
- * So the row gets the meaning and the detail view keeps the words.
- */
-function shortFailure(raw: string | null | undefined): string | null {
-  if (!raw) return null
-  const s = String(raw)
-  // Our own message already leads with the count and the address — keep that, it is the
-  // one case where the raw text is the useful text.
-  const mine = s.match(/^\d+ of \d+ failed — first was ([^:]+):/)
-  if (mine) return `${mine[1]} isn't a valid address`
-  if (/not a valid email|email is not valid|invalid_parameter/i.test(s)) return "An address on the list isn't valid"
-  if (/unrecognised IP|Unauthorized IP/i.test(s)) return "This server's IP isn't allowed in Brevo"
-  if (/sender|not verified|unverified/i.test(s)) return "The sending address isn't verified"
-  if (/rate|429|too many/i.test(s)) return "Rate limited — some messages were refused"
-  if (/401|unauthor/i.test(s)) return "The mail key was rejected"
-  return "Some messages couldn't be delivered"
-}
-
 /**
  * Spell a count out.
  *
@@ -331,6 +304,13 @@ export function BroadcastsView() {
   const [aud, setAud] = useState<BroadcastAudience>({})
   const [channels, setChannels] = useState<BroadcastChannel[]>(["email", "inapp"])
   const [saving, setSaving] = useState(false)
+  // THE RECIPIENTS, IN THE COMPOSER. Resolved live from the audience being edited, so the
+  // addresses are on the same screen as the message rather than a click away. Safe as an
+  // effect because the fetch writes `cCount` and never `aud` — its own result cannot
+  // re-satisfy the condition that triggered it (CLAUDE.md §2.8).
+  const [cCount, setCCount] = useState<Awaited<ReturnType<typeof previewBroadcastAudience>> | null>(null)
+  const [cCounting, setCCounting] = useState(false)
+  const [cAddr, setCAddr] = useState("")
 
   // Send confirmation. Held separately from the editor because it asks a different
   // question — not "is this right?" but "are you sure?".
@@ -393,6 +373,7 @@ export function BroadcastsView() {
     // in-app copy costs one insert. Older drafts keep whatever they were saved with.
     setChannels(b?.channels?.length ? b.channels : ["email", "inapp"])
     setAud(b?.audience ?? {})
+    setCCount(null); setCAddr("")
     setErr(null)
     setOpen(true)
   }
@@ -416,22 +397,63 @@ export function BroadcastsView() {
   }
 
   /**
-   * Compose straight into the send, rather than parking a draft and finding it again.
+   * Send from the composer, in one action.
    *
    * The draft row is still written first and is still what the server reads — that is the
-   * storage model, not a step in the task — but nobody has to go back to the list to act on
-   * it. What it opens is the recipient screen, so the addresses are read BEFORE the send,
-   * which is the whole reason that screen exists: there is no unsend.
+   * storage model, not a step in the task. The addresses are already on this screen and the
+   * button already names the count, so there is nothing a second confirm dialog would add
+   * that isn't in front of you. There is no unsend, which is why the count is in the button
+   * rather than in a sentence someone can skip.
    */
   const saveAndSend = async () => {
     setSaving(true); setErr(null)
     try {
       const b = await persist()
+      await sendBroadcast(b.id)
       setOpen(false); load()
-      await startSend(b)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not save")
+      setErr(e instanceof Error ? e.message : "Could not send")
     } finally { setSaving(false) }
+  }
+
+  /**
+   * Resolve the composer's audience into actual addresses, as it is edited.
+   *
+   * Debounced, and deliberately keyed on the audience only: the fetch writes `cCount`, which
+   * is not part of the condition, so it cannot re-trigger itself. A ticked box or a struck-off
+   * address re-resolves; nothing else does.
+   */
+  useEffect(() => {
+    if (!open || !channels.includes("email")) { return }
+    let live = true
+    const t = setTimeout(() => {
+      setCCounting(true)
+      previewBroadcastAudience(aud)
+        .then((r) => { if (live) setCCount(r) })
+        .catch(() => { if (live) setCCount(null) })
+        .finally(() => { if (live) setCCounting(false) })
+    }, 250)
+    return () => { live = false; clearTimeout(t) }
+  }, [open, aud, channels])
+
+  /** Strike someone off — an extra by address, a seller by id. Writes to the audience, which
+   *  is what the server resolves from, so the removal survives the send. */
+  const cDrop = (r: BroadcastRecipient) => {
+    if (r.extra) {
+      const keep = (aud.extraEmails ?? []).filter((e) => e.trim().toLowerCase() !== r.email.trim().toLowerCase())
+      return setAud({ ...aud, extraEmails: keep })
+    }
+    if (!r.id) return
+    setAud({ ...aud, excludeIds: [...new Set([...(aud.excludeIds ?? []), r.id])] })
+  }
+
+  const cAdd = () => {
+    const e = cAddr.trim()
+    if (!e) return
+    const have = new Set([...(cCount?.recipients ?? []).map((r) => r.email.toLowerCase()), ...(aud.extraEmails ?? []).map((x) => x.toLowerCase())])
+    setCAddr("")
+    if (have.has(e.toLowerCase())) return          // already on the list
+    setAud({ ...aud, extraEmails: [...(aud.extraEmails ?? []), e] })
   }
 
   /**
@@ -608,21 +630,13 @@ export function BroadcastsView() {
                           <>
                             <span>{b.sent_count.toLocaleString("en-US")}</span>
                             <span className="text-muted-foreground">{" / "}{(b.recipient_count ?? 0).toLocaleString("en-US")}</span>
+                            {/* THE COUNT ONLY. The reason used to be spelled out here too,
+                                which put a failing address on the board at all times — a
+                                stray line of red under a row that is otherwise a tidy
+                                counter. Open the broadcast and every address is listed with
+                                its own reason; that is the place to read it. */}
                             {b.failed_count > 0 && (
-                              <div className="text-xs text-red-600 dark:text-red-400">
-                                {b.failed_count} failed
-                                {/* One short line here; the transport's own words are kept
-                                    and shown in the detail view, where there is room for
-                                    them and where you have gone looking for them. */}
-                                {shortFailure(b.last_error) && (
-                                  <div className="mt-0.5 font-normal leading-snug opacity-90">{shortFailure(b.last_error)}</div>
-                                )}
-                              </div>
-                            )}
-                            {/* A run that sent nothing is marked failed with no counter to
-                                hang the reason on, so it needs its own line. */}
-                            {b.failed_count === 0 && b.status === "failed" && shortFailure(b.last_error) && (
-                              <div className="mt-0.5 text-xs leading-snug text-red-600 opacity-90 dark:text-red-400">{shortFailure(b.last_error)}</div>
+                              <div className="text-xs text-red-600 dark:text-red-400">{b.failed_count} failed</div>
                             )}
                           </>
                         )}
@@ -720,11 +734,12 @@ export function BroadcastsView() {
                   Include deactivated accounts
                 </label>
                 <p className="pt-1 text-xs text-muted-foreground">
-                  Anyone who has unsubscribed is excluded automatically, and the list is resolved when you
-                  send — not now — so an unsubscribe between today and then is still honoured.
+                  Anyone who has unsubscribed is excluded automatically, and the list is resolved again when
+                  you send, so an unsubscribe between now and then is still honoured.
                 </p>
               </div>
             </div>
+
           </div>
           <div>
             <div className="mb-1.5 flex items-center justify-between">
@@ -732,9 +747,62 @@ export function BroadcastsView() {
               <span className="text-2xs text-muted-foreground">Your saved branding</span>
             </div>
             <div className="mb-2 truncate text-xs text-muted-foreground">Subject: <span className="font-medium text-foreground">{subject || "…"}</span></div>
-            <div className="max-h-[52vh] overflow-y-auto">
+            <div className="max-h-[38vh] overflow-y-auto">
               <BrandedEmailPreview branding={branding} body={body} />
             </div>
+            {/* WHO THIS GOES TO, on the same screen as the message. It was behind a second
+                dialog, which meant writing a broadcast and picking its audience without ever
+                seeing an address. Every edit re-resolves server-side, so the list here is the
+                list that will be mailed — not a local guess at the audience rules. */}
+            {channels.includes("email") && (
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Recipients{cCount ? <span className="ml-1 font-normal">({cCount.count.toLocaleString("en-US")})</span> : null}
+                  </label>
+                  {cCounting && <CircleNotch size={12} className="animate-spin text-muted-foreground" />}
+                </div>
+                <div className="rounded-lg border border-border">
+                  {cCount?.recipients?.length ? (
+                    <div className="max-h-40 overflow-y-auto">
+                      {cCount.recipients.map((r) => (
+                        <div key={r.id ?? r.email} className="flex items-center gap-2 border-b border-border/60 px-2.5 py-1.5 text-xs last:border-b-0">
+                          <span className="min-w-0 flex-1 truncate">
+                            {r.email}
+                            {r.name && <span className="ml-1.5 text-muted-foreground">{r.name}</span>}
+                          </span>
+                          {r.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">added</span>}
+                          <button type="button" onClick={() => cDrop(r)} aria-label={`Remove ${r.email}`}
+                                  className="eg-tap shrink-0 text-muted-foreground transition-colors hover:text-destructive">
+                            <X size={12} weight="bold" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="px-2.5 py-3 text-xs text-muted-foreground">
+                      {cCounting ? "Resolving…" : "Nobody matches this audience yet."}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-1.5 border-t border-border p-2">
+                    <Input value={cAddr} onChange={(e) => setCAddr(e.target.value)}
+                           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); cAdd() } }}
+                           placeholder="Add an address…" className="h-7 text-xs" />
+                    <Button size="sm" variant="outline" disabled={!cAddr.trim()} onClick={cAdd}>Add</Button>
+                  </div>
+                </div>
+                {/* Addresses that cannot be delivered to, while fixing them is still cheap. */}
+                {!!cCount?.invalid?.length && (
+                  <p className="mt-1.5 text-2xs leading-snug text-amber-700 dark:text-amber-400">
+                    {cCount.invalid.length} address{cCount.invalid.length === 1 ? "" : "es"} can&apos;t be delivered to and will fail:{" "}
+                    <span className="font-mono">{cCount.invalid.map((x) => x.email || "(blank)").join(", ")}</span>.
+                  </p>
+                )}
+                <p className="mt-1.5 text-2xs text-muted-foreground">
+                  Added addresses get a real unsubscribe link — opting out suppresses that address for good, account or not.
+                </p>
+              </div>
+            )}
           </div>
           </div>
           <DialogFooter>
@@ -748,9 +816,13 @@ export function BroadcastsView() {
               </Button>
             )}
             {canSend && (
-              <Button onClick={saveAndSend} disabled={saving || !subject.trim() || !body.trim() || channels.length === 0}>
+              /* The count is IN the button. There is no unsend and no second confirm screen
+                 any more, so the number has to be on the thing you press. */
+              <Button onClick={saveAndSend}
+                      disabled={saving || cCounting || !subject.trim() || !body.trim() || channels.length === 0
+                                || (channels.includes("email") && !channels.includes("inapp") && !cCount?.count)}>
                 {saving ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} />}
-                Continue to send
+                {channels.includes("email") && cCount ? `Send to ${cCount.count.toLocaleString("en-US")}` : "Send now"}
               </Button>
             )}
           </DialogFooter>

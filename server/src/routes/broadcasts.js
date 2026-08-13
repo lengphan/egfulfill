@@ -467,12 +467,33 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
    * Best-effort by contract: the mail is already delivered by the time this runs, and
    * failing to write the note about it must never be reported as a failure to send.
    */
+  /**
+   * The reason one address didn't get it, in a few words.
+   *
+   * The transport's own sentence is written for whoever wrote the transport — "email is not
+   * valid in to" beside an address is noise next to the address itself, which already says
+   * which one. The full text is still kept verbatim on broadcasts.last_error for the send as
+   * a whole; this is the line that sits under a name in a list.
+   */
+  function shortReason(why) {
+    const s = String(why || '').toLowerCase();
+    if (!s) return 'no reason given';
+    if (/not valid|invalid|malformed|not an email/.test(s)) return 'not a valid email address';
+    if (/blacklist|blocked|suppress|unsubscrib/.test(s)) return 'blocked at the mail provider';
+    if (/rate|too many|quota|limit/.test(s)) return 'rate-limited by the mail provider';
+    if (/bounce|does not exist|unknown user|no such/.test(s)) return 'mailbox does not exist';
+    if (/sender|unverified|not authorised|not authorized/.test(s)) return 'sender not verified';
+    // Anything unrecognised keeps the transport's first clause rather than being flattened
+    // into a guess — a wrong short reason is worse than a long true one.
+    return String(why).split(/[.\n]/)[0].trim().slice(0, 80);
+  }
+
   async function recordDelivery(broadcastId, r, status, error) {
     await q(
       `insert into broadcast_deliveries (broadcast_id, email, name, status, error, extra)
        values ($1::bigint, $2, $3, $4, $5, $6)`,
       [broadcastId, String(r.email || '').slice(0, 320), r.name || null, status,
-       error ? String(error).slice(0, 300) : null, !!r.extra]
+       error ? shortReason(error) : null, !!r.extra]
     ).catch(() => {});
   }
 
