@@ -18,7 +18,10 @@ const PARTNER_LABEL: Record<string, string> = {
   pinkdesign: "Pink Design",
   designer: "In-house designers",
   carrier: "Carriers (postage)",
-  suppliers: "Suppliers (blanks)",
+  // Kept for rows booked before recordCost wrote a partner. Named so it cannot be mistaken
+  // for a live supplier — those now appear under their own names.
+  suppliers: "Suppliers (unsplit)",
+  unattributed: "Unattributed",
 }
 const label = (p: string) => PARTNER_LABEL[p] ?? p
 
@@ -26,7 +29,12 @@ const label = (p: string) => PARTNER_LABEL[p] ?? p
 // The filter used to list only partners already present in the ledger, so before the
 // first cost is recorded it was empty — which reads as "the filter is broken" rather
 // than "nothing has been spent". Keys match the mapping in wallet.js.
-const KNOWN_PARTNERS = ["byeastside", "pinkdesign", "designer", "carrier", "suppliers"]
+// The three we integrate with are listed so their filter option exists before their first
+// PO is received — an absent option reads as a broken filter, not as "nothing spent yet".
+// Alibaba sellers are NOT listed: they are individual people with no fixed set, and they
+// appear by name as soon as they are paid.
+const KNOWN_PARTNERS = ["byeastside", "pinkdesign", "designer", "carrier",
+  "Otto Cap", "S&S Activewear", "SanMar", "suppliers"]
 
 /** First and last day of the current month, as yyyy-mm-dd. */
 function thisMonth() {
@@ -96,9 +104,16 @@ export function BillingView() {
 
       {/* One card per partner. Totals are all-time — the table below is what's filtered,
           because a partner's LIFETIME position and this month's invoice are different
-          questions and collapsing them hides one. */}
+          questions and collapsing them hides one.
+
+          NO LONGER CAPPED AT FOUR. That cap predates suppliers being split out, when there
+          were only ever a handful of partners; with Otto, S&S, SanMar and every Alibaba
+          seller each carrying their own line, a silent slice would hide exactly the
+          suppliers this split exists to show. Eight is the point where the grid stops being
+          scannable, and anything beyond it is still in the table below — but it is stated
+          on screen rather than dropped, which the old slice never did. */}
       <StatGrid>
-        {(partners ?? []).slice(0, 4).map((p) => (
+        {(partners ?? []).slice(0, 8).map((p) => (
           <StatCard
             key={p.partner}
             label={label(p.partner)}
@@ -107,6 +122,13 @@ export function BillingView() {
             tone={p.total < 0 ? "neg" : "pos"}
           />
         ))}
+        {(partners?.length ?? 0) > 8 && (
+          <StatCard
+            label={`+${(partners?.length ?? 0) - 8} more partners`}
+            value={usd((partners ?? []).slice(8).reduce((t, x) => t + x.total, 0))}
+            sub="Filter the ledger below to see any one of them"
+          />
+        )}
         {partners !== null && partners.length === 0 && (
           <StatCard
             label={partnersErr ? "Couldn't load partners" : "No partner costs yet"}

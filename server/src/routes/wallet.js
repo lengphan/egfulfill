@@ -261,7 +261,43 @@ export function walletRoutes(app, requireAuth) {
       // SUM(delta), so a type nobody lists still LOWERS the total while appearing in no
       // line — money visibly gone and nowhere accounted for.
       samples: costOf('sample-cost'),
+      // What the BANK took to move our money, kept out of productCost on purpose: "what
+      // the supplier charged" and "what it cost us to pay them" are negotiated with
+      // different people, and adding them together loses both answers.
+      bankFees: costOf('bank-fee'),
     };
+
+    /**
+     * PER SUPPLIER, because "suppliers: $4,102" answers no question anyone actually has.
+     *
+     * The one before a negotiation is "what do we spend with Otto", and the one before
+     * dropping a supplier is "how much of this is SanMar". Both need the money split by who
+     * received it, which the cost TYPE can never do — blanks-cost is the same type whoever
+     * was paid. Only the `partner` column can, which is why recordCost now writes it.
+     *
+     * Rows written before that still carry null, so they are grouped under 'unattributed'
+     * rather than being silently dropped or, worse, assigned to whichever supplier happens
+     * to be first. A total that quietly excludes the past is how a report becomes wrong in
+     * a way nobody can see; a line named "unattributed" is one anybody can.
+     */
+    const supplierRows = await q(
+      `select coalesce(nullif(partner,''), 'unattributed') as partner,
+              sum(delta)::float as net,
+              sum(case when delta < 0 then -delta else 0 end)::float as spend,
+              sum(case when delta > 0 then delta else 0 end)::float as credited,
+              count(*)::int as entries
+         from wallet_ledger
+        where account = 'factory'
+          and (type like 'blanks-cost%' or type like 'sample-cost%' or type like 'bank-fee%')
+        group by 1
+        order by spend desc`).catch(() => ({ rows: [] }));
+    const bySupplier = supplierRows.rows.map((r) => ({
+      partner: r.partner,
+      // Signed from OUR side everywhere else in this file, so signed here too: spend is what
+      // went out, credited is what came back, net is what it actually cost.
+      spend: r.spend || 0, credited: r.credited || 0, net: Math.abs(r.net || 0),
+      entries: r.entries || 0,
+    }));
     // Ship the warning threshold WITH the balance, so a client never has to decide for
     // itself what "low" means — two screens using different numbers is how one warns and
     // the other doesn't. House accounts are exempt: they may run negative by design.
@@ -273,7 +309,7 @@ export function walletRoutes(app, requireAuth) {
         lowBelow = Number.isFinite(n) && n > 0 ? n : null;
       } catch { lowBelow = null; }
     }
-    return { account, balance: bal, ledger: led.rows, summary, lowBelow, low: lowBelow != null && bal < lowBelow };
+    return { account, balance: bal, ledger: led.rows, summary, bySupplier, lowBelow, low: lowBelow != null && bal < lowBelow };
   });
 
   // Append one ledger entry (idempotent by ref). Returns the new balance.
@@ -314,6 +350,11 @@ export function walletRoutes(app, requireAuth) {
       -- reconcile their invoices against. Left out, it would drop off the partner export
       -- while still sitting in the factory balance.
       when type like 'sample-cost%'         then 'suppliers'
+      -- A bank fee paid to move money to a supplier belongs in that supplier's statement:
+      -- it is part of what reaching them costs. Rows written by recordCost carry an explicit
+      -- partner column, so this only catches anything booked without one. (No backticks in
+      -- here: this whole block is a template literal, and one closes it mid-comment.)
+      when type like 'bank-fee%'            then 'suppliers'
     end)`;
 
   app.get('/api/wallet/export', { preHandler: requireAuth }, async (req, reply) => {

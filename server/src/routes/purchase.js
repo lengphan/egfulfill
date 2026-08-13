@@ -50,6 +50,52 @@ function supplierCharged(meta) {
 }
 
 /**
+ * ONE NAME PER SUPPLIER, so their spend doesn't split across spellings.
+ *
+ * `purchase_orders.supplier` holds a display name typed or picked in the UI, not a key —
+ * live values include "Otto Cap", "S&S Activewear", "SanMar", "Unassigned" and the names of
+ * individual Alibaba sellers. That is the right thing to store (an Alibaba seller has no
+ * key and shouldn't be forced one), but booked straight into the ledger it means "S&S
+ * Activewear" and "S&S ActiveWear" become two suppliers who each look half as expensive.
+ *
+ * So the three we integrate with are pinned to a canonical name, and everyone else passes
+ * through trimmed — which is what keeps each Alibaba seller its own line rather than being
+ * swallowed into one "Alibaba" total, since they are separate people we pay separately.
+ *
+ * "Unassigned" and blank both become null: a cost with no supplier is unattributed, and
+ * saying so is better than inventing a supplier called Unassigned to carry it.
+ */
+function supplierKey(name) {
+  const n = String(name || '').trim().replace(/\s+/g, ' ');
+  if (!n || /^unassigned$/i.test(n)) return null;
+  // Matched on a LETTERS-ONLY form, because the variants differ by exactly the characters a
+  // regex on the raw string trips over: "S&S Activewear", "S&S ActiveWear", "ss activewear"
+  // and "SSActivewear" are one supplier separated by an ampersand and a space.
+  const flat = n.toLowerCase().replace(/[^a-z]/g, '');
+  if (flat.includes('otto')) return 'Otto Cap';
+  if (flat.includes('sanmar')) return 'SanMar';
+  if (flat.includes('activewear') || flat === 'ss') return 'S&S Activewear';
+  return n;
+}
+
+/**
+ * The BANK/CARD FEE on a purchase order, typed in by whoever reconciled the statement.
+ *
+ * Deliberately hand-entered, not a percentage rule. Paying a supplier by card can add a
+ * foreign-transaction fee, an FX margin and a wire fee — three different numbers that vary
+ * by card and by supplier — so a configured rate would be an estimate that drifts from the
+ * statement it is meant to match. Typed once against the PO it belongs to, it is exact.
+ *
+ * Read from meta so no column has to be added, and tolerated in either spelling because
+ * this is filled in by a human through a form, not by a system.
+ */
+function supplierFee(meta) {
+  const m = (meta && typeof meta === 'object') ? meta : {};
+  const v = Number(m.bankFee ?? m.bank_fee ?? m.fee);
+  return isFinite(v) && v > 0 ? v : 0;
+}
+
+/**
  * A credential preview — enough to tell WHICH key is configured, never enough to use it.
  * Short values are masked entirely: revealing half of a 12-character secret is most of it.
  */
@@ -382,7 +428,28 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
           // will otherwise have to open the supplier's invoice to explain.
           + (charged != null && Math.abs(charged - total) >= 0.01
               ? ` · supplier charged ${charged.toFixed(2)} (goods ${total.toFixed(2)} + freight/tax)`
-              : ''));
+              : ''),
+          // WHICH supplier. Without this every PO books as an anonymous 'suppliers' row and
+          // the spend with S&S, Otto, SanMar and Alibaba can never be told apart.
+          { partner: supplierKey(b.supplier) });
+
+        /**
+         * THE BANK'S CUT, when there was one.
+         *
+         * Entered by hand because only the statement knows it: a foreign-transaction fee, an
+         * FX margin and a wire fee are three different numbers, they differ by card and by
+         * supplier, and a percentage rule would be a guess that quietly drifts from the real
+         * charge. Typed once against the PO it belongs to, it is exact.
+         *
+         * Booked against the SAME supplier, so their landed cost is complete, but under its
+         * own type so "what they charged" and "what it cost to pay them" stay separable.
+         */
+        const fee = Number(supplierFee(b.meta));
+        if (isFinite(fee) && fee > 0) {
+          await recordCost('bank', fee, `po-fee-${num}`,
+            `Bank/card fee · ${b.supplier || 'unassigned supplier'} · PO ${num}`,
+            { partner: supplierKey(b.supplier) });
+        }
       }
     }
     return { ok: true, num };

@@ -33,6 +33,16 @@ export const COST_TYPES = {
   // stock bought to sell: it has no order behind it and no margin to sit against, and
   // averaging it into COGS would quietly worsen every product's cost.
   sample: 'sample-cost',
+  /**
+   * What the BANK took to move our money, as distinct from what the supplier charged.
+   *
+   * Paying Otto or Alibaba by card adds a foreign-transaction fee, an FX margin or a wire
+   * fee on top of the invoice, and that is part of what the stock cost — it does not become
+   * free by appearing on a card statement instead of theirs. Booked separately rather than
+   * folded into blanks-cost so a landed cost can still be split into "what they charged"
+   * and "what it cost us to pay them", which are negotiated with different people.
+   */
+  bank: 'bank-fee',
 };
 
 /**
@@ -56,10 +66,23 @@ export async function recordCost(kind, amount, ref, note = null, meta = {}) {
   if (!type || !isFinite(amt) || amt <= 0 || !ref) return { ok: false, skipped: true };
   try {
     await q(
-      `insert into wallet_ledger (account, delta, type, ref, note)
-       values ($1, $2, $3, $4, $5)
+      `insert into wallet_ledger (account, delta, type, ref, note, partner)
+       values ($1, $2, $3, $4, $5, $6)
        on conflict do nothing`,
-      [HOUSE, -Math.abs(amt), type, String(ref), note || null]
+      /**
+       * WHICH supplier, not just "a supplier".
+       *
+       * `partner` existed and this function never wrote it, so every PO, sample and label
+       * it booked left the column null and fell through to the type-based guess in
+       * wallet.js — which can only say 'suppliers', because the TYPE is the same whether
+       * the money went to S&S, Otto, SanMar or Alibaba. The breakdown could therefore never
+       * answer "what are we spending with each of them", which is the question you ask
+       * before negotiating with any of them.
+       *
+       * Null stays valid and stays meaningful: the older rows keep resolving through the
+       * type fallback, so nothing has to be backfilled for the totals to stay right.
+       */
+      [HOUSE, -Math.abs(amt), type, String(ref), note || null, meta.partner ? String(meta.partner) : null]
     );
     // The order id, where there is one, so a cost can be traced to the job that caused it
     // — "what did FF-1042 actually cost us" is the question that finds a bad margin.
