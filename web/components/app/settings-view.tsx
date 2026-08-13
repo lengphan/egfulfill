@@ -75,6 +75,8 @@ import {
   type DbBackup,
   type BackupsState,
 } from "@/lib/api"
+import { TabLabel } from "@/components/app/tab-label"
+import { useLabelT } from "@/lib/i18n"
 
 const fmtDate = (s?: string | null) => {
   if (!s) return "—"
@@ -783,14 +785,17 @@ function TeamPanel() {
 // ─────────────────────────── Page ───────────────────────────
 // ─────────────────────────── Platform (warehouse/admin) ───────────────────────────
 function MoneyField({ label, hint, value, onChange }: { label: string; hint?: string; value: string; onChange: (v: string) => void }) {
+  // Translated HERE rather than at ~30 call sites. The value stays a number and the $ stays
+  // a $ — only the caption moves.
+  const tl = useLabelT()
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-sm font-medium">{tl("settings", label)}</span>
       <div className="relative">
         <CurrencyDollar size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input value={value} onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" inputMode="decimal" className="h-9 pl-7" />
       </div>
-      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+      {hint && <span className="text-xs text-muted-foreground">{tl("settingsHint", hint)}</span>}
     </label>
   )
 }
@@ -835,9 +840,10 @@ function MarkupFormula({ value, onChange }: { value: string; onChange: (v: strin
 
 /** Plain text counterpart to MoneyField, so the address rows match the money rows. */
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const tl = useLabelT()
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-sm font-medium">{tl("settings", label)}</span>
       <Input value={value} onChange={(e) => onChange(e.target.value)} className="h-9" />
     </label>
   )
@@ -2967,39 +2973,39 @@ export function SettingsView() {
   return (
     <Tabs value={tab} onValueChange={setTab} className="space-y-4">
       <TabsList>
-        <TabsTrigger value="profile">Profile</TabsTrigger>
+        <TabsTrigger value="profile"><TabLabel>Profile</TabLabel></TabsTrigger>
         {/* API keys are for building AGAINST the platform — a seller integrating their
             own systems, or an admin. An operator works the floor and has nothing to
             integrate, so the tab is noise on their settings. */}
         {/* Merged: your own live/test keys (top) + the platform's connected-service
             credentials (admin-only, below). One tab so keys live in one place. */}
-        {canUseKeys && <TabsTrigger value="keys">API keys</TabsTrigger>}
-        {canPlatform && <TabsTrigger value="platform">Platform</TabsTrigger>}
+        {canUseKeys && <TabsTrigger value="keys"><TabLabel>API keys</TabLabel></TabsTrigger>}
+        {canPlatform && <TabsTrigger value="platform"><TabLabel>Platform</TabLabel></TabsTrigger>}
         {/* ADMIN ONLY. Warehouse keeps Platform, Suppliers and Usage — this one writes
             users.password_hash, which is account takeover in one call. */}
-        {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
+        {isAdmin && <TabsTrigger value="users"><TabLabel>Users</TabLabel></TabsTrigger>}
         {/* Supplier ordering defaults. Warehouse/admin, matching who may spend — these
             decide how a purchase order pays and ships. */}
-        {canPlatform && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
+        {canPlatform && <TabsTrigger value="suppliers"><TabLabel>Suppliers</TabLabel></TabsTrigger>}
         {/* Integration usage/spend — a cost concern, so warehouse/admin like Platform. */}
-        {canPlatform && <TabsTrigger value="usage">Usage</TabsTrigger>}
+        {canPlatform && <TabsTrigger value="usage"><TabLabel>Usage</TabLabel></TabsTrigger>}
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
-        {isAdmin && <TabsTrigger value="site">Site content</TabsTrigger>}
-        {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
+        {isAdmin && <TabsTrigger value="site"><TabLabel>Site content</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="activity"><TabLabel>Activity</TabLabel></TabsTrigger>}
         {/* Backups — admin-only. Restoring a lost database is the least reversible thing on
             the platform, so who can trigger/delete a backup matches who can touch money. */}
-        {isAdmin && <TabsTrigger value="backups">Backups</TabsTrigger>}
+        {isAdmin && <TabsTrigger value="backups"><TabLabel>Backups</TabLabel></TabsTrigger>}
         {/* Privacy — buyer-PII retention. Admin-only for the same reason as Backups: the
             purge is irreversible, so it sits with the people who can touch money. */}
-        {isAdmin && <TabsTrigger value="privacy">Privacy</TabsTrigger>}
+        {isAdmin && <TabsTrigger value="privacy"><TabLabel>Privacy</TabLabel></TabsTrigger>}
         {/* Permissions — admin-only, HIDE-only nav visibility per role. */}
-        {isAdmin && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
+        {isAdmin && <TabsTrigger value="permissions"><TabLabel>Permissions</TabLabel></TabsTrigger>}
         {/* Team is a SELLER's own staff (and their permissions). Factory roles are managed
             in Users by admin/warehouse, so a "Team" tab on an operator's settings invites
             them to invite people into an account that isn't theirs. */}
-        {showTeam && <TabsTrigger value="team">Team</TabsTrigger>}
+        {showTeam && <TabsTrigger value="team"><TabLabel>Team</TabLabel></TabsTrigger>}
         {/* Plan is a SELLER subscription — operator/warehouse/admin have no plan. */}
-        {isSeller && <TabsTrigger value="plan">Plan</TabsTrigger>}
+        {isSeller && <TabsTrigger value="plan"><TabLabel>Plan</TabLabel></TabsTrigger>}
       </TabsList>
 
       <TabsContent value="profile">
