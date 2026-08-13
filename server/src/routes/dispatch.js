@@ -467,6 +467,13 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
      *
      * Merged by created_at so the list stays one chronology, which is the only thing
      * someone scanning it actually relies on.
+     *
+     * ONCE ATTACHED, A SHIPMENT LEAVES THIS LIST. `order_id is null` is what makes attaching
+     * a MOVE rather than a copy: without it the same tracking number appeared twice, once as
+     * sh_* and once as the order, and a list of parcels that shows one parcel twice is worse
+     * than the loose row it was meant to resolve — you cannot tell a duplicate label from a
+     * duplicate row. The shipment row itself stays in the table on purpose; it is the record
+     * of what was bought and charged, and the order now carries the tracking that matters.
      */
     await ensureShipments().catch(() => {});
     const sh = (await q(
@@ -474,7 +481,8 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
               (select sum(w.delta) from wallet_ledger w
                 where w.type='label-cost' and w.ref='label-void-'||shipments.id)::float as refund_credit
          from shipments
-        ${search ? "where lower(coalesce(tracking,'')||' '||coalesce(voided_tracking,'')||' '||coalesce(id,'')||' '||coalesce(carrier,'')||' '||coalesce(to_name,'')) like $1" : ''}
+        where order_id is null
+        ${search ? "and lower(coalesce(tracking,'')||' '||coalesce(voided_tracking,'')||' '||coalesce(id,'')||' '||coalesce(carrier,'')||' '||coalesce(to_name,'')) like $1" : ''}
         order by created_at desc limit 300`,
       search ? ['%' + search + '%'] : []).catch(() => ({ rows: [] }))).rows;
 
