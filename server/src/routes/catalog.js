@@ -470,6 +470,50 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return { error: 'Not found' };
   });
 
+  /**
+   * ARTWORK BY ADDRESS, NOT BY VALUE.
+   *
+   * Product images are stored as base64 `data:` URLs INSIDE the row, so the list response
+   * carried the pictures themselves: 5 products weighed 4.4 MB, one of them 1.4 MB on its
+   * own, and every visit to the products page downloaded all of it again. That is the whole
+   * of the slowness — it is not the number of rows, it is what one row contains.
+   *
+   * So a data: URL is swapped for `/api/catalog/img/<hash>` on the way out. That route
+   * already existed for partner sheets and already decodes base64 and serves the bytes with
+   * `immutable, max-age=604800` — so the browser fetches each picture ONCE and never asks
+   * again, instead of re-reading it inside a JSON body it cannot cache.
+   *
+   * The stored row is untouched: this is a projection, so nothing is migrated, nothing can
+   * be lost, and a product still round-trips through the editor unchanged.
+   *
+   * Only `data:` URLs move. A value that is already a path (`/api/ss/img?u=…`) is left
+   * exactly as it is — rewriting those would change supplier-image behaviour, which is
+   * governed by §2.9 and not what this is for.
+   */
+  const imgRefs = new Map();   // hash → url, so a repeat request re-hashes but never re-writes
+  async function byAddress(v) {
+    if (typeof v !== 'string' || !/^data:image\//i.test(v)) return v;
+    const hash = imgHash(v);
+    if (!imgRefs.has(hash)) {
+      // Idempotent by hash — identical bytes resolve to the same row, so the table cannot
+      // grow one entry per request.
+      await q('insert into catalog_img_refs (hash, url) values ($1,$2) on conflict (hash) do nothing', [hash, v])
+        .catch(() => {});
+      imgRefs.set(hash, true);
+    }
+    return `/api/catalog/img/${hash}`;
+  }
+  async function slimImages(p) {
+    const out = { ...p };
+    if (out.img) out.img = await byAddress(out.img);
+    if (Array.isArray(out.images)) out.images = await Promise.all(out.images.map(byAddress));
+    if (out.colorImages && typeof out.colorImages === 'object') {
+      const e = await Promise.all(Object.entries(out.colorImages).map(async ([k, v]) => [k, await byAddress(v)]));
+      out.colorImages = Object.fromEntries(e);
+    }
+    return out;
+  }
+
   app.get('/api/catalog_products', { preHandler: requireAuth }, async (req) => {
     const r = await q('select data, in_catalog, catalog_price from catalog_products order by created_at desc');
     const rows = r.rows
@@ -477,7 +521,8 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       // The catalogue fields ride on the product rather than in a parallel list, so a
       // consumer can't hold a product and miss whether it's published.
       .map((row) => ({ ...row.data, inCatalog: !!row.in_catalog, catalogPrice: row.catalog_price == null ? null : Number(row.catalog_price) }));
-    return isStaff(req.user) ? rows : rows.map(sellerSafe);
+    const light = await Promise.all(rows.map(slimImages));
+    return isStaff(req.user) ? light : light.map(sellerSafe);
   });
 
   /**
