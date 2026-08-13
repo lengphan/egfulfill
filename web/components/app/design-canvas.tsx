@@ -13,6 +13,7 @@ import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
 import { decodeEntities, usd } from "@/lib/order-format"
+import { useArtworkSrc } from "@/lib/pdf-preview"
 import { matchThreadColors, nearestThread, nearestThreads, matchQuality, hexToRgb, matchThreadRegions, canvasReadableSrc, type Thread, type ThreadRegion } from "@/lib/thread-match"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
@@ -457,6 +458,38 @@ const TIER_WHY: Record<DesignTier, string> = {
 /** null while settings are still loading, so a price never renders as a confident $0. */
 const feeFor = (t: DesignTier, fees: { standard: number; complex: number; check: number } | null) =>
   fees ? (t === "standard" ? fees.standard : t === "complex" ? fees.complex : fees.check) : null
+
+
+/**
+ * The buyer's uploaded file, as a picture — whatever kind of file it is.
+ *
+ * A personalisation upload is often a PDF, and an <img> pointed at one renders nothing, so
+ * a perfectly good file showed as a broken thumbnail. useArtworkSrc renders page one for a
+ * PDF and passes an image straight through; a file that genuinely cannot be read says PDF
+ * rather than pretending to be a broken image, because those need different actions from
+ * whoever is looking.
+ */
+function CustomerFileThumb({ src }: { src: string }) {
+  const art = useArtworkSrc(src)
+  const box = "size-14 shrink-0 rounded-md border border-border"
+  if (art.loading) {
+    return <div className={box + " grid place-items-center bg-muted"}><CircleNotch size={14} className="animate-spin text-muted-foreground" /></div>
+  }
+  if (!art.src) {
+    return (
+      <a href={canvasReadableSrc(src)} target="_blank" rel="noreferrer"
+         title="We can't render this file here — open it to view"
+         className={box + " grid place-items-center bg-muted text-3xs font-semibold text-muted-foreground hover:bg-accent"}>
+        {art.pdf ? "PDF" : "FILE"}
+      </a>
+    )
+  }
+  // Etsy blocks direct hotlinking, so the buyer's file must load through the same-origin
+  // proxy (not just for canvas reads — for display too). A rendered PDF is already a data
+  // URL and passes through canvasReadableSrc untouched.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={canvasReadableSrc(art.src)} alt="Customer file" className={box + " object-cover"} />
+}
 
 export function DesignCanvasDialog({
   open, onOpenChange, orderId, item, initialDesign, initialPos, onSaved, catalog,
@@ -1355,12 +1388,7 @@ export function DesignCanvasDialog({
             personalization note, with one click to adopt it as the design to place. */}
         {(item.design_src || item.personalization) && (
           <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
-            {item.design_src && (
-              // Etsy blocks direct hotlinking, so the buyer's file must load through the
-              // same-origin proxy (not just for canvas reads — for display too).
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={canvasReadableSrc(item.design_src)} alt="Customer file" className="size-14 shrink-0 rounded-md border border-border object-cover" />
-            )}
+            {item.design_src && <CustomerFileThumb src={item.design_src} />}
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-foreground">Customer&apos;s file</div>
               {/* NO decorative quotes around it. The buyer's text frequently contains its

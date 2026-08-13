@@ -52,7 +52,9 @@ type Line = { y: number; x: number; text: string }
  * gets you a 404 at parse time, which surfaces as every label failing at once.
  */
 let pdfjs: typeof import("pdfjs-dist") | null = null
-async function loadPdfjs() {
+/** Exported so artwork previews can reuse this loader rather than repeat the legacy-build
+ *  and worker-URL decisions documented above — getting either wrong fails silently. */
+export async function loadPdfjs() {
   if (pdfjs) return pdfjs
   // THE LEGACY BUILD, deliberately. pdfjs-dist v5's default build calls Promise.try and
   // Uint8Array.prototype.toHex — Chrome 128 and Chrome 140 respectively — and a floor
