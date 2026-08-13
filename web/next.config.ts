@@ -42,6 +42,11 @@ const nextConfig: NextConfig = {
       { source: "/dispatch", destination: "/shipping?tab=dispatch", permanent: false },
       { source: "/shipments", destination: "/shipping?tab=shipments", permanent: false },
       { source: "/scan", destination: "/inventory?tab=scan", permanent: false },
+      // /operator → /production. The production queue is shared by operator, warehouse AND
+      // admin, so a path named after one role told an admin they were somewhere they
+      // weren't. Redirected rather than moved outright: the old URL is in bookmarks and in
+      // notification links already sent.
+      { source: "/operator", destination: "/production", permanent: false },
     ]
   },
 }

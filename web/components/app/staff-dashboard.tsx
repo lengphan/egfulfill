@@ -42,7 +42,7 @@ const fmtDate = (s?: string | null) => {
 // Short blurbs for the shortcut tiles. Nav items don't carry descriptions; anything not
 // listed just shows its label, which is self-explanatory for a launcher.
 const SHORTCUT_DESC: Record<string, string> = {
-  "/operator": "Production queue",
+  "/production": "Production queue",
   "/designer": "Artwork board",
   "/shipping": "Dispatch + shipments",
   "/inventory": "Stock levels + scan",
@@ -455,7 +455,7 @@ export function StaffDashboard() {
           <SectionCard
             className="h-full"
             title={t("dash.productionLine")}
-            actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">{t("dash.openQueue")} <ArrowRight size={13} weight="bold" /></Link>}
+            actions={<Link href="/production" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">{t("dash.openQueue")} <ArrowRight size={13} weight="bold" /></Link>}
             /* flex-1 so the body actually receives the card's stretched height — without it
                the chart sized to its content and left a third of the card empty. */
             bodyClassName="flex flex-1 flex-col divide-y divide-border"
@@ -466,7 +466,7 @@ export function StaffDashboard() {
               <>
                 <ProductionLine orders={lineOrders} />
                 {stats.attention > 0 && (
-                  <Link href="/operator" className="flex items-center gap-2 bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50">
+                  <Link href="/production" className="flex items-center gap-2 bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50">
                     <Warning size={14} weight="fill" className="shrink-0" />
                     <span>{stats.attention === 1 ? t("dash.onHoldOne") : t("dash.onHold", { n: stats.attention })}</span>
                     <ArrowRight size={13} weight="bold" className="ml-auto shrink-0" />
@@ -480,7 +480,7 @@ export function StaffDashboard() {
 
       <div className="grid items-stretch gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SectionCard title={t("dash.recentOrders")} actions={<Link href="/operator" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">{t("dash.openQueue")} <ArrowRight size={13} weight="bold" /></Link>}>
+          <SectionCard title={t("dash.recentOrders")} actions={<Link href="/production" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">{t("dash.openQueue")} <ArrowRight size={13} weight="bold" /></Link>}>
             {orders === null ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
             ) : recent.length === 0 ? (

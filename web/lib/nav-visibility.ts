@@ -19,7 +19,7 @@ const isVisRole = (r: string): r is VisRole => (VIS_ROLES as string[]).includes(
 // would strand it on a blank screen or a redirect loop after login (risk #1). Excluded from
 // the toggle registry entirely, so the matrix can't touch them.
 const ESSENTIAL = new Set<string>([
-  "/dashboard", "/orders", "/settings", "/overview", "/operator", "/designer", "/earnings",
+  "/dashboard", "/orders", "/settings", "/overview", "/production", "/designer", "/earnings",
 ])
 
 export type VisSurface = { key: string; label: string; group: string; roles: VisRole[] }

@@ -5,7 +5,7 @@ export type StaffNavItem = { label: string; href: string; icon: Icon; roles: str
 // Staff boards, gated by role. Admin sees everything.
 export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Dashboard", href: "/overview", icon: SquaresFour, roles: ["operator", "warehouse", "admin"] },
-  { label: "Orders", href: "/operator", icon: Printer, roles: ["operator", "warehouse", "admin"] },
+  { label: "Orders", href: "/production", icon: Printer, roles: ["operator", "warehouse", "admin"] },
   // Warehouse removed: the design board is about artwork moving toward approval, which is
   // upstream of anything the floor does — their work starts at the print queue.
   { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "designer", "admin"] },
@@ -128,7 +128,7 @@ const ORDER_ROLES = ["operator", "warehouse", "admin"]
 
 /** Where "orders" means for this role: staff get their production board, sellers the list. */
 export function ordersHomeFor(role?: string | null): string {
-  return isStaffRole(role) ? "/operator" : "/orders"
+  return isStaffRole(role) ? "/production" : "/orders"
 }
 // May this staff role sit on this (app) page? (admin = all; others = shared + their tools)
 export function staffCanUseAppPath(role: string | null | undefined, pathname: string): boolean {
