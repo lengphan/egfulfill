@@ -46,13 +46,16 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
     window.addEventListener("eg-wallet-changed", h)
     return () => window.removeEventListener("eg-wallet-changed", h)
   }, [load])
+  /** Fee per pending row, typed before confirming. Keyed by id so two rows on screen never
+   *  share a value — the classic way one transfer's fee lands on another's. */
+  const [fees, setFees] = useState<Record<string, string>>({})
   const review = async (t: TopupRequest, action: "confirm" | "reject") => {
     // Close it out of the pending list immediately (optimistic), then record the decision.
     // On success refresh the wallet so the credit lands in the history right away; on
     // failure put it back by reloading the true pending list.
     setBusy(t.id); setTopups((prev) => (prev ?? []).filter((x) => x.id !== t.id))
     try {
-      const r = await (action === "confirm" ? confirmTopup(t.id) : rejectTopup(t.id))
+      const r = await (action === "confirm" ? confirmTopup(t.id, Number(fees[t.id]) || 0) : rejectTopup(t.id))
       if (r && r.error) { load() } else { onReviewed?.() }
     } catch { load() } finally { setBusy(null) }
   }
@@ -66,7 +69,23 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
               <div className="font-semibold tabular-nums">{usd2(Number(t.amount_usd) || 0)} <span className="text-sm font-normal text-muted-foreground">· {t.method || "transfer"}</span></div>
               <div className="text-xs text-muted-foreground">{t.ref ? `Ref ${t.ref} · ` : ""}{fmtDT2(t.created_at)}</div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {/* THE FEE, typed at the only moment it is knowable. PingPong, a wire and an
+                  FX spread each take a different cut that depends on the sender's bank and
+                  the day — nobody can predict it when the seller submits, and the person
+                  confirming is looking at what actually arrived. Optional: blank means the
+                  full amount landed, which is the common case. */}
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Fee $
+                <input
+                  type="number" min="0" step="0.01" inputMode="decimal"
+                  value={fees[t.id] ?? ""}
+                  onChange={(e) => setFees((f) => ({ ...f, [t.id]: e.target.value }))}
+                  placeholder="0.00"
+                  title="What the transfer itself cost. The seller is still credited the full amount — this is recorded as a separate charge they can see."
+                  className="h-8 w-20 rounded-lg border border-border bg-card px-2 text-right text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                />
+              </label>
               <Button size="sm" variant="outline" onClick={() => review(t, "reject")} disabled={busy === t.id} className="text-red-600 hover:text-red-700"><XCircle size={14} weight="bold" /> Reject</Button>
               <Button size="sm" onClick={() => review(t, "confirm")} disabled={busy === t.id}>{busy === t.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Confirm &amp; credit</>}</Button>
             </div>

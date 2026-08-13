@@ -446,8 +446,12 @@ export function getAudit(params?: { limit?: number; action?: string; cats?: stri
 export function getTopups(status?: string) {
   return api<TopupRequest[]>(`/api/topups${status ? `?status=${encodeURIComponent(status)}` : ""}`)
 }
-export function confirmTopup(id: string) {
-  return api<{ error?: string }>(`/api/topups/${encodeURIComponent(id)}/confirm`, { method: "POST" })
+/** `fee` is what the transfer itself cost — PingPong's cut, a wire charge, the FX spread.
+ *  Credited amount is unaffected: the seller gets the full sum and the fee is a separate,
+ *  named debit, so what they sent and what they were charged stay legible as two facts. */
+export function confirmTopup(id: string, fee?: number) {
+  return api<{ error?: string }>(`/api/topups/${encodeURIComponent(id)}/confirm`,
+    { method: "POST", body: JSON.stringify({ fee: fee && fee > 0 ? fee : 0 }) })
 }
 export function rejectTopup(id: string) {
   return api<{ error?: string }>(`/api/topups/${encodeURIComponent(id)}/reject`, { method: "POST" })

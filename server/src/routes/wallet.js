@@ -291,6 +291,10 @@ export function walletRoutes(app, requireAuth) {
       // the supplier charged" and "what it cost us to pay them" are negotiated with
       // different people, and adding them together loses both answers.
       bankFees: costOf('bank-fee'),
+      // What the money lost on the way IN — PingPong's cut, the bank's wire charge, the FX
+      // spread. Named the moment the type exists rather than later, because the refund bug
+      // in this same object is what an unnamed type looks like six months on.
+      transferFees: absNeg('topup-fee'),
       /**
        * CORRECTIONS, as one line and never folded into a trading category.
        *
@@ -324,6 +328,7 @@ export function walletRoutes(app, requireAuth) {
       'subscription-in', 'withdrawal', 'blanks-cost', 'label-cost', 'design-partner-cost',
       'design-pay-out', 'expedite-cost', 'sample-cost', 'bank-fee',
       'manual-adjust-in', 'manual-adjust-out', 'adjust', 'opening', 'test-cleanup',
+      'topup-fee',
     ]);
     const byTypeDetail = sumRows
       .map((r) => ({

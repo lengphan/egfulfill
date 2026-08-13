@@ -93,6 +93,34 @@ export function topupsRoutes(app, requireAuth) {
          values ($1,$2,'topup',$3,$4,$5) on conflict do nothing`,
         [rec.seller_id, Number(rec.amount_usd) || 0, String(rec.id), (rec.method ? rec.method + ' top-up' : 'Wallet top-up'), req.user.sub]
       ).catch(() => {});
+
+      /**
+       * THE TRANSFER FEE, entered at the moment it becomes knowable.
+       *
+       * $2,446 has arrived through PingPong, VietQR and bank transfer, and every one of
+       * those takes a cut that nobody can predict at the time the seller submits — it
+       * depends on their bank, the corridor and the day's FX. It is only knowable when the
+       * money lands, which is this moment, by the person looking at what actually arrived.
+       * (Card processing, where a percentage rule WOULD work, has never completed a single
+       * top-up here: PayPal's attempts were all rejected and the Stripe key is expired.)
+       *
+       * TWO ROWS, NOT ONE NET CREDIT. Crediting $980 for a $1,000 transfer would show the
+       * seller a number they cannot reconcile against the amount they sent, and would look
+       * exactly like being short-changed. So the full amount is credited and the fee is a
+       * separate, named debit they can read: "you sent 1,000, the transfer cost 20".
+       *
+       * Idempotent on its own ref, so confirming twice cannot charge the fee twice.
+       */
+      const fee = Number((req.body && (req.body.fee ?? req.body.transferFee)) || 0);
+      if (isFinite(fee) && fee > 0) {
+        await q(
+          `insert into wallet_ledger (account, delta, type, ref, note, created_by)
+           values ($1,$2,'topup-fee',$3,$4,$5) on conflict do nothing`,
+          [rec.seller_id, -Math.abs(fee), `fee-${rec.id}`,
+           `${rec.method || 'Transfer'} fee on $${(Number(rec.amount_usd) || 0).toFixed(2)} top-up`,
+           req.user.sub]
+        ).catch(() => {});
+      }
     }
     return rec;
   });
