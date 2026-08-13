@@ -16,10 +16,28 @@ import { q } from '../db.js';
 import { isStaff, canMoveMoney } from '../auth.js';
 import { audit } from '../audit.js';
 
+/**
+ * WHAT "NOT REAL MONEY" MEANS HERE.
+ *
+ * The ledger accumulated rows from building the thing — a $50 "test topup" against
+ * wallettest_…@example.com, three $1 top-ups on one afternoon — and because balance is
+ * SUM(delta) over everything, they are indistinguishable from real money in every figure
+ * the platform reports.
+ *
+ * Deleting them was the obvious fix and the wrong one. This ledger is append-only by
+ * design: it is what every balance is derived from, retries are made safe by
+ * (account, type, ref) already existing, and a deleted row takes its own audit trail with
+ * it. So a row is MARKED instead, and every read of money skips marked rows.
+ *
+ * Reversible on purpose. Mark one wrongly and the money comes back by unmarking it, which
+ * is not true of a DELETE.
+ */
+const REAL = 'coalesce(is_test,false) = false';
+
 // Balance of one account = SUM(delta) over the append-only ledger. Exported so every
 // caller reads money the same way (never a cached column that can drift).
 export async function balanceOf(account) {
-  const r = await q('select coalesce(sum(delta),0) as bal from wallet_ledger where account=$1', [String(account)]);
+  const r = await q(`select coalesce(sum(delta),0) as bal from wallet_ledger where account=$1 and ${REAL}`, [String(account)]);
   return parseFloat(r.rows[0].bal) || 0;
 }
 
@@ -97,7 +115,7 @@ export async function moveFunds({ from, to, amount, type = 'transfer', ref = nul
   return { fromBalance: await balanceOf(from), toBalance: await balanceOf(to) };
 }
 
-export function walletRoutes(app, requireAuth) {
+export function walletRoutes(app, requireAuth, requireAdmin) {
   // CHAINED, not fired in parallel. These were separate bare q() calls, and a bare q()
   // takes whatever pool connection is free — so the CREATE INDEX could reach the server
   // before the CREATE TABLE and fail with "relation does not exist", straight into a
@@ -115,6 +133,9 @@ export function walletRoutes(app, requireAuth) {
        created_by  text,
        created_at  timestamptz not null default now()
      )`)
+    // Marked-not-deleted — see REAL above. Defaults false so every existing row stays real
+    // money until somebody says otherwise.
+    .then(() => q('alter table wallet_ledger add column if not exists is_test boolean not null default false').catch(() => {}))
     // WHO the money is with, when it isn't us. Neither the dispatch partner nor the design
     // partner has a billing API we can charge or credit against — both settle by invoice —
     // so their costs only ever exist on OUR ledger. Without a column naming them you can
@@ -230,8 +251,12 @@ export function walletRoutes(app, requireAuth) {
      */
     const led = await q(
       `select * from (
-         select id, delta, type, ref, note, created_by, created_at,
-                sum(delta) over (order by created_at asc, id asc)::float as balance_after
+         select id, delta, type, ref, note, created_by, created_at, coalesce(is_test,false) as is_test,
+                -- Marked rows still APPEAR (you cannot unmark what you cannot see) but must
+                -- not move the running total, or this column would disagree with the balance
+                -- shown above it.
+                sum(delta) filter (where coalesce(is_test,false) = false)
+                  over (order by created_at asc, id asc)::float as balance_after
            from wallet_ledger where account=$1
        ) t order by created_at desc, id desc limit 200`, [account]);
     // P&L summary over the FULL ledger (not the 200-row window) so the cards total everything,
@@ -239,7 +264,7 @@ export function walletRoutes(app, requireAuth) {
     // distinct facts, not "everything positive vs everything negative". This is the honest
     // per-category total the sign-based row view can't give.
     const sumRows = (await q(
-      `select type, coalesce(sum(delta),0)::float as total from wallet_ledger where account=$1 group by type`,
+      `select type, coalesce(sum(delta),0)::float as total from wallet_ledger where account=$1 and ${REAL} group by type`,
       [account])).rows;
     const byType = Object.fromEntries(sumRows.map((r) => [r.type, Number(r.total) || 0]));
     const pos = (t) => Math.max(0, byType[t] || 0);
@@ -577,6 +602,33 @@ export function walletRoutes(app, requireAuth) {
       known: r.rows.length > 0,
       byType,
     };
+  });
+
+  /**
+   * MARK A LEDGER ROW AS NOT-REAL-MONEY (or put it back).
+   *
+   * The row survives; only its participation in the sums changes. That is the whole point:
+   * a deleted top-up is gone with its audit trail, while a marked one can be unmarked when
+   * somebody marks the wrong $200.
+   *
+   * ADMIN ONLY, and audited with before AND after. This silently changes a balance a seller
+   * has already seen — the same class of act as an adjustment — so it belongs with the
+   * people who can move money, and it has to leave a record naming who did it.
+   */
+  app.patch('/api/wallet/ledger/:id/test', { preHandler: requireAdmin }, async (req, reply) => {
+    const id = String(req.params.id);
+    const want = (req.body || {}).is_test !== false;   // default: mark AS test
+    const before = (await q('select account, delta, type, note, coalesce(is_test,false) as is_test from wallet_ledger where id=$1::bigint', [id])).rows[0];
+    if (!before) { reply.code(404); return { error: 'No such ledger entry.' }; }
+    if (before.is_test === want) return { ok: true, unchanged: true, is_test: want };
+    await q('update wallet_ledger set is_test=$2 where id=$1::bigint', [id, want]);
+    audit(req, want ? 'wallet.mark_test' : 'wallet.unmark_test', {
+      entityType: 'wallet_ledger', entityId: id,
+      before: { is_test: before.is_test }, after: { is_test: want },
+      note: `${want ? 'Excluded' : 'Restored'} ${before.type} ${before.delta} on ${before.account}`
+        + (before.note ? ` — ${before.note}` : ''),
+    });
+    return { ok: true, is_test: want, balance: await balanceOf(before.account) };
   });
 
   app.post('/api/wallet/ledger', { preHandler: requireAuth }, async (req, reply) => {

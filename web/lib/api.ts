@@ -204,6 +204,17 @@ export type LedgerRow = {
    *  paged or filtered. Absent on older responses; the client falls back to walking back
    *  from the current balance. */
   balance_after?: number
+  /** Marked as not-real-money by an admin. The row still shows — you cannot unmark what you
+   *  cannot see — but it is excluded from the balance and every summary total. */
+  is_test?: boolean
+}
+
+/** Mark a ledger row as test money, or restore it. Admin only; audited before/after,
+ *  because it changes a balance someone has already been shown. Returns the account's
+ *  recomputed balance so the screen can settle without a refetch. */
+export function markLedgerTest(id: string | number, isTest: boolean) {
+  return api<{ ok: boolean; is_test: boolean; balance?: number; unchanged?: boolean }>(
+    `/api/wallet/ledger/${id}/test`, { method: "PATCH", body: JSON.stringify({ is_test: isTest }) })
 }
 
 /** P&L totals over the FULL ledger (not the 200-row window), grouped by ledger type.

@@ -19,7 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SectionCard } from "@/components/app/section-card"
 import { CircleNotch, CheckCircle, XCircle, Warning } from "@phosphor-icons/react"
-import { getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type WalletSummary, type TopupRequest, type PayoutRequest } from "@/lib/api"
+import { markLedgerTest, getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type WalletSummary, type TopupRequest, type PayoutRequest } from "@/lib/api"
 import { BillingView } from "@/components/app/billing-view"
 import { getToken, getUser } from "@/lib/auth"
 
@@ -184,6 +184,9 @@ type Row = {
   label: string
   tone: string
   rejected?: boolean
+  /** Marked as not-real-money. Still listed — you cannot unmark what you cannot see — but
+   *  struck through and excluded from every total. */
+  isTest?: boolean
   amount: number
   balance: number
 }
@@ -266,6 +269,7 @@ function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary
       method: String(l.type).toLowerCase().startsWith("order-charge") ? "Wallet" : "—",
       label: meta.label,
       tone: meta.tone,
+      isTest: !!l.is_test,
       amount: delta,
       balance: balanceAfter,
     }
@@ -284,6 +288,10 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
   // API blipped mid-session was told their money was gone. Same pattern as
   // OrderRefundPanel: a read that FAILED is reported, never rendered as a fact.
   const [loadErr, setLoadErr] = useState<string | null>(null)
+  // Only an admin may re-classify money; the server enforces it too (requireAdmin), this
+  // just decides whether to offer the control.
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [markingId, setMarkingId] = useState<string | null>(null)
   const [pending, setPending] = useState<TopupRequest[]>([])
   // Kept so the attempt is still on the record — a rejected top-up never touches the
   // ledger, so without this it would disappear from the app entirely once it left the
@@ -359,9 +367,23 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       .catch(() => setPending([]))
   }, [isFactoryWallet])
   useEffect(() => {
-    const id = setTimeout(refresh, 0)
+    const id = setTimeout(() => { setIsAdmin(getUser()?.role === "admin"); refresh() }, 0)
     return () => clearTimeout(id)
   }, [refresh])
+
+  /**
+   * Mark a ledger row as not-real-money, or restore it.
+   *
+   * Reloads rather than patching the row in place: marking moves the balance, the
+   * running-balance column and every summary card at once, and a screen where the row
+   * changed but the totals didn't would be worse than one that took a moment.
+   */
+  const toggleTest = async (row: Row) => {
+    setMarkingId(row.id)
+    try { await markLedgerTest(row.id, !row.isTest); refresh() }
+    catch (e) { setLoadErr(e instanceof Error ? e.message : "Couldn't change that entry.") }
+    finally { setMarkingId(null) }
+  }
 
   // Nothing readable AND the read failed → say so. Previously this fell through to the
   // ZERO view and asserted a $0.00 balance, which is the one number a seller must never
@@ -592,6 +614,23 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                     <Badge className={t.tone} variant="secondary">
                       {t.label}
                     </Badge>
+                    {t.isTest && (
+                      <Badge variant="secondary" className="ml-1.5 bg-muted text-muted-foreground">Test</Badge>
+                    )}
+                    {/* ADMIN ONLY, and stopPropagation because the row itself opens a dialog.
+                        Marked money is excluded from the balance and every total, and the row
+                        stays put so the decision can be undone. */}
+                    {isAdmin && !t.rejected && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); void toggleTest(t) }}
+                        disabled={markingId === t.id}
+                        title={t.isTest ? "Count this as real money again" : "Exclude this from the balance and all totals"}
+                        className="eg-tap ml-1.5 rounded px-1.5 py-0.5 text-2xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        {markingId === t.id ? "…" : t.isTest ? "Unmark" : "Mark test"}
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell
                     className={
