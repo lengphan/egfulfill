@@ -154,11 +154,23 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * Falls back to the frame if the packet can't be built (a popup blocker, an unreadable
    * label): a label that prints without its slip beats one that doesn't print at all.
    */
+  /**
+   * THE LABEL, and only the label.
+   *
+   * The packing slip used to ride along as page two. It is a separate document with a
+   * separate audience — the label goes on the parcel, the slip goes inside it — and pairing
+   * them meant every single-label purchase produced a two-page job whether or not anyone
+   * wanted the second page. The slip has its own button beside this one, for when it IS
+   * wanted.
+   *
+   * Still rendered through pdf.js rather than printed as a PDF frame: Chrome will not print
+   * a PDF through contentWindow.print(), which is what made the original attempt silent.
+   */
   const printPacket = async () => {
     if (!labelSrc) { setPrintStage({ at: "idle", why: "no label bytes" }); return }
     setPrintStage({ at: "rendering" })
     try {
-      const { html, skipped } = await packetHtml([{ labelBlobUrl: labelSrc, order: order?.id ? ({ id: order.id, items: order.items, address: order.to } as never) : null }])
+      const { html, skipped } = await packetHtml([{ labelBlobUrl: labelSrc, order: null }])
       if (skipped.length) {
         // pdf.js couldn't read the label. Say so — the old code fell back to printing the
         // PDF frame, which is the thing Chrome refuses to do, so the fallback was silence.
@@ -376,7 +388,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 second before anything can happen. */}
             <div className="text-xs text-muted-foreground">
               {printStage.at === "fetching" && "Fetching the label…"}
-              {printStage.at === "rendering" && "Preparing label + packing slip…"}
+              {printStage.at === "rendering" && "Preparing the label…"}
               {printStage.at === "printing" && "Opening the print dialog…"}
               {printStage.at === "done" && "Sent to the printer."}
               {printStage.at === "idle" && printStage.why && (
