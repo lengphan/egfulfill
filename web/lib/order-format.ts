@@ -114,7 +114,7 @@ export const trackUrl = (carrier?: string | null, tracking?: string | null) => {
 /** Where an order's address came from, so a board can say whether it synced or was
  *  filled in by hand. Etsy withholds buyer addresses from the API, so "how did we get
  *  this" is genuinely useful operational information, not trivia. */
-export type AddressSource = "sync" | "csv" | "email" | "label" | "manual" | "none"
+export type AddressSource = "sync" | "csv" | "email" | "label" | "shippo" | "manual" | "none"
 export const addressSource = (o: OrderRow): AddressSource => {
   const a = (o.address ?? {}) as Record<string, string>
   const has = !!(a.street || a.first_line || a.line1 || a.address1)
@@ -125,6 +125,12 @@ export const addressSource = (o: OrderRow): AddressSource => {
   // "manual": nobody typed it onto the ORDER — it is where the parcel was really sent,
   // which is worth saying, and it only exists because the order had no address at all.
   if (a.source === "label") return "label"
+  // RECOVERED FROM SHIPPO. Etsy withholds buyer addresses from our app tier, so these
+  // arrived through Shippo's Etsy connection instead — which is neither a sync of ours nor
+  // anything a person typed. Without this case they fell through to "manual" and every one
+  // announced itself as "entered by hand", which is a confident statement of the opposite
+  // of the truth on the one field whose entire job is saying where an address came from.
+  if (a.source === "shippo") return "shippo"
   // Came straight off a marketplace sync. This USED TO RETURN "etsy" and the label read
   // "from Etsy", because when it was written Etsy was the only marketplace and line1 was
   // its shape. Shopify and TikTok write line1 too, so every order from either announced
@@ -138,6 +144,7 @@ const STATIC_SOURCE_LABEL: Record<Exclude<AddressSource, "sync">, string> = {
   csv: "from CSV import",
   email: "from sale email",
   label: "from the label",
+  shippo: "from Shippo",
   manual: "entered by hand",
   none: "no address yet",
 }
