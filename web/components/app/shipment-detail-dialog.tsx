@@ -1,11 +1,10 @@
 "use client"
 
-import { ArrowSquareOut, CircleNotch, X, Package, DownloadSimple, FilePdf, Printer, LinkSimple } from "@phosphor-icons/react"
+import { ArrowSquareOut, CircleNotch, X, Package, DownloadSimple, FilePdf, Printer } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { MatchShipmentDialog } from "@/components/app/match-shipment-dialog"
 import { useEffect, useRef, useState } from "react"
-import { fetchShipmentLabel, detachOrderLabel, type ShipmentRow } from "@/lib/api"
+import { fetchShipmentLabel, detachOrderLabel, getShipmentCandidates, attachShipmentToOrder, type ShipmentRow, type ShipmentCandidate } from "@/lib/api"
 
 /**
  * ONE PARCEL, IN FULL — so the table doesn't have to be.
@@ -78,7 +77,46 @@ export function ShipmentDetailDialog({
   // `sh_*` is the standalone namespace — see isShipmentId on the server. Every order id is
   // etsy-*, tiktok-*, FF-* or a bare sequence, so the two can never be confused.
   const isLoose = /^sh_/.test(String(id ?? ""))
-  const [matching, setMatching] = useState(false)
+  /**
+   * THE MATCHES ARE ON THE SCREEN, not behind a button.
+   *
+   * This began as an amber banner announcing the problem with a "Find its order" button
+   * beside it — which is a warning plus a click before you learn anything. But the answer
+   * is nearly always one row, already known to the server, and a click that reveals a
+   * single obvious choice was only ever a delay dressed as a decision.
+   *
+   * So the candidates load with the window and attach in one click each. Confirming is
+   * still explicit — one Attach per row, never automatic — because two of these seven
+   * parcels had more than one plausible order. What is gone is the step before the choice,
+   * not the choice.
+   */
+  const [cands, setCands] = useState<ShipmentCandidate[] | null>(null)
+  const [attaching, setAttaching] = useState<string | null>(null)
+  const [matchErr, setMatchErr] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    const t = setTimeout(() => {
+      if (!alive) return
+      setCands(null); setMatchErr(null)
+      if (!id || !/^sh_/.test(String(id))) return
+      getShipmentCandidates(String(id))
+        .then((r) => { if (alive) setCands(r.candidates ?? []) })
+        .catch(() => { if (alive) setCands([]) })
+    }, 0)
+    return () => { alive = false; clearTimeout(t) }
+  }, [id])
+  const attachTo = async (orderId: string) => {
+    if (!id) return
+    setAttaching(orderId); setMatchErr(null)
+    try {
+      const r = await attachShipmentToOrder(String(id), orderId)
+      if (r.error) throw new Error(r.error)
+      onOpenChange(false)
+      onChanged?.()
+    } catch (e) {
+      setMatchErr(e instanceof Error ? e.message : "Couldn't attach this label to that order.")
+    } finally { setAttaching(null) }
+  }
   const [detaching, setDetaching] = useState(false)
   const [detachErr, setDetachErr] = useState<string | null>(null)
   /**
@@ -167,22 +205,6 @@ export function ShipmentDetailDialog({
 
         {detachErr && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{detachErr}</div>
-        )}
-
-        {/* A LOOSE PARCEL SAYS SO, at the top, before the facts.
-            An `sh_*` id means this label was bought without an order — which is legitimate
-            for a re-ship or a sample, and a mistake the rest of the time. The difference
-            matters because in the mistaken case an order is sitting at "new" with no
-            tracking and its buyer has been told nothing, and nothing on this screen said so. */}
-        {isLoose && (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-            <span className="min-w-0 flex-1">
-              Not attached to an order — so no order shows this tracking, and the buyer has not been told.
-            </span>
-            <Button size="sm" variant="outline" onClick={() => setMatching(true)}>
-              <LinkSimple size={13} weight="bold" /> Find its order
-            </Button>
-          </div>
         )}
 
         {/* THE LABEL BESIDE THE FACTS.
@@ -294,73 +316,137 @@ export function ShipmentDetailDialog({
               already does on every read of this list: refreshStaleTracking trickles twelve
               rows a page load, anything unchecked for six hours. Opening the page you
               pressed it from had already done the work. */}
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
-            {/* Only while it can still work: a second refund can only ever collect the
-                carrier's refusal, and a label with no stored PDF has no reference to refund
-                against. */}
-            {canRefund && s.labelUrl && !refunded && (
-              <Button size="sm" variant="outline" onClick={() => onRefund(s)} disabled={voiding === s.id}
-                      className="mr-auto text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-                {voiding === s.id ? <CircleNotch size={13} className="animate-spin" /> : <X size={13} weight="bold" />}
-                Refund
-              </Button>
-            )}
-            {/* UNLINK, for a label that is fine but landed on the wrong order. Quiet and
-                text-only: it is the rare case, and it must not read as a peer of Print. */}
-            {!isLoose && !!s.tracking && (
-              <button
-                onClick={() => void detach()}
-                disabled={detaching}
-                title="Take this tracking off the order so a correct label can be bought. The postage is NOT refunded."
-                className="mr-auto inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
-              >
-                {detaching ? <CircleNotch size={12} className="animate-spin" /> : null}
-                Wrong order? Remove this tracking
-              </button>
-            )}
-            {s.labelUrl && (
-              <>
-                {/* The carrier's own copy still has a use — printing from their viewer, or
-                    checking ours against theirs — so the old route stays, demoted. */}
-                <a
-                  href={s.labelUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Open the carrier's own copy in a new tab"
-                  aria-label="Open the carrier's own copy in a new tab"
-                  className="eg-tap inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          {/* ITS ORDER, offered rather than announced. Only for a loose label — an `sh_*`
+              id means it was bought with no order behind it, which is legitimate for a
+              re-ship and a mistake the rest of the time. Either way the fix is the same
+              question, so the question is simply asked. */}
+          {isLoose && (
+            <div className="rounded-lg border border-border">
+              <div className="border-b border-border bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground">
+                {cands === null ? "Looking for its order…"
+                  : cands.length === 0 ? "No order matches this parcel"
+                  : cands.length === 1 ? "This parcel looks like it belongs to"
+                  : `${cands.length} orders could be this parcel`}
+              </div>
+              {matchErr && <div className="px-3 py-2 text-xs text-destructive">{matchErr}</div>}
+              {cands === null ? (
+                <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
+                  <CircleNotch size={13} className="animate-spin" /> Checking orders…
+                </div>
+              ) : cands.length === 0 ? (
+                // A fact, not a shrug — and it names the second reason, which is not obvious.
+                <div className="px-3 py-3 text-xs text-muted-foreground">
+                  Nothing matches its address or name. Orders that already have tracking aren&apos;t
+                  offered, since a second number on one order means a parcel is unaccounted for.
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {cands.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2">
+                          <span className="truncate text-sm font-medium">{c.customer || "No name on the order"}</span>
+                          <span className="font-mono text-2xs text-muted-foreground">{c.id}</span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-muted-foreground">
+                          {/* The import date earns its place: two orders for one buyer are
+                              told apart by when they arrived and by nothing else here. */}
+                          <span>Imported {c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-US", { dateStyle: "medium" }) : "—"}</span>
+                          {c.matchedZip && <span className="text-emerald-700 dark:text-emerald-400">· address matches</span>}
+                          {c.matchedName && <span className="text-sky-700 dark:text-sky-400">· name matches</span>}
+                          {!c.matchedZip && !c.matchedName && <span className="text-amber-700 dark:text-amber-400">· weak match</span>}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" disabled={!!attaching}
+                              onClick={() => void attachTo(c.id)} className="shrink-0">
+                        {attaching === c.id ? <CircleNotch size={12} className="animate-spin" /> : null}
+                        Attach
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TWO BUTTONS, and everything else is a sentence.
+              This had five controls in four different shapes — an outline button, a square
+              icon-only button, a filled button, an outline anchor and a text link — wrapping
+              onto two lines, and nothing in the arrangement said which one you came here to
+              press. Shape was carrying no meaning, so it was just noise with corners.
+
+              Now weight states rank, and only the primary action keeps an icon. Print is the
+              thing you almost always want; Download is its fallback for when the file has to
+              go somewhere else. The rest — refund, unlink, the carrier's own copy — are rare,
+              and rare things read better as words than as buttons competing for the same eye.
+              Grouping them left and the actions right also ends the old fault where the
+              window had two action areas facing each other with no single answer to "what
+              can I do here". */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              {/* Only while it can still work: a second refund can only ever collect the
+                  carrier's refusal, and a label with no stored PDF has no reference to
+                  refund against. Destructive colour on hover only — it is the one action
+                  here that spends money and cannot be taken back, but it is also not what
+                  most people opened this window for. */}
+              {canRefund && s.labelUrl && !refunded && (
+                <button
+                  onClick={() => onRefund(s)}
+                  disabled={voiding === s.id}
+                  title="Refund the postage with the carrier. This cannot be undone."
+                  className="inline-flex items-center gap-1.5 text-muted-foreground underline-offset-2 transition-colors hover:text-destructive hover:underline disabled:opacity-50"
                 >
-                  <ArrowSquareOut size={13} weight="bold" />
+                  {voiding === s.id ? <CircleNotch size={12} className="animate-spin" /> : null}
+                  Refund postage
+                </button>
+              )}
+              {/* UNLINK, for a label that is fine but landed on the wrong order. Deliberately
+                  sitting beside Refund and reading nothing like it: one frees the order, the
+                  other destroys the postage, and the title says so before the click. */}
+              {!isLoose && !!s.tracking && (
+                <button
+                  onClick={() => void detach()}
+                  disabled={detaching}
+                  title="Take this tracking off the order so a correct label can be bought. The postage is NOT refunded."
+                  className="inline-flex items-center gap-1.5 text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
+                >
+                  {detaching ? <CircleNotch size={12} className="animate-spin" /> : null}
+                  Wrong order?
+                </button>
+              )}
+              {/* The carrier's own copy still has a use — checking ours against theirs — so
+                  it stays, as three words rather than a square icon nobody could name. */}
+              {s.labelUrl && (
+                <a href={s.labelUrl} target="_blank" rel="noopener noreferrer"
+                   className="text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline">
+                  Carrier&apos;s copy
                 </a>
-                {/* The same blob the frame is showing — so what you save is provably what
-                    you just looked at, and it needs no second authenticated request. */}
-                {/* PRIMARY. A bought label's next step is almost always the printer —
-                    Download is the fallback for when it has to go somewhere else. */}
-                <Button size="sm" onClick={printLabel} disabled={!labelSrc}>
-                  <Printer size={13} weight="bold" /> Print
-                </Button>
+              )}
+            </div>
+
+            {s.labelUrl && (
+              <div className="flex items-center gap-2">
+                {/* The same blob the frame is showing — so what you save is provably what you
+                    just looked at, and it needs no second authenticated request. */}
                 <a
                   href={labelSrc ?? undefined}
                   download={`label-${s.num}.pdf`}
                   aria-disabled={!labelSrc}
-                  className={"eg-tap inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent "
+                  className={"eg-tap inline-flex h-9 items-center justify-center rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent "
                     + (labelSrc ? "" : "pointer-events-none opacity-50")}
                 >
-                  <DownloadSimple size={13} weight="bold" /> Download
+                  Download
                 </a>
-              </>
+                <Button onClick={printLabel} disabled={!labelSrc}>
+                  <Printer size={14} weight="bold" /> Print
+                </Button>
+              </div>
             )}
           </div>
         </div>
         </div>
       </DialogContent>
 
-      <MatchShipmentDialog
-        shipmentId={matching ? String(id) : null}
-        toName={s.customer}
-        onClose={() => setMatching(false)}
-        onAttached={() => { setMatching(false); onOpenChange(false); onChanged?.() }}
-      />
     </Dialog>
   )
 }
