@@ -430,6 +430,12 @@ export function walletRoutes(app, requireAuth) {
     'partner-invoice': 'Partner invoice',
     'supplier-invoice': 'Supplier invoice',
     'shipping-other': 'Shipping paid outside the aggregator',
+    // The bank's cut on OUR outgoing card spend — foreign transaction, FX margin, wire fee.
+    // Enterable by hand because that is the only place the real number exists: it appears on
+    // the card statement, days after the charge, and differs by card and by supplier.
+    // Same type recordCost books automatically from a PO's fee field, so a fee typed here
+    // and one carried on a PO land in the same line and the same supplier statement.
+    'bank-fee': 'Bank or card fee',
     equipment: 'Equipment or materials',
     overheads: 'Rent, utilities, software',
     'refund-manual': 'Refund issued by hand',
