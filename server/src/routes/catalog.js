@@ -87,24 +87,28 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * catalog_products, a redaction list silently starts publishing it. This builds a new object
    * from four named fields and nothing else can leak by being added upstream.
    *
-   * PUBLISHING IS THE DECISION. in_catalog is the flag a human ticks, so it — and it alone —
-   * decides visibility. This used to also require catalog_price, which meant a product could
-   * be ticked "published" and still be invisible on the public site with nothing anywhere
-   * saying why. That is not a stricter guardrail, it is a second hidden condition on an
-   * explicit choice: every product in the catalogue was in exactly that state.
+   * STATUS IS THE DECISION — see the visibility vocabulary below. Setting a product Active
+   * puts it on the marketing site, and nothing else is consulted.
    *
-   * catalog_price is now an OVERRIDE, not a gate. When it is set it wins; otherwise the
-   * product's own price is used, which is the same number the seller-facing catalogue shows
-   * — this page quotes what a seller would pay to order the item, so it is the right figure
-   * rather than a fallback that leaks something internal.
+   * It was in_catalog, and that was the wrong flag on the wrong screen: in_catalog belongs to
+   * the LOOKBOOK, the trade document sent to partners and wholesale buyers. One flag served
+   * both, so five Active products showed one on the website, and the fix was two pages away
+   * from where the question was being asked.
    *
-   * The ALLOW-LIST is untouched. Only in_catalog rows are read, and only these four fields
-   * are ever emitted, so widening the price rule cannot widen what a row exposes.
+   * catalog_price is likewise the lookbook's price and is NOT read here. A trade rate quoted
+   * to a partner is not the number a visitor should see; the public price is what a seller
+   * pays us to make one, which is exactly what this page exists to quote.
+   *
+   * The ALLOW-LIST is untouched. Only Active rows are read, and only these four fields are
+   * ever emitted, so changing the gate cannot widen what a row exposes.
    *
    * A product with no usable price at all is still dropped: an unpriced item on a pricing-led
    * page reads as "free" or as broken. The coalesce happens in JS rather than SQL because
    * data->>'price' is free text — an unparseable value would abort the whole query on a cast,
-   * taking every other product down with it.
+   * taking every other product down with it. The staff side now REPORTS that drop instead of
+   * performing it in silence (publicHidden on /api/catalog/summary, and the badge on the
+   * Products page), because an invisible product with no stated reason is the whole bug this
+   * model replaced.
    */
   /**
    * The product's display image, resolved the way the app resolves it.
@@ -162,6 +166,31 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    */
   const NAME_SUPPLIER_RE = /\b(?:s\s*&\s*s(?:\s+activewear)?|ssactivewear|sanmar|otto\s*cap|otto)\b[®™\s]*/gi;
   const publicName = (v) => String(v ?? '').replace(NAME_SUPPLIER_RE, ' ').replace(/\s+/g, ' ').trim();
+
+  /**
+   * WHO CAN SEE A PRODUCT — one vocabulary, three audiences, decided by `status` alone.
+   *
+   * Status IS the visibility switch. Setting a product Active puts it on the marketing site;
+   * there is no second flag to remember and therefore no way for the two to disagree.
+   *
+   *   Active        marketing site + sellers + staff
+   *   Sellers only  sellers + staff — orderable in the app, absent from the public site
+   *   Staff only    factory-internal; a seller never sees it
+   *   Draft         staff, unfinished
+   *   Archived      staff, retired
+   *
+   * This REPLACED `in_catalog` as the public gate. in_catalog and catalog_price still exist
+   * and still mean something — they are the LOOKBOOK: the trade document sent to partners and
+   * wholesale customers, which is priced separately because those buyers are not our sellers.
+   * Publishing to the web and assembling a trade brochure were one flag, and the result was
+   * five Active products with one on the website and no screen able to explain the gap.
+   *
+   * Anything not listed is staff-only by omission — an unrecognised status must never fall
+   * through to "public".
+   */
+  const PUBLIC_STATUS = 'Active';
+  const SELLER_STATUSES = new Set(['active', 'sellers only']);
+  const sellerVisible = (status) => SELLER_STATUSES.has(String(status || '').trim().toLowerCase());
   /**
    * Supplier DOMAINS. CLAUDE.md §2.8 covers URLs and redirects, not just fields — an address
    * bar reading `cdn.ssactivewear.com` names them exactly as plainly as a column headed
@@ -225,7 +254,20 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    */
   const publicShape = (row, slug) => {
     const d = row.data;
-    const price = row.catalog_price == null ? Number(d.price) : Number(row.catalog_price);
+    /**
+     * THE PRICE A VISITOR SEES IS THE SELLER PRICE — never catalog_price.
+     *
+     * catalog_price belongs to the lookbook, which is quoted to partners and wholesale
+     * buyers on different terms; putting it on the open web publishes a trade rate to
+     * everyone. `price`/`basePrice` is what a seller pays us to make one (pricing.js — it
+     * is the base the order charge is built from), which is exactly the figure this page
+     * exists to quote.
+     *
+     * basePrice is included as a fallback because a hand-built product carries only that:
+     * reading `price` alone made the hat and the hoodie priceless, and a priceless product
+     * is dropped below — so two perfectly good products were invisible with nothing said.
+     */
+    const price = Number(d.price ?? d.basePrice ?? d.base_price ?? row.base_price);
     const colorImages = d.colorImages && typeof d.colorImages === 'object' ? d.colorImages : {};
     const colors = Object.keys(colorImages)
       .filter((name) => typeof name === 'string' && name.trim())
@@ -276,9 +318,10 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    */
   const publicProducts = async () => {
     const r = await q(
-      `select data, catalog_price from catalog_products
-        where in_catalog = true
-        order by created_at desc limit 60`
+      `select data, catalog_price, base_price from catalog_products
+        where status = $1
+        order by created_at desc limit 60`,
+      [PUBLIC_STATUS]
     ).catch(() => ({ rows: [] }));
     const seen = new Map();
     return r.rows
@@ -303,7 +346,8 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    */
   const rawRowFor = async (slug) => {
     const r = await q(
-      `select data from catalog_products where in_catalog = true order by created_at desc limit 60`
+      `select data from catalog_products where status = $1 order by created_at desc limit 60`,
+      [PUBLIC_STATUS]
     ).catch(() => ({ rows: [] }));
     const seen = new Map();
     for (const row of r.rows) {
@@ -543,14 +587,21 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
   }
 
   app.get('/api/catalog_products', { preHandler: requireAuth }, async (req) => {
-    const r = await q('select data, in_catalog, catalog_price from catalog_products order by created_at desc');
+    const r = await q('select data, status, in_catalog, catalog_price from catalog_products order by created_at desc');
+    const staff = isStaff(req.user);
     const rows = r.rows
       .filter((row) => row.data)
+      // STAFF-ONLY MEANS STAFF. A seller's list is filtered by status here, at the read —
+      // not in the client, where "don't render it" still ships the row over the wire and a
+      // devtools tab is all it takes. Draft and Archived fall out for the same reason:
+      // sellerVisible() is an allow-list, so a status nobody has invented yet is withheld
+      // rather than published by default.
+      .filter((row) => staff || sellerVisible(row.status ?? row.data.status))
       // The catalogue fields ride on the product rather than in a parallel list, so a
       // consumer can't hold a product and miss whether it's published.
       .map((row) => ({ ...row.data, inCatalog: !!row.in_catalog, catalogPrice: row.catalog_price == null ? null : Number(row.catalog_price) }));
     const light = await Promise.all(rows.map(slimImages));
-    return isStaff(req.user) ? light : light.map(sellerSafe);
+    return staff ? light : light.map(sellerSafe);
   });
 
   /**
@@ -693,25 +744,36 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * where a number should be, and that is the kind of thing you notice after sending it.
    */
   /**
-   * The PUBLIC price rule, written as SQL — the same one publicShape applies: catalog_price
-   * when it is set, otherwise the price carried on the row's own data.
+   * The SELLER price, written as SQL — the same rule publicShape applies, in the same order:
+   * `price`, then `basePrice`, then the base_price column.
    *
-   * It lives beside the summary because a count computed by a DIFFERENT rule from the route
-   * it claims to describe is worse than no count at all. `catalog_price is null` was that
-   * count: it reported the one published product as "no price — prints blank" while the
-   * public page was quoting $41.20 from data->>'price' perfectly well.
+   * catalog_price is deliberately absent. That is the lookbook's number, quoted to partners
+   * on trade terms, and the marketing site does not show it.
    *
-   * The regex guard is not decoration. data->>'price' is free-form json, so a non-numeric
-   * value makes the cast throw — and this query is the whole summary.
+   * A count computed by a DIFFERENT rule from the route it describes is worse than no count,
+   * which is what `catalog_price is null` was: it called the one live product "no price —
+   * prints blank" while the page quoted $41.20 from data->>'price' perfectly well.
+   *
+   * The regex guards are not decoration. These are free-form json values, so a non-numeric
+   * one makes the cast throw — and this query is the whole summary.
    */
-  const PUBLIC_PRICE_SQL = `coalesce(catalog_price,
-    case when data->>'price' ~ '^[0-9]+(\\.[0-9]+)?$' then (data->>'price')::numeric end)`;
+  const NUMERIC_JSON = (path) =>
+    `case when data->>'${path}' ~ '^[0-9]+(\\.[0-9]+)?$' then (data->>'${path}')::numeric end`;
+  const PUBLIC_PRICE_SQL = `coalesce(${NUMERIC_JSON('price')}, ${NUMERIC_JSON('basePrice')}, base_price)`;
 
   app.get('/api/catalog/summary', { preHandler: requireStaff }, async () => {
+    // The LOOKBOOK — in_catalog plus picks. Its own thing, and no longer anything to do with
+    // what the website shows.
     const prod = await q(
+      `select count(*)::int as n, count(*) filter (where catalog_price is null)::int as unpriced
+         from catalog_products where in_catalog = true`
+    ).then((r) => r.rows[0] || { n: 0, unpriced: 0 }).catch(() => ({ n: 0, unpriced: 0 }));
+    // THE WEBSITE — status alone decides it.
+    const live = await q(
       `select count(*)::int as n,
               count(*) filter (where ${PUBLIC_PRICE_SQL} is null or ${PUBLIC_PRICE_SQL} <= 0)::int as unpriced
-         from catalog_products where in_catalog = true`
+         from catalog_products where status = $1`,
+      [PUBLIC_STATUS]
     ).then((r) => r.rows[0] || { n: 0, unpriced: 0 }).catch(() => ({ n: 0, unpriced: 0 }));
     const picks = await q(
       `select count(*)::int as n, count(*) filter (where catalog_price is null)::int as unpriced
@@ -721,20 +783,16 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       products: prod.n, styles: picks.n, total: prod.n + picks.n,
       unpriced: (prod.unpriced || 0) + (picks.unpriced || 0),
       /**
-       * WHAT THE MARKETING SITE CAN ACTUALLY SHOW — which is not `total`, and saying so is
-       * the entire point of this field.
+       * WHAT THE MARKETING SITE SHOWS — counted off `status`, the flag that now decides it,
+       * and deliberately NOT off this bar's own totals.
        *
-       * `total` counts the LOOKBOOK: products plus supplier styles, which is the right number
-       * for a trade document you hand a buyer. The public catalogue is a different surface —
-       * publicProducts() reads catalog_products alone and never touches catalog_picks — so a
-       * bar reading "4 in the catalogue" beside a site showing 1 was not a bug in either one.
-       * It was two true numbers for two different things, printed as if they were one.
-       *
-       * Both reasons a published product stays invisible are named, because "it is not there"
-       * and "it is there but has no price" need different fixes from whoever is looking.
+       * `total` above is the LOOKBOOK: in_catalog products plus supplier styles, the right
+       * number for a trade document. The website is a different surface with a different
+       * rule, and the two are printed apart so a bar reading "4 in the catalogue" can never
+       * again be read as a promise about the site.
        */
-      publicVisible: Math.max(0, (prod.n || 0) - (prod.unpriced || 0)),
-      publicHidden: { unpriced: prod.unpriced || 0, styles: picks.n || 0 },
+      publicVisible: Math.max(0, (live.n || 0) - (live.unpriced || 0)),
+      publicHidden: { unpriced: live.unpriced || 0 },
     };
   });
 

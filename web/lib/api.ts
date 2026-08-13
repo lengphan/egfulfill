@@ -699,10 +699,11 @@ export function getCatalogExport(id: string) {
 export function getCatalogSummary() {
   return api<{
     products: number; styles: number; total: number; unpriced: number
-    /** How many the MARKETING SITE actually shows. Not `total`: that counts the lookbook,
-     *  which includes supplier styles the public route never reads. See the summary route. */
+    /** How many the MARKETING SITE shows — counted off product `status`, not off this list.
+     *  `total` is the LOOKBOOK (in_catalog products + supplier styles), a trade document with
+     *  its own prices; the website is a separate surface. See the summary route. */
     publicVisible?: number
-    publicHidden?: { unpriced: number; styles: number }
+    publicHidden?: { unpriced: number }
   }>(`/api/catalog/summary`)
 }
 export function clearCatalog() {

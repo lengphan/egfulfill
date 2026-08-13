@@ -9,7 +9,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 type Summary = {
   products: number; styles: number; total: number; unpriced: number
   publicVisible?: number
-  publicHidden?: { unpriced: number; styles: number }
+  publicHidden?: { unpriced: number }
 }
 
 /**
@@ -66,22 +66,16 @@ export function CatalogSummaryBar({ refresh }: { refresh?: number }) {
           <Warning size={12} weight="fill" /> {s.unpriced} with no price — they print blank
         </span>
       )}
-      {/* THE NUMBER ON THE ACTUAL WEBSITE, said out loud.
-          "4 in the catalogue" beside a site showing 1 was two true numbers for two different
-          things: this bar counts the LOOKBOOK (products + supplier styles), and the public
-          route reads catalog_products alone. Both reasons the totals part are named, because
-          "supplier styles don't go to the site" and "this one has no price" need different
-          fixes from whoever is reading. */}
-      {typeof s.publicVisible === "number" && s.publicVisible !== s.total && (
+      {/* THIS BAR IS THE LOOKBOOK, and the website is a different number.
+          "4 in the catalogue" beside a site showing 1 was two true facts printed as one. What
+          is in here goes to partners and trade buyers; what is on the website is decided by a
+          product's status, over on Products. Naming the second number here stops this screen
+          from being read as a promise about the public site. */}
+      {typeof s.publicVisible === "number" && (
         <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
           <Globe size={12} weight="duotone" />
-          {s.publicVisible} on the public site
-          {(() => {
-            const why: string[] = []
-            if (s.publicHidden?.styles) why.push(`${s.publicHidden.styles} supplier style${s.publicHidden.styles === 1 ? "" : "s"} are lookbook-only`)
-            if (s.publicHidden?.unpriced) why.push(`${s.publicHidden.unpriced} need a price`)
-            return why.length ? ` — ${why.join(", ")}` : null
-          })()}
+          {s.publicVisible} on the public site — set by status, not by this list
+          {s.publicHidden?.unpriced ? ` (${s.publicHidden.unpriced} Active with no price)` : null}
         </span>
       )}
       {s.total > 0 && (

@@ -20,36 +20,50 @@ const priceOf = (p: CatalogProduct) =>
   Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
 
 /**
- * THE PUBLIC PRICE — mirrors publicShape in server/src/routes/catalog.js: catalogPrice when
- * it is set, otherwise the product's own `price`. A published product without one is dropped
- * from /api/public/products silently, with nothing said anywhere.
+ * THE PUBLIC PRICE — mirrors publicShape in server/src/routes/catalog.js, in the same order:
+ * `price`, then `basePrice`. That is what a seller pays us to make one (pricing.js), which is
+ * the figure the marketing page quotes.
  *
- * NOT priceOf(), and that difference is the whole point. priceOf falls back to basePrice so a
- * card always shows a number — right for staff, and exactly what hid this for months: the hat
- * and the hoodie displayed $11.99 and $9.99 on this page while the public route saw no price
- * at all and skipped both. basePrice is what we PAY; it is never published.
+ * catalogPrice is deliberately NOT consulted. It is the lookbook's price — a trade rate for
+ * partners and wholesale buyers — and putting it on the open web quotes those terms to
+ * everyone.
+ *
+ * An Active product with no usable price at all is still dropped by the public route, so this
+ * exists to let the page SAY so rather than leave it invisible and unexplained.
  */
 const publicPriceOf = (p: CatalogProduct) => {
-  const v = Number(p.catalogPrice ?? p.price ?? NaN)
+  const v = Number(p.price ?? p.basePrice ?? p.base_price ?? NaN)
   return Number.isFinite(v) && v > 0 ? v : null
 }
 
 /**
- * Why a product is, or is not, on the marketing site — as one value, so the badge and the
- * callout can never tell different stories.
+ * Who sees this product — read off `status`, the one flag that decides it.
  *
- * "Not published" and "published but invisible" are DIFFERENT FACTS with different fixes
- * (tick it in Catalog vs give it a price), and collapsing them into one "not live" is what
- * makes a person tick the same box a second time and conclude the feature is broken.
+ * Mirrors the visibility vocabulary in server/src/routes/catalog.js. Anything unrecognised
+ * is treated as staff-only here for the same reason the server withholds it: a status nobody
+ * has taught this function about must not be described to the reader as public.
+ *
+ * "Not on the site" and "Active but priceless" are DIFFERENT FACTS with different fixes, and
+ * collapsing them into one "not live" is what makes a person set the same field twice and
+ * conclude the feature is broken.
  */
 type PublicState = { live: boolean; label: string; why: string | null }
 const publicStateOf = (p: CatalogProduct): PublicState => {
-  if (!p.inCatalog) return { live: false, label: "Not published", why: null }
+  const status = (p.status ?? "Active").trim().toLowerCase()
+  if (status !== "active") {
+    return {
+      live: false,
+      label: status === "sellers only" ? "Sellers only" : status === "staff only" ? "Staff only" : "Not on the site",
+      why: status === "sellers only"
+        ? "Orderable by sellers in the app. Set it Active to put it on the marketing site."
+        : "Not on the public site. Set it Active to publish it.",
+    }
+  }
   if (publicPriceOf(p) === null) {
     return {
       live: false,
-      label: "No public price",
-      why: "Published, but the site skips it until it has a catalogue price. The price on this card is your cost, which is never shown publicly.",
+      label: "No price",
+      why: "Active, but the site skips it until it has a price. Set a base price on the product.",
     }
   }
   return { live: true, label: "On the site", why: null }
@@ -155,20 +169,19 @@ export function ProductsCatalog() {
 
   const stats = useMemo(() => {
     const list = products ?? []
+    // Active IS "on the marketing site" now — one flag, so this tile and the public route
+    // cannot drift apart. What can still differ is a product Active with no price: the public
+    // route drops it, so counting Active alone would again report items the site isn't showing.
     const active = list.filter((p) => (p.status ?? "Active") === "Active").length
-    // PUBLISHED is not the same flag as ACTIVE, and calling it so is what made three "Active"
-    // products look like three products on the public site when only one was there. `status`
-    // is whether we still sell the item; `inCatalog` is whether it appears on the marketing
-    // catalogue. A product can be Active and unpublished all day.
-    const published = list.filter((p) => p.inCatalog).length
-    // Published is not the same as VISIBLE either. A published product with no catalogue
-    // price is dropped by the public route without a word, so counting `inCatalog` alone
-    // still reports products the site is not showing.
-    const stranded = list.filter((p) => p.inCatalog && publicPriceOf(p) === null).length
+    const stranded = list.filter((p) => (p.status ?? "Active") === "Active" && publicPriceOf(p) === null).length
+    const internal = list.filter((p) => {
+      const s = (p.status ?? "Active").trim().toLowerCase()
+      return s === "sellers only" || s === "staff only"
+    }).length
     return {
       total: list.length,
       cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size),
-      active, published, live: published - stranded, stranded,
+      active, live: active - stranded, stranded, internal,
     }
   }, [products])
 
@@ -195,33 +208,29 @@ export function ProductsCatalog() {
       <StatGrid>
         <StatCard label="Products" value={String(stats.total)} sub="in your catalog" />
         <StatCard label="Categories" value={String(stats.cats)} sub="product types" />
-        <StatCard label="Active" value={String(stats.active)} sub="still sold" tone="pos" />
-        {/* The number that answers "why isn't this on our site?". It reads off inCatalog, the
-            flag the public route filters on, so this tile and the marketing catalogue can never
-            disagree about how many products are live. */}
-        {/* Counts what the site actually SHOWS, not what is ticked. When those differ the
-            tile says so rather than quietly reporting the larger, friendlier number. */}
+        <StatCard label="Internal" value={String(stats.internal)} sub="sellers or staff only" />
+        {/* Counts what the site actually SHOWS, not how many are Active. The two differ only
+            when a product has no price, and when they do this tile says so rather than
+            quietly reporting the larger, friendlier number. */}
         <StatCard
           label="On the public site"
           value={String(stats.live)}
           sub={stats.stranded > 0
-            ? `${stats.stranded} published but held back`
+            ? `${stats.stranded} Active but held back`
             : stats.live === stats.total ? "all products" : `of ${stats.total} products`}
           tone={stats.stranded > 0 ? "neg" : stats.live ? "pos" : undefined}
         />
       </StatGrid>
 
-      {/* The explanation, where the problem is — not in a tooltip on one card. Published but
-          priceless is invisible AND silent, which is how the same box gets ticked twice. */}
+      {/* The explanation, where the problem is — not in a tooltip on one card. Active but
+          priceless is invisible AND silent, which is how the same field gets set twice. */}
       {isStaff && stats.stranded > 0 && (
         <div className="flex items-start gap-2.5 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />
           <div>
-            <strong>{stats.stranded} published product{stats.stranded === 1 ? " is" : "s are"} not showing on the site.</strong>{" "}
-            {stats.stranded === 1 ? "It has" : "They have"} no catalogue price, and the public
-            catalogue skips anything without one. The price on the card is your cost — that
-            number is never published. Set a catalogue price in{" "}
-            <button className="underline underline-offset-2 hover:no-underline" onClick={() => router.push("/published-catalog")}>Catalog</button>.
+            <strong>{stats.stranded} Active product{stats.stranded === 1 ? " is" : "s are"} not showing on the site.</strong>{" "}
+            {stats.stranded === 1 ? "It has" : "They have"} no price, and the public catalogue
+            skips anything without one. Set a base price on the product and it appears.
           </div>
         </div>
       )}

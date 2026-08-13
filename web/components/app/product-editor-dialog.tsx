@@ -499,10 +499,29 @@ export function ProductEditorDialog({
                 <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Type</span>
                   <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{typeNames.map((t) => <option key={t}>{t}</option>)}</select>
                 </label>
+                {/* STATUS IS THE VISIBILITY SWITCH — it decides who sees the product, and
+                    there is no second flag to remember. Active reaches the public marketing
+                    site; everything below it is progressively narrower. The helper line is
+                    not decoration: "Active" alone gave no hint that it published to the open
+                    web, which is exactly how five Active products and a one-product website
+                    coexisted for months. */}
                 <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Status</span>
-                  <select value={status} onChange={(e) => setStatus(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"><option>Active</option><option>Draft</option><option>Archived</option></select>
+                  <select value={status} onChange={(e) => setStatus(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                    <option>Active</option>
+                    <option>Sellers only</option>
+                    <option>Staff only</option>
+                    <option>Draft</option>
+                    <option>Archived</option>
+                  </select>
                 </label>
               </div>
+              <p className="-mt-1 text-xs text-muted-foreground">
+                {status === "Active"
+                  ? "On the public marketing site, and orderable by sellers."
+                  : status === "Sellers only"
+                    ? "Orderable by sellers in the app. Not on the public site."
+                    : "Staff only — sellers never see this product."}
+              </p>
               {/* METHODS ARE MULTIPLE. A blank commonly takes several techniques — the
                   single select forced one, which is why a product that can be embroidered
                   AND screen printed had to lie about itself. The data already worked this
