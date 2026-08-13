@@ -23,6 +23,7 @@ import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
+import { setInternalNote } from "@/lib/api"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
 import { clickableProps } from "@/lib/a11y"
@@ -208,12 +209,55 @@ function ageOf(iso: string | null | undefined): string {
   return `${yrs}y`
 }
 
+
+/**
+ * The factory's private note on an order — staff to staff.
+ *
+ * Saves on blur rather than per keystroke: this is a scratchpad someone types a sentence
+ * into while doing something else, and a PATCH per character would put the order's audit
+ * trail under a paragraph of noise.
+ *
+ * The seed is a prop, and the field is keyed by order id at the call site, so switching
+ * rows shows that row's note rather than the last one's.
+ */
+function InternalNote({ orderId, value }: { orderId: string; value: string }) {
+  const [text, setText] = useState(value)
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const save = async () => {
+    if (text === value && state !== "error") return
+    setState("saving")
+    try { await setInternalNote(orderId, text); setState("saved") }
+    catch { setState("error") }
+  }
+  return (
+    <div>
+      <div className="mb-0.5 flex items-center gap-2">
+        <span className="font-semibold uppercase tracking-wide text-muted-foreground">Factory note</span>
+        <span className="text-3xs text-muted-foreground">
+          {state === "saving" ? "saving…" : state === "saved" ? "saved" : state === "error" ? "couldn't save" : "staff only"}
+        </span>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => { setText(e.target.value); if (state !== "idle") setState("idle") }}
+        onBlur={save}
+        rows={2}
+        placeholder="e.g. re-hooping, waiting on navy thread…"
+        className="w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-xs leading-relaxed"
+      />
+    </div>
+  )
+}
+
 export function OrdersHub() {
   const router = useRouter()
   const t = useT()
   const tl = useLabelT()
   const role = getUser()?.role || ""
   const isAdmin = role === "admin"
+  // Any non-seller. Mirrors isStaff() on the server, which is the boundary that actually
+  // matters — this only decides whether the control is worth rendering.
+  const isStaff = !!role && role !== "seller"
   const canFulfill = role === "warehouse" || isAdmin // receive (intake) + ship
   // Artwork review. NB: this no longer implies "set any status" — stage changes are
   // gated per-role by stageOptionsFor/canSetStage, and the server enforces it.
@@ -1980,12 +2024,19 @@ export function OrdersHub() {
                               {personal.map((p, i) => <div key={i} className="leading-relaxed">{decodeEntities(p)}</div>)}
                             </div>
                           )}
+                          {/* THE BUYER'S OWN WORDS, only when they wrote some. Renamed from
+                              "Note" because that is what it always was — a checkout message
+                              from Etsy — and calling it Note left no name for OUR note. */}
                           {notes && (
                             <div>
-                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Note")}</div>
+                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Buyer message")}</div>
                               <div className="leading-relaxed">{notes}</div>
                             </div>
                           )}
+                          {/* OURS. Staff only — the server strips this field from every
+                              seller-facing response and refuses the write from a seller, so
+                              this box is not the thing keeping it private. */}
+                          {isStaff && <InternalNote orderId={o.id} value={(o as { internal_note?: string | null }).internal_note ?? ""} />}
                         </div>
                       </div>
                     )

@@ -230,6 +230,14 @@ export function getShippoBilling() {
 /** Mark a ledger row as test money, or restore it. Admin only; audited before/after,
  *  because it changes a balance someone has already been shown. Returns the account's
  *  recomputed balance so the screen can settle without a refetch. */
+/** Set (or clear) the factory's private note on an order. STAFF ONLY — the server gates the
+ *  field, not just the route, and strips it from every seller-facing response. */
+export function setInternalNote(id: string, internalNote: string) {
+  return api<{ ok?: boolean }>(`/api/orders/${encodeURIComponent(id)}`, {
+    method: "PATCH", body: JSON.stringify({ internalNote }),
+  })
+}
+
 export function markLedgerTest(id: string | number, isTest: boolean) {
   return api<{ ok: boolean; is_test: boolean; balance?: number; unchanged?: boolean }>(
     `/api/wallet/ledger/${id}/test`, { method: "PATCH", body: JSON.stringify({ is_test: isTest }) })

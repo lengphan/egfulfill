@@ -563,6 +563,18 @@ export function ordersRoutes(app, requireAuth) {
   // shipments table because manifests, dispatch, tracking and the ledger all key off
   // order_id today; splitting that is a much larger change than the problem warrants.
   q('alter table orders add column if not exists label_only boolean not null default false').catch(() => {});
+  /**
+   * THE FACTORY'S OWN NOTE ON AN ORDER — staff to staff, never the seller.
+   *
+   * The panel already had a "Note" box, but it printed the BUYER's checkout message from
+   * Etsy: read-only, usually empty, and no use for "Hoa is re-hooping this" or "waiting on
+   * navy thread". There was nowhere to write that except the chat thread, which nobody
+   * opens while working a row.
+   *
+   * SEPARATE COLUMN, not folded into `notes` (jsonb, buyer-facing) or `meta`, precisely so
+   * the seller-facing shaper can drop one named field rather than pick through a blob.
+   */
+  q('alter table orders add column if not exists internal_note text').catch(() => {});
   // Per-seller display number ("#1, #2 …" for manual orders). The id stays the
   // globally-unique PK; this is just the friendly number the seller sees.
   q('alter table orders add column if not exists seq integer').catch(() => {});
@@ -853,6 +865,18 @@ export function ordersRoutes(app, requireAuth) {
    * from you" from "never arrived" — and those two look identical while meaning opposite
    * things, which is the whole reason Etsy's redacted addresses were mistaken for our bug.
    */
+  /**
+   * Remove staff-only fields. Deliberately NOT part of maskBuyerPII: that function returns
+   * early for manual orders, so putting the note there would have published it on every
+   * manual order — the exact shape of leak that is hardest to notice, because the common
+   * case looks right.
+   */
+  function stripStaffOnly(row) {
+    if (!row) return row;
+    const { internal_note, ...rest } = row;   // eslint-disable-line no-unused-vars
+    return rest;
+  }
+
   function maskBuyerPII(row) {
     if (!row) return row;
     if (String(row.source || '').toLowerCase() === 'manual') return row;
@@ -898,7 +922,7 @@ export function ordersRoutes(app, requireAuth) {
       if (!mine || !_canSurface(sel, 'orders') || row.factory_order) {
         reply.code(404); return { error: 'Order not found' };
       }
-      return maskBuyerPII(await healOrphanLines(row));
+      return stripStaffOnly(maskBuyerPII(await healOrphanLines(row)));
     }
     return healOrphanLines(row);
   });
@@ -1093,7 +1117,7 @@ export function ordersRoutes(app, requireAuth) {
       [sel.id]
     );
     await Promise.all(r.rows.map(healOrphanLines));
-    return r.rows.map(maskBuyerPII);
+    return r.rows.map((x) => stripStaffOnly(maskBuyerPII(x)));
   });
 
   /**
@@ -1297,6 +1321,10 @@ export function ordersRoutes(app, requireAuth) {
     const map = { factoryStatus: 'factory_status', status: 'status', tracking: 'tracking',
                   carrier: 'carrier', total: 'total', timeline: 'timeline', notes: 'notes', meta: 'meta',
                   address: 'address', customer: 'customer' };
+    // Staff-only fields: a seller may PATCH their own order, so the guard is on the FIELD
+    // and not only on the route. Without it a seller could write — and by writing, read
+    // back — the factory's private note on their own order.
+    if (isStaff(req.user)) map.internalNote = 'internal_note';
     const sets = [], vals = []; let n = 1;
     for (const k in (req.body || {})) if (map[k]) { sets.push(`${map[k]}=$${n++}`); vals.push(req.body[k]); }
     const body = req.body || {};
