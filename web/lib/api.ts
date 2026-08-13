@@ -218,6 +218,9 @@ export type ShippoBilling = {
   blocked?: boolean
   currency?: string | null
   error?: string
+  /** The card Shippo says it is charging right now (its top-level stripe_cc_* fields),
+   *  which is the one fact worth leading with — `methods` is every card on file. */
+  current?: { brand: string | null; last4: string; expires: string | null } | null
   methods: { brand: string | null; last4: string | null; expires: string | null; active: boolean; default: boolean; authorized: boolean }[]
 }
 export function getShippoBilling() {

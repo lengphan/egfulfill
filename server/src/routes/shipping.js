@@ -572,12 +572,20 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
       const r = await fetch(SH_BASE + '/billing/', { headers: { Authorization: shAuth() } });
       if (!r.ok) return { configured: true, error: 'Shippo HTTP ' + r.status, methods: [] };
       const d = await r.json().catch(() => ({}));
-      const cards = Array.isArray(d.payment_methods) ? d.payment_methods : [];
+      // `accounts`, NOT `payment_methods` — the field name was guessed from a truncated
+      // response and the panel confidently reported "No card on the Shippo account" for an
+      // account with five. Shippo also names the CURRENT card at the top level
+      // (stripe_cc_*), which is the single fact worth leading with.
+      const cards = Array.isArray(d.accounts) ? d.accounts : [];
       return {
         configured: true,
         paymentType: d.payment_type || null,
         blocked: !!d.blocked_billing,
         currency: d.payment_currency || null,
+        current: d.stripe_cc_last4
+          ? { brand: d.stripe_cc_brand || null, last4: d.stripe_cc_last4,
+              expires: d.stripe_cc_exp_month && d.stripe_cc_exp_year ? `${d.stripe_cc_exp_month}/${d.stripe_cc_exp_year}` : null }
+          : null,
         methods: cards.map((c) => ({
           brand: c.cc_brand || null, last4: c.last_four || null,
           expires: c.exp_month && c.exp_year ? `${c.exp_month}/${c.exp_year}` : null,

@@ -2967,8 +2967,17 @@ function ShippoBillingPanel() {
           Billing is blocked on this Shippo account — labels will fail until it&apos;s resolved in Shippo.
         </p>
       )}
+      {b.current && (
+        <p className="text-sm">
+          Charging <span className="font-medium">{b.current.brand || "card"}</span>{" "}
+          <span className="tabular-nums">•••• {b.current.last4}</span>
+          {b.current.expires ? <span className="text-muted-foreground"> · exp {b.current.expires}</span> : null}
+        </p>
+      )}
       {b.methods.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No card on the Shippo account.</p>
+        <p className="text-xs text-muted-foreground">
+          {b.current ? "No other cards on file." : "No card on the Shippo account."}
+        </p>
       ) : (
         <div className="rounded-lg border border-border">
           {b.methods.map((m, i) => (
