@@ -24,6 +24,7 @@ import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrd
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
 import { setInternalNote } from "@/lib/api"
+import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, decodeEntities } from "@/lib/order-format"
 import { clickableProps } from "@/lib/a11y"
@@ -949,7 +950,19 @@ export function OrdersHub() {
     // gap-x-3 is 0.75rem between every track, and px-5 is 1.25rem of gutter each side.
     return Math.round((fixed + gridCols.length * 0.75 + 2.5) * 16)
   }, [gridCols, dispatchOn])
-  const selectableOnPage = paged.pageItems.filter(dispatchable)
+  /**
+   * SELECTION IS NEUTRAL; ACTIONS ARE OPINIONATED.
+   *
+   * The checkbox used to be enabled only on dispatchable rows, which made sense when Send to
+   * dispatch was the only bulk action — and became a cage the moment there were others: an
+   * order with no label could not be ticked, so it could never be given the very action that
+   * buys it one.
+   *
+   * So anything can be selected, and each action filters what it can actually do and NAMES
+   * what it skipped. That is the honest split: the checkbox does not know which button you
+   * are about to press.
+   */
+  const selectableOnPage = paged.pageItems
   const allOnPageSelected = selectableOnPage.length > 0 && selectableOnPage.every((o) => selected.has(o.id))
 
   const toggleOne = (id: string) =>
@@ -1041,6 +1054,47 @@ export function OrdersHub() {
     } catch (e) {
       setPushMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't buy those labels." })
     } finally { setBuying(null) }
+  }
+
+  /**
+   * PACKING SLIPS FOR THE SELECTION. The safest bulk action there is — it reads what is
+   * already on screen, spends nothing, changes nothing, and can be repeated. Open to any
+   * staff role for that reason.
+   */
+  const doBulkSlips = () => {
+    const chosen = (orders ?? []).filter((o) => selected.has(o.id))
+    if (!chosen.length) return
+    const msg = printPackingSlips(chosen)
+    if (msg) setPushMsg({ tone: "err", text: msg })
+  }
+
+  /**
+   * START EVERY SELECTED ORDER — the same move as pressing Start on one row, done to many.
+   *
+   * Gated by canSetStage per order, exactly like the single button, so this cannot advance
+   * an order the role is not allowed to advance. Anything refused is COUNTED and named
+   * rather than silently dropped: a bulk action that says "12 started" when it started nine
+   * is worse than one that refuses outright.
+   */
+  const doBulkStart = async () => {
+    const chosen = (orders ?? []).filter((o) => selected.has(o.id))
+    const ready = chosen.filter((o) => canSetStage(role, normalizeStage(o.factory_status ?? orderStage(o.items ?? [])), "working", isFactoryOrder(o)))
+    if (!ready.length) {
+      setPushMsg({ tone: "err", text: "None of those can be started from where they are." })
+      return
+    }
+    setPushing(true); setPushMsg(null)
+    const results = await Promise.all(ready.map((o) =>
+      updateOrder(o.id, { factoryStatus: "working" }).then(() => true).catch(() => false)))
+    const ok = results.filter(Boolean).length
+    const skipped = chosen.length - ready.length
+    setPushMsg({
+      tone: ok === chosen.length ? "ok" : "err",
+      text: `${ok} started`
+        + (ok < ready.length ? ` · ${ready.length - ok} failed` : "")
+        + (skipped ? ` · ${skipped} skipped (not startable from their stage)` : ""),
+    })
+    setSelected(new Set()); setPushing(false); load()
   }
 
   const doPush = async () => {
@@ -1380,9 +1434,15 @@ export function OrdersHub() {
               "select all 8 in this filter", the in-house scan and Clear — which is a
               paragraph of options above a list you were already looking at. Rows carry
               their own checkbox, so bulk selection was never the only way in. */}
-          {dispatchOn && selected.size > 0 && (
+          {selected.size > 0 && (
             <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-5 py-2.5">
               <span className="text-sm text-muted-foreground">{selected.size} selected</span>
+              <Button size="sm" variant="outline" onClick={doBulkSlips} disabled={pushing || !!buying}>
+                <Package size={13} weight="bold" /> Packing slips
+              </Button>
+              <Button size="sm" variant="outline" onClick={doBulkStart} disabled={pushing || !!buying}>
+                <PaperPlaneTilt size={13} weight="bold" /> Start
+              </Button>
               <Button size="sm" onClick={doPush} disabled={pushing}>
                 {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
                 {pushing ? "Sending…" : `Send ${selected.size} to dispatch board`}
@@ -1648,24 +1708,13 @@ export function OrdersHub() {
                         only on dispatchable rows reads as a half-built feature: most orders
                         have no label yet, so most rows had no box, and a column that appears
                         on a minority of rows looks broken rather than selective. */}
-                    {dispatchOn && (
-                      <input
-                        type="checkbox"
-                        checked={selected.has(o.id)}
-                        disabled={!dispatchable(o)}
-                        onChange={() => toggleOne(o.id)}
-                        aria-label={dispatchable(o)
-                          ? `Select ${numOf(o)} for dispatch`
-                          : `${numOf(o)} can't be dispatched — ${o.label_scanned_at ? "already pre-scanned" : o.dispatch_pdf_id ? "already sent to the partner" : "no label bought yet"}`}
-                        title={dispatchable(o) ? undefined
-                          : o.label_scanned_at
-                            ? "Already pre-scanned — its tracking is live."
-                            : o.dispatch_pdf_id
-                              ? "Already sent to the dispatch partner — waiting on their scan. Re-sending does nothing."
-                              : "No label bought yet, so there's nothing for the partner to scan."}
-                        className="size-4 shrink-0 rounded border-input accent-primary disabled:cursor-not-allowed disabled:opacity-40"
-                      />
-                    )}
+                    <input
+                      type="checkbox"
+                      checked={selected.has(o.id)}
+                      onChange={() => toggleOne(o.id)}
+                      aria-label={`Select ${numOf(o)}`}
+                      className="size-4 shrink-0 rounded border-input accent-primary"
+                    />
                     <button
                       onClick={() => toggleCollapse(o.id)}
                       aria-expanded={!isCollapsed}
