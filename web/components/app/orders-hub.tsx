@@ -2502,7 +2502,23 @@ export function OrdersHub() {
                 open
                 onOpenChange={(v) => { if (!v) setShipOpen(null) }}
                 order={{ id: o.id, num: numOf(o), to: toAddrOf(o), items: o.items ?? [] }}
-                onCreated={() => { setShipOpen(null); load() }}
+                onCreated={() => {
+                  /**
+                   * DO NOT CLOSE ON SUCCESS.
+                   *
+                   * This used to call setShipOpen(null), which unmounted the dialog the
+                   * instant the buy returned — so the success panel never rendered, the
+                   * label bytes were never fetched, and the auto-print effect never ran at
+                   * all. That is why buying a label silently produced no print dialog, and
+                   * why fixes inside the dialog changed nothing: the component was gone
+                   * before any of them could execute.
+                   *
+                   * The dialog closes itself now, on Done — after it has printed, and after
+                   * you have had the chance to press Print again or buy Another. Refreshing
+                   * the board underneath is still right, so load() stays.
+                   */
+                  load()
+                }}
               />
             )
           })()}

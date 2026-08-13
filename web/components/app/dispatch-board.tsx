@@ -1301,7 +1301,11 @@ export function DispatchBoard() {
       <NewLabelDialog
         open={!!labelFor}
         onOpenChange={(v) => { if (!v) setLabelFor(null) }}
-        onCreated={() => { setLabelFor(null); load() }}
+        onCreated={() => {
+          // Same reason as the orders hub: closing here unmounts the dialog before it can
+          // fetch the label and print. It closes itself on Done.
+          load()
+        }}
         order={labelFor ? { id: String(labelFor.id), num: numOf(labelFor), to: toShip(labelFor) } : undefined}
       />
     </div>
