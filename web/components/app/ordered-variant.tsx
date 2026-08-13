@@ -35,6 +35,10 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
   // picked. Before a blank is chosen — which is exactly when someone is reading this strip
   // to decide — the count was nowhere on screen, and "how many" is the first thing you need
   // in order to pull stock.
+  //
+  // ALWAYS SHOWN, including x1. Hiding it at one made the field's absence ambiguous —
+  // "one of these" and "nobody has told me" looked identical — and a picker scanning a
+  // multi-line order needs a number on every row to count against.
   const qty = Math.max(1, Number(item.qty) || 1)
   if (!ordered && !sku) return null
 
@@ -43,9 +47,9 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
       {ordered && (
         <div className="text-muted-foreground">
           <span className="font-medium text-foreground/70">Ordered:</span> {ordered}
-          {/* Loud when it is more than one. A ×1 in the same weight as a ×6 is how a six
-              gets pulled as a one. */}
-          {qty > 1 && <span className="ml-1.5 font-semibold text-foreground">×{qty}</span>}
+          {/* Emphasised past one: every row carries a number so none is ambiguous, but a x6
+              has to catch the eye where a x1 should not. */}
+          <span className={"ml-1.5 " + (qty > 1 ? "font-semibold text-foreground" : "")}>×{qty}</span>
         </div>
       )}
       {/* Personalisation is deliberately NOT repeated here — the order panel above already
@@ -55,7 +59,7 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
         <div className="text-muted-foreground">
           <span className="font-medium text-foreground/70">Listing SKU:</span>{" "}
           <span className="font-mono">{sku}</span>
-          {!ordered && qty > 1 && <span className="ml-1.5 font-semibold text-foreground">×{qty}</span>}
+          {!ordered && <span className={"ml-1.5 " + (qty > 1 ? "font-semibold text-foreground" : "")}>×{qty}</span>}
         </div>
       )}
     </div>

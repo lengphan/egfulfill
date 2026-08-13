@@ -25,7 +25,7 @@ import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
 import { setInternalNote } from "@/lib/api"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
+import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, decodeEntities } from "@/lib/order-format"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
@@ -2011,7 +2011,6 @@ export function OrdersHub() {
                               {(a.street2 || a.second_line || a.line2) && <div>{a.street2 || a.second_line || a.line2}</div>}
                               <div>{[a.city, a.state, a.zip || a.postal_code].filter(Boolean).join(", ")}</div>
                               {(a.country || a.country_iso) && <div>{a.country || a.country_iso}</div>}
-                              <div className="mt-1 text-3xs text-muted-foreground">{addressSourceLabel(o)}</div>
                             </div>
                           ) : (
                             <div className="text-muted-foreground">{tl("ui", "Not available yet.")}</div>
@@ -2022,15 +2021,6 @@ export function OrdersHub() {
                             <div>
                               <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Personalisation")}</div>
                               {personal.map((p, i) => <div key={i} className="leading-relaxed">{decodeEntities(p)}</div>)}
-                            </div>
-                          )}
-                          {/* THE BUYER'S OWN WORDS, only when they wrote some. Renamed from
-                              "Note" because that is what it always was — a checkout message
-                              from Etsy — and calling it Note left no name for OUR note. */}
-                          {notes && (
-                            <div>
-                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Buyer message")}</div>
-                              <div className="leading-relaxed">{notes}</div>
                             </div>
                           )}
                           {/* OURS. Staff only — the server strips this field from every
