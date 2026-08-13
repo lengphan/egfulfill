@@ -31,6 +31,7 @@ import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, unitsOf, lineTota
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
+import { OrderedVariant } from "@/components/app/ordered-variant"
 
 // PhotoStack moved to components/app/photo-stack.tsx so the factory boards render the
 // identical strip instead of growing a second copy (CLAUDE.md §5).
@@ -373,6 +374,8 @@ export function OrdersList() {
                                           {lineTotal(it) ? usd(lineTotal(it)) : "—"}
                                         </span>
                                       </div>
+                                      {/* The seller's own view of what their buyer picked. */}
+                                      <OrderedVariant item={it} />
                                       {["", "new", "draft"].includes(String(o.factory_status || "")) ? (
                                         <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                                       ) : (

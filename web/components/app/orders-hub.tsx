@@ -23,6 +23,7 @@ import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
+import { OrderedVariant } from "@/components/app/ordered-variant"
 import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, addressSourceLabel, decodeEntities } from "@/lib/order-format"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
@@ -2085,6 +2086,10 @@ export function OrdersHub() {
                                 which are lifted to the top-right corner (position: absolute)
                                 so the variant strip below can run the FULL width of the row. */}
                             <div className="truncate text-sm font-medium sm:min-h-8 sm:pr-[15rem]">{it.name || it.sku || "Item"}</div>
+                            {/* What the BUYER chose, kept under the title through the whole
+                                picking step — the pickers below decide what we make, and this
+                                is the only thing on screen that says what they asked for. */}
+                            <OrderedVariant item={it} className="sm:pr-[15rem]" />
                             {/* Factory-owned marketplace orders arrive with no blank chosen;
                                 artwork review (canDesign) picks it here while the order is
                                 still unstarted. A pushed seller order is past "" (already

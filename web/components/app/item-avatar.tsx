@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { bestMockup, resolveProduct } from "@/lib/variant-resolve"
 import { designSrc } from "@/lib/order-image"
 import type { CatalogProduct, DesignPos, OrderDesign, OrderItem } from "@/lib/api"
+import { OrderedVariant } from "@/components/app/ordered-variant"
 
 /**
  * The ONE item avatar, shared by the seller order list, the order detail, and all three
@@ -170,6 +171,9 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="pr-6 text-sm leading-snug">{item.name || item.sku || "Item"}</DialogTitle>
+            {/* Shared by every board that renders a line, so the buyer's choice follows the
+                item wherever it is opened rather than only on the queue. */}
+            <OrderedVariant item={item} className="pr-6" />
           </DialogHeader>
           <div className="space-y-3 px-1 pb-1">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted">

@@ -47,6 +47,7 @@ import { OrderStageMenu } from "@/components/app/order-stage-menu"
 import { LabelActionButton } from "@/components/app/label-action-button"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { designSrc } from "@/lib/order-image"
+import { OrderedVariant } from "@/components/app/ordered-variant"
 
 // Same fallbacks as the boards' toAddrOf — marketplace payloads spell the address a dozen
 // ways, so the ship-to a label uses must read them all. Kept identical on purpose.
@@ -441,6 +442,9 @@ export default function OrderDetailPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
+                            {/* Same line as the production queue: what the buyer chose, next
+                                to what we are choosing. */}
+                            <OrderedVariant item={it} />
                             {/* THIS LINE's board state, with the lane named. "Sent to design"
                                 and "Approved" are different answers, and until now the only
                                 signal was an order-wide chip that lit for every item the
