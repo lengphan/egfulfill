@@ -384,7 +384,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
               sum(case when delta > 0 then delta else 0 end)::float as credited,
               count(*)::int as entries
          from wallet_ledger
-        where account = 'factory'
+        where account = 'factory' and ${REAL}
           and (type like 'blanks-cost%' or type like 'sample-cost%' or type like 'bank-fee%')
         group by 1
         order by spend desc`).catch(() => ({ rows: [] }));

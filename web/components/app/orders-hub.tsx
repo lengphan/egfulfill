@@ -1375,10 +1375,17 @@ export function OrdersHub() {
                 {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
                 {pushing ? "Sending…" : `Send ${selected.size} to dispatch board`}
               </Button>
+              {/* SAME GATE AS BUYING ONE. The single-order ship button on these very rows is
+                  canFulfill (warehouse/admin) because a label spends real money on the
+                  company card — and this button spends it twenty times in a row. It shipped
+                  without the check, and /api/usps/label is only requireStaff, so an operator
+                  could have bought a whole batch. */}
+              {canFulfill && (
               <Button size="sm" variant="outline" onClick={doBulkLabels} disabled={!!buying || pushing}>
                 {buying ? <CircleNotch size={13} className="animate-spin" /> : <Printer size={13} weight="bold" />}
                 {buying ? `Buying ${buying.done}/${buying.total}…` : `Buy labels (${selected.size})`}
               </Button>
+              )}
               {/* Unlabelled ×: without it there's no way out of a selection except
                   unticking every row. */}
               <button onClick={() => setSelected(new Set())}

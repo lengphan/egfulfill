@@ -202,7 +202,10 @@ async function shFindOrder(orderId) {
     const d = await r.json().catch(() => ({}));
     const hit = (d.results || []).find((o) => String(o.order_number || '').trim() === number);
     const id = hit ? hit.object_id : null;
-    shOrderCache.set(number, id);
+    // ONLY CACHE A HIT. Shippo imports an order minutes after we first look for it, so
+    // remembering "not there" would make the next buy skip the lookup and never link the
+    // label — the exact failure this function exists to prevent, made permanent.
+    if (id) shOrderCache.set(number, id);
     return id;
   } catch { return null; }
 }

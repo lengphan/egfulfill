@@ -159,7 +159,12 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
   };
 
   const renderable = (v) =>
-    typeof v === 'string' && (/^(https?:\/\/|data:image\/)/i.test(v) || v.startsWith('/api/ss/img'));
+    typeof v === 'string' && (/^(https?:\/\/|data:image\/)/i.test(v)
+      || v.startsWith('/api/ss/img')
+      // Our own image address. fattenImages puts the bytes back on write, so this should
+      // not reach storage — but a path that DID slip through still serves the picture, and
+      // treating it as unrenderable would blank a product that is perfectly fine.
+      || v.startsWith('/api/catalog/img/'));
 
   /** Rewrite a proxied S&S image to their LARGE variant. The size lives in the filename
    *  suffix, and the url we hold is url-encoded inside ?u=, so it is decoded, swapped and
@@ -497,9 +502,12 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     if (!imgRefs.has(hash)) {
       // Idempotent by hash — identical bytes resolve to the same row, so the table cannot
       // grow one entry per request.
-      await q('insert into catalog_img_refs (hash, url) values ($1,$2) on conflict (hash) do nothing', [hash, v])
-        .catch(() => {});
-      imgRefs.set(hash, true);
+      // Only remember it if the row is actually there. Marking a failed insert as done
+      // meant that image 404'd for the life of the process, with nothing to retry it.
+      const ok = await q('insert into catalog_img_refs (hash, url) values ($1,$2) on conflict (hash) do nothing', [hash, v])
+        .then(() => true).catch(() => false);
+      if (ok) imgRefs.set(hash, true);
+      else return v;   // keep the data: URL this time rather than point at a row that isn't there
     }
     return `/api/catalog/img/${hash}`;
   }
@@ -1189,8 +1197,39 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
   });
 
   // Full-list upsert: insert/update everything sent, then drop products removed locally.
+
+  /**
+   * A PROJECTION MUST NOT BECOME THE RECORD.
+   *
+   * The list route rewrites stored `data:` images to /api/catalog/img/<hash> so the response
+   * stops carrying megabytes of base64. But the products UI holds whole product objects and
+   * POSTs them straight back, so that rewrite was being SAVED — and once saved it is no
+   * longer a projection: renderable() rejects the path, so every published colourway's image
+   * went null, and the export sheet re-hashed a hash into a link that resolves to nothing.
+   *
+   * So a write puts the bytes back. The hash is a lookup into catalog_img_refs, which is
+   * exactly where slimImages recorded them, and an unknown hash is left alone rather than
+   * blanked — losing an image to a cache miss would be worse than storing a path.
+   */
+  async function fattenImages(p) {
+    const back = async (v) => {
+      const m = typeof v === 'string' && /^\/api\/catalog\/img\/([0-9a-f]{24})$/.exec(v);
+      if (!m) return v;
+      const r = await q('select url from catalog_img_refs where hash=$1', [m[1]]).catch(() => ({ rows: [] }));
+      return (r.rows[0] && r.rows[0].url) || v;
+    };
+    const out = { ...p };
+    if (out.img) out.img = await back(out.img);
+    if (Array.isArray(out.images)) out.images = await Promise.all(out.images.map(back));
+    if (out.colorImages && typeof out.colorImages === 'object') {
+      const e = await Promise.all(Object.entries(out.colorImages).map(async ([k, v]) => [k, await back(v)]));
+      out.colorImages = Object.fromEntries(e);
+    }
+    return out;
+  }
+
   app.post('/api/catalog_products', { preHandler: requireStaff }, async (req, reply) => {
-    const products = Array.isArray(req.body) ? req.body : [];
+    const products = await Promise.all((Array.isArray(req.body) ? req.body : []).map(fattenImages));
     // An empty list used to mean "delete every product", which is never what a full-list
     // sync intends — it's what a caller sends when it has nothing to send. The client
     // seeds this from localStorage, and the store deliberately clears the catalog cache
