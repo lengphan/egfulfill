@@ -14,6 +14,8 @@ import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCar
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
+import { labelableOrders, buyLabelsFor, summarise } from "@/lib/bulk-labels"
+import { printLabelPackets } from "@/lib/label-packet"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
 import { isApprovable } from "@/components/app/approve-order-button"
@@ -929,6 +931,59 @@ export function OrdersHub() {
    * routes are chosen (partner or in-house), so the decision belongs there, beside the
    * queue, rather than here beside a filter.
    */
+  /**
+   * BUY POSTAGE FOR EVERY SELECTED ORDER, then print the lot as one job.
+   *
+   * The selection can include drafts — a draft is an order nobody has started, not an order
+   * that isn't real, and its parcel still has to go out. What decides eligibility is whether
+   * we hold an address, which is checked BEFORE any money moves so the confirm can name what
+   * will actually be bought rather than the number of ticked boxes.
+   *
+   * The parcel is uniform for the batch, which is what makes it a batch; anything unusual
+   * goes through the label dialog on its own.
+   */
+  const [buying, setBuying] = useState<{ done: number; total: number } | null>(null)
+  const doBulkLabels = async () => {
+    const chosen = (orders ?? []).filter((o) => selected.has(o.id))
+    const { ready, blocked } = labelableOrders(chosen)
+    if (!ready.length) {
+      setPushMsg({ tone: "err", text: blocked.length
+        ? `Nothing to buy — ${blocked.length} skipped, first is ${blocked[0].reason}.`
+        : "Nothing selected that needs a label." })
+      return
+    }
+    // Naming the count and the money BEFORE spending it. A bulk button that quietly charges
+    // a card is the one thing this flow must never be.
+    const go = await confirm({
+      title: `Buy ${ready.length} label${ready.length === 1 ? "" : "s"}?`,
+      body: `This charges real postage for ${ready.length} parcel${ready.length === 1 ? "" : "s"}`
+        + (blocked.length ? `, and skips ${blocked.length} with no address or an existing label` : "")
+        + ". Labels and packing slips print together afterwards.",
+      confirmLabel: `Buy ${ready.length}`,
+      destructive: false,
+    })
+    if (!go) return
+
+    setBuying({ done: 0, total: ready.length }); setPushMsg(null)
+    try {
+      const results = await buyLabelsFor(ready, { weightOz: 6, length: 13, width: 10, height: 1 },
+        (done: number, total: number) => setBuying({ done, total }))
+      const printable = results.filter((r) => r.ok && r.labelBlobUrl)
+        .map((r) => ({ labelBlobUrl: r.labelBlobUrl as string, order: r.order }))
+      let msg = summarise(results, blocked)
+      if (printable.length) {
+        const { error, skipped } = await printLabelPackets(printable)
+        if (error) msg += ` · ${error}`
+        else if (skipped.length) msg += ` · ${skipped.length} couldn't be printed (${skipped.join(", ")})`
+      }
+      setPushMsg({ tone: results.some((r) => !r.ok) || blocked.length ? "err" : "ok", text: msg })
+      setSelected(new Set())
+      load()
+    } catch (e) {
+      setPushMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't buy those labels." })
+    } finally { setBuying(null) }
+  }
+
   const doPush = async () => {
     if (!selected.size) return
     setPushing(true); setPushMsg(null)
@@ -1272,6 +1327,10 @@ export function OrdersHub() {
               <Button size="sm" onClick={doPush} disabled={pushing}>
                 {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
                 {pushing ? "Sending…" : `Send ${selected.size} to dispatch board`}
+              </Button>
+              <Button size="sm" variant="outline" onClick={doBulkLabels} disabled={!!buying || pushing}>
+                {buying ? <CircleNotch size={13} className="animate-spin" /> : <Printer size={13} weight="bold" />}
+                {buying ? `Buying ${buying.done}/${buying.total}…` : `Buy labels (${selected.size})`}
               </Button>
               {/* Unlabelled ×: without it there's no way out of a selection except
                   unticking every row. */}

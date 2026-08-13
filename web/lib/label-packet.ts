@@ -1,5 +1,6 @@
 import { pdfFirstPageDataUrl } from "@/lib/pdf-preview"
 import { slipHtml } from "@/lib/packing-slip"
+import { numOf } from "@/lib/order-format"
 import type { OrderRow } from "@/lib/api"
 
 /**
@@ -24,17 +25,7 @@ import type { OrderRow } from "@/lib/api"
 /** 300 dpi across a 6in page — the long edge of a 4×6 label. */
 const LABEL_PX = 1800
 
-export async function printLabelPacket(labelBlobUrl: string, order: OrderRow | null): Promise<string | null> {
-  // The label first: if it cannot be rendered there is no packet worth opening, and the
-  // caller still has its own "Print again" path to fall back on.
-  const labelPng = await pdfFirstPageDataUrl(labelBlobUrl, LABEL_PX)
-  if (!labelPng) return "Couldn't read the label file to print it."
-
-  const slip = order ? slipHtml([order]) : ""
-  const w = window.open("", "_blank")
-  if (!w) return "Your popup blocker stopped the print window — allow popups for this site."
-
-  w.document.write(`<!doctype html><html><head><title>Label + packing slip</title><style>
+const PACKET_CSS = `<style>
     *{box-sizing:border-box}
     body{margin:0;font:12px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#111}
     .page{width:4in;height:6in;page-break-after:always;overflow:hidden}
@@ -46,7 +37,63 @@ export async function printLabelPacket(labelBlobUrl: string, order: OrderRow | n
        adding a THIRD blank page after the last one. */
     .slip{page-break-after:auto}
     @page{size:4in 6in;margin:0}
-  </style></head><body>
+</style>`
+
+/**
+ * MANY parcels, still ONE print job.
+ *
+ * A batch that opens ten print dialogs is worse than buying the labels one at a time, which
+ * is the thing bulk buying exists to replace. Every label and its slip go into a single
+ * document in order — label, slip, label, slip — so the stack comes off the printer already
+ * paired.
+ *
+ * A label that cannot be rendered is SKIPPED rather than aborting the batch, and its order
+ * number is returned: the postage is already bought either way, so the packet's job is to
+ * print what it can and say plainly what it couldn't.
+ */
+export async function printLabelPackets(
+  items: { labelBlobUrl: string; order: OrderRow | null }[],
+): Promise<{ error: string | null; skipped: string[] }> {
+  const pages: string[] = []
+  const skipped: string[] = []
+  for (const it of items) {
+    const png = await pdfFirstPageDataUrl(it.labelBlobUrl, LABEL_PX)
+    if (!png) { skipped.push(it.order ? numOf(it.order) : "?"); continue }
+    pages.push(`<div class="page label"><img src="${png}" alt="Shipping label"/></div>`)
+    if (it.order) pages.push(slipHtml([it.order]))
+  }
+  if (!pages.length) return { error: "None of those labels could be read for printing.", skipped }
+
+  const w = window.open("", "_blank")
+  if (!w) return { error: "Your popup blocker stopped the print window — allow popups for this site.", skipped }
+  w.document.write(`<!doctype html><html><head><title>Labels + packing slips</title>${PACKET_CSS}</head><body>${pages.join("")}</body></html>`)
+  w.document.close()
+  w.focus()
+  const imgs = Array.from(w.document.querySelectorAll("img")) as HTMLImageElement[]
+  const pending = imgs.filter((i) => !i.complete)
+  const go = () => { try { w.print() } catch { /* still usable by hand */ } }
+  if (!pending.length) go()
+  else {
+    let left = pending.length
+    // Print once EVERY image has decoded. Printing at the first load event would put blank
+    // pages in the middle of a batch, which is the failure nobody notices until the parcels
+    // are already taped.
+    pending.forEach((i) => i.addEventListener("load", () => { if (--left === 0) go() }, { once: true }))
+  }
+  return { error: null, skipped }
+}
+
+export async function printLabelPacket(labelBlobUrl: string, order: OrderRow | null): Promise<string | null> {
+  // The label first: if it cannot be rendered there is no packet worth opening, and the
+  // caller still has its own "Print again" path to fall back on.
+  const labelPng = await pdfFirstPageDataUrl(labelBlobUrl, LABEL_PX)
+  if (!labelPng) return "Couldn't read the label file to print it."
+
+  const slip = order ? slipHtml([order]) : ""
+  const w = window.open("", "_blank")
+  if (!w) return "Your popup blocker stopped the print window — allow popups for this site."
+
+  w.document.write(`<!doctype html><html><head><title>Label + packing slip</title>${PACKET_CSS}</head><body>
     <div class="page label"><img src="${labelPng}" alt="Shipping label"/></div>
     ${slip}
   </body></html>`)
