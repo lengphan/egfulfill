@@ -732,6 +732,171 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   });
 
   /**
+   * WHICH ORDER IS THIS PARCEL FOR?
+   *
+   * A label bought without an order is a real thing — a re-ship, a sample — but most of the
+   * time it means the address was pasted in rather than picked, and an order IS waiting for
+   * it. Seven such labels were bought in one evening: real customers, real postage, and
+   * seven orders still reading "new" with no tracking, so no buyer was ever told.
+   *
+   * This SUGGESTS and never decides. Matching on a name is a guess — two orders in that
+   * batch shared a buyer name — so every candidate carries what a human needs to judge it:
+   * the address it would ship to, when the order came in, and whether it already has a
+   * label. The confirming click is the whole point.
+   *
+   * Ranked, not filtered: a weak match still appears, below a strong one, because the right
+   * order being absent is worse than it being third.
+   */
+  app.get('/api/shipments/:id/candidates', { preHandler: requireWarehouse }, async (req, reply) => {
+    const id = String(req.params.id);
+    if (!isShipmentId(id)) { reply.code(400); return { error: 'Only a standalone shipment can be matched to an order.' }; }
+    await ensureShipments().catch(() => {});
+    const s = (await q('select id, to_name, to_city, to_state, to_zip, tracking, order_id from shipments where id=$1', [id])
+      .catch(() => ({ rows: [] }))).rows[0];
+    if (!s) { reply.code(404); return { error: 'Shipment not found' }; }
+
+    // ZIP is the strong signal and name is the weak one, so they are scored rather than
+    // AND-ed: a buyer who typed their name differently on the marketplace still matches on
+    // where it is going, and a name match in the wrong state does not outrank it.
+    const zip5 = String(s.to_zip || '').replace(/[^0-9]/g, '').slice(0, 5);
+    const name = String(s.to_name || '').trim().toLowerCase();
+    const r = await softQ('shipment candidates',
+      `select o.id, o.seq, o.created_at, o.status, o.factory_status, o.tracking,
+              o.customer->>'name' as customer,
+              coalesce(o.address->>'city','')  as city,
+              coalesce(o.address->>'state','') as state,
+              coalesce(o.address->>'zip','')   as zip,
+              coalesce(o.address->>'street', o.address->>'street1', o.address->>'line1','') as street,
+              (case when $1 <> '' and left(regexp_replace(coalesce(o.address->>'zip',''), '[^0-9]', '', 'g'), 5) = $1 then 2 else 0 end)
+            + (case when $2 <> '' and lower(coalesce(o.customer->>'name','')) = $2 then 2
+                    when $2 <> '' and lower(coalesce(o.customer->>'name','')) like '%' || $2 || '%' then 1
+                    else 0 end) as score
+         from orders o
+        where (o.tracking is null or o.tracking = '')
+          and ($1 <> '' and left(regexp_replace(coalesce(o.address->>'zip',''), '[^0-9]', '', 'g'), 5) = $1
+               or $2 <> '' and lower(coalesce(o.customer->>'name','')) like '%' || $2 || '%')
+        order by score desc, o.created_at desc
+        limit 25`, [zip5, name]);
+
+    return {
+      shipment: {
+        id: s.id, tracking: s.tracking, orderId: s.order_id || null,
+        to: { name: s.to_name, city: s.to_city, state: s.to_state, zip: s.to_zip },
+      },
+      // `score` is handed over so the UI can say WHY something is first — "address and name"
+      // beats a bare ordering nobody can check.
+      candidates: r.rows.map((x) => ({
+        id: x.id, seq: x.seq, createdAt: x.created_at, status: x.status,
+        factoryStatus: x.factory_status, customer: x.customer, tracking: x.tracking || null,
+        address: { street: x.street, city: x.city, state: x.state, zip: x.zip },
+        score: Number(x.score) || 0,
+        matchedZip: !!zip5 && String(x.zip || '').replace(/[^0-9]/g, '').slice(0, 5) === zip5,
+        matchedName: !!name && String(x.customer || '').toLowerCase().includes(name),
+      })),
+    };
+  });
+
+  /**
+   * Attach a standalone label to the order it was really for.
+   *
+   * MOVES the label, does not copy it: the order gains the tracking and the shipment keeps
+   * its row but is marked as belonging to that order. Deleting the shipment would erase the
+   * only record of what was bought and charged.
+   *
+   * THE LEDGER IS NOT TOUCHED. The postage was booked once, as `label-sh_*`, and it is the
+   * same money whichever record points at it — re-booking under the order id would count it
+   * twice, and deleting the original would break an append-only ledger to fix a label that
+   * was charged correctly.
+   *
+   * The marketplace is NOT told here either. Pushing tracking emails the buyer, and that is
+   * not a side effect of correcting our own bookkeeping — it is its own decision, made once
+   * the pairing is confirmed to be right.
+   */
+  app.post('/api/shipments/:id/attach', { preHandler: requireWarehouse }, async (req, reply) => {
+    const id = String(req.params.id);
+    const orderId = String((req.body && req.body.orderId) || '').trim();
+    if (!isShipmentId(id)) { reply.code(400); return { error: 'Only a standalone shipment can be attached.' }; }
+    if (!orderId) { reply.code(400); return { error: 'Say which order this parcel is for.' }; }
+    await ensureShipments().catch(() => {});
+    const s = (await q('select * from shipments where id=$1', [id]).catch(() => ({ rows: [] }))).rows[0];
+    if (!s) { reply.code(404); return { error: 'Shipment not found' }; }
+    if (s.order_id) { reply.code(409); return { error: `This label is already attached to order ${s.order_id}.` }; }
+    if (!s.tracking) { reply.code(400); return { error: 'This label has no live tracking — it was refunded, so there is nothing to attach.' }; }
+    const o = (await q('select id, tracking from orders where id=$1', [orderId]).catch(() => ({ rows: [] }))).rows[0];
+    if (!o) { reply.code(404); return { error: 'Order not found' }; }
+    // Never overwrite a label the order already has. Two tracking numbers on one order means
+    // one parcel is unaccounted for, and silently replacing it is how that happens.
+    if (o.tracking) { reply.code(409); return { error: `Order ${orderId} already has tracking ${o.tracking}. Remove it first if it is wrong.` }; }
+
+    await q(
+      `update orders set tracking=$2, carrier=coalesce($3, carrier),
+         ship_service=coalesce(nullif($4,''), ship_service),
+         tracking_label_url=coalesce($5, tracking_label_url),
+         label_cost=coalesce($6, label_cost), label_provider=coalesce($7, label_provider),
+         label_ref=coalesce($8, label_ref), label_carrier_account=coalesce($9, label_carrier_account),
+         label_test=coalesce($10, label_test)
+       where id=$1`,
+      [orderId, s.tracking, s.carrier, s.service || '', s.label_url, s.cost,
+       s.provider, s.provider_ref, s.carrier_account, s.test === true ? true : null]);
+    await q('update shipments set order_id=$2 where id=$1', [id, orderId]);
+
+    audit(req, 'shipping.label_attached', {
+      entityType: 'order', entityId: orderId,
+      before: { tracking: null },
+      after: { tracking: s.tracking, fromShipment: id, cost: s.cost, carrier: s.carrier },
+      note: `Standalone label ${id} attached to order ${orderId} · ${s.tracking}`,
+    });
+    egBroadcast({ type: 'orders' });
+    return { ok: true, orderId, tracking: s.tracking };
+  });
+
+  /**
+   * Take a tracking number off an order so a correct label can be bought.
+   *
+   * THIS IS NOT A REFUND. The postage stays bought and stays charged — if the label itself
+   * is wrong, void it, which refunds it. This is for the label that is fine but landed on
+   * the wrong order, and the two must not be one button: a void cannot be undone, and an
+   * operator reaching for "this is the wrong order" should not be able to destroy postage
+   * with it.
+   *
+   * The digits are kept in voided_tracking, exactly as the void path does. A buyer holding
+   * the parcel will quote that number back, and an order that has forgotten it entirely
+   * cannot answer them.
+   */
+  app.post('/api/orders/:id/label/detach', { preHandler: requireWarehouse }, async (req, reply) => {
+    const id = String(req.params.id);
+    const o = (await q('select id, tracking, label_scanned_at, marketplace_fulfilled_at from orders where id=$1', [id])
+      .catch(() => ({ rows: [] }))).rows[0];
+    if (!o) { reply.code(404); return { error: 'Order not found' }; }
+    if (!o.tracking) { reply.code(400); return { error: 'This order has no tracking to remove.' }; }
+    const had = o.tracking;
+
+    await q(
+      `update orders set voided_tracking=coalesce(nullif(tracking,''), voided_tracking),
+         tracking=null, carrier=null, tracking_label_url=null, label_ref=null,
+         label_cost=null, label_provider=null, label_carrier_account=null,
+         label_scanned_at=null, marketplace_fulfilled_at=null
+       where id=$1`, [id]);
+    // If it came from a standalone label, give that label its independence back so it can be
+    // matched again — otherwise correcting one mistake makes the parcel unreachable.
+    await q('update shipments set order_id=null where order_id=$1', [id]).catch(() => {});
+
+    audit(req, 'shipping.label_detached', {
+      entityType: 'order', entityId: id,
+      before: { tracking: had },
+      after: { tracking: null },
+      note: `Tracking ${had} removed from order ${id} — postage NOT refunded${o.marketplace_fulfilled_at ? ' · marketplace had already been told' : ''}`,
+    });
+    egBroadcast({ type: 'orders' });
+    return {
+      ok: true, removed: had,
+      // Said out loud rather than assumed: if the buyer already has this number, taking it
+      // off our side does not take it off theirs.
+      marketplaceWasTold: !!o.marketplace_fulfilled_at,
+    };
+  });
+
+  /**
    * Scan history — what was scanned, when, by whom, and by which route.
    *
    * The awaiting-scan queue answers "what's left". This answers "what happened", which is

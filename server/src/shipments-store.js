@@ -50,7 +50,18 @@ export function ensureShipments() {
        note           text,
        created_by     text,
        created_at     timestamptz not null default now()
-     )`).catch((e) => { _ready = null; throw e; });
+     )`)
+    // The order this parcel turned out to belong to. Added separately because the table
+    // predates it and schema.sql only runs on a first init — an existing deployment never
+    // sees a change made up there.
+    //
+    // NULL is the normal state and means what it always meant: a parcel with no order, a
+    // re-ship or a sample. A value means the label was bought loose and later matched to
+    // the order it was really for, and it MOVES rather than copies — the shipment row stays
+    // as the record of what was bought and charged.
+    .then(() => q(`alter table shipments add column if not exists order_id text`))
+    .then(() => q(`create index if not exists shipments_order on shipments (order_id)`))
+    .catch((e) => { _ready = null; throw e; });
   return _ready;
 }
 
