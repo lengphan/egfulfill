@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { MagnifyingGlass, Plus, Package, Sparkle, PenNib, PencilSimple, Trash } from "@phosphor-icons/react"
+import { MagnifyingGlass, Plus, Package, Sparkle, PenNib, PencilSimple, Trash, Warning } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,42 @@ import { clickableProps } from "@/lib/a11y"
 // ── helpers ───────────────────────────────────────────────────
 const priceOf = (p: CatalogProduct) =>
   Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
+
+/**
+ * THE PUBLIC PRICE — mirrors publicShape in server/src/routes/catalog.js: catalogPrice when
+ * it is set, otherwise the product's own `price`. A published product without one is dropped
+ * from /api/public/products silently, with nothing said anywhere.
+ *
+ * NOT priceOf(), and that difference is the whole point. priceOf falls back to basePrice so a
+ * card always shows a number — right for staff, and exactly what hid this for months: the hat
+ * and the hoodie displayed $11.99 and $9.99 on this page while the public route saw no price
+ * at all and skipped both. basePrice is what we PAY; it is never published.
+ */
+const publicPriceOf = (p: CatalogProduct) => {
+  const v = Number(p.catalogPrice ?? p.price ?? NaN)
+  return Number.isFinite(v) && v > 0 ? v : null
+}
+
+/**
+ * Why a product is, or is not, on the marketing site — as one value, so the badge and the
+ * callout can never tell different stories.
+ *
+ * "Not published" and "published but invisible" are DIFFERENT FACTS with different fixes
+ * (tick it in Catalog vs give it a price), and collapsing them into one "not live" is what
+ * makes a person tick the same box a second time and conclude the feature is broken.
+ */
+type PublicState = { live: boolean; label: string; why: string | null }
+const publicStateOf = (p: CatalogProduct): PublicState => {
+  if (!p.inCatalog) return { live: false, label: "Not published", why: null }
+  if (publicPriceOf(p) === null) {
+    return {
+      live: false,
+      label: "No public price",
+      why: "Published, but the site skips it until it has a catalogue price. The price on this card is your cost, which is never shown publicly.",
+    }
+  }
+  return { live: true, label: "On the site", why: null }
+}
 
 import { sizesOf } from "@/lib/variant-resolve"
 
@@ -125,7 +161,15 @@ export function ProductsCatalog() {
     // is whether we still sell the item; `inCatalog` is whether it appears on the marketing
     // catalogue. A product can be Active and unpublished all day.
     const published = list.filter((p) => p.inCatalog).length
-    return { total: list.length, cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size), active, published }
+    // Published is not the same as VISIBLE either. A published product with no catalogue
+    // price is dropped by the public route without a word, so counting `inCatalog` alone
+    // still reports products the site is not showing.
+    const stranded = list.filter((p) => p.inCatalog && publicPriceOf(p) === null).length
+    return {
+      total: list.length,
+      cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size),
+      active, published, live: published - stranded, stranded,
+    }
   }, [products])
 
   // ── loading skeleton ──
@@ -155,13 +199,32 @@ export function ProductsCatalog() {
         {/* The number that answers "why isn't this on our site?". It reads off inCatalog, the
             flag the public route filters on, so this tile and the marketing catalogue can never
             disagree about how many products are live. */}
+        {/* Counts what the site actually SHOWS, not what is ticked. When those differ the
+            tile says so rather than quietly reporting the larger, friendlier number. */}
         <StatCard
-          label="Published"
-          value={String(stats.published)}
-          sub={stats.published === stats.total ? "all on the public site" : `of ${stats.total} on the public site`}
-          tone={stats.published ? "pos" : undefined}
+          label="On the public site"
+          value={String(stats.live)}
+          sub={stats.stranded > 0
+            ? `${stats.stranded} published but held back`
+            : stats.live === stats.total ? "all products" : `of ${stats.total} products`}
+          tone={stats.stranded > 0 ? "neg" : stats.live ? "pos" : undefined}
         />
       </StatGrid>
+
+      {/* The explanation, where the problem is — not in a tooltip on one card. Published but
+          priceless is invisible AND silent, which is how the same box gets ticked twice. */}
+      {isStaff && stats.stranded > 0 && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />
+          <div>
+            <strong>{stats.stranded} published product{stats.stranded === 1 ? " is" : "s are"} not showing on the site.</strong>{" "}
+            {stats.stranded === 1 ? "It has" : "They have"} no catalogue price, and the public
+            catalogue skips anything without one. The price on the card is your cost — that
+            number is never published. Set a catalogue price in{" "}
+            <button className="underline underline-offset-2 hover:no-underline" onClick={() => router.push("/published-catalog")}>Catalog</button>.
+          </div>
+        </div>
+      )}
 
       {/* toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -222,6 +285,7 @@ export function ProductsCatalog() {
             const colors = colorsOf(p)
             const sizes = sizesOf(p)
             const status = p.status ?? "Active"
+            const pub = publicStateOf(p)
             return (
               <motion.div
                 key={String(p.id ?? p.sku ?? i)}
@@ -268,18 +332,39 @@ export function ProductsCatalog() {
                       </span>
                     </div>
                   )}
-                  <span
-                    className={
-                      "absolute left-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-2xs font-medium backdrop-blur " +
-                      (status === "Active"
-                        ? "bg-emerald-500/15 text-emerald-700"
-                        : status === "Draft"
-                          ? "bg-muted/70 text-muted-foreground"
-                          : "bg-amber-500/15 text-amber-700")
-                    }
-                  >
-                    {status}
-                  </span>
+                  {/* Two facts, stacked, because they are genuinely two: `status` is whether we
+                      still sell it, `pub` is whether the marketing site shows it. Reading the
+                      green "Active" badge as "it is on our site" is the misreading this whole
+                      screen kept producing. Staff only — a seller does not control publishing. */}
+                  <div className="absolute left-3 top-3 flex flex-col items-start gap-1">
+                    <span
+                      className={
+                        "inline-flex items-center rounded-full px-2.5 py-1 text-2xs font-medium backdrop-blur " +
+                        (status === "Active"
+                          ? "bg-emerald-500/15 text-emerald-700"
+                          : status === "Draft"
+                            ? "bg-muted/70 text-muted-foreground"
+                            : "bg-amber-500/15 text-amber-700")
+                      }
+                    >
+                      {status}
+                    </span>
+                    {isStaff && (
+                      <span
+                        title={pub.why ?? undefined}
+                        className={
+                          "inline-flex items-center rounded-full px-2.5 py-1 text-2xs font-medium backdrop-blur " +
+                          (pub.live
+                            ? "bg-primary/15 text-primary"
+                            : pub.why
+                              ? "bg-amber-500/20 text-amber-800"
+                              : "bg-background/70 text-muted-foreground")
+                        }
+                      >
+                        {pub.label}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* body */}

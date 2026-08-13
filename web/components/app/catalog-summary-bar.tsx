@@ -1,12 +1,16 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Storefront, Warning, CircleNotch } from "@phosphor-icons/react"
+import { Storefront, Warning, CircleNotch, Globe } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getCatalogSummary, clearCatalog } from "@/lib/api"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
-type Summary = { products: number; styles: number; total: number; unpriced: number }
+type Summary = {
+  products: number; styles: number; total: number; unpriced: number
+  publicVisible?: number
+  publicHidden?: { unpriced: number; styles: number }
+}
 
 /**
  * What is in the catalogue right now, on screen at all times.
@@ -60,6 +64,24 @@ export function CatalogSummaryBar({ refresh }: { refresh?: number }) {
       {s.unpriced > 0 && (
         <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
           <Warning size={12} weight="fill" /> {s.unpriced} with no price — they print blank
+        </span>
+      )}
+      {/* THE NUMBER ON THE ACTUAL WEBSITE, said out loud.
+          "4 in the catalogue" beside a site showing 1 was two true numbers for two different
+          things: this bar counts the LOOKBOOK (products + supplier styles), and the public
+          route reads catalog_products alone. Both reasons the totals part are named, because
+          "supplier styles don't go to the site" and "this one has no price" need different
+          fixes from whoever is reading. */}
+      {typeof s.publicVisible === "number" && s.publicVisible !== s.total && (
+        <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+          <Globe size={12} weight="duotone" />
+          {s.publicVisible} on the public site
+          {(() => {
+            const why: string[] = []
+            if (s.publicHidden?.styles) why.push(`${s.publicHidden.styles} supplier style${s.publicHidden.styles === 1 ? "" : "s"} are lookbook-only`)
+            if (s.publicHidden?.unpriced) why.push(`${s.publicHidden.unpriced} need a price`)
+            return why.length ? ` — ${why.join(", ")}` : null
+          })()}
         </span>
       )}
       {s.total > 0 && (

@@ -697,8 +697,13 @@ export function getCatalogExport(id: string) {
 /** What is currently IN the catalogue, from both sources. Read on every catalogue screen
  *  so the state is never something you have to open a preview to discover. */
 export function getCatalogSummary() {
-  return api<{ products: number; styles: number; total: number; unpriced: number }>(
-    `/api/catalog/summary`)
+  return api<{
+    products: number; styles: number; total: number; unpriced: number
+    /** How many the MARKETING SITE actually shows. Not `total`: that counts the lookbook,
+     *  which includes supplier styles the public route never reads. See the summary route. */
+    publicVisible?: number
+    publicHidden?: { unpriced: number; styles: number }
+  }>(`/api/catalog/summary`)
 }
 export function clearCatalog() {
   return api<{ ok?: boolean; cleared?: number; error?: string }>(`/api/catalog/summary`, { method: "DELETE" })

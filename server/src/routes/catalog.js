@@ -145,6 +145,24 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return SUPPLIER_NAMES.has(t.toLowerCase()) ? '' : t;
   };
   /**
+   * A SUPPLIER'S NAME INSIDE A PRODUCT TITLE — the same breach as a field headed "Supplier".
+   *
+   * notSupplier() only catches a value that IS a supplier name, which is exactly right for
+   * `brand` and useless for a title. "OTTO CAP® Digital Camouflage 6 Panel Low Profile
+   * Baseball Cap" is a real row here: the name published verbatim, and slugify() then printed
+   * it a SECOND time in the URL — and CLAUDE.md §2.9 covers URLs explicitly, not just fields.
+   *
+   * The token is stripped rather than the product dropped. The garment is perfectly sellable;
+   * it is only its title that names who makes it, and refusing to publish would quietly hide
+   * a product for a reason no one on the staff side could see.
+   *
+   * Bare "ss" is deliberately NOT stripped even though it is in SUPPLIER_NAMES: it is an
+   * ordinary abbreviation in garment titles (short sleeve), and mangling honest names is a
+   * poor trade for a hole that "s&s" and "ssactivewear" already close.
+   */
+  const NAME_SUPPLIER_RE = /\b(?:s\s*&\s*s(?:\s+activewear)?|ssactivewear|sanmar|otto\s*cap|otto)\b[®™\s]*/gi;
+  const publicName = (v) => String(v ?? '').replace(NAME_SUPPLIER_RE, ' ').replace(/\s+/g, ' ').trim();
+  /**
    * Supplier DOMAINS. CLAUDE.md §2.8 covers URLs and redirects, not just fields — an address
    * bar reading `cdn.ssactivewear.com` names them exactly as plainly as a column headed
    * "Supplier" does. Anything matching here is re-dispatched through /api/ss/img internally
@@ -225,7 +243,9 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       : (typeof d.method === 'string' && d.method.trim() ? [d.method] : []);
     return {
       slug,
-      name: String(d.name),
+      // Stripped, not raw — see publicName. The slug is built from the same stripped value,
+      // so the title and the URL can never disagree about what this product is called.
+      name: publicName(d.name),
       image: publicImage(d) ? `/api/public/products/${slug}/img` : null,
       category: typeof d.category === 'string' ? d.category : null,
       // Real prose from the supplier feed, already synced and never published. Capped and
@@ -264,7 +284,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return r.rows
       .filter((row) => row.data && row.data.name)
       .map((row) => {
-        const base = slugify(row.data.name);
+        const base = slugify(publicName(row.data.name));
         if (!base) return null;
         const n = (seen.get(base) ?? 0) + 1;
         seen.set(base, n);
@@ -288,7 +308,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const seen = new Map();
     for (const row of r.rows) {
       if (!row.data || !row.data.name) continue;
-      const base = slugify(row.data.name);
+      const base = slugify(publicName(row.data.name));
       if (!base) continue;
       const n = (seen.get(base) ?? 0) + 1;
       seen.set(base, n);
@@ -672,9 +692,25 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * `unpriced` matters as much as the count: a published style with no price prints a blank
    * where a number should be, and that is the kind of thing you notice after sending it.
    */
+  /**
+   * The PUBLIC price rule, written as SQL — the same one publicShape applies: catalog_price
+   * when it is set, otherwise the price carried on the row's own data.
+   *
+   * It lives beside the summary because a count computed by a DIFFERENT rule from the route
+   * it claims to describe is worse than no count at all. `catalog_price is null` was that
+   * count: it reported the one published product as "no price — prints blank" while the
+   * public page was quoting $41.20 from data->>'price' perfectly well.
+   *
+   * The regex guard is not decoration. data->>'price' is free-form json, so a non-numeric
+   * value makes the cast throw — and this query is the whole summary.
+   */
+  const PUBLIC_PRICE_SQL = `coalesce(catalog_price,
+    case when data->>'price' ~ '^[0-9]+(\\.[0-9]+)?$' then (data->>'price')::numeric end)`;
+
   app.get('/api/catalog/summary', { preHandler: requireStaff }, async () => {
     const prod = await q(
-      `select count(*)::int as n, count(*) filter (where catalog_price is null)::int as unpriced
+      `select count(*)::int as n,
+              count(*) filter (where ${PUBLIC_PRICE_SQL} is null or ${PUBLIC_PRICE_SQL} <= 0)::int as unpriced
          from catalog_products where in_catalog = true`
     ).then((r) => r.rows[0] || { n: 0, unpriced: 0 }).catch(() => ({ n: 0, unpriced: 0 }));
     const picks = await q(
@@ -684,6 +720,21 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return {
       products: prod.n, styles: picks.n, total: prod.n + picks.n,
       unpriced: (prod.unpriced || 0) + (picks.unpriced || 0),
+      /**
+       * WHAT THE MARKETING SITE CAN ACTUALLY SHOW — which is not `total`, and saying so is
+       * the entire point of this field.
+       *
+       * `total` counts the LOOKBOOK: products plus supplier styles, which is the right number
+       * for a trade document you hand a buyer. The public catalogue is a different surface —
+       * publicProducts() reads catalog_products alone and never touches catalog_picks — so a
+       * bar reading "4 in the catalogue" beside a site showing 1 was not a bug in either one.
+       * It was two true numbers for two different things, printed as if they were one.
+       *
+       * Both reasons a published product stays invisible are named, because "it is not there"
+       * and "it is there but has no price" need different fixes from whoever is looking.
+       */
+      publicVisible: Math.max(0, (prod.n || 0) - (prod.unpriced || 0)),
+      publicHidden: { unpriced: prod.unpriced || 0, styles: picks.n || 0 },
     };
   });
 
