@@ -113,7 +113,11 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
    * keep the corner swap they already had.
    */
   const showBoth = canSwap && !listingFirst && size >= 56
-  const insetSize = Math.max(22, Math.round(size * 0.38))
+  /** Which card is in front. The print leads, because it is what the floor makes. */
+  const [listingFront, setListingFront] = useState(false)
+  /** How far the second card sits along — 0.62 leaves a good third of the back card
+   *  visible, which is enough to read it AND enough to click without aiming. */
+  const OVERLAP = 0.62
 
   const open = () => {
     if (onEdit) { onEdit(); return }
@@ -146,39 +150,57 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
       <div
         {...dropProps}
         className={"group/avatar relative shrink-0 " + (over ? "rounded-md ring-2 ring-primary ring-offset-1 " : "") + (className ?? "")}
-        style={{ width: size, height: size }}
+        // Wide enough for both cards at their overlap. Only when both are shown, so every
+        // other caller's layout is exactly as it was.
+        style={{ width: showBoth ? Math.round(size * (1 + OVERLAP)) : size, height: size }}
       >
         <button
           type="button"
-          onClick={open}
-          title={onEdit ? "Edit the design" : "View larger"}
-          className={"eg-tap size-full overflow-hidden rounded-md bg-muted transition-colors " + (bare ? "" : "border border-border hover:border-foreground/25")}
+          onClick={showBoth && listingFront ? () => setListingFront(false) : open}
+          title={showBoth && listingFront ? "Bring the design forward" : (onEdit ? "Edit the design" : "View larger")}
+          className={"eg-tap overflow-hidden rounded-md bg-muted transition-colors " + (bare ? "" : "border border-border hover:border-foreground/25")
+            + (showBoth ? (listingFront ? " absolute left-0 top-1/2 -translate-y-1/2 z-0" : " absolute left-0 top-1/2 -translate-y-1/2 z-20 border-2 border-background shadow-md") : " size-full")}
+          style={showBoth ? { width: size, height: size } : undefined}
         >
           <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} />
-          {/* THE BUYER'S LISTING PHOTO, offset off the bottom-left corner so it reads as a
-              second card rather than a badge on the first.
-
-              pointer-events-none is the whole reason this is safe: it cannot intercept the
-              click, so the button underneath stays one uninterrupted target and opening the
-              designer is exactly as easy as it was with nothing there. Bottom-LEFT, because
-              the hover affordance sits centre and the drop ring hugs the edges — the corner
-              furthest from anything else that wants attention. */}
-          {showBoth && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -bottom-1.5 -left-1.5 overflow-hidden rounded-md border-2 border-background bg-muted shadow-md"
-              style={{ width: insetSize, height: insetSize }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={listing} alt="" className="size-full object-cover" />
-            </span>
-          )}
           {/* Affordance only where there's something to do — and only on hover, so the
               row stays quiet until you're actually pointing at it. */}
           <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-md bg-black/45 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 sm:flex">
             {onEdit ? <PencilSimple size={14} weight="bold" /> : <MagnifyingGlassPlus size={14} weight="bold" />}
           </span>
         </button>
+
+        {/**
+          * THE LISTING, AS A SECOND CARD BESIDE THE PRINT.
+          *
+          * Overlapping just enough to read as a pair rather than two unrelated tiles, and
+          * the interaction follows the overlap: the card BEHIND is a swap (click it and it
+          * comes forward), the card in FRONT is the real action (the print opens the design
+          * step, the listing opens at full size).
+          *
+          * That is one rule — "click the back one to bring it forward, click the front one
+          * to open it" — and it means neither card can steal the other's click, which was
+          * the whole problem with a swap toggle and then with a click-through inset.
+          */}
+        {showBoth && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (listingFront) { setShowListing(true); setPreview(true) }
+              else setListingFront(true)
+            }}
+            title={listingFront ? "View the buyer's listing photo" : "Bring the listing photo forward"}
+            className={
+              "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border-2 border-background bg-muted shadow-md transition-transform hover:scale-[1.03] " +
+              (listingFront ? "z-20" : "z-0")
+            }
+            style={{ left: Math.round(size * OVERLAP), width: size, height: size }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={listing} alt="Buyer's listing photo" className="size-full object-cover" />
+          </button>
+        )}
 
         {/* No corner swap on a listing-first thumb: the row shows the listing, and the
             design lives one click away in the detail view rather than behind a 16px
