@@ -24,7 +24,7 @@ import { q, softQ } from '../db.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 import { refundOrder } from './order_refunds.js';
-import { aggregatorRefundLabel, aggregatorFetchCost, aggregatorRefundStatus, refreshTrackingFor } from './shipping.js';
+import { aggregatorRefundLabel, aggregatorFetchCost, aggregatorRefundStatus, aggregatorFindByTracking, refreshTrackingFor } from './shipping.js';
 import { ensureShipments, isShipmentId } from '../shipments-store.js';
 
 /**
@@ -267,6 +267,17 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   // ACCEPTING a refund is not receiving one: Shippo answers QUEUED/PENDING and settles up to
   // 14 days later, and it can still end in ERROR ("the shipment was found to be used").
   // Without these there was nothing to re-read and nothing on screen but a flat "Refunded".
+  // EVERYTHING A DETACH TAKES OFF, kept so it can be put back.
+  //
+  // Unlinking used to null the provider reference, the PDF url and the cost along with the
+  // tracking — which reads as "cancelled" and, worse, is unrecoverable: the reference is
+  // the only handle the postage can ever be refunded by, so a mis-click destroyed a live
+  // label AND the ability to get the money back for it. The number itself survived in
+  // voided_tracking and nothing else did.
+  //
+  // Now the whole label is snapshotted here first. It is a record, not state: nothing reads
+  // it except the restore route, and it is cleared the moment the label goes back on.
+  q('alter table orders add column if not exists label_detached jsonb').catch(() => {});
   q('alter table orders add column if not exists refund_ref text').catch(() => {});
   q("alter table orders add column if not exists refund_status text").catch(() => {});
   q('alter table orders add column if not exists dispatch_pushed_at timestamptz').catch(() => {});
@@ -408,6 +419,16 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
               o.factory_status, o.delivery_status, o.delivery_detail, o.delivery_checked_at,
               o.label_scanned_at, o.scanned_via, o.created_at, o.ship_service, o.label_test,
               o.voided_tracking, o.refund_status,
+              -- Was the tracking UNLINKED rather than refunded? Two rows look identical
+              -- otherwise — struck-through number, no PDF — and only one of them can be
+              -- undone. Which WAY back is sent too, because they are not equally certain:
+              -- 'snapshot' restores exactly what was there, 'carrier' has to go and ask and
+              -- may come back empty. Never the snapshot itself; the window needs to know a
+              -- way exists, not what is in it.
+              case when o.label_detached is not null then 'snapshot'
+                   when coalesce(o.tracking,'') = '' and coalesce(o.voided_tracking,'') <> ''
+                        and o.refund_status is null then 'carrier'
+              end as restorable,
               -- price from the order column if stored, else the label-cost ledger row (so
               -- labels bought before the column existed still show what they cost).
               coalesce(o.label_cost,
@@ -505,6 +526,9 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
           customer: x.to_name || null, state: x.to_state || null,
           tracking: x.tracking, carrier: x.carrier || null,
           voidedTracking: x.voided_tracking || null,
+          // A loose label was never ON an order, so there is nothing to put it back onto —
+          // its way home is Attach, offered in the window already.
+          restorable: null,
           refundStatus: x.refund_status || null,
           labelUrl: x.label_url || null,
           method: x.service || null,
@@ -531,6 +555,8 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         // through — the parcel it named is gone, but the digits are still the answer to
         // "what was that number", which is what a buyer holding it will ask.
         voidedTracking: x.voided_tracking || null,
+        // 'snapshot' | 'carrier' | null — see the CASE above.
+        restorable: x.restorable || null,
         labelUrl: x.tracking_label_url || null,
         method: x.ship_service || null,
         price: x.label_cost != null ? Number(x.label_cost) : null,
@@ -882,21 +908,44 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
    * The digits are kept in voided_tracking, exactly as the void path does. A buyer holding
    * the parcel will quote that number back, and an order that has forgotten it entirely
    * cannot answer them.
+   *
+   * AND IT IS REVERSIBLE. The digits alone were not enough to undo it: the provider
+   * reference, the PDF and the cost were nulled with the tracking, so a mis-click left a
+   * label that could not be put back and could not even be refunded — the reference is the
+   * only handle a refund has. The row on screen showed a struck-through number and "no
+   * label bought", which is indistinguishable from a cancellation. So the whole label is
+   * snapshotted into label_detached before it is cleared, and /label/restore puts it back.
    */
   app.post('/api/orders/:id/label/detach', { preHandler: requireWarehouse }, async (req, reply) => {
     const id = String(req.params.id);
-    const o = (await q('select id, tracking, label_scanned_at, marketplace_fulfilled_at from orders where id=$1', [id])
+    const o = (await q(`select id, tracking, carrier, ship_service, tracking_label_url, label_ref,
+                               label_cost, label_provider, label_carrier_account, label_test,
+                               label_scanned_at, scanned_via, scanned_by, marketplace_fulfilled_at
+                          from orders where id=$1`, [id])
       .catch(() => ({ rows: [] }))).rows[0];
     if (!o) { reply.code(404); return { error: 'Order not found' }; }
     if (!o.tracking) { reply.code(400); return { error: 'This order has no tracking to remove.' }; }
     const had = o.tracking;
+    // Written as its own object rather than `o` so a later column added to the SELECT for
+    // some other reason can't silently start being restored.
+    const snapshot = {
+      tracking: o.tracking, carrier: o.carrier, shipService: o.ship_service,
+      labelUrl: o.tracking_label_url, labelRef: o.label_ref,
+      labelCost: o.label_cost == null ? null : Number(o.label_cost),
+      labelProvider: o.label_provider, labelCarrierAccount: o.label_carrier_account,
+      labelTest: o.label_test, labelScannedAt: o.label_scanned_at, scannedVia: o.scanned_via,
+      scannedBy: o.scanned_by, marketplaceFulfilledAt: o.marketplace_fulfilled_at,
+      detachedAt: new Date().toISOString(),
+      detachedBy: (req.user && (req.user.email || req.user.id)) || null,
+    };
 
     await q(
       `update orders set voided_tracking=coalesce(nullif(tracking,''), voided_tracking),
+         label_detached=$2::jsonb,
          tracking=null, carrier=null, tracking_label_url=null, label_ref=null,
          label_cost=null, label_provider=null, label_carrier_account=null,
          label_scanned_at=null, marketplace_fulfilled_at=null
-       where id=$1`, [id]);
+       where id=$1`, [id, JSON.stringify(snapshot)]);
     // If it came from a standalone label, give that label its independence back so it can be
     // matched again — otherwise correcting one mistake makes the parcel unreachable.
     await q('update shipments set order_id=null where order_id=$1', [id]).catch(() => {});
@@ -914,6 +963,99 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       // off our side does not take it off theirs.
       marketplaceWasTold: !!o.marketplace_fulfilled_at,
     };
+  });
+
+  /**
+   * PUT IT BACK — the undo for the route above.
+   *
+   * "This is the wrong order" is a judgement made in a second, and it is wrong about as
+   * often as it is right. Nothing about a detach needs to be permanent: the postage was
+   * never refunded, the parcel still exists and the label file is still at the provider.
+   * The only thing that made it permanent was us throwing the reference away.
+   *
+   * Two ways back, in order of trust:
+   *   1. label_detached — exactly what was on the order, restored verbatim.
+   *   2. the provider, asked by tracking number — for labels detached BEFORE the snapshot
+   *      existed, where voided_tracking is all that survived. Slower and it can come back
+   *      empty, but it recovers the reference, the PDF and the real cost from the source.
+   *
+   * Refuses when the order has been labelled again: a second live number on one order means
+   * a parcel is unaccounted for, which is the same rule the attach route enforces.
+   */
+  app.post('/api/orders/:id/label/restore', { preHandler: requireWarehouse }, async (req, reply) => {
+    const id = String(req.params.id);
+    const o = (await q('select id, tracking, voided_tracking, label_detached, label_test from orders where id=$1', [id])
+      .catch(() => ({ rows: [] }))).rows[0];
+    if (!o) { reply.code(404); return { error: 'Order not found' }; }
+    if (o.tracking) {
+      reply.code(409);
+      return { error: `Order ${id} already has tracking ${o.tracking}. Remove that first if it is the wrong one.` };
+    }
+    const snap = o.label_detached && typeof o.label_detached === 'object' ? o.label_detached : null;
+    let label = null;
+    let via = 'snapshot';
+    if (snap && snap.tracking) {
+      label = {
+        tracking: snap.tracking, carrier: snap.carrier || null, service: snap.shipService || null,
+        labelUrl: snap.labelUrl || null, ref: snap.labelRef || null,
+        cost: snap.labelCost == null ? null : Number(snap.labelCost),
+        provider: snap.labelProvider || null, carrierAccount: snap.labelCarrierAccount || null,
+        test: snap.labelTest === true ? true : null,
+        scannedAt: snap.labelScannedAt || null, scannedVia: snap.scannedVia || null,
+        fulfilledAt: snap.marketplaceFulfilledAt || null,
+      };
+    } else if (o.voided_tracking) {
+      // No snapshot: this was detached by the older code, which kept nothing but the digits.
+      // Ask the provider what that number was — it still holds the transaction.
+      const found = await aggregatorFindByTracking('shippo', o.voided_tracking).catch(() => null);
+      if (!found) {
+        reply.code(400);
+        return { error: `Nothing to put back. ${o.voided_tracking} could not be found at the carrier, so the label has to be bought again.` };
+      }
+      via = 'provider';
+      label = {
+        tracking: found.tracking || o.voided_tracking, carrier: found.carrier || null,
+        service: found.service || null, labelUrl: found.labelUrl || null, ref: found.providerId || null,
+        cost: found.cost == null ? null : Number(found.cost),
+        provider: 'shippo', carrierAccount: found.carrierAccount || null,
+        test: found.test === true ? true : null,
+        // A scan and a marketplace push are claims about what we DID, and the provider has
+        // no opinion on either. Left off rather than guessed.
+        scannedAt: null, scannedVia: null, fulfilledAt: null,
+      };
+    } else {
+      reply.code(400);
+      return { error: 'This order has no removed tracking to put back.' };
+    }
+
+    await q(
+      `update orders set tracking=$2, carrier=$3, ship_service=coalesce(nullif($4,''), ship_service),
+         tracking_label_url=$5, label_ref=$6, label_cost=$7, label_provider=$8,
+         label_carrier_account=$9, label_test=coalesce($10, label_test),
+         label_scanned_at=$11, scanned_via=coalesce($12, scanned_via),
+         marketplace_fulfilled_at=$13,
+         -- It is not a dead number any more, so it must stop being displayed as one. Only
+         -- the digits being restored are cleared: an EARLIER voided label on the same order
+         -- is a different fact and stays.
+         voided_tracking = case when voided_tracking = $2 then null else voided_tracking end,
+         label_detached=null
+       where id=$1`,
+      [id, label.tracking, label.carrier, label.service || '', label.labelUrl, label.ref,
+       label.cost, label.provider, label.carrierAccount, label.test, label.scannedAt,
+       label.scannedVia, label.fulfilledAt]);
+
+    audit(req, 'shipping.label_restored', {
+      entityType: 'order', entityId: id,
+      before: { tracking: null },
+      after: { tracking: label.tracking, cost: label.cost, via },
+      note: `Tracking ${label.tracking} put back on order ${id} (${via === 'provider' ? 'recovered from the carrier' : 'from the detach snapshot'})`,
+    });
+    // The order asserts a tracking number again, so the marketplace can be told — and must
+    // be, if the detach cleared a stamp that had already gone out. Same once-only guard and
+    // the same test-label skip as every other push path.
+    fulfillMarketplace(id, { test: label.test === true }).catch(() => {});
+    egBroadcast({ type: 'orders' });
+    return { ok: true, tracking: label.tracking, via, cost: label.cost };
   });
 
   /**

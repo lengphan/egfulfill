@@ -4,7 +4,7 @@ import { ArrowSquareOut, CircleNotch, X, Package, DownloadSimple, FilePdf, Print
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useEffect, useRef, useState } from "react"
-import { fetchShipmentLabel, detachOrderLabel, getShipmentCandidates, attachShipmentToOrder, type ShipmentRow, type ShipmentCandidate } from "@/lib/api"
+import { fetchShipmentLabel, detachOrderLabel, restoreOrderLabel, getShipmentCandidates, attachShipmentToOrder, type ShipmentRow, type ShipmentCandidate } from "@/lib/api"
 
 /**
  * ONE PARCEL, IN FULL — so the table doesn't have to be.
@@ -120,13 +120,17 @@ export function ShipmentDetailDialog({
   const [detaching, setDetaching] = useState(false)
   const [detachErr, setDetachErr] = useState<string | null>(null)
   /**
-   * WRONG ORDER is not the same as WRONG LABEL, and they must not share a button.
+   * ASK FIRST. This was a one-click action on a text link sitting between "Refund postage"
+   * and "Carrier's copy", and it was pressed to find out what it did — which is a reasonable
+   * thing to do to a link labelled "Wrong order?" and a terrible thing for it to answer by
+   * removing a live tracking number from a real parcel.
    *
-   * This unlinks: the order gives the tracking back and can be labelled again, while the
-   * postage stays bought and stays charged. Refund is the other one, it goes to the carrier,
-   * and it cannot be undone. An operator reaching for "I put this on the wrong order" must
-   * not be able to destroy postage with the same click.
+   * The confirm is not a "are you sure" — that adds a click and no information. It says what
+   * happens, what does NOT happen (the postage stays bought), and names the other two things
+   * the presser might actually have wanted, because "wrong order" is one of three different
+   * problems and only one of them is fixed here.
    */
+  const [confirmDetach, setConfirmDetach] = useState(false)
   const detach = async () => {
     if (!id) return
     setDetaching(true); setDetachErr(null)
@@ -137,7 +141,25 @@ export function ShipmentDetailDialog({
       onChanged?.()
     } catch (e) {
       setDetachErr(e instanceof Error ? e.message : "Couldn't remove the tracking from this order.")
-    } finally { setDetaching(false) }
+    } finally { setDetaching(false); setConfirmDetach(false) }
+  }
+  /**
+   * THE WAY BACK. Unlinking is reversible — the postage was never refunded and the label
+   * still exists at the carrier — so an order whose tracking was taken off offers to have it
+   * put back, rather than reading like a cancellation nobody can undo.
+   */
+  const [restoring, setRestoring] = useState(false)
+  const restore = async () => {
+    if (!id) return
+    setRestoring(true); setDetachErr(null)
+    try {
+      const r = await restoreOrderLabel(String(id))
+      if (r.error) throw new Error(r.error)
+      onOpenChange(false)
+      onChanged?.()
+    } catch (e) {
+      setDetachErr(e instanceof Error ? e.message : "Couldn't put the tracking back on this order.")
+    } finally { setRestoring(false) }
   }
   const [labelSrc, setLabelSrc] = useState<string | null>(null)
   const [labelErr, setLabelErr] = useState<string | null>(null)
@@ -241,12 +263,17 @@ export function ShipmentDetailDialog({
               </div>
             </div>
           ) : (
-            // Says WHICH: no label was ever bought, or it was refunded and the file with it.
+            // Says WHICH of THREE, because they are not the same thing and the panel used to
+            // say the first one to all of them. A parcel whose tracking was merely unlinked
+            // read as "no label bought" — indistinguishable from a cancellation, when in fact
+            // the postage is still bought, still paid for, and one click from coming back.
             // A blank panel here reads as a load that failed.
             <div className="flex aspect-[4/6] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-4 text-center">
               <FilePdf size={22} className="text-muted-foreground/60" />
               <span className="text-xs text-muted-foreground">
-                {refunded ? "The label was refunded — its file is gone with it." : "No label bought for this parcel."}
+                {refunded ? "The label was refunded — its file is gone with it."
+                  : s.restorable ? "The tracking was taken off this order. The postage is still bought and nothing was refunded."
+                    : "No label bought for this parcel."}
               </span>
             </div>
           )}
@@ -382,6 +409,57 @@ export function ShipmentDetailDialog({
               Grouping them left and the actions right also ends the old fault where the
               window had two action areas facing each other with no single answer to "what
               can I do here". */}
+          {/* PUT IT BACK — offered wherever an order sits with its tracking removed, which
+              is the state a mis-click leaves behind. Stated as what it costs (nothing) and
+              what it does, because the reason someone is looking at this row is that they
+              are not sure what the last click did. */}
+          {!isLoose && !s.tracking && s.restorable && (
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="text-xs text-muted-foreground">
+                {s.restorable === "snapshot"
+                  ? <>This order&apos;s tracking was <strong className="font-medium text-foreground">unlinked, not refunded</strong>. The label is kept in full — putting it back restores the number, the PDF and the postage exactly as they were.</>
+                  : <>This order&apos;s tracking was <strong className="font-medium text-foreground">unlinked, not refunded</strong>, before the label was kept — so it has to be looked up at the carrier by its number. That can come back empty, in which case nothing changes and the label has to be bought again.</>}
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => void restore()} disabled={restoring}>
+                  {restoring ? <CircleNotch size={12} className="animate-spin" /> : null}
+                  {s.restorable === "snapshot" ? "Put the tracking back" : "Look it up and put it back"}
+                </Button>
+                {s.voidedTracking && <span className="font-mono text-2xs text-muted-foreground">{s.voidedTracking}</span>}
+              </div>
+            </div>
+          )}
+
+          {/* THE CONFIRM, in place of the click that used to be the whole action. It sits
+              above the buttons rather than in a second dialog: what it is asking about is
+              the tracking number three rows up, and a stacked modal would cover it. */}
+          {confirmDetach && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-500/40 dark:bg-amber-500/10">
+              <p className="text-sm font-medium">Take {s.tracking} off this order?</p>
+              <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
+                <li>· The order goes back to unlabelled and a correct label can be bought.</li>
+                <li>· The postage stays bought and stays charged — <strong className="font-medium text-foreground">this is not a refund</strong>.</li>
+                <li>· The parcel keeps moving. If the buyer already has this number, it still works for them.</li>
+                <li>· It can be undone from this window afterwards.</li>
+              </ul>
+              {/* The two things the presser may have actually wanted, named rather than
+                  left to be discovered — "wrong order" is three different problems. */}
+              <p className="mt-2 text-xs text-muted-foreground">
+                If the <em>label</em> is wrong rather than the order, Refund postage is the one that gets the money back.
+                To find the order this parcel really belongs to, unlink it here first — it is then offered its matching orders.
+              </p>
+              <div className="mt-2.5 flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => void detach()} disabled={detaching}>
+                  {detaching ? <CircleNotch size={12} className="animate-spin" /> : null}
+                  Yes, unlink it
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmDetach(false)} disabled={detaching}>
+                  Keep it
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-3">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               {/* Only while it can still work: a second refund can only ever collect the
@@ -405,12 +483,12 @@ export function ShipmentDetailDialog({
                   other destroys the postage, and the title says so before the click. */}
               {!isLoose && !!s.tracking && (
                 <button
-                  onClick={() => void detach()}
-                  disabled={detaching}
-                  title="Take this tracking off the order so a correct label can be bought. The postage is NOT refunded."
+                  // Opens the confirm above; it does NOT act. See the note on confirmDetach.
+                  onClick={() => setConfirmDetach(true)}
+                  disabled={detaching || confirmDetach}
+                  title="Take this tracking off the order so a correct label can be bought. The postage is NOT refunded, and this can be undone."
                   className="inline-flex items-center gap-1.5 text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
                 >
-                  {detaching ? <CircleNotch size={12} className="animate-spin" /> : null}
                   Wrong order?
                 </button>
               )}

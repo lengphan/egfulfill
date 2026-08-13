@@ -2899,6 +2899,15 @@ export function detachOrderLabel(orderId: string) {
   return api<{ ok?: boolean; removed?: string; marketplaceWasTold?: boolean; error?: string }>(
     `/api/orders/${encodeURIComponent(orderId)}/label/detach`, { method: "POST" })
 }
+/** UNDO the above. The postage was never refunded and the label still exists at the carrier,
+ *  so unlinking is reversible: the whole label is restored — tracking, PDF, cost and the
+ *  provider reference a refund needs. `via` says where it came from ("snapshot" = exactly
+ *  what was removed, "provider" = recovered from the carrier by tracking number). Refuses
+ *  with 409 if the order has been given a different label in the meantime. */
+export function restoreOrderLabel(orderId: string) {
+  return api<{ ok?: boolean; tracking?: string; via?: string; cost?: number | null; error?: string }>(
+    `/api/orders/${encodeURIComponent(orderId)}/label/restore`, { method: "POST" })
+}
 
 export async function fetchShipmentLabel(id: string): Promise<Blob> {
   const token = getToken()
@@ -3795,6 +3804,12 @@ export type ShipmentRow = {
   /** The number this label carried before it was refunded. `tracking` is cleared on a
    *  refund because it is what asserts the order shipped; this keeps the digits. */
   voidedTracking: string | null
+  /** Can the removed tracking be put BACK on this order, and how sure is it?
+   *  `"snapshot"` — unlinked since the label is kept in full; restores verbatim.
+   *  `"carrier"`  — unlinked by the older code, which kept only the digits; the label has
+   *                 to be looked up at the carrier and may not be found.
+   *  `null`       — nothing to put back (live, refunded, or never labelled). */
+  restorable: "snapshot" | "carrier" | null
   /** THE PROVIDER'S own word — QUEUED / PENDING / SUCCESS / ERROR. Accepting a refund is
    *  not receiving one: Shippo settles up to 14 days later and can still refuse, so a flat
    *  "Refunded" the moment the request lands overstates it. */

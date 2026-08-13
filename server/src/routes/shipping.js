@@ -549,6 +549,53 @@ export async function aggregatorFetchCost(provider, providerId) {
   return null;
 }
 
+/**
+ * FIND A BOUGHT LABEL BY THE ONLY THING LEFT OF IT — its tracking number.
+ *
+ * For a label whose provider reference we lost: the number was recorded, the transaction
+ * that produced it still exists at Shippo, and everything else (the PDF, the reference a
+ * refund needs, what it actually cost) can be read back off it.
+ *
+ * Shippo's /transactions/ has no tracking_number filter, so this pages newest-first and
+ * matches. BOUNDED at 5 pages / 500 transactions on purpose — a lost label is days old at
+ * most, and an unbounded walk of an account's whole history to answer one question is how
+ * a recovery turns into an outage. Not found is a normal answer here, not a failure.
+ */
+export async function aggregatorFindByTracking(provider, tracking, maxPages = 5) {
+  const want = String(tracking || '').trim();
+  if (!want) return null;
+  if (provider && provider !== 'shippo') return null;
+  if (!shToken()) return null;
+  try {
+    for (let page = 1; page <= maxPages; page++) {
+      const r = await fetch(`${SH_BASE}/transactions/?results=100&page=${page}`, { headers: { Authorization: shAuth() } });
+      if (!r.ok) return null;
+      const d = await r.json().catch(() => ({}));
+      const rows = Array.isArray(d.results) ? d.results : [];
+      if (!rows.length) return null;
+      const hit = rows.find((t) => String(t.tracking_number || '').trim() === want);
+      if (hit) {
+        // The transaction carries the rate as a bare id, so the money has to be resolved
+        // separately — the same two-step aggregatorFetchCost does.
+        const priced = await aggregatorFetchCost('shippo', hit.object_id).catch(() => null);
+        recordUsage('shippo', { endpoint: 'transactions.find', ok: true });
+        return {
+          tracking: hit.tracking_number || want,
+          providerId: hit.object_id || '',
+          labelUrl: hit.label_url || '',
+          test: !!hit.test,
+          carrier: (priced && priced.carrier) || '',
+          service: (priced && priced.service) || '',
+          cost: priced ? priced.cost : null,
+          carrierAccount: '',
+        };
+      }
+      if (!d.next) return null;
+    }
+  } catch { /* a recovery that throws is worse than one that says no */ }
+  return null;
+}
+
 export function shippingRoutes(app, requireAuth, requireStaff) {
   const guard = { preHandler: requireStaff };
 

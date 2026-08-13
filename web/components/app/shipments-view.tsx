@@ -483,6 +483,10 @@ export function ShipmentsView() {
     {/* Everything the table no longer carries, for the one row someone stopped on — plus
         the three actions, which all act on exactly one parcel. */}
     <ShipmentDetailDialog
+      // Keyed, so a different parcel gets a clean window rather than the last one's
+      // in-progress state — the unlink confirm above all, which must never be left standing
+      // open over a row it was not opened on.
+      key={detail?.id ?? "none"}
       shipment={detail}
       onOpenChange={(o) => { if (!o) setDetail(null) }}
       onRefund={doVoid}
