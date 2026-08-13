@@ -496,6 +496,13 @@ async function syncConnection(conn, opts = {}) {
     await pullPass(`&was_shipped=false`);
   }
   await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
+  // Etsy withholds buyer addresses from our app tier, so orders land with none. Shippo's
+  // Etsy app is not restricted — if the shop is connected there, the address is sitting in
+  // the order it imported. Fill the blanks now, while we are already in a sync. Fills only,
+  // never overwrites; best-effort, because an address backfill must not fail an order sync.
+  import('./shipping.js')
+    .then((m) => m.fillBlankAddressesFromShippo(100))
+    .catch(() => {});
   return { shop: conn.shop_name, shop_id: conn.shop_id, orders, skipped, purgedShipped, resolved, incremental: isIncremental };
 }
 

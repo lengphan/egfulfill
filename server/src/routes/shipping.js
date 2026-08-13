@@ -187,6 +187,56 @@ async function shFindOrder(orderId) {
   } catch { return null; }
 }
 
+/**
+ * THE ADDRESSES OUR OWN API IS NOT ALLOWED TO SEE.
+ *
+ * Etsy withholds buyer addresses from an app on the restricted tier, so every one of our
+ * Etsy orders reads "Not available yet" and a label cannot be bought without someone
+ * copying the address across by hand. Shippo's Etsy app is not restricted: an order it
+ * imported from a connected shop arrives complete, address and all.
+ *
+ * So this reads them back. Marked `source: 'shippo'` rather than passed off as a sync,
+ * because how we came to know an address is real operational information — see
+ * addressSource in lib/order-format.ts.
+ *
+ * ONLY EVER FILLS A BLANK. The guard is repeated inside the UPDATE, not just in the SELECT,
+ * so an address typed by hand between the two statements cannot be overwritten by this.
+ * CLAUDE.md §2.6: a sync may fill a gap, never blank or replace a fact.
+ */
+export async function fillBlankAddressesFromShippo(limit = 100) {
+  if (!shToken()) return { filled: 0, reason: 'no-shippo-token' };
+  const blank = `coalesce(address->>'street', address->>'line1', address->>'first_line', address->>'address1', '') = ''`;
+  try {
+    const r = await fetch(SH_BASE + `/orders?results=${Math.min(250, Math.max(1, limit))}`, { headers: { Authorization: shAuth() } });
+    if (!r.ok) return { filled: 0, reason: 'shippo HTTP ' + r.status };
+    const d = await r.json().catch(() => ({}));
+    const byNumber = new Map();
+    for (const o of (d.results || [])) {
+      const n = String(o.order_number || '').trim();
+      if (n && o.to_address && o.to_address.street1) byNumber.set(n, o.to_address);
+    }
+    if (!byNumber.size) return { filled: 0, seen: 0 };
+    const ids = [...byNumber.keys()].map((n) => 'etsy-' + n);
+    const rows = (await q(`select id from orders where id = any($1::text[]) and ${blank}`, [ids])).rows;
+    let filled = 0;
+    for (const row of rows) {
+      const a = byNumber.get(String(row.id).replace(/^etsy-/i, ''));
+      if (!a) continue;
+      const upd = await q(
+        `update orders set address = jsonb_strip_nulls($2::jsonb) where id = $1 and ${blank}`,
+        [row.id, JSON.stringify({
+          name: a.name || null, street: a.street1 || null, street2: a.street2 || null,
+          city: a.city || null, state: a.state || null, zip: a.zip || null,
+          country: a.country || 'US', source: 'shippo',
+        })]).catch(() => null);
+      if (upd && upd.rowCount) filled++;
+    }
+    return { filled, seen: byNumber.size, blank: rows.length };
+  } catch (e) {
+    return { filled: 0, reason: (e && e.message) || 'failed' };
+  }
+}
+
 async function shBuy(rateObjectId, sel, orderId) {
   // Linked when we can find it, plain when we can't — see shFindOrder.
   const shippoOrder = orderId ? await shFindOrder(orderId) : null;
@@ -447,6 +497,16 @@ export async function aggregatorFetchCost(provider, providerId) {
 
 export function shippingRoutes(app, requireAuth, requireStaff) {
   const guard = { preHandler: requireStaff };
+
+  /**
+   * Pull buyer addresses back from Shippo for orders that have none.
+   *
+   * On demand as well as on every Etsy sync, because the sync only reaches orders in its
+   * window and someone staring at "Not available yet" on an older order wants it now.
+   */
+  app.post('/api/shipping/backfill-addresses', guard, async (req) => {
+    return await fillBlankAddressesFromShippo(Number((req.body || {}).limit) || 100);
+  });
 
   app.get('/api/shipping/config', guard, async () => ({
     easypost: !!epKey(), shippo: !!shToken(), enabled: !!(epKey() || shToken())
