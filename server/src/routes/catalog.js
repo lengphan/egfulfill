@@ -188,9 +188,18 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * Anything not listed is staff-only by omission — an unrecognised status must never fall
    * through to "public".
    */
-  const PUBLIC_STATUS = 'Active';
+  const PUBLIC_STATUS = 'active';
   const SELLER_STATUSES = new Set(['active', 'sellers only']);
   const sellerVisible = (status) => SELLER_STATUSES.has(String(status || '').trim().toLowerCase());
+  /**
+   * The public gate as SQL, and it MATCHES sellerVisible's normalisation on purpose.
+   *
+   * An exact `status = 'Active'` looked fine — the editor is a <select>, so the casing is
+   * controlled. But an import or an API caller can write "active", and then the product was
+   * visible to sellers and absent from the website with nothing saying why: precisely the
+   * silent invisibility this whole model replaced, reintroduced by a comparison operator.
+   */
+  const PUBLIC_STATUS_SQL = `lower(trim(coalesce(status, ''))) = $1`;
   /**
    * Supplier DOMAINS. CLAUDE.md §2.8 covers URLs and redirects, not just fields — an address
    * bar reading `cdn.ssactivewear.com` names them exactly as plainly as a column headed
@@ -319,7 +328,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
   const publicProducts = async () => {
     const r = await q(
       `select data, catalog_price, base_price from catalog_products
-        where status = $1
+        where ${PUBLIC_STATUS_SQL}
         order by created_at desc limit 60`,
       [PUBLIC_STATUS]
     ).catch(() => ({ rows: [] }));
@@ -346,7 +355,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    */
   const rawRowFor = async (slug) => {
     const r = await q(
-      `select data from catalog_products where status = $1 order by created_at desc limit 60`,
+      `select data from catalog_products where ${PUBLIC_STATUS_SQL} order by created_at desc limit 60`,
       [PUBLIC_STATUS]
     ).catch(() => ({ rows: [] }));
     const seen = new Map();
@@ -772,7 +781,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const live = await q(
       `select count(*)::int as n,
               count(*) filter (where ${PUBLIC_PRICE_SQL} is null or ${PUBLIC_PRICE_SQL} <= 0)::int as unpriced
-         from catalog_products where status = $1`,
+         from catalog_products where ${PUBLIC_STATUS_SQL}`,
       [PUBLIC_STATUS]
     ).then((r) => r.rows[0] || { n: 0, unpriced: 0 }).catch(() => ({ n: 0, unpriced: 0 }));
     const picks = await q(
