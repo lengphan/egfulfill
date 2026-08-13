@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowSquareOut, CircleNotch, X, Package, DownloadSimple, FilePdf, Printer } from "@phosphor-icons/react"
+import { ArrowUUpLeft, CircleNotch, LinkBreak, Package, Receipt, FilePdf, Printer, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useEffect, useRef, useState } from "react"
@@ -34,6 +34,80 @@ const VIA_WORD: Record<string, string> = {
   "in-house": "Scanned here",
   partner: "Scanned by byeastside",
   carrier: "Accepted by the carrier",
+}
+
+/**
+ * THE LEFT COLUMN WHEN THERE IS NO PDF — which is three different situations, and they were
+ * sharing one grey sentence in the middle of a large dashed rectangle. The box was drawn as
+ * an upload target ("drop a file here") for a panel nothing can be dropped into, and the
+ * sentence it framed was doing the whole job of saying what had happened to a real parcel.
+ *
+ * So it is a state, dressed as one: the situation's own colour, its icon, a heading you can
+ * read from across a desk, and one sentence under it. The way out lives here too, next to
+ * the words explaining why it is needed, rather than as a link at the far end of the window.
+ *
+ * Amber is deliberate and reserved — the floor reads it as warning/hold, which is exactly
+ * what an unlinked-but-paid-for label is. A refund is finished, not held, so it stays muted.
+ */
+function NoLabel({
+  kind, tracking, canRestore, restoring, onRestore,
+}: {
+  kind: "refunded" | "unlinked" | "never"
+  tracking: string | null
+  canRestore: "snapshot" | "carrier" | null
+  restoring: boolean
+  onRestore: () => void
+}) {
+  const unlinked = kind === "unlinked"
+  const Icon = kind === "refunded" ? Receipt : unlinked ? LinkBreak : FilePdf
+  return (
+    // Same 4:6 frame the label itself occupies, so the window doesn't change shape depending
+    // on what happened to the parcel.
+    <div className={"flex aspect-[4/6] flex-col items-center justify-center gap-3 rounded-xl border px-6 text-center "
+      + (unlinked
+        ? "border-amber-200 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10"
+        : "border-border bg-muted/30")}>
+      <div className={"flex size-11 items-center justify-center rounded-full "
+        + (unlinked ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" : "bg-muted text-muted-foreground")}>
+        <Icon size={20} weight="duotone" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">
+          {kind === "refunded" ? "Postage refunded" : unlinked ? "Tracking unlinked" : "No label yet"}
+        </p>
+        {/* The sentence answers the question the panel raises — where did the label go, and
+            is this parcel in trouble — rather than restating the heading. */}
+        <p className="mx-auto max-w-[15rem] text-xs leading-relaxed text-muted-foreground">
+          {kind === "refunded"
+            ? "The label was cancelled with the carrier and its file went with it."
+            : unlinked
+              ? "It was taken off this order, not refunded. The postage is still bought and the parcel is still moving."
+              : "Nothing has been bought for this parcel yet."}
+        </p>
+        {unlinked && tracking && (
+          <p className="pt-0.5 font-mono text-2xs text-muted-foreground line-through decoration-destructive/60">{tracking}</p>
+        )}
+      </div>
+      {unlinked && canRestore && (
+        <Button size="sm" variant="outline" onClick={onRestore} disabled={restoring} className="mt-1 bg-card">
+          {restoring ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
+          {canRestore === "snapshot" ? "Put it back" : "Find it and put it back"}
+        </Button>
+      )}
+      {unlinked && canRestore === "carrier" && (
+        // Said before the click, not after it fails: this one has to go and ask the carrier,
+        // and it can come back with nothing.
+        <p className="max-w-[16rem] text-2xs leading-relaxed text-muted-foreground">
+          Looked up at the carrier by its number — if it isn&apos;t found, nothing changes.
+          {/* Stated because it is a real gap, not a detail: whether the buyer was already
+              told was destroyed along with the label, and pushing on a guess would email
+              them a second time. Saving the order pushes it when someone knows. */}
+          {" "}The marketplace is <span className="font-medium text-foreground">not</span> told automatically —
+          we no longer know whether the buyer already has this number.
+        </p>
+      )}
+    </div>
+  )
 }
 
 /** One labelled fact. `mono` for numbers you might read aloud down a phone. */
@@ -225,8 +299,20 @@ export function ShipmentDetailDialog({
           </DialogTitle>
         </DialogHeader>
 
+        {/* The failure of one of the two actions in this window, said where the eye already
+            is. Icon and heading rather than a bare red sentence: what follows is the
+            provider's own wording, which can be a paragraph, and a paragraph of red text
+            with nothing in front of it reads as a crash rather than as an answer. */}
         {detachErr && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{detachErr}</div>
+          <div className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <Warning size={16} weight="fill" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-destructive">That didn&apos;t go through</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{detachErr}</p>
+            </div>
+          </div>
         )}
 
         {/* THE LABEL BESIDE THE FACTS.
@@ -263,19 +349,17 @@ export function ShipmentDetailDialog({
               </div>
             </div>
           ) : (
-            // Says WHICH of THREE, because they are not the same thing and the panel used to
-            // say the first one to all of them. A parcel whose tracking was merely unlinked
-            // read as "no label bought" — indistinguishable from a cancellation, when in fact
-            // the postage is still bought, still paid for, and one click from coming back.
-            // A blank panel here reads as a load that failed.
-            <div className="flex aspect-[4/6] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-4 text-center">
-              <FilePdf size={22} className="text-muted-foreground/60" />
-              <span className="text-xs text-muted-foreground">
-                {refunded ? "The label was refunded — its file is gone with it."
-                  : s.restorable ? "The tracking was taken off this order. The postage is still bought and nothing was refunded."
-                    : "No label bought for this parcel."}
-              </span>
-            </div>
+            // WHICH of three, because they are not the same thing and one grey sentence was
+            // saying the first one to all of them. A parcel whose tracking was merely
+            // unlinked read as "no label bought" — indistinguishable from a cancellation,
+            // when the postage is still bought, still paid for, and one click from coming back.
+            <NoLabel
+              kind={refunded ? "refunded" : s.restorable ? "unlinked" : "never"}
+              tracking={s.voidedTracking}
+              canRestore={isLoose ? null : s.restorable}
+              restoring={restoring}
+              onRestore={() => void restore()}
+            />
           )}
 
         <div className="space-y-4">
@@ -409,53 +493,39 @@ export function ShipmentDetailDialog({
               Grouping them left and the actions right also ends the old fault where the
               window had two action areas facing each other with no single answer to "what
               can I do here". */}
-          {/* PUT IT BACK — offered wherever an order sits with its tracking removed, which
-              is the state a mis-click leaves behind. Stated as what it costs (nothing) and
-              what it does, because the reason someone is looking at this row is that they
-              are not sure what the last click did. */}
-          {!isLoose && !s.tracking && s.restorable && (
-            <div className="rounded-lg border border-border bg-muted/20 p-3">
-              <p className="text-xs text-muted-foreground">
-                {s.restorable === "snapshot"
-                  ? <>This order&apos;s tracking was <strong className="font-medium text-foreground">unlinked, not refunded</strong>. The label is kept in full — putting it back restores the number, the PDF and the postage exactly as they were.</>
-                  : <>This order&apos;s tracking was <strong className="font-medium text-foreground">unlinked, not refunded</strong>, before the label was kept — so it has to be looked up at the carrier by its number. That can come back empty, in which case nothing changes and the label has to be bought again.</>}
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => void restore()} disabled={restoring}>
-                  {restoring ? <CircleNotch size={12} className="animate-spin" /> : null}
-                  {s.restorable === "snapshot" ? "Put the tracking back" : "Look it up and put it back"}
-                </Button>
-                {s.voidedTracking && <span className="font-mono text-2xs text-muted-foreground">{s.voidedTracking}</span>}
-              </div>
-            </div>
-          )}
-
           {/* THE CONFIRM, in place of the click that used to be the whole action. It sits
               above the buttons rather than in a second dialog: what it is asking about is
               the tracking number three rows up, and a stacked modal would cover it. */}
           {confirmDetach && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-500/40 dark:bg-amber-500/10">
-              <p className="text-sm font-medium">Take {s.tracking} off this order?</p>
-              <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
-                <li>· The order goes back to unlabelled and a correct label can be bought.</li>
-                <li>· The postage stays bought and stays charged — <strong className="font-medium text-foreground">this is not a refund</strong>.</li>
-                <li>· The parcel keeps moving. If the buyer already has this number, it still works for them.</li>
-                <li>· It can be undone from this window afterwards.</li>
-              </ul>
-              {/* The two things the presser may have actually wanted, named rather than
-                  left to be discovered — "wrong order" is three different problems. */}
-              <p className="mt-2 text-xs text-muted-foreground">
-                If the <em>label</em> is wrong rather than the order, Refund postage is the one that gets the money back.
-                To find the order this parcel really belongs to, unlink it here first — it is then offered its matching orders.
-              </p>
-              <div className="mt-2.5 flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => void detach()} disabled={detaching}>
-                  {detaching ? <CircleNotch size={12} className="animate-spin" /> : null}
-                  Yes, unlink it
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setConfirmDetach(false)} disabled={detaching}>
-                  Keep it
-                </Button>
+            <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 dark:border-amber-500/30 dark:bg-amber-500/10">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                <Warning size={16} weight="fill" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Take this tracking off the order?</p>
+                <p className="mt-0.5 font-mono text-2xs text-muted-foreground">{s.tracking}</p>
+                <ul className="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground">
+                  <li>The order goes back to unlabelled, so a correct label can be bought.</li>
+                  <li>The postage stays bought and stays charged — <strong className="font-medium text-foreground">this is not a refund</strong>.</li>
+                  <li>The parcel keeps moving. If the buyer already has this number, it still works for them.</li>
+                  <li>You can put it back from this window afterwards.</li>
+                </ul>
+                {/* The two things the presser may have actually wanted, named rather than
+                    left to be discovered — "wrong order" is three different problems. */}
+                <p className="mt-2 border-t border-amber-200/70 pt-2 text-xs leading-relaxed text-muted-foreground dark:border-amber-500/20">
+                  If the <em>label</em> is wrong rather than the order, <span className="font-medium text-foreground">Refund postage</span> is
+                  the one that gets the money back. To find the order this parcel really belongs to, unlink it here
+                  first — its matching orders are then offered.
+                </p>
+                <div className="mt-3 flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => void detach()} disabled={detaching} className="bg-card">
+                    {detaching ? <CircleNotch size={13} className="animate-spin" /> : <LinkBreak size={13} weight="bold" />}
+                    Yes, unlink it
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmDetach(false)} disabled={detaching}>
+                    Keep it
+                  </Button>
+                </div>
               </div>
             </div>
           )}

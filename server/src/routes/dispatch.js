@@ -1050,12 +1050,22 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       after: { tracking: label.tracking, cost: label.cost, via },
       note: `Tracking ${label.tracking} put back on order ${id} (${via === 'provider' ? 'recovered from the carrier' : 'from the detach snapshot'})`,
     });
-    // The order asserts a tracking number again, so the marketplace can be told — and must
-    // be, if the detach cleared a stamp that had already gone out. Same once-only guard and
-    // the same test-label skip as every other push path.
-    fulfillMarketplace(id, { test: label.test === true }).catch(() => {});
+    /**
+     * THE BUYER IS TOLD ONLY WHEN WE KNOW THEY WEREN'T ALREADY.
+     *
+     * A restore from the snapshot puts marketplace_fulfilled_at back exactly as it was, so
+     * the once-only guard still holds and a receipt that was already marked shipped is left
+     * alone. The provider path has no such record — the detach destroyed it — and pushing
+     * on a guess is not symmetric: with MARKETPLACE_FULFILL_LIVE=1 a second push creates a
+     * second shipment on the Etsy receipt and re-emails the buyer, which cannot be taken
+     * back. Not pushing is recoverable: saving the order re-fires it (orders.js).
+     *
+     * So the caller is told the state is unknown, and a human decides.
+     */
+    const marketplaceUnknown = via === 'provider';
+    if (!marketplaceUnknown) fulfillMarketplace(id, { test: label.test === true }).catch(() => {});
     egBroadcast({ type: 'orders' });
-    return { ok: true, tracking: label.tracking, via, cost: label.cost };
+    return { ok: true, tracking: label.tracking, via, cost: label.cost, marketplaceUnknown };
   });
 
   /**
