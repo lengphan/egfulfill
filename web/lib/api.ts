@@ -3882,6 +3882,32 @@ export function sendBroadcast(id: string | number) {
   return api<{ id: string; recipientCount: number; postedCount?: number; status?: string; note?: string }>(`/api/broadcasts/${id}/send`, { method: "POST" })
 }
 
+/** One address the send actually attempted, with what happened to it. */
+export type BroadcastDelivery = {
+  email: string
+  name: string | null
+  status: "sent" | "failed"
+  /** Why it failed, in the transport's words. Null on a delivered one. */
+  error: string | null
+  /** Typed in at send rather than resolved from a seller record. */
+  extra: boolean
+  created_at: string
+}
+
+/**
+ * WHO A SENT BROADCAST ACTUALLY REACHED — the list behind "17 of 18 delivered".
+ *
+ * Written per address as the send runs, so it is a record of what happened rather than a
+ * re-resolution of the audience. Re-resolving would answer a different question (who WOULD
+ * be mailed today) and would quietly exclude anyone who unsubscribed since.
+ *
+ * Empty for broadcasts sent before this was added — their addresses were never recorded and
+ * cannot be recovered, which the UI says outright rather than showing an empty list.
+ */
+export function getBroadcastDeliveries(id: string | number) {
+  return api<{ deliveries: BroadcastDelivery[]; sent: number; failed: number }>(`/api/broadcasts/${id}/deliveries`)
+}
+
 // ── Site content — editable marketing-home copy (admin) ──────────────────────
 // The type + defaults live in lib/site-content.ts (shared with the SSR homepage). These
 // are the admin read/write used by Settings › Site content.

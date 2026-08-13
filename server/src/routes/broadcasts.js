@@ -71,6 +71,32 @@ function ensureTables() {
       sent_at         timestamptz
     )`).catch(() => {});
     await q('create index if not exists broadcasts_created_idx on broadcasts(created_at desc)').catch(() => {});
+
+    /**
+     * WHO ACTUALLY GOT IT — one row per address, written as each message is attempted.
+     *
+     * The screen could say "17 of 18 delivered" and not one word about WHICH eighteen, so
+     * "did this reach that seller?" was unanswerable the moment the send finished. Counts
+     * are a summary of a list nobody kept.
+     *
+     * THIS IS A RECORD, NEVER AN AUDIENCE. Rule 1 at the top of this file stands: a send
+     * resolves its recipients live, so an unsubscribe between drafting and sending is
+     * honoured. Nothing may ever read these rows back to decide who to mail — they exist to
+     * answer what happened, and re-sending from them would post to people who have since
+     * opted out. The `status` column is the point: it records the outcome, which a list of
+     * intended targets does not have.
+     */
+    await q(`create table if not exists broadcast_deliveries (
+      id           bigserial primary key,
+      broadcast_id bigint not null references broadcasts(id) on delete cascade,
+      email        text not null,
+      name         text,
+      status       text not null,        -- sent|failed
+      error        text,                 -- why, when status='failed'
+      extra        boolean not null default false,  -- typed in at send, not a seller record
+      created_at   timestamptz default now()
+    )`).catch(() => {});
+    await q('create index if not exists broadcast_deliveries_bc_idx on broadcast_deliveries(broadcast_id, id)').catch(() => {});
   // WHY a send failed, kept on the row. It was only ever written to the server log — so the
   // screen said "failed" and the one fact that makes it fixable (an unverified sender, a
   // rejected key, a rate limit) lived on a box nobody sending a broadcast is reading.
@@ -433,6 +459,44 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
   // ── Count an audience WITHOUT sending. Powers the "this will go to N sellers" line the
   // send dialog shows before anything leaves. Same resolver the send uses, so the number
   // shown and the number mailed can't drift apart.
+  /**
+   * One line in the delivery record. Written as each message is attempted, so a send that
+   * dies halfway still says exactly how far it got — a record assembled at the end would
+   * lose precisely the sends that most need explaining.
+   *
+   * Best-effort by contract: the mail is already delivered by the time this runs, and
+   * failing to write the note about it must never be reported as a failure to send.
+   */
+  async function recordDelivery(broadcastId, r, status, error) {
+    await q(
+      `insert into broadcast_deliveries (broadcast_id, email, name, status, error, extra)
+       values ($1::bigint, $2, $3, $4, $5, $6)`,
+      [broadcastId, String(r.email || '').slice(0, 320), r.name || null, status,
+       error ? String(error).slice(0, 300) : null, !!r.extra]
+    ).catch(() => {});
+  }
+
+  /**
+   * WHO IT WENT TO — the list behind the counts, readable after the fact.
+   *
+   * Staff read (requireDraft), matching the board it is shown on. Ordered failures-first:
+   * the reason you open this screen is almost always to find who didn't get it.
+   */
+  app.get('/api/broadcasts/:id/deliveries', { preHandler: requireDraft }, async (req) => {
+    await ensureTables();
+    const r = await q(
+      `select email, name, status, error, extra, created_at
+         from broadcast_deliveries
+        where broadcast_id = $1::bigint
+        order by (status = 'failed') desc, id`,
+      [String(req.params.id)]);
+    return {
+      deliveries: r.rows,
+      sent: r.rows.filter((x) => x.status === 'sent').length,
+      failed: r.rows.filter((x) => x.status === 'failed').length,
+    };
+  });
+
   app.post('/api/broadcasts/preview', { preHandler: requireDraft }, async (req) => {
     await ensureTables();
     const rows = await resolveRecipients((req.body || {}).audience);
@@ -451,7 +515,11 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
       // The full list, so the confirm screen can show who is actually being mailed rather
       // than "first few" — and the malformed ones separately, since those are the only
       // recipients a send cannot reach and the only ones still cheap to fix.
-      recipients: rows.map((x) => ({ id: x.id, email: x.email, name: x.name || null })),
+      // `extra` travels with the row. Without it the confirm screen can't tell a seller from
+      // a hand-typed address, so the "added" badge never appeared and — worse — striking one
+      // off did nothing: an extra has no id, and the remove path falls back to excludeIds,
+      // which is keyed on id. The address stayed on the list and got the mail.
+      recipients: rows.map((x) => ({ id: x.id, email: x.email, name: x.name || null, extra: !!x.extra })),
       invalid,
     };
   });
@@ -618,7 +686,9 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
         // it IS a person who didn't get the mail — but with a reason that names the fix.
         if (!validEmail(r.email)) {
           bad++;
-          if (!firstBad) firstBad = { email: r.email || '(blank)', why: 'not a valid email address — fix it on the seller record' };
+          const why = 'not a valid email address — fix it on the seller record';
+          if (!firstBad) firstBad = { email: r.email || '(blank)', why };
+          await recordDelivery(id, r, 'failed', why);
           continue;
         }
         const unsubUrl = `${publicOrigin()}/api/broadcasts/unsubscribe?t=${unsubToken(r.sub || r.id)}`;
@@ -641,14 +711,16 @@ export function broadcastsRoutes(app, requireDraft, requireAdmin) {
             'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
           },
         }).catch(() => false);
-        if (sent) ok++;
+        if (sent) { ok++; await recordDelivery(id, r, 'sent', null); }
         else {
           bad++;
           // NAME THE RECIPIENT. "email is not valid in to" is Brevo telling us one address
           // is malformed — useless without knowing WHICH, since the fix is editing that
           // user's record and the list can be hundreds long. Keep the first failure's
           // address and reason; later ones are almost always the same fault.
-          if (!firstBad) firstBad = { email: r.email, why: lastMailError() || 'unknown reason' };
+          const why = lastMailError() || 'unknown reason';
+          if (!firstBad) firstBad = { email: r.email, why };
+          await recordDelivery(id, r, 'failed', why);
         }
         // Live counters, so a long send shows progress instead of looking hung.
         if ((ok + bad) % 10 === 0) {

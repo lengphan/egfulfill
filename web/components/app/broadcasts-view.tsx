@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import {
   getBroadcasts, previewBroadcastAudience, createBroadcast, updateBroadcast, deleteBroadcast,
-  sendBroadcast, getEmailBranding, setEmailBranding, uploadHeroImage,
-  type Broadcast, type BroadcastAudience, type BroadcastChannel, type BroadcastRecipient, type EmailBranding,
+  sendBroadcast, getEmailBranding, setEmailBranding, uploadHeroImage, getBroadcastDeliveries,
+  type Broadcast, type BroadcastAudience, type BroadcastChannel, type BroadcastRecipient,
+  type BroadcastDelivery, type EmailBranding,
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
@@ -336,6 +337,10 @@ export function BroadcastsView() {
   // A sent broadcast, reopened to read. Separate from `editing`: a sent one cannot be
   // changed — it is a record of what went out — so this is deliberately read-only.
   const [viewing, setViewing] = useState<Broadcast | null>(null)
+  // WHO IT REACHED. Fetched when the record is opened rather than carried on the row: it is
+  // one list per broadcast and the board renders every row.
+  const [deliveries, setDeliveries] = useState<BroadcastDelivery[] | null>(null)
+  const [delLoading, setDelLoading] = useState(false)
   const [confirming, setConfirming] = useState<Broadcast | null>(null)
   const [count, setCount] = useState<Awaited<ReturnType<typeof previewBroadcastAudience>> | null>(null)
   // The audience AS EDITED on the CONFIRM screen — distinct from `aud` above, which belongs
@@ -392,15 +397,56 @@ export function BroadcastsView() {
     setOpen(true)
   }
 
+  /** Persist the composer. Returns the stored row, which the send path needs — the server
+   *  resolves recipients from what is STORED, never from what a dialog passes. */
+  const persist = async () => (
+    editing
+      ? await updateBroadcast(editing.id, { subject, body, audience: aud, channels })
+      : await createBroadcast({ subject, body, audience: aud, channels })
+  )
+
   const save = async () => {
     setSaving(true); setErr(null)
     try {
-      if (editing) await updateBroadcast(editing.id, { subject, body, audience: aud, channels })
-      else await createBroadcast({ subject, body, audience: aud, channels })
+      await persist()
       setOpen(false); load()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not save")
     } finally { setSaving(false) }
+  }
+
+  /**
+   * Compose straight into the send, rather than parking a draft and finding it again.
+   *
+   * The draft row is still written first and is still what the server reads — that is the
+   * storage model, not a step in the task — but nobody has to go back to the list to act on
+   * it. What it opens is the recipient screen, so the addresses are read BEFORE the send,
+   * which is the whole reason that screen exists: there is no unsend.
+   */
+  const saveAndSend = async () => {
+    setSaving(true); setErr(null)
+    try {
+      const b = await persist()
+      setOpen(false); load()
+      await startSend(b)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not save")
+    } finally { setSaving(false) }
+  }
+
+  /**
+   * Open the record of a sent broadcast, and load the addresses it actually went to.
+   *
+   * Driven by the click rather than an effect on `viewing`: an effect would have to clear
+   * the previous list synchronously on open, which is the set-state-in-effect the lint rule
+   * forbids, and would re-fetch on every unrelated re-render of a dialog that is already up.
+   */
+  const openViewer = (b: Broadcast) => {
+    setViewing(b); setDeliveries(null); setDelLoading(true)
+    getBroadcastDeliveries(b.id)
+      .then((r) => setDeliveries(r.deliveries ?? []))
+      .catch(() => setDeliveries([]))
+      .finally(() => setDelLoading(false))
   }
 
   const remove = async (b: Broadcast) => {
@@ -529,7 +575,7 @@ export function BroadcastsView() {
                             there. */}
                         <button
                           type="button"
-                          onClick={() => (b.status === "draft" ? openEditor(b) : setViewing(b))}
+                          onClick={() => (b.status === "draft" ? openEditor(b) : openViewer(b))}
                           className="eg-tap block max-w-full truncate text-left font-medium transition-colors hover:text-primary"
                           title={b.status === "draft" ? "Open this draft" : "Read what was sent"}
                         >
@@ -693,9 +739,20 @@ export function BroadcastsView() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save} disabled={saving || !subject.trim() || !body.trim() || channels.length === 0}>
-              {saving ? <CircleNotch size={14} className="animate-spin" /> : null}Save draft
-            </Button>
+            {/* Saving without sending stays available, but only for the people who have no
+                other option — a team member who can draft and cannot send. Offering it to a
+                sender is what created the two-step nobody wanted. */}
+            {!canSend && (
+              <Button variant="outline" onClick={save} disabled={saving || !subject.trim() || !body.trim() || channels.length === 0}>
+                {saving ? <CircleNotch size={14} className="animate-spin" /> : null}Save draft
+              </Button>
+            )}
+            {canSend && (
+              <Button onClick={saveAndSend} disabled={saving || !subject.trim() || !body.trim() || channels.length === 0}>
+                {saving ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} />}
+                Continue to send
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -729,6 +786,53 @@ export function BroadcastsView() {
               <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs leading-snug text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
                 <div className="font-medium">{viewing.failed_count.toLocaleString("en-US")} didn&apos;t get it</div>
                 <div className="mt-0.5 font-mono opacity-90">{viewing.last_error}</div>
+              </div>
+            )}
+            {/* WHERE IT LANDED, address by address. The counts above answer "how many"; this
+                is the only thing that answers "did it reach this person?" — which is the
+                question anyone actually opens this screen with. Failures sort first. */}
+            {viewing && mailsOf(viewing) && (
+              <div>
+                <div className="mb-1.5 text-xs font-medium text-muted-foreground">
+                  Sent to
+                  {deliveries?.length ? <span className="ml-1 font-normal">({deliveries.length.toLocaleString("en-US")})</span> : null}
+                </div>
+                {delLoading ? (
+                  <div className="flex items-center justify-center py-5 text-muted-foreground"><CircleNotch size={16} className="animate-spin" /></div>
+                ) : deliveries?.length ? (
+                  <div className="max-h-56 overflow-y-auto rounded-lg border border-border">
+                    {deliveries.map((d, i) => (
+                      <div key={`${d.email}-${i}`} className="flex items-start gap-2 border-b border-border/60 px-2.5 py-1.5 text-xs last:border-b-0">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">
+                            {d.email}
+                            {d.name && <span className="ml-1.5 text-muted-foreground">{d.name}</span>}
+                          </span>
+                          {/* The reason sits under the address it belongs to — a failure list
+                              that doesn't say why is just a shorter list. */}
+                          {d.status === "failed" && d.error && (
+                            <span className="mt-0.5 block font-mono text-3xs leading-snug text-red-700 dark:text-red-300">{d.error}</span>
+                          )}
+                        </span>
+                        {d.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">added</span>}
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-3xs ${
+                          d.status === "sent"
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                            : "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300"
+                        }`}>
+                          {d.status === "sent" ? "delivered" : "failed"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* An empty list and an unrecorded one are different facts, and a screen that
+                     showed nothing for both would read as "it went to nobody". */
+                  <p className="rounded-lg border border-dashed border-border px-2.5 py-3 text-xs text-muted-foreground">
+                    No per-address record for this one — it was sent before addresses were kept.
+                    The counts above are what was logged at the time.
+                  </p>
+                )}
               </div>
             )}
             <p className="text-xs text-muted-foreground">
