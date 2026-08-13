@@ -12,25 +12,7 @@ import type { OrderRow } from "@/lib/api"
  * Returns null on success, or a message to show — a popup blocker is the one failure this
  * has, and it is worth naming rather than appearing to do nothing.
  */
-export function printPackingSlips(chosen: OrderRow[]): string | null {
-if (!chosen.length) return null
-  const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string))
-  const slips = chosen.map((o) => {
-    const its = o.items ?? []
-    const rows = its.length
-      ? its.map((it) => `<tr><td>${esc(it.name || it.sku || "Item")}${it.sku && it.name ? `<div class="sku mono">${esc(it.sku)}</div>` : ""}</td><td class="qty">&times;${esc(it.qty ?? 1)}</td></tr>`).join("")
-      : `<tr><td colspan="2" class="empty">No items recorded on this order</td></tr>`
-    return `<section class="slip">
-      <div class="hd"><div class="num mono">${esc(numOf(o))}</div><div class="plat">${esc(platformOf(o))}${o.store ? " &middot; " + esc(o.store) : ""}</div></div>
-      <div class="cust">${esc(customerOf(o))}</div>
-      ${addrLine(o) ? `<div class="addr">${esc(addrLine(o))}</div>` : ""}
-      <table><tbody>${rows}</tbody></table>
-      <div class="ft">${esc(unitsOf(o))} unit${unitsOf(o) === 1 ? "" : "s"}${o.tracking ? ` &middot; <span class="mono">${esc(o.tracking)}</span>` : ""}</div>
-    </section>`
-  }).join("")
-  const w = window.open("", "_blank")
-if (!w) return "Your popup blocker stopped the packing slips — allow popups for this site."
-  w.document.write(`<!doctype html><html><head><title>Packing slips</title><style>
+const SLIP_CSS = `<style>
     *{box-sizing:border-box}
     body{font:12px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#111;margin:0}
     .slip{width:4in;min-height:6in;padding:.25in;page-break-after:always;display:flex;flex-direction:column}
@@ -47,7 +29,41 @@ if (!w) return "Your popup blocker stopped the packing slips — allow popups fo
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
     .ft{margin-top:auto;padding-top:8px;border-top:1px solid #ddd;font-size:9px;color:#888}
     @page{size:4in 6in;margin:0}
-  </style></head><body>${slips}</body></html>`)
+  </style>`
+
+/** HTML-escape a value going into the slip. Buyer names and product titles are free text
+ *  and routinely contain & and <, which would otherwise break the document silently. */
+const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string))
+
+function buildSlips(chosen: OrderRow[]): string {
+  return chosen.map((o) => {
+    const its = o.items ?? []
+    const rows = its.length
+      ? its.map((it) => `<tr><td>${esc(it.name || it.sku || "Item")}${it.sku && it.name ? `<div class="sku mono">${esc(it.sku)}</div>` : ""}</td><td class="qty">&times;${esc(it.qty ?? 1)}</td></tr>`).join("")
+      : `<tr><td colspan="2" class="empty">No items recorded on this order</td></tr>`
+    return `<section class="slip">
+      <div class="hd"><div class="num mono">${esc(numOf(o))}</div><div class="plat">${esc(platformOf(o))}${o.store ? " &middot; " + esc(o.store) : ""}</div></div>
+      <div class="cust">${esc(customerOf(o))}</div>
+      ${addrLine(o) ? `<div class="addr">${esc(addrLine(o))}</div>` : ""}
+      <table><tbody>${rows}</tbody></table>
+      <div class="ft">${esc(unitsOf(o))} unit${unitsOf(o) === 1 ? "" : "s"}${o.tracking ? ` &middot; <span class="mono">${esc(o.tracking)}</span>` : ""}</div>
+    </section>`
+  }).join("")
+}
+
+/** The slips as markup, so they can be printed alone OR embedded in a bigger document
+ *  (see lib/label-packet) without a second implementation of the layout. */
+export function slipHtml(chosen: OrderRow[]): string {
+  if (!chosen.length) return ""
+  return SLIP_CSS + buildSlips(chosen)
+}
+
+export function printPackingSlips(chosen: OrderRow[]): string | null {
+if (!chosen.length) return null
+  const slips = buildSlips(chosen)
+  const w = window.open("", "_blank")
+if (!w) return "Your popup blocker stopped the packing slips — allow popups for this site."
+  w.document.write(`<!doctype html><html><head><title>Packing slips</title>${SLIP_CSS}</head><body>${slips}</body></html>`)
   w.document.close()
   w.focus()
   w.print()

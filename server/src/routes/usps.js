@@ -21,6 +21,30 @@ import { shippingEnabled, aggregatorBuyCheapest, aggregatorBuyRate, aggregatorVe
 import { recordShipment } from '../shipments-store.js';
 import { missingArtwork, fulfillMarketplace } from './orders.js';
 
+
+/**
+ * WHAT GETS PRINTED ON THE LABEL as its reference line.
+ *
+ * Whatever the caller passed, or — failing that — the order number and its SKUs, which is
+ * what somebody holding the parcel actually needs. A packer with a stack of identical 4×6
+ * mailers cannot tell them apart from the postage alone, and turning each one over to read
+ * a packing slip is the job this line removes.
+ *
+ * Multiple lines are joined with a comma and the whole thing is capped downstream at the 50
+ * characters carriers accept, so a large order degrades to the first few SKUs rather than
+ * being dropped for being too long.
+ */
+async function labelReference(b) {
+  if (b.refNo) return String(b.refNo);
+  if (!b.orderId) return null;
+  try {
+    const r = await q('select sku from order_items where order_id=$1 order by id', [b.orderId]);
+    const skus = r.rows.map((x) => String(x.sku || '').trim()).filter(Boolean);
+    const num = String(b.orderId).replace(/^(etsy|shopify|tiktok)-/i, '');
+    return skus.length ? `${num} · ${skus.join(', ')}` : num;
+  } catch { return null; }
+}
+
 // Map a USPS mailClass to a service-name hint for the aggregator rate filter.
 function _svcPref(mc) {
   mc = String(mc || '').toUpperCase();
@@ -494,7 +518,8 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
             { carrierPref: 'usps', servicePref: _svcPref(b.mailClass),
               orderId: b.orderId,
-              extra: { signature: !!b.signature, insurance: Number(b.insurance) || 0 } });
+              extra: { signature: !!b.signature, insurance: Number(b.insurance) || 0,
+                       reference1: await labelReference(b), reference2: b.refNo2 || null } });
           if (buy && buy.tracking) {
             const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy, b.to, req);
             return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };

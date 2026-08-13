@@ -122,10 +122,24 @@ async function shRates(to, from, pc, extra) {
   // transaction, and both add to the quoted amount — so setting them here means the
   // rate we buy already includes them. Only sent when asked, so a plain label is
   // unchanged and a provider that rejects the field can't break the common path.
-  if (extra && (extra.signature || (Number(extra.insurance) > 0))) {
+  if (extra && (extra.signature || (Number(extra.insurance) > 0) || extra.reference1 || extra.reference2)) {
     body.extra = {};
     if (extra.signature) body.extra.signature_confirmation = extra.signature === true ? 'STANDARD' : String(extra.signature);
     if (Number(extra.insurance) > 0) body.extra.insurance = { amount: Number(extra.insurance).toFixed(2), currency: 'USD' };
+    /**
+     * WHAT'S IN THE BOX, PRINTED ON THE BOX.
+     *
+     * Shippo puts reference_1/reference_2 on the label itself, which is the only way a
+     * packer holding a stack of 4×6s can tell them apart without opening the packing slip.
+     * We already accepted refNo/refNo2 through /api/usps/label — but they only ever reached
+     * the MOCK label's HTML, so a real label never carried them and the parameter looked
+     * like it worked.
+     *
+     * Truncated at 50: carriers silently drop or wrap an over-long reference, and a wrapped
+     * SKU line is worse than a short one.
+     */
+    if (extra.reference1) body.extra.reference_1 = String(extra.reference1).slice(0, 50);
+    if (extra.reference2) body.extra.reference_2 = String(extra.reference2).slice(0, 50);
   }
   const r = await fetch(SH_BASE + '/shipments/', { method: 'POST', headers: { Authorization: shAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
@@ -406,6 +420,12 @@ export async function aggregatorBuyCheapest(to, from, pc, opts) {
 // captured even though Shippo's transaction response doesn't expand the rate. Reused by
 // /api/usps/label so a UPS/USPS/any label records exactly like a USPS one (cost, PDF,
 // provider ref for voiding).
+/**
+ * NB: a rate's references cannot be set here. Shippo carries `extra` on the SHIPMENT, which
+ * was already created when the rates were fetched — so reference_1/2 must be passed to
+ * /api/shipping/rates, not to the buy. The buy-cheapest path builds its shipment at buy
+ * time, which is why it CAN set them.
+ */
 export async function aggregatorBuyRate(rateToken, sel, orderId) {
   const t = dec(rateToken);
   if (!t) throw new Error('That rate is unreadable or expired — fetch fresh rates and try again.');
