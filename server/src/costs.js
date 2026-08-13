@@ -64,10 +64,25 @@ export async function recordCost(kind, amount, ref, note = null, meta = {}) {
   const type = COST_TYPES[kind];
   const amt = Number(amount);
   if (!type || !isFinite(amt) || amt <= 0 || !ref) return { ok: false, skipped: true };
+  /**
+   * WHICH REAL ACCOUNT PAID. Postage is charged to a card, and that card is named once in
+   * Settings rather than chosen on every label — so a label cost can place itself.
+   *
+   * Only postage: everything else here (blanks, samples, partner work) is paid in ways we
+   * are not told about, and guessing would put a number on a card that never saw it.
+   * Those land in Unassigned, which is the honest place for them.
+   */
+  let cashAccount = null;
+  if (kind === 'label') {
+    try {
+      const m = await import('./routes/cash_accounts.js');
+      cashAccount = await m.postageAccountId();
+    } catch { /* accounts not set up yet — Unassigned is correct */ }
+  }
   try {
     await q(
-      `insert into wallet_ledger (account, delta, type, ref, note, partner)
-       values ($1, $2, $3, $4, $5, $6)
+      `insert into wallet_ledger (account, delta, type, ref, note, partner, cash_account)
+       values ($1, $2, $3, $4, $5, $6, $7)
        on conflict do nothing`,
       /**
        * WHICH supplier, not just "a supplier".
@@ -82,7 +97,7 @@ export async function recordCost(kind, amount, ref, note = null, meta = {}) {
        * Null stays valid and stays meaningful: the older rows keep resolving through the
        * type fallback, so nothing has to be backfilled for the totals to stay right.
        */
-      [HOUSE, -Math.abs(amt), type, String(ref), note || null, meta.partner ? String(meta.partner) : null]
+      [HOUSE, -Math.abs(amt), type, String(ref), note || null, meta.partner ? String(meta.partner) : null, cashAccount]
     );
     // The order id, where there is one, so a cost can be traced to the job that caused it
     // — "what did FF-1042 actually cost us" is the question that finds a bad margin.

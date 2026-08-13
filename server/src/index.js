@@ -37,6 +37,7 @@ import { designLibraryRoutes } from './routes/design_library.js';
 import { designFilesRoutes } from './routes/design_files.js';
 import { sheetsRoutes } from './routes/sheets.js';
 import { walletRoutes } from './routes/wallet.js';
+import { cashAccountRoutes } from './routes/cash_accounts.js';
 import { factoryListsRoutes } from './routes/factory_lists.js';
 import { teamRoutes } from './routes/team.js';
 import { sandboxRoutes, authKey, keyAllows } from './routes/sandbox.js';
@@ -470,7 +471,8 @@ billingRoutes(app, requireAuth, requireAdmin);                       // subscrip
 planRoutes(app, requireAuth, requireStaff, requireAdmin);  // volume tiers: the admin ladder + a seller's own meter. MEASURES ONLY — quoteOrder does not import it, so a ladder cannot move a charge
 consignmentRoutes(app, requireAuth, requireStaff);     // inventory services: seller-owned stock (ASN -> count -> internal SKU + bin); kept OUT of `inventory`, which has no owner column
 mailIngestRoutes(app, requireAuth);                                // inbound Etsy sale emails -> order addresses (shared-secret URL; sender must be a known account)
-walletRoutes(app, requireAuth, requireAdmin);                        // SERVER-authoritative wallet balance + append-only ledger (seller/factory/designer), idempotent by ref
+walletRoutes(app, requireAuth, requireAdmin);
+cashAccountRoutes(app, requireAuth, requireAdmin);      // WHERE the money is — named real accounts + attribution of every ledger movement                        // SERVER-authoritative wallet balance + append-only ledger (seller/factory/designer), idempotent by ref
 factoryListsRoutes(app, requireAuth);                  // shared factory queues (backorders + purchase orders) — staff-only, whole-array blobs
 teamRoutes(app, requireAuth);                          // seller team members + per-member access surfaces (drives nav-hiding); auth/login untouched
 sandboxRoutes(app, requireAuth);                       // seller API keys (/api/keys) + safe /api/test/* sandbox (simulated, no side effects) — isolated key-auth, global hook untouched
