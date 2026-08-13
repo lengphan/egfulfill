@@ -64,6 +64,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
   const [ratesLoading, setRatesLoading] = useState(false)
   const [pickedToken, setPickedToken] = useState<string | null>(null)
   const [carriers, setCarriers] = useState<string[]>(DEFAULT_CARRIERS)
+  /** Services this warehouse doesn't ship (Settings › Platform → hidden_services), matched
+   *  as lowercase substrings against the rate's service name. */
+  const [hiddenServices, setHiddenServices] = useState<string[]>([])
 
   // Load the saved warehouse 'from' when the dialog opens (deferred so no sync setState).
   // With an `order`, also seed ship-to from its address so the label is one click away.
@@ -76,6 +79,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
         if (sf && sf.street) { const a = { ...BLANK, ...sf }; setFrom(a); try { localStorage.setItem(FROM_STORE, JSON.stringify(a)) } catch {} }
         const ec = String(s?.enabled_carriers || "").split(",").map((c) => c.trim().toLowerCase()).filter(Boolean)
         setCarriers(ec.length ? ec : DEFAULT_CARRIERS)
+        setHiddenServices(String(s?.hidden_services || "").split(",").map((c) => c.trim().toLowerCase()).filter(Boolean))
       }).catch(() => {})
       if (order?.to && order.to.street) {
         const a = { ...BLANK, ...order.to }
@@ -183,7 +187,15 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
       if (r.error) { setErr(r.error); setRates([]); return }
       // Only the carriers this warehouse offers (admin-set; defaults to USPS + UPS), cheapest first.
       const filtered = (r.rates || []).filter((rt) => carriers.some((c) => (rt.carrier || "").toLowerCase().includes(c)))
-      const shown = (filtered.length ? filtered : (r.rates || [])).slice().sort((a, b) => a.amount - b.amount)
+      // Then drop the services it doesn't ship — Ground Saver and the like. Applied AFTER
+      // the carrier filter and never as a fallback: if hiding leaves nothing, that is the
+      // honest answer for this parcel, and quietly showing a service the floor refuses to
+      // use would be worse than an empty list.
+      const offered = hiddenServices.length
+        ? filtered.filter((rt) => !hiddenServices.some((h) => (rt.service || "").toLowerCase().includes(h)))
+        : filtered
+      const shown = (offered.length ? offered : (filtered.length ? filtered : (r.rates || [])).filter((rt) => !hiddenServices.some((h) => (rt.service || "").toLowerCase().includes(h))))
+        .slice().sort((a, b) => a.amount - b.amount)
       setRates(shown)
       if (shown.length) setPickedToken(shown[0].token)
       if (!shown.length && r.errors?.length) setErr(r.errors.join(" · "))

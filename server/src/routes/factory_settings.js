@@ -75,6 +75,13 @@ const TEXT_KEYS = ['ss_shipping_method', 'otto_payment_method', 'otto_shipping_m
                    // substrings matched against the rate's carrier name), e.g. "usps,ups".
                    // Empty = show every carrier the Shippo account returns.
                    'enabled_carriers',
+                   // Services this warehouse does NOT want offered, comma-separated
+                   // substrings matched against the rate's service name — e.g.
+                   // "ground saver,parcel select". Carrier-level filtering was too blunt:
+                   // USPS is wanted, USPS Ground Saver is not, and an operator scanning a
+                   // rate table under time pressure should not have to remember which of
+                   // eight lines the floor actually ships. Empty = offer everything.
+                   'hidden_services',
                    // Editable delay notice shown to a seller ONLY once they've crossed their
                    // order limit — e.g. "orders submitted now may ship later than usual".
                    'capacity_notice',
