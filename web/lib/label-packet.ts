@@ -61,7 +61,17 @@ export function printHtmlViaIframe(html: string): Promise<void> {
     f.onload = () => {
       const w = f.contentWindow
       if (!w) { f.remove(); resolve(); return }
+      /**
+       * ONCE. Both the image-decode handler and the safety timeout call this, and nothing
+       * used to stop the second one running after the first — so a label whose image
+       * decoded quickly still got a SECOND print() eight seconds later, and a second print
+       * dialog on top of the first. A latch, not a cleared timer, because the two callers
+       * cannot see each other.
+       */
+      let fired = false
       const go = () => {
+        if (fired) return
+        fired = true
         try { w.focus(); w.print() } catch { /* nothing more to try */ }
         // Left in the DOM briefly: removing it while the print dialog is still reading the
         // document gives a blank sheet in some browsers.
