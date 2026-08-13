@@ -101,6 +101,19 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   const listing = item.img || ""
   // Only worth offering the swap when the two views actually differ.
   const canSwap = !!(art && listing && listing !== blank)
+  /**
+   * BOTH PICTURES AT ONCE, rather than a swap between them.
+   *
+   * Swapping made you hold one in your head to compare it with the other, which is exactly
+   * the comparison this thumb exists for: what the buyer bought, against what we are about
+   * to print. So the listing sits as a small card offset off the corner — visible together,
+   * legible apart.
+   *
+   * Only where there is room. Below ~56px the inset card would be a smudge, so those sizes
+   * keep the corner swap they already had.
+   */
+  const showBoth = canSwap && !listingFirst && size >= 56
+  const insetSize = Math.max(22, Math.round(size * 0.38))
 
   const open = () => {
     if (onEdit) { onEdit(); return }
@@ -113,7 +126,9 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
 
   // What the THUMBNAIL shows. `listingFirst` prefers the buyer's photo and falls back to
   // the composite when a line has none; otherwise the composite, as before.
-  const thumbShowsListing = listingFirst ? !!listing : showListing
+  // With both on screen the big one is always WHAT WE WILL PRINT — the inset is the
+  // listing, so letting the main image swap to the listing too would show it twice.
+  const thumbShowsListing = showBoth ? false : (listingFirst ? !!listing : showListing)
 
   if (readOnly) {
     return (
@@ -140,6 +155,24 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           className={"eg-tap size-full overflow-hidden rounded-md bg-muted transition-colors " + (bare ? "" : "border border-border hover:border-foreground/25")}
         >
           <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} />
+          {/* THE BUYER'S LISTING PHOTO, offset off the bottom-left corner so it reads as a
+              second card rather than a badge on the first.
+
+              pointer-events-none is the whole reason this is safe: it cannot intercept the
+              click, so the button underneath stays one uninterrupted target and opening the
+              designer is exactly as easy as it was with nothing there. Bottom-LEFT, because
+              the hover affordance sits centre and the drop ring hugs the edges — the corner
+              furthest from anything else that wants attention. */}
+          {showBoth && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -bottom-1.5 -left-1.5 overflow-hidden rounded-md border-2 border-background bg-muted shadow-md"
+              style={{ width: insetSize, height: insetSize }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={listing} alt="" className="size-full object-cover" />
+            </span>
+          )}
           {/* Affordance only where there's something to do — and only on hover, so the
               row stays quiet until you're actually pointing at it. */}
           <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-md bg-black/45 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 sm:flex">
@@ -150,7 +183,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         {/* No corner swap on a listing-first thumb: the row shows the listing, and the
             design lives one click away in the detail view rather than behind a 16px
             control on a 32px image. */}
-        {canSwap && !listingFirst && (
+        {canSwap && !listingFirst && !showBoth && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowListing((v) => !v) }}
