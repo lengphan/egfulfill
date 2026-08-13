@@ -14,7 +14,7 @@ import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCar
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
-import { labelableOrders, buyLabelsFor, summarise } from "@/lib/bulk-labels"
+import { labelableOrders, buyLabelsFor, summarise, DEFAULT_BULK_PARCEL } from "@/lib/bulk-labels"
 import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
@@ -1011,8 +1011,20 @@ export function OrdersHub() {
 
     setBuying({ done: 0, total: ready.length }); setPushMsg(null)
     try {
-      const results = await buyLabelsFor(ready, { weightOz: 6, length: 13, width: 10, height: 1 },
-        (done: number, total: number) => setBuying({ done, total }))
+      /**
+       * A PARCEL PER ORDER, not one guess for all of them.
+       *
+       * This shipped hardcoding 6oz in a 13x10x1 mailer for every order in the batch, while
+       * the single-label dialog beside it derives weight and box from the catalog via
+       * parcelFromOrder. So a batch containing a hoodie was declared as a tee — and USPS does
+       * not refuse an under-declared parcel, it carries it and bills the difference
+       * afterwards, against a batch already charged. Silent, and only visible on the invoice.
+       *
+       * The stock mailer stays the FALLBACK for a line whose product carries no weight or
+       * box, which is what the dialog does too.
+       */
+      const results = await buyLabelsFor(ready, DEFAULT_BULK_PARCEL,
+        (done: number, total: number) => setBuying({ done, total }), catalog)
       const printable = results.filter((r) => r.ok && r.labelBlobUrl)
         .map((r) => ({ labelBlobUrl: r.labelBlobUrl as string, order: r.order }))
       let msg = summarise(results, blocked)

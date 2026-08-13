@@ -1,5 +1,11 @@
 import { buyUspsLabel, fetchShipmentLabel, type OrderRow, type ShipAddress } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
+import { parcelFromOrder } from "@/lib/parcel-from-order"
+import type { CatalogProduct } from "@/lib/api"
+
+/** The stock mailer, used only where the catalog knows nothing about a line. Same box the
+ *  single-label dialog opens on, so a bulk buy and a one-off agree. */
+export const DEFAULT_BULK_PARCEL = { weightOz: 6, length: 13, width: 10, height: 1 }
 
 /**
  * BUY POSTAGE FOR A SELECTION, one parcel at a time.
@@ -64,12 +70,24 @@ export async function buyLabelsFor(
   orders: OrderRow[],
   parcel: { weightOz: number; length: number; width: number; height: number },
   onProgress?: (done: number, total: number, last: BulkLabelOutcome) => void,
+  catalog?: CatalogProduct[],
 ): Promise<BulkLabelOutcome[]> {
   const out: BulkLabelOutcome[] = []
   for (const o of orders) {
     let result: BulkLabelOutcome
+    // EACH order's own weight and box, from the catalog — the same derivation the single
+    // label dialog uses, so buying twenty is not a different declaration from buying one.
+    // Falls back to the stock mailer per FIELD, not wholesale: a product that knows its
+    // weight but not its box should contribute the weight.
+    const g = catalog ? parcelFromOrder(o.items, catalog) : null
+    const box = g
+      ? { weightOz: g.weightOz || parcel.weightOz,
+          length: g.length || parcel.length,
+          width: g.width || parcel.width,
+          height: g.height || parcel.height }
+      : parcel
     try {
-      const r = await buyUspsLabel({ to: toShipAddress(o), from: {} as ShipAddress, orderId: o.id, ...parcel })
+      const r = await buyUspsLabel({ to: toShipAddress(o), from: {} as ShipAddress, orderId: o.id, ...box })
       if (r?.error || !r?.trackingNumber) {
         result = { order: o, ok: false, reason: r?.error || "the carrier returned no label" }
       } else {
