@@ -14,6 +14,7 @@ import { AssignCardDialog } from "@/components/app/assign-card-dialog"
 import { PushToPartnerInline } from "@/components/app/push-to-partner-dialog"
 import { OrderHistory } from "@/components/app/order-history"
 import { useConfirm, usePrompt } from "@/components/app/confirm-dialog"
+import { PageTitle } from "@/components/app/page-title"
 
 /**
  * Renders a Wilcom TrueView PNG for an EMB card's raw .emb, falling back to `children` (the
@@ -461,7 +462,7 @@ export function DesignerBoard() {
             on the right stays. On mobile the hero is the title. */}
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><PenNib size={18} weight="fill" /></span>
         <div className="min-w-0 md:hidden">
-          <h1 className="font-title text-2xl font-semibold tracking-tight">Designer</h1>
+          <PageTitle>Designer</PageTitle>
           <p className="truncate text-sm text-muted-foreground">{view === "board" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
         </div>
         {/* Add design — the explicit way in, in EITHER view. Drag-drop onto a lane only

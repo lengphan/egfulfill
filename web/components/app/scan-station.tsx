@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { getInventory, getScanHistory, scanInventory, undoScan, type InventoryItem } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { parseScan, exactSkuReady, scanBeep, buzz, cameraSupported, startCameraScan, releaseCamera } from "@/lib/barcode-scan"
+import { PageTitle } from "@/components/app/page-title"
 
 type Entry = { key: string; sku: string; qty: number; dir: "in" | "out"; ok: boolean; label: string; sub: string; scanId?: string }
 
@@ -203,7 +204,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
         <div className="flex items-center gap-3 md:hidden">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BarcodeIcon size={18} weight="fill" /></span>
           <div className="min-w-0">
-            <h1 className="font-title text-2xl font-semibold tracking-tight">Scan</h1>
+            <PageTitle>Scan</PageTitle>
             <p className="truncate text-sm text-muted-foreground">Scan stock in and out. Works with a scanner gun or your phone camera.</p>
           </div>
         </div>

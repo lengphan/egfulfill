@@ -11,6 +11,8 @@ import {
   getWilcomAlphabets, wilcomCombine, wilcomLetteringPreview,
   type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration, type WilcomTransform,
 } from "@/lib/api"
+import { PageTitle } from "@/components/app/page-title"
+import { TabLabel } from "@/components/app/tab-label"
 
 type Tab = "create" | "library" | "history"
 type Source = "order" | "library"
@@ -85,7 +87,7 @@ export function DigitizerStudio() {
       <div className="flex items-center gap-3">
         <span className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Needle size={22} weight="duotone" /></span>
         <div>
-          <h1 className="font-title text-2xl font-semibold tracking-tight">Digitizer</h1>
+          <PageTitle>Digitizer</PageTitle>
           <p className="text-sm text-muted-foreground">Turn artwork into an embroidery preview and a machine file — or build one from scratch.</p>
         </div>
       </div>
@@ -95,7 +97,7 @@ export function DigitizerStudio() {
           const Icon = t.icon
           return (
             <button key={t.id} onClick={() => setTab(t.id)} className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-              <Icon size={15} weight={tab === t.id ? "fill" : "regular"} /> {t.label}
+              <Icon size={15} weight={tab === t.id ? "fill" : "regular"} /> <TabLabel>{t.label}</TabLabel>
             </button>
           )
         })}

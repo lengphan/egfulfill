@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getAdsConfig, getAdConnections, getAdCampaigns, createAdCampaign, setAdCampaignStatus, type AdsConfig, type AdConnection, type AdsResponse } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
+import { PageTitle } from "@/components/app/page-title"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const int = (n: number) => (n ?? 0).toLocaleString("en-US")
@@ -68,7 +69,7 @@ export function CampaignsView() {
         <div className="flex items-center gap-3 md:hidden">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Megaphone size={18} weight="fill" /></span>
           <div>
-            <h1 className="font-title text-2xl font-semibold tracking-tight">Campaigns</h1>
+            <PageTitle>Campaigns</PageTitle>
             <p className="text-sm text-muted-foreground">Facebook &amp; Google ad performance{data ? ` · ${data.since} → ${data.until}` : ""}</p>
           </div>
         </div>

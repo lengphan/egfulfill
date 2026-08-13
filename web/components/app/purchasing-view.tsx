@@ -8,6 +8,8 @@ import { AllSuppliers } from "@/components/app/all-suppliers"
 import { FavoritesView } from "@/components/app/favorites-view"
 import { PurchaseView } from "@/components/app/purchase-view"
 import { AlibabaOrders } from "@/components/app/alibaba-orders"
+import { PageTitle } from "@/components/app/page-title"
+import { TabLabel } from "@/components/app/tab-label"
 
 type Tab = "all" | "favorites" | "purchase" | "alibaba"
 
@@ -125,7 +127,7 @@ export function PurchasingView() {
       <div className="flex items-center gap-3 md:hidden">
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={18} weight="fill" /></span>
         <div className="min-w-0">
-          <h1 className="font-title text-2xl font-semibold tracking-tight">Purchasing</h1>
+          <PageTitle>Purchasing</PageTitle>
           <p className="truncate text-sm text-muted-foreground">Browse suppliers, build a cart, and track orders.</p>
         </div>
       </div>
@@ -141,7 +143,7 @@ export function PurchasingView() {
             onClick={() => pick(t.id)}
             className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
           >
-            {t.label}
+            <TabLabel>{t.label}</TabLabel>
             {/* Only on the tab it belongs to, and only when there IS something. A zero
                 beside every tab is a row of noughts pretending to be information. */}
             {t.id === "purchase" && cartCount > 0 && (

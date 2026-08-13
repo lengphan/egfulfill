@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { getLedgerPartners, getLedgerExport, ledgerExportUrl, type LedgerRowOut, type PartnerTotal } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { LedgerEntryDialog } from "@/components/app/ledger-entry-dialog"
+import { PageTitle } from "@/components/app/page-title"
 
 const usd = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -97,7 +98,7 @@ export function BillingView() {
       <div className="flex items-center gap-3 md:hidden">
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Receipt size={18} weight="fill" /></span>
         <div className="min-w-0">
-          <h1 className="font-title text-2xl font-semibold tracking-tight">Billing</h1>
+          <PageTitle>Billing</PageTitle>
           <p className="truncate text-sm text-muted-foreground">What each partner is owed, and the rows behind it.</p>
         </div>
       </div>

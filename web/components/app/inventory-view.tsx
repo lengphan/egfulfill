@@ -14,6 +14,8 @@ import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, type InventoryItem, type ScanRow, type SkuVisibility } from "@/lib/api"
 import { getToken } from "@/lib/auth"
+import { PageTitle } from "@/components/app/page-title"
+import { TabLabel } from "@/components/app/tab-label"
 
 const num = (v: unknown) => Number(v) || 0
 
@@ -170,7 +172,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         {!embedded && (<>
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><Package size={18} weight="fill" /></span>
           <div className="min-w-0 md:hidden">
-            <h1 className="font-title text-2xl font-semibold tracking-tight">Inventory</h1>
+            <PageTitle>Inventory</PageTitle>
             <p className="truncate text-sm text-muted-foreground">Track stock per variant, flag low/out, and print SKU barcodes.</p>
           </div>
         </>)}
@@ -190,7 +192,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               onClick={() => setOwnTab(t.id)}
               className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
             >
-              {t.label}
+              <TabLabel>{t.label}</TabLabel>
             </button>
           ))}
         </div>

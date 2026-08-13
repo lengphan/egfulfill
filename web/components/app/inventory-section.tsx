@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { Package } from "@phosphor-icons/react"
 import { InventoryView } from "@/components/app/inventory-view"
 import { ScanStation } from "@/components/app/scan-station"
+import { PageTitle } from "@/components/app/page-title"
+import { TabLabel } from "@/components/app/tab-label"
 
 // One flat row instead of Stock/Scan stacked over Our-stock/Seller-stock: the two stock
 // pools and the scan station are siblings here. `stock` is kept as a legacy ?tab= alias.
@@ -45,7 +47,7 @@ export function InventorySection() {
       <div className="flex items-center gap-3 md:hidden">
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
         <div className="min-w-0">
-          <h1 className="font-title text-2xl font-semibold tracking-tight">Inventory</h1>
+          <PageTitle>Inventory</PageTitle>
           <p className="truncate text-sm text-muted-foreground">Stock levels on hand and the scan station.</p>
         </div>
       </div>
@@ -56,7 +58,7 @@ export function InventorySection() {
             onClick={() => pick(t.id)}
             className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
           >
-            {t.label}
+            <TabLabel>{t.label}</TabLabel>
           </button>
         ))}
       </div>
