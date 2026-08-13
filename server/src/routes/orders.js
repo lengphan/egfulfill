@@ -1787,8 +1787,13 @@ export function ordersRoutes(app, requireAuth) {
       const byHash = raw.match(/\/api\/order_designs\/art\/([0-9a-f]{16,64})/i);
       const byKey = byHash ? null : raw.match(/\/(order-designs\/[^?#\s]+)/i);
       if (byHash || byKey) {
+        // A hash can match several rows — the same artwork on two lines, one saved before
+        // storage was switched on and one after. Prefer the row that still has an object:
+        // taking the inline twin would quietly move megabytes of base64 back into Postgres,
+        // which is the thing object storage exists to stop.
         const prior = await q(
-          `select data, storage_key, art_hash from order_designs where ${byHash ? 'art_hash' : 'storage_key'}=$1 limit 1`,
+          `select data, storage_key, art_hash from order_designs where ${byHash ? 'art_hash' : 'storage_key'}=$1
+            order by (storage_key is not null) desc limit 1`,
           [byHash ? byHash[1].toLowerCase() : decodeURIComponent(byKey[1])]
         ).then((r) => r.rows[0]).catch(() => null);
         // Not found → fall through and keep the link verbatim. A link that renders is a
