@@ -6,7 +6,7 @@
 import { q } from '../db.js';
 import { readAll } from './factory_settings.js';
 import { isStaff, canMoveMoney } from '../auth.js';
-import { storageEnabled, putObject, fromDataUrl } from '../storage.js';
+import { storageEnabled, putObject, getObject, fromDataUrl } from '../storage.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
@@ -50,6 +50,21 @@ export function designFilesRoutes(app, requireAuth) {
      * uploads are scoped.
      */
     .then(() => q('alter table design_file_data add column if not exists line_id text'))
+    /**
+     * THE OBJECT KEY, because the URL beside it points at a host that does not exist.
+     *
+     * `url` holds whatever putObject() returned, and putObject prefers SPACES_CDN — set to
+     * https://cdn.egful.store, which has never been connected and answers NXDOMAIN. So every
+     * storage-backed machine file handed the browser a dead link: 23 of the 24 rows on the
+     * live database, i.e. every .EMB/.PES a seller has bought or a machine operator has
+     * tried to fetch since storage was switched on.
+     *
+     * Serving the bytes back through this API needs the key, not the link — the same shape
+     * order designs and design cards already use. Existing rows are backfilled from the URL
+     * path, which IS the key: putObject built the URL as `<base>/<key>`.
+     */
+    .then(() => q('alter table design_file_data add column if not exists storage_key text'))
+    .then(() => q("update design_file_data set storage_key = regexp_replace(url, '^https?://[^/]+/', '') where url is not null and storage_key is null"))
     .then(() => q('create index if not exists design_file_data_order on design_file_data (order_id)'))
     .catch(() => {});
 
@@ -214,10 +229,13 @@ export function designFilesRoutes(app, requireAuth) {
     const seller = await ownerOfOrder(orderId, null);
     const newId = `${src.kind === 'pes' ? 'DL' : 'EMB'}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     await q(
-      `insert into design_file_data (design_id, order_id, sku, seller_id, file_name, mime, data, url, content_hash, price, kind, created_at, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), now())`,
+      // storage_key travels with the copy. Without it the new row points at the same object
+      // through a URL the download route can no longer read, so a reused file downloads as
+      // nothing while the original works.
+      `insert into design_file_data (design_id, order_id, sku, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, created_at, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$12,$9,$10,$11, now(), now())`,
       [newId, orderId, sku, seller || null, src.file_name, src.mime, src.data, src.url, src.content_hash,
-       Number(src.price) || 0, src.kind]
+       Number(src.price) || 0, src.kind, src.storage_key || null]
     );
     // Audited so the reuse is traceable on OUR side even though it's invisible on theirs.
     audit(req, 'design_file.reused', {
@@ -258,19 +276,35 @@ export function designFilesRoutes(app, requireAuth) {
     const seller = await ownerOfOrder(b.orderId, req.user.sub);
     // A non-staff caller may only write under their OWN order/design.
     if (!isStaff(req.user) && seller && seller !== (await effectiveSeller(req.user))) { reply.code(403); return { error: 'forbidden' }; }
+    /**
+     * BYTES ONLY. fromDataUrl() base64-DECODES anything that isn't a data: URL, so a caller
+     * that passed a link — which "apply this file to every item" did, because the download
+     * route used to hand back a storage URL rather than the file — silently replaced the
+     * deliverable with a few dozen bytes of decoded URL text. Refuse it out loud instead:
+     * this endpoint stores a file, and a link is not one. (order_designs hit the same trap;
+     * there a link is a legitimate value, so it resolves rather than refuses.)
+     */
+    if (!/^data:/i.test(String(b.data))) {
+      reply.code(400);
+      return { error: 'Send the file itself, not a link to it — a link would overwrite the file with its own text.' };
+    }
     // Prefer object storage (Spaces/S3) — keep the big base64 OUT of Postgres. Falls back to inline.
-    let data = String(b.data), url = null;
+    let data = String(b.data), url = null, storageKey = null;
     if (storageEnabled()) {
       try {
         const parsed = fromDataUrl(data);
         const ext = (String(b.name || '').match(/\.[a-z0-9]+$/i) || [''])[0] || '';
-        url = await putObject('design-files/' + encodeURIComponent(String(b.designId)) + ext, parsed.buffer, b.mime || parsed.mime);
+        const key = 'design-files/' + encodeURIComponent(String(b.designId)) + ext;
+        url = await putObject(key, parsed.buffer, b.mime || parsed.mime);
+        // The key, not just the URL: the URL is a CDN address that has never resolved, and
+        // the download route reads the bytes back through this key.
+        storageKey = key;
         data = null;
       } catch (e) { /* storage failed → keep inline */ }
     }
     await q(
-      `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, content_hash, price, kind, created_at, updated_at)
-       values ($1,$2,$3,$12,$4,$5,$6,$7,$8,$9, coalesce($10, 0), $11, now(), now())
+      `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, created_at, updated_at)
+       values ($1,$2,$3,$12,$4,$5,$6,$7,$8,$13,$9, coalesce($10, 0), $11, now(), now())
        on conflict (design_id) do update set
          order_id=coalesce(excluded.order_id, design_file_data.order_id),
          sku=coalesce(excluded.sku, design_file_data.sku),
@@ -281,13 +315,14 @@ export function designFilesRoutes(app, requireAuth) {
          line_id=excluded.line_id,
          seller_id=coalesce(excluded.seller_id, design_file_data.seller_id),
          file_name=excluded.file_name, mime=excluded.mime, data=excluded.data, url=excluded.url,
-         content_hash=excluded.content_hash,
+         storage_key=excluded.storage_key, content_hash=excluded.content_hash,
          price=coalesce($10, design_file_data.price), kind=excluded.kind, updated_at=now()`,
       [String(b.designId), b.orderId || null, b.sku || null, seller || null, b.name || null, b.mime || null, data, url, b.hash || null,
        priceFor(req.user, b, defaultPrice),
        kindOf(b.name, b.mime),
        // "" and undefined both mean the whole order — only a real line id scopes a file.
-       (b.lineId || b.line_id) ? String(b.lineId || b.line_id) : null]);
+       (b.lineId || b.line_id) ? String(b.lineId || b.line_id) : null,
+       storageKey]);
     /**
      * Record it + wake the boards. Without these two lines the file lands in storage but
      * nothing tells the UI: the Design readiness tag stayed grey until a full reload (it
@@ -511,7 +546,7 @@ export function designFilesRoutes(app, requireAuth) {
 
   // Download a machine file. Staff any; a seller only their own AND only once paid.
   app.get('/api/design_files/:designId', { preHandler: requireAuth }, async (req, reply) => {
-    const r = await q('select design_id, order_id, sku, seller_id, file_name, mime, data, url, price, kind from design_file_data where design_id=$1', [String(req.params.designId)]);
+    const r = await q('select design_id, order_id, sku, seller_id, file_name, mime, data, url, storage_key, price, kind from design_file_data where design_id=$1', [String(req.params.designId)]);
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'not found' }; }
     if (!isStaff(req.user)) {
@@ -527,7 +562,30 @@ export function designFilesRoutes(app, requireAuth) {
         return { error: 'This file has not been purchased yet.', price, needsPurchase: true };
       }
     }
-    // data = the download source (inline base64 data-URL OR the object-storage URL — both work as an <a download> href).
-    return { designId: row.design_id, orderId: row.order_id, sku: row.sku, name: row.file_name, mime: row.mime, data: row.data || row.url, url: row.url };
+    /**
+     * THE BYTES, NOT THE ADDRESS.
+     *
+     * `url` is whatever putObject returned, and putObject prefers SPACES_CDN —
+     * https://cdn.egful.store, a host that has never been connected. So this used to hand
+     * back a link that resolves to nothing for 23 of the 24 stored files: every machine
+     * file a seller has paid for and every one an operator has tried to open.
+     *
+     * Read back through the key and returned as a data: URL — the exact shape this route
+     * served before storage existed, so `<a download>` and the dialog's Download button
+     * need no change. It also keeps the paywall above meaningful: a storage link, once
+     * issued, is readable by anyone holding it, whereas these bytes only leave here after
+     * the checks. Machine files are kilobytes-to-a-few-megabytes, so inlining them is not
+     * the cost it would be for artwork.
+     */
+    let payload = row.data;
+    if (!payload && row.storage_key) {
+      const obj = await getObject(row.storage_key).catch(() => null);
+      if (obj && obj.body) {
+        const mime = row.mime || obj.contentType || 'application/octet-stream';
+        payload = `data:${mime};base64,${obj.body.toString('base64')}`;
+      }
+    }
+    if (!payload) { reply.code(404); return { error: 'The file is recorded but its contents could not be read back from storage.' }; }
+    return { designId: row.design_id, orderId: row.order_id, sku: row.sku, name: row.file_name, mime: row.mime, data: payload, url: null };
   });
 }

@@ -656,10 +656,21 @@ export function DesignCanvasDialog({
     setPicking(false)
   }
   const [err, setErr] = useState<string | null>(null)
-  // A machine file that was ATTACHED rather than placed. Separate from `err` because it is
-  // a success, and the seller needs telling that something happened — the canvas cannot
-  // show a .emb, so without a word the window looks identical to a dropped file being lost.
+  // The green line under the steps: something worked. Separate from `err` because it is a
+  // success, and the seller needs telling that something happened — the canvas cannot show
+  // a .emb, so without a word the window looks identical to a dropped file being lost.
+  //
+  // IT IS A MESSAGE, NOT A STATE. Four different actions write to it (a machine file
+  // filed, a file widened to the order, artwork copied to the other lines, a tier charged),
+  // and step ② read `!!attached` as "this line has a machine file" — so pressing "Apply
+  // image to all items" ticked the EMBROIDERY FILE step green and captioned it "ready to
+  // stitch" for a line with no file at all. It also flipped the suggested design tier to
+  // 'supplied' (the cheap check fee, for a file the seller never sent). The fact lives in
+  // `justAttachedFile` now; this string only ever speaks.
   const [attached, setAttached] = useState<string | null>(null)
+  /** A machine file was filed in THIS window — the one thing that legitimately makes step ②
+   *  done before the server has been re-read. */
+  const [justAttachedFile, setJustAttachedFile] = useState(false)
   const [libOpen, setLibOpen] = useState(false)
   const [over, setOver] = useState(false)
   /** The explicit machine-file picker. Dropping one already worked; there was no BUTTON,
@@ -822,7 +833,7 @@ export function DesignCanvasDialog({
     }, 0)
     return () => clearTimeout(t)
   }, [open, orderId, item.sku, item.line_id])
-  const hasMachineFile = hasFile || !!attached
+  const hasMachineFile = hasFile || justAttachedFile
   /**
    * SENT IS NOT DONE, AND NOT NOTHING.
    *
@@ -894,6 +905,7 @@ export function DesignCanvasDialog({
       // Keep it SHORT — just confirm the file. Staff keep the one actionable nudge (add an
       // image so the stitch file has somewhere to sit on the mockup); the seller sees a plain
       // success line, no fee explainer.
+      setJustAttachedFile(true)
       setAttached(isStaff
         ? `${f.name} filed as the machine file. Add an image too so it shows on the mockup.`
         : `Embroidery file added — ${f.name}.`)
@@ -949,8 +961,14 @@ export function DesignCanvasDialog({
     setFileBusy(true); setDlErr(null)
     try {
       const r = await downloadDesignFile(latestMachine.designId)
-      const data = r.data || r.url
-      if (!data) throw new Error("Couldn't read the file back to re-file it.")
+      const data = r.data
+      // BYTES OR NOTHING. This used to fall back to `r.url` when the download route handed
+      // back a storage link instead of the file — and re-uploading a link re-files the
+      // LINK: the server base64-decodes it into a few dozen bytes of noise and writes that
+      // over the object. One click, and the machine file for every item on the order is
+      // gone. Refusing is the only safe answer; the route now returns the real bytes, so
+      // this is the belt to that braces.
+      if (!data || !data.startsWith("data:")) throw new Error("Couldn't read the file back to re-file it.")
       const up = await uploadDesignFile({
         designId: latestMachine.designId, orderId,
         // null, not undefined — the whole point is to CLEAR the line and go order-wide.
@@ -1196,12 +1214,13 @@ export function DesignCanvasDialog({
         </div>
         {/* Right column — controls, in the order you work through them: what the buyer sent,
             the two upload steps, thread match, then the charge. */}
-        {/* self-center, not start: on a line with little to configure (no artwork yet, no
-            buyer file) these controls are much shorter than the garment beside them, and
-            top-aligning them left a tall band of dead space under the column. Centring only
-            has an effect in that case — once the column is the taller of the two it behaves
-            exactly like start. */}
-        <div className="flex flex-col gap-4 lg:min-w-0 lg:self-center">
+        {/* self-START. The two columns are one thing being worked on and the controls that
+            act on it, so they have to begin on the same line — centring the shorter column
+            floated the steps somewhere down the middle of the garment, and "1 Your design"
+            no longer lined up with the top of the image it was talking about. The dead band
+            it was avoiding only ever appeared on an empty line, and a gap below the last
+            control reads as nothing at all; a first step that starts halfway down does not. */}
+        <div className="flex flex-col gap-4 lg:min-w-0 lg:self-start">
         {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
             nearest in-stock cone; saved with the design so the floor loads the right threads.
             `order-last` rather than moving the block: it sits first in the markup for historical
@@ -1538,7 +1557,7 @@ export function DesignCanvasDialog({
                       try {
                         const r = await deleteDesignFile(latestMachine.designId)
                         if (r && r.error) throw new Error(r.error)
-                        setHasFile(false); setLatestMachine(null)
+                        setHasFile(false); setLatestMachine(null); setJustAttachedFile(false)
                       } catch (e) {
                         setErr(e instanceof Error ? e.message : "Couldn't remove the file.")
                       } finally { setFileBusy(false) }

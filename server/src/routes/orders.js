@@ -310,9 +310,12 @@ async function autoPushDesigns(orderId, lineId, sku) {
   ).then((r) => r.rows[0]);
   if (!it) return { pushed: false, reason: 'no-item' };
 
-  const design = await q('select data, art_hash from order_designs where order_id=$1 and sku=$2 limit 1',
+  const design = await q('select data, art_hash, storage_key from order_designs where order_id=$1 and sku=$2 limit 1',
     [orderId, it.sku]).then((r) => r.rows[0]).catch(() => null);
-  const hasArt = !!((design && design.data) || it.design_src);
+  // storage_key COUNTS AS ARTWORK. Once object storage was switched on `data` is null on
+  // every new row, so a line with perfectly good artwork reported 'no-artwork' here and
+  // never reached the board.
+  const hasArt = !!((design && (design.data || design.storage_key)) || it.design_src);
   if (!hasArt) return { pushed: false, reason: 'no-artwork' };
 
   const carded = await q(
@@ -340,7 +343,11 @@ async function autoPushDesigns(orderId, lineId, sku) {
   // ourselves. Never the marketplace listing photo: a designer opening a card needs to see
   // what they're digitising, and a photo of the finished product tells them nothing about
   // the file. design_src (a URL) is preferred over the placed data (base64) to keep the row small.
-  const thumb = it.design_src || (design && design.data) || null;
+  // A stored design contributes its same-origin address for the same reason — it is a short
+  // string rather than a megabyte of base64, and it does not expire the way a signed link does.
+  const thumb = it.design_src
+    || (design && design.storage_key && design.art_hash ? `/api/order_designs/art/${design.art_hash}` : null)
+    || (design && design.data) || null;
   await q(
     `insert into design_cards (id, order_id, sku, title, col, type, product, pay_status, payment, is_emb, thumb, notes)
      values ($1,$2,$3,$4,'incoming',$5,$6,'pending',0,$7,$8,$9)
@@ -1731,27 +1738,68 @@ export function ordersRoutes(app, requireAuth) {
     // Exact hash is ours, never the client's — it decides whether an already-produced
     // machine file may be reused, so a forged one would attach the wrong deliverable.
     // The perceptual hash is only ever a suggestion, so taking it from the client is fine.
-    const artHash = hashOf(data);
     const artPhash = isPhash(req.body && req.body.phash) ? String(req.body.phash).toLowerCase() : null;
-    // Push the bytes to object storage when it's configured, and keep only the URL in
-    // Postgres. Two reasons: base64 artwork bloats the DB and every query that touches it,
-    // and an outside design partner (Pink Design) can ONLY be given a URL — it has no file
-    // upload. When storage is off, `data` keeps the inline base64 exactly as before, so
-    // nothing breaks on an unconfigured server. Readers take `url ?? data`.
-    let storedData = data, storedKey = null;
-    if (storageEnabled()) {
-      try {
-        const parsed = fromDataUrl(data);
-        const key = `order-designs/${artHash}${extFromMime(parsed.mime)}`;
-        // PRIVATE when links are meant to expire — a public-read object stays readable
-        // forever by anyone holding the URL, which would make the TTL a lie. TTL 0 is an
-        // explicit opt-in to permanent links, so public-read is right there.
-        await putObject(key, parsed.buffer, parsed.mime, designUrlTtlDays() > 0 ? 'private' : 'public-read');
-        storedKey = key;          // the URL is minted per read, never stored
-        storedData = null;
-      } catch (e) {
-        req.log?.warn?.({ err: e }, 'design upload to storage failed - keeping inline base64');
+    /**
+     * BYTES OR A REFERENCE — and this route could not tell them apart.
+     *
+     * `data` is a data: URL when someone has just picked a file, and one of OUR OWN artwork
+     * addresses when they opened a design that is already saved, nudged it, and pressed
+     * Save again. Both were handed to fromDataUrl(), whose fallback base64-DECODES anything
+     * that isn't a data: URL — so a ~500-character signed storage link decoded (Node's
+     * decoder stops at the first '=') to 64 bytes of noise, which was uploaded OVER the
+     * row's own object and written back as its storage key. The save returned ok, the
+     * readiness tag stayed green, and the artwork was gone.
+     *
+     * Not hypothetical: order_designs for etsy-4128916808 and etsy-4127934165 each hold a
+     * 64-byte object whose first bytes are the decode of "https://egfulfill-files…". Those
+     * two are unrecoverable — the originals were replaced in the bucket.
+     *
+     * design_cards.js hit the identical trap on its own upload and documents it there; the
+     * fix never reached this route. So a reference is now RESOLVED, never decoded: both
+     * shapes this API has handed out are recognised — the same-origin re-serve
+     * (/api/order_designs/art/<hash>) and a bucket URL carrying the object key — and the
+     * row that owns those bytes supplies them. Re-saving a position is then a metadata
+     * write that touches no object at all.
+     *
+     * Otherwise: push the bytes to object storage when it's configured and keep only the
+     * key in Postgres. Base64 artwork bloats the DB and every query that touches it, and an
+     * outside design partner (Pink Design) can only be given a URL. When storage is off,
+     * `data` keeps the inline base64 exactly as before.
+     */
+    const raw = String(data);
+    let artHash = hashOf(raw), storedData = raw, storedKey = null;
+    if (/^data:/i.test(raw)) {
+      if (storageEnabled()) {
+        try {
+          const parsed = fromDataUrl(raw);
+          const key = `order-designs/${artHash}${extFromMime(parsed.mime)}`;
+          // PRIVATE when links are meant to expire — a public-read object stays readable
+          // forever by anyone holding the URL, which would make the TTL a lie. TTL 0 is an
+          // explicit opt-in to permanent links, so public-read is right there.
+          await putObject(key, parsed.buffer, parsed.mime, designUrlTtlDays() > 0 ? 'private' : 'public-read');
+          storedKey = key;          // the URL is minted per read, never stored
+          storedData = null;
+        } catch (e) {
+          req.log?.warn?.({ err: e }, 'design upload to storage failed - keeping inline base64');
+        }
       }
+    } else {
+      const byHash = raw.match(/\/api\/order_designs\/art\/([0-9a-f]{16,64})/i);
+      const byKey = byHash ? null : raw.match(/\/(order-designs\/[^?#\s]+)/i);
+      if (byHash || byKey) {
+        const prior = await q(
+          `select data, storage_key, art_hash from order_designs where ${byHash ? 'art_hash' : 'storage_key'}=$1 limit 1`,
+          [byHash ? byHash[1].toLowerCase() : decodeURIComponent(byKey[1])]
+        ).then((r) => r.rows[0]).catch(() => null);
+        // Not found → fall through and keep the link verbatim. A link that renders is a
+        // worse row than the real bytes and a far better one than 64 bytes of noise.
+        if (prior) {
+          storedData = prior.data; storedKey = prior.storage_key;
+          if (prior.art_hash) artHash = prior.art_hash;
+        }
+      }
+      // Anything else is a plain link — a marketplace image, a library pick. Stored as a
+      // link, which is what it is; readers already render `data` as an <img src>.
     }
     await q(
       `insert into order_designs (order_id, sku, line_id, kind, data, storage_key, name, pos, art_hash, art_phash, updated_at)
@@ -2152,7 +2200,13 @@ export function ordersRoutes(app, requireAuth) {
 
   app.get('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
-    const r = await q(`select sku, line_id, kind, data, storage_key, name, pos from order_designs where order_id=$1`, [req.params.id]);
+    // art_hash IS SELECTED, and has to be: designUrlOf prefers the same-origin re-serve
+    // (/api/order_designs/art/<hash>) and falls back to a bucket link only for rows that
+    // predate the column. Omitting it here made every storage-backed design come back as a
+    // SIGNED CROSS-ORIGIN link instead — which expires, taints the canvas so the thread
+    // matcher reports "couldn't open this image to read its colours", and is the string the
+    // client hands back on the next save.
+    const r = await q(`select sku, line_id, kind, data, storage_key, art_hash, name, pos from order_designs where order_id=$1`, [req.params.id]);
     // Minted per read, not stored: a signed URL expires, so a persisted one would go
     // stale. Returned through `data` because that's what every client already renders
     // (an <img src> takes a URL or a data-URL either way).

@@ -7,10 +7,15 @@ import { type OrderItem } from "@/lib/api"
 
 export type DesignBlob = { data?: string; pos?: unknown; name?: string; kind?: string }
 
-// Normalize a raw design blob (data-URL, http URL, or bare base64) to a usable <img> src.
+// Normalize a raw design blob (data-URL, http URL, same-origin path, or bare base64) to a
+// usable <img> src.
+//
+// The leading-slash case is NOT cosmetic: storage-backed artwork now comes back as
+// /api/order_designs/art/<hash>.png, and without this it was treated as bare base64 and
+// prefixed with a data:image/png header — turning a working path into a broken image.
 export function designSrc(d?: string | null): string {
   if (!d) return ""
-  return d.startsWith("data:") || d.startsWith("http") ? d : `data:image/png;base64,${d}`
+  return d.startsWith("data:") || d.startsWith("http") || d.startsWith("/") ? d : `data:image/png;base64,${d}`
 }
 
 // The item's composite/listing image — server-authoritative `img` (re-inherited per SKU

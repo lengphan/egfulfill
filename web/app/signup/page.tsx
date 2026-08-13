@@ -10,7 +10,7 @@ import { PasswordInput } from "@/components/ui/password-input"
 import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
 import { signupUser } from "@/lib/api"
-import { getToken, getUser, setSession, getRememberedIdentifier } from "@/lib/auth"
+import { getUser, setSession } from "@/lib/auth"
 
 /** Same-origin relative paths only — see the note in app/login/page.tsx. */
 function safeNext(raw: string | null): string | null {
@@ -40,34 +40,22 @@ export default function SignupPage() {
   const [sessionChecked, setSessionChecked] = useState(false)
 
   /**
-   * WHO IS ALREADY SIGNED IN, if anyone — shown, never acted on.
+   * A SESSION ON THIS BROWSER IS NOT THIS PAGE'S BUSINESS.
    *
-   * This used to REPLACE the route with the dashboard the moment it found a session, which
-   * made "Start free" unusable for the two people most likely to press it: someone opening
-   * a second shop, and someone on a shared machine whose colleague is still signed in. They
-   * asked to make an account and were sent to somebody's dashboard instead.
+   * Two rules, and they used to fight. This page must not REDIRECT someone who asked to
+   * make an account — the two people most likely to press "Start free" are someone opening
+   * a second shop and someone at a shared machine whose colleague is still signed in, and
+   * both were being dropped on somebody else's dashboard. But the fix, a banner reading
+   * "Signed in as <name> — go to your dashboard", solved that by printing a stranger's name
+   * across a sign-up form, which is the shared machine again from the other side: the last
+   * person's identity shown to the next one, above the form they came here to fill in.
    *
-   * So a session is a fact on this page rather than a redirect off it. The way back in is a
-   * link, which is one click and never a surprise. `landingFor` still decides where that
-   * link goes, so it stays the one answer to "where does this role belong".
+   * So: no redirect and no announcement. Someone who wants their dashboard is one click
+   * from it through the header; someone who came here to sign up sees a sign-up page.
    */
-  const [signedIn, setSignedIn] = useState<{ name: string; href: string } | null>(null)
-  /** The last identifier typed on this machine — so "log in instead" can name you. */
-  const [remembered, setRemembered] = useState("")
-
   useEffect(() => {
     const id = setTimeout(() => {
-      const want = safeNext(new URLSearchParams(window.location.search).get("next"))
-      setNext(want)
-      if (getToken()) {
-        const u = getUser()
-        const role = typeof u?.role === "string" ? u.role : null
-        setSignedIn({
-          name: (typeof u?.name === "string" && u.name) || getRememberedIdentifier() || "your account",
-          href: want ?? landingFor(role),
-        })
-      }
-      setRemembered(getRememberedIdentifier())
+      setNext(safeNext(new URLSearchParams(window.location.search).get("next")))
       setSessionChecked(true)
     }, 0)
     return () => clearTimeout(id)
@@ -120,21 +108,6 @@ export default function SignupPage() {
 
   return (
     <AuthShell subtitle="Create your seller account">
-      {/* SOMEONE IS ALREADY SIGNED IN ON THIS BROWSER. Said, not acted on: making a second
-          account is a legitimate reason to be here, and so is being the second person at a
-          shared machine. Both were previously bounced to a dashboard that may not be
-          theirs. */}
-      {signedIn && (
-        <div className="mb-4 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
-          <span className="text-muted-foreground">Signed in as </span>
-          <span className="font-medium">{signedIn.name}</span>
-          <span className="text-muted-foreground"> — </span>
-          <Link href={signedIn.href} className="font-medium text-foreground hover:underline">
-            go to your dashboard
-          </Link>
-          <span className="text-muted-foreground">, or make another account below.</span>
-        </div>
-      )}
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Store name</span>
@@ -177,16 +150,15 @@ export default function SignupPage() {
           onError={setError}
         />
 
-        {/* The way back, named. "Already have an account? Sign in" is true for everyone and
-            useful to no one in particular; when this machine knows WHO, saying so turns a
-            generic link into one click. */}
+        {/* The way back, UNNAMED. This read "Log in as <name>" and carried the identifier in
+            the URL, which named whoever last used the browser to whoever is using it now.
+            Nothing is lost by dropping both: the login page fills the field from the
+            remembered identifier itself, so someone who ticked "remember me" still lands on
+            a form with only the password left to type, and someone else simply types theirs. */}
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link
-            href={remembered ? `/login?id=${encodeURIComponent(remembered)}` : "/login"}
-            className="font-medium text-foreground hover:underline"
-          >
-            {remembered ? `Log in as ${remembered}` : "Sign in"}
+          <Link href="/login" className="font-medium text-foreground hover:underline">
+            Log in
           </Link>
         </p>
       </form>
