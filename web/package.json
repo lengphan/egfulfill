@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "ulimit -u 150; next dev",
+    "dev": "ulimit -u $(( $(ps -u $(id -u) | wc -l) + 250 )) 2>/dev/null; next dev",
     "dev:unlimited": "next dev",
     "build": "next build",
     "start": "next start",
