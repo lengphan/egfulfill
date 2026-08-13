@@ -227,6 +227,48 @@ export function getShippoBilling() {
   return api<ShippoBilling>(`/api/shipping/billing`)
 }
 
+// ── Cash accounts — WHERE the money actually sits ────────────────────────────
+// wallet_ledger says what moved; these say which real account it moved through. See
+// server/src/routes/cash_accounts.js.
+
+export type CashAccount = {
+  id: string; name: string; kind: string; opening: number
+  is_postage: boolean; note: string | null
+  /** opening + every movement attributed to it, test-marked rows excluded. */
+  balance: number
+  movements: number
+}
+export type CashAccountsView = {
+  accounts: CashAccount[]
+  /** Money the platform has seen that nobody has placed yet. Its own line on purpose. */
+  unassigned: { amount: number; entries: number }
+  total: number
+}
+
+export function getCashAccounts() {
+  return api<CashAccountsView>(`/api/cash-accounts`)
+}
+export function saveCashAccount(a: { id: string; name: string; kind?: string; opening?: number; isPostage?: boolean; note?: string }) {
+  return api<{ ok: boolean; id: string }>(`/api/cash-accounts`, { method: "POST", body: JSON.stringify(a) })
+}
+export function archiveCashAccount(id: string) {
+  return api<{ ok: boolean }>(`/api/cash-accounts/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
+/** Tell it what the account REALLY holds. The difference is recorded as its own ledger
+ *  entry rather than overwriting history — that gap is money that moved unseen. */
+export function reconcileCashAccount(id: string, actual: number) {
+  return api<{ ok: boolean; balance?: number; adjustment?: number; unchanged?: boolean }>(
+    `/api/cash-accounts/${encodeURIComponent(id)}/reconcile`, { method: "POST", body: JSON.stringify({ actual }) })
+}
+/** Money in or out of a real account — the factory's own payment, not a seller top-up. */
+export function recordCashPayment(id: string, p: { amount: number; direction: "in" | "out"; note?: string }) {
+  return api<{ ok: boolean }>(`/api/cash-accounts/${encodeURIComponent(id)}/payment`, { method: "POST", body: JSON.stringify(p) })
+}
+/** Move an existing ledger entry onto an account — how Unassigned gets emptied. */
+export function attributeLedgerEntry(ledgerId: string | number, account: string | null) {
+  return api<{ ok: boolean }>(`/api/cash-accounts/attribute/${ledgerId}`, { method: "PATCH", body: JSON.stringify({ account }) })
+}
+
 /** Mark a ledger row as test money, or restore it. Admin only; audited before/after,
  *  because it changes a balance someone has already been shown. Returns the account's
  *  recomputed balance so the screen can settle without a refetch. */
