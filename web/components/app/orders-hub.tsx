@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
+import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
@@ -1097,25 +1097,47 @@ export function OrdersHub() {
     setSelected(new Set()); setPushing(false); load()
   }
 
+  /**
+   * SEND THE SELECTED LABELS TO THE DISPATCH PARTNER.
+   *
+   * This used to set factory_status='working' and report "sent to the dispatch board",
+   * which is not what it said: moving an order to Working is Start, and after Start was
+   * added as its own bulk action the two buttons did the identical thing under different
+   * names. Two controls with one behaviour is how somebody presses the wrong one.
+   *
+   * It now calls the push the dispatch board itself uses. That needs a bought label —
+   * there is nothing for the partner to scan otherwise — and an order already pre-scanned
+   * or already sent is excluded, because re-sending a label that is out does nothing and
+   * the row gives no sign it went twice.
+   */
   const doPush = async () => {
-    if (!selected.size) return
+    const chosen = (orders ?? []).filter((o) => selected.has(o.id))
+    const ready = chosen.filter(dispatchable)
+    if (!ready.length) {
+      setPushMsg({ tone: "err", text: "None of those can be dispatched — they need a bought label that hasn't been sent yet." })
+      return
+    }
     setPushing(true); setPushMsg(null)
     try {
-      const ids = [...selected]
-      const results = await Promise.all(ids.map((id) =>
-        updateOrder(id, { factoryStatus: "working" })
-          .then(() => ({ ok: true, error: "" }))
-          .catch((e: unknown) => ({ ok: false, error: e instanceof Error ? e.message : "failed" }))))
-      const failed = results.filter((x) => !x.ok)
-      setPushMsg(failed.length
-        ? { tone: "err", text: `${ids.length - failed.length} sent · ${failed.length} failed — ${failed[0].error}` }
-        : { tone: "ok", text: `${ids.length} sent to the dispatch board — pick the scan route there.` })
+      const r = await pushToDispatch(ready.map((o) => o.id))
+      if (r.error) throw new Error(r.error)
+      const failed = (r.results ?? []).filter((x: { ok?: boolean }) => !x.ok)
+      const skipped = chosen.length - ready.length
+      setPushMsg({
+        tone: failed.length || skipped ? "err" : "ok",
+        // Their words verbatim: byeastside don't document error codes, so what came back is
+        // the only thing that helps.
+        text: `${r.pushed ?? ready.length - failed.length} sent to the partner`
+          + (failed.length ? ` · ${failed.length} failed — ${failed[0].error ?? "unknown error"}` : "")
+          + (skipped ? ` · ${skipped} skipped (no label, or already sent)` : ""),
+      })
       setSelected(new Set())
       load()
     } catch (e) {
-      setPushMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't send those to the board." })
+      setPushMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't send those to the partner." })
     } finally { setPushing(false) }
   }
+
 
   // Artwork for EVERY row on the page, not only the open ones — the collapsed row now
   // carries a photo strip, and a strip of bare blanks on a production board is a picture
@@ -2131,7 +2153,11 @@ export function OrdersHub() {
                             item={it}
                             designs={designs[o.id]}
                             catalog={catalog}
-                            size={canDesign && stage === "" ? 104 : 64}
+                            // Bigger while a blank is being chosen — that panel is dense with text on the right
+                            // and the thumbnails were leaving the left column half empty. The pair
+                            // renders wider than one tile (see OVERLAP), so this is the size of EACH
+                            // card, not the strip.
+                            size={canDesign && stage === "" ? 136 : 88}
                             onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
                             /**
                              * A DROP LANDS ON THIS LINE, AND ONLY THIS LINE.
