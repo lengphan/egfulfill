@@ -496,6 +496,41 @@ async function pushMarketplaceTracking(order, tracking, carrier) {
   }
 }
 
+/**
+ * Push an order's tracking to its marketplace, ONCE, from wherever the tracking came from.
+ *
+ * The push used to live only in the order-status PATCH, so it fired when someone marked the
+ * order shipped — but the label-buy paths (usps.js) and the standalone-label attach
+ * (dispatch.js) write `orders.tracking` with their own UPDATE and never went near it. Tracking
+ * therefore existed on our side and never reached Etsy: five Etsy orders carried a number and
+ * not one had `marketplace_fulfilled_at`, four of them still sitting at status `new`.
+ *
+ * `marketplace_fulfilled_at` is the once-only guard — it is stamped only on a real send, so a
+ * re-save, a re-attach or a second caller can never re-email the buyer, and a dry run leaves it
+ * null so flipping the gate later still fires the first real push.
+ *
+ * A TEST label must never come through here: it would mark a live receipt shipped and email a
+ * real buyer a tracking number the carrier has never heard of. Callers pass `test` and get a
+ * no-op. Best-effort by contract — the label is already bought and paid for, so nothing in here
+ * may turn a successful purchase into a failed one. Never throws.
+ */
+export async function fulfillMarketplace(orderId, { test = false } = {}) {
+  if (!orderId || test) return { skipped: test ? 'test-label' : 'no-order' };
+  try {
+    const o = (await q(
+      'select id, store, seller_id, tracking, carrier, marketplace_fulfilled_at from orders where id=$1',
+      [orderId])).rows[0];
+    if (!o || !o.tracking || o.marketplace_fulfilled_at) return { skipped: 'nothing-to-push' };
+    const push = await pushMarketplaceTracking(o, o.tracking, o.carrier);
+    if (push && push.ok) {
+      await q('update orders set marketplace_fulfilled_at=now() where id=$1', [orderId]).catch(() => {});
+    }
+    return push;
+  } catch (e) {
+    return { error: (e && e.message) || 'push failed' };
+  }
+}
+
 export function ordersRoutes(app, requireAuth) {
   // Idempotent: ensure the factory_order column exists (also created in etsy.js).
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
@@ -1477,13 +1512,9 @@ export function ordersRoutes(app, requireAuth) {
         // marketplace_fulfilled_at so a re-save can't re-email the buyer; a dry run doesn't
         // stamp it, so flipping the gate later still fires the real push.
         try {
-          const o = (await q('select id, store, seller_id, tracking, carrier, marketplace_fulfilled_at from orders where id=$1', [req.params.id])).rows[0];
-          if (o && o.tracking && !o.marketplace_fulfilled_at) {
-            const push = await pushMarketplaceTracking(o, o.tracking, o.carrier);
-            if (push && push.ok) {
-              await q('update orders set marketplace_fulfilled_at=now() where id=$1', [req.params.id]).catch(() => {});
-              audit(req, 'order.marketplace_fulfilled', { entityType: 'order', entityId: req.params.id, after: { channel: push.channel } });
-            }
+          const push = await fulfillMarketplace(req.params.id);
+          if (push && push.ok) {
+            audit(req, 'order.marketplace_fulfilled', { entityType: 'order', entityId: req.params.id, after: { channel: push.channel } });
           }
         } catch (e) { req.log && req.log.warn && req.log.warn({ err: String(e) }, 'marketplace tracking push failed'); }
       }

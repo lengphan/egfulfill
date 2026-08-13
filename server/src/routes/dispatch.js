@@ -72,6 +72,7 @@ import { egBroadcast } from '../events.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll as readSettings } from './factory_settings.js';
 import { recordCost } from '../costs.js';
+import { fulfillMarketplace } from './orders.js';
 
 // Read at CALL time, not module load: the key can be set from Settings › Integrations
 // (secrets.js overlays app_secrets onto process.env), and a module-load capture would
@@ -861,6 +862,10 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       after: { tracking: s.tracking, fromShipment: id, cost: s.cost, carrier: s.carrier },
       note: `Standalone label ${id} attached to order ${orderId} · ${s.tracking}`,
     });
+    // The order has a tracking number as of this statement, so the marketplace can be told.
+    // Same once-only guard and same live gate as every other push path; a test label is
+    // skipped so a watermarked number never marks a real receipt shipped.
+    fulfillMarketplace(orderId, { test: s.test === true }).catch(() => {});
     egBroadcast({ type: 'orders' });
     return { ok: true, orderId, tracking: s.tracking };
   });

@@ -19,7 +19,7 @@ import { recordCost } from '../costs.js';
 import { shipFromForOrder } from './factory_settings.js';
 import { shippingEnabled, aggregatorBuyCheapest, aggregatorBuyRate, aggregatorVerifyAddress } from './shipping.js';
 import { recordShipment } from '../shipments-store.js';
-import { missingArtwork } from './orders.js';
+import { missingArtwork, fulfillMarketplace } from './orders.js';
 
 // Map a USPS mailClass to a service-name hint for the aggregator rate filter.
 function _svcPref(mc) {
@@ -426,6 +426,14 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
       `update orders set label_provider=$1, label_ref=$2, label_carrier_account=$3 where id=$4`,
       [ref.provider || null, ref.providerId, ref.carrierAccount || null, orderId]).catch(() => {});
   }
+
+  // Tell the marketplace, now that the order actually has a tracking number. This is the
+  // moment tracking comes into existence for a label-bought order — waiting for someone to
+  // separately mark it shipped is why Etsy orders sat with a number we never sent. Guarded
+  // once-only inside fulfillMarketplace, gated by MARKETPLACE_FULFILL_LIVE, and never for a
+  // test label. Fire-and-forget: a marketplace hiccup must not fail a bought label.
+  fulfillMarketplace(orderId, { test: isTest }).catch(() => {});
+
   return { shipped: false, stage: cur };
 }
 
