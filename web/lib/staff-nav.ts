@@ -22,10 +22,18 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
   // Purchasing = Suppliers (browse) + Purchase (cart/on-order/history) folded into one
   // section with tabs. Old /suppliers + /purchase routes redirect here (next.config).
-  // ADMIN ONLY. Purchasing commits company money to a supplier and the list shows unit cost
-  // across every blank we buy. Receiving stock is NOT here — that's the Inventory > Scan
-  // station, still open to warehouse — so the floor can still book deliveries in.
-  { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, roles: ["admin"] },
+  //
+  // OPERATORS BROWSE; ONLY ADMIN BUYS. The section was admin-only outright, which also shut
+  // operators out of the supplier catalogues — so building the product catalogue meant
+  // retyping a blank an operator was already looking at, or asking an admin to do it. The
+  // tabs are split by that line instead (see PurchasingView): All suppliers and Favorites
+  // are open to operators, Cart and Sample are not, and the Order button is not rendered for
+  // them anywhere.
+  //
+  // The boundary that matters is the server's, and it already draws the same line: every
+  // /api/purchase* route is requireAdmin, while browsing, favourites and add-to-catalog are
+  // requireStaff. Nothing here grants an operator anything the API would not.
+  { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, roles: ["operator", "admin"] },
   // Sourcing — the supplier pipeline: where a product could come from, what it lands at, and
   // how far along each supplier is (Saved -> In touch -> Sampling -> Approved, derived from
   // sample orders and recorded messages rather than typed — see SOURCING_STAGES). Its own

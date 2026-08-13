@@ -479,7 +479,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
            sku the supplier will actually accept — a cart line carrying our own guess at a
            code is a purchase order that gets rejected. The variant chosen here rides along
            as the preselection. */
-        onAddToCart={detail ? async (sel) => {
+        onAddToCart={detail && isAdmin ? async (sel) => {
           const it = detail.item
           const base = quickOrderFor(it)
           setDetail(null)
@@ -573,7 +573,13 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
                   added={added.has(keyOf(it))}
                   adding={addingId === keyOf(it)}
                   onAdd={() => addToCatalog(it)}
-                  onQuickOrder={async () => {
+                  // ORDERING IS ADMIN. An operator browses these catalogues to build OUR
+                  // catalogue from them; committing money to a supplier is not their call.
+                  // Passing undefined removes the button rather than disabling it — the card
+                  // gives Add to catalog the full row when Order isn't offered, so an
+                  // operator sees a complete control, not a greyed-out one they must ask
+                  // about. The server agrees regardless: /api/purchase* is requireAdmin.
+                  onQuickOrder={!isAdmin ? undefined : async () => {
                     const base = quickOrderFor(it)
                     // Otto sizes have no sku on the card; fetch the real ones so what's
                     // ordered is a code the supplier recognises.

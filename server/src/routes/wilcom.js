@@ -53,6 +53,47 @@ const XML_ESC = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').re
 // EWA filenames accept only 0-9 a-z A-Z - _ space; sanitize anything else.
 const safeName = (s, fallback) => (String(s || '').replace(/[^0-9A-Za-z _-]/g, '_').trim() || fallback);
 
+/**
+ * WHICH .EMB VERSION THE API WRITES.
+ *
+ * EWA defaults to **e4.5**, and we were never sending `design_version` — so every native
+ * .emb came back as e4.5 and EmbroideryStudio **e4.2 could not open it at all**. Not a
+ * corrupt download and not a parsing bug: a newer EMB simply doesn't load in an older
+ * Wilcom, and the file that arrives is unusable to the person it was digitised for.
+ *
+ * So the default here is the version the floor actually RUNS, not the version the API
+ * prefers. `WILCOM_EMB_VERSION` overrides it when that changes — read at call time rather
+ * than module load, because a key or setting saved after boot must still apply.
+ *
+ * Documented values (docs/WILCOM-EWA-PHASE1.md): e4.5 e4.2 e4.1 e4.0 e3.x e2, plus the 2024
+ * and 2025 natives. Anything else falls back rather than being passed through — an
+ * unrecognised version is refused by EWA, which would turn a typo in .env into every
+ * digitize failing.
+ *
+ * NATIVE .EMB ONLY. Stitch formats (.dst/.pes) carry no version, so this is emitted only
+ * when a design_file is actually being asked for.
+ */
+const EMB_VERSIONS = ['e4.5', 'e4.2', 'e4.1', 'e4.0', 'e3.x', 'e2', '2024', '2025'];
+const DEFAULT_EMB_VERSION = 'e4.2';
+function embVersion() {
+  const v = String(process.env.WILCOM_EMB_VERSION || '').trim().toLowerCase();
+  return EMB_VERSIONS.includes(v) ? v : DEFAULT_EMB_VERSION;
+}
+
+/**
+ * The shared `<output …>` attributes. Was duplicated at four call sites, which is how the
+ * missing design_version stayed missing in all four.
+ */
+function outputAttrs(designFile, trueviewFile) {
+  return [
+    designFile ? `design_file="${XML_ESC(designFile)}"` : '',
+    // Only meaningful alongside a native design file — see embVersion().
+    designFile ? `design_version="${embVersion()}"` : '',
+    `trueview_file="${XML_ESC(trueviewFile)}"`,
+    'dpi="120"',
+  ].filter(Boolean).join(' ');
+}
+
 function fromDataUrl(dataUrl) {
   const m = /^data:(image\/[a-z0-9.+-]+);base64,([\s\S]+)$/i.exec(String(dataUrl || ''));
   if (!m) return null;
@@ -63,7 +104,7 @@ function fromDataUrl(dataUrl) {
 
 function buildBitmapXml({ filename, base64, width, height, designFile }) {
   const dims = [width ? `width="${Number(width)}"` : '', height ? `height="${Number(height)}"` : ''].filter(Boolean).join(' ');
-  const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="trueview.png"', 'dpi="120"'].filter(Boolean).join(' ');
+  const out = outputAttrs(designFile, 'trueview.png');
   // NB: the <bitmap> file-reference attribute name is UNCONFIRMED in the spec — `file` is the
   // best read of "specifies which file element will be processed". If the first live call
   // rejects it, the EWA error says so; fix the attribute here.
@@ -229,7 +270,7 @@ const hexToColorInt = (hex) => {
   return (r || 0) + ((g || 0) << 8) + ((b || 0) << 16);
 };
 function buildLetteringXml({ text, alphabet, height, colorInt, designFile }) {
-  const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="preview.png"', 'dpi="120"'].filter(Boolean).join(' ');
+  const out = outputAttrs(designFile, 'preview.png');
   const h = Math.min(50, Math.max(5, Number(height) || 20));
   return '<xml><recipe>'
     + '<decorations><lettering>'
@@ -310,7 +351,7 @@ function tfXml(tf) {
 }
 function buildCombinedXml({ embName, embBase64, text, alphabet, letterHeight, colorInt, designFile, designTf, letterTf }) {
   const lh = Math.min(50, Math.max(5, Number(letterHeight) || 20));
-  const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="preview.png"', 'dpi="120"'].filter(Boolean).join(' ');
+  const out = outputAttrs(designFile, 'preview.png');
   return '<xml><recipe>'
     + '<decorations>'
     + `<design file="${XML_ESC(embName)}" colorwaytype="current">${tfXml(designTf)}</design>`
@@ -340,7 +381,7 @@ function decoXml(d) {
     + `<thread color="${d.colorInt}"/></lettering>`;
 }
 function buildMultiXml({ decorations, files, designFile }) {
-  const out = [designFile ? `design_file="${XML_ESC(designFile)}"` : '', 'trueview_file="preview.png"', 'dpi="120"'].filter(Boolean).join(' ');
+  const out = outputAttrs(designFile, 'preview.png');
   return '<xml><recipe><decorations>'
     + decorations.map(decoXml).join('')
     + '</decorations>'
