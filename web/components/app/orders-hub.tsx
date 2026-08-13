@@ -2184,11 +2184,15 @@ export function OrdersHub() {
                             item={it}
                             designs={designs[o.id]}
                             catalog={catalog}
-                            // Bigger while a blank is being chosen — that panel is dense with text on the right
-                            // and the thumbnails were leaving the left column half empty. The pair
-                            // renders wider than one tile (see OVERLAP), so this is the size of EACH
-                            // card, not the strip.
-                            size={canDesign && stage === "" ? 136 : 88}
+                            // Bigger while a blank is being chosen — that panel is denser on the
+                            // right, and the thumbnails were leaving the left column half empty.
+                            //
+                            // 136 was sized against a right column carrying THREE stacked meta
+                            // lines. Those are one wrapping line now (OrderedVariant), so the tall
+                            // case is ~34px shorter and 136 would put the empty band back on the
+                            // other side. This is the size of the PRINT card; the listing tucks
+                            // behind it and adds PEEK, not another full tile.
+                            size={canDesign && stage === "" ? 104 : 88}
                             onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
                             /**
                              * A DROP LANDS ON THIS LINE, AND ONLY THIS LINE.

@@ -125,9 +125,21 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   const showBoth = !!(listing && (art || blank) && listing !== blank) && !listingFirst && size >= 56
   /** Which card is in front. The print leads, because it is what the floor makes. */
   const [listingFront, setListingFront] = useState(false)
-  /** How far the second card sits along — 0.62 leaves a good third of the back card
-   *  visible, which is enough to read it AND enough to click without aiming. */
-  const OVERLAP = 0.62
+  /**
+   * A PRIMARY AND A REFERENCE — not two equal cards.
+   *
+   * They were the same size, side by side, and that is why the pair read as odd: with equal
+   * weight nothing says which one matters, so the eye bounces between them and neither gets
+   * read. The print is the answer to "what do I make", so it is full size and in front; the
+   * listing is the thing you glance at to check it, so it is smaller and tucked behind the
+   * print's left edge, peeking out far enough to recognise and to click.
+   *
+   * PEEK is how much of the listing shows to the left of the print. It doubles as the whole
+   * strip's extra width, so the pair costs size × (1 + PEEK) instead of the 1.62 two equal
+   * cards needed.
+   */
+  const PEEK = 0.4
+  const SECONDARY = 0.78
 
   const open = () => {
     if (onEdit) { onEdit(); return }
@@ -160,17 +172,18 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
       <div
         {...dropProps}
         className={"group/avatar relative shrink-0 " + (over ? "rounded-md ring-2 ring-primary ring-offset-1 " : "") + (className ?? "")}
-        // Wide enough for both cards at their overlap. Only when both are shown, so every
-        // other caller's layout is exactly as it was.
-        style={{ width: showBoth ? Math.round(size * (1 + OVERLAP)) : size, height: size }}
+        // Wide enough for the print plus the listing's peek. Only when both are shown, so
+        // every other caller's layout is exactly as it was.
+        style={{ width: showBoth ? Math.round(size * (1 + PEEK)) : size, height: size }}
       >
+        {/* THE PRINT — full size, in front, offset right by exactly the listing's peek. */}
         <button
           type="button"
           onClick={showBoth && listingFront ? () => setListingFront(false) : open}
           title={showBoth && listingFront ? "Bring the design forward" : (onEdit ? "Edit the design" : "View larger")}
-          className={"eg-tap overflow-hidden rounded-md bg-muted transition-colors " + (bare ? "" : "border border-border hover:border-foreground/25")
-            + (showBoth ? (listingFront ? " absolute left-0 top-1/2 -translate-y-1/2 z-0" : " absolute left-0 top-1/2 -translate-y-1/2 z-20 border-2 border-background shadow-md") : " size-full")}
-          style={showBoth ? { width: size, height: size } : undefined}
+          className={"eg-tap overflow-hidden rounded-md bg-muted transition-[border-color,transform] " + (bare ? "" : "border border-border hover:border-foreground/25")
+            + (showBoth ? (listingFront ? " absolute top-1/2 -translate-y-1/2 z-0" : " absolute top-1/2 -translate-y-1/2 z-20 border-2 border-background shadow-md") : " size-full")}
+          style={showBoth ? { left: Math.round(size * PEEK), width: size, height: size } : undefined}
         >
           <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} />
           {/* Affordance only where there's something to do — and only on hover, so the
@@ -181,16 +194,17 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         </button>
 
         {/**
-          * THE LISTING, AS A SECOND CARD BESIDE THE PRINT.
+          * THE LISTING, TUCKED BEHIND THE PRINT'S LEFT EDGE.
           *
-          * Overlapping just enough to read as a pair rather than two unrelated tiles, and
-          * the interaction follows the overlap: the card BEHIND is a swap (click it and it
-          * comes forward), the card in FRONT is the real action (the print opens the design
-          * step, the listing opens at full size).
+          * Smaller and behind, because it is the reference and the print is the answer. The
+          * interaction rule is unchanged and still one sentence: the card BEHIND is a swap
+          * (click it and it comes forward), the card in FRONT is the real action (the print
+          * opens the design step, the listing opens at full size). Neither card can steal the
+          * other's click, which was the whole problem with a swap toggle and then with a
+          * click-through inset.
           *
-          * That is one rule — "click the back one to bring it forward, click the front one
-          * to open it" — and it means neither card can steal the other's click, which was
-          * the whole problem with a swap toggle and then with a click-through inset.
+          * It grows to full size when brought forward, so "in front" is never something you
+          * have to infer from a z-index you cannot see.
           */}
         {showBoth && (
           <button
@@ -202,10 +216,18 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             }}
             title={listingFront ? "View the buyer's listing photo" : "Bring the listing photo forward"}
             className={
-              "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border-2 border-background bg-muted shadow-md transition-transform hover:scale-[1.03] " +
+              "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border-2 border-background bg-muted shadow-md transition-all hover:brightness-105 " +
               (listingFront ? "z-20" : "z-0")
             }
-            style={{ left: Math.round(size * OVERLAP), width: size, height: size }}
+            // NO `transform` here. Tailwind v4 compiles -translate-y-1/2 to the `translate`
+            // property, not `transform` — they are separate properties and both apply, so an
+            // inline translateY(-50%) centred the card TWICE and lifted it clean out of the
+            // row. Sizing only; the class does the centring.
+            style={
+              listingFront
+                ? { left: 0, width: size, height: size }
+                : { left: 0, width: Math.round(size * SECONDARY), height: Math.round(size * SECONDARY) }
+            }
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={listing} alt="Buyer's listing photo" className="size-full object-cover" />

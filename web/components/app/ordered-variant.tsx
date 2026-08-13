@@ -42,30 +42,43 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
   const qty = Math.max(1, Number(item.qty) || 1)
   if (!ordered && !sku) return null
 
+  /**
+   * ONE WRAPPING LINE, not three stacked ones.
+   *
+   * These are three short values whose LABELS are longer than their data, and as full-width
+   * rows they cost ~34px of height on every line of every expanded order — which in turn was
+   * what forced the thumbnail up to 136px to avoid a half-empty left column. Inline, they
+   * read as one sentence about the line and wrap only when the width genuinely runs out.
+   *
+   * The labels STAY. "Listing SKU" is not the blank sku we buy against (CLAUDE.md §5), and a
+   * bare mono string next to a size and a count is exactly the ambiguity that distinction
+   * exists to prevent.
+   *
+   * Personalisation is still deliberately absent — the order panel above prints it once, in
+   * full, and a copy under every line turns a four-line order into the same sentence four
+   * times.
+   */
+  const parts: React.ReactNode[] = []
+  if (ordered) parts.push(<span key="o"><span className="font-medium text-foreground/70">Ordered:</span> {ordered}</span>)
+  if (sku) parts.push(<span key="s"><span className="font-medium text-foreground/70">Listing SKU:</span> <span className="font-mono">{sku}</span></span>)
+  // ALWAYS PRESENT, including x1. An absent count and a count of one must never look the
+  // same to someone pulling stock. Emphasised past one so a 6 catches the eye where a 1
+  // should not.
+  parts.push(
+    <span key="q">
+      <span className="font-medium text-foreground/70">Qty</span>{" "}
+      <span className={qty > 1 ? "font-semibold text-foreground" : ""}>{qty}</span>
+    </span>
+  )
+
   return (
-    <div className={"mt-0.5 space-y-0.5 text-xs leading-snug " + className}>
-      {ordered && (
-        <div className="text-muted-foreground">
-          <span className="font-medium text-foreground/70">Ordered:</span> {ordered}
-        </div>
-      )}
-      {/* Personalisation is deliberately NOT repeated here — the order panel above already
-          prints it once, in full, and a second copy under every line turns a four-line order
-          into the same sentence four times. */}
-      {sku && (
-        <div className="text-muted-foreground">
-          <span className="font-medium text-foreground/70">Listing SKU:</span>{" "}
-          <span className="font-mono">{sku}</span>
-        </div>
-      )}
-      {/* Its own labelled line, reading like the two above it rather than a bare xN tacked
-          onto the end of one. Emphasised past one so a 6 catches the eye where a 1 should
-          not — but always present, because an absent count and a count of one must never
-          look the same to someone pulling stock. */}
-      <div className="text-muted-foreground">
-        <span className="font-medium text-foreground/70">Quantity:</span>{" "}
-        <span className={qty > 1 ? "font-semibold text-foreground" : ""}>{qty}</span>
-      </div>
+    <div className={"mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs leading-snug text-muted-foreground " + className}>
+      {parts.map((p, i) => (
+        <span key={i} className="inline-flex items-baseline gap-2">
+          {i > 0 && <span aria-hidden className="text-border">·</span>}
+          {p}
+        </span>
+      ))}
     </div>
   )
 }
