@@ -187,6 +187,19 @@ const PLACEMENTS: { label: string; w: number; h: number }[] = [
 const MAX_AREA_MM2 = 22500
 const mmToIn = (mm: number) => mm / 25.4
 const fmtIn = (mm: number) => `${mmToIn(mm).toFixed(1)}"`
+/**
+ * Inches as a bare editable value — no quote mark, so it can go in an input.
+ *
+ * TWO decimals, trailing zeros stripped. One decimal reads more cleanly but quantises to
+ * 2.5mm, and the placement presets are stated in round mm: a left chest is 90mm, which at one
+ * decimal displays as 3.5" and converts back to 89mm. The preset would then no longer send the
+ * size it names. At two decimals it round-trips exactly, and a value that doesn't need them
+ * (3.5", 4") still shows short.
+ */
+const inOf = (mm: number) => mmToIn(mm).toFixed(2).replace(/\.?0+$/, "")
+/** What the user typed, back to the mm every size path below is expressed in. NaN when the
+ *  field is mid-edit or nonsense, and every caller guards on `> 0`. */
+const inToMm = (v: string) => Number(v) * 25.4
 
 // ── The detail modal: original ↔ big embroidery preview + thread matching ────────
 function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem; palette: ThreadColor[]; onClose: () => void; onGenerated: () => void }) {
@@ -195,7 +208,9 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
   const [err, setErr] = useState<string | null>(null)
   const [routing, setRouting] = useState(false)
   const [routed, setRouted] = useState(false)
-  /** Target finished size in mm. Empty = let Wilcom choose, which is the old behaviour. */
+  /** Target finished size in INCHES, as typed. Empty = let Wilcom choose, which is the old
+   *  behaviour. mm is derived at the edge (wMm/hMm) because that is what EWA is given — the
+   *  floor states placements in inches, so that is what the field holds. */
   const [size, setSize] = useState<{ w: string; h: string }>({ w: "", h: "" })
   /** Keep the artwork's proportions: typing one dimension derives the other. Off by default
    *  would let someone silently distort a logo, which is not recoverable from the output. */
@@ -214,16 +229,22 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
     return () => { live = false }
   }, [item])
 
-  const wNum = Number(size.w) || 0
-  const hNum = Number(size.h) || 0
+  // Inches as typed; mm as sent. Wilcom's area ceiling is stated in mm², so the check has to
+  // happen on the converted values, not the typed ones.
+  const wIn = Number(size.w) || 0
+  const hIn = Number(size.h) || 0
+  const wNum = wIn > 0 ? Math.round(wIn * 25.4) : 0
+  const hNum = hIn > 0 ? Math.round(hIn * 25.4) : 0
   const areaOver = wNum > 0 && hNum > 0 && wNum * hNum > MAX_AREA_MM2
+  // One decimal, in inches — rounding to whole units here would quantise a 2.5" chest logo
+  // to 2" or 3", which mm never did.
   const setW = (v: string) => {
     const n = Number(v)
-    setSize(lockRatio && aspect && n > 0 ? { w: v, h: String(Math.round(n / aspect)) } : (p) => ({ ...p, w: v }))
+    setSize(lockRatio && aspect && n > 0 ? { w: v, h: (n / aspect).toFixed(1) } : (p) => ({ ...p, w: v }))
   }
   const setH = (v: string) => {
     const n = Number(v)
-    setSize(lockRatio && aspect && n > 0 ? { w: String(Math.round(n * aspect)), h: v } : (p) => ({ ...p, h: v }))
+    setSize(lockRatio && aspect && n > 0 ? { w: (n * aspect).toFixed(1), h: v } : (p) => ({ ...p, h: v }))
   }
 
   useEffect(() => {
@@ -306,14 +327,17 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 {PLACEMENTS.map((pl) => {
                   // A preset fills the box it has to fit INSIDE, so the art keeps its shape
                   // rather than being stretched to the placement's own ratio.
+                  // PLACEMENTS are stated in mm (that's how a placement is specified), so the
+                  // comparison and the fill both happen in mm and only the stored value is
+                  // inches.
                   const on = wNum === pl.w || (aspect ? Math.round(Math.min(pl.w, pl.h * aspect)) === wNum : false)
                   return (
                     <button
                       key={pl.label}
                       onClick={() => {
-                        if (!aspect) { setSize({ w: String(pl.w), h: String(pl.h) }); return }
+                        if (!aspect) { setSize({ w: inOf(pl.w), h: inOf(pl.h) }); return }
                         const w = Math.min(pl.w, pl.h * aspect)
-                        setSize({ w: String(Math.round(w)), h: String(Math.round(w / aspect)) })
+                        setSize({ w: inOf(w), h: inOf(w / aspect) })
                       }}
                       className={"eg-tap rounded-md border px-2 py-1 text-2xs font-medium transition-colors " +
                         (on ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground")}
@@ -327,24 +351,26 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 <label className="flex flex-1 items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">W</span>
                   <input inputMode="decimal" value={size.w} onChange={(e) => setW(e.target.value)} placeholder="auto"
-                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished width in millimetres" />
+                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished width in inches" />
                 </label>
                 <span className="text-xs text-muted-foreground">×</span>
                 <label className="flex flex-1 items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">H</span>
                   <input inputMode="decimal" value={size.h} onChange={(e) => setH(e.target.value)} placeholder="auto"
-                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished height in millimetres" />
+                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished height in inches" />
                 </label>
-                <span className="shrink-0 text-xs text-muted-foreground">mm</span>
+                <span className="shrink-0 text-xs text-muted-foreground">in</span>
                 {(wNum > 0 || hNum > 0) && (
                   <button onClick={() => setSize({ w: "", h: "" })} className="eg-tap shrink-0 rounded-md px-1.5 py-1 text-2xs text-muted-foreground hover:text-foreground" title="Back to automatic">Auto</button>
                 )}
               </div>
-              {/* Inches beside mm, always. A US floor sizes placements in inches and a
-                  mm-only field is a conversion someone does in their head and gets wrong. */}
+              {/* The fields ARE inches now, so this no longer repeats them. What is left is
+                  the mm² area, which is the only reason mm still appears on this screen:
+                  Wilcom's auto-digitize ceiling is stated in mm² and refusing to show it
+                  would make the warning below arrive from nowhere. */}
               {wNum > 0 && hNum > 0 && (
                 <div className="mt-1.5 text-2xs tabular-nums text-muted-foreground">
-                  {fmtIn(wNum)} × {fmtIn(hNum)} · {Math.round(wNum * hNum).toLocaleString()} mm²
+                  {Math.round(wNum * hNum).toLocaleString()} mm² of Wilcom&apos;s {MAX_AREA_MM2.toLocaleString()} limit
                 </div>
               )}
               {areaOver && (
@@ -414,7 +440,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <div><div className="text-xs text-muted-foreground">Stitches</div><div className="font-semibold tabular-nums">{res.stitches != null ? res.stitches.toLocaleString() : "—"}</div></div>
                   <div><div className="text-xs text-muted-foreground">Colours</div><div className="font-semibold tabular-nums">{res.colours ?? "—"}</div></div>
-                  <div><div className="text-xs text-muted-foreground">Size</div><div className="font-semibold tabular-nums">{res.width != null && res.height != null ? `${Math.round(res.width)} × ${Math.round(res.height)} mm` : "—"}</div>{res.width != null && res.height != null && <div className="text-2xs tabular-nums text-muted-foreground">{fmtIn(res.width)} × {fmtIn(res.height)}</div>}</div>
+                  <div><div className="text-xs text-muted-foreground">Size</div><div className="font-semibold tabular-nums">{res.width != null && res.height != null ? `${fmtIn(res.width)} × ${fmtIn(res.height)}` : "—"}</div></div>
                   <div><div className="text-xs text-muted-foreground">Format</div><div className="font-semibold">{res.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : "preview"}</div></div>
                 </div>
               ) : (
@@ -604,6 +630,8 @@ function CreateTab() {
   // every keystroke fed a half-typed number ("9" of "90") back through the scale clamp and the
   // rounding — typing 90 actually landed on 110. Hold the keystrokes, commit on blur/Enter.
   const [wDraft, setWDraft] = useState<string | null>(null)
+  /** Same, for the height box — either dimension can be the one you type. */
+  const [hDraft, setHDraft] = useState<string | null>(null)
   // Drop `dragId` onto `targetId`: dragId takes the target's slot in the stack.
   const reorderTo = (dragId: string, targetId: string) => setLayers((prev) => {
     if (dragId === targetId) return prev
@@ -757,7 +785,25 @@ function CreateTab() {
    */
   const resizeTo = (targetW: number) => {
     if (!footprint || !(targetW > 0)) return
-    const f = targetW / footprint.w
+    applyFactor(targetW / footprint.w)
+  }
+
+  /**
+   * The same resize, driven by the HEIGHT instead.
+   *
+   * Height used to be a read-only number that followed the width, so a placement stated as a
+   * height — a cap front is 50mm tall and the width is whatever the art makes it — could only
+   * be reached by typing widths until the other number landed. Either dimension can now be the
+   * one you pin; the arrangement keeps its proportions whichever you type, because a layer
+   * carries ONE scale and there is no honest way to stretch one axis (see the note on the
+   * inputs).
+   */
+  const resizeToHeight = (targetH: number) => {
+    if (!footprint || !(targetH > 0)) return
+    applyFactor(targetH / footprint.h)
+  }
+
+  const applyFactor = (f: number) => {
     if (!Number.isFinite(f) || f <= 0) return
     setLayers((prev) => prev.map((l) => ({
       ...l,
@@ -977,8 +1023,12 @@ function CreateTab() {
 
           {/* Editable, and LIVE — driven by the layer boxes, so it reads a real size while you
               are still arranging instead of "—" until the first generate. */}
+          {/* INCHES, and only inches. This bar carried the size in mm with a separate inches
+              readout beside it — the same two numbers twice, in a strip whose whole job is to
+              answer "does this fit the placement". The floor sizes placements in inches, so
+              that is the unit; mm survives underneath, because it is what EWA is given. */}
           <div>
-            <div className="text-2xs text-muted-foreground">Width × height</div>
+            <div className="text-2xs text-muted-foreground">Width × height (in)</div>
             {/* Empty until there is something to measure. An enabled-looking input with no
                 value reads as a field that failed to load, not as "nothing here yet". */}
             {!footprint ? (
@@ -987,31 +1037,33 @@ function CreateTab() {
               <div className="flex items-center gap-1.5">
                 <input
                   inputMode="decimal"
-                  value={wDraft ?? String(Math.round(footprint.w))}
+                  value={wDraft ?? inOf(footprint.w)}
                   onChange={(e) => setWDraft(e.target.value)}
                   // Commit, then drop the draft so the box snaps back to the size actually
                   // achieved — clampScale can land short of the target, and showing the number
                   // you asked for instead of the one you got would hide that.
-                  onBlur={() => { if (wDraft != null) { resizeTo(Number(wDraft)); setWDraft(null) } }}
+                  onBlur={() => { if (wDraft != null) { resizeTo(inToMm(wDraft)); setWDraft(null) } }}
                   onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setWDraft(null) }}
-                  aria-label="Design width in millimetres"
+                  aria-label="Design width in inches"
                   className="h-7 w-16 rounded-md border border-input bg-background px-1.5 text-base font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
                 <span className="text-sm text-muted-foreground">×</span>
-                {/* Height follows: the resize is uniform, so letting you type a height that
-                    broke the arrangement's proportions would be a lie about what happened. */}
-                <span className="text-base font-semibold tabular-nums">{Math.round(footprint.h)}</span>
-                <span className="text-2xs text-muted-foreground">mm</span>
+                {/* EITHER dimension can be typed now. Both drive the SAME uniform resize —
+                    a layer carries one scale, so there is no way to stretch one axis without
+                    lying about what was actually produced. Pin the one the placement is
+                    stated in and the other follows. */}
+                <input
+                  inputMode="decimal"
+                  value={hDraft ?? inOf(footprint.h)}
+                  onChange={(e) => setHDraft(e.target.value)}
+                  onBlur={() => { if (hDraft != null) { resizeToHeight(inToMm(hDraft)); setHDraft(null) } }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setHDraft(null) }}
+                  aria-label="Design height in inches"
+                  className="h-7 w-16 rounded-md border border-input bg-background px-1.5 text-base font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                />
               </div>
             )}
           </div>
-
-          {footprint && (
-            <div>
-              <div className="text-2xs text-muted-foreground">Inches</div>
-              <div className="text-base font-semibold tabular-nums">{fmtIn(footprint.w)} × {fmtIn(footprint.h)}</div>
-            </div>
-          )}
 
           {/* Same placements as the digitize modal, so a size learned in one is the same
               button in the other. */}
