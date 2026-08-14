@@ -320,51 +320,41 @@ export function SupplierDetailDialog({
                   * stock" across a style is not an answer to "can you make six 2XL".
                   */}
                 {/**
-                  * PER VARIANT — a colourway and a size, which is the thing actually ordered.
+                  * THE VARIANT YOU CLICKED, AND ONLY THAT.
                   *
-                  * "6,949 at the supplier, across 3 colours" is true and useless: nobody buys
-                  * a style, they buy Black / XS, and a grand total hides the one size that is
-                  * empty. One row per colour, its sizes along it, so the gap is visible where
-                  * it matters rather than averaged away.
+                  * This listed every colourway with its sizes — fourteen rows of numbers under
+                  * a style with fourteen colours. Every figure was true and the block was
+                  * useless: a wall of quantities for thirteen variants nobody had asked about,
+                  * pushing the actual controls off the bottom of the panel.
                   *
-                  * Picking a colour narrows to that row; picking a size dims the others so the
-                  * column you care about stands out without the rest disappearing — what a
-                  * neighbouring size holds is exactly what you check before changing the pick.
+                  * Stock is a question you ask about a specific thing. So it answers when you
+                  * have named one — pick a colour and it shows that colourway's sizes, pick a
+                  * size too and it is a single number. Before that it says nothing, because
+                  * there is nothing yet to be asked about.
+                  *
+                  * The per-colour total still lives on each swatch's tooltip, which is where
+                  * you look while choosing rather than after.
                   */}
-                {d.stockByColor && (
+                {d.stockByColor && colour && (
                   <Section label="Stock">
                     {(() => {
-                      const rows = Object.entries(d.stockByVariant ?? {}).filter(([c]) => !colour || c === colour)
-                      if (!rows.length) return <span className="text-muted-foreground">No per-variant figures for this style.</span>
-                      /**
-                       * SAY EACH THING ONCE.
-                       *
-                       * The colour name is under its swatch now, and the size list is its own
-                       * row above — so repeating both here turned "521" into "Grey · One Size
-                       * 521", three labels around one number.
-                       *
-                       * Each label earns its place only when it distinguishes something: the
-                       * colour when more than one row is shown, the size when the style has
-                       * more than one. A single-size style in a chosen colour is just the
-                       * number, sitting next to the word Stock, which is all it ever was.
-                       */
-                      const manyColours = rows.length > 1
-                      const manySizes = d.sizes.length > 1
+                      const bySize = d.stockByVariant?.[colour] ?? {}
+                      const entries = Object.entries(bySize)
+                      if (!entries.length) return <span className="text-muted-foreground">No figures for this colourway.</span>
+                      // A size chosen as well: one number, no labels. Nothing else is in
+                      // question, and the colour and size are both lit up above.
+                      if (size) {
+                        const n = bySize[size]
+                        return n == null
+                          ? <span className="text-muted-foreground">Not offered in {size}.</span>
+                          : <span className={"text-lg font-semibold tabular-nums " + (n > 0 ? "" : "text-muted-foreground line-through")}>{n.toLocaleString()}</span>
+                      }
                       return (
-                        <span className="flex flex-col gap-1">
-                          {rows.map(([c, bySize]) => (
-                            <span key={c} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                              {manyColours && <span className="w-20 shrink-0 truncate text-muted-foreground">{prettyColorName(c)}</span>}
-                              {Object.entries(bySize).map(([z, n]) => (
-                                <span
-                                  key={z}
-                                  className={"tabular-nums " + (size && z !== size ? "text-muted-foreground/45" : n > 0 ? "font-medium text-foreground" : "text-muted-foreground line-through")}
-                                  title={`${c} / ${z}`}
-                                >
-                                  {manySizes && <span className="font-normal text-muted-foreground">{z} </span>}
-                                  {n.toLocaleString()}
-                                </span>
-                              ))}
+                        <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          {entries.map(([z, n]) => (
+                            <span key={z} className="tabular-nums">
+                              <span className="text-muted-foreground">{z} </span>
+                              <span className={"font-medium " + (n > 0 ? "" : "text-muted-foreground line-through")}>{n.toLocaleString()}</span>
                             </span>
                           ))}
                         </span>
