@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, Package, PenNib, Tag } from "@phosphor-icons/react"
+import { ArrowLeft, Package, Tag } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
-import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { getCatalogProducts, getDesignFees, type CatalogProduct, type DesignFees } from "@/lib/api"
+import { ShippingFees } from "@/components/shipping-fees"
 import { sizesOf, methodsOf } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { descriptionLines } from "@/lib/description"
@@ -66,6 +67,13 @@ export default function ProductDetailPage() {
   const id = decodeURIComponent(String(params?.id ?? ""))
   const [products, setProducts] = useState<CatalogProduct[] | null>(null)
   const [active, setActive] = useState(0)
+  // The platform's shipping fees — the other half of what a seller pays. Seller-safe read,
+  // so this page shows the same two numbers a board or the public site does.
+  const [fees, setFees] = useState<DesignFees | null>(null)
+  useEffect(() => {
+    const t = setTimeout(() => { getDesignFees().then(setFees).catch(() => setFees(null)) }, 0)
+    return () => clearTimeout(t)
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -182,13 +190,19 @@ export default function ProductDetailPage() {
             <div className="mt-1 font-mono text-sm text-muted-foreground">{product.sku ?? "—"}</div>
           </div>
 
+          {/* THE NUMBER, THEN WHAT SHIPPING ADDS TO IT.
+              "base price" was a caption saying what a large bold figure beside a product
+              already says, and it invited the reading it was meant to prevent — a price
+              with the parcel left out. The shipping table underneath is the missing half,
+              and it says it in figures rather than in a word. */}
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-semibold tabular-nums">{usd(priceOf(product))}</span>
-            <span className="text-sm text-muted-foreground">base price</span>
-            {shipFee > 0 && (
-              <span className="text-sm text-muted-foreground">+ shipping from {usd(shipFee)}</span>
-            )}
           </div>
+          <ShippingFees
+            first={fees?.shipFirst ?? shipFee}
+            extra={fees?.shipExtra ?? 0}
+            className="max-w-xs"
+          />
 
           {/* The primary action the old PDP had and this port dropped — nothing on the
               page let you actually do anything with the product. Carries id/colour/size
@@ -198,7 +212,7 @@ export default function ProductDetailPage() {
             className="w-full sm:w-auto"
             onClick={() => router.push(`/design/maker?product=${encodeURIComponent(String(product.id ?? product.sku ?? ""))}`)}
           >
-            <PenNib size={16} weight="bold" /> Start designing
+            Start designing
           </Button>
 
           <SectionCard title="Variants">

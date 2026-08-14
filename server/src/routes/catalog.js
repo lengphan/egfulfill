@@ -9,6 +9,7 @@ import { quoteSpec } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
+import { readAll as readSettings } from './factory_settings.js';
 
 // Roles that OWN pricing. A change by anyone else is legitimate — operators build
 // products, and that is the point — but it should not happen unseen, because a base
@@ -372,7 +373,14 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
 
   app.get('/api/public/products', async () => {
     const products = await publicProducts();
-    return { products: products.sort((a, b) => a.price - b.price).slice(0, 24) };
+    // The two shipping numbers ride along. A price with no shipping beside it is the half
+    // of the answer that flatters us, and these are our own prices to a seller — not a
+    // supplier cost, not a margin. Still an ALLOW-LIST: two named numbers, nothing else.
+    const nums = await readSettings().catch(() => ({}));
+    return {
+      products: products.sort((a, b) => a.price - b.price).slice(0, 24),
+      shipping: { first: Number(nums.ship_first) || 0, extra: Number(nums.ship_extra) || 0 },
+    };
   });
 
   /**

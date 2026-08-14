@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { TShirt } from "@phosphor-icons/react"
 import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
+import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
 
 /**
@@ -31,7 +32,13 @@ const swatchOf = (name: string) => SWATCH[name.toLowerCase().trim()] ?? "#c7c4bd
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-export function BoldCatalog({ products }: { products: PublicProduct[] | null }) {
+export function BoldCatalog({ products, shipping }: {
+  products: PublicProduct[] | null
+  /** What a seller pays to send a parcel — first unit, then each extra in the same box.
+   *  Shown once for the whole grid rather than on every card: it is one platform fee, and
+   *  repeating it 24 times would read as a per-product charge. */
+  shipping?: { first: number; extra: number } | null
+}) {
   // null = the catalogue could not be READ; [] = it is genuinely empty. The house rule is
   // that those two must never look the same, so the caller distinguishes them and this
   // renders each honestly.
@@ -118,7 +125,6 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                       <div className="line-clamp-2 text-[15px] font-semibold leading-snug">{p.name}</div>
                       <div className="mt-2 flex items-baseline gap-1.5">
                         <span className="text-lg font-black tabular-nums">{usd(p.price)}</span>
-                        <span className="text-[13px] text-black/45">per item</span>
                       </div>
                       {/* Colour chips. The count alone ("6 colourways") is a fact you have to
                           imagine; the swatches are the thing a buyer actually shops by, and
@@ -162,6 +168,18 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
           ))
         )}
       </section>
+
+      {/* THE PARCEL, once, under the grid. Every price above is a garment; this is what
+          it costs to send one, and leaving it to the checkout is how a quoted price stops
+          matching a bill. Once for the page, not on every card — it is one platform fee,
+          and 24 copies of it would read as a per-product charge. */}
+      {shipping && (
+        <section className="px-6 pb-14">
+          <div className="mx-auto max-w-5xl">
+            <ShippingFees first={shipping.first} extra={shipping.extra} tone="marketing" className="max-w-md" />
+          </div>
+        </section>
+      )}
 
       <section className="px-6 pb-16">
         <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>

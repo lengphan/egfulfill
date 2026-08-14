@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { TShirt, ArrowLeft, Check } from "@phosphor-icons/react"
 import { ACCENT, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
+import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
 
@@ -57,7 +58,12 @@ const FILE_GUIDES: { label: string; body: string; methods: string[] }[] = [
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-export function BoldProduct({ product }: { product: PublicProduct }) {
+export function BoldProduct({ product, shipping }: {
+  product: PublicProduct
+  /** First unit / each additional unit in the same parcel. The garment price alone is the
+   *  half of the answer that flatters us. */
+  shipping?: { first: number; extra: number } | null
+}) {
   // The colourway the visitor is looking at. Selection is REAL feedback even when that colour
   // carries no photo — it is a choice a buyer genuinely makes — but the hero only swaps for a
   // colour that actually has an image, rather than blanking to a placeholder mid-browse.
@@ -153,14 +159,15 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
             <div className="mt-7 border-y border-black/[0.09] py-6">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-black tracking-tight tabular-nums">{usd(product.price)}</span>
-                <span className="text-sm font-semibold text-black/45">per item</span>
               </div>
               {/* Say WHOSE price this is. It's what a seller pays us to make and ship one —
                   not a retail price, and not our cost. Leaving that ambiguous on a public
                   page invites both wrong readings. */}
               <p className="mt-2 text-sm leading-relaxed text-black/55">
-                What you pay us to make and ship one, before your own retail markup.
+                What you pay us to make one, before your own retail markup. Shipping is
+                charged per parcel, below.
               </p>
+              {shipping && <ShippingFees first={shipping.first} extra={shipping.extra} tone="marketing" className="mt-4" />}
             </div>
 
             {/* The garment described in the manufacturer's own words. It was synced all

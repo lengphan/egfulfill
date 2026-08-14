@@ -14,10 +14,16 @@ export default async function CatalogPage() {
   // Collapsing both into [] is what let this page report an empty catalogue while the API
   // was returning products perfectly well — the error was real, and the empty state hid it.
   let products: Awaited<ReturnType<typeof getPublicProducts>>["products"] | null = null
+  // The parcel is part of the price, so it travels with the products rather than being
+  // fetched again by the component — one read, one source, no chance of the grid and the
+  // shipping line disagreeing.
+  let shipping: { first: number; extra: number } | null = null
   try {
-    products = (await getPublicProducts()).products ?? []
+    const r = await getPublicProducts()
+    products = r.products ?? []
+    shipping = r.shipping ?? null
   } catch {
     products = null
   }
-  return <BoldCatalog products={products} />
+  return <BoldCatalog products={products} shipping={shipping} />
 }

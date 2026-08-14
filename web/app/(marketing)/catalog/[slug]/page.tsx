@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { BoldProduct } from "@/components/marketing/bold-product"
+import { getPublicProducts } from "@/lib/api"
 import { SURFACE } from "@/components/marketing/bold-kit"
 import { getPublicProduct, ApiError } from "@/lib/api"
 
@@ -60,5 +61,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     )
   }
 
-  return <BoldProduct product={product} />
+  // The parcel travels with the price. Read from the same public route the grid uses, and
+  // a failure here must not take the product page down — it simply shows no table.
+  let shipping: { first: number; extra: number } | null = null
+  try { shipping = (await getPublicProducts()).shipping ?? null } catch { shipping = null }
+  return <BoldProduct product={product} shipping={shipping} />
 }

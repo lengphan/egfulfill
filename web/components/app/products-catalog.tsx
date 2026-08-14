@@ -8,10 +8,11 @@ import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { ShippingFees } from "@/components/shipping-fees"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { nextEgSku } from "@/lib/sku"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getCatalogProducts, saveCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { getCatalogProducts, saveCatalogProducts, getDesignFees, type CatalogProduct, type DesignFees } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 
@@ -114,6 +115,12 @@ export function ProductsCatalog() {
   const [isStaff, setIsStaff] = useState(false)
   const [editing, setEditing] = useState<CatalogProduct | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
+  // The platform's shipping fees — the other half of every price on this grid.
+  const [fees, setFees] = useState<DesignFees | null>(null)
+  useEffect(() => {
+    const t = setTimeout(() => { getDesignFees().then(setFees).catch(() => setFees(null)) }, 0)
+    return () => clearTimeout(t)
+  }, [])
 
   useEffect(() => {
     const id = setTimeout(() => { const r = getUser()?.role; setIsStaff(!!r && r !== "seller") }, 0)
@@ -221,6 +228,12 @@ export function ProductsCatalog() {
           tone={stats.stranded > 0 ? "neg" : stats.live ? "pos" : undefined}
         />
       </StatGrid>
+
+      {/* WHAT THE PARCEL COSTS, beside what the garments cost. Every price on the grid is
+          a garment; a seller planning a retail price needs the other half, and it is two
+          numbers, not a page. Once for the board — it is one platform fee, not a property
+          of any product. */}
+      <ShippingFees first={fees?.shipFirst ?? 0} extra={fees?.shipExtra ?? 0} className="max-w-md" />
 
       {/* The explanation, where the problem is — not in a tooltip on one card. Active but
           priceless is invisible AND silent, which is how the same field gets set twice. */}

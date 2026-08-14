@@ -396,6 +396,12 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       standard: Number(nums.design_fee_standard) || 0,
       complex: Number(nums.design_fee_complex) || 0,
       check: Number(nums.check_fee) || 0,
+      // SHIPPING BELONGS BESIDE THEM. These two decide what a seller pays to send a parcel
+      // — first unit, then each additional one in the same box — and every screen that
+      // shows a price was quoting the garment alone, so the number a seller read was never
+      // what they would be charged. Seller-safe: they are OUR prices to them, not costs.
+      shipFirst: Number(nums.ship_first) || 0,
+      shipExtra: Number(nums.ship_extra) || 0,
     };
   });
 
