@@ -200,7 +200,6 @@ export function VariantStrip({
   if (!chips.length) {
     return (
       <div className={cn("flex flex-wrap items-center gap-1", className)}>
-        {showBuyer && <BuyerChip text={buyerText} />}
         <span className="text-xs text-muted-foreground">{showBuyer ? tl("field", "Not set up for production yet") : tl("field", "No variant set")}</span>
       </div>
     )
@@ -217,7 +216,6 @@ export function VariantStrip({
           <VariantField label="Size" value={size || ""} options={[]} disabled onChange={() => {}} />
           <VariantField label="Method" value={method || ""} options={[]} disabled onChange={() => {}} />
         </div>
-        {showBuyer && <BuyerChip text={buyerText} />}
       </div>
     )
   }
@@ -242,22 +240,8 @@ export function VariantStrip({
           <span className="truncate">{c.label}</span>
         </span>
       ))}
-      {showBuyer && <BuyerChip text={buyerText} />}
     </div>
   )
 }
 
-/** What the buyer picked on the marketplace, verbatim. Visually distinct from the
- *  production chips so nobody mistakes a listing label for a blank spec. */
-function BuyerChip({ text }: { text: string }) {
-  const tl = useLabelT()
-  return (
-    <span
-      title={`Buyer chose "${text}" on the marketplace`}
-      className="inline-flex max-w-[14rem] items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-2xs text-muted-foreground"
-    >
-      <span className="text-3xs font-semibold uppercase tracking-wide opacity-70">{tl("field", "Buyer")}</span>
-      <span className="truncate">{text}</span>
-    </span>
-  )
-}
+

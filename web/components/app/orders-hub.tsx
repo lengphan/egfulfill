@@ -44,6 +44,8 @@ import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 
 const nowId = () => Date.now()
+// Not on the floor yet — the spec can still be set.
+const NOT_STARTED = ["", "new", "draft", "in_review"]
 
 /**
  * HOW MANY OF THIS BLANK WE HOLD — on the line, at every stage.
@@ -324,10 +326,18 @@ export function OrdersHub() {
   // Artwork review. NB: this no longer implies "set any status" — stage changes are
   // gated per-role by stageOptionsFor/canSetStage, and the server enforces it.
   const canDesign = role === "operator" || isAdmin // send to designer
-  // WHO MAY CHANGE WHAT WE MAKE. The floor executes the spec, it does not set it — an
-  // operator or a warehouse hand editing a colour on the queue changes the order behind the
-  // seller's back, and the detail page has locked them out of it all along. Same rule here.
-  const canEditVariants = isAdmin
+  /**
+   * WHO MAY CHANGE WHAT WE MAKE, AND UNTIL WHEN.
+   *
+   * A synced factory order arrives with nothing picked, and somebody has to pick it — that
+   * is the operator's job, so locking them out left those orders unmakeable. What must not
+   * happen is a spec changing under a job already being made.
+   *
+   * So: operator and admin while the order has not started; admin alone once it is working,
+   * because by then the change is a correction someone has to own. Warehouse never — their
+   * zone starts at the parcel.
+   */
+  const canPickVariants = isAdmin || role === "operator"
   // Only warehouse/admin may write purchase orders (mirrors requireWarehouse on the server),
   // so only they get the actionable amber "send to PO" — operators see the status read-only.
   const canPO = isAdmin || role === "warehouse"
@@ -2352,7 +2362,7 @@ export function OrdersHub() {
                               * above (OrderedVariant), so the "×1" that used to sit beside the
                               * strip was the same number printed twice on one line.
                               */}
-                            {canEditVariants && stage === "" ? (
+                            {canPickVariants && NOT_STARTED.includes(stage) ? (
                               <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                             ) : (
                               // Locked, not chipped: the same four fields the editable strip
