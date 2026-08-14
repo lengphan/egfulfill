@@ -666,7 +666,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
                                 (array_agg(image) filter (where image is not null))[1] as image,
                                 array_agg(distinct color) filter (where color is not null) as colors,
                                 array_agg(distinct size) filter (where size is not null) as sizes,
-                                min(price) as price, count(*)::int as variants
+                                min(price) as price, count(*)::int as variants,
+                                -- Stock, from the same GROUP BY that is already running. The
+                                -- sync stores a qty per sku, so the style total costs one more
+                                -- aggregate and no extra request — which is what lets the grid
+                                -- filter on it without the page getting slower.
+                                coalesce(sum(qty), 0)::int as stock
                          from ss_products where style_id is not null group by style_id`);
       if (!g.rows.length) return { synced: false, total: 0, styles: [] };
       let favs = new Set();
@@ -678,8 +683,24 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         // Present (possibly empty) so the client can tell "synced, no size dimension" —
         // one size — apart from "not loaded", which is what an ABSENT sizes field means.
         sizes: Array.isArray(r.sizes) ? r.sizes : [],
+        stock: Number(r.stock) || 0,
         favorited: favs.has(String(r.style_id)),
       }));
+      /**
+       * HIDE WHAT WE COULD NOT BUY ENOUGH OF ANYWAY.
+       *
+       * `minStock` is a floor on the STYLE's total across every colour and size, which is the
+       * number that decides whether a blank is worth putting in Products at all. It is not a
+       * promise about the colourway you eventually pick — the per-variant breakdown on the
+       * detail dialog is where that question gets answered.
+       *
+       * S&S ONLY, and the caller has to know it. Otto and SanMar keep no stock in our data —
+       * asking them costs a live call per SKU and per style — so filtering them by a number
+       * we do not have would empty the grid of two suppliers and look like they were out of
+       * stock, when the truth is we never asked.
+       */
+      const minStock = Math.max(0, parseInt(req.query?.minStock, 10) || 0);
+      if (minStock > 0) list = list.filter((s) => s.stock >= minStock);
       // Search the NUMBERS as well as the words. "18500" and "Gildan 5000" are how a
       // style is referred to on the floor and on every S&S page; matching only the
       // marketing title meant the fastest way in didn't work.
@@ -1001,9 +1022,32 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       let price = null, brand = null, styleName = null, image = null;
       // One front image per colour + all OTHER angle/model photos (deduped, never a colour's front).
       const colorImages = {}, frontUrls = new Set(), extraSet = new Set();
+      /**
+       * STOCK, FOR FREE.
+       *
+       * `qty` is already in PRODUCT_FIELDS, so these rows have carried the quantity all
+       * along and threw it away. Summing it in the loop that is already running costs one
+       * addition per row and NO extra request — which is the whole reason the numbers can
+       * be shown without the dialog getting slower.
+       *
+       * Both shapes, because they answer different questions: the per-colour total is what
+       * decides whether a colourway is worth adding at all, and the per-size breakdown is
+       * what tells you the 2XL is the one that will hold up the order.
+       */
+      const stockByColor = {}, stockByVariant = {};
+      let stockTotal = 0;
       for (const p of rows) {
         const c = p.colorName; if (c && !cseen.has(c)) { cseen.add(c); colors.push(c); }
         const s = p.sizeName;  if (s && !sseen.has(s)) { sseen.add(s); sizes.push(s); }
+        const qty = int(p.qty) || 0;
+        stockTotal += qty;
+        if (c) {
+          stockByColor[c] = (stockByColor[c] || 0) + qty;
+          if (s) {
+            if (!stockByVariant[c]) stockByVariant[c] = {};
+            stockByVariant[c][s] = (stockByVariant[c][s] || 0) + qty;
+          }
+        }
         const cp = num(p.customerPrice ?? p.piecePrice);
         if (cp != null && (price == null || cp < price)) price = cp;
         if (!brand && p.brandName) brand = p.brandName;
@@ -1043,7 +1087,8 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       const colorImagesProx = {};
       Object.keys(colorImages).forEach((k) => { const pu = proxify(colorImages[k]); if (pu) colorImagesProx[k] = pu; });
       const extraImages = [...extraSet].filter((u) => !frontUrls.has(u)).slice(0, 24).map(proxify).filter(Boolean);
-      const out = { styleID: id, title, brand: brand || null, description, image: proxify(image), price, colors, sizes, colorImages: colorImagesProx, extraImages };
+      const out = { styleID: id, title, brand: brand || null, description, image: proxify(image), price, colors, sizes, colorImages: colorImagesProx, extraImages,
+                    stockByColor, stockByVariant, stockTotal };
       _styleCache.set(id, { at: Date.now(), data: out });   // cache for repeat opens
       return out;
     } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }

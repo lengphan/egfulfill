@@ -35,6 +35,9 @@ type Detail = {
   sizes: string[]
   colorImages: Record<string, string>
   skus: number
+  /** null = we never asked (Otto / SanMar). {} = asked and the style has none. */
+  stockByColor?: Record<string, number> | null
+  stockByVariant?: Record<string, Record<string, number>> | null
 }
 
 const SUPPLIER_NAME: Record<Supplier, string> = { ss: "S&S Activewear", otto: "Otto Cap", sanmar: "SanMar" }
@@ -124,6 +127,12 @@ export function SupplierDetailDialog({
             sizes: Array.isArray(raw.sizes) ? (raw.sizes as string[]) : [],
             colorImages: (raw.colorImages as Record<string, string>) ?? {},
             skus: Array.isArray(raw.skus) ? (raw.skus as string[]).length : 0,
+            // ABSENT MEANS UNKNOWN, NOT ZERO. Only S&S returns these — Otto and SanMar keep
+            // no quantity in our data, and asking them costs a live call per sku / per style.
+            // Defaulting the missing case to 0 would print "Out of stock" over two suppliers
+            // we never asked, which is the one thing worse than not showing a number.
+            stockByColor: (raw.stockByColor as Record<string, number>) ?? null,
+            stockByVariant: (raw.stockByVariant as Record<string, Record<string, number>>) ?? null,
           })
         })
         .catch((e) => { if (alive) setErr(e instanceof Error ? e.message : "Couldn't load this blank.") })
@@ -226,10 +235,14 @@ export function SupplierDetailDialog({
                         <button
                           key={c}
                           type="button"
-                          title={c}
+                          title={d.stockByColor ? `${c} — ${d.stockByColor[c] ?? 0} in stock at the supplier` : c}
                           onClick={() => setColour(c === colour ? null : c)}
-                          className={"size-6 overflow-hidden rounded-full border transition-transform hover:scale-110 "
-                            + (c === colour ? "border-primary ring-2 ring-primary/40" : "border-black/15")}
+                          className={"relative size-6 overflow-hidden rounded-full border transition-transform hover:scale-110 "
+                            + (c === colour ? "border-primary ring-2 ring-primary/40" : "border-black/15")
+                            // A colourway the supplier cannot fill is dimmed rather than hidden:
+                            // it is still the colour the buyer asked for, and knowing it is
+                            // unavailable is the point of showing it.
+                            + (d.stockByColor && !(d.stockByColor[c] > 0) ? " opacity-35" : "")}
                           style={d.colorImages[c] ? undefined : { background: swatchHex(c) }}
                         >
                           {d.colorImages[c] && (
@@ -242,6 +255,43 @@ export function SupplierDetailDialog({
                   ) : "—"}
                 </Field>
                 {d.skus > 0 && <Field label="Orderable skus">{d.skus.toLocaleString()}</Field>}
+                {/**
+                  * SUPPLIER STOCK, from the rows this dialog already fetched.
+                  *
+                  * Costs no extra request: `qty` rides along in the same S&S product feed the
+                  * colours and sizes come from, so this is a sum, not a lookup.
+                  *
+                  * Shown ONLY when we actually asked. Otto and SanMar keep no quantity in our
+                  * data, so the field is absent for them and this row does not render at all —
+                  * far better than a confident "0" over a supplier nobody queried.
+                  *
+                  * Picking a colour narrows it to that colourway's sizes, because "480 in
+                  * stock" across a style is not an answer to "can you make six 2XL".
+                  */}
+                {d.stockByColor && (
+                  <Field label={colour ? `Stock · ${colour}` : "Stock"}>
+                    {colour ? (
+                      <span className="flex flex-wrap gap-1">
+                        {Object.entries(d.stockByVariant?.[colour] ?? {}).length ? (
+                          Object.entries(d.stockByVariant?.[colour] ?? {}).map(([z, n]) => (
+                            <span
+                              key={z}
+                              className={"rounded-md px-1.5 py-0.5 text-2xs font-medium tabular-nums "
+                                + (n > 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground line-through")}
+                            >
+                              {z} {n.toLocaleString()}
+                            </span>
+                          ))
+                        ) : <span className="text-muted-foreground">none for this colour</span>}
+                      </span>
+                    ) : (
+                      <span className="tabular-nums">
+                        {Object.values(d.stockByColor).reduce((a, b) => a + b, 0).toLocaleString()}
+                        <span className="text-muted-foreground"> across {Object.keys(d.stockByColor).length} colour{Object.keys(d.stockByColor).length === 1 ? "" : "s"} — pick one for sizes</span>
+                      </span>
+                    )}
+                  </Field>
+                )}
               </>
             )}
 
