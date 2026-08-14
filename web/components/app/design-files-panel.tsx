@@ -303,7 +303,6 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [over, setOver] = useState(false)
-  const [sent, setSent] = useState<string | null>(null)
   const [role, setRole] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
   const confirm = useConfirm()
@@ -347,7 +346,7 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
   const stage = (list: FileList | File[]) => {
     const arr = Array.from(list)
     if (!arr.length) return
-    setErr(null); setSent(null)
+    setErr(null)
     const wrong = arr.filter((f) => !MACHINE_RE.test(f.name) && !isImg(f))
     if (wrong.length) {
       setErr(`${wrong.map((f) => f.name).join(", ")} — not a machine file or an image, so there's nothing to do with it here.`)
@@ -388,7 +387,7 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
    */
   const attach = async () => {
     if (!staged.length) return
-    setErr(null); setSent(null)
+    setErr(null)
     const failed: string[] = []
     let images = 0, machines = 0
     const skipped: string[] = []
@@ -432,7 +431,6 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
     const parts: string[] = []
     if (machines) parts.push(`${machines} machine file${machines === 1 ? "" : "s"} — we'll check ${machines === 1 ? "it" : "them"} before production`)
     if (images) parts.push(`${images} design image${images === 1 ? "" : "s"} — placed on the items`)
-    if (parts.length) setSent(`Sent ${parts.join("; and ")}.`)
     load()
     if (images) onAttached?.()
   }
@@ -555,7 +553,10 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
   const notices = (
     <>
       {err && <div className="flex items-start gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"><Warning size={12} weight="fill" className="mt-0.5 shrink-0" /> {err}</div>}
-      {sent && <div className="flex items-start gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><Sparkle size={12} weight="fill" className="mt-0.5 shrink-0" /> {sent}</div>}
+      {/* The green "Sent 1 design image" banner is gone. A success message that sits above the
+          list it just changed is telling you what the list is already showing — the new row is
+          right there, and it stays, which the banner does not. Failures still speak up: an
+          error is the one outcome you cannot see by looking. */}
     </>
   )
 
@@ -602,9 +603,33 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
       {notices}
       {orderFiles(files).map((f) => (
         <div key={f.designId} className="flex items-center gap-3 rounded-xl border border-border p-3">
-          <span className={"flex size-8 shrink-0 items-center justify-center rounded-lg " + (f.kind === "image" ? "bg-sky-100 text-sky-700" : "bg-violet-100 text-violet-700")}>
-            {f.kind === "image" ? <ImageIcon size={14} weight="fill" /> : <Sparkle size={14} weight="fill" />}
-          </span>
+          {/**
+            * WHICH ITEM THIS FILE IS FOR — the number, not a glyph.
+            *
+            * Every row carried the same sparkle or the same picture icon, so the square said
+            * only "this is a machine file" / "this is an image", which the filename already
+            * says. On a six-line order with names two characters apart ("dc21", "dc22") the
+            * question you are actually asking is WHICH LINE, and nothing on the row answered
+            * it.
+            *
+            * The number is the one the target dropdown and the item rows use — position in
+            * the ORDER — so picking 3 there and reading 3 here are the same 3. A file that
+            * applies to everything says so rather than borrowing a line's number.
+            */}
+          {(() => {
+            const it = items.find((x) =>
+              (f.lineId && x.line_id === f.lineId) || (!f.lineId && !!f.sku && x.sku === f.sku))
+            const n = it ? numberOf(it) + 1 : null
+            const tone = f.kind === "image" ? "bg-sky-100 text-sky-700" : "bg-violet-100 text-violet-700"
+            return (
+              <span
+                className={"flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums " + tone}
+                title={n ? `Item ${n}${it?.name ? ` — ${it.name}` : ""}` : "Applies to every item on this order"}
+              >
+                {n ?? "All"}
+              </span>
+            )
+          })()}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-sm font-medium">{f.name}</span>
