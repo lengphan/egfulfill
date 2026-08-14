@@ -387,6 +387,14 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
    * Searchable by tracking, order id, customer name or carrier — all four are things
    * someone might arrive holding.
    */
+  /** "12 Meadow Ln, Southampton, NY 11968" from either address shape. */
+  const addrLine = (a) => {
+    if (!a || typeof a !== 'object') return null;
+    const street = a.street || a.first_line || a.line1 || a.address1 || '';
+    const zip = a.zip || a.postal_code || '';
+    return [street, a.city, [a.state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || null;
+  };
+
   app.get('/api/shipments', { preHandler: requireAuth }, async (req, reply) => {
     if (!req.user || req.user.role === 'seller') { reply.code(403); return { error: 'Staff only' }; }
     const search = String((req.query && req.query.search) || '').trim().toLowerCase();
@@ -440,7 +448,12 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
               -- like a live one and its postage looked like money still spent.
               (select sum(w.delta) from wallet_ledger w
                 where w.type='label-cost' and w.ref='label-void-'||o.id)::float as label_refund,
-              o.customer->>'name' as customer, o.address->>'state' as state
+              o.customer->>'name' as customer, o.address->>'state' as state,
+              -- WHERE IT IS GOING, in one line. The window showed the state alone, which is
+              -- not enough to tell two parcels for one buyer apart, and it is the first
+              -- thing anyone checks when the question is "did this go to the right place".
+              -- Both key shapes: marketplaces send first_line/line1, manual sends street.
+              o.address as address_json
          from orders o
          ${where}
         order by coalesce(o.label_scanned_at, o.created_at) desc
@@ -524,6 +537,8 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         ...sh.map((x) => ({
           id: x.id, num: x.id,
           customer: x.to_name || null, state: x.to_state || null,
+          // A loose label carries no street — the buy stored only what it shipped to.
+          address: [x.to_city, x.to_state, x.to_zip].filter(Boolean).join(', ') || null,
           tracking: x.tracking, carrier: x.carrier || null,
           voidedTracking: x.voided_tracking || null,
           // A loose label was never ON an order, so there is nothing to put it back onto —
@@ -546,6 +561,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         ...r.rows.map((x) => ({
         id: x.id, num: x.seq ? '#' + x.seq : x.id,
         customer: x.customer || null, state: x.state || null,
+        address: addrLine(x.address_json),
         tracking: x.tracking, carrier: x.carrier || null,
         // The PROVIDER'S own word for where the refund got to (QUEUED / PENDING / SUCCESS /
         // ERROR), not a flattened version — the screen should be able to show what their

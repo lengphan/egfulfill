@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowSquareOut, ArrowUUpLeft, CircleNotch, DownloadSimple, LinkBreak, Package, Receipt, FilePdf, Printer, Warning } from "@phosphor-icons/react"
+import { ArrowSquareOut, ArrowUUpLeft, CircleNotch, DownloadSimple, LinkBreak, Receipt, FilePdf, Printer, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { useEffect, useRef, useState } from "react"
@@ -289,16 +289,23 @@ export function ShipmentDetailDialog({
           above 640px. This dialog carries a label beside its facts and needs the room. */}
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package size={16} weight="fill" className="text-muted-foreground" />
-            {/* The number the buyer and the marketplace both use, then where it came from —
-                the same split as the list. `etsy-` is routing, not reading. */}
+          {/* THE NUMBER AND WHAT IT COST, and nothing else.
+              The icon was decoration on a line that already says what it is, and the
+              marketplace chip was a second thing to read before the number — it is a fact
+              about the order, so it went down into the facts with the rest of them. What
+              earns the other half of this line is the price: it is the figure someone is
+              here to check or to justify, and it was six rows down in body text.
+              `pe-8` keeps it clear of the close button. */}
+          <DialogTitle className="flex items-baseline gap-3 pe-8">
             <span className="truncate tabular-nums">{isLoose ? s.id : s.num.startsWith("#") ? s.num : plainNum(s.id)}</span>
-            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
-              {isLoose ? "Label with no order" : platformFromId(s.id)}
-            </span>
             {s.test && (
-              <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-2xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">TEST</span>
+              <span className="shrink-0 self-center rounded bg-slate-200 px-1.5 py-0.5 text-2xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">TEST</span>
+            )}
+            {s.price != null && (
+              <span className={"ms-auto shrink-0 text-xl font-semibold tabular-nums "
+                + (refunded ? "text-muted-foreground line-through decoration-destructive/70" : "")}>
+                ${s.price.toFixed(2)}
+              </span>
             )}
           </DialogTitle>
         </DialogHeader>
@@ -381,22 +388,23 @@ export function ShipmentDetailDialog({
             </p>
           )}
 
+          {/* WHOSE PARCEL, THEN WHICH PARCEL, THEN HOW IT IS GOING — read top to bottom.
+              The marketplace leads because it is the first thing that decides where you go
+              to check anything else. Postage is gone from here: it is in the title now. */}
           <div>
+            <Row label="Marketplace">{isLoose ? "No order — a loose label" : platformFromId(s.id)}</Row>
             <Row label="Customer">{s.customer || "—"}</Row>
-            <Row label="Ships to">{s.state || "—"}</Row>
             <Row label="Tracking" mono>
               {s.tracking ? s.tracking
                 : s.voidedTracking
                   ? <span className="text-muted-foreground line-through decoration-destructive/70">{s.voidedTracking}</span>
                   : "—"}
             </Row>
+            {/* The full line, not the state alone — two parcels for one buyer are told apart
+                by the street, and "did this go to the right place" is the question. */}
+            <Row label="Address">{s.address || s.state || "—"}</Row>
             <Row label="Carrier">{s.carrier || "—"}</Row>
             <Row label="Service">{s.method || "—"}</Row>
-            <Row label="Postage" mono>
-              {s.price != null
-                ? <span className={refunded ? "text-muted-foreground line-through decoration-destructive/70" : ""}>${s.price.toFixed(2)}</span>
-                : "—"}
-            </Row>
             {refunded && (
               // The provider's own word, in full, because this is the screen where someone
               // is deciding whether to chase it — and "pending" for two weeks is normal,
@@ -412,16 +420,29 @@ export function ShipmentDetailDialog({
             )}
           </div>
 
+          {/* TWO STATUSES, ONE EACH SIDE OF THE DOOR — and they used to be four rows.
+              "Carrier says", "Detail", "Last checked" and "Pre-scan" are all one question
+              asked twice: what does the carrier know, and what did WE do. So the carrier's
+              word, their sentence and when we last asked collapse into one row, and the
+              scan becomes the dispatch side of the pair. The parcel's own history reads
+              down the column instead of being spread across labels. */}
           <div>
-            <Row label="Carrier says">
-              {s.delivery ? (DELIVERY_WORD[s.delivery] ?? s.delivery) : <span className="text-muted-foreground">Not asked yet</span>}
+            <Row label="Carrier status">
+              {s.delivery
+                ? <>
+                    <span>{DELIVERY_WORD[s.delivery] ?? s.delivery}</span>
+                    {s.deliveryDetail && <span className="block text-xs text-muted-foreground">{s.deliveryDetail}</span>}
+                    {s.deliveryCheckedAt && <span className="block text-2xs text-muted-foreground">asked {when(s.deliveryCheckedAt)}</span>}
+                  </>
+                : <span className="text-muted-foreground">Not asked yet</span>}
             </Row>
-            {s.deliveryDetail && <Row label="Detail">{s.deliveryDetail}</Row>}
-            <Row label="Last checked">{when(s.deliveryCheckedAt) ?? <span className="text-muted-foreground">never</span>}</Row>
-            <Row label="Pre-scan">
+            <Row label="Dispatch status">
               {s.scannedAt
-                ? <>{VIA_WORD[s.scannedVia ?? ""] ?? "Scanned"} · {when(s.scannedAt)}</>
-                : <span className="text-muted-foreground">not scanned</span>}
+                ? <>
+                    <span>{VIA_WORD[s.scannedVia ?? ""] ?? "Scanned"}</span>
+                    <span className="block text-2xs text-muted-foreground">{when(s.scannedAt)}</span>
+                  </>
+                : <span className="text-muted-foreground">Not scanned out yet</span>}
             </Row>
             <Row label="Created">{when(s.createdAt) ?? "—"}</Row>
           </div>

@@ -3842,6 +3842,9 @@ export function getDispatchHistory(p: { days?: number; search?: string } = {}) {
 
 export type ShipmentRow = {
   id: string; num: string; customer: string | null; state: string | null
+  /** One-line destination — street, city, state zip. A loose label has no street, so it
+   *  carries city/state/zip only. Null when the order has no address at all. */
+  address: string | null
   tracking: string; carrier: string | null; labelUrl: string | null
   /** Shipping service (e.g. "USPS Ground Advantage"), and what the label cost. */
   method: string | null; price: number | null
