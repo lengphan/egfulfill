@@ -751,8 +751,12 @@ export default function OrderDetailPage() {
             <dl className="space-y-2 p-5 text-sm">
               {quote && !quote.unpriced?.length ? (
                 <>
+                  {/* BASE COST, the same word the product editor uses for this number —
+                      what the seller is charged for the blank, as against "product cost",
+                      which is what the blank costs US. Two names for two numbers, and this
+                      screen had been using the supplier's one for the seller's money. */}
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Production</dt>
+                    <dt className="text-muted-foreground">Base cost</dt>
                     <dd className="tabular-nums">{usd(quote.subtotal)}</dd>
                   </div>
                   <div className="flex justify-between">
@@ -839,7 +843,7 @@ export default function OrderDetailPage() {
                       <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Factory · not shown to the seller</div>
                       <div className="flex justify-between text-sm">
                         <dt className="text-muted-foreground">
-                          Supplier cost · blanks
+                          Product cost · what the blanks cost us
                           {/* A partial figure says so rather than reading as the total. */}
                           {quote.supplierKnown != null && quote.lines && quote.supplierKnown < quote.lines.length && (
                             <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
@@ -860,9 +864,13 @@ export default function OrderDetailPage() {
                             : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
                         </dd>
                       </div>
+                      {/* THE ARITHMETIC, WRITTEN OUT. A margin figure with three numbers
+                          above it and no sign of how they combine is a number you have to
+                          trust; spelled out, it is one you can check. */}
                       <p className="text-2xs text-muted-foreground">
-                        What the seller paid us, less the blanks and the postage. Design work and
-                        partner fees are booked separately in the ledger.
+                        Base cost{labelCost > 0 ? " + shipping charged" : ""} − product cost
+                        {labelCost > 0 ? " − postage" : ""}. Design work and partner fees are booked
+                        separately in the ledger.
                       </p>
                     </div>
                   )}

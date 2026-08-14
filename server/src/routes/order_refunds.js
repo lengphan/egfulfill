@@ -63,7 +63,16 @@ const REFUND_TYPE = 'order-refund';
  */
 export const PART_ORDER = ['product', 'shipping', 'expedite', 'express', 'design', 'files'];
 const PART_LABELS = {
-  product: 'Product cost',
+  /**
+   * BASE COST, because "product cost" already means something else here.
+   *
+   * The product editor has used the pair for a long time: PRODUCT COST is what the blank
+   * costs US from the supplier (COGS), BASE COST is what the seller is charged for it. The
+   * order summary was labelling the seller's number with the supplier's word, so an order
+   * reading "Product cost $37.00" for two beanies we buy at $1.50 each looked either like a
+   * catastrophic margin or a bug, depending on who was reading. Same money, correct name.
+   */
+  product: 'Base cost',
   shipping: 'Shipping',
   // NB these two read alike but are different money. `expedite` is the DISPATCH-partner
   // fee — charged per label when one is pushed to the partner's pre-scan queue — while
