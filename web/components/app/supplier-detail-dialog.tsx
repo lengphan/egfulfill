@@ -272,7 +272,7 @@ export function SupplierDetailDialog({
               )}
               {onAddToCatalog && (
                 <Button size="sm" onClick={onAddToCatalog} disabled={added}>
-                  <Plus size={13} weight="bold" /> {added ? "In catalog" : "Add to catalog"}
+                  <Plus size={13} weight="bold" /> {added ? "In Products" : "Add to Products"}
                 </Button>
               )}
             </div>

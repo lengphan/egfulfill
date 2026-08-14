@@ -170,7 +170,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
 
   // ── Quick order ────────────────────────────────────────────────────────────
-  // Buying is not the same act as listing. "Add to catalog" decides what we SELL;
+  // Buying is not the same act as listing. "Add to Products" decides what we SELL;
   // this decides what we BUY, and it goes to the to-order list without importing
   // anything — needing six of a blank shouldn't put it on the shop.
   const [quickOrder, setQuickOrder] = useState<QuickOrderProduct | null>(null)
@@ -274,8 +274,11 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
       await saveCatalogProducts(next)
       if (previewKey) setAdded((prev) => new Set(prev).add(previewKey))
       setPreview(null); setPreviewKey(null)
-      setMsg(`Added "${product.name ?? "product"}" to your catalog.`)
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't add to catalog.") }
+      // "Products", not "catalog". Catalog is a DIFFERENT screen — /published-catalog, the
+      // lookbook sent to trade buyers — and calling this one by that name is what had five
+      // Active products read as five on the marketing site when one was there.
+      setMsg(`Added "${product.name ?? "product"}" to Products.`)
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't add to Products.") }
   }
 
   const favorite = (it: Item, on: boolean) => {
@@ -576,7 +579,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
                   // ORDERING IS ADMIN. An operator browses these catalogues to build OUR
                   // catalogue from them; committing money to a supplier is not their call.
                   // Passing undefined removes the button rather than disabling it — the card
-                  // gives Add to catalog the full row when Order isn't offered, so an
+                  // gives Add to Products the full row when Order isn't offered, so an
                   // operator sees a complete control, not a greyed-out one they must ask
                   // about. The server agrees regardless: /api/purchase* is requireAdmin.
                   onQuickOrder={!isAdmin ? undefined : async () => {
@@ -640,7 +643,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
         onSave={confirmAdd}
         newIdSeed={0}
         title="Review before adding"
-        ctaLabel="Add to catalog"
+        ctaLabel="Add to Products"
       />
       <QuickOrderDialog
         product={quickOrder}

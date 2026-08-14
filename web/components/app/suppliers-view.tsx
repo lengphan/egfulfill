@@ -19,7 +19,7 @@ export function SuppliersView({ embedded = false }: { embedded?: boolean }) {
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
           <div className="min-w-0">
             <PageTitle>Suppliers</PageTitle>
-            <p className="truncate text-sm text-muted-foreground">Browse S&amp;S and Otto blanks in one feed and add them to your catalog.</p>
+            <p className="truncate text-sm text-muted-foreground">Browse S&amp;S and Otto blanks in one feed and add them to Products.</p>
           </div>
         </div>
       )}

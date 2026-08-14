@@ -252,7 +252,7 @@ export function SupplierProductCard({
         {/* Sizes by NAME, not a count — "2 sizes" doesn't tell you whether it's S/M or
             3XL/4XL. This is now the ONLY size display on the card: the "Edit colours &
             sizes" link that used to sit below it was removed because it called the exact
-            same handler as Add to catalog (onEditVariants === onAdd in every caller), so
+            same handler as Add to Products (onEditVariants === onAdd in every caller), so
             it was a second button for the one action, worded as if it did something else.
             With it gone, the full size set expands here rather than hiding behind it. */}
         <div className={"mt-1 flex items-center gap-1 " + (showAllSizes ? "flex-wrap" : "h-5 overflow-hidden")}>
@@ -285,9 +285,9 @@ export function SupplierProductCard({
           )}
         </div>
 
-        {/* Order and Add to catalog share the width EVENLY — both flex-1 — so neither
+        {/* Order and Add to Products share the width EVENLY — both flex-1 — so neither
             reads as the lesser action. When Order isn't offered (favourites, some grids),
-            Add to catalog is the only child and takes the whole row on its own. */}
+            Add to Products is the only child and takes the whole row on its own. */}
         <div className="mt-auto grid grid-cols-2 gap-2 pt-3">
           {onQuickOrder && (
             <button onClick={onQuickOrder} title="Order this — quantities and prices per size"
@@ -302,7 +302,7 @@ export function SupplierProductCard({
                 : CARD_ACTION_PRIMARY,
               "w-full", !onQuickOrder && "col-span-2",
             )}>
-            {adding ? <CircleNotch size={13} className="animate-spin" /> : added ? <><CheckCircle size={13} weight="fill" /> Added</> : <><Plus size={13} weight="bold" /> Add to catalog</>}
+            {adding ? <CircleNotch size={13} className="animate-spin" /> : added ? <><CheckCircle size={13} weight="fill" /> Added</> : <><Plus size={13} weight="bold" /> Add to Products</>}
           </button>
         </div>
       </div>

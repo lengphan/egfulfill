@@ -16,7 +16,7 @@ type OttoFb = { name?: string | null; price?: number | string | null; image?: st
 type SanmarFb = { name?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null }
 
 // Build a catalog product from a supplier style (fetches its full detail on demand). One
-// place, reused by every "Add to catalog" button so the shape never drifts.
+// place, reused by every "Add to Products" button so the shape never drifts.
 export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<CatalogProduct> {
   const d = await getSsStyle(styleID)
   if (d.error) throw new Error(d.error)
