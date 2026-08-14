@@ -12,6 +12,45 @@ import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
 import { phashDistance, PHASH_NEAR } from '../fingerprint.js';
 
+/**
+ * Raise a review card for every seller-supplied machine file on an order that hasn't got
+ * one. Called at SUBMIT: before then the order is still being assembled and a card is work
+ * nobody can do. Idempotent — it only inserts where no card covers that line.
+ */
+export async function queueSellerFilesForReview(orderId) {
+  if (!orderId) return { added: 0 };
+  const files = await q(
+    `select design_id, sku, line_id, file_name from design_file_data
+      where order_id=$1 and coalesce(source,'factory')='seller'
+        and (kind in ('emb','pes'))`, [orderId]).then((r) => r.rows).catch(() => []);
+  let added = 0;
+  for (const f of files) {
+    const dup = await q(
+      `select 1 from design_cards
+        where order_id=$1
+          and ( ($3::text is not null and line_id = $3)
+             or ($3::text is null and line_id is null and coalesce(sku,'') = coalesce($2,'')) )
+        limit 1`, [orderId, f.sku || null, f.line_id || null]).then((r) => r.rowCount).catch(() => 1);
+    if (dup) continue;
+    await q(
+      `insert into design_cards (order_id, sku, line_id, design_id, title, col, type, payment, pay_status)
+       values ($1,$2,$5,$3,$4,'review','emb',0,'pending')`,
+      [orderId, f.sku || null, f.design_id || null, `Seller file · ${f.file_name || f.design_id}`, f.line_id || null]
+    ).catch(() => {});
+    added++;
+  }
+  if (added) {
+    await notify({
+      roles: ['operator', 'warehouse', 'admin'],
+      type: 'design-card', title: 'Seller machine files to check',
+      body: `${orderId} — ${added} file${added === 1 ? '' : 's'} need checking before production.`,
+      href: '/designer', entityId: String(orderId),
+    }).catch(() => {});
+    egBroadcast({ type: 'design-card' });
+  }
+  return { added };
+}
+
 export function designFilesRoutes(app, requireAuth) {
   q(`create table if not exists design_file_data (
        design_id    text primary key,
@@ -379,7 +418,16 @@ export function designFilesRoutes(app, requireAuth) {
      * seller's upload succeeding.
      */
     const uploadedKind = kindOf(b.name, b.mime);
-    if (!isStaff(req.user) && b.orderId && (uploadedKind === 'emb' || uploadedKind === 'pes')) {
+    // NOT BEFORE THE ORDER IS SUBMITTED. Dropping a file is filing it against the order —
+    // the seller is still assembling it, and a card per dropped file put half-built orders
+    // on the designer board with nothing to work on. queueSellerFilesForReview() raises the
+    // cards at submit, for every file that has one waiting.
+    const stage = b.orderId
+      ? await q('select factory_status from orders where id=$1', [String(b.orderId)])
+          .then((r) => String(r.rows[0]?.factory_status || '')).catch(() => '')
+      : '';
+    const submitted = !['', 'new', 'draft'].includes(stage);
+    if (!isStaff(req.user) && submitted && b.orderId && (uploadedKind === 'emb' || uploadedKind === 'pes')) {
       /**
        * ONE CARD PER LINE — keyed line-first, like everything else that is per line.
        *

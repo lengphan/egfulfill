@@ -2295,6 +2295,10 @@ export function answerDesignQuote(orderId: string, body: { decision: "accept" | 
 
 export type DesignCard = {
   id: number | string
+  /** A stitch preview is already rendered and cached for this card's machine file, so
+   *  showing it costs nothing. False ⇒ rendering one is a Wilcom call, so the board waits
+   *  to be asked. */
+  has_preview?: boolean
   title?: string
   product?: string
   type?: string

@@ -24,18 +24,39 @@ import { PageTitle } from "@/components/app/page-title"
  * site restores the old behaviour with nothing else touched, and the preview never blocks
  * the card render (it swaps in asynchronously if it arrives).
  */
-function EmbPreview({ designId, orderId, sku, children }: { designId?: string | null; orderId?: string | null; sku?: string | null; children: ReactNode }) {
+function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: string | null; orderId?: string | null; sku?: string | null; cached?: boolean; children: ReactNode }) {
   const [png, setPng] = useState<string | null>(null)
-  useEffect(() => {
+  const [busy, setBusy] = useState(false)
+  const fetchPng = useCallback(() => {
     if (!designId && !orderId) return
-    let live = true
+    setBusy(true)
     // design_id is the reliable key (the file's order_id can be null); order+sku is a fallback.
-    getEmbPreview(designId ? { designId } : { orderId, sku }).then((r) => { if (live && r.ok && r.png) setPng(r.png) }).catch(() => {})
-    return () => { live = false }
+    getEmbPreview(designId ? { designId } : { orderId, sku })
+      .then((r) => { if (r.ok && r.png) setPng(r.png) })
+      .catch(() => {})
+      .finally(() => setBusy(false))
   }, [designId, orderId, sku])
+  // ONLY WHEN IT IS FREE. A rendered preview is cached server-side, so fetching it costs
+  // nothing; rendering a new one is a Wilcom call, and a board of twenty EMB cards would
+  // spend twenty on every load. Those wait to be asked.
+  useEffect(() => { if (cached) { const t = setTimeout(fetchPng, 0); return () => clearTimeout(t) } }, [cached, fetchPng])
   // eslint-disable-next-line @next/next/no-img-element
   if (png) return <img src={`data:image/png;base64,${png}`} alt="" className="size-full object-cover" />
-  return <>{children}</>
+  return (
+    <div className="relative size-full">
+      {children}
+      {!cached && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); fetchPng() }}
+          disabled={busy}
+          className="absolute inset-x-2 bottom-2 rounded-full border border-border bg-background/90 px-2 py-1 text-2xs font-medium text-muted-foreground backdrop-blur hover:text-foreground disabled:opacity-60"
+        >
+          {busy ? "Rendering…" : "Show stitches"}
+        </button>
+      )}
+    </div>
+  )
 }
 
 // A card's artwork — resilient and WILCOM-INDEPENDENT, so a card never shows a torn-image
@@ -51,7 +72,7 @@ function CardArt({ card, imgClass, iconSize }: { card: DesignCard; imgClass: str
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={String(card.thumb)} alt="" className={imgClass} onError={() => setBroken(true)} />
   }
-  if (isEmbCard(card)) return <EmbPreview designId={card.design_id} orderId={card.order_id} sku={card.sku}>{placeholder}</EmbPreview>
+  if (isEmbCard(card)) return <EmbPreview designId={card.design_id} orderId={card.order_id} sku={card.sku} cached={card.has_preview}>{placeholder}</EmbPreview>
   return placeholder
 }
 

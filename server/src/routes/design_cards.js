@@ -401,7 +401,11 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
            -- carried the CUSTOMER's name in the same slot a claimer's name uses, which reads
            -- as "this person is working on it". Resolved here like claimed_role above.
            (select coalesce(u3.name, u3.email) from users u3
-             where u3.id::text = design_cards.created_by) as created_by_name
+             where u3.id::text = design_cards.created_by) as created_by_name,
+           -- Is a stitch preview already rendered for this card's file? The board asks so it
+           -- can show a cached one for free and leave the rest to a click — a TrueView costs
+           -- a Wilcom call, and a busy board would spend one per card on every load.
+           exists (select 1 from wilcom_previews wp where wp.design_id = design_cards.design_id) as has_preview
            from design_cards order by id`);
       // Manual cards keep their artwork in object storage, and a signed URL expires — so it
       // is minted per read rather than stored. `thumb` is what every client already renders,
