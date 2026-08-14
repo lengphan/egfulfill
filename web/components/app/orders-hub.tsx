@@ -45,6 +45,67 @@ import { NewLabelDialog } from "@/components/app/new-label-dialog"
 
 const nowId = () => Date.now()
 
+/**
+ * HOW MANY OF THIS BLANK WE HOLD — on the line, at every stage.
+ *
+ * The number existed and rendered in only one of the two branches below: the one shown
+ * AFTER a blank is picked. So it was missing from the only stage where someone is deciding
+ * which blank to use, which is precisely when "do we have any" decides the answer. Both
+ * branches render this now.
+ *
+ * FACTORY ONLY. Stock is a fact about our shelves, not about the seller's order — and
+ * /api/inventory is requireStaff, so a seller's `stock` map is empty and the pill silently
+ * would not render. That is accidental safety, not a gate: one route change and a seller
+ * reads "Short — 0 of 5" on their own order. The caller passes `show` explicitly.
+ *
+ * The three no-answer cases are NAMED rather than blank, because "we hold none" and "nobody
+ * has told me which blank this is" are opposite instructions to the person reading it
+ * (CLAUDE.md §4). Stock is held against the BLANK sku, so an unpicked line has no key to
+ * look up — it is not a stock problem, it is a setup one.
+ */
+function LineStock({ item, catalog, stock, pos, orderId, show }: {
+  item: OrderItem
+  catalog: CatalogProduct[]
+  stock: Record<string, number>
+  /** Open POs, so a short line can name the one it is already on. */
+  pos: PurchaseOrder[]
+  orderId: string
+  show: boolean
+}) {
+  if (!show) return null
+  const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium"
+  const blankSku = resolveProduct(item, catalog)?.sku || item.blank || ""
+  if (!blankSku) {
+    return <span className={pill + " bg-muted text-muted-foreground"}>Stock — pick a blank</span>
+  }
+  const have = stock[String(blankSku).toUpperCase()]
+  if (have == null) {
+    return (
+      <span className={pill + " bg-muted text-muted-foreground"} title={`${blankSku} is not on the inventory list`}>
+        Stock — not tracked
+      </span>
+    )
+  }
+  const need = Number(item.qty) || 1
+  const enough = have >= need
+  // Only a SHORT line needs to name a purchase order — saying "on PO-X" beside a full shelf
+  // is noise about a document nobody is waiting on.
+  const skuU = String(blankSku).toUpperCase()
+  const poNum = enough ? null : pos.find((p) => (p.items ?? []).some(
+    (pi) => String(pi.sku).toUpperCase() === skuU && (pi.sources ?? []).some((s) => s.order === orderId)
+  ))?.num ?? null
+  return (
+    <span
+      className={pill + " " + (enough ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-800")}
+      title={enough
+        ? `${have} of ${blankSku} on the shelf — this line needs ${need}`
+        : `Only ${have} of ${blankSku} in stock, this line needs ${need}${poNum ? ` — on PO ${poNum}` : ""}`}
+    >
+      {enough ? `${have} in stock` : `Short — ${have} of ${need}`}{poNum ? ` · ${poNum}` : ""}
+    </span>
+  )
+}
+
 // Per-order blank-stock chip for the warehouse, shown beside the readiness strip: is the
 // stock here (purple), short (amber → send to a PO), or untracked/unknown (grey)? Hovering
 // breaks it down per line and shows any PO a short blank is already on. Module-scope (not
@@ -2265,59 +2326,50 @@ export function OrdersHub() {
                                 still unstarted. A pushed seller order is past "" (already
                                 charged) so it shows the read-only variant instead — and the
                                 server 409s any stray write to a charged order regardless. */}
+                            {/**
+                              * ONE RHYTHM, BOTH BRANCHES: the strip sits under the order
+                              * details, and the make-spec pills sit under the strip.
+                              *
+                              * These were one wrapping row — read-only variant chips, the qty,
+                              * stock, threads and the machine file all breaking together — on
+                              * the argument that they are all facts about the same line. They
+                              * are, but they answer different questions: the strip says WHAT we
+                              * are making, the pills say what it takes to MAKE it. Merged, a
+                              * long colourway pushed "25 in stock" onto a second row anyway, so
+                              * the split happened at whatever width the browser chose rather
+                              * than where the meaning changes.
+                              *
+                              * Qty is NOT repeated here. It moved into the order-details line
+                              * above (OrderedVariant), so the "×1" that used to sit beside the
+                              * strip was the same number printed twice on one line.
+                              */}
                             {canDesign && stage === "" ? (
                               <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                             ) : (
-                              <>
-                              {/* ONE ROW, not two. The make-spec pills below used to open
-                                  their own line, so a line's own details — sku, method,
-                                  colourway, qty — sat above and "25 in stock" sat under them
-                                  looking like a separate statement about the order. They are
-                                  all facts about the same line; they wrap together now and
-                                  break only when the width actually runs out. */}
                               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                 <VariantStrip sku={resolveProduct(it, catalog)?.sku || it.blank || undefined} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} />
-                                {it.qty ? <span className="text-2xs text-muted-foreground">×{it.qty}</span> : null}
+                              </div>
+                            )}
 
-                              {/* What the floor needs to actually MAKE this line: how much
-                                  blank we hold, which cones to load, and the machine file.
-                                  All three were stored already and shown nowhere. */}
+                            {/* What the floor needs to actually MAKE this line: how much blank
+                                we hold, which cones to load, and the machine file. Stock leads
+                                — it is the one that decides whether the line can start at all,
+                                and it now shows at EVERY stage rather than only after a blank
+                                is picked. */}
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 empty:mt-0">
+                              <LineStock item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} />
                               {(() => {
-                                // Stock is held against the BLANK we shelve, not the
-                                // marketplace listing SKU — same resolution the barcode
-                                // does. Keying on it.sku meant every Etsy line (which
-                                // arrives with no blank chosen) silently showed no stock
-                                // at all rather than "no blank picked yet".
-                                const stockSku = resolveProduct(it, catalog)?.sku || it.blank || ""
-                                const skuU = String(stockSku || it.sku || "").toUpperCase()
-                                const have = stockSku ? stock[skuU] : undefined
-                                const need = Number(it.qty) || 1
-                                // The full stock number lives HERE in the detail (the row just
-                                // carries the coloured status pill). When a line is short and
-                                // already on a purchase order, name that PO so the warehouse can
-                                // see it's handled without leaving the row.
-                                const onPO = have != null && have < need
-                                  ? pos.find((p) => (p.items ?? []).some((pi) => String(pi.sku).toUpperCase() === skuU && (pi.sources ?? []).some((s) => s.order === o.id)))
-                                  : null
+                                const skuU = String(resolveProduct(it, catalog)?.sku || it.blank || it.sku || "").toUpperCase()
                                 const cones = (threads[o.id] ?? []).find((t) => String(t.sku).toUpperCase() === skuU)?.threads ?? []
                                 const file = (dfiles[o.id] ?? []).find((f) => String(f.sku ?? "").toUpperCase() === skuU)
-                                if (have == null && !cones.length && !file) return null
+                                if (!cones.length && !file) return null
                                 // One uniform pill language for the line's make-spec, matching
                                 // the Label/Scan/Design + Stock pills above: same rounded-md
-                                // px-2 py-0.5 shape, tinted by meaning. Stock is purple when
-                                // there's enough, amber when short (with the PO it's on); the
-                                // thread + file pills are neutral info, not status.
+                                // px-2 py-0.5 shape, tinted by meaning. The thread + file pills
+                                // are neutral info, not status.
                                 const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium"
                                 return (
                                   <>
-                                    {have != null && (
-                                      <span
-                                        className={pill + " " + (have >= need ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-800")}
-                                        title={have >= need ? "Enough blank stock for this line" : `Only ${have} in stock, this line needs ${need}${onPO ? ` — on PO ${onPO.num}` : ""}`}
-                                      >
-                                        {have >= need ? `${have} in stock` : `Short — ${have} of ${need}`}{onPO ? ` · ${onPO.num}` : ""}
-                                      </span>
-                                    )}
                                     {cones.length > 0 && (
                                       // Mini-swatches + count in a neutral pill; click opens the
                                       // map of which cone covers which part of the artwork.
@@ -2340,9 +2392,7 @@ export function OrdersHub() {
                                   </>
                                 )
                               })()}
-                              </div>
-                              </>
-                            )}
+                            </div>
                           </div>
                           <div className="mt-2 flex w-full flex-wrap items-center gap-2 sm:absolute sm:right-2.5 sm:top-2.5 sm:z-10 sm:mt-0 sm:w-auto">
                           {/* The per-line "Board" button is GONE. Sending a card to the
