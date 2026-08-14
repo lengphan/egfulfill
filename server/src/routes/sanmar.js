@@ -1025,8 +1025,24 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
         // path the file gives no way to rebuild (they 302). The style image stands in.
         image: styleImage,
       }));
+      /**
+       * THE KEYS, WITHOUT INVENTING THE PICTURES.
+       *
+       * This filled every colour with the STYLE image, so a 17-colour cap drew seventeen
+       * identical photographs of the black one and each was captioned as a different
+       * colourway. That is not a missing picture, it is a wrong one: the swatch says "this
+       * is what Ash looks like" while showing Black, and somebody picks from it.
+       *
+       * We genuinely do not have per-colour photos for SanMar — those columns are bare names
+       * under a dated imglib path the flat file gives no way to rebuild, and they 302 to a
+       * placeholder. So the honest shape is the colour NAME with no image, which every
+       * consumer already handles: an empty value falls through to the swatchHex dot in the
+       * detail dialog and on the product card. The keys stay, because the colour LIST is
+       * real and is what colorsOf() is derived from — dropping them would lose the colours
+       * as well as the photos.
+       */
       const colorImages = {};
-      for (const v of variants) if (v.color && !colorImages[v.color]) colorImages[v.color] = styleImage;
+      for (const v of variants) if (v.color && !(v.color in colorImages)) colorImages[v.color] = '';
       return {
         style: s.style, name: s.title || s.style, brand: s.brand || 'SanMar', category: s.category || null,
         description: s.description || null,
