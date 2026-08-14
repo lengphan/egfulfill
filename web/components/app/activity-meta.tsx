@@ -111,10 +111,14 @@ export function actionMeta(action: string): ActionMeta {
 const FIELD_WORD: Record<string, string> = {
   blank: "Blank", color: "Colour", size: "Size", printType: "Method", variant: "Variant",
 }
-export function actionDetail(r: AuditRow): string {
+export function actionDetail(r: AuditRow, resolveLine?: (key: string) => string | null): string {
   const a = (r.after ?? {}) as Record<string, unknown>
+  const b = (r.before ?? {}) as Record<string, unknown>
   const str = (k: string) => (a[k] == null ? "" : String(a[k]))
-  const on = str("sku") || str("line_id")
+  // A LINE ID IS NOT A NAME. "FFL-mssfifwo0l05v" tells a reader nothing; the caller can
+  // turn it into "Item 1 · dc21", and without a resolver it is dropped rather than printed.
+  const rawOn = str("line_id") || str("sku")
+  const on = rawOn ? (resolveLine ? resolveLine(rawOn) || "" : "") : ""
   switch (r.action) {
     case "item.setup": {
       const set = Object.keys(FIELD_WORD)
@@ -135,6 +139,16 @@ export function actionDetail(r: AuditRow): string {
       return str("tracking") || String((r.before as Record<string, unknown> | null)?.tracking ?? "")
     case "order.stage":
       return str("to") || str("stage")
+    case "order.updated": {
+      // WHICH FIELDS. "updated" on its own is the least useful entry in the log.
+      const WORD: Record<string, string> = {
+        factory_status: "stage", status: "status", tracking: "tracking", carrier: "carrier",
+        total: "customer paid", address: "address", customer: "customer",
+        internal_note: "factory note", notes: "notes", meta: "details",
+      }
+      const keys = Object.keys(a).filter((k) => WORD[k] && JSON.stringify(a[k]) !== JSON.stringify(b[k]))
+      return keys.map((k) => WORD[k]).join(" · ")
+    }
     default:
       return ""
   }

@@ -48,6 +48,7 @@ export function ActivityFeed({
   compact = false,
   note = true,
   subject,
+  resolveLine,
   loadingText,
   empty,
   className,
@@ -57,6 +58,9 @@ export function ActivityFeed({
   compact?: boolean
   /** Append the audit note to the sentence when a row carries one (order/dispatch feeds). */
   note?: boolean
+  /** Turns a line id or sku into something a person reads — "Item 1 · dc21". Without it,
+   *  ids are dropped from the entry rather than printed raw. */
+  resolveLine?: (key: string) => string | null
   /** The object of the verb — a card title, a "from → to". Order/dispatch actions pass none. */
   subject?: (r: AuditRow) => ReactNode
   loadingText?: ReactNode
@@ -83,7 +87,7 @@ export function ActivityFeed({
         const Icon = m.icon
         // The caller's own object wins; otherwise build one from what the row recorded.
         const subj = subject ? subject(r) : null
-        const detail = subj == null ? actionDetail(r) : ""
+        const detail = subj == null ? actionDetail(r, resolveLine) : ""
         const who = actorName(r)
         const when = fmtWhen(r.ts)
 

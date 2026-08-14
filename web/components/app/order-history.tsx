@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { SectionCard } from "@/components/app/section-card"
 import { ActivityFeed } from "@/components/app/activity-feed"
-import { getOrderHistory, type AuditRow } from "@/lib/api"
+import { getOrderHistory, type AuditRow, type OrderItem } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 
 /**
@@ -16,7 +16,15 @@ import { getUser } from "@/lib/auth"
  * Staff-only by API (GET /api/audit/entity requires staff), so this renders empty for a
  * seller rather than leaking who on the floor touched their order.
  */
-export function OrderHistory({ orderId }: { orderId: string }) {
+export function OrderHistory({ orderId, items = [] }: { orderId: string; items?: OrderItem[] }) {
+  // "FFL-mssfifwo0l05v" means nothing to a reader. The order knows which line that is, so
+  // the log borrows the SAME number the item rows and the drop zone use.
+  const resolveLine = (key: string) => {
+    const i = items.findIndex((it) => (it.line_id || it.sku) === key)
+    if (i < 0) return null
+    const it = items[i]
+    return `Item ${i + 1}${it.name ? ` · ${it.name}` : ""}`
+  }
   const [rows, setRows] = useState<AuditRow[] | null>(null)
   // Don't even ASK as a seller. The endpoint is staff-gated, but relying on a 403 means
   // the request still goes out and the panel can flash before it fails — and this is
@@ -51,6 +59,7 @@ export function OrderHistory({ orderId }: { orderId: string }) {
       <div className="max-h-72 overflow-y-auto p-3">
         <ActivityFeed
           rows={rows}
+          resolveLine={resolveLine}
           variant="card"
           empty="Nothing recorded for this order yet — changes from here on will appear."
         />

@@ -632,7 +632,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* The RECORD, distinct from the conversation below it. */}
-          <OrderHistory orderId={String(id)} />
+          <OrderHistory orderId={String(id)} items={items} />
 
           <SectionCard title="Order activity">
             <div className="flex flex-col">
