@@ -1247,6 +1247,23 @@ export function DesignCanvasDialog({
               {bg.msg && (
                 <span className="pointer-events-auto rounded-lg bg-card/95 px-2 py-1 text-2xs text-muted-foreground shadow-sm backdrop-blur">{bg.msg}</span>
               )}
+              {/* ON THE ARTWORK, like the background tools — it changes what the stage
+                  draws, so it belongs where the stage is, not in the file card across the
+                  window. */}
+              {latestMachine && (
+                <button
+                  type="button"
+                  onClick={() => void toggleStitch()}
+                  disabled={stitchState === "loading" || stitchState === "none"}
+                  title={stitchState === "none" ? "EWA can't read this file" : "Show the stitches instead of the image"}
+                  className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur transition-colors hover:bg-accent disabled:opacity-60"
+                >
+                  {stitchState === "loading" ? <CircleNotch size={12} className="animate-spin" /> : <Eyedropper size={12} weight="bold" />}
+                  {stitchState === "loading" ? "Rendering…"
+                    : stitchState === "none" ? "No stitch preview"
+                      : showStitch ? "Show image" : "Show stitches"}
+                </button>
+              )}
             </div>
           )}
           {!designUrl && (
@@ -1586,19 +1603,6 @@ export function DesignCanvasDialog({
                     live — a direct link would hand out bytes the caller may not have bought. */}
                 {latestMachine && (
                   <>
-                  {/* Show what will actually be stitched, on the same stage, in the same
-                      box as the artwork — and switch back. The image stays where it is;
-                      only what is drawn changes. */}
-                  <Button
-                    variant="outline" size="sm"
-                    disabled={stitchState === "loading"}
-                    onClick={() => void toggleStitch()}
-                    title={stitchState === "none" ? "No stitch preview for this file" : undefined}
-                  >
-                    {stitchState === "loading" ? "Rendering…"
-                      : stitchState === "none" ? "No stitch preview"
-                        : showStitch ? "Show image" : "Show stitches"}
-                  </Button>
                   <Button variant="outline" size="sm" disabled={dlBusy} onClick={() => void downloadMachine()}>
                     {dlBusy
                       ? <><CircleNotch size={13} className="animate-spin" /> Fetching…</>

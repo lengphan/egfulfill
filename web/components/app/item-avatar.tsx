@@ -6,6 +6,7 @@ import { Package, ArrowsLeftRight, PencilSimple, MagnifyingGlassPlus } from "@ph
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { bestMockup, resolveProduct } from "@/lib/variant-resolve"
 import { designSrc } from "@/lib/order-image"
+import { designForLine } from "@/lib/api"
 import type { CatalogProduct, DesignPos, OrderDesign, OrderItem } from "@/lib/api"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 
@@ -108,7 +109,10 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
       }
     : {}
 
-  const design = designs && item.sku ? designs[item.sku] : null
+  // LINE-FIRST. Keyed on sku alone this found nothing for an imported or marketplace line —
+  // those carry a line_id and no sku until a variant is picked — so artwork saved a moment
+  // earlier never appeared on the thumbnail and looked like it hadn't saved.
+  const design = designForLine(designs ?? undefined, item) ?? null
   const art = designSrc(design?.data) || designSrc(item.design_src)
   const { url: blank, missing: blankMissing } = blankOf(item, catalog)
   const listing = item.img || ""
