@@ -921,11 +921,9 @@ export default function OrderDetailPage() {
                   )}
                 </>
               )}
-              {quote?.unpriced?.length ? (
-                <p className="border-t border-border pt-2 text-xs text-destructive">
-                  Not priced yet: {quote.unpriced.map((u) => u.sku).join(", ")} — pick a blank on those lines first.
-                </p>
-              ) : null}
+              {/* The unpriced lines say so on the rows themselves ("Not priced · pick a
+                  blank first"), which is where the fix is. Repeating it in red under the
+                  total made the same fact an alarm about the total. */}
             </dl>
           </SectionCard>
 
