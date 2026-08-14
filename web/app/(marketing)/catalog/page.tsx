@@ -1,5 +1,5 @@
 import { BoldCatalog } from "@/components/marketing/bold-catalog"
-import { getPublicProducts } from "@/lib/api"
+import { getPublicProducts, type ShipBands } from "@/lib/api"
 
 export const metadata = { title: "Products — EGFUL" }
 // Re-read periodically rather than baking the catalogue into the build: publishing a product
@@ -17,7 +17,7 @@ export default async function CatalogPage() {
   // The parcel is part of the price, so it travels with the products rather than being
   // fetched again by the component — one read, one source, no chance of the grid and the
   // shipping line disagreeing.
-  let shipping: { first: number; extra: number } | null = null
+  let shipping: { bands: ShipBands; extra: number } | null = null
   try {
     const r = await getPublicProducts()
     products = r.products ?? []

@@ -13,7 +13,7 @@ const KEYS = [
   // It was called design_fee, which read like something a seller pays, and a
   // seller-facing design charge is now being added: two "design fees" meaning opposite
   // directions is a mistake waiting to be made in a money path.
-  'designer_payout', 'ship_first', 'ship_extra', 'emb_price',
+  'designer_payout', 'ship_extra', 'emb_price',
   // SELLER-FACING design charges. Three mutually exclusive outcomes for one embroidered
   // line, and which one applies is decided by where the machine file comes from:
   //   we digitise it, ordinary          -> design_fee_standard
@@ -104,7 +104,10 @@ export const SETTING_DEFAULTS = {
   // for one fee, and the screen showing the wrong one. Worse, saving that screen wrote
   // the 0 back and shipping really did become free. Values match the legacy seeds
   // (eg_default_shipping_fee / eg_default_addl_item_fee in schema.sql).
-  ship_first: 5,       // first unit — one order is one parcel
+  // No flat "first item" fee. The per-garment bands below ARE the first-item fee, and one
+  // of them always applies (shippingBandOf falls through to ship_garment), so a platform
+  // default underneath them was unreachable — an editable number that priced nothing. The
+  // parcel is now two settings: which band the garment falls in, and each extra unit.
   ship_extra: 2,       // every additional UNIT in that same parcel
   designer_payout: 2.5, // paid TO a designer per approved design (legacy eg_designer_fee_rate)
   overdue_days: 10,    // an open order older than this is flagged on the boards
@@ -396,11 +399,20 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       standard: Number(nums.design_fee_standard) || 0,
       complex: Number(nums.design_fee_complex) || 0,
       check: Number(nums.check_fee) || 0,
-      // SHIPPING BELONGS BESIDE THEM. These two decide what a seller pays to send a parcel
-      // — first unit, then each additional one in the same box — and every screen that
-      // shows a price was quoting the garment alone, so the number a seller read was never
-      // what they would be charged. Seller-safe: they are OUR prices to them, not costs.
-      shipFirst: Number(nums.ship_first) || 0,
+      // SHIPPING BELONGS BESIDE THEM. Every screen that shows a price was quoting the
+      // garment alone, so the number a seller read was never what they would be charged.
+      // Seller-safe: these are OUR prices to them, not costs.
+      //
+      // The BANDS, not one flat number. A cap and a hoodie do not ship for the same money
+      // and never did — the single figure this used to send was a platform default that
+      // pricing.js could not reach, so the "first item" every product page printed was a
+      // number no invoice contained. Sent as three so a page can quote the one that
+      // actually applies to what is on screen.
+      shipBands: {
+        cap: Number(nums.ship_cap) || 0,
+        heavy: Number(nums.ship_heavy) || 0,
+        garment: Number(nums.ship_garment) || 0,
+      },
       shipExtra: Number(nums.ship_extra) || 0,
     };
   });

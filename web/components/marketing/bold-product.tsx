@@ -62,7 +62,7 @@ export function BoldProduct({ product, shipping }: {
   product: PublicProduct
   /** First unit / each additional unit in the same parcel. The garment price alone is the
    *  half of the answer that flatters us. */
-  shipping?: { first: number; extra: number } | null
+  shipping?: { extra: number } | null
 }) {
   // The colourway the visitor is looking at. Selection is REAL feedback even when that colour
   // carries no photo — it is a choice a buyer genuinely makes — but the hero only swaps for a
@@ -167,7 +167,10 @@ export function BoldProduct({ product, shipping }: {
                 What you pay us to make one, before your own retail markup. Shipping is
                 charged per parcel, below.
               </p>
-              {shipping && <ShippingFees first={shipping.first} extra={shipping.extra} tone="marketing" className="mt-4" />}
+              {/* THIS product's fee, not the catalogue's average. `ship` is resolved
+                  server-side by the same function that bills the order, so the figure a
+                  visitor reads here is the one they are charged. */}
+              {shipping && <ShippingFees first={product.ship} extra={shipping.extra} tone="marketing" className="mt-4" />}
             </div>
 
             {/* The garment described in the manufacturer's own words. It was synced all

@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto';
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
-import { quoteSpec } from '../pricing.js';
+import { quoteSpec, shipFeeOf, feeSettings } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
@@ -262,7 +262,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * which is exactly what a detail page is for. Colour images are filtered to renderable
    * URLs so a storage key can never ride out inside the colour map.
    */
-  const publicShape = (row, slug) => {
+  const publicShape = (row, slug, fees) => {
     const d = row.data;
     /**
      * THE PRICE A VISITOR SEES IS THE SELLER PRICE — never catalog_price.
@@ -313,6 +313,18 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       brand: SUPPLIER_NAMES.has(String(d.brand || '').trim().toLowerCase())
         ? null : publicText(d.brand, 60),
       price,
+      /**
+       * WHAT THIS ONE SHIPS FOR — not a platform average.
+       *
+       * Straight out of pricing.js's shipFeeOf, which is the function that actually bills:
+       * the product's own fee when it has one, otherwise its garment band. The page used to
+       * print a single flat "first item" figure for every product on the site, so a cap and
+       * a hoodie quoted the same postage and neither matched the invoice.
+       *
+       * Not a leak: this is OUR price to a seller. It says nothing about what the blank
+       * cost us or who made it.
+       */
+      ship: fees ? money(shipFeeOf(row, null, fees)) : null,
       methods,
       colors,
       sizes: Array.isArray(d.sizes) ? d.sizes.filter((s) => typeof s === 'string' && s.trim()) : [],
@@ -327,6 +339,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * a link from the grid ends up 404ing on a name that merely looks similar.
    */
   const publicProducts = async () => {
+    const fees = await feeSettings().catch(() => null);
     const r = await q(
       `select data, catalog_price, base_price from catalog_products
         where ${PUBLIC_STATUS_SQL}
@@ -341,7 +354,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         if (!base) return null;
         const n = (seen.get(base) ?? 0) + 1;
         seen.set(base, n);
-        return publicShape(row, n === 1 ? base : `${base}-${n}`);
+        return publicShape(row, n === 1 ? base : `${base}-${n}`, fees);
       })
       .filter(Boolean)
       .filter((p) => Number.isFinite(p.price) && p.price > 0);
@@ -373,13 +386,25 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
 
   app.get('/api/public/products', async () => {
     const products = await publicProducts();
-    // The two shipping numbers ride along. A price with no shipping beside it is the half
-    // of the answer that flatters us, and these are our own prices to a seller — not a
-    // supplier cost, not a margin. Still an ALLOW-LIST: two named numbers, nothing else.
+    // The extra-item fee rides along. A price with no shipping beside it is the half of the
+    // answer that flatters us, and this is our own price to a seller — not a supplier cost,
+    // not a margin. Still an ALLOW-LIST: four named numbers, nothing else.
+    //
+    // The FIRST item's fee is per-product now (`ship` on each card above), because it always
+    // was — it comes from the garment's band. Publishing one flat figure for the whole
+    // catalogue quoted a cap and a hoodie the same postage. The bands ride along too, for
+    // the grid, where no single product is on screen and only the three classes are true.
     const nums = await readSettings().catch(() => ({}));
     return {
       products: products.sort((a, b) => a.price - b.price).slice(0, 24),
-      shipping: { first: Number(nums.ship_first) || 0, extra: Number(nums.ship_extra) || 0 },
+      shipping: {
+        bands: {
+          cap: Number(nums.ship_cap) || 0,
+          heavy: Number(nums.ship_heavy) || 0,
+          garment: Number(nums.ship_garment) || 0,
+        },
+        extra: Number(nums.ship_extra) || 0,
+      },
     };
   });
 

@@ -1,5 +1,7 @@
 "use client"
 
+import type { ShipBands } from "@/lib/api"
+
 /**
  * WHAT SHIPPING COSTS, next to what the garment costs.
  *
@@ -9,9 +11,18 @@
  * their retail price against was never the number they would be billed, and the difference
  * only appeared at submit.
  *
- * Two lines, because there are exactly two facts. It is not a pricing table with bands and
- * exceptions — bands exist in pricing.js and are chosen by weight at quote time, which is
- * not something anyone can act on while looking at a product.
+ * THE FIRST ITEM'S FEE DEPENDS ON THE GARMENT. This used to print one flat platform figure
+ * for every product on every screen, which was wrong twice over: a cap and a hoodie do not
+ * ship for the same money, and the number being printed was a setting pricing.js could not
+ * even reach — one of the three garment bands always applied, so no invoice ever contained
+ * it. The comment here previously said bands were "not something anyone can act on while
+ * looking at a product". On a product it is exactly what you can act on; on a whole
+ * catalogue it is the three-row answer. Hence two modes:
+ *
+ *   `first`  — one resolved fee. Use where the product is known: its own fee if it carries
+ *              one, otherwise its band. This is what the order will charge.
+ *   `bands`  — the three classes. Use where many products are in view and no single number
+ *              is true for all of them.
  *
  * ONE COMPONENT, TWO SKINS. The app and the marketing site have different type and colour
  * systems (shadcn tokens vs the bold kit's ink-on-paper), and a component that renders app
@@ -19,26 +30,41 @@
  * numbers or the wording, which is why this is one file and not two.
  */
 export function ShippingFees({
-  first, extra, tone = "app", className = "",
+  first, bands, extra, tone = "app", className = "",
 }: {
-  first: number
+  /** A single resolved first-item fee — when the product is known. */
+  first?: number | null
+  /** The three garment bands — when it isn't. Ignored if `first` is given. */
+  bands?: ShipBands | null
   extra: number
   /** "app" — shadcn tokens on a card. "marketing" — ink on paper, bold kit. */
   tone?: "app" | "marketing"
   className?: string
 }) {
-  // Nothing to say rather than "$0.00 shipping", which reads as free postage and isn't —
-  // it means nobody has set the platform's shipping fees yet.
-  if (!(first > 0) && !(extra > 0)) return null
   const usd = (n: number) => `$${n.toFixed(2)}`
   const marketing = tone === "marketing"
 
-  // Two labels, no qualifiers. "one order is one parcel" and "in the same parcel" were
-  // explaining a rule nobody had asked about yet, on a card whose whole job is two numbers.
-  const rows = [
-    { label: "First item", value: usd(first) },
-    { label: "Additional item", value: usd(extra) },
-  ]
+  // The first-item rows. `first` wins: a known product's own number beats a table of
+  // classes it belongs to one of. Zero-value bands are dropped rather than shown as
+  // "$0.00", which reads as free postage for that class and isn't — it means unset.
+  const firstRows =
+    first != null && first > 0
+      ? [{ label: "First item", value: usd(first) }]
+      : bands
+        ? ([
+            ["Caps & hats", bands.cap],
+            ["Sweatshirts, hoodies, jackets", bands.heavy],
+            ["All other garments", bands.garment],
+          ] as const)
+            .filter(([, v]) => v > 0)
+            .map(([label, v]) => ({ label, value: usd(v) }))
+        : []
+
+  const rows = [...firstRows, ...(extra > 0 ? [{ label: "Additional item", value: usd(extra) }] : [])]
+
+  // Nothing to say rather than "$0.00 shipping", which reads as free postage and isn't —
+  // it means nobody has set the platform's shipping fees yet.
+  if (!rows.length) return null
 
   return (
     <div
@@ -69,6 +95,15 @@ export function ShippingFees({
           </div>
         ))}
       </dl>
+      {/* Only when the rows ARE the bands. Beside one product the label already says which
+          number applies; beside three it does not, and "why is my hoodie dearer" is the
+          question this sentence exists to answer before it is asked. */}
+      {firstRows.length > 1 && (
+        <p className={marketing ? "mt-3 text-xs text-black/45" : "mt-2 text-2xs text-muted-foreground"}>
+          The first item is charged at its garment&rsquo;s rate. A product with its own
+          shipping fee uses that instead.
+        </p>
+      )}
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf, platformOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, Paperclip, FileArrowDown, CircleNotch } from "@phosphor-icons/react"
+import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, getOrderDesignCards, cardForLine, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
@@ -18,7 +18,7 @@ import { OrderHistory } from "@/components/app/order-history"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { ApproveOrderButton } from "@/components/app/approve-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
-import { SellerDesignFiles, DesignFilesPanel } from "@/components/app/design-files-panel"
+import { SellerDesignFiles } from "@/components/app/design-files-panel"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -100,9 +100,6 @@ export default function OrderDetailPage() {
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
   const [customize, setCustomize] = useState<OrderItem | null>(null)
-  // Which line's per-item file uploader is expanded (staff only). One at a time keeps the
-  // row list calm; the file lands on that line, no board card and no design push.
-  const [attachFor, setAttachFor] = useState<string | null>(null)
   // Design-partner state per line. Read separately from the order so a failure costs the
   // chip, not the page — and it 403s for sellers, which is exactly the intended result:
   // null means "no partner UI here", not "broken".
@@ -447,12 +444,6 @@ export default function OrderDetailPage() {
                   const qLine = quote?.lines?.find(
                     (l) => String(l.id) === String((it as { id?: string | number }).id ?? ""))
                   const unit = qLine ? Number(qLine.unitCost) || 0 : Number(it.unit_price) || 0
-                  // THE NUMBER ON THE ROW, and the key everything else uses for this line.
-                  // An order of six lines called dc21/dc22/ab11/ab12 is four near-identical
-                  // strings; the number is what a person can hold in their head while they
-                  // look at a file list, which is why the drop zone's targets carry the same
-                  // one. Position in the order, not an id — ids are for machines.
-                  const lineKey = it.line_id || it.sku || String(i)
                   return (
                     <div key={i} className="flex items-start gap-4 px-5 py-4">
                       {/* The blank with its artwork placed — the seller sees the same
@@ -486,7 +477,12 @@ export default function OrderDetailPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-2xs font-semibold tabular-nums text-primary" title={`Item ${i + 1} on this order`}>
+                              {/* Bigger than a footnote, because it is the handle: the drop
+                                  zone's targets are numbered the same way, and a badge you
+                                  have to lean in to read is no use for matching a file to a
+                                  line. Filled, not tinted — at this size a 10% wash reads as
+                                  a disabled control. */}
+                              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold tabular-nums text-primary-foreground" title={`Item ${i + 1} on this order`}>
                                 {i + 1}
                               </span>
                               <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
@@ -498,10 +494,17 @@ export default function OrderDetailPage() {
                                 and "Approved" are different answers, and until now the only
                                 signal was an order-wide chip that lit for every item the
                                 moment one of them was sent. */}
+                            {/* THE LANE IS THE NEWS, "on design board" is the preamble.
+                                A filled violet chip carrying both, at the same weight, sat
+                                louder than the item's own name and said the obvious part
+                                first. Now: a dot for the state, one quiet word for where it
+                                is, and the lane in ink — the only part that changes as the
+                                job moves. */}
                             {card && (
-                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-1.5 py-0.5 text-2xs font-medium text-primary">
-                                On design board
-                                <span className="font-semibold">{card.lane_label || card.col || "Incoming"}</span>
+                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-0.5 text-2xs text-muted-foreground">
+                                <span className="size-1.5 rounded-full bg-violet-500" />
+                                Design
+                                <span className="font-medium text-foreground">{card.lane_label || card.col || "Incoming"}</span>
                               </span>
                             )}
                             {it.sku && <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{it.sku}</div>}
@@ -541,16 +544,6 @@ export default function OrderDetailPage() {
                         {(it.sku || it.line_id) && (
                           <>
                             <div className="mt-3 flex items-center justify-end gap-2">
-                              {/* ONE BUTTON, BOTH SIDES — the factory attaches a file it cut,
-                                  and the SELLER sends their own machine file for THIS line.
-                                  It was staff-only, so a seller with a .dst per item had one
-                                  order-wide drop zone and no way to say which item it was
-                                  for. Silent either way: no board card, no design push, the
-                                  file just lands on this line. */}
-                              <Button variant="outline" size="sm" onClick={() => setAttachFor((s) => (s === lineKey ? null : lineKey))}>
-                                <Paperclip size={14} weight="bold" />
-                                {attachFor === lineKey ? "Hide files" : isStaff ? "Attach file" : "Send a file"}
-                              </Button>
                               {/* Partner chip + the tucked-away send action. Staff only —
                                   it renders nothing when design-status can't be read, which
                                   is what a seller gets. */}
@@ -568,11 +561,6 @@ export default function OrderDetailPage() {
                                 />
                               )}
                             </div>
-                            {attachFor === lineKey && (
-                              <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
-                                <DesignFilesPanel orderId={String(id)} sku={it.sku || undefined} lineId={it.line_id ?? undefined} compact />
-                              </div>
-                            )}
                           </>
                         )}
                       </div>

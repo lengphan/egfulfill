@@ -5,6 +5,7 @@ import Link from "next/link"
 import { TShirt } from "@phosphor-icons/react"
 import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import { ShippingFees } from "@/components/shipping-fees"
+import type { ShipBands } from "@/lib/api"
 import type { PublicProduct } from "@/lib/api"
 
 /**
@@ -37,7 +38,7 @@ export function BoldCatalog({ products, shipping }: {
   /** What a seller pays to send a parcel — first unit, then each extra in the same box.
    *  Shown once for the whole grid rather than on every card: it is one platform fee, and
    *  repeating it 24 times would read as a per-product charge. */
-  shipping?: { first: number; extra: number } | null
+  shipping?: { bands: ShipBands; extra: number } | null
 }) {
   // null = the catalogue could not be READ; [] = it is genuinely empty. The house rule is
   // that those two must never look the same, so the caller distinguishes them and this
@@ -176,7 +177,7 @@ export function BoldCatalog({ products, shipping }: {
       {shipping && (
         <section className="px-6 pb-14">
           <div className="mx-auto max-w-5xl">
-            <ShippingFees first={shipping.first} extra={shipping.extra} tone="marketing" className="max-w-md" />
+            <ShippingFees bands={shipping.bands} extra={shipping.extra} tone="marketing" className="max-w-md" />
           </div>
         </section>
       )}

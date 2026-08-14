@@ -1,10 +1,18 @@
 // What a seller pays the factory to produce an order.
 //
-//   charge = Σ(base cost × qty)  +  first item's shipping  +  ship_extra × (every other unit)
+//   charge = Σ(base cost × qty)  +  the DEAREST line's shipping  +  ship_extra × (every other unit)
 //
 // One order is one parcel, so shipping is charged ONCE and each additional unit only
 // adds the extra-item fee. That's why `ship_extra` exists in factory settings; charging
 // full shipping per unit would bill a 3-tee order as three shipments.
+//
+// TWO NUMBERS DECIDE A PARCEL, NOT THREE. A flat platform "first item" fee used to sit
+// under the per-garment bands as a second fallback, and it was unreachable: shippingBandOf
+// returns ship_garment for anything it doesn't recognise, and every band carries a default,
+// so the band was ALWAYS a number and the flat fee never once priced an order. It was still
+// editable on the Settings screen, in a different block from the bands, showing $5 — a
+// figure an admin could change all day with no effect on any invoice. Removed rather than
+// documented: a setting that does nothing is worse than no setting.
 //
 // NB this is NOT orders.total. total is REVENUE — for an Etsy order it's the buyer's
 // grandtotal (etsy.js sets it from rc.grandtotal). The old app charged o.total flat
@@ -20,7 +28,7 @@ const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
 // change without a deploy. Defaults come from factory_settings so the admin screen and
 // the billing path can't disagree about what "unset" means.
 const FEE_KEYS = [
-  'ship_first', 'ship_extra',
+  'ship_extra',
   'ship_cap', 'ship_heavy', 'ship_garment',
   'method_dtg', 'method_dtf', 'method_emb', 'method_apl', 'method_lsr',
   'method_scr', 'method_sub', 'method_vnl',
@@ -203,18 +211,32 @@ function methodAddOn(d, printType, fees) {
   return plat != null && plat > 0 ? plat : 0;
 }
 
-// Per-unit shipping, most specific first: the size's own fee, then the product's fee,
-// then the platform default.
-function shipFeeOf(row, size, fees) {
+/**
+ * Per-unit shipping, MOST SPECIFIC FIRST. Three steps, and the last one always answers:
+ *
+ *   1. the size's own fee   — a 4XL ships dearer than an S, when someone has said so
+ *   2. the product's fee    — what the product card carries, if it was filled in
+ *   3. its garment band     — caps / heavy / everything else, from Settings
+ *
+ * Step 3 cannot fail: shippingBandOf falls through to `ship_garment` for anything it
+ * doesn't recognise, and every band has a default in SETTING_DEFAULTS. That is what makes
+ * a fourth fallback pointless — see the note at the top of this file.
+ *
+ * Exported because the public catalogue quotes the same number. A second "what does this
+ * ship for" rule on the marketing page would drift from the one that bills.
+ */
+export function shipFeeOf(row, size, fees) {
   const d = row.data || {};
   const tier = tierFor(d, size);
   if (tier && tier.shipping != null) { const s = num(tier.shipping); if (s != null) return s; }
   const own = num(d.shippingFee ?? d.shipping_fee);
   if (own != null) return own;
   // No per-size and no per-product fee → the flat band for this garment class (caps ship
-  // cheaper than hoodies), falling back to the platform's single default if unset.
-  const band = num(fees[shippingBandOf(`${d.type || ''} ${d.name || ''}`)]);
-  return band != null ? band : fees.ship_first;
+  // cheaper than hoodies). SETTING_DEFAULTS is the backstop rather than a separate setting,
+  // so "unset" means the same number here as it does on the Settings screen.
+  const key = shippingBandOf(`${d.type || ''} ${d.name || ''}`);
+  const band = num(fees[key]);
+  return band != null ? band : num(SETTING_DEFAULTS[key]) || 0;
 }
 
 // The extra-item fee for additional units. A product may set its own
@@ -245,8 +267,8 @@ export async function quoteSpec({ blank, sku, size, printType }) {
   return {
     matched: { id: row.id, sku: row.sku, name: d.name ?? null },
     unitCost: cost == null ? null : money(cost),
-    shipping: money(ship ?? fees.ship_first),
-    total: cost == null ? null : money(cost + (ship ?? fees.ship_first)),
+    shipping: money(ship),
+    total: cost == null ? null : money(cost + ship),
   };
 }
 
@@ -283,7 +305,7 @@ export async function quoteOrder(orderId) {
     const srow = matchProduct(idx, it);
     const supplier = srow ? supplierCostOf(srow, it) : null;
     lines.push({ id: it.id, sku: it.sku, name: it.name, qty, size: it.size, blank: it.blank,
-                 unitCost: money(cost), shipFee: money(ship ?? fees.ship_first), extraFee: money(extra),
+                 unitCost: money(cost), shipFee: money(ship), extraFee: money(extra),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
   const totals = computeTotals(lines, fees);
@@ -296,16 +318,32 @@ export async function quoteOrder(orderId) {
 
 // The money formula, kept pure and exported so it can be tested without a database:
 //   subtotal = Σ((base for its size + print-method add-on) × qty)
-//   shipping = the FIRST unit's fee + that product's extra-item fee for every other UNIT
+//   shipping = the DEAREST line's fee + that product's extra-item fee for every other UNIT
 //   total    = subtotal + shipping
 // Note "unit", not "line": 3× of one tee is 3 units in one parcel, so it pays one
 // shipping fee and two extra-item fees — not one extra fee for being a single line.
-// The first line sets both rates because it's one parcel and something has to define it.
 export function computeTotals(lines, fees) {
   const subtotal = money(lines.reduce((s, l) => s + l.unitCost * l.qty, 0));
   const units = lines.reduce((s, l) => s + l.qty, 0);
   if (!units) return { subtotal, shipping: 0, units: 0, total: subtotal };
-  const first = lines[0];
+  /**
+   * THE DEAREST LINE SETS THE RATE, not the first one typed.
+   *
+   * This used to take lines[0], which is whichever line someone happened to add first. A
+   * beanie and a hoodie in one box came to $7.99 of postage if the beanie was entered
+   * first and $11.99 if the hoodie was — the same parcel, four dollars apart, decided by
+   * typing order, with nothing on screen to explain it. Re-entering the same order the
+   * other way round changed the price.
+   *
+   * The parcel is sized by the biggest thing in it, so the highest fee is both the more
+   * accurate answer and the one that cannot under-charge us. It is also deterministic:
+   * the same basket now always costs the same, whatever order it was built in.
+   *
+   * The extra-item rate comes from that same line, so the two halves of the shipping
+   * figure describe one product rather than two — and a product carrying its own
+   * additionalItemShipping still overrides the platform default, as before.
+   */
+  const first = lines.reduce((a, b) => (num(b.shipFee) > num(a.shipFee) ? b : a), lines[0]);
   const extra = first.extraFee != null ? first.extraFee : (fees.ship_extra || 0);
   const shipping = money(first.shipFee + extra * (units - 1));
   return { subtotal, shipping, units, total: money(subtotal + shipping) };

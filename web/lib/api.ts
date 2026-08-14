@@ -904,6 +904,9 @@ export type PublicProduct = {
   brand: string | null
   /** What a SELLER pays us. Never our cost. */
   price: number
+  /** What THIS product ships for as the first item in a parcel — its own fee if it carries
+   *  one, otherwise its garment band. Resolved by the same function that bills the order. */
+  ship: number | null
   methods: string[]
   colors: PublicColor[]
   sizes: string[]
@@ -918,10 +921,13 @@ export type PublicProduct = {
  *  margin and supplier that the authenticated catalog carries. Colourways and sizes ARE
  *  published — they describe the finished product a buyer picks from. */
 export function getPublicProducts() {
-  /** `shipping` is what a seller pays us to send the parcel — first unit, then each extra
-   *  in the same box. Published beside the prices because a garment price on its own is
-   *  the half of the answer that flatters us. */
-  return api<{ products: PublicProduct[]; shipping?: { first: number; extra: number } }>(`/api/public/products`)
+  /** `shipping.extra` is each ADDITIONAL unit in the same box. The first unit's fee is on
+   *  each product (`ship`), because it depends on the garment — a cap and a hoodie never
+   *  shipped for the same money, though one flat figure here used to say they did. The
+   *  bands ride along for the grid, where no single product is on screen.
+   *  Published beside the prices because a garment price on its own is the half of the
+   *  answer that flatters us. */
+  return api<{ products: PublicProduct[]; shipping?: { bands: ShipBands; extra: number } }>(`/api/public/products`)
 }
 /** One published product by slug, for the marketing detail page. 404s for anything not
  *  published — deliberately without distinguishing "unpublished" from "does not exist", so
@@ -1827,7 +1833,7 @@ export type OrderQuote = {
    *  price list), so it is absent rather than zero on a seller's request. */
   lines: { id: string; sku: string; name: string; qty: number; size: string | null; unitCost: number; shipFee: number; supplierCost?: number | null }[]
   unpriced: { sku: string; name: string }[]
-  fees: { ship_first: number; ship_extra: number }
+  fees: { ship_extra: number }
   subtotal: number
   shipping: number
   units: number
@@ -2105,7 +2111,7 @@ export function aiDraft(threadId: string) {
  *  admin-editable, so pricing policy changes without a deploy. The index signature keeps
  *  the method_* keys addressable by name from the settings form. */
 export type FactorySettings = {
-  designer_payout?: number; ship_first?: number; ship_extra?: number; emb_price?: number
+  designer_payout?: number; ship_extra?: number; emb_price?: number
   /** Seller payout guardrails. payout_max = 0 means "no fixed ceiling — balance is the cap". */
   payout_min?: number; payout_max?: number
   /** Seller-facing design charges. Exactly ONE of the three applies to a line, decided by
@@ -2175,11 +2181,17 @@ export function getFactorySettings() {
 }
 /** Seller-safe: just the design fees a seller is charged (no cost/margin policy). Powers the
  *  fee estimate on the seller-side design canvas, where /api/factory/settings is off-limits. */
-/** What a SELLER pays us: the three design charges, and the parcel. shipFirst/shipExtra
- *  are the platform's shipping fees — first unit, then each additional unit in the same
- *  parcel — served here because this is the seller-safe fee read every app screen already
- *  calls, and a garment price with no shipping beside it is not the price. */
-export type DesignFees = { standard: number; complex: number; check: number; shipFirst?: number; shipExtra?: number }
+/** What a SELLER pays us: the three design charges, and the parcel. Served here because
+ *  this is the seller-safe fee read every app screen already calls, and a garment price
+ *  with no shipping beside it is not the price.
+ *
+ *  `shipBands` is the FIRST item's fee, by garment class — a cap, a hoodie, everything
+ *  else. It replaced a single flat `shipFirst`, which named a platform default that
+ *  pricing.js could never reach: one of the three bands always applies, so the flat number
+ *  billed nothing while every product page printed it. `shipExtra` is each additional unit
+ *  in the same parcel. */
+export type ShipBands = { cap: number; heavy: number; garment: number }
+export type DesignFees = { standard: number; complex: number; check: number; shipBands?: ShipBands; shipExtra?: number }
 export function getDesignFees() {
   return api<DesignFees>(`/api/design_fees`)
 }

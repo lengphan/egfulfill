@@ -9,6 +9,7 @@ import { readImageFile } from "@/components/app/design-canvas"
 import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { getFactorySettings, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
+import { shipBandKey } from "@/lib/ship-band"
 import { swatchHex } from "@/lib/color-swatch"
 import { extractDominant, hexToRgb, rgbToOklab } from "@/lib/thread-match"
 import { normalizeMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-method"
@@ -341,14 +342,10 @@ export function ProductEditorDialog({
     return () => clearTimeout(id)
   }, [])
 
-  // Which flat shipping band this product falls in — mirrors shippingBandOf() on the
-  // server, matched on substrings because catalog types are loose.
-  const bandKey = (() => {
-    const t = `${type} ${name}`.toLowerCase()
-    if (/cap|hat|beanie|visor|headwear|trucker/.test(t)) return "ship_cap"
-    if (/hoodie|hooded|sweatshirt|sweater|crewneck|jacket|coat|pullover|fleece/.test(t)) return "ship_heavy"
-    return "ship_garment"
-  })()
+  // Which flat shipping band this product falls in. lib/ship-band.ts is the one copy of
+  // the server's shippingBandOf — the product page needs the same answer, and a second
+  // private version of it here is how the two screens start disagreeing about money.
+  const bandKey = shipBandKey(`${type} ${name}`)
   const bandFee = fees?.[bandKey]
 
   // Dim-weight check for the packaging suggestion (÷166, USPS/Shippo). Deterministic math.

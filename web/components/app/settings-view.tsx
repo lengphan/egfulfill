@@ -1088,7 +1088,6 @@ function PlatformPanel() {
   const [lookbookContact, setLookbookContact] = useState("")
   const [capacityMode, setCapacityMode] = useState(false)
   const [factoryDailyLimit, setFactoryDailyLimit] = useState("")
-  const [shipFirst, setShipFirst] = useState("")
   const [shipExtra, setShipExtra] = useState("")
   const [embPrice, setEmbPrice] = useState("")
   // Seller payout guardrails. Max = 0 means "no fixed ceiling — the seller's balance is the
@@ -1155,7 +1154,6 @@ function PlatformPanel() {
       setLookbookContact(r.lookbook_contact != null ? String(r.lookbook_contact) : "")
       setCapacityMode(!!Number(r.capacity_mode || 0))
       setFactoryDailyLimit(r.factory_daily_limit != null ? String(r.factory_daily_limit) : "")
-      setShipFirst(r.ship_first != null ? String(r.ship_first) : "")
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
       setPayoutMin(r.payout_min != null ? String(r.payout_min) : "")
@@ -1222,7 +1220,6 @@ function PlatformPanel() {
         lookbook_contact: lookbookContact,
         capacity_mode: capacityMode ? 1 : 0,
         factory_daily_limit: factoryDailyLimit === "" ? undefined : Number(factoryDailyLimit),
-        ship_first: shipFirst === "" ? undefined : Number(shipFirst),
         ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
         emb_price: embPrice === "" ? undefined : Number(embPrice),
         payout_min: payoutMin === "" ? undefined : Number(payoutMin),
@@ -1456,8 +1453,11 @@ function PlatformPanel() {
           hint="What a blank sells for, and what carriage adds. Unrelated to design — separated so the design decisions above can be read on their own."
         >
           <div className="sm:col-span-2"><MarkupFormula value={baseMarkup} onChange={setBaseMarkup} /></div>
-          <MoneyField label="Shipping — first item" value={shipFirst} onChange={setShipFirst} />
-          <MoneyField label="Shipping — each additional" value={shipExtra} onChange={setShipExtra} />
+          {/* Both shipping fields moved to "Shipping by product type" below. They were
+              split across two blocks — the bands in one, the first/extra pair in another —
+              so the two halves of one parcel charge were edited in different places and the
+              flat "first item" figure looked like it outranked the bands. It never applied
+              at all; the bands are the first item's fee. One block now, one rule. */}
           {/* Belongs with the seller's shipping charges, not with partner rates: this is
               money coming IN from a seller, and the two rate blocks read in opposite
               directions. Only TikTok-SHIPPED orders — a seller-shipped TikTok order buys a
@@ -1860,15 +1860,33 @@ function PlatformPanel() {
         <ShippoBillingPanel />
       </Fold>
 
-      {/* Flat shipping by garment class. A product's own shippingFee still wins; these are
-          what a product WITHOUT one falls back to, instead of one flat platform number. */}
-      <Fold title="Shipping by product type" hint="flat rate per garment class">
+      {/* THE WHOLE PARCEL CHARGE, IN ONE PLACE.
+          A seller pays for one parcel: the first item at its garment's rate, then a smaller
+          fee for every other unit in the same box. Those two numbers used to live in
+          different folds, with a third — a flat platform "first item" fee — sitting above
+          the bands as though it took precedence. It took nothing: pricing.js reaches the
+          bands first and one of them always matches, so that field was edited and saved and
+          changed no invoice. It is gone, and what remains is the two figures that bill. */}
+      <Fold title="Shipping" hint="what a seller pays to send one parcel">
 
-        <p className="mb-3 text-xs text-muted-foreground">Used when a product has no shipping fee of its own.</p>
+        <p className="mb-3 text-xs text-muted-foreground">
+          The first item is charged at its garment&rsquo;s rate below; every other unit in the
+          same parcel adds the extra-item fee. A product with its own shipping fee — set on
+          the product card — overrides the rate for that product, and a per-size fee overrides
+          both. When an order mixes garments, the DEAREST rate applies: a parcel with a hoodie
+          in it costs hoodie postage whatever else is in the box.
+        </p>
         <div className="grid gap-4 sm:grid-cols-3">
           <MoneyField label="Caps & hats" value={bands.ship_cap ?? ""} onChange={(v) => setBand("ship_cap", v)} />
           <MoneyField label="Sweatshirts, hoodies, jackets" value={bands.ship_heavy ?? ""} onChange={(v) => setBand("ship_heavy", v)} />
           <MoneyField label="All other garments" value={bands.ship_garment ?? ""} onChange={(v) => setBand("ship_garment", v)} />
+        </div>
+        <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
+          <MoneyField
+            label="Each additional item"
+            hint="Per extra UNIT in the same parcel — 3× of one tee pays one rate above and two of these."
+            value={shipExtra} onChange={setShipExtra}
+          />
         </div>
       </Fold>
 

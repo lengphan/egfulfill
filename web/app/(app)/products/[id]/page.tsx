@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getCatalogProducts, getDesignFees, type CatalogProduct, type DesignFees } from "@/lib/api"
 import { ShippingFees } from "@/components/shipping-fees"
+import { shipFirstFee } from "@/lib/ship-band"
 import { sizesOf, methodsOf } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { descriptionLines } from "@/lib/description"
@@ -199,7 +200,7 @@ export default function ProductDetailPage() {
             <span className="text-3xl font-semibold tabular-nums">{usd(priceOf(product))}</span>
           </div>
           <ShippingFees
-            first={fees?.shipFirst ?? shipFee}
+            first={shipFee || shipFirstFee(product, fees?.shipBands)}
             extra={fees?.shipExtra ?? 0}
             className="max-w-xs"
           />

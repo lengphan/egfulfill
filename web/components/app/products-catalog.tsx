@@ -230,10 +230,10 @@ export function ProductsCatalog() {
       </StatGrid>
 
       {/* WHAT THE PARCEL COSTS, beside what the garments cost. Every price on the grid is
-          a garment; a seller planning a retail price needs the other half, and it is two
-          numbers, not a page. Once for the board — it is one platform fee, not a property
-          of any product. */}
-      <ShippingFees first={fees?.shipFirst ?? 0} extra={fees?.shipExtra ?? 0} className="max-w-md" />
+          a garment; a seller planning a retail price needs the other half.
+          The BANDS, because a grid holds caps and hoodies at once and no single first-item
+          figure is true for both — the flat number this used to print was true for neither. */}
+      <ShippingFees bands={fees?.shipBands} extra={fees?.shipExtra ?? 0} className="max-w-md" />
 
       {/* The explanation, where the problem is — not in a tooltip on one card. Active but
           priceless is invisible AND silent, which is how the same field gets set twice. */}
