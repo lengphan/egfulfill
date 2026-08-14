@@ -28,6 +28,9 @@ export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<Catal
     productCost: d.price ?? fb.price ?? undefined,
     sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: colorNames(d.colors)[0] ?? fb.colors?.[0],
     img: d.image ?? fb.image ?? undefined, images: d.extraImages ?? [], sku: styleID,
+    // The back / side / on-model shots, still attached to the colourway S&S sent them for.
+    // `images` keeps the same pictures as a flat gallery for readers that want one.
+    colorGallery: d.colorExtras ?? undefined,
     description: d.description ?? undefined, supplier: "S&S",
   }
 }

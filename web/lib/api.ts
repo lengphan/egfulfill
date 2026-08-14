@@ -820,7 +820,22 @@ export type CatalogProduct = {
   img?: string
   image?: string
   hero?: string
+  /** THE colour's photo — one per colourway, and the one every other surface reads: the
+   *  swatch, the row avatar, the print mockup. Its KEYS are also where colorsOf() gets the
+   *  colour list from, so a colour with no picture still belongs here with an empty value. */
   colorImages?: Record<string, string>
+  /**
+   * EVERY photo of that colourway, not just the representative one.
+   *
+   * Suppliers send a front, a back, a side and on-model shots PER COLOUR. Only the front fitted
+   * in `colorImages`, so the rest arrived as an anonymous `images` gallery and the product
+   * editor showed thirty tiles asking "— colour —" for photos whose colour the supplier had
+   * already told us.
+   *
+   * Additive on purpose: `colorImages` keeps its exact meaning and every existing reader is
+   * untouched. This is the extra angles, keyed by the same colour names.
+   */
+  colorGallery?: Record<string, string[]>
   // The uploaded blank mockup graphic (the 2D garment image), + per-side variants
   // ({front, back, left, right, ...}) for placing artwork on more than one face.
   mockup?: string
@@ -961,6 +976,9 @@ export type SsStyle = { styleID: string; brand: string; title: string; category?
    *  is fixed by pressing Sync. */
   sizes?: string[]; synced?: boolean; colorCount?: number }
 export type SsStyleDetail = SsStyle & { sizes?: string[]; colorImages?: Record<string, string>; description?: string; extraImages?: string[]; error?: string
+  /** The same extra angles as `extraImages`, still keyed by the colourway S&S sent them for —
+   *  so the product editor doesn't have to ask a human to match photos to names by eye. */
+  colorExtras?: Record<string, string[]>
   /** Stock, summed from the SAME rows the detail already fetches — `qty` is in the S&S
    *  product fields, so these cost no extra request. Absent for Otto and SanMar, which keep
    *  no quantity in our data: absent means UNKNOWN, never zero. */
