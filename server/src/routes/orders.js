@@ -11,7 +11,6 @@ import { aiComplete } from './support_ai.js';
 import { sendMail, mailConfigured } from '../mailer.js';
 import { supportReplyEmail } from '../emails.js';
 import { audit } from '../audit.js';
-import { queueSellerFilesForReview } from './design_files.js';
 import { designNoFor, designLabel, ensureDesignIds } from '../design-id.js';
 import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
@@ -1409,9 +1408,6 @@ export function ordersRoutes(app, requireAuth) {
           reply.code(402); return paid;                          // 402 Payment Required
         }
         _charged = paid.charged || 0;
-        // The order is real now, so the seller's own machine files become work for the
-        // board. Before this moment they are just files on a draft.
-        queueSellerFilesForReview(req.params.id).catch(() => {});
       }
       if (want === 'cancelled' && !started) {
         const back = await refundForCancel(req.params.id, sel.id, req.user.sub);

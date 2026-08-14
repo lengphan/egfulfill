@@ -202,6 +202,10 @@ function ensurePreviews() {
   _pvReady = q(`create table if not exists wilcom_previews (
       design_id text primary key, hash text, png text, stitches int, colours int,
       created_at timestamptz default now())`)
+    // WHY IT FAILED, remembered. EWA refuses some files outright (a protected .EMB answers
+    // ERROR_FILE_SECURITY_INVALID), and without recording that, every click on that card
+    // spends another call to be told the same thing.
+    .then(() => q('alter table wilcom_previews add column if not exists failed text'))
     .catch((e) => { _pvReady = null; throw e; });
   return _pvReady;
 }
@@ -645,8 +649,10 @@ export function wilcomRoutes(app, requireStaff) {
     await ensurePreviews();
     // Cache key from the file's stored content hash (no bytes needed to check the cache).
     const hash = String(row.content_hash || ('id-' + row.design_id)).slice(0, 32);
-    const cached = (await q(`select png, stitches, colours from wilcom_previews where design_id=$1 and hash=$2`, [row.design_id, hash])).rows[0];
+    const cached = (await q(`select png, stitches, colours, failed from wilcom_previews where design_id=$1 and hash=$2`, [row.design_id, hash])).rows[0];
     if (cached && cached.png) return { ok: true, png: cached.png, stitches: cached.stitches, colours: cached.colours, cached: true };
+    // Already tried and refused: same file, same answer, no call.
+    if (cached && cached.failed) return { ok: false, unavailable: true, reason: cached.failed, cached: true };
     if (!configured()) return { ok: false, unavailable: true, reason: 'not-configured' };
     // The bytes are EITHER inline (data) OR in object storage (url, public-read) — the big
     // base64 is kept out of Postgres when storage is on, which is why data can be null.
@@ -677,8 +683,14 @@ export function wilcomRoutes(app, requireStaff) {
       const res = await ewaCall('api/designTrueview', buildDesignTrueviewXml({ filename, base64 }));
       if (!res.ok) {
         const em = /<(?:message|error|errormessage|detail)>([^<]{1,300})<\//i.exec(res.body || '');
-        reply.code(502);
-        return { ok: false, error: em ? em[1].trim() : 'EWA rejected the request', sample: (res.body || '').slice(0, 1200) };
+        const why = /ERROR_FILE_SECURITY_INVALID/i.test(res.body || '') ? 'file-security'
+          : em ? em[1].trim().slice(0, 60) : 'ewa-rejected';
+        await q(`insert into wilcom_previews (design_id, hash, failed) values ($1,$2,$3)
+                 on conflict (design_id) do update set hash=excluded.hash, failed=excluded.failed,
+                   png=null, created_at=now()`, [row.design_id, hash, why]).catch(() => {});
+        // Not a 502: the file cannot be rendered, which is an answer. The card keeps its
+        // placeholder and stops asking.
+        return { ok: false, unavailable: true, reason: why };
       }
       const files = parseFiles(res.body);
       const info = parseDesignInfo(res.body) || {};
