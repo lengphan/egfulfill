@@ -324,6 +324,10 @@ export function OrdersHub() {
   // Artwork review. NB: this no longer implies "set any status" — stage changes are
   // gated per-role by stageOptionsFor/canSetStage, and the server enforces it.
   const canDesign = role === "operator" || isAdmin // send to designer
+  // WHO MAY CHANGE WHAT WE MAKE. The floor executes the spec, it does not set it — an
+  // operator or a warehouse hand editing a colour on the queue changes the order behind the
+  // seller's back, and the detail page has locked them out of it all along. Same rule here.
+  const canEditVariants = isAdmin
   // Only warehouse/admin may write purchase orders (mirrors requireWarehouse on the server),
   // so only they get the actionable amber "send to PO" — operators see the status read-only.
   const canPO = isAdmin || role === "warehouse"
@@ -2348,11 +2352,18 @@ export function OrdersHub() {
                               * above (OrderedVariant), so the "×1" that used to sit beside the
                               * strip was the same number printed twice on one line.
                               */}
-                            {canDesign && stage === "" ? (
+                            {canEditVariants && stage === "" ? (
                               <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                             ) : (
-                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                <VariantStrip sku={resolveProduct(it, catalog)?.sku || it.blank || undefined} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} />
+                              // Locked, not chipped: the same four fields the editable strip
+                              // shows, greyed. A row that changes shape by role reads as two
+                              // different screens.
+                              <div className="mt-1">
+                                <VariantStrip
+                                  blank={resolveProduct(it, catalog)?.name || it.blank || undefined}
+                                  color={it.color} size={it.size} method={it.print_type}
+                                  marketplace={it.variant} locked
+                                />
                               </div>
                             )}
 
