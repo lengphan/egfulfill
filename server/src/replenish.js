@@ -45,21 +45,38 @@ const blankOf = (idx, r) => stripMethod(resolveStockSku(idx, r) || r.blank || r.
  */
 export async function autoReplenish(orderId) {
   const lines = (await q(
-    `select sku, blank, qty from order_items where order_id=$1`, [orderId]
+    `select sku, blank, qty, color, size from order_items where order_id=$1`, [orderId]
   ).catch(() => ({ rows: [] }))).rows;
   if (!lines.length) return null;
 
   // One catalog read for the whole call — matchProduct walks it per line.
   const idx = await catalogIndex();
 
-  // HOW MANY OF EACH BLANK THIS ORDER NEEDS. Two lines of the same blank add up: they are
-  // two jobs but one shelf, and ordering for each separately would buy the same shortfall
-  // twice.
-  const need = new Map();
+  /**
+   * HOW MANY OF EACH BLANK THIS ORDER NEEDS — and in WHICH VARIANT.
+   *
+   * Two lines of the same blank add up: they are two jobs but one shelf, and ordering for
+   * each separately would buy the same shortfall twice. But they only add up per COLOURWAY
+   * AND SIZE — the cart keys its lines `sku|variant` precisely because 10 White/XL and 2
+   * Black/2XL are not 12 of anything. Parking a line with no variant, as this did, collapses
+   * every colour of a blank into one line wearing whichever variant happened to be first,
+   * which is the fault the cart's own lineKey exists to prevent, arriving from the server.
+   *
+   * "Colour / Size", the same string /api/purchase/resolve-suppliers builds, so a parked
+   * line and a picked one merge instead of sitting beside each other saying the same thing.
+   */
+  const variantOf = (r) => [r.color, r.size].map((v) => String(v ?? '').trim()).filter(Boolean).join(' / ');
+  const need = new Map();          // blank sku -> total units
+  const byVariant = new Map();     // blank sku -> Map(variant -> units)
   for (const r of lines) {
     const sku = blankOf(idx, r);
     if (!sku) continue;
-    need.set(sku, (need.get(sku) || 0) + (Number(r.qty) || 1));
+    const qty = Number(r.qty) || 1;
+    need.set(sku, (need.get(sku) || 0) + qty);
+    if (!byVariant.has(sku)) byVariant.set(sku, new Map());
+    const v = byVariant.get(sku);
+    const key = variantOf(r);
+    v.set(key, (v.get(key) || 0) + qty);
   }
   const wanted = [...need.keys()];
   if (!wanted.length) return null;
@@ -123,10 +140,28 @@ export async function autoReplenish(orderId) {
     const want = need.get(sku) || 0;
     if (available >= want) continue;                        // makeable from stock on hand
 
-    const qty = want - available;
+    /**
+     * SPLIT THE SHORTFALL ACROSS THE VARIANTS THAT NEED IT.
+     *
+     * Stock is held per BLANK — every inventory row has an empty `variant` — so there is no
+     * per-colour number to subtract from, and any allocation of the units we DO hold is
+     * arbitrary. Handing them out in the order the lines appear is the simplest rule that is
+     * honest about that: the TOTAL bought is exactly the blank's shortfall, and every line
+     * emitted names a real colourway somebody can actually pick off a supplier's site.
+     *
+     * The alternative — one line with the summed quantity and no variant — is the thing that
+     * gets you twelve of one colour and none of the other.
+     */
+    let left = available;
     const supplier = row.supplier || 'Unassigned';
     if (!bySupplier.has(supplier)) bySupplier.set(supplier, []);
-    bySupplier.get(supplier).push({ sku, qty, have, promised, want, available });
+    for (const [variant, units] of (byVariant.get(sku) || new Map())) {
+      const covered = Math.min(left, units);
+      left -= covered;
+      const qty = units - covered;
+      if (qty <= 0) continue;
+      bySupplier.get(supplier).push({ sku, variant, qty, have, promised, want, available });
+    }
   }
   if (!bySupplier.size) return { ordered: [], skipped, po: null };
 
@@ -144,9 +179,17 @@ export async function autoReplenish(orderId) {
     .catch(() => ({ rows: [] }))).rows[0];
   const list = Array.isArray(cur?.v) ? cur.v : [];
 
+  /**
+   * THE CART'S OWN KEY, mirrored exactly — sku uppercased, variant lowercased, both trimmed.
+   * See lineKey in web/components/app/purchase-view.tsx; change both together. Matching on
+   * sku alone here would merge Black/2XL into White/XL on the way IN, which is the same
+   * twelve-of-one-colour failure the cart's key prevents on the way out.
+   */
+  const lineKey = (l) => `${String(l.sku ?? '').trim().toUpperCase()}|${String(l.variant ?? '').trim().toLowerCase()}`;
+
   for (const [supplier, items] of bySupplier) {
     for (const it of items) {
-      const hit = list.find((x) => String(x.sku || '').toUpperCase() === it.sku);
+      const hit = list.find((x) => lineKey(x) === lineKey(it));
       const src = { order: String(orderId), qty: it.qty };
       if (hit) {
         // Same blank needed by another order: raise the quantity and record who for,
@@ -156,10 +199,11 @@ export async function autoReplenish(orderId) {
         hit.qty = (Number(hit.qty) || 0) + it.qty;
         hit.sources = [...seen, src];
       } else {
-        list.push({ sku: it.sku, qty: it.qty, price: 0, supplier, auto: true,
-                    sources: [src], savedAt: new Date().toISOString() });
+        list.push({ sku: it.sku, variant: it.variant || '', qty: it.qty, price: 0, supplier,
+                    auto: true, sources: [src], savedAt: new Date().toISOString() });
       }
-      ordered.push({ sku: it.sku, qty: it.qty, supplier, saved: true, have: it.have, promised: it.promised });
+      ordered.push({ sku: it.sku, variant: it.variant || '', qty: it.qty, supplier,
+                     saved: true, have: it.have, promised: it.promised });
     }
   }
 
