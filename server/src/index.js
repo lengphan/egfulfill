@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { limited } from './ratelimit.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn, renewIfStale } from './auth.js';
+import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn, renewIfStale, EMAIL_RE } from './auth.js';
 import { q } from './db.js';
 import { ordersRoutes } from './routes/orders.js';
 import { orderRefundRoutes } from './routes/order_refunds.js';
@@ -379,6 +379,38 @@ app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
     await ensureUsernameColumn().catch(() => {});
     try { put('username', b.username === null || b.username === '' ? null : normalizeUsername(b.username)); }
     catch (e) { reply.code(400); return { error: e.message }; }
+  }
+  /**
+   * EMAIL: A REPAIR, NOT AN EDIT.
+   *
+   * Signup used to accept any string in the email column — the form said "Email/Username" —
+   * so accounts exist whose email IS a username ("haianhseller"). Those people cannot reset
+   * a password, because nothing can be sent anywhere, and the app shows a username under a
+   * field labelled Email. Signup validates now, but the rows already written don't fix
+   * themselves.
+   *
+   * So this accepts an email ONLY when the stored one is not an address. A working email is
+   * the recovery route for the whole account, and letting it be changed from a live session
+   * turns a borrowed browser into a permanent takeover — that stays a support action.
+   *
+   * The old identifier is not thrown away: it moves into `username`, which is what they have
+   * been signing in with. Losing it here would lock them out while "fixing" their account.
+   */
+  if (typeof b.email === 'string') {
+    const cur = (await q('select email, username from users where id=$1', [req.user.sub])).rows[0] || {};
+    if (EMAIL_RE.test(String(cur.email || ''))) {
+      reply.code(403);
+      return { error: 'Your email is already set. Ask support to change it.' };
+    }
+    const next = String(b.email).trim().toLowerCase();
+    if (!EMAIL_RE.test(next)) { reply.code(400); return { error: 'Enter a real email address.' }; }
+    put('email', next);
+    // Only when the caller isn't setting one itself — two puts of the same column would
+    // write it twice in one statement.
+    if (b.username === undefined && !cur.username && cur.email) {
+      await ensureUsernameColumn().catch(() => {});
+      try { put('username', normalizeUsername(cur.email)); } catch { /* not a legal username; let it go */ }
+    }
   }
   if (!sets.length) { reply.code(400); return { error: 'Nothing to update' }; }
 

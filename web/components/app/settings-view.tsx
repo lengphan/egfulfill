@@ -119,7 +119,11 @@ function ProfilePanel() {
       const u = getUser()
       setUser(u)
       setName(u?.name ?? "")
-      setUname(u?.username ?? "")
+      // A username-shaped "email" IS the username — show it where it belongs rather than
+      // leaving the field empty next to a prompt asking for a real address.
+      const stored = u?.email ?? ""
+      const real = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(stored)
+      setUname(u?.username ?? (!real && stored ? stored.toLowerCase() : ""))
       setEmoji(u?.avatar_emoji ?? "")
       setColor(u?.avatar_color ?? AVATAR_COLORS[0])
       setSound(u?.notify_sound !== false)
@@ -127,11 +131,26 @@ function ProfilePanel() {
     return () => clearTimeout(id)
   }, [])
 
+  /**
+   * IS WHAT'S IN THE EMAIL COLUMN ACTUALLY AN EMAIL?
+   *
+   * Old signups accepted anything there — the form said "Email/Username" — so accounts
+   * exist whose "email" is a username. Those people can never reset a password, and the
+   * page shows them a username under a label that says Email. When that is the case the
+   * field stops being a read-out and becomes the one thing this page asks them for; their
+   * old identifier moves to Username, which is what they actually sign in with.
+   */
+  const storedEmail = user?.email ?? ""
+  const emailIsReal = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(storedEmail)
+  const needsEmail = !!user && !emailIsReal
+  const [email, setEmail] = useState("")
+  const emailDirty = needsEmail && email.trim() !== ""
+
   const usernameDirty = uname.trim().toLowerCase() !== (user?.username ?? "")
   const nameDirty = !!name.trim() && name.trim() !== (user?.name ?? "")
   const avatarDirty = emoji !== (user?.avatar_emoji ?? "") || color !== (user?.avatar_color ?? AVATAR_COLORS[0])
   const soundDirty = sound !== (user?.notify_sound !== false)
-  const dirty = !!user && (nameDirty || usernameDirty || avatarDirty || soundDirty)
+  const dirty = !!user && (nameDirty || usernameDirty || avatarDirty || soundDirty || emailDirty)
 
   const save = async () => {
     if (!dirty) return
@@ -140,13 +159,18 @@ function ProfilePanel() {
       // Send null (not "") to clear — the server treats null as "back to the initial".
       const r = await updateProfile({
         name: name.trim(),
-        username: uname.trim() ? uname.trim().toLowerCase() : null,
+        // The broken account keeps its old identifier as the username: it is what they type
+        // to sign in, and the server falls back to it only when this field is left empty.
+        username: uname.trim() ? uname.trim().toLowerCase()
+          : needsEmail && storedEmail ? storedEmail.toLowerCase()
+            : null,
+        ...(emailDirty ? { email: email.trim() } : {}),
         avatar_emoji: emoji || null,
         avatar_color: color || null,
         notify_sound: sound,
       })
       if (r.error) throw new Error(r.error)
-      const next = { name: r.name ?? name.trim(), username: r.username ?? null, avatar_emoji: emoji || null, avatar_color: color || null, notify_sound: sound }
+      const next = { name: r.name ?? name.trim(), username: r.username ?? null, email: r.email ?? user?.email, avatar_emoji: emoji || null, avatar_color: color || null, notify_sound: sound }
       updateUser(next)
       setUser((u) => (u ? { ...u, ...next } : u))
       setSaved(true)
@@ -258,10 +282,32 @@ function ProfilePanel() {
           <Switch checked={sound} onCheckedChange={(v) => { setSound(v); setSaved(false) }} disabled={!user} />
         </label>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-muted-foreground">Email</span>
-          <div className="text-sm">{user?.email || "—"}</div>
-        </div>
+        {needsEmail ? (
+          // Not a read-out any more: this account has no address on it, so nothing can be
+          // sent to it — no password reset, no receipt, no notice. Asked for plainly, and
+          // it says what the old value was and where it is going rather than appearing to
+          // lose it.
+          <label className="flex max-w-sm flex-col gap-1.5 rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+            <span className="text-sm font-medium">Email <span className="font-normal text-muted-foreground">— we don&apos;t have one for you</span></span>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setSaved(false) }}
+              onKeyDown={(e) => { if (e.key === "Enter") save() }}
+              placeholder="you@example.com"
+              className="bg-card"
+            />
+            <span className="text-xs text-muted-foreground">
+              &ldquo;{storedEmail}&rdquo; was saved here when you signed up. It stays as your username, so you
+              can keep signing in with it — but a password reset needs a real address.
+            </span>
+          </label>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-muted-foreground">Email</span>
+            <div className="text-sm">{user?.email || "—"}</div>
+          </div>
+        )}
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-muted-foreground">Role</span>
           <div className="text-sm capitalize">{user?.role || "seller"}</div>

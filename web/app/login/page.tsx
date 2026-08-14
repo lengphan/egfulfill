@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
-import { getToken, getUser, setSession, getRememberedIdentifier, setRememberedIdentifier } from "@/lib/auth"
+import { getUser, setSession, getRememberedIdentifier, setRememberedIdentifier } from "@/lib/auth"
 import { API_BASE } from "@/lib/api"
 import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
@@ -34,39 +34,28 @@ export default function LoginPage() {
   // Defaults ON, which is exactly today's behaviour — nobody who ignores this box is
   // signed out by its arrival.
   const [remember, setRemember] = useState(true)
-  /**
-   * Has the session check run yet?
-   *
-   * The redirect below is correct but ORDERED WRONG for the eye: the form renders, then the
-   * deferred effect reads localStorage, then it replaces the route — so someone who is
-   * already signed in sees a frame of a login form they don't need. There is no server-side
-   * fix available: the session lives in localStorage/sessionStorage (that is what makes
-   * "remember me" work), so the server cannot see it and middleware cannot gate it.
-   *
-   * So the form waits. A signed-out visitor loses roughly one frame before it appears; a
-   * signed-in one never sees it at all, which is the trade worth making.
-   */
-  const [sessionChecked, setSessionChecked] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Read the intended destination, and skip the form entirely for someone who already
-  // has a session — arriving at a login page you don't need is the failure this fixes.
-  // Deferred: localStorage doesn't exist during the prerender.
+  /**
+   * THIS PAGE ALWAYS SHOWS THE FORM. It never walks anyone into the app on its own.
+   *
+   * It used to: a token in storage meant an immediate router.replace to that role's landing
+   * board, with no form and no server check. A leftover `eg_token` is not a signed-in
+   * person — it is left by the previous user of the machine, by a session that has since
+   * expired or been revoked, or by the legacy static site, which writes the same key. So
+   * pressing "Start free" on the marketing site and then "Log in" dropped a visitor who has
+   * never signed up onto somebody's staff board, and nothing on the way asked the server
+   * whether that token was still worth anything.
+   *
+   * What survives from that shortcut is the useful half: the identifier is remembered and
+   * filled in, so the only thing left to type is the secret. Deferred because localStorage
+   * doesn't exist during the prerender, and reading it at useState-init would make the
+   * server and client markup disagree.
+   */
   useEffect(() => {
     const id = setTimeout(() => {
-      const want = safeNext(new URLSearchParams(window.location.search).get("next"))
-      setNext(want)
-      if (getToken()) {
-        const role = getUser()?.role
-        router.replace(want ?? landingFor(typeof role === "string" ? role : null))
-        return
-      }
-      setSessionChecked(true)
-      // Fill in who you are, so the only thing left to type is the secret. Deferred with
-      // the rest: reading localStorage at useState-init time would make the server and
-      // client markup disagree.
-      //
+      setNext(safeNext(new URLSearchParams(window.location.search).get("next")))
       // `?id=` wins: it is carried by signup's "Log in as <name>" link, and it is the same
       // machine's remembered identifier anyway — but honouring it explicitly means the link
       // keeps its promise even if the two ever disagree.
@@ -75,7 +64,7 @@ export default function LoginPage() {
       if (last) setEmail(last)
     }, 0)
     return () => clearTimeout(id)
-  }, [router])
+  }, [])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -110,10 +99,6 @@ export default function LoginPage() {
       setLoading(false)
     }
   }
-
-  // Nothing until we know. Rendering the shell but not the form would still flash a
-  // heading at someone who is on their way to the app.
-  if (!sessionChecked) return null
 
   return (
     // AuthShell, not a private copy of it. This page had its own inline card+wordmark that

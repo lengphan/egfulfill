@@ -2157,8 +2157,11 @@ export function setFactorySettings(body: Record<string, string | number | boolea
   return api<FactorySettings & { ok?: boolean; error?: string }>(`/api/factory/settings`, { method: "PUT", body: JSON.stringify(body) })
 }
 
-// Update the signed-in user's profile (currently just the display name).
-export function updateProfile(patch: { name?: string; username?: string | null; avatar_emoji?: string | null; avatar_color?: string | null; notify_sound?: boolean }) {
+/** Update the signed-in user's own profile. `email` is a REPAIR path, not an edit: the
+ *  server accepts it only while the stored one isn't a real address (old signups let a
+ *  username land in that column), and moves the old identifier into `username` so the
+ *  person can still sign in with what they've always typed. 403 otherwise. */
+export function updateProfile(patch: { name?: string; username?: string | null; email?: string; avatar_emoji?: string | null; avatar_color?: string | null; notify_sound?: boolean }) {
   return api<{ id?: string; name?: string; username?: string | null; email?: string; role?: string; avatar_emoji?: string | null; avatar_color?: string | null; error?: string }>(`/api/me`, {
     method: "PATCH",
     body: JSON.stringify(patch),

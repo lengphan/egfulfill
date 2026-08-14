@@ -37,7 +37,7 @@ const looksLikeEmail = (s) => String(s || '').includes('@');
 
 // Deliberately permissive — this rejects "linh", not exotic-but-valid addresses. The
 // only job is to stop a NON-address being stored in the email column.
-const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 
 // Added idempotently at boot — an existing deployment's users table predates this.
 // The unique index is case-insensitive so "Linh" and "linh" can't both be taken.
