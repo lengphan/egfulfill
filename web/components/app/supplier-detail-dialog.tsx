@@ -237,12 +237,13 @@ export function SupplierDetailDialog({
                           type="button"
                           title={d.stockByColor ? `${c} — ${d.stockByColor[c] ?? 0} in stock at the supplier` : c}
                           onClick={() => setColour(c === colour ? null : c)}
+                          // NOT dimmed by stock. Fading the unavailable ones washed out the
+                          // whole palette — seventeen pale blobs that read as "this widget is
+                          // broken" rather than "these colours are short", and it hid the very
+                          // thing a swatch exists to show: the colour. Stock is a number, and
+                          // it belongs on the line below, in words.
                           className={"relative size-6 overflow-hidden rounded-full border transition-transform hover:scale-110 "
-                            + (c === colour ? "border-primary ring-2 ring-primary/40" : "border-black/15")
-                            // A colourway the supplier cannot fill is dimmed rather than hidden:
-                            // it is still the colour the buyer asked for, and knowing it is
-                            // unavailable is the point of showing it.
-                            + (d.stockByColor && !(d.stockByColor[c] > 0) ? " opacity-35" : "")}
+                            + (c === colour ? "border-primary ring-2 ring-primary/40" : "border-black/15")}
                           style={d.colorImages[c] ? undefined : { background: swatchHex(c) }}
                         >
                           {d.colorImages[c] && (
@@ -268,28 +269,36 @@ export function SupplierDetailDialog({
                   * Picking a colour narrows it to that colourway's sizes, because "480 in
                   * stock" across a style is not an answer to "can you make six 2XL".
                   */}
+                {/**
+                  * ONE PLAIN SENTENCE. This was a row of chips with strikethroughs and a
+                  * two-mode layout, which took longer to decode than it saved. A number and
+                  * the word "in stock" is the whole requirement.
+                  *
+                  * Sizes are only listed when there is more than one, because "Adjustable 0"
+                  * beside a style whose only size IS Adjustable reads as a phrase rather than
+                  * a quantity — which is precisely how it was misread.
+                  */}
                 {d.stockByColor && (
-                  <Field label={colour ? `Stock · ${colour}` : "Stock"}>
-                    {colour ? (
-                      <span className="flex flex-wrap gap-1">
-                        {Object.entries(d.stockByVariant?.[colour] ?? {}).length ? (
-                          Object.entries(d.stockByVariant?.[colour] ?? {}).map(([z, n]) => (
-                            <span
-                              key={z}
-                              className={"rounded-md px-1.5 py-0.5 text-2xs font-medium tabular-nums "
-                                + (n > 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground line-through")}
-                            >
-                              {z} {n.toLocaleString()}
+                  <Field label="Stock">
+                    {(() => {
+                      const total = Object.values(d.stockByColor).reduce((a, b) => a + b, 0)
+                      if (!colour) {
+                        return <span className="tabular-nums">{total.toLocaleString()} <span className="text-muted-foreground">at the supplier, across {Object.keys(d.stockByColor).length} colours</span></span>
+                      }
+                      const sizes = Object.entries(d.stockByVariant?.[colour] ?? {})
+                      const forColour = d.stockByColor[colour] ?? 0
+                      return (
+                        <span>
+                          <span className="tabular-nums font-medium">{forColour.toLocaleString()}</span>
+                          <span className="text-muted-foreground"> in {colour}</span>
+                          {sizes.length > 1 && (
+                            <span className="text-muted-foreground">
+                              {" — "}{sizes.map(([z, n]) => `${z} ${n.toLocaleString()}`).join(" · ")}
                             </span>
-                          ))
-                        ) : <span className="text-muted-foreground">none for this colour</span>}
-                      </span>
-                    ) : (
-                      <span className="tabular-nums">
-                        {Object.values(d.stockByColor).reduce((a, b) => a + b, 0).toLocaleString()}
-                        <span className="text-muted-foreground"> across {Object.keys(d.stockByColor).length} colour{Object.keys(d.stockByColor).length === 1 ? "" : "s"} — pick one for sizes</span>
-                      </span>
-                    )}
+                          )}
+                        </span>
+                      )
+                    })()}
                   </Field>
                 )}
               </>

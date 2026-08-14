@@ -1013,7 +1013,10 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     if (_hit && (Date.now() - _hit.at) < STYLE_TTL) return _hit.data;   // instant on repeat
     try {
       const pr = await ssGet('/products/?style=' + encodeURIComponent(id) +
-        '&fields=sku,colorName,sizeName,piecePrice,customerPrice,colorFrontImage,colorBackImage,colorSideImage,colorOnModelFrontImage,colorOnModelBackImage,styleName,brandName');
+        // `qty` is ASKED FOR, not assumed. It was absent from this list while the code below
+        // summed p.qty, so every colour and size reported a confident 0 — a number nobody had
+        // requested, printed as fact. One more field on a call already being made.
+        '&fields=sku,colorName,sizeName,qty,piecePrice,customerPrice,colorFrontImage,colorBackImage,colorSideImage,colorOnModelFrontImage,colorOnModelBackImage,styleName,brandName');
       if (!pr.ok || !Array.isArray(pr.data)) { reply.code(pr.status || 502); return { error: 'S&S style fetch failed (' + pr.status + ')' }; }
       const rows = pr.data;
 
