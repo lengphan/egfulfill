@@ -8,6 +8,7 @@ import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFil
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { VariantField } from "@/components/app/variant-field"
+import { isEmbroidery } from "@/lib/variant-resolve"
 
 /**
  * WHICH LINE IS THIS FILE FOR? — guessed from its name, never decided by it.
@@ -360,7 +361,11 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
     setStaged((prev) => [
       ...prev,
       ...ok.filter((f) => !prev.some((s) => s.name === f.name))
-        .map((f) => ({ file: f, name: f.name, target: items.length ? matchLine(f.name, items) : ALL, image: isImg(f) })),
+        .map((f) => {
+          const image = isImg(f)
+          const allowed = image ? items : items.filter((it) => isEmbroidery(it.print_type))
+          return { file: f, name: f.name, target: allowed.length ? matchLine(f.name, allowed) : ALL, image }
+        }),
     ])
   }
 
@@ -386,13 +391,20 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
     setErr(null); setSent(null)
     const failed: string[] = []
     let images = 0, machines = 0
+    const skipped: string[] = []
     for (const s of staged) {
+      // Nowhere legal to put it: a stitch file on an order with no embroidered line. Left
+      // in the list rather than written to the order as a whole — attaching it anywhere
+      // would be inventing a target, and it is what raised a check fee for a file no
+      // machine can run.
+      if (!s.image && items.length > 0 && embItems.length === 0) { skipped.push(s.name); continue }
       setBusy(s.name)
       try {
         const data = await readDataUrl(s.file)
+        const pool = targetsFor(s.image)
         const targets = s.target === ALL
-          ? (items.length ? items : [{ line_id: undefined, sku: "" } as OrderItem])
-          : items.filter((it) => (it.line_id || it.sku) === s.target)
+          ? (pool.length ? pool : [{ line_id: undefined, sku: "" } as OrderItem])
+          : pool.filter((it) => (it.line_id || it.sku) === s.target)
         for (const it of targets) {
           if (s.image) {
             const r = await postOrderDesign(orderId, { sku: it.sku ?? "", line_id: it.line_id ?? undefined, data, name: s.name })
@@ -411,8 +423,12 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
         failed.push(`${s.name}${e instanceof Error ? ` (${e.message})` : ""}`)
       } finally { setBusy(null) }
     }
-    setStaged(failed.length ? staged.filter((s) => failed.some((f) => f.startsWith(s.name))) : [])
+    const keep = new Set([...failed.map((f) => f.split(" (")[0]), ...skipped])
+    setStaged(keep.size ? staged.filter((s) => keep.has(s.name)) : [])
     if (failed.length) setErr(`Couldn't attach: ${failed.join(", ")}`)
+    if (skipped.length) {
+      setErr((e) => [e, `${skipped.join(", ")} — a machine file needs an embroidered item, and this order has none.`].filter(Boolean).join(" "))
+    }
     const parts: string[] = []
     if (machines) parts.push(`${machines} machine file${machines === 1 ? "" : "s"} — we'll check ${machines === 1 ? "it" : "them"} before production`)
     if (images) parts.push(`${images} design image${images === 1 ? "" : "s"} — placed on the items`)
@@ -441,6 +457,20 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
   )
 
   /**
+   * A STITCH FILE ONLY FITS AN EMBROIDERY LINE.
+   *
+   * A .dst on a DTG line is not a near-miss, it is nothing: there is no machine to run it
+   * and no check to perform, and letting one be assigned there is how six lines ended up
+   * carrying a check fee for a file that could never be used. Images have no such
+   * restriction — every line takes artwork.
+   *
+   * So the target list is filtered by what the FILE is, and when no line on the order is
+   * embroidered the row says so instead of offering a choice that cannot be right.
+   */
+  const embItems = items.filter((it) => isEmbroidery(it.print_type))
+  const targetsFor = (image: boolean) => (image ? items : embItems)
+
+  /**
    * The order's lines as picker options, plus the whole-order default.
    *
    * NUMBERED, and numbered the SAME WAY the item rows above are: "dc21" and "dc22" are two
@@ -450,14 +480,22 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
    */
   const targetLabel = (it: OrderItem, i: number) =>
     `${i + 1} · ${it.name || it.sku || "Item"}` + (Number(it.qty) > 1 ? ` ×${it.qty}` : "")
-  const targetOptions = ["All items", ...items.map(targetLabel)]
-  const keyAt = (label: string) => {
-    const i = targetOptions.indexOf(label) - 1
-    return i < 0 ? ALL : (items[i]?.line_id || items[i]?.sku || ALL)
+  // The number a line shows is its position in the ORDER, not in the filtered list — the
+  // badge on the row must be the one you read in the dropdown, or the number is a lie.
+  const numberOf = (it: OrderItem) => items.findIndex((x) => (x.line_id || x.sku) === (it.line_id || it.sku))
+  const optionsFor = (image: boolean) => {
+    const pool = targetsFor(image)
+    return [image ? "All items" : "All embroidery items", ...pool.map((it) => targetLabel(it, numberOf(it)))]
   }
-  const labelFor = (key: string) => {
-    const i = items.findIndex((it) => (it.line_id || it.sku) === key)
-    return i < 0 ? "All items" : targetLabel(items[i], i)
+  const keyAt = (image: boolean, label: string) => {
+    const opts = optionsFor(image)
+    const i = opts.indexOf(label) - 1
+    const pool = targetsFor(image)
+    return i < 0 ? ALL : (pool[i]?.line_id || pool[i]?.sku || ALL)
+  }
+  const labelFor = (image: boolean, key: string) => {
+    const it = items.find((x) => (x.line_id || x.sku) === key)
+    return it ? targetLabel(it, numberOf(it)) : (image ? "All items" : "All embroidery items")
   }
 
   /** WHAT IS ABOUT TO HAPPEN, one row per file, before anything is written. */
@@ -484,13 +522,19 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
                 {items.length > 0 && s.target !== ALL ? " · matched by name" : ""}
               </div>
             </div>
-            {items.length > 0 && (
+            {items.length > 0 && (targetsFor(s.image).length > 0 ? (
               <VariantField
                 label="Goes on" compact className="w-44"
-                value={labelFor(s.target)} options={targetOptions}
-                onChange={(v) => setStaged((prev) => prev.map((x) => (x.name === s.name ? { ...x, target: keyAt(v) } : x)))}
+                value={labelFor(s.image, s.target)} options={optionsFor(s.image)}
+                onChange={(v) => setStaged((prev) => prev.map((x) => (x.name === s.name ? { ...x, target: keyAt(s.image, v) } : x)))}
               />
-            )}
+            ) : (
+              // Not a disabled dropdown — there is no choice to grey out. It says why, and
+              // Attach below leaves this row alone.
+              <span className="shrink-0 rounded-lg bg-amber-50 px-2 py-1 text-3xs font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                No embroidery item on this order
+              </span>
+            ))}
             <button
               onClick={() => setStaged((prev) => prev.filter((x) => x.name !== s.name))}
               title="Take this one out" className="shrink-0 text-muted-foreground hover:text-destructive"

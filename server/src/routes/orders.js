@@ -1955,9 +1955,17 @@ export function ordersRoutes(app, requireAuth) {
     const STD = Number(fees.design_fee_standard) || 0;
     const CPX = Number(fees.design_fee_complex) || 0;
     const rows = await q(
-      `select i.line_id, i.sku, i.name, i.design_tier, i.design_quote_status, i.design_charged_at,
+      `select i.line_id, i.sku, i.name, i.print_type, i.design_tier, i.design_quote_status, i.design_charged_at,
+              -- LINE-FIRST, like every other per-line read. Matching on coalesce(sku,'')
+              -- meant that on an order whose lines have no sku yet — an import, or any
+              -- marketplace line before a variant is picked — ONE machine file matched
+              -- EVERY line, and the summary billed a check fee six times for a single
+              -- uploaded file. A file with no line id is genuinely order-wide and still
+              -- counts for every line, which is what the second branch is.
               exists(select 1 from design_file_data f
-                       where f.order_id = i.order_id and coalesce(f.sku,'') = coalesce(i.sku,'')) as has_machine,
+                       where f.order_id = i.order_id
+                         and (f.line_id = i.line_id
+                              or (f.line_id is null and coalesce(f.sku,'') = coalesce(i.sku,'')))) as has_machine,
               exists(select 1 from order_designs d
                        where d.order_id = i.order_id
                          and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
@@ -1966,8 +1974,18 @@ export function ordersRoutes(app, requireAuth) {
       [orderId]).then((r) => r.rows).catch(() => []);
     const items = []; let total = 0;
     for (const r of rows) {
-      // Staff's classification wins; before that, infer from what the seller supplied.
-      const tier = r.design_tier || (r.has_machine ? 'supplied' : r.has_image ? 'standard' : null);
+      /**
+       * A CHECK FEE IS AN EMBROIDERY FEE. It pays for someone opening a stitch file and
+       * judging whether it will run — size, format, machine. A DTG or DTF line has no
+       * stitch file and nothing to check, so a supplied machine file must not raise one
+       * there, however the file got attached.
+       *
+       * Only the INFERENCE is gated. Staff's own classification still wins outright: if
+       * someone has looked at a line and called it supplied, they had a reason, and this
+       * is not the place to overrule it.
+       */
+      const isEmb = /emb/i.test(String(r.print_type || ''));
+      const tier = r.design_tier || (r.has_machine && isEmb ? 'supplied' : r.has_image ? 'standard' : null);
       if (!tier) continue;
       let label, amount;
       if (tier === 'supplied') { label = 'Check Fee (File Provided)'; amount = CHECK; }
