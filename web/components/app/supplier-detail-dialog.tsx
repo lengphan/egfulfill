@@ -141,11 +141,18 @@ export function SupplierDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* WIDER, because the right-hand column is doing real work now — a size run, a palette
-          of fourteen named swatches, and a per-variant stock table. At 3xl with a 22rem
-          image beside it, the colours fell to three per row and every compound Otto name
-          ("Navy/White", "Black/Dark Green") truncated to "Navy/W…", which is not a name. */}
-      <DialogContent className="sm:max-w-5xl">
+      {/**
+        * WIDTH SET BY WHAT IS IN IT, which is not much: a size run, a palette, one number.
+        *
+        * 3xl with a 22rem photo squeezed the colours to three per row and truncated every
+        * compound name. 5xl fixed that and broke the other way — the panel ran out of content
+        * halfway across and left the photo looking like a stamp in a field of white.
+        *
+        * 4xl with a 20rem photo is the middle: the picture is big enough to judge a blank by,
+        * the swatches get six or seven to a row, and the content reaches the edge instead of
+        * trailing off.
+        */}
+      <DialogContent className="sm:max-w-4xl">
         {/**
           * THE PRODUCT IDENTIFIES ITSELF ONCE, AT THE TOP.
           *
@@ -175,7 +182,7 @@ export function SupplierDetailDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-5 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] md:items-start">
+        <div className="grid gap-6 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:items-start">
           {/**
             * THE PHOTO STOPS CLAIMING A COLUMN IT DOESN'T FILL.
             *
