@@ -3,7 +3,14 @@
 import { useMemo, useState } from "react"
 import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
 import { resolveProduct, colorsOf, methodsOf, sizesOf } from "@/lib/variant-resolve"
+import { PRODUCT_METHODS } from "@/lib/print-method"
 import { VariantField } from "@/components/app/variant-field"
+
+// What the fields offer when the blank can't be resolved — see the note on colorList.
+// Sizes are the ladder every apparel blank in the catalogue draws from; methods are the
+// canonical list, so this can't drift from what pricing recognises.
+const FALLBACK_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "OS"]
+const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 
 // The per-line variant picker: Blank · Colour · Size · Method. Marketplace orders arrive
 // with these UNSET (nothing to price), so this is what makes them submittable — and a
@@ -31,6 +38,35 @@ export function VariantPicker({
   const colorOpts = useMemo(() => colorsOf(product), [product])
   const sizeOpts = useMemo(() => sizesOf(product), [product])
   const methodOpts = useMemo(() => methodsOf(product), [product])
+
+  /**
+   * NOTHING HERE LOCKS BEFORE THE ORDER IS SUBMITTED.
+   *
+   * Colour, size and method were dead controls whenever the blank didn't resolve — which is
+   * the exact state a sheet import lands in, since it writes whatever Blank SKU cell it was
+   * given. So a seller looking at their own unsubmitted order could not touch three of the
+   * four fields, and the one instruction on screen ("pick a blank first") pointed at a field
+   * that already had a value.
+   *
+   * A blank we can't resolve means we don't know this product's OPTIONS. It does not mean
+   * the seller doesn't know what they want. So the options fall back to what we can say
+   * generally — every colour the catalogue uses, the standard size ladder, our print
+   * methods — and the line keeps whatever the sheet supplied. Pricing still needs a real
+   * blank, which is what the note under the strip is for; that is a separate problem from
+   * being able to type what you're asking for.
+   */
+  const catalogColors = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of catalog) for (const c of colorsOf(p)) set.add(c)
+    return [...set]
+  }, [catalog])
+  // `keep` puts a value the list doesn't contain at the front rather than dropping it —
+  // the same rule blankOptions uses, so an imported "Light Blue" survives a product that
+  // has never heard of it.
+  const keep = (value: string, opts: string[]) => (value && !opts.includes(value) ? [value, ...opts] : opts)
+  const colorList = keep(item.color || "", colorOpts.length ? colorOpts : catalogColors)
+  const sizeList = keep(item.size || "", sizeOpts.length ? sizeOpts : FALLBACK_SIZES)
+  const methodList = keep(item.print_type || "", methodOpts.length ? methodOpts : FALLBACK_METHODS)
 
   // Keep a blank the catalog no longer lists so an existing line can't silently lose it.
   const blankOptions = useMemo(() => {
@@ -98,16 +134,16 @@ export function VariantPicker({
           disabled={busy === "blank"} onChange={pickBlank}
         />
         <VariantField
-          label="Colour" value={item.color || ""} options={colorOpts} swatches
-          disabled={!product || busy === "color"} onChange={(v) => save({ color: v }, "color")}
+          label="Colour" value={item.color || ""} options={colorList} swatches
+          disabled={busy === "color"} onChange={(v) => save({ color: v }, "color")}
         />
         <VariantField
-          label="Size" value={item.size || ""} options={sizeOpts}
-          disabled={!product || busy === "size"} onChange={(v) => save({ size: v }, "size")}
+          label="Size" value={item.size || ""} options={sizeList}
+          disabled={busy === "size"} onChange={(v) => save({ size: v }, "size")}
         />
         <VariantField
-          label="Method" value={item.print_type || ""} options={methodOpts}
-          disabled={!product || busy === "printType"} onChange={(v) => save({ printType: v }, "printType")}
+          label="Method" value={item.print_type || ""} options={methodList}
+          disabled={busy === "printType"} onChange={(v) => save({ printType: v }, "printType")}
         />
       </div>
 

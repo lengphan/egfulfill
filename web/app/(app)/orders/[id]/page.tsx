@@ -25,6 +25,8 @@ import { Input } from "@/components/ui/input"
 import {
   getOrders,
   getOrder,
+  indexDesigns,
+  designForLine,
   getOrderDesigns,
   getOrderMessages,
   getOrderQuote,
@@ -158,10 +160,7 @@ export default function OrderDetailPage() {
   const reloadDesigns = () => {
     getOrderDesigns(id)
       .then((r) => {
-        const list = Array.isArray(r) ? r : (r?.designs ?? [])
-        const by: Record<string, OrderDesign> = {}
-        for (const d of list) if (d.sku && d.data && !by[d.sku]) by[d.sku] = d
-        setDesigns(by)
+        setDesigns(indexDesigns(Array.isArray(r) ? r : (r?.designs ?? [])))
       })
       .catch(() => {})
   }
@@ -185,9 +184,7 @@ export default function OrderDetailPage() {
     if (id) {
       getOrderDesigns(id)
         .then((r) => {
-          const list = Array.isArray(r) ? r : (r?.designs ?? [])
-          const by: Record<string, OrderDesign> = {}
-          for (const d of list) if (d.sku && d.data && !by[d.sku]) by[d.sku] = d
+          const by = indexDesigns(Array.isArray(r) ? r : (r?.designs ?? []))
           if (alive) setDesigns(by)
         })
         .catch(() => {})
@@ -405,7 +402,7 @@ export default function OrderDetailPage() {
                   // Per LINE, not per order: the order-level readiness chip said "on the
                   // board" for every item the moment one of them was sent.
                   const card = isStaff ? cardForLine(boardCards, { line_id: it.line_id, sku: it.sku }) : undefined
-                  const design = it.sku ? designs[it.sku] : undefined
+                  const design = designForLine(designs, it)
                   const artwork = designSrc(design?.data)
                   const qty = Number(it.qty) || 1
                   const unit = Number(it.unit_price) || 0
@@ -783,8 +780,8 @@ export default function OrderDetailPage() {
           onOpenChange={(v) => !v && setCustomize(null)}
           orderId={id}
           item={customize}
-          initialDesign={designSrc(designs[customize.sku ?? ""]?.data)}
-          initialPos={designs[customize.sku ?? ""]?.pos}
+          initialDesign={designSrc(designForLine(designs, customize)?.data)}
+          initialPos={designForLine(designs, customize)?.pos}
           siblings={items.filter((it) => (it.line_id ?? it.sku) !== (customize.line_id ?? customize.sku))}
           designs={designs}
           onSaved={reloadDesigns}
