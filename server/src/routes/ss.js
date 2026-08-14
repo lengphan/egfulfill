@@ -432,7 +432,23 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     // previous pattern ended at [\w./%-]+ and couldn't match "?id=...", so Drive URLs were
     // rejected on shape before the host was even considered.
     const ALLOWED_IMG_HOSTS = /^https:\/\/([\w-]+\.)?(ssactivewear\.com|ottocap\.com|googleusercontent\.com|drive\.google\.com|usercontent\.google\.com)\//i;
-    if (!ALLOWED_IMG_HOSTS.test(u)) {
+    /**
+     * OTTO'S OWN PICTURES DO NOT LIVE ON OTTOCAP.COM.
+     *
+     * Their catalogue rows point at an S3 bucket —
+     * https://s3-us-west-2.amazonaws.com/ottocap/media/products/otto/111/111-003-FB.jpg —
+     * so every Otto image was refused on the host and rendered as a broken tile, both the
+     * main photo and every colour swatch. The picture itself was always fine: 200,
+     * image/jpeg, 1.9MB, straight from that URL.
+     *
+     * SCOPED TO THE BUCKET PATH, NOT THE HOST. `amazonaws.com` is every S3 bucket on earth,
+     * and this endpoint fetches whatever it is handed — allowing the bare host would turn it
+     * into a general-purpose proxy for any address an attacker can put in a query string,
+     * which is the exact hole the allow-list above exists to close. Ownership here is in the
+     * PATH (`/ottocap/`), so that is what is matched.
+     */
+    const ALLOWED_IMG_PATHS = /^https:\/\/s3[\w.-]*\.amazonaws\.com\/ottocap\//i;
+    if (!ALLOWED_IMG_HOSTS.test(u) && !ALLOWED_IMG_PATHS.test(u)) {
       console.error(`[ss/img] refused non-supplier host: ${u.slice(0, 120)}`);
       reply.code(400); return { error: 'only supplier image hosts may be proxied' };
     }
