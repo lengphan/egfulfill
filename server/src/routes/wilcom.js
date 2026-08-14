@@ -88,7 +88,14 @@ function outputAttrs(designFile, trueviewFile) {
   return [
     designFile ? `design_file="${XML_ESC(designFile)}"` : '',
     // Only meaningful alongside a native design file — see embVersion().
-    designFile ? `design_version="${embVersion()}"` : '',
+    // NOT SENT. Every value EWA was offered — e4.2, 4.2, E4.2, e4_2, ES4.2, e4.5, 4.5,
+    // 2025 — comes back ERROR_INVALID_VERSION and the whole call 500s, so adding this
+    // attribute stopped every .emb download ("Exception occurs inside CAD Server"). The
+    // same request without it returns the design and the trueview. The attribute name or
+    // its accepted values are not what docs/WILCOM-EWA-PHASE1.md records; until Wilcom
+    // confirms the real one, EWA writes its own default version.
+    // Set WILCOM_EMB_VERSION to re-enable it once the correct value is known.
+    designFile && process.env.WILCOM_EMB_VERSION ? `design_version="${embVersion()}"` : '',
     `trueview_file="${XML_ESC(trueviewFile)}"`,
     'dpi="120"',
   ].filter(Boolean).join(' ');

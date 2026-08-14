@@ -961,9 +961,19 @@ export function DesignCanvasDialog({
     setDlBusy(true); setDlErr(null)
     try {
       const r = await downloadDesignFile(latestMachine.designId)
-      const url = r.url || r.data
-      if (!url) throw new Error("No file came back.")
-      window.open(url, "_blank", "noopener")
+      const src = r.data || r.url
+      if (!src) throw new Error("No file came back.")
+      // SAVED WITH ITS NAME. window.open() on a data: URL hands Chrome a file called
+      // "download" with no extension — 124 KB of EMB that no embroidery program will open
+      // because nothing tells it what it is. `download` is ignored cross-origin, so a
+      // storage URL is fetched to a blob first and saved from this origin.
+      const blob = src.startsWith("data:") ? await (await fetch(src)).blob() : await (await fetch(src)).blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = href
+      a.download = r.name || latestMachine.name || "design.emb"
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(href), 10_000)
     } catch (e) {
       const m = e instanceof Error ? e.message : "Couldn't open that file."
       setDlErr(/402|purchase|paid/i.test(m) ? "Not purchased yet." : m)
