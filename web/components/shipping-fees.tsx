@@ -33,9 +33,11 @@ export function ShippingFees({
   const usd = (n: number) => `$${n.toFixed(2)}`
   const marketing = tone === "marketing"
 
+  // Two labels, no qualifiers. "one order is one parcel" and "in the same parcel" were
+  // explaining a rule nobody had asked about yet, on a card whose whole job is two numbers.
   const rows = [
-    { label: "First item", value: usd(first), note: "one order is one parcel" },
-    { label: "Each item after", value: usd(extra), note: "in the same parcel" },
+    { label: "First item", value: usd(first) },
+    { label: "Additional item", value: usd(extra) },
   ]
 
   return (
@@ -60,10 +62,6 @@ export function ShippingFees({
           <div key={r.label} className="flex items-baseline justify-between gap-4">
             <dt className={marketing ? "text-sm text-black/70" : "text-xs text-muted-foreground"}>
               {r.label}
-              {/* The qualifier earns its place: "each item after" is meaningless without
-                  "in the same parcel", and that is the whole reason the second number is
-                  smaller than the first. */}
-              <span className={marketing ? " text-black/40" : " text-muted-foreground/70"}> · {r.note}</span>
             </dt>
             <dd className={marketing ? "text-sm font-black tabular-nums" : "text-sm font-semibold tabular-nums"}>
               {r.value}
