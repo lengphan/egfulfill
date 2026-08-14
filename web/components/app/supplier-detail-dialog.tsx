@@ -141,7 +141,11 @@ export function SupplierDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      {/* WIDER, because the right-hand column is doing real work now — a size run, a palette
+          of fourteen named swatches, and a per-variant stock table. At 3xl with a 22rem
+          image beside it, the colours fell to three per row and every compound Otto name
+          ("Navy/White", "Black/Dark Green") truncated to "Navy/W…", which is not a name. */}
+      <DialogContent className="sm:max-w-5xl">
         {/**
           * THE PRODUCT IDENTIFIES ITSELF ONCE, AT THE TOP.
           *
@@ -171,9 +175,21 @@ export function SupplierDetailDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-5 md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-          <div className="space-y-2">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-lg border border-border bg-white">
+        <div className="grid gap-5 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] md:items-start">
+          {/**
+            * THE PHOTO STOPS CLAIMING A COLUMN IT DOESN'T FILL.
+            *
+            * It was a 22rem box at 4:5 with object-contain, so a cap — wide and short —
+            * floated in the middle of a tall white rectangle, and the column beneath it stayed
+            * empty for the whole height of the palette and the stock table. That is the blank
+            * space: a fixed tall frame next to a variable tall panel.
+            *
+            * Square is closer to the shape of the things in it, 17rem gives the width back to
+            * the column doing the work, and `sticky` keeps the picture beside whichever colour
+            * you scroll to instead of leaving a long empty gutter under it.
+            */}
+          <div className="md:sticky md:top-0">
+            <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-white">
               {shown ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={shown} alt="" className="absolute inset-0 size-full object-contain" />
@@ -239,7 +255,7 @@ export function SupplierDetailDialog({
                   {d.colors.length ? (
                     <span className="flex flex-wrap gap-x-2 gap-y-2">
                       {d.colors.map((c) => (
-                        <span key={c} className="flex w-14 flex-col items-center gap-1">
+                        <span key={c} className="flex w-[4.5rem] flex-col items-center gap-1">
                         <button
                           type="button"
                           title={d.stockByColor ? `${c} — ${d.stockByColor[c] ?? 0} in stock at the supplier` : c}
@@ -271,8 +287,13 @@ export function SupplierDetailDialog({
                             Charcoal from Black. Supplier codes are prettified ("031753A -
                             Blk/Dk.Grn" → the readable half) and truncated; the full string
                             stays on the button's title. */}
+                        {/* TWO LINES, NOT AN ELLIPSIS. Otto names are compound — "Navy/White",
+                            "Black/Dark Green", "Khaki/Navy" — and a single truncated line
+                            turned three different colourways into "Navy/W…", "Navy/Da…" and
+                            "Navy/Kh…", which distinguishes nothing. Wrapping keeps the part
+                            that actually differs visible. */}
                         <span
-                          className={"w-full truncate text-center text-2xs leading-tight " + (c === colour ? "font-medium text-foreground" : "text-muted-foreground")}
+                          className={"line-clamp-2 w-full break-words text-center text-2xs leading-tight " + (c === colour ? "font-medium text-foreground" : "text-muted-foreground")}
                           title={c}
                         >
                           {prettyColorName(c)}
@@ -355,50 +376,48 @@ export function SupplierDetailDialog({
             )}
 
             {/**
-              * ONE ACTION ROW.
+              * THE ACTION BAR — grouped by what each control belongs TO, and one height.
               *
-              * These were two rows separated by a rule, so "Add to cart" and "Add to Products"
-              * read as belonging to different sections when they are simply the two things you
-              * can do with the blank you are looking at.
+              * Everything was a flat wrap of four items at three different heights: a 32px
+              * number box, then buttons that broke to a second line whenever the column was
+              * narrow, so "Add to Products" ended up stranded underneath looking like a
+              * different section. That is the awkwardness — no grouping and no baseline.
               *
-              * They are also deliberately different WEIGHTS, because they do different things
-              * and were identically styled: buying stock and listing a product for sale are
-              * not the same decision, and a purple button beside an identical purple button
-              * invites the wrong one. Add to cart is filled — it is the one tied to the
-              * quantity box next to it. Add to Products is outlined.
+              * Quantity belongs to Add to cart, so those two sit together as one unit. Order
+              * and Add to Products do something else with the same blank, so they go to the
+              * far end. Everything is h-9, which is the app's input height, so the number box
+              * and the buttons finally line up.
               *
-              * The picked colourway is said back on the same row, because a cart line that
-              * turns out to be the wrong colour is otherwise discovered on the PO, which is
-              * late.
+              * WEIGHTS STILL DIFFER, deliberately: buying stock and listing a product for sale
+              * are not the same decision, and two identical purple buttons invite the wrong
+              * one. Add to cart is filled; the others are outlined.
               */}
             <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
               {onAddToCart && (
-                <>
+                <div className="flex items-center gap-2">
                   <input
                     type="number" min={1} value={qty}
                     onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
                     aria-label="Quantity"
-                    className="h-8 w-16 rounded-lg border border-border bg-card px-2 text-sm tabular-nums"
+                    className="h-9 w-16 rounded-lg border border-border bg-card px-2.5 text-sm tabular-nums"
                   />
-                  <Button size="sm" onClick={() => onAddToCart({ colour, size, qty })}>
-                    <ShoppingCart size={13} weight="bold" /> Add to cart
+                  <Button size="sm" className="h-9" onClick={() => onAddToCart({ colour, size, qty })}>
+                    <ShoppingCart size={14} weight="bold" /> Add to cart
                   </Button>
-                </>
+                </div>
               )}
+              <div className="ml-auto flex flex-wrap items-center gap-2">
               {onOrder && (
-                <Button size="sm" variant="outline" onClick={onOrder}>
-                  <ShoppingCart size={13} weight="bold" /> Order
+                <Button size="sm" variant="outline" className="h-9" onClick={onOrder}>
+                  <ShoppingCart size={14} weight="bold" /> Order
                 </Button>
               )}
               {onAddToCatalog && (
-                <Button size="sm" variant="outline" onClick={onAddToCatalog} disabled={added}>
-                  <Plus size={13} weight="bold" /> {added ? "In Products" : "Add to Products"}
+                <Button size="sm" variant="outline" className="h-9" onClick={onAddToCatalog} disabled={added}>
+                  <Plus size={14} weight="bold" /> {added ? "In Products" : "Add to Products"}
                 </Button>
               )}
-              {/* The "White / S" echo is gone too. The size chip and the colour swatch above
-                  are both visibly selected — restating the same choice as text beside the
-                  button is the third place one decision is shown, and it was the least
-                  legible of the three. */}
+              </div>
             </div>
           </div>
         </div>
