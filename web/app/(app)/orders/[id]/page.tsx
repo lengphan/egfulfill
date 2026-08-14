@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
-import { numOf } from "@/lib/order-format"
+import { numOf, platformOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, Paperclip, FileArrowDown, CircleNotch } from "@phosphor-icons/react"
@@ -304,7 +304,25 @@ export default function OrderDetailPage() {
   // so `total` is 0 or whatever someone typed — hence `hasRevenue` rather than treating
   // 0 as "sold for nothing". An order with no retail price recorded and one genuinely
   // sold at $0 look identical in the column and mean opposite things.
-  const revenue = Number(order.total ?? 0) || 0
+  /**
+   * ON A MANUAL ORDER, `total` IS NOT THE BUYER'S MONEY.
+   *
+   * The new-order form computes it as Σ(price you typed × qty) PLUS our shipping fees, so
+   * an order created with the price column left at 0 still carries a total — the postage.
+   * Read as revenue it says the customer paid $9.00 for two beanies that cost $44.99 to
+   * make, and the card reported a $35.99 loss in red. The loss is arithmetic on a number
+   * that was never a retail price.
+   *
+   * So a manual order's revenue comes from the LINES, which is where a seller actually
+   * records what the buyer paid. Nothing there means nothing recorded — stated as such,
+   * with no profit figure, which is the existing honest path for this case. A marketplace
+   * order is unaffected: etsy.js sets `total` from the receipt grandtotal, and that IS the
+   * buyer's money.
+   */
+  const lineRevenue = (order.items ?? []).reduce(
+    (s, it) => s + (Number(it.unit_price) || 0) * (Number(it.qty) || 1), 0)
+  const fromMarketplace = platformOf(order) !== "Manual"
+  const revenue = fromMarketplace ? (Number(order.total ?? 0) || 0) || lineRevenue : lineRevenue
   const hasRevenue = revenue > 0
   // COST is what the seller paid US, read off the ledger — every part, including the ones
   // the quote can't see. Falls back to the quote before submit, when nothing is charged yet.
