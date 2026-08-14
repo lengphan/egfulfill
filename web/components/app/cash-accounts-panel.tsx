@@ -52,8 +52,12 @@ export function CashAccountsPanel() {
     const id = seed?.id ?? name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32)
     const opening = await prompt({ title: `Opening balance for ${name}`, body: "What is in it right now? Leave blank for zero.", placeholder: "0.00" })
     if (opening === null) return
+    // A rail is always a rail. Anything else is a card if it names one, because that is what
+    // decides whether it can be the postage account — and typing "Visa ····1241" and then
+    // being unable to charge postage to it would be a dead end with no explanation.
+    const kind = seed?.kind ?? (/visa|mastercard|amex|card|credit|debit|\d{4}$/i.test(name) ? "card" : "bank")
     setBusy(id)
-    try { await saveCashAccount({ id, name, kind: seed?.kind ?? "bank", opening: Number(opening) || 0 }); load() }
+    try { await saveCashAccount({ id, name, kind, opening: Number(opening) || 0 }); load() }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't save that account.") }
     finally { setBusy(null) }
   }
@@ -71,6 +75,15 @@ export function CashAccountsPanel() {
       if (r.adjustment) setErr(null)
       load()
     } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't reconcile.") }
+    finally { setBusy(null) }
+  }
+
+  /** Mark this card as the one Shippo charges. The server clears the flag from any other,
+   *  because attribution has to have exactly one answer. */
+  const setPostage = async (a: { id: string; name: string; kind: string; opening: number }) => {
+    setBusy(a.id)
+    try { await saveCashAccount({ id: a.id, name: a.name, kind: a.kind, opening: a.opening, isPostage: true }); load() }
+    catch (e) { setErr(e instanceof Error ? e.message : "Couldn't set the postage card.") }
     finally { setBusy(null) }
   }
 
@@ -159,6 +172,16 @@ export function CashAccountsPanel() {
                 className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title="Set the real balance">
                 {busy === a.id ? <CircleNotch size={9} className="animate-spin" /> : <ArrowsClockwise size={9} />}
               </button>
+              {/* WHICH CARD SHIPPO CHARGES. Named once here, and every label cost places
+                  itself against it from then on — the alternative is choosing an account on
+                  every label, which nobody would do and which would leave postage in
+                  Unassigned forever. Only offered on a card, because postage is charged to
+                  one; marking a bank would attribute spend to a place it never left. */}
+              {a.kind === "card" && !a.is_postage && (
+                <button onClick={() => setPostage(a)} disabled={busy === a.id}
+                  className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent"
+                  title="Charge postage to this card">$</button>
+              )}
             </span>
           </div>
         </Card>

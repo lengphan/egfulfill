@@ -252,6 +252,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
     const led = await q(
       `select * from (
          select id, delta, type, ref, note, created_by, created_at, coalesce(is_test,false) as is_test,
+                cash_account,
                 -- Marked rows still APPEAR (you cannot unmark what you cannot see) but must
                 -- not move the running total, or this column would disagree with the balance
                 -- shown above it.

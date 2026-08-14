@@ -207,6 +207,9 @@ export type LedgerRow = {
   /** Marked as not-real-money by an admin. The row still shows — you cannot unmark what you
    *  cannot see — but it is excluded from the balance and every summary total. */
   is_test?: boolean
+  /** Which real account this movement passed through. Null = not placed yet, which is a
+   *  visible state rather than a silent one (see the Unassigned card in Finance). */
+  cash_account?: string | null
 }
 
 /** The card Shippo charges postage to. Passthrough from Shippo's /billing — brand and last

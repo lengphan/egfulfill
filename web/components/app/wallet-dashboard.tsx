@@ -19,7 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SectionCard } from "@/components/app/section-card"
 import { CircleNotch, CheckCircle, XCircle, Warning } from "@phosphor-icons/react"
-import { markLedgerTest, getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type WalletSummary, type TopupRequest, type PayoutRequest } from "@/lib/api"
+import { getCashAccounts, attributeLedgerEntry, type CashAccount, markLedgerTest, getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type WalletSummary, type TopupRequest, type PayoutRequest } from "@/lib/api"
 import { BillingView } from "@/components/app/billing-view"
 import { getToken, getUser } from "@/lib/auth"
 
@@ -187,6 +187,8 @@ type Row = {
   /** Marked as not-real-money. Still listed — you cannot unmark what you cannot see — but
    *  struck through and excluded from every total. */
   isTest?: boolean
+  /** The real account it moved through, or null while unattributed. */
+  cashAccount?: string | null
   amount: number
   balance: number
 }
@@ -270,6 +272,7 @@ function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary
       label: meta.label,
       tone: meta.tone,
       isTest: !!l.is_test,
+      cashAccount: l.cash_account ?? null,
       amount: delta,
       balance: balanceAfter,
     }
@@ -292,6 +295,9 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
   // just decides whether to offer the control.
   const [isAdmin, setIsAdmin] = useState(false)
   const [markingId, setMarkingId] = useState<string | null>(null)
+  /** The accounts a row can be attributed to. Loaded once — it is a short list that changes
+   *  when someone adds an account, not while reading a ledger. */
+  const [accounts, setAccounts] = useState<CashAccount[]>([])
   const [pending, setPending] = useState<TopupRequest[]>([])
   // Kept so the attempt is still on the record — a rejected top-up never touches the
   // ledger, so without this it would disappear from the app entirely once it left the
@@ -367,7 +373,11 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       .catch(() => setPending([]))
   }, [isFactoryWallet])
   useEffect(() => {
-    const id = setTimeout(() => { setIsAdmin(getUser()?.role === "admin"); refresh() }, 0)
+    const id = setTimeout(() => {
+      setIsAdmin(getUser()?.role === "admin")
+      refresh()
+      getCashAccounts().then((r) => setAccounts(r.accounts ?? [])).catch(() => {})
+    }, 0)
     return () => clearTimeout(id)
   }, [refresh])
 
@@ -378,6 +388,20 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
    * running-balance column and every summary card at once, and a screen where the row
    * changed but the totals didn't would be worse than one that took a moment.
    */
+  /**
+   * Place a movement in the account it really passed through.
+   *
+   * A select rather than a dialog: this is a list of eighteen entries somebody works down
+   * in one sitting, and a modal per row would make attributing the backlog a chore nobody
+   * finishes. Reloads because it moves a balance in the panel above.
+   */
+  const attribute = async (row: Row, account: string) => {
+    setMarkingId(row.id)
+    try { await attributeLedgerEntry(row.id, account || null); refresh(); getCashAccounts().then((r) => setAccounts(r.accounts ?? [])).catch(() => {}) }
+    catch (e) { setLoadErr(e instanceof Error ? e.message : "Couldn't attribute that entry.") }
+    finally { setMarkingId(null) }
+  }
+
   const toggleTest = async (row: Row) => {
     setMarkingId(row.id)
     try { await markLedgerTest(row.id, !row.isTest); refresh() }
@@ -620,6 +644,23 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                     {/* ADMIN ONLY, and stopPropagation because the row itself opens a dialog.
                         Marked money is excluded from the balance and every total, and the row
                         stays put so the decision can be undone. */}
+                    {/* WHICH ACCOUNT IT MOVED THROUGH. Only offered once accounts exist —
+                        an empty select on every row would be chrome asking a question that
+                        has no answers yet. Unattributed shows a dash, not a guess. */}
+                    {isAdmin && !t.rejected && accounts.length > 0 && (
+                      <select
+                        value={t.cashAccount ?? ""}
+                        disabled={markingId === t.id}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => { e.stopPropagation(); void attribute(t, e.target.value) }}
+                        title="Which real account this moved through"
+                        className={"ml-1.5 max-w-[7.5rem] rounded border border-border bg-transparent px-1 py-0.5 text-2xs "
+                          + (t.cashAccount ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}
+                      >
+                        <option value="">— unassigned</option>
+                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    )}
                     {isAdmin && !t.rejected && (
                       <button
                         type="button"
