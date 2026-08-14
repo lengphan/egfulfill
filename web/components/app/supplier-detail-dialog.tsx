@@ -198,13 +198,15 @@ export function SupplierDetailDialog({
                     answered by looking rather than by counting. */}
                 <Field label={`Sizes${d.sizes.length ? ` (${d.sizes.length})` : ""}`}>
                   {d.sizes.length ? (
-                    <span className="flex flex-wrap gap-1">
+                    <span className="flex flex-wrap gap-1.5">
                       {d.sizes.map((z) => (
                         <button
                           key={z}
                           type="button"
                           onClick={() => setSize(z === size ? null : z)}
-                          className={"rounded-md border px-1.5 py-0.5 text-2xs font-medium transition-colors "
+                          // Sized to be HIT as well as read. These were 10px text in a 2px
+                          // pad — a target you aim at, on the control you are here to use.
+                          className={"min-w-9 rounded-lg border px-2.5 py-1 text-sm font-medium transition-colors "
                             + (z === size ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
                         >
                           {z}
@@ -232,15 +234,22 @@ export function SupplierDetailDialog({
                           // broken" rather than "these colours are short", and it hid the very
                           // thing a swatch exists to show: the colour. Stock is a number, and
                           // it belongs on the line below, in words.
-                          className={"relative size-6 overflow-hidden rounded-full border transition-transform hover:scale-110 "
+                          /**
+                           * BIGGER, AND ZOOMED INTO THE GARMENT.
+                           *
+                           * These were 24px showing the WHOLE product photo — which on a
+                           * studio shot is mostly white backdrop, so seventeen swatches read
+                           * as seventeen white circles with a speck in the middle. A swatch
+                           * exists to show the COLOUR, so the picture is scaled up and pulled
+                           * to the body of the garment. Same treatment the product card
+                           * already uses (260% at center 42%).
+                           */
+                          className={"relative size-9 shrink-0 overflow-hidden rounded-full border-2 bg-muted transition-transform hover:scale-110 "
                             + (c === colour ? "border-primary ring-2 ring-primary/40" : "border-black/15")}
-                          style={d.colorImages[c] ? undefined : { background: swatchHex(c) }}
-                        >
-                          {d.colorImages[c] && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={d.colorImages[c]} alt={c} className="size-full object-cover" />
-                          )}
-                        </button>
+                          style={d.colorImages[c]
+                            ? { backgroundImage: `url("${d.colorImages[c]}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
+                            : { background: swatchHex(c) }}
+                        />
                       ))}
                     </span>
                   ) : "—"}
@@ -262,35 +271,40 @@ export function SupplierDetailDialog({
                   * stock" across a style is not an answer to "can you make six 2XL".
                   */}
                 {/**
-                  * ONE PLAIN SENTENCE. This was a row of chips with strikethroughs and a
-                  * two-mode layout, which took longer to decode than it saved. A number and
-                  * the word "in stock" is the whole requirement.
+                  * PER VARIANT — a colourway and a size, which is the thing actually ordered.
                   *
-                  * Sizes are only listed when there is more than one, because "Adjustable 0"
-                  * beside a style whose only size IS Adjustable reads as a phrase rather than
-                  * a quantity — which is precisely how it was misread.
+                  * "6,949 at the supplier, across 3 colours" is true and useless: nobody buys
+                  * a style, they buy Black / XS, and a grand total hides the one size that is
+                  * empty. One row per colour, its sizes along it, so the gap is visible where
+                  * it matters rather than averaged away.
+                  *
+                  * Picking a colour narrows to that row; picking a size dims the others so the
+                  * column you care about stands out without the rest disappearing — what a
+                  * neighbouring size holds is exactly what you check before changing the pick.
                   */}
                 {d.stockByColor && (
                   <Field label="Stock">
-                    {(() => {
-                      const total = Object.values(d.stockByColor).reduce((a, b) => a + b, 0)
-                      if (!colour) {
-                        return <span className="tabular-nums">{total.toLocaleString()} <span className="text-muted-foreground">at the supplier, across {Object.keys(d.stockByColor).length} colours</span></span>
-                      }
-                      const sizes = Object.entries(d.stockByVariant?.[colour] ?? {})
-                      const forColour = d.stockByColor[colour] ?? 0
-                      return (
-                        <span>
-                          <span className="tabular-nums font-medium">{forColour.toLocaleString()}</span>
-                          <span className="text-muted-foreground"> in {colour}</span>
-                          {sizes.length > 1 && (
-                            <span className="text-muted-foreground">
-                              {" — "}{sizes.map(([z, n]) => `${z} ${n.toLocaleString()}`).join(" · ")}
-                            </span>
-                          )}
-                        </span>
-                      )
-                    })()}
+                    <span className="flex flex-col gap-1">
+                      {Object.entries(d.stockByVariant ?? {})
+                        .filter(([c]) => !colour || c === colour)
+                        .map(([c, bySize]) => (
+                          <span key={c} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <span className="w-24 shrink-0 truncate font-medium">{c}</span>
+                            {Object.entries(bySize).map(([z, n]) => (
+                              <span
+                                key={z}
+                                className={"tabular-nums " + (size && z !== size ? "text-muted-foreground/45" : n > 0 ? "text-foreground" : "text-muted-foreground line-through")}
+                                title={`${c} / ${z}`}
+                              >
+                                <span className="text-muted-foreground">{z}</span> {n.toLocaleString()}
+                              </span>
+                            ))}
+                          </span>
+                        ))}
+                      {!Object.keys(d.stockByVariant ?? {}).length && (
+                        <span className="text-muted-foreground">No per-variant figures for this style.</span>
+                      )}
+                    </span>
                   </Field>
                 )}
               </>
@@ -337,15 +351,10 @@ export function SupplierDetailDialog({
                   <Plus size={13} weight="bold" /> {added ? "In Products" : "Add to Products"}
                 </Button>
               )}
-              {/* The picked variant, and NOTHING when nothing is picked. The placeholder read
-                  "whole style — pick a colour and size", which is an instruction sitting
-                  permanently beside a button, in the widest slot on the row, saying what the
-                  colour swatches directly above already invite. */}
-              {onAddToCart && [colour, size].filter(Boolean).length > 0 && (
-                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                  {[colour, size].filter(Boolean).join(" / ")}
-                </span>
-              )}
+              {/* The "White / S" echo is gone too. The size chip and the colour swatch above
+                  are both visibly selected — restating the same choice as text beside the
+                  button is the third place one decision is shown, and it was the least
+                  legible of the three. */}
             </div>
           </div>
         </div>
@@ -354,11 +363,22 @@ export function SupplierDetailDialog({
   )
 }
 
+/**
+ * One labelled row.
+ *
+ * NO RULE BETWEEN ROWS. Every row drew its own bottom border, and `last:border-0` never fired
+ * because these are rendered inside a fragment — so the final row's rule landed directly
+ * above the action row's own top rule and read as a double line. Spacing separates them now;
+ * the label column already does the work a rule was there to do.
+ *
+ * Type is text-sm, not text-xs. This is the window where somebody decides whether a blank is
+ * right — fabric, sizes, stock — and it was set two steps below the app's body size.
+ */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline gap-3 border-b border-border/60 py-1.5 last:border-0">
-      <span className="w-28 shrink-0 text-xs text-muted-foreground">{label}</span>
-      <span className="min-w-0 flex-1 text-xs">{children}</span>
+    <div className="flex items-baseline gap-3 py-2">
+      <span className="w-28 shrink-0 text-sm text-muted-foreground">{label}</span>
+      <span className="min-w-0 flex-1 text-sm">{children}</span>
     </div>
   )
 }
