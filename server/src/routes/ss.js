@@ -1024,7 +1024,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       const colors = [], sizes = [], cseen = new Set(), sseen = new Set();
       let price = null, brand = null, styleName = null, image = null;
       // One front image per colour + all OTHER angle/model photos (deduped, never a colour's front).
-      const colorImages = {}, frontUrls = new Set(), extraSet = new Set();
+      const colorImages = {}, frontUrls = new Set(), extraSet = new Set(), colorExtras = {};
       /**
        * STOCK, FOR FREE.
        *
@@ -1058,7 +1058,25 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         const front = ssImg(p.colorFrontImage);
         if (!image && front) image = front;
         if (c && front && !colorImages[c]) { colorImages[c] = front; frontUrls.add(front); }
-        [p.colorBackImage, p.colorSideImage, p.colorOnModelFrontImage, p.colorOnModelBackImage].forEach((raw) => { const im = ssImg(raw); if (im) extraSet.add(im); });
+        /**
+         * THE ANGLE SHOTS BELONG TO A COLOUR TOO.
+         *
+         * S&S sends back / side / on-model images PER PRODUCT ROW, so each one already knows
+         * its colourway — and this threw that away, flattening them all into one anonymous
+         * `extraImages` list. In the product editor that is exactly what it looked like: the
+         * front of every colour carried its name, and thirty back-views sat underneath saying
+         * "— colour —", as though the supplier had never told us. It had.
+         *
+         * Kept BOTH ways round. `extraImages` stays as it was, because callers rely on it for
+         * a plain gallery; `colorExtras` is the same pictures keyed by colour, so the editor
+         * can assign each one without a human matching photographs to names by eye.
+         */
+        [p.colorBackImage, p.colorSideImage, p.colorOnModelFrontImage, p.colorOnModelBackImage].forEach((raw) => {
+          const im = ssImg(raw);
+          if (!im) return;
+          extraSet.add(im);
+          if (c) { if (!colorExtras[c]) colorExtras[c] = []; if (!colorExtras[c].includes(im)) colorExtras[c].push(im); }
+        });
       }
 
       // Style-level metadata (descriptive title + description); best-effort — some
@@ -1090,8 +1108,15 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       const colorImagesProx = {};
       Object.keys(colorImages).forEach((k) => { const pu = proxify(colorImages[k]); if (pu) colorImagesProx[k] = pu; });
       const extraImages = [...extraSet].filter((u) => !frontUrls.has(u)).slice(0, 24).map(proxify).filter(Boolean);
+      // Same pictures, still keyed by their colourway, proxied the same way. A front shot is
+      // dropped here because colorImages already carries it — this is the extra angles only.
+      const colorExtrasProx = {};
+      for (const [c, urls] of Object.entries(colorExtras)) {
+        const list = urls.filter((u) => !frontUrls.has(u)).map(proxify).filter(Boolean);
+        if (list.length) colorExtrasProx[c] = list;
+      }
       const out = { styleID: id, title, brand: brand || null, description, image: proxify(image), price, colors, sizes, colorImages: colorImagesProx, extraImages,
-                    stockByColor, stockByVariant, stockTotal };
+                    colorExtras: colorExtrasProx, stockByColor, stockByVariant, stockTotal };
       _styleCache.set(id, { at: Date.now(), data: out });   // cache for repeat opens
       return out;
     } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }
