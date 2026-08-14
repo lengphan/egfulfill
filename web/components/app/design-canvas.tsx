@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
-import { getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -759,6 +759,12 @@ export function DesignCanvasDialog({
   // The NEWEST machine file for this line, by name — so slot ② can show which fixed file is
   // current after a revision, instead of a bare "added".
   const [latestMachine, setLatestMachine] = useState<{ designId: string; name: string } | null>(null)
+  // The stitch preview of this line's machine file, and whether the stage is showing it.
+  // Fetched once, on the first switch — a render costs a Wilcom call, and the server keeps
+  // the result against the file's hash, so switching back and forth is free after that.
+  const [stitchPng, setStitchPng] = useState<string | null>(null)
+  const [stitchState, setStitchState] = useState<"idle" | "loading" | "none">("idle")
+  const [showStitch, setShowStitch] = useState(false)
   // Fetching the bytes. Per-file busy/error so a paywalled or missing file says so HERE
   // rather than failing silently under the cursor.
   /**
@@ -955,6 +961,17 @@ export function DesignCanvasDialog({
    * Counts what it would OVERWRITE and says so first. This is one click and it can replace
    * artwork on lines nobody is currently looking at.
    */
+  /** Swap the stage between the artwork and the stitch preview of the attached file. */
+  const toggleStitch = useCallback(async () => {
+    if (showStitch) { setShowStitch(false); return }
+    if (stitchPng) { setShowStitch(true); return }
+    if (!latestMachine) return
+    setStitchState("loading")
+    const r = await getEmbPreview({ designId: latestMachine.designId }).catch(() => null)
+    if (r?.ok && r.png) { setStitchPng(r.png); setShowStitch(true); setStitchState("idle") }
+    else setStitchState("none")
+  }, [showStitch, stitchPng, latestMachine])
+
   /** Open this line's machine file. 402 is the paywall, not a fault — say which. */
   const downloadMachine = useCallback(async () => {
     if (!latestMachine) return
@@ -1187,7 +1204,9 @@ export function DesignCanvasDialog({
             placement on, which is the one thing this window exists for. */}
         <div className="relative w-full max-w-[min(100%,78vh)]">
           <DesignStage
-            className="w-full" mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos}
+            className="w-full" mockup={activeMockup}
+            designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
+            pos={pos} setPos={setPos}
             onRemove={() => setDesignUrl("")} picking={picking} onPickColor={onPickColor}
             // Suppress the stage's OWN "Pick a blank to start designing" placeholder: the
             // overlay below is already the empty state, and rendering both stacked two
@@ -1566,11 +1585,26 @@ export function DesignCanvasDialog({
                     URL, because that route is where the paywall and the seller/staff checks
                     live — a direct link would hand out bytes the caller may not have bought. */}
                 {latestMachine && (
+                  <>
+                  {/* Show what will actually be stitched, on the same stage, in the same
+                      box as the artwork — and switch back. The image stays where it is;
+                      only what is drawn changes. */}
+                  <Button
+                    variant="outline" size="sm"
+                    disabled={stitchState === "loading"}
+                    onClick={() => void toggleStitch()}
+                    title={stitchState === "none" ? "No stitch preview for this file" : undefined}
+                  >
+                    {stitchState === "loading" ? "Rendering…"
+                      : stitchState === "none" ? "No stitch preview"
+                        : showStitch ? "Show image" : "Show stitches"}
+                  </Button>
                   <Button variant="outline" size="sm" disabled={dlBusy} onClick={() => void downloadMachine()}>
                     {dlBusy
                       ? <><CircleNotch size={13} className="animate-spin" /> Fetching…</>
                       : <><DownloadSimple size={13} weight="bold" /> Download</>}
                   </Button>
+                  </>
                 )}
                               {/* REMOVE. The artwork on the canvas has always had its X; the machine file
                     had Replace and Download and no way to say "not this one after all". A
