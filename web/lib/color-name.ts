@@ -91,3 +91,69 @@ export function prettyColorName(raw: string): string {
     .filter(Boolean)
     .join("/")
 }
+
+/**
+ * A HEX FOR A COLOUR NAME — the swatch you draw when there is no photograph of that colourway.
+ *
+ * Three private 24-entry lookups grew for this (products-catalog, variant-field, and the
+ * supplier dialog via the first). They knew "navy" and "forest" and nothing else, which was
+ * survivable while every swatch had a supplier photo behind it. It stopped being survivable
+ * when SanMar's stopped: their names are "Aquatic Blue", "Athletic Heather", "Deep Black" —
+ * none of which matched — so forty-eight colourways all drew the same neutral grey and the
+ * palette looked broken rather than unphotographed.
+ *
+ * Built off NAMED above, which already carries 45 colours with real RGB, so there is one
+ * table rather than a fourth copy.
+ *
+ * MATCHED ON THE LAST COLOUR WORD, then shaded by any modifier before it. English puts the
+ * noun last — "Aquatic Blue" IS a blue, "Athletic Heather" IS a heather — so the final
+ * recognised word is the colour and the ones before it qualify it. A two-tone name
+ * ("Black/Dark Green") takes the FIRST half, because that is the body of the garment.
+ */
+const HEX_BY_NAME: Record<string, string> = {
+  ...Object.fromEntries(
+    NAMED.map(([n, r, g, b]) => [n.toLowerCase(), `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`])
+  ),
+  /**
+   * Garment-trade names NAMED does not carry. NAMED is the palette for SUGGESTING a name
+   * from a picked hex (thread cones), so it holds generic colours; blank catalogues use a
+   * different vocabulary — "Ash", "Natural", "Sport Grey", "Cardinal" — and those are the
+   * ones that were falling through to neutral.
+   */
+  ash: "#b2b2b0", natural: "#e8e0cf", stone: "#d5cdbe", sand: "#d8cbb4", bone: "#e3ded3",
+  "sport grey": "#b7b7b3", graphite: "#4b4f54", slate: "#57636e", smoke: "#8c8c8c",
+  kelly: "#00875a", cardinal: "#8c2131", burgundy: "#6d2233", wine: "#5e2233",
+  camo: "#4b5320", military: "#4b5320", carolina: "#7ba4db", columbia: "#8fbfe0",
+  cyan: "#00b7c3", turquoise: "#30d5c8", aqua: "#5fc9d8", mustard: "#d4a017",
+  chocolate: "#5c4033", espresso: "#3b2a20", clay: "#b66a50", terracotta: "#c46a4a",
+  heather: "#9c9c9c", oatmeal: "#ded3c0", vintage: "#9a9287",
+}
+const shade = (hex: string, pct: number): string => {
+  const h = hex.replace("#", "")
+  const ch = [0, 2, 4].map((i) => {
+    const v = parseInt(h.slice(i, i + 2), 16)
+    return Math.max(0, Math.min(255, Math.round(v + (pct < 0 ? v : 255 - v) * (pct / 100))))
+  })
+  return `#${ch.map((v) => v.toString(16).padStart(2, "0")).join("")}`
+}
+
+export function colorHex(raw: string): string {
+  const pretty = prettyColorName(raw)
+  if (!pretty) return "#c7c4bd"
+  // Two-tone: the first half is the body of the garment, the rest is trim.
+  const main = pretty.split("/")[0].trim().toLowerCase()
+  if (HEX_BY_NAME[main]) return HEX_BY_NAME[main]
+  const words = main.split(/[\s.-]+/).filter(Boolean)
+  // The last recognised colour word wins; earlier ones are modifiers.
+  let base = ""
+  for (const w of words) if (HEX_BY_NAME[w]) base = HEX_BY_NAME[w]
+  if (!base) {
+    // "Heather"/"Heathered" on its own is a grey; it is the commonest unmatched word.
+    if (words.some((w) => w.startsWith("heather"))) return HEX_BY_NAME["grey"]
+    return "#c7c4bd"
+  }
+  if (words.includes("dark") || words.includes("deep")) return shade(base, -28)
+  if (words.includes("light") || words.includes("pale")) return shade(base, 34)
+  if (words.some((w) => w.startsWith("heather"))) return shade(base, 22)
+  return base
+}

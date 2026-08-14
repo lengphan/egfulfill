@@ -5,9 +5,8 @@ import { CircleNotch, ShoppingCart, Plus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { getSsStyle, getOttoStyle, getSanmarCatalogStyle } from "@/lib/api"
-import { swatchHex } from "@/components/app/products-catalog"
+import { colorHex, prettyColorName } from "@/lib/color-name"
 import { descriptionLines } from "@/lib/description"
-import { prettyColorName } from "@/lib/color-name"
 
 /**
  * ONE BLANK, IN FULL — the catalogue tile's picture is a thumbnail of a decision.
@@ -331,7 +330,7 @@ export function SupplierDetailDialog({
                             + (c === colour ? "border-primary ring-2 ring-primary/40" : "border-black/15")}
                           style={d.colorImages[c]
                             ? { backgroundImage: `url("${d.colorImages[c]}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
-                            : { background: swatchHex(c) }}
+                            : { background: colorHex(c) }}
                         />
                         {/* THE NAME UNDER THE SWATCH. It was on hover and on the selected chip
                             only, so reading the palette meant pointing at each circle in turn
