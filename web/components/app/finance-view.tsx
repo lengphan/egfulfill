@@ -12,10 +12,18 @@ import { CashAccountsPanel } from "@/components/app/cash-accounts-panel"
  */
 export function FinanceView() {
   return (
-    <div className="space-y-4">
-      {/* WHERE the money is, above WHAT it did. The ledger below is the record of movement;
-          this is the answer to "how much is in PingPong, and what is on the Shippo card" —
-          the question that otherwise needs three browser tabs. */}
+    /**
+     * BESIDE, not above.
+     *
+     * Stacked, the accounts took a full band — and with the rails offered, two bands — of
+     * white space before the numbers anyone opens this page for. They are a narrow column
+     * now, so the whole set is one glance and the P&L keeps the width it needs.
+     *
+     * One column on small screens, where side-by-side would squeeze both. The accounts come
+     * first there: on a phone you are far more likely to be checking a balance than reading
+     * a P&L.
+     */
+    <div className="grid gap-4 lg:grid-cols-[minmax(190px,230px)_1fr] lg:items-start">
       <CashAccountsPanel />
       <WalletDashboard partnerHistory />
     </div>

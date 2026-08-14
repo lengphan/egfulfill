@@ -109,71 +109,86 @@ export function CashAccountsPanel() {
   const missing = SUGGESTED.filter((sg) => !view.accounts.some((a) => a.id === sg.id))
 
   /**
-   * CARDS, matching the P&L row below — the page already speaks in cards, and a bordered
-   * list of full-width rows read as a settings table bolted on top of a dashboard.
+   * A NARROW COLUMN, stacked — not a band across the page.
    *
-   * Deliberately SMALLER than those cards: p-3 against p-5, text-xl against text-3xl. These
-   * are reference figures checked occasionally; the P&L underneath is the headline. Same
-   * language, quieter voice — which is also why there is no SectionCard chrome around them,
-   * so they read as part of the page rather than a second panel competing with it.
+   * As a grid these took a full row of their own above the P&L, and with the rails offered
+   * too they wrapped onto a second row: seven cards and a lot of white space before the
+   * numbers anyone came for. Down the side instead, the whole set is one glance and the P&L
+   * keeps the width it needs.
+   *
+   * Smaller than the P&L cards on purpose — text-base against text-3xl. These are reference
+   * figures; that is the headline. Same language, lower voice.
+   */
+  /**
+   * A TINTED REGION, not a new colour.
+   *
+   * These need to read as a different KIND of thing from the P&L beside them — money that
+   * exists, against money that moved — but the palette's hues are spoken for: emerald is
+   * shipped, amber is on hold, red is an alert, violet is working. A fifth hue here would
+   * mean nothing while sitting next to four that mean something, and start eroding them.
+   *
+   * So the separation is a muted GROUND with white cards on it, which is the same device
+   * the order panel already uses. Different region, no new vocabulary.
    */
   return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Accounts
-        </span>
-        <span className="flex items-center gap-2">
-          {view.unassigned.entries > 0 && (
-            <span className="text-2xs text-muted-foreground">
-              {usd(view.unassigned.amount)} unassigned
-            </span>
-          )}
-          <button onClick={() => add()}
-            className="eg-tap text-2xs font-medium text-primary hover:underline">+ Account</button>
-        </span>
+    <div className="space-y-1.5 rounded-xl bg-muted/40 p-2.5">
+      <div className="flex items-baseline justify-between gap-2 px-0.5">
+        <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Accounts</span>
+        <button onClick={() => add()} className="eg-tap text-2xs font-medium text-primary hover:underline">+ Add</button>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        {view.accounts.map((a) => (
-          // group/acct so the actions can stay out of sight until this card is pointed at —
-          // three controls on every card is a wall of buttons on a reference figure.
-          <Card key={a.id} className="group/acct relative gap-0 p-3">
-            <div className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {a.kind === "card" ? <CreditCard size={12} /> : <Bank size={12} />}
-              <span className="truncate">{a.name}</span>
-              {a.is_postage && <span className="ml-auto shrink-0 rounded bg-primary/10 px-1 py-0.5 text-3xs normal-case text-primary">postage</span>}
-            </div>
-            <div className={"mt-1.5 text-xl font-extrabold tracking-tight tabular-nums " + (a.balance < 0 ? "text-red-600 dark:text-red-400" : "")}>
+      {view.accounts.map((a) => (
+        // group/acct so the controls stay out of sight until this card is pointed at — three
+        // buttons on every card is a wall of chrome on a figure you mostly just read.
+        <Card key={a.id} className="group/acct gap-0 px-3 py-2">
+          <div className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {a.kind === "card" ? <CreditCard size={11} /> : <Bank size={11} />}
+            <span className="truncate">{a.name}</span>
+            {a.is_postage && <span className="ml-auto shrink-0 rounded bg-primary/10 px-1 text-3xs normal-case text-primary">postage</span>}
+          </div>
+          <div className="mt-0.5 flex items-baseline justify-between gap-2">
+            <span className={"text-base font-bold tracking-tight tabular-nums " + (a.balance < 0 ? "text-red-600 dark:text-red-400" : "")}>
               {usd(a.balance)}
-            </div>
-            <div className="mt-0.5 text-2xs text-muted-foreground">
-              {a.movements ? `${a.movements} movement${a.movements === 1 ? "" : "s"}` : "no movements yet"}
-            </div>
-            <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover/acct:opacity-100 focus-within:opacity-100">
+            </span>
+            <span className="flex gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/acct:opacity-100">
               <button onClick={() => pay(a.id, a.name, "in")} disabled={busy === a.id}
-                className="eg-tap rounded border border-border px-1.5 py-0.5 text-2xs hover:bg-accent" title="Money in">+</button>
+                className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title="Money in">+</button>
               <button onClick={() => pay(a.id, a.name, "out")} disabled={busy === a.id}
-                className="eg-tap rounded border border-border px-1.5 py-0.5 text-2xs hover:bg-accent" title="Money out">−</button>
+                className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title="Money out">−</button>
               <button onClick={() => reconcile(a.id, a.name, a.balance)} disabled={busy === a.id}
-                className="eg-tap ml-auto inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-2xs hover:bg-accent" title="Set the real balance">
-                {busy === a.id ? <CircleNotch size={10} className="animate-spin" /> : <ArrowsClockwise size={10} />} Reconcile
+                className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title="Set the real balance">
+                {busy === a.id ? <CircleNotch size={9} className="animate-spin" /> : <ArrowsClockwise size={9} />}
               </button>
-            </div>
-          </Card>
-        ))}
+            </span>
+          </div>
+        </Card>
+      ))}
 
-        {/* The rails, as empty cards rather than a row of links — an account you have not
-            added yet still occupies a place in the answer, and its id has to match what the
-            server maps a top-up's method onto. */}
-        {missing.map((sg) => (
-          <button key={sg.id} onClick={() => add(sg)} disabled={busy === sg.id}
-            className="eg-tap flex min-h-[5.25rem] flex-col items-start justify-center rounded-xl border border-dashed border-border p-3 text-left transition-colors hover:border-primary hover:bg-accent/40">
-            <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{sg.name}</span>
-            <span className="mt-1 text-xs text-muted-foreground">+ add this rail</span>
-          </button>
-        ))}
-      </div>
+      {view.unassigned.entries > 0 && (
+        <Card className="gap-0 border-dashed px-3 py-2">
+          <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Unassigned</div>
+          <div className="mt-0.5 flex items-baseline justify-between gap-2">
+            <span className="text-base font-bold tabular-nums">{usd(view.unassigned.amount)}</span>
+            <span className="text-3xs text-muted-foreground">{view.unassigned.entries} entries</span>
+          </div>
+        </Card>
+      )}
+
+      {/* The rails not yet added, as ONE line rather than a card each — an unset account is
+          a prompt, not a figure, and giving each its own card put empty boxes on equal
+          footing with real balances. The one-click id still matters: a hand-typed
+          "Ping Pong" becomes `ping-pong` and then silently receives nothing. */}
+      {missing.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 pt-0.5 text-3xs text-muted-foreground">
+          <span>Add:</span>
+          {missing.map((sg) => (
+            <button key={sg.id} onClick={() => add(sg)} disabled={busy === sg.id}
+              className="eg-tap rounded border border-dashed border-border px-1.5 py-0.5 font-medium transition-colors hover:border-primary hover:text-foreground">
+              {sg.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {err && <p className="text-2xs text-amber-700 dark:text-amber-400">{err}</p>}
     </div>
