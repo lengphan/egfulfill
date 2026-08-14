@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { getSsStyle, getOttoStyle, getSanmarCatalogStyle } from "@/lib/api"
 import { swatchHex } from "@/components/app/products-catalog"
+import { descriptionLines } from "@/lib/description"
 
 /**
  * ONE BLANK, IN FULL — the catalogue tile's picture is a thumbnail of a decision.
@@ -42,35 +43,24 @@ type Detail = {
 
 const SUPPLIER_NAME: Record<Supplier, string> = { ss: "S&S Activewear", otto: "Otto Cap", sanmar: "SanMar" }
 
-/** Their descriptions arrive with markup and hard breaks; this is a catalogue blurb, not a
- *  document, so it renders as text rather than trusting a supplier's HTML into the page. */
-const plain = (s?: string | null) =>
-  String(s ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
-
 /**
- * A SPEC SHEET, not a paragraph.
+ * THE SPEC LINES COME FROM lib/description.ts — there is one splitter, not two.
  *
- * Suppliers ship these as one unpunctuated run — "95% Cotton / 5% Spandex Unstructured Soft
- * Crown Low-Fitting 6 Panel Flexible Fitted Cap Seamed Front Panel without Buckram 6 Sewn
- * Eyelets…" — which is a list of features wearing the shape of prose, and unreadable as
- * either. Each fragment is a separate fact you might be checking for, so they get separate
- * lines.
+ * This file had its own, and its own was wrong. It stripped every tag to a space first,
+ * destroying the <p>/<li> boundaries the supplier actually sent, then GUESSED them back from
+ * capitalisation with `(?<=[a-z%)])\s+(?=[A-Z][a-z])` — which breaks before any capitalised
+ * word. "95% Cotton" became "95%" / "Cotton"; "Soft Crown" became "Soft" / "Crown". Every
+ * feature was cut into single words, one per row, which is exactly what the dialog showed.
  *
- * Split on the punctuation they DO use (periods, semicolons, bullets, dashes between
- * clauses) and, failing that, on the capital that starts each new feature — but only when
- * the run is long enough that prose is clearly not what arrived. A short, real sentence is
- * left exactly as written.
+ * descriptionLines() already turns block tags into line breaks BEFORE stripping them, splits
+ * inline bullet glyphs (SanMar sends "LIMITED EDITION • 5 oz./yd² • Regular fit" with no tags
+ * at all), and handles the labelled clauses S&S glues on with no separator. The product
+ * editor has been using it the whole time — which is why the same description read correctly
+ * there and as a column of words here.
+ *
+ * CLAUDE.md §5: import shared logic, never re-derive it. This was the third private copy.
  */
-function specLines(raw?: string | null): string[] {
-  const t = plain(raw)
-  if (!t) return []
-  const punctuated = t.split(/(?:\s*[•;]\s*)|(?:\.\s+)|(?:\s+[-–—]\s+)/).map((x) => x.trim()).filter(Boolean)
-  if (punctuated.length > 2) return punctuated
-  if (t.length < 140) return [t]
-  // No punctuation and long: break before a capitalised word that follows a lowercase one,
-  // which is where one feature ends and the next begins in these strings.
-  return t.split(/(?<=[a-z%)])\s+(?=[A-Z][a-z])/).map((x) => x.trim()).filter(Boolean)
-}
+const specLines = descriptionLines
 
 export function SupplierDetailDialog({
   open, onOpenChange, supplier, styleId, seed, onOrder, onAddToCatalog, added, onAddToCart,
@@ -255,7 +245,9 @@ export function SupplierDetailDialog({
                     </span>
                   ) : "—"}
                 </Field>
-                {d.skus > 0 && <Field label="Orderable skus">{d.skus.toLocaleString()}</Field>}
+                {/* "Orderable skus 24" is colours × sizes — a number already implied by the
+                    two rows above it, and not one anybody acts on. Removed rather than kept
+                    for completeness. */}
                 {/**
                   * SUPPLIER STOCK, from the rows this dialog already fetched.
                   *
@@ -345,9 +337,13 @@ export function SupplierDetailDialog({
                   <Plus size={13} weight="bold" /> {added ? "In Products" : "Add to Products"}
                 </Button>
               )}
-              {onAddToCart && (
+              {/* The picked variant, and NOTHING when nothing is picked. The placeholder read
+                  "whole style — pick a colour and size", which is an instruction sitting
+                  permanently beside a button, in the widest slot on the row, saying what the
+                  colour swatches directly above already invite. */}
+              {onAddToCart && [colour, size].filter(Boolean).length > 0 && (
                 <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                  {[colour, size].filter(Boolean).join(" / ") || "whole style — pick a colour and size"}
+                  {[colour, size].filter(Boolean).join(" / ")}
                 </span>
               )}
             </div>
