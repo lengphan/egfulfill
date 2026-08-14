@@ -8,11 +8,10 @@ import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
-import { ShippingFees } from "@/components/shipping-fees"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { nextEgSku } from "@/lib/sku"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getCatalogProducts, saveCatalogProducts, getDesignFees, type CatalogProduct, type DesignFees } from "@/lib/api"
+import { getCatalogProducts, saveCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 
@@ -115,12 +114,8 @@ export function ProductsCatalog() {
   const [isStaff, setIsStaff] = useState(false)
   const [editing, setEditing] = useState<CatalogProduct | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
-  // The platform's shipping fees — the other half of every price on this grid.
-  const [fees, setFees] = useState<DesignFees | null>(null)
-  useEffect(() => {
-    const t = setTimeout(() => { getDesignFees().then(setFees).catch(() => setFees(null)) }, 0)
-    return () => clearTimeout(t)
-  }, [])
+  // The shipping-fee fetch went with the table it fed. It was a request on every visit to
+  // this page for a block that is no longer rendered — the detail page loads its own.
 
   useEffect(() => {
     const id = setTimeout(() => { const r = getUser()?.role; setIsStaff(!!r && r !== "seller") }, 0)
@@ -229,11 +224,10 @@ export function ProductsCatalog() {
         />
       </StatGrid>
 
-      {/* WHAT THE PARCEL COSTS, beside what the garments cost. Every price on the grid is
-          a garment; a seller planning a retail price needs the other half.
-          The BANDS, because a grid holds caps and hoodies at once and no single first-item
-          figure is true for both — the flat number this used to print was true for neither. */}
-      <ShippingFees bands={fees?.shipBands} extra={fees?.shipExtra ?? 0} className="max-w-md" />
+      {/* The shipping-band table used to sit here, between the stats and the grid. It is
+          still on the product DETAIL page, where you are looking at one garment and its band
+          is the one that applies — on the all-products page it was a block of four rates
+          above every product, answering a question nobody had asked yet. */}
 
       {/* The explanation, where the problem is — not in a tooltip on one card. Active but
           priceless is invisible AND silent, which is how the same field gets set twice. */}
