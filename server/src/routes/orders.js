@@ -1573,6 +1573,20 @@ export function ordersRoutes(app, requireAuth) {
     const quote = await quoteOrder(req.params.id);
     const paid = await chargedAmount(req.params.id);
     const designFees = await computeDesignFees(req.params.id).catch(() => ({ items: [], total: 0 }));
+    /**
+     * WHAT THE BLANKS COST US NEVER REACHES A SELLER.
+     *
+     * It names our margin outright, and read across a few orders it reconstructs our
+     * supplier's price list — the same reason sellerSafe strips productCost from the
+     * catalogue and §2.9 withholds who supplies us. Stripped HERE, on the way out, rather
+     * than left to each screen to remember: a field that has to be hidden by every
+     * consumer is a field that will be shown by one of them.
+     */
+    if (!isStaff(req.user)) {
+      quote.lines = (quote.lines || []).map(({ supplierCost, ...l }) => l);
+      delete quote.supplierTotal;
+      delete quote.supplierKnown;
+    }
     return { ...quote, designFees, charged: paid > 0 ? paid : 0, balance: await balanceOf(row.seller_id) };
   });
 

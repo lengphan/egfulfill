@@ -320,6 +320,13 @@ export default function OrderDetailPage() {
   // ever reaches us, so they cannot appear here. Named and hinted accordingly rather than
   // presented as take-home.
   const estProfit = hasRevenue && netCost != null ? revenue - netCost : null
+  // OUR margin, not the seller's: what they paid us, less what the goods and the parcel
+  // cost us. Null until they have actually been charged — subtracting real costs from a
+  // quote nobody has paid reports a loss that hasn't happened.
+  const labelCost = Number(order.label_cost ?? 0) || 0
+  const factoryMargin = netCost != null && quote?.supplierTotal != null
+    ? netCost - quote.supplierTotal - labelCost
+    : null
 
   return (
     <div className="space-y-5">
@@ -781,6 +788,44 @@ export default function OrderDetailPage() {
                       </dd>
                     </div>
                   </div>
+
+                  {/* OUR SIDE OF THE SAME ORDER — staff only, and physically separated
+                      from the seller's block above because the two are different pots of
+                      money. What the blanks cost us is the number a margin is measured
+                      against; the server strips it from a seller's quote entirely, so this
+                      renders nothing for them even if the markup were wrong. */}
+                  {isStaff && quote?.supplierTotal != null && (
+                    <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+                      <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Factory · not shown to the seller</div>
+                      <div className="flex justify-between text-sm">
+                        <dt className="text-muted-foreground">
+                          Supplier cost · blanks
+                          {/* A partial figure says so rather than reading as the total. */}
+                          {quote.supplierKnown != null && quote.lines && quote.supplierKnown < quote.lines.length && (
+                            <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
+                          )}
+                        </dt>
+                        <dd className="tabular-nums">{usd(quote.supplierTotal)}</dd>
+                      </div>
+                      {labelCost > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <dt className="text-muted-foreground">Postage we bought</dt>
+                          <dd className="tabular-nums">{usd(labelCost)}</dd>
+                        </div>
+                      )}
+                      <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
+                        <dt>Factory margin</dt>
+                        <dd className={"tabular-nums " + (factoryMargin != null && factoryMargin < 0 ? "text-destructive" : "")}>
+                          {factoryMargin != null ? usd(factoryMargin)
+                            : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
+                        </dd>
+                      </div>
+                      <p className="text-2xs text-muted-foreground">
+                        What the seller paid us, less the blanks and the postage. Design work and
+                        partner fees are booked separately in the ledger.
+                      </p>
+                    </div>
+                  )}
 
                   <p className="pt-1 text-xs text-muted-foreground">
                     {hasRevenue

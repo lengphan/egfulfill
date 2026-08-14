@@ -162,6 +162,26 @@ function unitCostOf(row, item, fees) {
   return base + methodAddOn(d, item.print_type, fees);
 }
 
+/**
+ * WHAT THE BLANK COSTS US — the supplier's price, not the seller's.
+ *
+ * Same ladder as unitCostOf's cost branches and no other: the size's own cost first, then
+ * the product's. Deliberately NOT falling back to basePrice — that is the SELL price, and
+ * quietly using it as a cost would report a margin of zero on every product priced by hand
+ * rather than saying "we don't know what this blank costs".
+ *
+ * Never leaves the building on a seller's request: the quote route strips it, for the same
+ * reason sellerSafe strips productCost — it names our margin and, read across products, our
+ * supplier's price list.
+ */
+function supplierCostOf(row, item) {
+  const d = row.data || {};
+  const tier = tierFor(d, item.size);
+  if (tier && tier.cost != null) { const c = num(tier.cost); if (c != null && c > 0) return c; }
+  const c = num(d.productCost ?? d.product_cost);
+  return c != null && c > 0 ? c : null;
+}
+
 // Print-method surcharge (EMB stitches cost more than DTG ink). Method aliases are
 // normalised exactly as eg-design-tools.js does it.
 function methodAddOn(d, printType, fees) {
@@ -257,10 +277,21 @@ export async function quoteOrder(orderId) {
       extra = extraFeeOf(row, fees);
       if (cost == null) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '', reason: 'no-cost' }); continue; }
     }
+    // The supplier's price for this blank, when the catalogue knows it. Read even for a
+    // frozen line: the sell price is history once charged, but what we PAID is a fact
+    // about the blank and is what any margin figure has to be measured against.
+    const srow = matchProduct(idx, it);
+    const supplier = srow ? supplierCostOf(srow, it) : null;
     lines.push({ id: it.id, sku: it.sku, name: it.name, qty, size: it.size, blank: it.blank,
-                 unitCost: money(cost), shipFee: money(ship ?? fees.ship_first), extraFee: money(extra) });
+                 unitCost: money(cost), shipFee: money(ship ?? fees.ship_first), extraFee: money(extra),
+                 supplierCost: supplier == null ? null : money(supplier) });
   }
-  return { lines, unpriced, fees, ...computeTotals(lines, fees) };
+  const totals = computeTotals(lines, fees);
+  // Null when NOTHING is known — "$0.00 of blanks" and "we don't know" are different
+  // answers, and only one of them should be subtracted from anything.
+  const known = lines.filter((l) => l.supplierCost != null);
+  const supplierTotal = known.length ? money(known.reduce((s, l) => s + l.supplierCost * l.qty, 0)) : null;
+  return { lines, unpriced, fees, supplierTotal, supplierKnown: known.length, ...totals };
 }
 
 // The money formula, kept pure and exported so it can be tested without a database:

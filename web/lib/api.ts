@@ -954,7 +954,13 @@ export type SsStyle = { styleID: string; brand: string; title: string; category?
    *  has never been pulled — different from a style with no colours, and only one of those
    *  is fixed by pressing Sync. */
   sizes?: string[]; synced?: boolean; colorCount?: number }
-export type SsStyleDetail = SsStyle & { sizes?: string[]; colorImages?: Record<string, string>; description?: string; extraImages?: string[]; error?: string }
+export type SsStyleDetail = SsStyle & { sizes?: string[]; colorImages?: Record<string, string>; description?: string; extraImages?: string[]; error?: string
+  /** Stock, summed from the SAME rows the detail already fetches — `qty` is in the S&S
+   *  product fields, so these cost no extra request. Absent for Otto and SanMar, which keep
+   *  no quantity in our data: absent means UNKNOWN, never zero. */
+  stockByColor?: Record<string, number>
+  stockByVariant?: Record<string, Record<string, number>>
+  stockTotal?: number }
 export function getSsStatus() {
   return api<{ configured?: boolean; synced_count?: number; last_sync?: string | null }>(`/api/ss/status`)
 }
@@ -1559,6 +1565,9 @@ export type OrderRow = {
   rush?: boolean
   rushed_at?: string | null
   label_printed_at?: string | null
+  /** What the postage cost US — staff-facing. Present on the order row; the seller is
+   *  charged shipping through the quote, which is a different number. */
+  label_cost?: number | null
   /** Pre-scanned at dispatch — tracking is LIVE for the buyer even though the parcel may
    *  still be in production. Separate from factory_status on purpose; see orders.js. */
   label_scanned_at?: string | null
@@ -1813,7 +1822,10 @@ export type OrderDesignFee = {
   lines?: { line_id: string | null; sku: string | null }[]
 }
 export type OrderQuote = {
-  lines: { id: string; sku: string; name: string; qty: number; size: string | null; unitCost: number; shipFee: number }[]
+  /** `supplierCost` is what the BLANK costs us — STAFF ONLY. The server strips it from a
+   *  seller's copy of the quote (it names our margin, and across orders our supplier's
+   *  price list), so it is absent rather than zero on a seller's request. */
+  lines: { id: string; sku: string; name: string; qty: number; size: string | null; unitCost: number; shipFee: number; supplierCost?: number | null }[]
   unpriced: { sku: string; name: string }[]
   fees: { ship_first: number; ship_extra: number }
   subtotal: number
@@ -1824,6 +1836,11 @@ export type OrderQuote = {
   balance: number
   /** Design/check fees per line — visible in the Summary; complex ones are TBD until accepted. */
   designFees?: { items: OrderDesignFee[]; total: number }
+  /** Σ(supplier cost × qty) over the lines we know a blank cost for. Null = we know none,
+   *  which is not the same as zero and must never be subtracted as if it were. STAFF ONLY. */
+  supplierTotal?: number | null
+  /** How many lines that total actually covers, so a partial figure can say so. */
+  supplierKnown?: number
 }
 export function getOrderQuote(id: string) {
   return api<OrderQuote>(`/api/orders/${encodeURIComponent(id)}/quote`)
