@@ -405,7 +405,23 @@ export default function OrderDetailPage() {
                   const design = designForLine(designs, it)
                   const artwork = designSrc(design?.data)
                   const qty = Number(it.qty) || 1
-                  const unit = Number(it.unit_price) || 0
+                  /**
+                   * WHAT THIS LINE COSTS, from the quote — not unit_price.
+                   *
+                   * unit_price is the SELLER'S LISTING PRICE, what their buyer paid on a
+                   * marketplace. A factory order has no listing, so it is 0 and always will
+                   * be — which is why every line on a submitted manual order read $0.00
+                   * while the seller had actually been charged $18.50 each.
+                   *
+                   * The quote is the same computation the CHARGE uses (pricing.js), so the
+                   * number on the row is the number taken from the wallet. Matched on the
+                   * line's own id rather than position: an unpriced line is absent from
+                   * quote.lines, so index alignment silently shifts every row after it onto
+                   * the wrong price.
+                   */
+                  const qLine = quote?.lines?.find(
+                    (l) => String(l.id) === String((it as { id?: string | number }).id ?? ""))
+                  const unit = qLine ? Number(qLine.unitCost) || 0 : Number(it.unit_price) || 0
                   // THE NUMBER ON THE ROW, and the key everything else uses for this line.
                   // An order of six lines called dc21/dc22/ab11/ab12 is four near-identical
                   // strings; the number is what a person can hold in their head while they
