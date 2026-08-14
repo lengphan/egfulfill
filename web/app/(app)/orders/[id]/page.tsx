@@ -461,7 +461,13 @@ export default function OrderDetailPage() {
                    */
                   const qLine = quote?.lines?.find(
                     (l) => String(l.id) === String((it as { id?: string | number }).id ?? ""))
-                  const unit = qLine ? Number(qLine.unitCost) || 0 : Number(it.unit_price) || 0
+                  // THREE SOURCES, most authoritative first: the live quote while the order
+                  // can still change, the cost FROZEN on the line once it is charged, and
+                  // the buyer's retail price as a last resort. A submitted order stops
+                  // quoting, which is why these rows read "—" beside a Summary that had the
+                  // total all along — the frozen number was on the line, unread.
+                  const unit = qLine ? Number(qLine.unitCost) || 0
+                    : Number(it.unit_cost ?? 0) || Number(it.unit_price) || 0
                   return (
                     <div key={i} className="relative flex items-start gap-4 px-5 py-4">
                       {/* The line's number, where the eye lands last — same number the drop
@@ -896,11 +902,13 @@ export default function OrderDetailPage() {
                     </div>
                   )}
 
-                  <p className="pt-1 text-xs text-muted-foreground">
-                    {hasRevenue
-                      ? "Estimated — marketplace fees (listing, transaction, payment processing) are taken by the store before the money reaches us, so they aren't included here."
-                      : "No retail price recorded for this order, so profit can't be worked out. Marketplace orders carry the buyer's total automatically."}
-                  </p>
+                  {/* Only when there is nothing to work out. A profit figure needs no essay
+                      beside it; a missing one needs a reason. */}
+                  {!hasRevenue && (
+                    <p className="pt-1 text-xs text-muted-foreground">
+                      No retail price recorded, so profit can&apos;t be worked out.
+                    </p>
+                  )}
                 </>
               )}
               {quote?.unpriced?.length ? (
@@ -925,6 +933,9 @@ export default function OrderDetailPage() {
           item={customize}
           initialDesign={designSrc(designForLine(designs, customize)?.data)}
           initialPos={designForLine(designs, customize)?.pos}
+          // A submitted order's files are settled for the seller — the buttons stay visible
+          // and disabled, and the chat is the way to ask.
+          filesLocked={!preSubmit && !isStaff}
           siblings={items.filter((it) => (it.line_id ?? it.sku) !== (customize.line_id ?? customize.sku))}
           designs={designs}
           onSaved={reloadDesigns}

@@ -493,7 +493,7 @@ function CustomerFileThumb({ src }: { src: string }) {
 
 export function DesignCanvasDialog({
   open, onOpenChange, orderId, item, initialDesign, initialPos, onSaved, catalog,
-  siblings, designs, onSendToDesigner,
+  siblings, designs, onSendToDesigner, filesLocked,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -512,6 +512,11 @@ export function DesignCanvasDialog({
   /** Staff-only. Offered only when the line has artwork — there is nothing to digitise
    *  otherwise. Absent → not offered at all. */
   onSendToDesigner?: () => void
+  /** Submitted order, seller side — the file is settled. Replace and Remove are shown but
+   *  disabled: the seller asks the factory in chat rather than swapping a file underneath a
+   *  job that may already be running. The server refuses it anyway; this stops the click
+   *  that gets refused. */
+  filesLocked?: boolean
 }) {
   const [designUrl, setDesignUrl] = useState(initialDesign ?? "")
   // Background removal, shared with the Design maker so the two behave identically.
@@ -1567,7 +1572,14 @@ export function DesignCanvasDialog({
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <Button variant="outline" size="sm" onClick={() => machineRef.current?.click()}>{hasMachineFile ? "Replace file" : "Attach file"}</Button>
+                <Button
+                  variant="outline" size="sm"
+                  disabled={filesLocked}
+                  title={filesLocked ? "The order is submitted — ask the factory in chat to change this file" : undefined}
+                  onClick={() => machineRef.current?.click()}
+                >
+                  {hasMachineFile ? "Replace file" : "Attach file"}
+                </Button>
                 {/* THE SECOND ROUTE TO THE SAME THING, standing beside the first.
                     ──────────────────────────────────────────────────────────────
                     There are exactly two ways this line ever gets a stitch file: someone
@@ -1619,7 +1631,8 @@ export function DesignCanvasDialog({
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={fileBusy}
+                    disabled={fileBusy || filesLocked}
+                    title={filesLocked ? "The order is submitted — ask the factory in chat to remove this file" : undefined}
                     className="text-muted-foreground hover:text-destructive"
                     onClick={async () => {
                       const ok = await confirm({

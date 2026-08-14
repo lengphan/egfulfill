@@ -1541,6 +1541,10 @@ export type OrderItem = {
   design_no?: number | null
   personalization?: string
   unit_price?: number | string
+  /** FROZEN AT SUBMIT — what this line costs the seller to produce, stored on the line so a
+   *  later catalogue edit can't move a charged price. It is the number the row shows once
+   *  the order is submitted and the live quote is no longer consulted. */
+  unit_cost?: number | string | null
   print_type?: string
   factory_status?: string | null
 }
