@@ -401,6 +401,55 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
     return passthru(reply, '/inventory?sku=' + encodeURIComponent(sku) + '&supplier=' + OC_SUPPLIER);
   });
 
+  /**
+   * STOCK FOR ONE COLOURWAY OF ONE STYLE.
+   *
+   * Otto's /inventory takes a single sku, so a style is one call PER VARIANT — 11.5 on
+   * average, 429 at worst. Asking for a whole style on open would make the dialog crawl on
+   * exactly the products with the most to say. Scoping to the COLOUR you clicked bounds it
+   * to a size run (usually two to six calls), which is also the only question being asked:
+   * "can Otto fill Navy in S/M".
+   *
+   * Fanned out here rather than in the browser so it is one request from the page, and
+   * capped so a pathological style cannot open 400 sockets. Failures come back as null —
+   * NOT zero — because "Otto did not answer" and "Otto has none" are different facts and
+   * only one of them should stop somebody ordering.
+   */
+  app.get('/api/otto/style-stock/:style', { preHandler: requireStaff }, async (req, reply) => {
+    const g = guard(reply); if (g) return g;
+    const style = String(req.params.style || '').trim();
+    const color = String(req.query?.color || '').trim();
+    if (!style) { reply.code(400); return { error: 'style required' }; }
+    const rows = (await q(
+      `select sku, size from otto_products
+        where style = $1 and ($2 = '' or color = $2) and sku is not null
+        order by sku limit 40`, [style, color]
+    ).catch(() => ({ rows: [] }))).rows;
+    if (!rows.length) return { style, color: color || null, bySize: {}, total: 0, asked: 0 };
+
+    const one = async (r) => {
+      try {
+        const res = await ocGet('/inventory?sku=' + encodeURIComponent(r.sku) + '&supplier=' + OC_SUPPLIER);
+        if (!res.ok) return { size: r.size, qty: null };
+        // `total_stock` is the figure their live API returns alongside warehouse_stock[];
+        // verified against real skus rather than assumed from the docs.
+        const n = Number(res.data && res.data.total_stock);
+        return { size: r.size, qty: Number.isFinite(n) ? n : null };
+      } catch { return { size: r.size, qty: null }; }
+    };
+    const settled = await Promise.all(rows.map(one));
+    const bySize = {};
+    let total = 0, known = 0;
+    for (const s of settled) {
+      if (s.qty == null) continue;
+      known++;
+      total += s.qty;
+      const k = s.size || '—';
+      bySize[k] = (bySize[k] || 0) + s.qty;
+    }
+    return { style, color: color || null, bySize, total, asked: rows.length, answered: known };
+  });
+
   // Lookups needed to build an order.
   app.get('/api/otto/payment_methods', { preHandler: requireStaff }, async (req, reply) => { const g = guard(reply); if (g) return g; return passthru(reply, '/payment_methods'); });
   app.get('/api/otto/shipping_methods', { preHandler: requireStaff }, async (req, reply) => { const g = guard(reply); if (g) return g; return passthru(reply, '/shipping_methods'); });
