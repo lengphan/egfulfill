@@ -51,6 +51,20 @@ export function designFilesRoutes(app, requireAuth) {
      */
     .then(() => q('alter table design_file_data add column if not exists line_id text'))
     /**
+     * WHO PUT THIS FILE HERE — 'seller' or 'factory'.
+     *
+     * Visibility was decided by `kind` alone, and `kind` is a fact about the FILE TYPE, not
+     * about who it belongs to: a seller could see 'pes' and nothing else. So a seller who
+     * dropped their own .dst on their own order got "Sent your machine file" and then "No
+     * files on this order yet" underneath it — the row existed, was theirs, and was filtered
+     * out of their own list. Worse, when it was the order's only file the list answered 403.
+     *
+     * A file someone sent us is not a deliverable to be bought back; it is their file. This
+     * column is what lets the read say so. Rows written before it are factory files by
+     * definition — sellers had no upload path that survived the filter.
+     */
+    .then(() => q("alter table design_file_data add column if not exists source text"))
+    /**
      * THE OBJECT KEY, because the URL beside it points at a host that does not exist.
      *
      * `url` holds whatever putObject() returned, and putObject prefers SPACES_CDN — set to
@@ -303,9 +317,12 @@ export function designFilesRoutes(app, requireAuth) {
       } catch (e) { /* storage failed → keep inline */ }
     }
     await q(
-      `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, created_at, updated_at)
-       values ($1,$2,$3,$12,$4,$5,$6,$7,$8,$13,$9, coalesce($10, 0), $11, now(), now())
+      `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, source, created_at, updated_at)
+       values ($1,$2,$3,$12,$4,$5,$6,$7,$8,$13,$9, coalesce($10, 0), $11, $14, now(), now())
        on conflict (design_id) do update set
+         -- Whoever wrote it LAST owns the row's provenance: staff replacing a seller's file
+         -- with a cut version makes it a factory file, which is exactly what it now is.
+         source=excluded.source,
          order_id=coalesce(excluded.order_id, design_file_data.order_id),
          sku=coalesce(excluded.sku, design_file_data.sku),
          -- line_id takes the INCOMING value verbatim, including null. Everywhere else here
@@ -322,7 +339,8 @@ export function designFilesRoutes(app, requireAuth) {
        kindOf(b.name, b.mime),
        // "" and undefined both mean the whole order — only a real line id scopes a file.
        (b.lineId || b.line_id) ? String(b.lineId || b.line_id) : null,
-       storageKey]);
+       storageKey,
+       isStaff(req.user) ? 'factory' : 'seller']);
     /**
      * Record it + wake the boards. Without these two lines the file lands in storage but
      * nothing tells the UI: the Design readiness tag stayed grey until a full reload (it
@@ -513,7 +531,7 @@ export function designFilesRoutes(app, requireAuth) {
     const orderId = String(req.query?.orderId || '');
     if (!orderId) { reply.code(400); return { error: 'orderId is required' }; }
     const r = await q(
-      'select design_id, order_id, sku, line_id, seller_id, file_name, mime, price, kind, created_at from design_file_data where order_id=$1 order by created_at',
+      'select design_id, order_id, sku, line_id, seller_id, file_name, mime, price, kind, source, created_at from design_file_data where order_id=$1 order by created_at',
       [orderId]
     );
     if (!isStaff(req.user)) {
@@ -531,17 +549,36 @@ export function designFilesRoutes(app, requireAuth) {
         ).then((x) => (Array.isArray(x.rows[0]?.permissions) ? x.rows[0].permissions : [])).catch(() => []);
         if (perms.indexOf('files') < 0) return [];
       }
-      const mine = r.rows.filter((x) => (!x.seller_id || x.seller_id === eff) && x.kind === 'pes');
-      if (r.rows.length && !mine.length) { reply.code(403); return { error: 'forbidden' }; }
+      /**
+       * TWO THINGS A SELLER MAY SEE, and only one of them was here.
+       *
+       *   their .pes deliverable  — behind the wallet paywall, as before
+       *   a file THEY sent us     — theirs already; nothing to unlock, nothing to buy
+       *
+       * The filter was `kind === 'pes'` alone, so a seller's own upload vanished from their
+       * own order the moment it landed, and an order whose only file was that upload
+       * answered 403 — the panel then rendered "No files on this order yet" over the top of
+       * "Sent your machine file". Factory working files stay hidden either way: those are
+       * `source='factory'` whatever their type.
+       */
+      const ours = r.rows.filter((x) => !x.seller_id || x.seller_id === eff);
+      // 403 only when NONE of the order's files are this account's — that is somebody
+      // else's order. Files that exist but aren't visible to a seller are a normal state
+      // (every factory .emb is one), and answering 403 for it broke the seller's panel.
+      if (r.rows.length && !ours.length) { reply.code(403); return { error: 'forbidden' }; }
+      const mine = ours.filter((x) => x.kind === 'pes' || x.source === 'seller');
       // Tell the seller what's unlocked without handing over any bytes.
       return Promise.all(mine.map(async (x) => ({
         designId: x.design_id, sku: x.sku, lineId: x.line_id, name: x.file_name, mime: x.mime, kind: x.kind,
+        source: x.source || 'factory',
         price: Number(x.price) || 0, created_at: x.created_at,
-        paid: (Number(x.price) || 0) <= 0 || (await isPaid(x, eff)),
+        // Their own upload is not a purchase. `paid` drives the button, and a file they
+        // sent us must never be offered back to them with a price on it.
+        paid: x.source === 'seller' || (Number(x.price) || 0) <= 0 || (await isPaid(x, eff)),
       })));
     }
     // Staff (every factory board) see every file on the order.
-    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, lineId: x.line_id, name: x.file_name, mime: x.mime, kind: x.kind, price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user) }));
+    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, lineId: x.line_id, name: x.file_name, mime: x.mime, kind: x.kind, source: x.source || "factory", price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user) }));
   });
 
   // Download a machine file. Staff any; a seller only their own AND only once paid.

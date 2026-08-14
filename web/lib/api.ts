@@ -1200,7 +1200,11 @@ export function setAdCampaignStatus(channel: string, id: string, status: "ACTIVE
 /** `lineId` is the file's SCOPE: a line id pins it to that one line, null/absent means it
  *  applies to the whole order. Files written before the column existed have no lineId, which
  *  is why "no line" reads as order-wide rather than as unattributed. */
-export type DesignFileRow = { designId: string; sku?: string | null; lineId?: string | null; name?: string | null; mime?: string | null; kind?: string; price?: number; paid?: boolean; canPrice?: boolean; created_at?: string }
+export type DesignFileRow = { designId: string; sku?: string | null; lineId?: string | null; name?: string | null; mime?: string | null; kind?: string; price?: number; paid?: boolean; canPrice?: boolean; created_at?: string
+  /** WHO put it here — "seller" (they sent it to us) or "factory" (we made it). Visibility
+   *  and the buy button both hang off this: a file a seller sent is already theirs, so it is
+   *  never offered back to them with a price on it. */
+  source?: "seller" | "factory" }
 
 /** Which files apply to THIS line: its own, else the order-wide ones. Line beats whole-order,
  *  the same precedence designForLine uses for artwork — so a file filed against one item

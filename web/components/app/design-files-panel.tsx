@@ -405,14 +405,23 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
             </div>
             <div className="text-xs text-muted-foreground">
               {f.sku ? `Item ${f.sku} · ` : ""}
-              {f.kind === "image" ? "Design image" : f.paid ? "Purchased" : f.price ? `$${f.price} — pays from your wallet` : "Free"}
+              {/* A file the SELLER sent says who sent it and when, and says nothing about
+                  money — it is already theirs. Only what we made carries a price. */}
+              {f.source === "seller" ? `You sent this${f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })}` : ""}`
+                : f.kind === "image" ? "Design image"
+                  : f.paid ? "Purchased" : f.price ? `$${f.price} — pays from your wallet` : "Free"}
             </div>
           </div>
-          <Button size="sm" variant={f.paid || !f.price ? "outline" : "default"} disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
-            {busy === f.designId ? <CircleNotch size={13} className="animate-spin" />
-              : (f.paid || !f.price) ? <><FileArrowDown size={13} weight="bold" /> Download</>
-              : <>Buy ${f.price} &amp; download</>}
-          </Button>
+          {/* No download for their own upload: the file came FROM this browser, and the
+              route refuses a non-deliverable to a seller anyway — so a button here would
+              only ever produce "forbidden". */}
+          {f.source !== "seller" && (
+            <Button size="sm" variant={f.paid || !f.price ? "outline" : "default"} disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
+              {busy === f.designId ? <CircleNotch size={13} className="animate-spin" />
+                : (f.paid || !f.price) ? <><FileArrowDown size={13} weight="bold" /> Download</>
+                : <>Buy ${f.price} &amp; download</>}
+            </Button>
+          )}
           {canRemove && (
             <Button size="sm" variant="ghost" className="shrink-0 text-muted-foreground hover:text-destructive" disabled={busy === f.designId} onClick={() => remove(f)} title="Remove this file">
               <Trash size={13} weight="bold" />
