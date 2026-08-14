@@ -51,6 +51,10 @@ const REGISTRY: Record<string, { label: string; verb: string; icon: ActionMeta["
   "dispatch.cancel":     { label: "Cancelled with byeastside", verb: "cancelled it with byeastside", icon: X },
   // Order state
   "item.status":         { label: "Item status changed", verb: "changed an item's status", icon: ArrowRight },
+  "item.setup":          { label: "Variant set",   verb: "set",                      icon: PencilSimple },
+  "shipping.label_detached": { label: "Tracking unlinked", verb: "unlinked the tracking", icon: X },
+  "shipping.label_restored": { label: "Tracking restored", verb: "put the tracking back", icon: ArrowUUpLeft },
+  "design_file.reused":  { label: "File reused",   verb: "reused a machine file",     icon: File },
   "order.stage":         { label: "Order stage changed",  verb: "changed the stage",        icon: ArrowRight },
   // Design / artwork
   "design.saved":        { label: "Artwork attached", verb: "attached artwork",              icon: File },
@@ -97,6 +101,43 @@ export function actionMeta(action: string): ActionMeta {
   const human = action.replace(/^[a-z_]+\./, "").replace(/[._]/g, " ")
   const label = human.charAt(0).toUpperCase() + human.slice(1)
   return { label, verb: human, icon: PencilSimple }
+}
+
+/**
+ * The OBJECT of the verb, built from what the row recorded. "haianhseller setup" five times
+ * over says nothing; "haianhseller set Colour Navy · dc21" is the line someone came to read.
+ * Empty string when the action carries nothing worth naming.
+ */
+const FIELD_WORD: Record<string, string> = {
+  blank: "Blank", color: "Colour", size: "Size", printType: "Method", variant: "Variant",
+}
+export function actionDetail(r: AuditRow): string {
+  const a = (r.after ?? {}) as Record<string, unknown>
+  const str = (k: string) => (a[k] == null ? "" : String(a[k]))
+  const on = str("sku") || str("line_id")
+  switch (r.action) {
+    case "item.setup": {
+      const set = Object.keys(FIELD_WORD)
+        .filter((k) => a[k] !== undefined && String(a[k] ?? "") !== "")
+        .map((k) => `${FIELD_WORD[k]} ${str(k)}`)
+      return [set.join(" · "), on].filter(Boolean).join(" · ")
+    }
+    case "design_file.uploaded":
+    case "design_file.removed":
+      return [str("name"), on].filter(Boolean).join(" · ")
+    case "design.saved":
+      return [str("name") || str("kind"), on].filter(Boolean).join(" · ")
+    case "shipping.label_bought":
+    case "order.tracking":
+      return str("tracking")
+    case "shipping.label_detached":
+    case "shipping.label_restored":
+      return str("tracking") || String((r.before as Record<string, unknown> | null)?.tracking ?? "")
+    case "order.stage":
+      return str("to") || str("stage")
+    default:
+      return ""
+  }
 }
 
 /** Who did it, as the bold subject of the sentence — the name, then email, then role, so an

@@ -188,7 +188,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
     <>
       <div
         {...dropProps}
-        className={"group/avatar relative shrink-0 " + (over ? "rounded-md ring-2 ring-primary ring-offset-1 " : "") + (className ?? "")}
+        className={"group/avatar relative shrink-0 transition-[width] duration-300 ease-out " + (over ? "rounded-md ring-2 ring-primary ring-offset-1 " : "") + (className ?? "")}
         // Wide enough for the print plus the listing's peek. Only when both are shown, so
         // every other caller's layout is exactly as it was.
         style={{ width: showBoth ? Math.round(size * (1 + PEEK)) : size, height: size }}
@@ -198,9 +198,13 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           type="button"
           onClick={showBoth && listingFront ? () => setListingFront(false) : open}
           title={showBoth && listingFront ? "Bring the design forward" : (onEdit ? "Edit the design" : "View larger")}
-          className={"eg-tap overflow-hidden rounded-md bg-muted transition-[border-color,transform] " + (bare ? "" : "border border-border hover:border-foreground/25")
-            + (showBoth ? (listingFront ? " absolute top-1/2 -translate-y-1/2 z-0" : " absolute top-1/2 -translate-y-1/2 z-20 border-2 border-background shadow-md") : " size-full")}
-          style={showBoth ? { left: Math.round(size * PEEK), width: size, height: size } : undefined}
+          // ALWAYS ABSOLUTE, so picking a blank moves numbers rather than swapping layout
+          // modes. Going from `size-full` in flow to absolutely positioned is a discrete
+          // change nothing can tween, which is why the row jumped the moment the listing
+          // photo slid behind.
+          className={"eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md bg-muted transition-all duration-300 ease-out " + (bare ? "" : "border border-border hover:border-foreground/25")
+            + (showBoth && !listingFront ? " z-20 border-2 border-background shadow-md" : " z-0")}
+          style={{ left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
         >
           <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} />
           {/* Affordance only where there's something to do — and only on hover, so the

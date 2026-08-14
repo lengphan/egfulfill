@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { CircleNotch } from "@phosphor-icons/react"
-import { actionMeta, actorName } from "@/components/app/activity-meta"
+import { actionMeta, actionDetail, actorName } from "@/components/app/activity-meta"
 import type { AuditRow } from "@/lib/api"
 
 // The money an audited action moved, when it recorded one — a charge/refund/payout carries
@@ -37,8 +37,10 @@ const fmtMoney = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleStr
  * self-contained and pass none. Rows render in the order given — the caller decides newest-
  * or oldest-first, because a dispatch timeline reads forward and a history reads backward.
  */
+// Seconds included: two edits a moment apart are otherwise the same timestamp, and this
+// log's job is telling them apart.
 const fmtWhen = (ts: string | null | undefined) =>
-  ts ? new Date(ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""
+  ts ? new Date(ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : ""
 
 export function ActivityFeed({
   rows,
@@ -79,7 +81,9 @@ export function ActivityFeed({
       {rows.map((r, i) => {
         const m = actionMeta(r.action)
         const Icon = m.icon
+        // The caller's own object wins; otherwise build one from what the row recorded.
         const subj = subject ? subject(r) : null
+        const detail = subj == null ? actionDetail(r) : ""
         const who = actorName(r)
         const when = fmtWhen(r.ts)
 
@@ -92,6 +96,7 @@ export function ActivityFeed({
                   <span className="font-medium text-foreground">{who}</span>{" "}
                   <span className="text-muted-foreground">{m.verb}</span>
                   {subj != null && <> {subj}</>}
+                  {detail && <span className="font-medium text-foreground"> {detail}</span>}
                   {note && r.note ? <span className="text-muted-foreground"> · {r.note}</span> : null}
                   {(() => { const amt = moneyOf(r); return amt != null ? <span className="font-semibold text-foreground"> · {fmtMoney(amt)}</span> : null })()}
                   <span className="text-muted-foreground/70"> · {when}</span>
@@ -108,6 +113,7 @@ export function ActivityFeed({
               <span className="font-medium text-foreground">{who}</span>{" "}
               <span className="text-muted-foreground">{m.verb}</span>
               {subj != null && <> {subj}</>}
+              {detail && <span className="font-medium text-foreground"> {detail}</span>}
               {note && r.note ? <span className="text-muted-foreground"> · {r.note}</span> : null}
             </div>
             {(() => { const amt = moneyOf(r); return amt != null ? <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-2xs font-semibold tabular-nums">{fmtMoney(amt)}</span> : null })()}
