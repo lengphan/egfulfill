@@ -488,9 +488,27 @@ export default function OrderDetailPage() {
                             )}
                             {it.sku && <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{it.sku}</div>}
                           </div>
+                          {/* "$0.00 · 1 × $0.00" IS NOT A PRICE, it is the absence of one.
+                              A line whose blank doesn't resolve is missing from the quote
+                              entirely — no product, no cost — and the buyer's retail price
+                              is 0 on anything imported without an Item Price column. Both
+                              printed as free goods on a row about to be produced, which is
+                              the empty-state-that-looks-like-a-feature this house rule
+                              exists to stop. Say which is missing, and where to fix it. */}
                           <div className="shrink-0 text-right text-sm">
-                            <div className="font-medium tabular-nums">{usd(unit * qty)}</div>
-                            <div className="text-xs tabular-nums text-muted-foreground">{qty} × {usd(unit)}</div>
+                            {unit > 0 ? (
+                              <>
+                                <div className="font-medium tabular-nums">{usd(unit * qty)}</div>
+                                <div className="text-xs tabular-nums text-muted-foreground">{qty} × {usd(unit)}</div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="font-medium text-muted-foreground">Not priced</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {qLine ? "no cost on this blank" : "pick a blank first"}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
 
