@@ -75,14 +75,14 @@ function LineStock({ item, catalog, stock, pos, orderId, show }: {
   if (!show) return null
   const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium"
   const blankSku = resolveProduct(item, catalog)?.sku || item.blank || ""
-  if (!blankSku) {
-    return <span className={pill + " bg-muted text-muted-foreground"}>Stock — pick a blank</span>
-  }
+  // Nothing before a blank is chosen: it sits beside Qty now, and stock against no blank is
+  // not a fact about stock.
+  if (!blankSku) return null
   const have = stock[String(blankSku).toUpperCase()]
   if (have == null) {
     return (
       <span className={pill + " bg-muted text-muted-foreground"} title={`${blankSku} is not on the inventory list`}>
-        Stock — not tracked
+        Not tracked
       </span>
     )
   }
@@ -2320,7 +2320,12 @@ export function OrdersHub() {
                             {/* What the BUYER chose, kept under the title through the whole
                                 picking step — the pickers below decide what we make, and this
                                 is the only thing on screen that says what they asked for. */}
-                            <OrderedVariant item={it} className="sm:pr-[15rem]" />
+                            {/* Stock sits with Qty: how many we need, how many we hold. */}
+                            <OrderedVariant
+                              item={it}
+                              className="sm:pr-[15rem]"
+                              after={<LineStock item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} />}
+                            />
                             {/* Factory-owned marketplace orders arrive with no blank chosen;
                                 artwork review (canDesign) picks it here while the order is
                                 still unstarted. A pushed seller order is past "" (already
@@ -2357,7 +2362,6 @@ export function OrdersHub() {
                                 and it now shows at EVERY stage rather than only after a blank
                                 is picked. */}
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 empty:mt-0">
-                              <LineStock item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} />
                               {(() => {
                                 const skuU = String(resolveProduct(it, catalog)?.sku || it.blank || it.sku || "").toUpperCase()
                                 const cones = (threads[o.id] ?? []).find((t) => String(t.sku).toUpperCase() === skuU)?.threads ?? []

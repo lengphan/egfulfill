@@ -2074,12 +2074,12 @@ export function ordersRoutes(app, requireAuth) {
     for (const g of groups.values()) {
       const first = g.lines[0];
       let label, amount;
-      if (g.tier === 'supplied') { label = 'Check Fee (File Provided)'; amount = CHECK; }
+      if (g.tier === 'supplied') { label = 'Check fee'; amount = CHECK; }
       else if (g.tier === 'complex') {
-        label = 'Design Fee (Complex)';
+        label = 'Complex design fee';
         // Fixed only once accepted or charged; otherwise under review → To Be Determined.
         amount = (g.charged || g.quote === 'accepted') ? CPX : null;
-      } else { label = 'Design Fee (New)'; amount = STD; }
+      } else { label = 'Design fee'; amount = STD; }
       const status = g.charged ? 'charged' : (amount == null ? 'tbd' : 'estimated');
       if (amount != null) total += amount;
       // The rest of the group is NAMED rather than silently folded in: "ab11 +2 items"

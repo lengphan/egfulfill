@@ -23,7 +23,7 @@ import { decodeEntities } from "@/lib/order-format"
  *
  * Renders nothing when the line carries neither, so a manual order gains no empty strip.
  */
-export function OrderedVariant({ item, className = "" }: { item: OrderItem; className?: string }) {
+export function OrderedVariant({ item, className = "", after }: { item: OrderItem; className?: string; after?: React.ReactNode }) {
   // Entities arrive HTML-encoded from the marketplaces (&amp;, &#39;) — the same decode the
   // order title gets, or "Men&#39;s" is what a packer reads.
   const ordered = decodeEntities(String(item.variant ?? "").trim())
@@ -70,6 +70,10 @@ export function OrderedVariant({ item, className = "" }: { item: OrderItem; clas
       <span className={qty > 1 ? "font-semibold text-foreground" : ""}>{qty}</span>
     </span>
   )
+
+  // Anything the caller wants on the end of the line — the stock pill sits here, next to
+  // Qty, because the two are read together: how many we need, how many we hold.
+  if (after) parts.push(<span key="a">{after}</span>)
 
   return (
     <div className={"mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs leading-snug text-muted-foreground " + className}>
