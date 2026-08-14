@@ -36,6 +36,10 @@ type Detail = {
   colors: string[]
   sizes: string[]
   colorImages: Record<string, string>
+  /** The OTHER angles of each colourway — back, side, on-model — keyed by colour. */
+  colorExtras?: Record<string, string[]>
+  /** Style-level gallery, for when no colour is chosen yet. */
+  extraImages?: string[]
   skus: number
   /** null = we never asked (Otto / SanMar). {} = asked and the style has none. */
   stockByColor?: Record<string, number> | null
@@ -93,12 +97,14 @@ export function SupplierDetailDialog({
    */
   const [size, setSize] = useState<string | null>(null)
   const [qty, setQty] = useState(1)
+  /** Which angle of the current colourway is on screen. Cleared with the colour. */
+  const [frame, setFrame] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open || !supplier || !styleId) return
     let alive = true
     const t = setTimeout(() => {
-      setD(null); setErr(null); setColour(null); setSize(null); setQty(1)
+      setD(null); setErr(null); setColour(null); setSize(null); setQty(1); setFrame(null)
       const fetcher =
         supplier === "ss" ? getSsStyle(styleId)
           : supplier === "otto" ? getOttoStyle(styleId)
@@ -117,6 +123,8 @@ export function SupplierDetailDialog({
             colors: Array.isArray(raw.colors) ? (raw.colors as string[]) : [],
             sizes: Array.isArray(raw.sizes) ? (raw.sizes as string[]) : [],
             colorImages: (raw.colorImages as Record<string, string>) ?? {},
+            colorExtras: (raw.colorExtras as Record<string, string[]>) ?? undefined,
+            extraImages: Array.isArray(raw.extraImages) ? (raw.extraImages as string[]) : undefined,
             skus: Array.isArray(raw.skus) ? (raw.skus as string[]).length : 0,
             // ABSENT MEANS UNKNOWN, NOT ZERO. Only S&S returns these — Otto and SanMar keep
             // no quantity in our data, and asking them costs a live call per sku / per style.
@@ -134,10 +142,26 @@ export function SupplierDetailDialog({
 
   if (!open || !supplier || !styleId) return null
 
-  // The colour you picked wins; otherwise the style's own photo. Falling back to the first
-  // colour image would show a colour nobody chose, which is the mistake this window exists
-  // to prevent on a purchase order.
-  const shown = (colour && (d?.colorImages ?? {})[colour]) || d?.image || seed?.image || null
+  /**
+   * EVERY ANGLE OF WHAT YOU ARE LOOKING AT.
+   *
+   * A cap photographed head-on tells you almost nothing about the back, which on a trucker
+   * or a snapback is half the product — and the supplier sends those shots per colourway, so
+   * the only reason they weren't here is that we flattened them (see colorExtras in ss.js).
+   *
+   * Scoped to the CHOSEN colour: the angles of a colour you did not pick are noise, and
+   * mixing them would put a black back-view under a red cap. Before a colour is chosen it
+   * falls back to the style's own gallery.
+   */
+  const frames = (() => {
+    const front = (colour && (d?.colorImages ?? {})[colour]) || d?.image || seed?.image || null
+    const extras = colour ? (d?.colorExtras ?? {})[colour] ?? [] : (d?.extraImages ?? [])
+    return Array.from(new Set([front, ...extras].filter((x): x is string => !!x)))
+  })()
+  // The frame you clicked, else the first — which is the colour's front, or the style photo.
+  // `frame` is cleared whenever the colour changes, so it can never show the previous
+  // colourway's back panel next to the new colour's name.
+  const shown = (frame && frames.includes(frame) ? frame : frames[0]) ?? null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -195,7 +219,7 @@ export function SupplierDetailDialog({
             * the column doing the work, and `sticky` keeps the picture beside whichever colour
             * you scroll to instead of leaving a long empty gutter under it.
             */}
-          <div className="md:sticky md:top-0">
+          <div className="space-y-2 md:sticky md:top-0">
             <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-white">
               {shown ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -204,6 +228,27 @@ export function SupplierDetailDialog({
                 <div className="flex size-full items-center justify-center text-xs text-muted-foreground/60">No image</div>
               )}
             </div>
+            {/* The other angles of THIS colourway. A cap head-on says nothing about the back,
+                which on a trucker or a snapback is half the product. Only shown when there is
+                more than one — a single thumbnail under a photo of the same thing is furniture. */}
+            {frames.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {frames.map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => setFrame(u)}
+                    aria-label="Show this angle"
+                    aria-pressed={u === shown}
+                    className={"relative size-14 shrink-0 overflow-hidden rounded-md border bg-white transition-colors "
+                      + (u === shown ? "border-primary ring-1 ring-primary/40" : "border-border hover:border-foreground/25")}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt="" className="absolute inset-0 size-full object-contain" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="min-w-0 space-y-3 text-sm">
@@ -266,7 +311,7 @@ export function SupplierDetailDialog({
                         <button
                           type="button"
                           title={d.stockByColor ? `${c} — ${d.stockByColor[c] ?? 0} in stock at the supplier` : c}
-                          onClick={() => setColour(c === colour ? null : c)}
+                          onClick={() => { setColour(c === colour ? null : c); setFrame(null) }}
                           // NOT dimmed by stock. Fading the unavailable ones washed out the
                           // whole palette — seventeen pale blobs that read as "this widget is
                           // broken" rather than "these colours are short", and it hid the very
@@ -352,16 +397,19 @@ export function SupplierDetailDialog({
                       // question, and the colour and size are both lit up above.
                       if (size) {
                         const n = bySize[size]
+                        // NO STRIKETHROUGH ON A ZERO. A struck-out number reads as "this
+                        // figure is void", when the figure is the answer: there are none.
+                        // Colour carries it instead — the number stays legible.
                         return n == null
                           ? <span className="text-muted-foreground">Not offered in {size}.</span>
-                          : <span className={"text-lg font-semibold tabular-nums " + (n > 0 ? "" : "text-muted-foreground line-through")}>{n.toLocaleString()}</span>
+                          : <span className={"text-lg font-semibold tabular-nums " + (n > 0 ? "" : "text-amber-700")}>{n.toLocaleString()}</span>
                       }
                       return (
                         <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                           {entries.map(([z, n]) => (
                             <span key={z} className="tabular-nums">
                               <span className="text-muted-foreground">{z} </span>
-                              <span className={"font-medium " + (n > 0 ? "" : "text-muted-foreground line-through")}>{n.toLocaleString()}</span>
+                              <span className={"font-medium " + (n > 0 ? "" : "text-amber-700")}>{n.toLocaleString()}</span>
                             </span>
                           ))}
                         </span>

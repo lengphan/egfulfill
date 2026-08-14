@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch } from "@phosphor-icons/react"
+import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch, Trash } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -82,6 +82,7 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
 // pricing shows the live margin, and supplier-derived blanks pre-fill description + cost.
 export function ProductEditorDialog({
   open, onOpenChange, product, onSave, newIdSeed, nextSku, title, ctaLabel,
+  stockByColor,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -97,6 +98,9 @@ export function ProductEditorDialog({
    *  yet, so the defaults ("Edit product" / "Save changes") would misdescribe it. */
   title?: string
   ctaLabel?: string
+  /** Per-colour supplier stock, when the caller has it (S&S review step). null/undefined
+   *  means NOT ASKED — never zero — so the trim control simply does not appear. */
+  stockByColor?: Record<string, number> | null
 }) {
   const [name, setName] = useState("")
   // OURS and THEIRS — see lib/sku.ts. Only `sku` ever reaches a marketplace or a seller.
@@ -833,6 +837,48 @@ export function ProductEditorDialog({
             <div className="mb-3 flex items-center justify-between gap-2">
               <span className="text-sm font-medium">Photo</span>
               <div className="flex items-center gap-2">
+                {/**
+                  * DROP THE COLOURWAYS THE SUPPLIER CANNOT FILL — before they become a product.
+                  *
+                  * A style arrives with every colour it has ever had; several are routinely at
+                  * zero. Publishing those means a seller picks one, the order reaches the
+                  * floor, and the shortage is discovered at the point it costs the most. The
+                  * cheapest moment to decide is here, while it is still a draft.
+                  *
+                  * A BUTTON, NOT A FILTER. It says how many it will remove and does it once,
+                  * so the decision is visible and reversible by cancelling the dialog — stock
+                  * moves, and a colour silently missing from a product nobody can explain is
+                  * worse than one you chose to drop.
+                  *
+                  * Shown only when we actually asked: `stockByColor` is null for Otto and
+                  * SanMar, and "no data" must never be rendered as "no stock".
+                  */}
+                {(() => {
+                  if (!stockByColor) return null
+                  const dead = colors.filter((c) => (stockByColor[c] ?? 0) <= 0)
+                  if (!dead.length || dead.length === colors.length) return null
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const keep = new Set(colors.filter((c) => (stockByColor[c] ?? 0) > 0))
+                        const gone = colors.filter((c) => !keep.has(c))
+                        setColors((cs) => cs.filter((c) => keep.has(c)))
+                        setColorImgs((m) => Object.fromEntries(Object.entries(m).filter(([c]) => keep.has(c))))
+                        // The tags go too, or a photo stays filed under a colour the product
+                        // no longer has and colorGallery saves a name nothing references.
+                        setImgColor((m) => Object.fromEntries(Object.entries(m).filter(([, c]) => keep.has(c))))
+                        setMatchConf((m) => Object.fromEntries(Object.entries(m).filter(([c]) => keep.has(c))))
+                        setErr(`Removed ${gone.length} out-of-stock colour${gone.length === 1 ? "" : "s"}: ${gone.map(prettyColorName).join(", ")}`)
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100"
+                      title={dead.map((c) => `${prettyColorName(c)} — 0`).join("\n")}
+                    >
+                      <Trash size={12} weight="bold" />
+                      Remove {dead.length} out of stock
+                    </button>
+                  )
+                })()}
                 {colors.length > 0 && gallery.length > 0 && (
                   <button type="button" onClick={autoMatch} disabled={matching} className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60">
                     {matching ? <CircleNotch size={12} weight="bold" className="animate-spin" /> : <MagicWand size={12} weight="fill" />}

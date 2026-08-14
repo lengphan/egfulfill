@@ -17,6 +17,22 @@ type SanmarFb = { name?: string | null; price?: number | string | null; image?: 
 
 // Build a catalog product from a supplier style (fetches its full detail on demand). One
 // place, reused by every "Add to Products" button so the shape never drifts.
+/**
+ * Per-colour stock for one S&S style, for the review step.
+ *
+ * A separate call rather than a field on the product, because stock is a fact about the
+ * SUPPLIER right now and a product is a thing we sell — folding a quantity into the record
+ * would persist a number that is stale the moment it is written. The server caches a style's
+ * detail for repeat opens, so asking twice in the same breath costs one request.
+ *
+ * Only S&S answers. Otto's inventory is a call per sku and SanMar's is SOAP per style, so
+ * this returns null for them — null being "we did not ask", never "none".
+ */
+export async function ssStockByColor(styleID: string): Promise<Record<string, number> | null> {
+  const d = await getSsStyle(styleID).catch(() => null)
+  return d && !d.error && d.stockByColor ? d.stockByColor : null
+}
+
 export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<CatalogProduct> {
   const d = await getSsStyle(styleID)
   if (d.error) throw new Error(d.error)

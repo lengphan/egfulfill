@@ -22,7 +22,7 @@ import {
   type SsStyle, type OttoStyle, type OttoImportRow, type SanmarCatalogStyle, type CatalogProduct,
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
-import { driveImg, prettyColor, driveMap, ssCatalogProduct, ottoCatalogProduct, sanmarCatalogProduct } from "@/lib/supplier-catalog"
+import { driveImg, prettyColor, driveMap, ssCatalogProduct, ssStockByColor, ottoCatalogProduct, sanmarCatalogProduct } from "@/lib/supplier-catalog"
 
 const PAGE = 30
 
@@ -114,6 +114,8 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   // product is now staged here and shown in the normal product editor for review.
   const [preview, setPreview] = useState<CatalogProduct | null>(null)
   const [previewKey, setPreviewKey] = useState<string | null>(null)
+  /** Per-colour supplier stock for the review step. null = not asked (Otto / SanMar). */
+  const [previewStock, setPreviewStock] = useState<Record<string, number> | null>(null)
   // S&S only returns sizes on the STYLE DETAIL, which is the same request the colour
   // swatches already make — so cache both from that one call rather than fetching twice.
   const [detailSizes, setDetailSizes] = useState<Record<string, string[]>>({})
@@ -288,6 +290,10 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
           ? await ottoCatalogProduct(it.id, { name: it.otto.name, price: it.otto.price, image: it.otto.image, colors: it.otto.colors })
           : await sanmarCatalogProduct(it.id, { name: it.sanmar.name, price: it.sanmar.price, image: it.sanmar.fullImage || it.sanmar.image, colors: it.sanmar.colors ?? [] })
       setPreview(product); setPreviewKey(keyOf(it))
+      // Stock for the review step, so a style can be trimmed to what the supplier can
+      // actually fill BEFORE it becomes a product. S&S only — the other two would cost a
+      // call per sku / per style, and null means "not asked", never "none".
+      setPreviewStock(it.supplier === "ss" ? await ssStockByColor(it.id) : null)
     } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't load that product.") } finally { setAddingId(null) }
   }
 
@@ -671,6 +677,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
         newIdSeed={0}
         title="Review before adding"
         ctaLabel="Add to Products"
+        stockByColor={previewStock}
       />
       <QuickOrderDialog
         product={quickOrder}
