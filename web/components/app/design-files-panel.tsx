@@ -4,9 +4,43 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, type DesignFileRow } from "@/lib/api"
+import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, type DesignFileRow, type OrderItem } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
+import { VariantField } from "@/components/app/variant-field"
+
+/**
+ * WHICH LINE IS THIS FILE FOR? — guessed from its name, never decided by it.
+ *
+ * Someone with an eight-line order has eight files named after the items ("dc21.png",
+ * "ab13.png"), because that is how anyone keeps them straight on their own disk. Matching
+ * on that is worth doing and worth CONFIRMING: the guess is pre-filled into a dropdown the
+ * person can see and change before anything is written, which is the same rule the artwork
+ * matcher follows — suggest, never auto-attach.
+ *
+ * Compared with punctuation and case stripped, so "DC-21 final.png" still finds "dc21".
+ * A file that matches nothing lands on "All items", which is the common case (one design,
+ * whole order) and costs no clicks.
+ */
+const squash = (s: string) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "")
+const ALL = "__all"
+function matchLine(fileName: string, items: OrderItem[]): string {
+  const base = squash(fileName.replace(/\.[a-z0-9]+$/i, ""))
+  if (!base) return ALL
+  let best = ""
+  let bestLen = 0
+  for (const it of items) {
+    const key = it.line_id || it.sku || ""
+    if (!key) continue
+    for (const cand of [it.name, it.sku]) {
+      const c = squash(cand ?? "")
+      // Long enough to mean something: "l" or "os" would otherwise match half the order.
+      if (c.length < 3) continue
+      if ((base.includes(c) || c.includes(base)) && c.length > bestLen) { best = key; bestLen = c.length }
+    }
+  }
+  return best || ALL
+}
 
 // A file id that's stable per (order, sku, filename) so re-dropping the same file
 // REPLACES it rather than piling up duplicates on the card.
@@ -256,7 +290,14 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: s
  * `price` defaults to 0, the download route only charges when `price > 0`, and only
  * admin/warehouse can ever set a price. Verified against design_files.js, not assumed.
  */
-export function SellerDesignFiles({ orderId }: { orderId: string }) {
+export function SellerDesignFiles({ orderId, items = [], onAttached }: {
+  orderId: string
+  /** The order's lines, so a dropped file can be pointed at one. Empty ⇒ everything a
+   *  seller drops applies to the whole order, which is how this panel behaved before. */
+  items?: OrderItem[]
+  /** Artwork went onto a line — the page reloads its designs so the canvas shows it. */
+  onAttached?: () => void
+}) {
   const [files, setFiles] = useState<DesignFileRow[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -286,52 +327,105 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
     } finally { setBusy(null) }
   }
 
+  const isImg = (f: File) => /^image\//i.test(f.type) || /\.(png|jpe?g|webp|gif|bmp|heic|avif)$/i.test(f.name)
+
   /**
-   * Send us a machine file OR a design image. Machine files get checked before production;
-   * images are stored as artwork on the order. Anything that's neither is named, not stored.
+   * DROP FIRST, DECIDE SECOND.
+   *
+   * A drop used to upload immediately, to the whole order, and that is only right when the
+   * order is one design on every line. It rarely is: eight lines, eight artworks, and no way
+   * to say which went where without opening the designer eight times.
+   *
+   * So a drop STAGES. Each file becomes a row carrying its own target — a line, or all
+   * items — pre-filled from its filename, and nothing is written until Attach. One list
+   * shows every decision at once, which is what makes a wrong guess obvious while it is
+   * still free to fix.
    */
-  const send = async (list: FileList | File[]) => {
+  type Staged = { file: File; name: string; target: string; image: boolean }
+  const [staged, setStaged] = useState<Staged[]>([])
+  const stage = (list: FileList | File[]) => {
     const arr = Array.from(list)
     if (!arr.length) return
     setErr(null); setSent(null)
-    const isImg = (f: File) => /^image\//i.test(f.type) || /\.(png|jpe?g|webp|gif|bmp|heic|avif)$/i.test(f.name)
-    const ok = arr.filter((f) => MACHINE_RE.test(f.name) || isImg(f))
     const wrong = arr.filter((f) => !MACHINE_RE.test(f.name) && !isImg(f))
     if (wrong.length) {
       setErr(`${wrong.map((f) => f.name).join(", ")} — not a machine file or an image, so there's nothing to do with it here.`)
     }
-    let anyImg = false, anyMachine = false
-    for (const f of ok) {
-      // 50MB: the body limit is 60MB and base64 inflates by about a third, so a bigger
-      // file returns a server error that says nothing useful.
-      if (f.size > 50 * 1024 * 1024) { setErr(`${f.name} is too large — 50 MB is the limit.`); continue }
-      setBusy(f.name)
+    // 50MB: the body limit is 60MB and base64 inflates by about a third, so a bigger file
+    // returns a server error that says nothing useful. Caught here, before it is queued,
+    // so the row never appears rather than failing at the end of a batch.
+    const big = arr.filter((f) => f.size > 50 * 1024 * 1024)
+    if (big.length) setErr(`${big.map((f) => f.name).join(", ")} — over the 50 MB limit.`)
+    const ok = arr.filter((f) => (MACHINE_RE.test(f.name) || isImg(f)) && f.size <= 50 * 1024 * 1024)
+    setStaged((prev) => [
+      ...prev,
+      ...ok.filter((f) => !prev.some((s) => s.name === f.name))
+        .map((f) => ({ file: f, name: f.name, target: items.length ? matchLine(f.name, items) : ALL, image: isImg(f) })),
+    ])
+  }
+
+  const readDataUrl = (f: File) => new Promise<string>((res, rej) => {
+    const fr = new FileReader()
+    fr.onload = () => res(String(fr.result))
+    fr.onerror = () => rej(new Error("Could not read the file"))
+    fr.readAsDataURL(f)
+  })
+
+  /**
+   * WHAT EACH KIND BECOMES, which is not the same thing.
+   *
+   *   an image        → the LINE'S ARTWORK (order_designs), so it shows on the mockup and
+   *                     in the designer, exactly as if it had been placed there
+   *   a machine file  → a file on the line for us to check instead of digitising
+   *
+   * "All items" writes to every line rather than to a null line: artwork is read per line,
+   * and a single order-wide row cannot say "this one is placed and that one isn't".
+   */
+  const attach = async () => {
+    if (!staged.length) return
+    setErr(null); setSent(null)
+    const failed: string[] = []
+    let images = 0, machines = 0
+    for (const s of staged) {
+      setBusy(s.name)
       try {
-        const data = await new Promise<string>((res, rej) => {
-          const fr = new FileReader()
-          fr.onload = () => res(String(fr.result))
-          fr.onerror = () => rej(new Error("Could not read the file"))
-          fr.readAsDataURL(f)
-        })
-        const r = await uploadDesignFile({ designId: idFor(orderId, undefined, f.name), orderId, name: f.name, mime: f.type || undefined, data })
-        if (r?.error) throw new Error(r.error)
-        if (isImg(f)) anyImg = true; else anyMachine = true
+        const data = await readDataUrl(s.file)
+        const targets = s.target === ALL
+          ? (items.length ? items : [{ line_id: undefined, sku: "" } as OrderItem])
+          : items.filter((it) => (it.line_id || it.sku) === s.target)
+        for (const it of targets) {
+          if (s.image) {
+            const r = await postOrderDesign(orderId, { sku: it.sku ?? "", line_id: it.line_id ?? undefined, data, name: s.name })
+            if (r?.error) throw new Error(r.error)
+          } else {
+            const scope = it.line_id || it.sku || undefined
+            const r = await uploadDesignFile({
+              designId: idFor(orderId, scope, s.name), orderId, sku: it.sku ?? undefined,
+              lineId: it.line_id ?? undefined, name: s.name, mime: s.file.type || undefined, data,
+            })
+            if (r?.error) throw new Error(r.error)
+          }
+        }
+        if (s.image) images++; else machines++
       } catch (e) {
-        setErr(e instanceof Error ? e.message : `Could not send ${f.name}`)
+        failed.push(`${s.name}${e instanceof Error ? ` (${e.message})` : ""}`)
       } finally { setBusy(null) }
     }
+    setStaged(failed.length ? staged.filter((s) => failed.some((f) => f.startsWith(s.name))) : [])
+    if (failed.length) setErr(`Couldn't attach: ${failed.join(", ")}`)
     const parts: string[] = []
-    if (anyMachine) parts.push("machine file — we'll check it before production and come back to you if anything's wrong")
-    if (anyImg) parts.push("design image — added to this order")
-    if (parts.length) setSent(`Sent your ${parts.join("; and your ")}.`)
+    if (machines) parts.push(`${machines} machine file${machines === 1 ? "" : "s"} — we'll check ${machines === 1 ? "it" : "them"} before production`)
+    if (images) parts.push(`${images} design image${images === 1 ? "" : "s"} — placed on the items`)
+    if (parts.length) setSent(`Sent ${parts.join("; and ")}.`)
     load()
+    if (images) onAttached?.()
   }
 
   const dropZone = (
     <div
       onDragOver={(e) => { e.preventDefault(); setOver(true) }}
       onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); void send(e.dataTransfer.files) }}
+      onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
       onClick={() => inputRef.current?.click()}
       className={
         "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center transition-colors " +
@@ -342,7 +436,67 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
       <span className="text-xs font-medium">{busy ? `Sending ${busy}…` : "Have a machine file or a design image? Drop it here"}</span>
       <span className="text-3xs text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>
       <input ref={inputRef} type="file" multiple accept={MACHINE_ACCEPT + ",image/*"} className="hidden"
-        onChange={(e) => { if (e.target.files) void send(e.target.files); e.target.value = "" }} />
+        onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = "" }} />
+    </div>
+  )
+
+  /** The order's lines as picker options, plus the whole-order default. */
+  const targetLabel = (it: OrderItem, i: number) => (it.name || it.sku || `Item ${i + 1}`) + (Number(it.qty) > 1 ? ` ×${it.qty}` : "")
+  const targetOptions = ["All items", ...items.map(targetLabel)]
+  const keyAt = (label: string) => {
+    const i = targetOptions.indexOf(label) - 1
+    return i < 0 ? ALL : (items[i]?.line_id || items[i]?.sku || ALL)
+  }
+  const labelFor = (key: string) => {
+    const i = items.findIndex((it) => (it.line_id || it.sku) === key)
+    return i < 0 ? "All items" : targetLabel(items[i], i)
+  }
+
+  /** WHAT IS ABOUT TO HAPPEN, one row per file, before anything is written. */
+  const queue = staged.length > 0 && (
+    <div className="rounded-xl border border-border">
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-3 py-2">
+        <span className="text-xs font-semibold text-muted-foreground">
+          {staged.length} file{staged.length === 1 ? "" : "s"} ready — check where each one goes
+        </span>
+        <button onClick={() => setStaged([])} className="text-2xs text-muted-foreground underline-offset-2 hover:underline">Clear</button>
+      </div>
+      <div className="divide-y divide-border">
+        {staged.map((s) => (
+          <div key={s.name} className="flex flex-wrap items-center gap-2 px-3 py-2">
+            <span className={"flex size-7 shrink-0 items-center justify-center rounded-lg " + (s.image ? "bg-sky-100 text-sky-700" : "bg-violet-100 text-violet-700")}>
+              {s.image ? <ImageIcon size={13} weight="fill" /> : <Sparkle size={13} weight="fill" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-medium">{s.name}</div>
+              {/* Says what it will BECOME, because the two kinds land in different places
+                  and only one of them shows up on the mockup. */}
+              <div className="text-3xs text-muted-foreground">
+                {s.image ? "artwork — placed on the item" : "machine file — we check it instead of digitising"}
+                {items.length > 0 && s.target !== ALL ? " · matched by name" : ""}
+              </div>
+            </div>
+            {items.length > 0 && (
+              <VariantField
+                label="Goes on" compact className="w-44"
+                value={labelFor(s.target)} options={targetOptions}
+                onChange={(v) => setStaged((prev) => prev.map((x) => (x.name === s.name ? { ...x, target: keyAt(v) } : x)))}
+              />
+            )}
+            <button
+              onClick={() => setStaged((prev) => prev.filter((x) => x.name !== s.name))}
+              title="Take this one out" className="shrink-0 text-muted-foreground hover:text-destructive"
+            >
+              <Trash size={13} weight="bold" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-end gap-2 border-t border-border px-3 py-2">
+        <Button size="sm" onClick={() => void attach()} disabled={!!busy}>
+          {busy ? <><CircleNotch size={13} className="animate-spin" /> Sending {busy}…</> : `Attach ${staged.length} file${staged.length === 1 ? "" : "s"}`}
+        </Button>
+      </div>
     </div>
   )
 
@@ -385,6 +539,7 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
           No files on this order yet. Machine files appear here once we&apos;ve cut them — or send us your own machine file or a design image.
         </p>
         {dropZone}
+        {queue}
         {notices}
       </div>
     )
@@ -432,6 +587,7 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
       {/* Offered alongside existing files too, not only when the list is empty — a seller
           may send a corrected file after we've already delivered one. */}
       {dropZone}
+      {queue}
     </div>
   )
 }

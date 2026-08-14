@@ -515,7 +515,7 @@ export default function OrderDetailPage() {
               filtered out server-side and the bytes are paywalled there too, so this
               renders nothing when there's nothing they can buy. */}
           <SectionCard title="Design files">
-            <div className="p-5"><SellerDesignFiles orderId={String(id)} /></div>
+            <div className="p-5"><SellerDesignFiles orderId={String(id)} items={items} onAttached={reloadDesigns} /></div>
           </SectionCard>
 
           {timeline.length > 0 && (
