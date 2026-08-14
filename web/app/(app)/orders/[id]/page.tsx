@@ -97,6 +97,10 @@ export default function OrderDetailPage() {
   const [ttLabelBusy, setTtLabelBusy] = useState(false)
   const [ttLabelErr, setTtLabelErr] = useState<string | null>(null)
   const [designs, setDesigns] = useState<Record<string, OrderDesign>>({})
+  // What the buyer paid, when nothing recorded it — a manual order has no marketplace to
+  // ask, so it is typed here or it is never known.
+  const [editRetail, setEditRetail] = useState(false)
+  const [retailDraft, setRetailDraft] = useState("")
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
   const [customize, setCustomize] = useState<OrderItem | null>(null)
@@ -276,6 +280,9 @@ export default function OrderDetailPage() {
   // Variants are editable only before submit — after that the cost is frozen and the
   // server rejects changes. new/draft/"" = not yet submitted.
   const preSubmit = ["", "new", "draft"].includes(String(order.factory_status || ""))
+  // Admin can still correct a line after submit — the price is frozen either way — until
+  // the blanks go to a supplier. Everyone else is locked at submit.
+  const canEditVariants = preSubmit || (role === "admin" && !(order as { blanks_ordered?: boolean }).blanks_ordered)
   // Was a private copy of numOf, so the detail page still showed the raw "etsy-4120118148"
   // after the boards were stripping the source prefix. Use the shared formatter.
   const num = numOf(order)
@@ -319,7 +326,18 @@ export default function OrderDetailPage() {
   const lineRevenue = (order.items ?? []).reduce(
     (s, it) => s + (Number(it.unit_price) || 0) * (Number(it.qty) || 1), 0)
   const fromMarketplace = platformOf(order) !== "Manual"
-  const revenue = fromMarketplace ? (Number(order.total ?? 0) || 0) || lineRevenue : lineRevenue
+  const retailSet = !!(order.meta as { retail_set?: boolean } | undefined)?.retail_set
+  const saveRetail = async () => {
+    const v = Number(retailDraft)
+    if (!isFinite(v) || v < 0) { setEditRetail(false); return }
+    setEditRetail(false)
+    // `retail_set` is what makes `total` authoritative: without it a manual order's total
+    // is the create form's subtotal + shipping, which is not the buyer's money.
+    await updateOrder(String(id), { total: v, meta: { ...(order.meta ?? {}), retail_set: true } })
+      .catch(() => {})
+    reloadOne()
+  }
+  const revenue = fromMarketplace || retailSet ? (Number(order.total ?? 0) || 0) || lineRevenue : lineRevenue
   const hasRevenue = revenue > 0
   // COST is what the seller paid US, read off the ledger — every part, including the ones
   // the quote can't see. Falls back to the quote before submit, when nothing is charged yet.
@@ -445,7 +463,12 @@ export default function OrderDetailPage() {
                     (l) => String(l.id) === String((it as { id?: string | number }).id ?? ""))
                   const unit = qLine ? Number(qLine.unitCost) || 0 : Number(it.unit_price) || 0
                   return (
-                    <div key={i} className="flex items-start gap-4 px-5 py-4">
+                    <div key={i} className="relative flex items-start gap-4 px-5 py-4">
+                      {/* The line's number, where the eye lands last — same number the drop
+                          zone's targets carry. */}
+                      <span className="absolute bottom-3 right-4 flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold tabular-nums text-primary-foreground" title={`Item ${i + 1}`}>
+                        {i + 1}
+                      </span>
                       {/* The blank with its artwork placed — the seller sees the same
                           composite the floor will produce from. */}
                       <div className="relative shrink-0">
@@ -477,14 +500,6 @@ export default function OrderDetailPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              {/* Bigger than a footnote, because it is the handle: the drop
-                                  zone's targets are numbered the same way, and a badge you
-                                  have to lean in to read is no use for matching a file to a
-                                  line. Filled, not tinted — at this size a 10% wash reads as
-                                  a disabled control. */}
-                              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold tabular-nums text-primary-foreground" title={`Item ${i + 1} on this order`}>
-                                {i + 1}
-                              </span>
                               <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
                             </div>
                             {/* Same line as the production queue: what the buyer chose, next
@@ -549,9 +564,7 @@ export default function OrderDetailPage() {
                           </div>
                         </div>
 
-                        {preSubmit ? (
-                          // Before submit: pick the blank + variants (marketplace orders
-                          // arrive unset). Saving updates the quote in Summary.
+                        {canEditVariants ? (
                           <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reloadOne} />
                         ) : (
                           <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-2" />
@@ -818,11 +831,27 @@ export default function OrderDetailPage() {
                       money on one card is only safe if the reader can never mistake one
                       for the other — which is the bug this replaced. */}
                   <div className="mt-3 space-y-2 border-t border-border pt-3">
-                    <div className="flex justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <dt className="text-muted-foreground">Customer paid</dt>
                       <dd className="tabular-nums">
-                        {hasRevenue ? usd(revenue)
-                          : <span className="italic text-muted-foreground">not recorded</span>}
+                        {editRetail ? (
+                          <span className="flex items-center gap-1">
+                            <Input
+                              autoFocus value={retailDraft} inputMode="decimal"
+                              onChange={(e) => setRetailDraft(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") void saveRetail(); if (e.key === "Escape") setEditRetail(false) }}
+                              className="h-7 w-24 text-right text-sm"
+                            />
+                            <Button size="sm" variant="ghost" onClick={() => void saveRetail()}>Save</Button>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => { setRetailDraft(revenue ? String(revenue) : ""); setEditRetail(true) }}
+                            className="underline-offset-2 hover:underline"
+                          >
+                            {hasRevenue ? usd(revenue) : <span className="italic text-muted-foreground">not recorded</span>}
+                          </button>
+                        )}
                       </dd>
                     </div>
                     <div className="flex justify-between font-semibold">

@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, CaretDown, LockSimple } from "@phosphor-icons/react"
+import { Check, CaretDown } from "@phosphor-icons/react"
 import { prettyColorName } from "@/lib/color-name"
 import {
   DropdownMenu,
@@ -206,22 +206,36 @@ export function VariantStrip({
     )
   }
 
+  // LOCKED reads as the same four fields, greyed — not as five small chips. A settled line
+  // and an editable one describe the same thing, so they should hold the same shape.
+  if (locked) {
+    return (
+      <div className={cn("space-y-1", className)}>
+        <div className="grid grid-cols-2 gap-x-2 gap-y-2.5 sm:grid-cols-[1.7fr_1.25fr_0.7fr_0.85fr]">
+          <VariantField label="Blank" value={blank || ""} options={[]} disabled onChange={() => {}} />
+          <VariantField label="Colour" value={color || ""} options={[]} swatches disabled onChange={() => {}} />
+          <VariantField label="Size" value={size || ""} options={[]} disabled onChange={() => {}} />
+          <VariantField label="Method" value={method || ""} options={[]} disabled onChange={() => {}} />
+        </div>
+        {showBuyer && <BuyerChip text={buyerText} />}
+      </div>
+    )
+  }
+
   return (
-    <div className={cn("flex flex-wrap items-center gap-1", className)} title={locked ? "Locked — variants can't change after an order is submitted" : undefined}>
+    <div className={cn("flex flex-wrap items-center gap-1", className)}>
       {chips.map((c) => (
         <span
           key={c.key}
           className={cn(
             "inline-flex max-w-[12rem] items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs font-medium",
             c.mono && "font-mono",
-            locked
-              ? "border-border/60 bg-muted/30 text-muted-foreground"
-              : "border-border bg-muted/50 text-foreground/80"
+            "border-border bg-muted/50 text-foreground/80"
           )}
         >
           {c.swatch && (
             <span
-              className={cn("size-2.5 shrink-0 rounded-full border border-black/10", locked && "opacity-60")}
+              className="size-2.5 shrink-0 rounded-full border border-black/10"
               style={{ background: swatchHex(c.label) }}
             />
           )}
@@ -229,7 +243,6 @@ export function VariantStrip({
         </span>
       ))}
       {showBuyer && <BuyerChip text={buyerText} />}
-      {locked && <LockSimple size={11} weight="fill" className="shrink-0 text-muted-foreground/70" />}
     </div>
   )
 }

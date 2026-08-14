@@ -903,8 +903,17 @@ export function ordersRoutes(app, requireAuth) {
 
   app.get('/api/orders/:id', { preHandler: requireAuth }, async (req, reply) => {
     const agg = `coalesce(json_agg(i.* order by i.id) filter (where i.id is not null), '[]') as items`;
+    // Have the blanks for this order gone to a supplier? It is what decides whether an
+    // admin may still correct a variant — see the item-setup route.
+    const placedPO = `exists (
+        select 1 from purchase_orders po
+         where coalesce(po.status,'draft') <> 'draft'
+           and exists (
+             select 1 from jsonb_array_elements(coalesce(po.items,'[]'::jsonb)) it,
+                          jsonb_array_elements(coalesce(it->'sources','[]'::jsonb)) src
+              where src->>'order' = o.id)) as blanks_ordered`;
     const r = await q(
-      `select o.*, ${agg} from orders o left join order_items i on i.order_id = o.id
+      `select o.*, ${placedPO}, ${agg} from orders o left join order_items i on i.order_id = o.id
         where o.id = $1 group by o.id`, [req.params.id]);
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'Order not found' }; }
@@ -1738,8 +1747,28 @@ export function ordersRoutes(app, requireAuth) {
     // variants", which reads as a way out and is one the code has never had.
     const charged = await chargedAmount(req.params.id);
     if (charged > 0) {
-      reply.code(409);
-      return { error: 'This order has been submitted and paid for, so its variants are locked — changing them now would stop matching the price charged. Ask the factory to amend the line, or cancel this order for a refund and place a new one.' };
+      /**
+       * ADMIN MAY STILL CORRECT A LINE UNTIL THE BLANKS ARE ORDERED.
+       *
+       * The price is frozen at submit either way — unit_cost/ship_fee are stored on the
+       * line — so an edit after charging changes what we MAKE, not what was billed. Up to
+       * the moment a purchase order goes to the supplier that is a correction; after it,
+       * the wrong garment is already bought and the fix is a new line, not a new colour.
+       * Everyone else stays locked at submit.
+       */
+      const isAdmin = req.user && req.user.role === 'admin';
+      const placed = isAdmin ? await q(
+        `select 1 from purchase_orders po
+          where coalesce(po.status,'draft') <> 'draft'
+            and exists (
+              select 1 from jsonb_array_elements(coalesce(po.items,'[]'::jsonb)) it,
+                           jsonb_array_elements(coalesce(it->'sources','[]'::jsonb)) src
+               where src->>'order' = $1)
+          limit 1`, [req.params.id]).then((r) => r.rowCount > 0).catch(() => true) : false;
+      if (!isAdmin || placed) {
+        reply.code(409);
+        return { error: placed ? 'Blanks already ordered — this line is locked.' : 'Order submitted — variants are locked.' };
+      }
     }
     // Only the fields the picker owns; undefined = leave as-is.
     const sets = [], vals = []; let n = 1;
