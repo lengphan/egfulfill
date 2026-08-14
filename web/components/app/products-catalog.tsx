@@ -358,16 +358,18 @@ export function ProductsCatalog() {
                     >
                       {status}
                     </span>
-                    {isStaff && (
+                    {/* ONLY WHEN IT IS NOT WHAT THE STATUS ABOVE ALREADY SAYS.
+                        "Active" and "On the site" under it are the same sentence twice, and
+                        a pill that is present on every healthy card teaches the eye to skip
+                        the place where the exceptions appear. The cases worth a second pill
+                        are the ones where Active does NOT mean public — no price, sellers
+                        only, staff only — so those keep it and the agreeing case drops. */}
+                    {isStaff && !pub.live && (
                       <span
                         title={pub.why ?? undefined}
                         className={
                           "inline-flex items-center rounded-full px-2.5 py-1 text-2xs font-medium backdrop-blur " +
-                          (pub.live
-                            ? "bg-primary/15 text-primary"
-                            : pub.why
-                              ? "bg-amber-500/20 text-amber-800"
-                              : "bg-background/70 text-muted-foreground")
+                          (pub.why ? "bg-amber-500/20 text-amber-800" : "bg-background/70 text-muted-foreground")
                         }
                       >
                         {pub.label}
