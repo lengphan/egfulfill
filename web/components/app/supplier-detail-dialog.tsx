@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CircleNotch, Package, ShoppingCart, Plus } from "@phosphor-icons/react"
+import { CircleNotch, ShoppingCart, Plus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { getSsStyle, getOttoStyle, getSanmarCatalogStyle } from "@/lib/api"
@@ -142,10 +142,32 @@ export function SupplierDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
+        {/**
+          * THE PRODUCT IDENTIFIES ITSELF ONCE, AT THE TOP.
+          *
+          * Brand, then name, then the codes underneath — the order you'd read it on a spec
+          * sheet, and the order that tells you what the thing IS before what it is called.
+          * The box icon is gone: it was the same glyph on every product, so it identified
+          * nothing and only pushed the name along.
+          *
+          * All of this used to be repeated in the right-hand column above the description,
+          * which meant the name was on screen twice and the panel that should be about
+          * CHOOSING opened with facts you had already read in the title bar.
+          */}
         <DialogHeader>
-          <DialogTitle className="flex min-w-0 items-center gap-2">
-            <Package size={16} weight="fill" className="shrink-0 text-muted-foreground" />
-            <span className="truncate">{d?.name || seed?.name || styleId}</span>
+          <DialogTitle className="min-w-0 space-y-0.5">
+            {(d?.brand || seed?.brand) && (
+              <span className="block truncate text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {d?.brand || seed?.brand}
+              </span>
+            )}
+            <span className="block truncate text-base font-semibold leading-tight">
+              {d?.name || seed?.name || styleId}
+            </span>
+            <span className="flex flex-wrap items-baseline gap-x-2 text-xs font-normal text-muted-foreground">
+              <span>{[SUPPLIER_NAME[supplier], styleId, d?.category].filter(Boolean).join(" · ")}</span>
+              {seed?.price && <span className="font-semibold text-foreground">{seed.price}</span>}
+            </span>
           </DialogTitle>
         </DialogHeader>
 
@@ -164,16 +186,8 @@ export function SupplierDetailDialog({
           <div className="min-w-0 space-y-3 text-sm">
             {err && <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
 
-            <div>
-              {(d?.brand || seed?.brand) && (
-                <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{d?.brand || seed?.brand}</div>
-              )}
-              <div className="text-xs text-muted-foreground">
-                {[SUPPLIER_NAME[supplier], styleId, d?.category].filter(Boolean).join(" · ")}
-              </div>
-              {seed?.price && <div className="mt-1 font-semibold">{seed.price}</div>}
-            </div>
-
+            {/* Brand, name, supplier and price all live in the header now — this column is
+                the description and the variant choice, and nothing else. */}
             {!d && !err && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <CircleNotch size={13} className="animate-spin" /> Loading the rest…
@@ -197,7 +211,7 @@ export function SupplierDetailDialog({
                 {/* Sizes are PICKABLE, for the same reason the colours are: this is where
                     the choice is being made. Still a full list, so "does it reach 4XL" is
                     answered by looking rather than by counting. */}
-                <Field label={`Sizes${d.sizes.length ? ` (${d.sizes.length})` : ""}`}>
+                <Section label={`Sizes${d.sizes.length ? ` (${d.sizes.length})` : ""}`}>
                   {d.sizes.length ? (
                     <span className="flex flex-wrap gap-1.5">
                       {d.sizes.map((z) => (
@@ -215,13 +229,13 @@ export function SupplierDetailDialog({
                       ))}
                     </span>
                   ) : "—"}
-                </Field>
+                </Section>
                 {/* Names ran together into an unreadable line — "016 - White · 017 - Dk.
                     Green · 021 - Green · 030 - Sky Blue…" is fourteen facts in one sentence.
                     They are chips now: the ones with a photo show it, the rest show their
                     colour, and every one of them changes the picture. The name is on hover
                     and on the selected chip, which is the only moment it matters. */}
-                <Field label={`Colours${d.colors.length ? ` (${d.colors.length})` : ""}`}>
+                <Section label={`Colours${d.colors.length ? ` (${d.colors.length})` : ""}`}>
                   {d.colors.length ? (
                     <span className="flex flex-wrap gap-x-2 gap-y-2">
                       {d.colors.map((c) => (
@@ -267,7 +281,7 @@ export function SupplierDetailDialog({
                       ))}
                     </span>
                   ) : "—"}
-                </Field>
+                </Section>
                 {/* "Orderable skus 24" is colours × sizes — a number already implied by the
                     two rows above it, and not one anybody acts on. Removed rather than kept
                     for completeness. */}
@@ -297,7 +311,7 @@ export function SupplierDetailDialog({
                   * neighbouring size holds is exactly what you check before changing the pick.
                   */}
                 {d.stockByColor && (
-                  <Field label="Stock">
+                  <Section label="Stock">
                     {(() => {
                       const rows = Object.entries(d.stockByVariant ?? {}).filter(([c]) => !colour || c === colour)
                       if (!rows.length) return <span className="text-muted-foreground">No per-variant figures for this style.</span>
@@ -335,7 +349,7 @@ export function SupplierDetailDialog({
                         </span>
                       )
                     })()}
-                  </Field>
+                  </Section>
                 )}
               </>
             )}
@@ -394,21 +408,23 @@ export function SupplierDetailDialog({
 }
 
 /**
- * One labelled row.
+ * One block of the variant panel — caption above, content beneath it, full width.
  *
- * NO RULE BETWEEN ROWS. Every row drew its own bottom border, and `last:border-0` never fired
- * because these are rendered inside a fragment — so the final row's rule landed directly
- * above the action row's own top rule and read as a double line. Spacing separates them now;
- * the label column already does the work a rule was there to do.
+ * These were label-and-value ROWS: a fixed 112px column of grey text on the left, the control
+ * squeezed into whatever was left on the right. That layout suits short values, and none of
+ * these are short — a size run, a palette of swatches with names under them, a per-variant
+ * stock table. Everything fought for the same half-width gutter while the label column sat
+ * mostly empty beside it.
  *
- * Type is text-sm, not text-xs. This is the window where somebody decides whether a blank is
- * right — fabric, sizes, stock — and it was set two steps below the app's body size.
+ * Reading down beats reading across here: the caption is small and quiet, the content gets
+ * the whole width, and the three blocks stack instead of interleaving. It also removes the
+ * rules that were drawing double lines against the action row.
  */
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline gap-3 py-2">
-      <span className="w-28 shrink-0 text-sm text-muted-foreground">{label}</span>
-      <span className="min-w-0 flex-1 text-sm">{children}</span>
+    <div className="space-y-1.5">
+      <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-sm">{children}</div>
     </div>
   )
 }
