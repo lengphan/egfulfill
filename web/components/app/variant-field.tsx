@@ -36,7 +36,7 @@ export function VariantField({
   options,
   onChange,
   placeholder,
-  emptyLabel = "Any",
+  emptyLabel,
   disabled,
   required,
   swatches,
@@ -79,16 +79,22 @@ export function VariantField({
    */
   const ph = tl("field", placeholder ?? label)
   /**
-   * AN EMPTY FIELD MUST STILL SAY WHICH FIELD IT IS.
+   * AN EMPTY FIELD MUST SAY WHICH FIELD IT IS — and nothing more than that.
    *
-   * The no-options state used to render `emptyLabel` alone — "Any" — which was fine while a
-   * caption sat above it. With the caption inside, three of these in a row became three
-   * identical "Any" controls with nothing to tell Colour from Size from Method. The label
-   * leads and the empty note follows it.
+   * The no-options state rendered `emptyLabel` alone ("Any"), which was fine under a caption
+   * and became three identical "Any" controls without one. Naming the field fixed that and
+   * then made the note redundant: "Colour · Any" says "Colour" twice over, once as identity
+   * and once as filler, and three of those in a row is the same visual noise the caption row
+   * was removed to stop.
+   *
+   * So the note appears ONLY when a caller supplies one, which is the case where it carries
+   * information the label cannot — orders/new says "None on this blank", a real fact about
+   * the chosen product rather than a synonym for empty. The default is now no note at all.
    */
+  const note = emptyLabel ? tl("field", emptyLabel) : ""
   const shown = value
     ? pretty(value)
-    : hasOptions ? ph : `${ph} · ${tl("field", emptyLabel)}`
+    : hasOptions || !note ? ph : `${ph} · ${note}`
   const unset = !value
 
   const trigger = (

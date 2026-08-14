@@ -65,10 +65,23 @@ export type ItemAvatarProps = {
   className?: string
 }
 
-/** The blank the artwork sits on: the chosen colour's mockup, falling back to the listing photo. */
-function blankOf(item: OrderItem, catalog?: CatalogProduct[]): string {
+/**
+ * The blank the artwork sits on — and whether it is REALLY the blank.
+ *
+ * `url` falls back to the listing photo, which keeps a manual order from rendering an empty
+ * tile. But that fallback is a quiet lie on a production surface: a blank with no mockup put
+ * the BUYER'S photo in the "what we'll print" position, on a component whose entire premise
+ * is that it never shows the listing photo. The floor then sees a rack of aprons captioned as
+ * the thing to make, with nothing anywhere saying the chosen blank has no picture.
+ *
+ * `missing` is that fact, kept separate so the caller can say it out loud instead — CLAUDE.md
+ * §4: an empty state must never be indistinguishable from a broken one.
+ */
+function blankOf(item: OrderItem, catalog?: CatalogProduct[]): { url: string; missing: boolean } {
   const p = catalog?.length ? resolveProduct(item, catalog) : null
-  return bestMockup(p, item.color, item.img || "")
+  // No fallback — this is the blank's OWN imagery or nothing.
+  const own = bestMockup(p, item.color, "")
+  return { url: own || item.img || "", missing: !!p && !own }
 }
 
 export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, listingFirst, onDropImage, bare, className }: ItemAvatarProps) {
@@ -97,7 +110,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
 
   const design = designs && item.sku ? designs[item.sku] : null
   const art = designSrc(design?.data) || designSrc(item.design_src)
-  const blank = blankOf(item, catalog)
+  const { url: blank, missing: blankMissing } = blankOf(item, catalog)
   const listing = item.img || ""
   // Only worth offering the swap when the two views actually differ.
   const canSwap = !!(art && listing && listing !== blank)
@@ -121,8 +134,12 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
    * is exactly when someone is choosing the blank — and requiring `art` meant a line with no
    * design yet fell back to a single image, so the treatment looked arbitrary from row to
    * row on the same order.
+   *
+   * AND A CHOSEN-BUT-PICTURELESS BLANK IS STILL TWO THINGS. Without blankMissing the pair
+   * collapsed to one tile the moment someone picked a blank we hold no photo for, which
+   * reads as "this order is different" rather than "that product needs a photo".
    */
-  const showBoth = !!(listing && (art || blank) && listing !== blank) && !listingFirst && size >= 56
+  const showBoth = !!(listing && (art || blankMissing || (blank && listing !== blank))) && !listingFirst && size >= 56
   /** Which card is in front. The print leads, because it is what the floor makes. */
   const [listingFront, setListingFront] = useState(false)
   /**
@@ -162,7 +179,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         className={"relative block shrink-0 overflow-hidden rounded-md bg-muted " + (bare ? "" : "border border-border ") + (className ?? "")}
         style={{ width: size, height: size }}
       >
-        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} />
+        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} />
       </span>
     )
   }
@@ -185,7 +202,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             + (showBoth ? (listingFront ? " absolute top-1/2 -translate-y-1/2 z-0" : " absolute top-1/2 -translate-y-1/2 z-20 border-2 border-background shadow-md") : " size-full")}
           style={showBoth ? { left: Math.round(size * PEEK), width: size, height: size } : undefined}
         >
-          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} />
+          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} />
           {/* Affordance only where there's something to do — and only on hover, so the
               row stays quiet until you're actually pointing at it. */}
           <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-md bg-black/45 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 sm:flex">
@@ -264,7 +281,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           </DialogHeader>
           <div className="space-y-3 px-1 pb-1">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted">
-              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} fit="contain" />
+              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} blankMissing={blankMissing} fit="contain" />
             </div>
             {canSwap && (
               <button
@@ -295,7 +312,24 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
  * so the same numbers hold at 44px in a row and at full size in the preview — one model,
  * no per-surface maths.
  */
-function Composite({ blank, art, pos, listing, showListing, alt, fit }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string; fit?: "cover" | "contain" }) {
+function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissing }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string; fit?: "cover" | "contain"; blankMissing?: boolean }) {
+  /**
+   * SAY IT, rather than borrow the listing photo.
+   *
+   * When the chosen blank has no imagery, `blank` falls back to the buyer's listing photo —
+   * and this component's whole premise is that it shows what gets MADE, never the listing.
+   * A rack of aprons sitting in the print position, captioned as the thing to produce, is
+   * worse than an empty tile: it is confidently wrong. So when a blank IS chosen and simply
+   * has no picture, the card says so and the pair keeps both halves.
+   */
+  if (blankMissing && !art && !showListing) {
+    return (
+      <span className="grid size-full place-items-center gap-1 bg-muted/60 p-1 text-center text-muted-foreground">
+        <Package size={15} />
+        <span className="text-[9px] font-medium leading-tight">No blank photo</span>
+      </span>
+    )
+  }
   const base = showListing ? (listing || blank) : (blank || listing)
   if (!base && !art) {
     return <span className="grid size-full place-items-center text-muted-foreground"><Package size={16} /></span>
