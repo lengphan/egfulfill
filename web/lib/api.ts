@@ -1804,6 +1804,10 @@ export type OrderDesignFee = {
   /** null = quoted, under review ("To Be Determined") — shown, never hidden. */
   amount: number | null
   status: "charged" | "estimated" | "tbd"
+  /** Every line this ONE fee covers. Both fees pay for work done once — a file is checked
+   *  once however many items carry it, a picture is digitised once — so lines sharing a
+   *  design are billed together and `name` reads "ab11 +2 items". */
+  lines?: { line_id: string | null; sku: string | null }[]
 }
 export type OrderQuote = {
   lines: { id: string; sku: string; name: string; qty: number; size: string | null; unitCost: number; shipFee: number }[]

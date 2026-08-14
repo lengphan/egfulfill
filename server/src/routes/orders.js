@@ -1878,6 +1878,19 @@ export function ordersRoutes(app, requireAuth) {
     if (row.design_charged_at) return { charged: 0, reason: 'already-charged' };
     if (!row.seller_id) return { charged: 0, reason: 'no-seller' };
     /**
+     * THE SAME JOB IS PAID FOR ONCE — the charge obeys the rule the estimate shows.
+     *
+     * One file on five items is one file checked; one picture on five items is one
+     * digitising job. The estimate groups by the design for exactly that reason, and if
+     * this billed per line the seller would be quoted three fees and charged five. Every
+     * line carrying this design is stamped below, so the second one through this function
+     * stops at the already-charged guard above.
+     */
+    const lines = await designLines(orderId);
+    const me = lines.find((l) => String(lineId ? l.line_id : l.sku) === String(lineId || sku));
+    const sameDesign = me ? lines.filter((l) => designKeyOf(l, tier) === designKeyOf(me, tier)) : [];
+    if (sameDesign.some((l) => l.design_charged_at)) return { charged: 0, reason: 'already-charged-same-design' };
+    /**
      * A FACTORY-OWNED order charges nobody.
      *
      * Our own shop's orders carry a staff account as seller_id, so charging one would move
@@ -1936,8 +1949,19 @@ export function ordersRoutes(app, requireAuth) {
       [orderId, why, JSON.stringify({ by: 'Billing', design_fee: amount, order_ref: orderId })]
     ).catch(() => {});
     egBroadcast({ type: 'order-message' });
-    await q(`update order_items set design_charged_at = now() where order_id=$1 and ${key}=$2`,
-      [orderId, lineId || sku]).catch(() => {});
+    // EVERY line this one payment covers is stamped, not just the one that triggered it —
+    // otherwise the next line carrying the same file walks back in and bills it again.
+    const stampIds = sameDesign.map((l) => l.line_id).filter(Boolean);
+    const stampSkus = sameDesign.filter((l) => !l.line_id).map((l) => l.sku).filter(Boolean);
+    if (stampIds.length || stampSkus.length) {
+      await q(
+        `update order_items set design_charged_at = now()
+          where order_id=$1 and (line_id = any($2::text[]) or (line_id is null and sku = any($3::text[])))`,
+        [orderId, stampIds, stampSkus]).catch(() => {});
+    } else {
+      await q(`update order_items set design_charged_at = now() where order_id=$1 and ${key}=$2`,
+        [orderId, lineId || sku]).catch(() => {});
+    }
     audit(req, 'design.charged', { entityType: 'order', entityId: orderId, after: { tier, amount, line_id: lineId, sku } });
     return { charged: amount, tier };
   }
@@ -1949,54 +1973,112 @@ export function ordersRoutes(app, requireAuth) {
    * fee; image → we digitise it, standard). Complex is quoted, so its amount is left null =
    * "To Be Determined" until accepted, rather than hidden. Amounts mirror chargeDesign.
    */
+  /**
+   * Every line of an order with the design it carries — the file it was given, or the
+   * artwork placed on it. One query, because both the estimate and the charge have to
+   * answer "is this the same job as that one" the same way.
+   *
+   * LINE-FIRST, like every other per-line read. Matching on coalesce(sku,'') meant that on
+   * an order whose lines have no sku yet — an import, or any marketplace line before a
+   * variant is picked — ONE machine file matched EVERY line. A file with no line id is
+   * genuinely order-wide and still counts for all of them, which is the second branch.
+   */
+  async function designLines(orderId) {
+    return q(
+      `select i.line_id, i.sku, i.name, i.print_type, i.design_tier, i.design_quote_status, i.design_charged_at,
+              (select coalesce(f.content_hash, f.design_id) from design_file_data f
+                 where f.order_id = i.order_id
+                   and (f.line_id = i.line_id
+                        or (f.line_id is null and coalesce(f.sku,'') = coalesce(i.sku,'')))
+                 order by (f.line_id is not null) desc, f.created_at desc limit 1) as machine_key,
+              (select coalesce(d.art_hash, d.storage_key, left(d.data, 64)) from order_designs d
+                 where d.order_id = i.order_id
+                   and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
+                   and (d.data is not null or d.storage_key is not null)
+                 order by (d.line_id is not null) desc limit 1) as image_key
+         from order_items i where i.order_id = $1`,
+      [orderId]).then((r) => r.rows).catch(() => []);
+  }
+
+  /**
+   * What this line attracts, if anything.
+   *
+   * A CHECK FEE IS AN EMBROIDERY FEE — it pays for someone opening a stitch file and
+   * judging whether it will run. So is digitising. A DTG or DTF line has neither: the
+   * artwork IS the print file, and there is nothing to cut. Neither fee is inferred there,
+   * however a file ended up attached to it.
+   *
+   * Only the INFERENCE is gated. Staff's own classification wins outright: if someone has
+   * looked at a line and called it supplied, they had a reason, and this is not the place
+   * to overrule it.
+   */
+  function tierOf(r) {
+    if (r.design_tier) return r.design_tier;
+    if (!/emb/i.test(String(r.print_type || ''))) return null;
+    return r.machine_key ? 'supplied' : r.image_key ? 'standard' : null;
+  }
+
+  /** What makes two lines the SAME job: the same file, or the same artwork. A line with
+   *  neither (a staff-set tier on an empty line) is only ever itself. */
+  function designKeyOf(r, tier) {
+    const own = `L:${r.line_id || r.sku || ''}`;
+    if (tier === 'supplied') return r.machine_key || own;
+    return r.image_key || r.machine_key || own;
+  }
+
   async function computeDesignFees(orderId) {
     const fees = await readAll().catch(() => ({}));
     const CHECK = Number(fees.check_fee) || 0;
     const STD = Number(fees.design_fee_standard) || 0;
     const CPX = Number(fees.design_fee_complex) || 0;
-    const rows = await q(
-      `select i.line_id, i.sku, i.name, i.print_type, i.design_tier, i.design_quote_status, i.design_charged_at,
-              -- LINE-FIRST, like every other per-line read. Matching on coalesce(sku,'')
-              -- meant that on an order whose lines have no sku yet — an import, or any
-              -- marketplace line before a variant is picked — ONE machine file matched
-              -- EVERY line, and the summary billed a check fee six times for a single
-              -- uploaded file. A file with no line id is genuinely order-wide and still
-              -- counts for every line, which is what the second branch is.
-              exists(select 1 from design_file_data f
-                       where f.order_id = i.order_id
-                         and (f.line_id = i.line_id
-                              or (f.line_id is null and coalesce(f.sku,'') = coalesce(i.sku,'')))) as has_machine,
-              exists(select 1 from order_designs d
-                       where d.order_id = i.order_id
-                         and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
-                         and (d.data is not null or d.storage_key is not null)) as has_image
-         from order_items i where i.order_id = $1`,
-      [orderId]).then((r) => r.rows).catch(() => []);
-    const items = []; let total = 0;
+    const rows = await designLines(orderId);
+    /**
+     * ONE FEE PER DESIGN, NOT PER LINE.
+     *
+     * Both fees pay for a piece of WORK done once. The check fee is a person opening a
+     * stitch file and judging whether it will run; the standard fee is digitising a picture
+     * into stitches. Put the same file on five items and it is checked once; put the same
+     * picture on five items and it is digitised once. Billing per line charged five times
+     * for one job — which is what the summary was doing, six identical check-fee rows for a
+     * single uploaded file.
+     *
+     * So lines are GROUPED by the design they carry — the file's content hash, or the
+     * artwork's — and each group is one fee. Five embroidered items carrying three files
+     * and two pictures is three check fees and two standard fees, which is the number of
+     * times somebody actually sits down to work.
+     */
+    const groups = new Map();
     for (const r of rows) {
-      /**
-       * A CHECK FEE IS AN EMBROIDERY FEE. It pays for someone opening a stitch file and
-       * judging whether it will run — size, format, machine. A DTG or DTF line has no
-       * stitch file and nothing to check, so a supplied machine file must not raise one
-       * there, however the file got attached.
-       *
-       * Only the INFERENCE is gated. Staff's own classification still wins outright: if
-       * someone has looked at a line and called it supplied, they had a reason, and this
-       * is not the place to overrule it.
-       */
-      const isEmb = /emb/i.test(String(r.print_type || ''));
-      const tier = r.design_tier || (r.has_machine && isEmb ? 'supplied' : r.has_image ? 'standard' : null);
+      const tier = tierOf(r);
       if (!tier) continue;
+      const key = `${tier}|${designKeyOf(r, tier)}`;
+      const g = groups.get(key);
+      if (g) { g.lines.push(r); if (r.design_charged_at) g.charged = true; continue; }
+      groups.set(key, { tier, lines: [r], charged: !!r.design_charged_at, quote: r.design_quote_status });
+    }
+    const items = []; let total = 0;
+    for (const g of groups.values()) {
+      const first = g.lines[0];
       let label, amount;
-      if (tier === 'supplied') { label = 'Check Fee (File Provided)'; amount = CHECK; }
-      else if (tier === 'complex') {
+      if (g.tier === 'supplied') { label = 'Check Fee (File Provided)'; amount = CHECK; }
+      else if (g.tier === 'complex') {
         label = 'Design Fee (Complex)';
         // Fixed only once accepted or charged; otherwise under review → To Be Determined.
-        amount = (r.design_charged_at || r.design_quote_status === 'accepted') ? CPX : null;
+        amount = (g.charged || g.quote === 'accepted') ? CPX : null;
       } else { label = 'Design Fee (New)'; amount = STD; }
-      const status = r.design_charged_at ? 'charged' : (amount == null ? 'tbd' : 'estimated');
+      const status = g.charged ? 'charged' : (amount == null ? 'tbd' : 'estimated');
       if (amount != null) total += amount;
-      items.push({ line_id: r.line_id || null, sku: r.sku || null, name: r.name || null, tier, label, amount, status });
+      // The rest of the group is NAMED rather than silently folded in: "ab11 +2 items"
+      // says one fee covers three lines, which is the fact a seller is checking for.
+      const extra = g.lines.length - 1;
+      const name = (first.name || first.sku || 'Item') + (extra > 0 ? ` +${extra} item${extra === 1 ? '' : 's'}` : '');
+      items.push({
+        line_id: first.line_id || null, sku: first.sku || null, name,
+        tier: g.tier, label, amount, status,
+        // Every line this one fee covers, so a caller can mark them all rather than
+        // guessing which line the row stands for.
+        lines: g.lines.map((l) => ({ line_id: l.line_id || null, sku: l.sku || null })),
+      });
     }
     return { items, total };
   }
