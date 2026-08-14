@@ -540,8 +540,15 @@ export default function OrderDetailPage() {
                           <div className="shrink-0 text-right text-sm">
                             {unit > 0 ? (
                               <>
-                                <div className="font-medium tabular-nums">{usd(unit * qty)}</div>
-                                <div className="text-xs tabular-nums text-muted-foreground">{qty} × {usd(unit)}</div>
+                                {/* ONE LINE: the unit price and how many of it. It was two —
+                                    the extended total above, "1 × $18.50" beneath — which on
+                                    a quantity of one printed the same figure twice, and even
+                                    at four is one multiplication shown as two rows. The
+                                    total is the sum at the foot of the order; what a row has
+                                    to say is what this item costs and how many there are. */}
+                                <div className="font-medium tabular-nums">
+                                  {usd(unit)} <span className="text-muted-foreground">× {qty}</span>
+                                </div>
                                 {/* WHERE THE NUMBER COMES FROM. The catalogue says $13.50
                                     and the order says $18.50, and until this line existed
                                     those looked like two prices for one product. They are
