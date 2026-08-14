@@ -82,7 +82,27 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   const [ottoTotal, setOttoTotal] = useState(0)
   const [sanmarTotal, setSanmarTotal] = useState(0)
   const [loading, setLoading] = useState(false)
+  /**
+   * WHAT IS ALREADY IN OUR CATALOGUE.
+   *
+   * This only ever recorded what YOU added in this session, so a refresh made every card
+   * look untouched — and browsing 4,000 styles with no idea which you had already taken is
+   * how the same blank gets added three times under three names.
+   *
+   * Seeded from the catalogue itself on load, matched on the id the builders write
+   * (SS-1717 / OTTO-39 / SANMAR-K500), so it survives a reload and is true across people
+   * rather than per-tab.
+   */
   const [added, setAdded] = useState<Set<string>>(new Set())
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    const t = setTimeout(() => {
+      getCatalogProducts()
+        .then((r) => setAddedIds(new Set((r ?? []).map((p) => String(p.id || "")).filter(Boolean))))
+        .catch(() => { /* the grid still works; cards just cannot say "Added" */ })
+    }, 0)
+    return () => clearTimeout(t)
+  }, [refreshKey])
   const [allFilters, setAllFilters] = useState<{ brands: string[]; categories: string[]; priceMin: number | null; priceMax: number | null } | null>(null)
   useEffect(() => {
     const t = setTimeout(() => { getCatalogFilters().then(setAllFilters).catch(() => {}) }, 0)
@@ -168,6 +188,13 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   }
 
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
+  /**
+   * The catalog id a supplier style becomes once added — SS-1717, OTTO-39, SANMAR-K500.
+   * Set by the three builders in lib/supplier-catalog, and the only durable link between a
+   * card in this grid and a row in our catalogue.
+   */
+  const catalogIdOf = (it: Item) =>
+    `${it.supplier === "ss" ? "SS" : it.supplier === "otto" ? "OTTO" : "SANMAR"}-${it.id}`
 
   // ── Quick order ────────────────────────────────────────────────────────────
   // Buying is not the same act as listing. "Add to Products" decides what we SELL;
@@ -573,7 +600,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
                               price: c.price != null ? (c.priceMax != null && c.priceMax !== c.price ? `$${c.price}–$${c.priceMax}` : `$${c.price}`) : null },
                     })
                   }}
-                  added={added.has(keyOf(it))}
+                  added={added.has(keyOf(it)) || addedIds.has(catalogIdOf(it))}
                   adding={addingId === keyOf(it)}
                   onAdd={() => addToCatalog(it)}
                   // ORDERING IS ADMIN. An operator browses these catalogues to build OUR
