@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { getSsStyle, getOttoStyle, getSanmarCatalogStyle } from "@/lib/api"
 import { swatchHex } from "@/components/app/products-catalog"
 import { descriptionLines } from "@/lib/description"
+import { prettyColorName } from "@/lib/color-name"
 
 /**
  * ONE BLANK, IN FULL — the catalogue tile's picture is a thumbnail of a decision.
@@ -222,10 +223,10 @@ export function SupplierDetailDialog({
                     and on the selected chip, which is the only moment it matters. */}
                 <Field label={`Colours${d.colors.length ? ` (${d.colors.length})` : ""}`}>
                   {d.colors.length ? (
-                    <span className="flex flex-wrap gap-1.5">
+                    <span className="flex flex-wrap gap-x-2 gap-y-2">
                       {d.colors.map((c) => (
+                        <span key={c} className="flex w-14 flex-col items-center gap-1">
                         <button
-                          key={c}
                           type="button"
                           title={d.stockByColor ? `${c} — ${d.stockByColor[c] ?? 0} in stock at the supplier` : c}
                           onClick={() => setColour(c === colour ? null : c)}
@@ -250,6 +251,19 @@ export function SupplierDetailDialog({
                             ? { backgroundImage: `url("${d.colorImages[c]}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
                             : { background: swatchHex(c) }}
                         />
+                        {/* THE NAME UNDER THE SWATCH. It was on hover and on the selected chip
+                            only, so reading the palette meant pointing at each circle in turn
+                            — and a zoomed crop of a garment is not always enough to tell
+                            Charcoal from Black. Supplier codes are prettified ("031753A -
+                            Blk/Dk.Grn" → the readable half) and truncated; the full string
+                            stays on the button's title. */}
+                        <span
+                          className={"w-full truncate text-center text-2xs leading-tight " + (c === colour ? "font-medium text-foreground" : "text-muted-foreground")}
+                          title={c}
+                        >
+                          {prettyColorName(c)}
+                        </span>
+                        </span>
                       ))}
                     </span>
                   ) : "—"}
@@ -284,27 +298,43 @@ export function SupplierDetailDialog({
                   */}
                 {d.stockByColor && (
                   <Field label="Stock">
-                    <span className="flex flex-col gap-1">
-                      {Object.entries(d.stockByVariant ?? {})
-                        .filter(([c]) => !colour || c === colour)
-                        .map(([c, bySize]) => (
-                          <span key={c} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                            <span className="w-24 shrink-0 truncate font-medium">{c}</span>
-                            {Object.entries(bySize).map(([z, n]) => (
-                              <span
-                                key={z}
-                                className={"tabular-nums " + (size && z !== size ? "text-muted-foreground/45" : n > 0 ? "text-foreground" : "text-muted-foreground line-through")}
-                                title={`${c} / ${z}`}
-                              >
-                                <span className="text-muted-foreground">{z}</span> {n.toLocaleString()}
-                              </span>
-                            ))}
-                          </span>
-                        ))}
-                      {!Object.keys(d.stockByVariant ?? {}).length && (
-                        <span className="text-muted-foreground">No per-variant figures for this style.</span>
-                      )}
-                    </span>
+                    {(() => {
+                      const rows = Object.entries(d.stockByVariant ?? {}).filter(([c]) => !colour || c === colour)
+                      if (!rows.length) return <span className="text-muted-foreground">No per-variant figures for this style.</span>
+                      /**
+                       * SAY EACH THING ONCE.
+                       *
+                       * The colour name is under its swatch now, and the size list is its own
+                       * row above — so repeating both here turned "521" into "Grey · One Size
+                       * 521", three labels around one number.
+                       *
+                       * Each label earns its place only when it distinguishes something: the
+                       * colour when more than one row is shown, the size when the style has
+                       * more than one. A single-size style in a chosen colour is just the
+                       * number, sitting next to the word Stock, which is all it ever was.
+                       */
+                      const manyColours = rows.length > 1
+                      const manySizes = d.sizes.length > 1
+                      return (
+                        <span className="flex flex-col gap-1">
+                          {rows.map(([c, bySize]) => (
+                            <span key={c} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                              {manyColours && <span className="w-20 shrink-0 truncate text-muted-foreground">{prettyColorName(c)}</span>}
+                              {Object.entries(bySize).map(([z, n]) => (
+                                <span
+                                  key={z}
+                                  className={"tabular-nums " + (size && z !== size ? "text-muted-foreground/45" : n > 0 ? "font-medium text-foreground" : "text-muted-foreground line-through")}
+                                  title={`${c} / ${z}`}
+                                >
+                                  {manySizes && <span className="font-normal text-muted-foreground">{z} </span>}
+                                  {n.toLocaleString()}
+                                </span>
+                              ))}
+                            </span>
+                          ))}
+                        </span>
+                      )
+                    })()}
                   </Field>
                 )}
               </>
