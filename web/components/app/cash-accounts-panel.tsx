@@ -122,14 +122,18 @@ export function CashAccountsPanel() {
   const missing = SUGGESTED.filter((sg) => !view.accounts.some((a) => a.id === sg.id))
 
   /**
-   * A NARROW COLUMN, stacked — not a band across the page.
+   * ONE THIN STRIP across the top.
    *
-   * As a grid these took a full row of their own above the P&L, and with the rails offered
-   * too they wrapped onto a second row: seven cards and a lot of white space before the
-   * numbers anyone came for. Down the side instead, the whole set is one glance and the P&L
-   * keeps the width it needs.
+   * This has been three shapes. A grid of tall cards took two bands before the numbers
+   * anyone came for. A side column was worse: as a sibling of the whole dashboard it
+   * squeezed the P&L from four cards to two, narrowed the transaction table, and left the
+   * space under five accounts dead.
    *
-   * Smaller than the P&L cards on purpose — text-base against text-3xl. These are reference
+   * What made the first version tall was the CARD SIZE and giving every unset rail one.
+   * Halve the cards, turn the rails into chips, and the whole set is a single strip — so it
+   * can sit above and full width without taking the page.
+   *
+   * Still smaller than the P&L cards: text-base against text-3xl. These are reference
    * figures; that is the headline. Same language, lower voice.
    */
   /**
@@ -144,12 +148,15 @@ export function CashAccountsPanel() {
    * the order panel already uses. Different region, no new vocabulary.
    */
   return (
-    <div className="space-y-1.5 rounded-xl bg-muted/40 p-2.5">
+    <div className="space-y-2 rounded-xl bg-muted/40 p-2.5">
       <div className="flex items-baseline justify-between gap-2 px-0.5">
         <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Accounts</span>
         <button onClick={() => add()} className="eg-tap text-2xs font-medium text-primary hover:underline">+ Add</button>
       </div>
 
+      {/* Across, not down — six to a row on a wide screen, so five accounts and an
+          Unassigned line are ONE strip rather than a column with dead space beneath it. */}
+      <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
       {view.accounts.map((a) => (
         // group/acct so the controls stay out of sight until this card is pointed at — three
         // buttons on every card is a wall of chrome on a figure you mostly just read.
@@ -196,6 +203,7 @@ export function CashAccountsPanel() {
           </div>
         </Card>
       )}
+      </div>
 
       {/* The rails not yet added, as ONE line rather than a card each — an unset account is
           a prompt, not a figure, and giving each its own card put empty boxes on equal

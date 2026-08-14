@@ -13,17 +13,18 @@ import { CashAccountsPanel } from "@/components/app/cash-accounts-panel"
 export function FinanceView() {
   return (
     /**
-     * BESIDE, not above.
+     * A THIN BAND ABOVE, NOT A COLUMN BESIDE.
      *
-     * Stacked, the accounts took a full band — and with the rails offered, two bands — of
-     * white space before the numbers anyone opens this page for. They are a narrow column
-     * now, so the whole set is one glance and the P&L keeps the width it needs.
+     * As a side column it was a sibling of the ENTIRE dashboard, so a short list of accounts
+     * squeezed everything: the P&L dropped from four cards across to two, the transaction
+     * table lost most of its width, and the space under five accounts was simply dead.
      *
-     * One column on small screens, where side-by-side would squeeze both. The accounts come
-     * first there: on a phone you are far more likely to be checking a balance than reading
-     * a P&L.
+     * The reason it was moved out of the flow in the first place — a tall stack pushing the
+     * numbers down — is gone: the cards are half the height now and the unset rails are
+     * chips rather than cards, so the whole set is one strip. Above and full width lets the
+     * table have the page back.
      */
-    <div className="grid gap-4 lg:grid-cols-[minmax(190px,230px)_1fr] lg:items-start">
+    <div className="space-y-4">
       <CashAccountsPanel />
       <WalletDashboard partnerHistory />
     </div>
