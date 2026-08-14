@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { X, Printer, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, type LookbookStyle } from "@/lib/api"
+import { descriptionLines } from "@/lib/description"
 
 const money = (n: number | null | undefined) =>
   n == null ? "" : `$${(Number(n) || 0).toFixed(2)}`
@@ -226,7 +227,18 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   </div>
 
                   {st.description
-                    ? <p className="mt-4 text-[11px] leading-relaxed text-neutral-600">{st.description}</p>
+                    ? (
+                      // Same split as every other surface — a printed lookbook page is the
+                      // one place a wall of run-together specs is hardest to skim.
+                      <ul className="mt-4 space-y-0.5 text-[11px] leading-relaxed text-neutral-600">
+                        {descriptionLines(st.description).map((line, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="mt-[0.6em] size-[3px] shrink-0 rounded-full bg-neutral-400" />
+                            <span>{line}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )
                     // No description on most supplier styles, and an empty column reads as
                     // an unfinished page. The size run fills it as a chart instead, which
                     // is the thing a buyer would otherwise have to ask for.

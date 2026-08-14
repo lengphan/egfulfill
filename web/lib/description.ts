@@ -7,6 +7,22 @@
 // pulling in a parser for this would cost more than the feature. Output is plain text —
 // never injected as HTML — so a malformed tag can't become an XSS hole.
 
+/** A LABEL: one or more capitalised words ending in a colon — "Responsible Supplier:". */
+const LABEL = /[A-Z][a-z]+(?:\s[A-Z][a-z]+)*:/
+/**
+ * The two ways a supplier drops the separator before a label:
+ *   glued   "…recycled polyesterResponsible Supplier:"   lowercase meets it directly
+ *   spaced  "…on left sleeve Responsible Materials:"      a whole lowercase WORD, then it
+ *
+ * SPACED demands a word boundary before the lowercase run, so it can never match inside
+ * "Responsible" itself — without that it splits the label in half and yields a bullet
+ * reading just "Responsible".
+ */
+const GLUED = new RegExp(`(?<=[a-z])(?=${LABEL.source})`)
+const SPACED = new RegExp(`(?<=\\b[a-z]{3,})\\s(?=${LABEL.source})`)
+/** Bullet glyphs used INLINE, mid-sentence, rather than at the start of a line. */
+const INLINE_BULLETS = /[•·●▪|]+/
+
 const ENTITIES: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'", "#039": "'", "#34": '"',
 }
@@ -20,6 +36,12 @@ function decodeEntities(s: string): string {
  *
  * Block-level tags become line breaks (that's what they meant), inline tags are dropped,
  * and existing bullet glyphs are stripped so we don't end up with "• • Soft Crown".
+ *
+ * NOT ALL SUPPLIERS SEND HTML. SanMar sends one paragraph with the bullets INSIDE it —
+ * "LIMITED EDITION • 5 oz./yd² • Regular fit • Side vents …" — which has no tags to break
+ * on and rendered as a wall of text that hides "Side vents" from whoever is choosing the
+ * blank. Some also drop the separator entirely before a labelled clause. Both are split
+ * here too, so one function answers "what are the lines" whatever the supplier sent.
  */
 export function descriptionLines(raw?: string | null): string[] {
   if (!raw) return []
@@ -31,6 +53,9 @@ export function descriptionLines(raw?: string | null): string[] {
   s = decodeEntities(s)
   return s
     .split(/\r?\n/)
+    .flatMap((l) => l.split(INLINE_BULLETS))
+    .flatMap((l) => l.split(GLUED))
+    .flatMap((l) => l.split(SPACED))
     .map((l) => l.replace(/^\s*[•\-*·–—]\s*/, "").trim())   // strip pre-existing bullets
     .filter(Boolean)
 }

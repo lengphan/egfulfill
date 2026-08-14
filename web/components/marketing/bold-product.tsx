@@ -6,6 +6,7 @@ import Link from "next/link"
 import { TShirt, ArrowLeft, Check } from "@phosphor-icons/react"
 import { ACCENT, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
 import type { PublicProduct } from "@/lib/api"
+import { descriptionLines } from "@/lib/description"
 
 /**
  * One published product, in public shape.
@@ -165,8 +166,20 @@ export function BoldProduct({ product }: { product: PublicProduct }) {
             {/* The garment described in the manufacturer's own words. It was synced all
                 along and simply never published, and it is most of what the page was
                 missing — everything else here is a chip. */}
-            {product.description && (
-              <p className="mt-6 text-[15px] leading-relaxed text-black/70">{product.description}</p>
+            {/* ONE FACT PER ROW. What suppliers send is a list wearing a paragraph's
+                clothes — "LIMITED EDITION • 5 oz./yd² • Regular fit • Side vents …" — and
+                as prose it becomes a wall that hides the one line a buyer is looking for.
+                Same split the app's product page uses, so the two never disagree about
+                what this garment says about itself. */}
+            {descriptionLines(product.description).length > 0 && (
+              <ul className="mt-6 space-y-1.5 text-[15px] leading-relaxed text-black/70">
+                {descriptionLines(product.description).map((line, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <span className="mt-[0.55em] size-1 shrink-0 rounded-full bg-black/30" />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
             )}
 
             {product.methods.length > 0 && <Spec label="Print method" items={product.methods} />}
