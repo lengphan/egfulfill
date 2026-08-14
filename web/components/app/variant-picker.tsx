@@ -111,11 +111,24 @@ export function VariantPicker({
         />
       </div>
 
-      {/* Colour/Size/Method are disabled until a blank is chosen — the blank decides which
-          options exist. Without saying so, those greyed "Any" fields read as broken ("can't
-          select them"); this line names the gate and the next action. */}
+      {/* Colour/Size/Method are disabled until a blank RESOLVES — the blank decides which
+          options exist. Without saying so, those greyed fields read as broken.
+
+          TWO REASONS THEY CAN BE GREY, and they were sharing one sentence. A line imported
+          from a sheet arrives with a Blank SKU typed into it: the field shows "EG-18500",
+          so "Pick a blank first" reads as a lie — one is picked, and the instruction says
+          to do what has already been done. What is actually wrong is that the value matches
+          no product in the catalogue, which nothing on screen said. Name it, and name the
+          value, because the fix is usually a typo in one cell of the sheet. */}
       {!product && (
-        <p className="mt-2 text-xs text-muted-foreground">Pick a blank first — it sets the colour, size &amp; method options.</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {item.blank
+            ? <>
+                <span className="font-medium text-amber-700 dark:text-amber-400">&ldquo;{item.blank}&rdquo; isn&apos;t a blank in the catalogue</span>
+                {" "}— colour, size and method come from the blank, so pick the one we should print on.
+              </>
+            : <>Pick a blank first — it sets the colour, size &amp; method options.</>}
+        </p>
       )}
 
       {/* Errors only — no transient "Saving…" line.
