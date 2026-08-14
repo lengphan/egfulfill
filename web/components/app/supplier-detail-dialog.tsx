@@ -304,35 +304,51 @@ export function SupplierDetailDialog({
               </>
             )}
 
-            {/* What you picked, said back before anything is added — a cart line that turns
-                out to be the wrong colourway is discovered on the PO, which is late. */}
-            {onAddToCart && (
-              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                <input
-                  type="number" min={1} value={qty}
-                  onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  aria-label="Quantity"
-                  className="h-8 w-16 rounded-lg border border-border bg-card px-2 text-sm tabular-nums"
-                />
-                <Button size="sm" onClick={() => onAddToCart({ colour, size, qty })}>
-                  <ShoppingCart size={13} weight="bold" /> Add to cart
-                </Button>
-                <span className="min-w-0 truncate text-xs text-muted-foreground">
-                  {[colour, size].filter(Boolean).join(" / ") || "whole style — pick a colour and size"}
-                </span>
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+            {/**
+              * ONE ACTION ROW.
+              *
+              * These were two rows separated by a rule, so "Add to cart" and "Add to Products"
+              * read as belonging to different sections when they are simply the two things you
+              * can do with the blank you are looking at.
+              *
+              * They are also deliberately different WEIGHTS, because they do different things
+              * and were identically styled: buying stock and listing a product for sale are
+              * not the same decision, and a purple button beside an identical purple button
+              * invites the wrong one. Add to cart is filled — it is the one tied to the
+              * quantity box next to it. Add to Products is outlined.
+              *
+              * The picked colourway is said back on the same row, because a cart line that
+              * turns out to be the wrong colour is otherwise discovered on the PO, which is
+              * late.
+              */}
+            <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              {onAddToCart && (
+                <>
+                  <input
+                    type="number" min={1} value={qty}
+                    onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    aria-label="Quantity"
+                    className="h-8 w-16 rounded-lg border border-border bg-card px-2 text-sm tabular-nums"
+                  />
+                  <Button size="sm" onClick={() => onAddToCart({ colour, size, qty })}>
+                    <ShoppingCart size={13} weight="bold" /> Add to cart
+                  </Button>
+                </>
+              )}
               {onOrder && (
                 <Button size="sm" variant="outline" onClick={onOrder}>
                   <ShoppingCart size={13} weight="bold" /> Order
                 </Button>
               )}
               {onAddToCatalog && (
-                <Button size="sm" onClick={onAddToCatalog} disabled={added}>
+                <Button size="sm" variant="outline" onClick={onAddToCatalog} disabled={added}>
                   <Plus size={13} weight="bold" /> {added ? "In Products" : "Add to Products"}
                 </Button>
+              )}
+              {onAddToCart && (
+                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                  {[colour, size].filter(Boolean).join(" / ") || "whole style — pick a colour and size"}
+                </span>
               )}
             </div>
           </div>
