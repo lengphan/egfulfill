@@ -620,7 +620,10 @@ export default function OrderDetailPage() {
             <div className="p-5"><SellerDesignFiles orderId={String(id)} items={items} onAttached={reloadDesigns} /></div>
           </SectionCard>
 
-          {timeline.length > 0 && (
+          {/* FACTORY ONLY. A seller's order page shows them what they need to act on; the
+              blow-by-blow of who moved it where is internal, and the chat is where anything
+              they should know gets said. */}
+          {isStaff && timeline.length > 0 && (
             <SectionCard title="Timeline">
               <ol className="space-y-3 p-5">
                 {timeline.map((t, i) => (

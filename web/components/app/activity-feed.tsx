@@ -110,18 +110,25 @@ export function ActivityFeed({
           )
         }
 
+        // WHAT HAPPENED ON TOP, WHO AND WHEN UNDERNEATH. One long grey sentence with the
+        // name first, the verb in the middle and the time at the far right meant the thing
+        // that actually happened was the least visible part of the row.
         return (
           <div key={String(r.id ?? i)} className="flex items-start gap-2.5 px-3 py-2 text-sm">
             <Icon size={15} weight="regular" className="mt-[3px] shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1 leading-snug">
-              <span className="font-medium text-foreground">{who}</span>{" "}
-              <span className="text-muted-foreground">{m.verb}</span>
-              {subj != null && <> {subj}</>}
-              {detail && <span className="font-medium text-foreground"> {detail}</span>}
-              {note && r.note ? <span className="text-muted-foreground"> · {r.note}</span> : null}
+              <div className="truncate">
+                <span className="font-medium text-foreground">{m.label}</span>
+                {subj != null && <span className="text-muted-foreground"> {subj}</span>}
+                {detail && <span className="text-muted-foreground"> · {detail}</span>}
+              </div>
+              <div className="truncate text-2xs text-muted-foreground/80">
+                {who}
+                {note && r.note ? ` · ${r.note}` : ""}
+                {" · "}{when}
+              </div>
             </div>
             {(() => { const amt = moneyOf(r); return amt != null ? <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-2xs font-semibold tabular-nums">{fmtMoney(amt)}</span> : null })()}
-            <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">{when}</span>
           </div>
         )
       })}
