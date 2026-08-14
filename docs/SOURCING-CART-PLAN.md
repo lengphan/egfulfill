@@ -38,14 +38,54 @@ Start currently writes to **saved**; the plan is that it writes to the **cart**.
 
 ---
 
+## Measured reality (2026-08-14, live data)
+
+The blocker fix is **done and deployed**. What it revealed is that the cart is gated on
+catalogue setup, not on code:
+
+```
+unshipped lines           1151
+  resolve to a SKU          54   (53 of those are stocked)
+  resolve to nothing      1097
+
+why they don't resolve:
+  no blank picked at all  1008   ← marketplace orders arrive unset
+  blank name not in the catalogue ~90
+     "Unisex Heavy Cotton™ T-Shirt"  18
+     "Gildan Unisex Cotton Shirt"    17
+     "test product"                  16
+```
+
+`inventory` holds **4 SKUs** against ~1,100 committed units.
+
+**So Start would fill an almost-empty cart today, no matter which quantity model is used.**
+Two things move that number, and neither is this feature:
+
+1. **Blanks get picked** on marketplace lines (1,008 of them) — or resolve automatically,
+   by mapping listing SKUs (`LA6`, `LA3`, `LA10-POCKET`, `LA10-NOPOCKET` — the four biggest
+   by volume) onto catalog products via `variantSkus`. That one mapping covers ~1,000 units.
+2. **Blank names get reconciled** with the catalogue — three names carrying ~50 lines are
+   near-misses for products that exist.
+
+Building phases 1–4 before that lands means shipping a cart with nothing in it.
+
 ## Settled decisions
 
 1. **Group the cart by the supplier we buy FROM** — S&S, Otto, SanMar, a named Alibaba
    seller, Amazon. One group is one checkout, because that is the unit actually paid.
-2. **Quantity = this order's shortfall** (`need − have`), not a top-up to `reorder_at`.
-   The cart maps 1:1 to orders you can see, which is what makes it checkable before
-   spending. Consequence, accepted: no buffer is built, so the same blank is re-bought
-   order after order until someone sets up a top-up job.
+2. **Quantity = this order's shortfall against what is FREE**, not a top-up to `reorder_at`
+   and not measured against `in_stock`:
+
+   ```
+   available = in_stock − claimed by other unshipped orders
+   buy       = need − available
+   ```
+
+   Measuring against `in_stock` under-orders every time, because stock reads high the
+   moment an order is accepted — nothing has been picked off the shelf yet. The cart maps
+   1:1 to orders you can see, which is what makes it checkable before spending.
+   Consequence, accepted: no buffer is built, so the same blank is re-bought order after
+   order until someone sets up a top-up job. **Implemented in `replenish.js` 2026-08-14.**
 3. **Buy = build the order, do not send.** Check the wallet balance server-side, mark the
    lines `ordered`, store the built payload. Do **not** contact the supplier: the
    S&S/Otto/SanMar payloads have never been validated against a live account, and
@@ -90,11 +130,9 @@ reversible cost. Never contacts the supplier while the gates are off.
 
 ## Known conflicts to resolve while building
 
-- **`autoReplenish` is a top-up model and Start is becoming buy-to-order.** Today Start
-  fires `autoReplenish`, which orders `reorder_at − projected` (restore the shelf).
-  Decision 2 says shortfall. Running both means every Start adds two quantities for the
-  same blank. `autoReplenish` must either be retired or moved to a scheduled job that
-  never triggers on Start.
+- ~~`autoReplenish` is a top-up model and Start is becoming buy-to-order.~~ **Resolved
+  2026-08-14** — `autoReplenish` now computes the shortfall directly, so there is one model
+  and nothing to double-count. `reorder_at` is no longer read for the quantity.
 - **`autoReplenish` runs once per LINE.** `startOrder` writes an item status per line, and
   the route calls `autoReplenish` on each. It merges by SKU and dedupes on order id, so it
   is probably safe — **this has not been verified** and should be before more is built on it.
