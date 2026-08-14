@@ -406,6 +406,12 @@ export default function OrderDetailPage() {
                   const artwork = designSrc(design?.data)
                   const qty = Number(it.qty) || 1
                   const unit = Number(it.unit_price) || 0
+                  // THE NUMBER ON THE ROW, and the key everything else uses for this line.
+                  // An order of six lines called dc21/dc22/ab11/ab12 is four near-identical
+                  // strings; the number is what a person can hold in their head while they
+                  // look at a file list, which is why the drop zone's targets carry the same
+                  // one. Position in the order, not an id — ids are for machines.
+                  const lineKey = it.line_id || it.sku || String(i)
                   return (
                     <div key={i} className="flex items-start gap-4 px-5 py-4">
                       {/* The blank with its artwork placed — the seller sees the same
@@ -438,7 +444,12 @@ export default function OrderDetailPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-2xs font-semibold tabular-nums text-primary" title={`Item ${i + 1} on this order`}>
+                                {i + 1}
+                              </span>
+                              <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
+                            </div>
                             {/* Same line as the production queue: what the buyer chose, next
                                 to what we are choosing. */}
                             <OrderedVariant item={it} />
@@ -468,21 +479,23 @@ export default function OrderDetailPage() {
                           <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-2" />
                         )}
 
-                        {it.sku && (
+                        {(it.sku || it.line_id) && (
                           <>
                             <div className="mt-3 flex items-center justify-end gap-2">
-                              {/* Factory attaches its OWN file (an .emb it cut, a print file)
-                                  straight onto THIS line — a silent attach: no board card, no
-                                  design push, it just lands in this line's files below. */}
-                              {isStaff && (
-                                <Button variant="outline" size="sm" onClick={() => setAttachFor((s) => (s === String(it.sku) ? null : String(it.sku)))}>
-                                  <Paperclip size={14} weight="bold" /> {attachFor === String(it.sku) ? "Hide files" : "Attach file"}
-                                </Button>
-                              )}
+                              {/* ONE BUTTON, BOTH SIDES — the factory attaches a file it cut,
+                                  and the SELLER sends their own machine file for THIS line.
+                                  It was staff-only, so a seller with a .dst per item had one
+                                  order-wide drop zone and no way to say which item it was
+                                  for. Silent either way: no board card, no design push, the
+                                  file just lands on this line. */}
+                              <Button variant="outline" size="sm" onClick={() => setAttachFor((s) => (s === lineKey ? null : lineKey))}>
+                                <Paperclip size={14} weight="bold" />
+                                {attachFor === lineKey ? "Hide files" : isStaff ? "Attach file" : "Send a file"}
+                              </Button>
                               {/* Partner chip + the tucked-away send action. Staff only —
                                   it renders nothing when design-status can't be read, which
                                   is what a seller gets. */}
-                              {designStatus && (
+                              {designStatus && it.sku && (
                                 <ItemDesignActions
                                   orderId={id}
                                   sku={String(it.sku)}
@@ -496,9 +509,9 @@ export default function OrderDetailPage() {
                                 />
                               )}
                             </div>
-                            {isStaff && attachFor === String(it.sku) && (
+                            {attachFor === lineKey && (
                               <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
-                                <DesignFilesPanel orderId={String(id)} sku={String(it.sku)} lineId={it.line_id ?? undefined} compact />
+                                <DesignFilesPanel orderId={String(id)} sku={it.sku || undefined} lineId={it.line_id ?? undefined} compact />
                               </div>
                             )}
                           </>

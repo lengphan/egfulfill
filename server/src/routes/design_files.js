@@ -380,15 +380,30 @@ export function designFilesRoutes(app, requireAuth) {
      */
     const uploadedKind = kindOf(b.name, b.mime);
     if (!isStaff(req.user) && b.orderId && (uploadedKind === 'emb' || uploadedKind === 'pes')) {
+      /**
+       * ONE CARD PER LINE — keyed line-first, like everything else that is per line.
+       *
+       * The duplicate check compared `coalesce(sku,'')`, and an imported or marketplace line
+       * has NO sku until a variant is picked. So on an order of six such lines the first
+       * seller file made a card and the other five matched that same empty sku, found a
+       * "duplicate", and silently made none: five stitch files attached to the order with
+       * nobody queued to look at any of them. Now that a seller can send a file per item,
+       * that is the normal case rather than an edge.
+       */
+      const lineId = (b.lineId || b.line_id) ? String(b.lineId || b.line_id) : null;
       const dup = await q(
-        'select 1 from design_cards where order_id=$1 and coalesce(sku,\'\')=coalesce($2,\'\') limit 1',
-        [String(b.orderId), b.sku || null]).then((r) => r.rowCount).catch(() => 1);
+        `select 1 from design_cards
+          where order_id=$1
+            and ( ($3::text is not null and line_id = $3)
+               or ($3::text is null and line_id is null and coalesce(sku,'') = coalesce($2,'')) )
+          limit 1`,
+        [String(b.orderId), b.sku || null, lineId]).then((r) => r.rowCount).catch(() => 1);
       if (!dup) {
         await q(
-          `insert into design_cards (order_id, sku, design_id, title, col, type, payment, pay_status)
-           values ($1,$2,$3,$4,'review',$5,0,'pending')`,
+          `insert into design_cards (order_id, sku, line_id, design_id, title, col, type, payment, pay_status)
+           values ($1,$2,$6,$3,$4,'review',$5,0,'pending')`,
           [String(b.orderId), b.sku || null, b.designId || null,
-           `Seller file · ${b.name || b.designId}`, 'emb']
+           `Seller file · ${b.name || b.designId}`, 'emb', lineId]
         ).catch(() => {});
         notify({
           roles: ['operator', 'warehouse', 'admin'],

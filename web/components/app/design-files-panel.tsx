@@ -440,8 +440,16 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
     </div>
   )
 
-  /** The order's lines as picker options, plus the whole-order default. */
-  const targetLabel = (it: OrderItem, i: number) => (it.name || it.sku || `Item ${i + 1}`) + (Number(it.qty) > 1 ? ` ×${it.qty}` : "")
+  /**
+   * The order's lines as picker options, plus the whole-order default.
+   *
+   * NUMBERED, and numbered the SAME WAY the item rows above are: "dc21" and "dc22" are two
+   * characters apart in a list of six, and a dropdown full of near-identical names is a
+   * thing you have to read twice. The number is the handle — pick 3 here, look for ③ on the
+   * order. Position in the order, which is what the row badge shows.
+   */
+  const targetLabel = (it: OrderItem, i: number) =>
+    `${i + 1} · ${it.name || it.sku || "Item"}` + (Number(it.qty) > 1 ? ` ×${it.qty}` : "")
   const targetOptions = ["All items", ...items.map(targetLabel)]
   const keyAt = (label: string) => {
     const i = targetOptions.indexOf(label) - 1
