@@ -1831,7 +1831,13 @@ export type OrderQuote = {
   /** `supplierCost` is what the BLANK costs us — STAFF ONLY. The server strips it from a
    *  seller's copy of the quote (it names our margin, and across orders our supplier's
    *  price list), so it is absent rather than zero on a seller's request. */
-  lines: { id: string; sku: string; name: string; qty: number; size: string | null; unitCost: number; shipFee: number; supplierCost?: number | null }[]
+  lines: { id: string; sku: string; name: string; qty: number; size: string | null; unitCost: number; shipFee: number
+    /** What unitCost is MADE OF: the blank's price for this size, plus the print method's
+     *  surcharge. A $13.50 product quoting $18.50 on an embroidered line is not two prices
+     *  — it is the blank and the technique, and the row shows both so they can't read as a
+     *  disagreement. */
+    baseCost?: number | null; methodFee?: number
+    supplierCost?: number | null }[]
   unpriced: { sku: string; name: string }[]
   fees: { ship_extra: number }
   subtotal: number

@@ -521,7 +521,23 @@ export default function OrderDetailPage() {
                               <>
                                 <div className="font-medium tabular-nums">{usd(unit * qty)}</div>
                                 <div className="text-xs tabular-nums text-muted-foreground">{qty} × {usd(unit)}</div>
+                                {/* WHERE THE NUMBER COMES FROM. The catalogue says $13.50
+                                    and the order says $18.50, and until this line existed
+                                    those looked like two prices for one product. They are
+                                    the blank and the technique. Shown only when the
+                                    technique actually adds something. */}
+                                {qLine?.baseCost != null && (qLine.methodFee ?? 0) > 0 && (
+                                  <div className="text-2xs tabular-nums text-muted-foreground/80">
+                                    {usd(qLine.baseCost)} blank + {usd(qLine.methodFee ?? 0)} {it.print_type || "print"}
+                                  </div>
+                                )}
                               </>
+                            ) : quote === null ? (
+                              // STILL LOADING. The quote arrives a moment after the rows, and
+                              // asserting "Not priced · pick a blank first" in that gap is a
+                              // confident answer to a question nobody has finished asking —
+                              // it appeared on lines that were correctly priced all along.
+                              <div className="text-muted-foreground">—</div>
                             ) : (
                               <>
                                 <div className="font-medium text-muted-foreground">Not priced</div>

@@ -304,8 +304,14 @@ export async function quoteOrder(orderId) {
     // about the blank and is what any margin figure has to be measured against.
     const srow = matchProduct(idx, it);
     const supplier = srow ? supplierCostOf(srow, it) : null;
+    // What the unit cost is MADE OF. Read from the catalogue even on a frozen line: the
+    // split is a fact about the product and the technique, and showing it is the only way
+    // a $13.50 blank quoting $18.50 stops looking like two different prices.
+    const parts = srow ? costPartsOf(srow, it, fees) : { base: null, method: 0 };
     lines.push({ id: it.id, sku: it.sku, name: it.name, qty, size: it.size, blank: it.blank,
                  unitCost: money(cost), shipFee: money(ship), extraFee: money(extra),
+                 baseCost: parts.base == null ? null : money(parts.base),
+                 methodFee: money(parts.method || 0),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
   const totals = computeTotals(lines, fees);
