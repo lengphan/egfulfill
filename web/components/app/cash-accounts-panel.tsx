@@ -5,7 +5,7 @@ import { Bank, CreditCard, ArrowsClockwise, CircleNotch, Warning } from "@phosph
 import { Card } from "@/components/ui/card"
 import { usePrompt } from "@/components/app/confirm-dialog"
 import {
-  getCashAccounts, saveCashAccount, reconcileCashAccount, recordCashPayment,
+  getCashAccounts, saveCashAccount, reconcileCashAccount, recordCashPayment, backfillPostage,
   type CashAccountsView,
 } from "@/lib/api"
 
@@ -84,6 +84,16 @@ export function CashAccountsPanel() {
     setBusy(a.id)
     try { await saveCashAccount({ id: a.id, name: a.name, kind: a.kind, opening: a.opening, isPostage: true }); load() }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't set the postage card.") }
+    finally { setBusy(null) }
+  }
+
+  const runBackfill = async () => {
+    setBusy("backfill")
+    try {
+      const r = await backfillPostage()
+      setErr(r.attributed ? null : "Nothing left to place — every past label cost already has an account.")
+      load()
+    } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't place past postage.") }
     finally { setBusy(null) }
   }
 
@@ -195,12 +205,22 @@ export function CashAccountsPanel() {
       ))}
 
       {view.unassigned.entries > 0 && (
-        <Card className="gap-0 border-dashed px-3 py-2">
+        <Card className="group/un gap-0 border-dashed px-3 py-2">
           <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Unassigned</div>
           <div className="mt-0.5 flex items-baseline justify-between gap-2">
             <span className="text-base font-bold tabular-nums">{usd(view.unassigned.amount)}</span>
             <span className="text-3xs text-muted-foreground">{view.unassigned.entries} entries</span>
           </div>
+          {/* Postage places itself from the moment a card is marked — but everything bought
+              BEFORE that is still sitting here, and seventy-odd rows through a per-row picker
+              is a chore nobody finishes. Only offered once a postage card exists, because
+              without one there is nowhere to put them. */}
+          {view.accounts.some((a) => a.is_postage) && (
+            <button onClick={runBackfill} disabled={busy === "backfill"}
+              className="eg-tap mt-1 self-start rounded border border-border px-1.5 text-2xs leading-4 hover:bg-accent">
+              {busy === "backfill" ? "…" : "Place past postage"}
+            </button>
+          )}
         </Card>
       )}
       </div>

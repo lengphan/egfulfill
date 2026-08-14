@@ -228,6 +228,35 @@ export function cashAccountRoutes(app, requireAuth, requireAdmin) {
     return { ok: true };
   });
 
+  /**
+   * BACKFILL POSTAGE onto the card that pays for it.
+   *
+   * Label costs place themselves — but only from the moment a card is marked, and there were
+   * 73 of them before that. Attributing seventy-three rows through a per-row picker is a
+   * chore nobody finishes, so this does the pass in one action.
+   *
+   * ONLY ROWS WITH NO ACCOUNT. Anything already attributed — by hand or otherwise — is left
+   * exactly as it is: a bulk action that overwrites someone's deliberate correction is worse
+   * than one that does nothing.
+   *
+   * Reversible like any other attribution: each row can be moved again from its picker.
+   */
+  app.post('/api/cash-accounts/backfill-postage', { preHandler: requireAdmin }, async (req, reply) => {
+    await ensure();
+    const id = await postageAccountId();
+    if (!id) { reply.code(400); return { error: 'No postage card is marked yet — mark one on an account first.' }; }
+    const r = await q(
+      `update wallet_ledger set cash_account = $1
+        where type = 'label-cost' and cash_account is null and coalesce(is_test,false) = false
+        returning id`, [id]);
+    audit(req, 'cash_account.backfill_postage', {
+      entityType: 'cash_account', entityId: id,
+      after: { attributed: r.rowCount },
+      note: `Attributed ${r.rowCount} past label cost${r.rowCount === 1 ? '' : 's'} to ${id}`,
+    });
+    return { ok: true, attributed: r.rowCount, account: id };
+  });
+
   /** Move an existing ledger entry to an account — how Unassigned gets emptied. */
   app.patch('/api/cash-accounts/attribute/:ledgerId', { preHandler: requireAdmin }, async (req, reply) => {
     await ensure();

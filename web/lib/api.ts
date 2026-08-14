@@ -267,6 +267,12 @@ export function reconcileCashAccount(id: string, actual: number) {
 export function recordCashPayment(id: string, p: { amount: number; direction: "in" | "out"; note?: string }) {
   return api<{ ok: boolean }>(`/api/cash-accounts/${encodeURIComponent(id)}/payment`, { method: "POST", body: JSON.stringify(p) })
 }
+/** One pass over every past label cost with no account, onto the marked postage card.
+ *  Only touches unattributed rows, so a hand-made correction is never overwritten. */
+export function backfillPostage() {
+  return api<{ ok: boolean; attributed: number; account: string }>(`/api/cash-accounts/backfill-postage`, { method: "POST" })
+}
+
 /** Move an existing ledger entry onto an account — how Unassigned gets emptied. */
 export function attributeLedgerEntry(ledgerId: string | number, account: string | null) {
   return api<{ ok: boolean }>(`/api/cash-accounts/attribute/${ledgerId}`, { method: "PATCH", body: JSON.stringify({ account }) })
