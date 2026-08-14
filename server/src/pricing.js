@@ -91,6 +91,27 @@ function matchProduct(idx, item) {
   return null;
 }
 
+/**
+ * THE SKU STOCK IS HELD AGAINST, for one order line.
+ *
+ * `order_items.blank` stores the product's NAME — that is what the variant picker writes —
+ * while `inventory` is keyed by SKU. Anything matching one against the other finds nothing:
+ * 144 lines carried a blank and ZERO matched an inventory sku, which is why replenishment
+ * was a silent no-op for every line where somebody had actually chosen a blank.
+ *
+ * matchProduct is the resolution the boards and pricing already use, so this cannot drift
+ * from what the screen shows. Mirrors resolveProduct + stockSkuOf in
+ * web/lib/variant-resolve.ts / web/lib/stock-status.ts — change all three together.
+ *
+ * Returns '' when nothing resolves, which the caller must treat as "unknown blank", never
+ * as "not stocked": they need different fixes and only one of them is about stock.
+ */
+export function resolveStockSku(idx, item) {
+  const row = matchProduct(idx, item);
+  const sku = row ? (row.sku || (row.data && row.data.sku)) : null;
+  return sku ? String(sku).trim() : '';
+}
+
 // Resolve the BLANK NAME a line should carry, from its SKU, when it doesn't already have a
 // blank. Returns the catalog product's name (what the client's resolveProduct/VariantPicker
 // key on), or null if there's nothing to fill or nothing matched. Used so an imported line

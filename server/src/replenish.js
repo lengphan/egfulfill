@@ -14,6 +14,7 @@
 //     Ordering against it would under-order every time. What matters is in_stock
 //     minus everything already promised to unshipped orders.
 import { q } from './db.js';
+import { catalogIndex, resolveStockSku } from './pricing.js';
 
 const AUTO_PO = (supplier) => 'PO-AUTO-' + String(supplier || 'UNASSIGNED').toUpperCase().replace(/[^A-Z0-9]+/g, '-').slice(0, 24);
 
@@ -27,8 +28,15 @@ const METHOD_SUFFIX = /-(EMB|DTG|DTF|APL|LSR|SUB|SCR)$/i;
  *  while the shelf is full. */
 export const stripMethod = (s) => String(s || '').trim().replace(METHOD_SUFFIX, '');
 
-/** The blank a line consumes: the chosen blank, else the line's own sku, method stripped. */
-const blankOf = (r) => stripMethod(r.blank || r.sku).toUpperCase();
+/**
+ * The blank a line consumes, as the SKU inventory is actually keyed by.
+ *
+ * This used to be `stripMethod(r.blank || r.sku)` — the raw blank, which is a product NAME,
+ * matched against `inventory.sku`. 144 lines carried a blank and none of them could ever
+ * match, so every line where somebody had chosen a blank was skipped as "not an inventory
+ * item" and nothing was ever replenished for it.
+ */
+const blankOf = (idx, r) => stripMethod(resolveStockSku(idx, r) || r.blank || r.sku).toUpperCase();
 
 /**
  * Park this order's short blanks in the shared saved-for-later list.
@@ -41,10 +49,19 @@ export async function autoReplenish(orderId) {
   ).catch(() => ({ rows: [] }))).rows;
   if (!lines.length) return null;
 
-  // The distinct blanks this order touches. A line with no blank chosen (unset
-  // marketplace variant) resolves to its listing sku, which won't match inventory —
-  // it falls out below as "unknown" rather than silently ordering nothing.
-  const wanted = [...new Set(lines.map(blankOf).filter(Boolean))];
+  // One catalog read for the whole call — matchProduct walks it per line.
+  const idx = await catalogIndex();
+
+  // HOW MANY OF EACH BLANK THIS ORDER NEEDS. Two lines of the same blank add up: they are
+  // two jobs but one shelf, and ordering for each separately would buy the same shortfall
+  // twice.
+  const need = new Map();
+  for (const r of lines) {
+    const sku = blankOf(idx, r);
+    if (!sku) continue;
+    need.set(sku, (need.get(sku) || 0) + (Number(r.qty) || 1));
+  }
+  const wanted = [...need.keys()];
   if (!wanted.length) return null;
 
   const inv = (await q(
@@ -53,21 +70,31 @@ export async function autoReplenish(orderId) {
   ).catch(() => ({ rows: [] }))).rows;
   const bySku = new Map(inv.map((r) => [r.sku, r]));
 
-  // Committed demand across the whole floor: every unshipped line promised to an
-  // order. This is the "reserved" number the inventory table never maintained.
+  /**
+   * WHAT OTHER UNSHIPPED ORDERS HAVE ALREADY CLAIMED. This is the "reserved" number the
+   * inventory table never maintained.
+   *
+   * Resolved in JS rather than grouped in SQL, because the blank on a line is a product
+   * NAME and only matchProduct knows how to turn one into a sku. The old query grouped on
+   * `coalesce(blank, sku)` directly, so its buckets were a mix of names and skus and none
+   * of the name ones matched inventory.
+   *
+   * THIS ORDER IS EXCLUDED. Its own lines are the demand we are about to satisfy; counting
+   * them as already-promised would subtract this order's need from its own availability and
+   * order roughly twice what is missing.
+   */
   const committed = new Map();
   for (const r of (await q(
-    // Must strip the method suffix on THIS side too — grouping the raw sku would
-    // split "LA6-EMB" and "LA6-DTG" into two buckets, neither matching the blank.
-    `select upper(regexp_replace(coalesce(nullif(i.blank,''), i.sku), '-(EMB|DTG|DTF|APL|LSR|SUB|SCR)$', '', 'i')) as sku,
-            sum(i.qty)::int as qty
-       from order_items i
+    `select i.sku, i.blank, i.qty from order_items i
        join orders o on o.id = i.order_id
-      where upper(regexp_replace(coalesce(nullif(i.blank,''), i.sku), '-(EMB|DTG|DTF|APL|LSR|SUB|SCR)$', '', 'i')) = any($1)
-        and coalesce(i.factory_status,'') <> 'shipped'
+      where coalesce(i.factory_status,'') <> 'shipped'
         and coalesce(o.status,'') not in ('cancelled','canceled','refunded')
-      group by 1`, [wanted]
-  ).catch(() => ({ rows: [] }))).rows) committed.set(r.sku, Number(r.qty) || 0);
+        and i.order_id <> $1`, [orderId]
+  ).catch(() => ({ rows: [] }))).rows) {
+    const sku = blankOf(idx, r);
+    if (!sku || !need.has(sku)) continue;   // only the blanks this order touches
+    committed.set(sku, (committed.get(sku) || 0) + (Number(r.qty) || 1));
+  }
 
   const ordered = [], skipped = [];
   // Group the shortfalls by supplier so each supplier's draft is written once.
@@ -76,18 +103,30 @@ export async function autoReplenish(orderId) {
   for (const sku of wanted) {
     const row = bySku.get(sku);
     if (!row) { skipped.push({ sku, reason: 'not an inventory item' }); continue; }
+    /**
+     * SHORTFALL AGAINST WHAT IS ACTUALLY FREE — not against in_stock, and not a top-up.
+     *
+     * in_stock reads high the moment an order is accepted, because nothing has been picked
+     * off the shelf yet. Ordering against it under-orders every time: the units are there,
+     * they are just already promised to somebody else, and you find that out at the bench.
+     * So availability is stock MINUS everything other unshipped orders have claimed.
+     *
+     * The quantity is what THIS order is missing, deliberately. It buys no buffer — the
+     * same blank gets bought again for the next order — and that is the accepted trade for
+     * a cart that maps 1:1 to orders somebody can look at before spending money.
+     * reorder_at is untouched here; restoring a buffer is a separate, scheduled job if it
+     * is ever wanted.
+     */
     const have = Number(row.in_stock) || 0;
     const promised = committed.get(sku) || 0;
-    const floor = Number(row.reorder_at) || 0;
-    const projected = have - promised;
-    if (projected >= floor) continue;                       // still comfortable
+    const available = Math.max(0, have - promised);
+    const want = need.get(sku) || 0;
+    if (available >= want) continue;                        // makeable from stock on hand
 
-    // Order back up to the reorder point, in whole units. reorder_at is the floor we
-    // never want to cross, so that's what we restore to.
-    const qty = Math.max(1, floor - projected);
+    const qty = want - available;
     const supplier = row.supplier || 'Unassigned';
     if (!bySupplier.has(supplier)) bySupplier.set(supplier, []);
-    bySupplier.get(supplier).push({ sku, qty, have, promised, floor });
+    bySupplier.get(supplier).push({ sku, qty, have, promised, want, available });
   }
   if (!bySupplier.size) return { ordered: [], skipped, po: null };
 
