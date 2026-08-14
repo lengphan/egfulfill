@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack, MagnifyingGlass, Eraser, ArrowCounterClockwise } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack, MagnifyingGlass, Eraser, ArrowCounterClockwise } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } from "@/components/app/design-canvas"
@@ -348,7 +348,7 @@ export function DesignMaker() {
         <aside className="hidden w-60 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-3 lg:flex">
           <div className="space-y-1.5">
             <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Blank</div>
-            <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}><Storefront size={15} weight="bold" /> {mockup ? "Change blank" : "Pick a blank"}</Button>
+            <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}>{mockup ? "Change blank" : "Pick a blank"}</Button>
           </div>
           {/* Print area — the printable rectangle scales against a 12x16 base, matching
               what production actually trims to. */}
@@ -413,7 +413,7 @@ export function DesignMaker() {
                 )}
               </>
             )}
-            <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setLibOpen(true)}><FolderOpen size={15} weight="bold" /> Saved designs</Button>
+            <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setLibOpen(true)}>Saved designs</Button>
           </div>
           <div className="space-y-1.5">
             <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Layers</div>

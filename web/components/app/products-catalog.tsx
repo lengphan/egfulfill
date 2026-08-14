@@ -300,8 +300,6 @@ export function ProductsCatalog() {
             const img = imageOf(p)
             const colors = colorsOf(p)
             const sizes = sizesOf(p)
-            const status = p.status ?? "Active"
-            const pub = publicStateOf(p)
             return (
               <motion.div
                 key={String(p.id ?? p.sku ?? i)}
@@ -366,31 +364,13 @@ export function ProductsCatalog() {
                       </span>
                     </div>
                   )}
-                  {/* ONE PILL. It was two, and on a "Sellers only" product both of them
-                      said "Sellers only" — the status and the public state are the same
-                      sentence whenever the status is the reason the site doesn't show it.
-                      Stacking a label under its own duplicate reads as a rendering fault.
+                  {/* NO PILL OVER THE PHOTO. A label pinned to the corner of every tile put a
+                      coloured chip on the one part of the card that is meant to be the
+                      product — and the grid's whole job is comparing pictures.
 
-                      So the card says the one thing worth knowing: what the status is, or
-                      — for the case the status can't express — that it is Active and still
-                      held back for want of a price. The full reason stays in the title. */}
-                  <div className="absolute left-3 top-3">
-                    <span
-                      title={pub.why ?? undefined}
-                      className={
-                        "inline-flex items-center rounded-full px-2.5 py-1 text-2xs font-medium backdrop-blur " +
-                        (pub.live
-                          ? "bg-emerald-500/15 text-emerald-700"
-                          : status === "Draft"
-                            ? "bg-muted/70 text-muted-foreground"
-                            : "bg-amber-500/15 text-amber-700")
-                      }
-                    >
-                      {/* "No price" only reaches here when the status is Active — any other
-                          status is its own explanation and says itself. */}
-                      {isStaff && !pub.live && pub.label !== status ? pub.label : status}
-                    </span>
-                  </div>
+                      Nothing is lost: the "On the public site" tile above counts what is
+                      live and names how many are held back, the editor states the status
+                      outright, and the card's title still carries the full reason. */}
                 </div>
 
                 {/* body */}

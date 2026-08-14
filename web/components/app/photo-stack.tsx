@@ -54,7 +54,19 @@ export function PhotoStack({
           // sku alone gave duplicate React keys on identical-SKU siblings — which lets
           // React reuse the wrong node when the list reorders.
           key={it.line_id ?? it.sku ?? i}
-          className={"relative " + (i && overlap ? "-ml-2.5" : "")}
+          /**
+           * A LIFT, SO OVERLAPPING PHOTOS READ AS SEPARATE CARDS.
+           *
+           * Stacked with a negative margin and nothing else, three thumbnails of similar
+           * artwork merged into one wide smudge — you could not see where one ended and the
+           * next began, which is the only thing a stack has to communicate.
+           *
+           * A ring rather than a border, because a border would change each tile's box and
+           * shift the overlap; the ring paints outside it. Shadow and ring together give the
+           * edge in both directions — the ring separates a pale photo from a pale neighbour,
+           * the shadow separates a dark one from the page.
+           */
+          className={"relative rounded-md shadow-sm ring-1 ring-black/10 " + (i && overlap ? "-ml-2.5" : "")}
           style={{ zIndex: shown.length - i }}
         >
           <ItemAvatar
@@ -71,7 +83,7 @@ export function PhotoStack({
       ))}
       {extra > 0 && (
         <span
-          className={(overlap ? "-ml-2.5 " : "") + "flex items-center justify-center rounded-md border border-background bg-muted text-xs font-semibold text-muted-foreground"}
+          className={(overlap ? "-ml-2.5 " : "") + "flex items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground shadow-sm ring-1 ring-black/10"}
           style={{ width: size, height: size }}
         >
           +{extra}

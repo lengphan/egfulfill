@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, Package, Tag } from "@phosphor-icons/react"
+import { ArrowLeft, Package } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getCatalogProducts, getDesignFees, type CatalogProduct, type DesignFees } from "@/lib/api"
@@ -289,7 +289,7 @@ export default function ProductDetailPage() {
                 const fee = product.methodPrices?.[t.key.toUpperCase()] ?? product.methodPrices?.[t.label.split(" ")[0]]
                 return (
                   <span key={t.key} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-sm font-medium">
-                    <Tag size={13} weight="bold" className="text-muted-foreground" /> {t.label}
+                    {t.label}
                     {typeof fee === "number" && fee > 0 && <span className="text-xs text-muted-foreground">+{usd(fee)}</span>}
                   </span>
                 )
