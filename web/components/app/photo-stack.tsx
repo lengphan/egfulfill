@@ -27,10 +27,18 @@ export function PhotoStack({
   designs,
   catalog,
   max = 3,
-  // The row's PRIMARY image. It was 32px — smaller than the 44-64px avatars inside an
-  // EXPANDED line, so the summary picture was the least legible one on screen, which is
-  // backwards: the row is what you scan, the expansion is what you already chose to open.
-  size = 48,
+  /**
+   * The row's PRIMARY image, and it should not be the smallest one on screen.
+   *
+   * It was 32px, then 48 — still under the 88px avatar an expanded line shows, so the
+   * picture you SCAN was consistently less legible than the picture you had already chosen
+   * to open. That is backwards, and it is worse in a stack: three overlapping 48px thumbs of
+   * similar artwork are three smudges.
+   *
+   * 72 is close to the per-item avatar without making every row of a 700-row queue that
+   * tall. One number, shared by every board, so they cannot drift apart again.
+   */
+  size = 72,
   readOnly,
   overlap = true,
 }: {

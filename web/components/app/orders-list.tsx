@@ -23,7 +23,7 @@ import { getOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designFor
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
-import { getToken } from "@/lib/auth"
+import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
@@ -79,6 +79,29 @@ function renderCell(id: OrderColId, o: OrderRow, designs?: Record<string, OrderD
 
 export function OrdersList() {
   const router = useRouter()
+  /**
+   * WHO MAY CHANGE WHAT WE MAKE — the same rule the order hub applies, which this board did
+   * not apply at all.
+   *
+   * The picker here was gated purely on factory_status, so ANY signed-in viewer of an
+   * unstarted order got the editable strip: an operator or a warehouse hand opening this
+   * page could change a colourway behind the seller's back. The hub locked that down
+   * (canEditVariants = isAdmin) precisely because the floor executes the spec, it does not
+   * set it.
+   *
+   * The seller keeps it, because this is their own board and their own order — they are the
+   * one whose choice it is. Admin keeps it to correct. Operator and warehouse read it.
+   *
+   * NB the SERVER is looser than this by design: item-setup allows anyone who can see the
+   * order until it is charged. This is a UI policy mirroring the hub, not the security
+   * boundary — and it should not be mistaken for one.
+   */
+  const [role, setRole] = useState("")
+  useEffect(() => {
+    const t = setTimeout(() => setRole(getUser()?.role || ""), 0)
+    return () => clearTimeout(t)
+  }, [])
+  const canEditVariants = role === "seller" || role === "admin"
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [isDemo, setIsDemo] = useState(false)
   const [query, setQuery] = useState("")
@@ -376,7 +399,7 @@ export function OrdersList() {
                                       </div>
                                       {/* The seller's own view of what their buyer picked. */}
                                       <OrderedVariant item={it} />
-                                      {["", "new", "draft"].includes(String(o.factory_status || "")) ? (
+                                      {canEditVariants && ["", "new", "draft"].includes(String(o.factory_status || "")) ? (
                                         <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                                       ) : (
                                         <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-1.5" />
