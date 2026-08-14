@@ -625,6 +625,15 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const e = await Promise.all(Object.entries(out.colorImages).map(async ([k, v]) => [k, await byAddress(v)]));
       out.colorImages = Object.fromEntries(e);
     }
+    // colorGallery holds the SAME kind of value as colorImages — a colourway's extra angles —
+    // so it has to be slimmed by the same rule. Left out, an uploaded back-view stays a raw
+    // data: URL in every list response, which is the megabytes-per-row problem this exists to
+    // stop, just through a newer field.
+    if (out.colorGallery && typeof out.colorGallery === 'object') {
+      const e = await Promise.all(Object.entries(out.colorGallery).map(async ([k, v]) =>
+        [k, Array.isArray(v) ? await Promise.all(v.map(byAddress)) : v]));
+      out.colorGallery = Object.fromEntries(e);
+    }
     return out;
   }
 
@@ -1375,6 +1384,14 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     if (out.colorImages && typeof out.colorImages === 'object') {
       const e = await Promise.all(Object.entries(out.colorImages).map(async ([k, v]) => [k, await back(v)]));
       out.colorImages = Object.fromEntries(e);
+    }
+    // The other half of the same rule — a projection must not become the record here either.
+    // Without this, a colourway's extra angles would be SAVED as /api/catalog/img/<hash>,
+    // which is exactly the fault this function was written to undo for colorImages.
+    if (out.colorGallery && typeof out.colorGallery === 'object') {
+      const e = await Promise.all(Object.entries(out.colorGallery).map(async ([k, v]) =>
+        [k, Array.isArray(v) ? await Promise.all(v.map(back)) : v]));
+      out.colorGallery = Object.fromEntries(e);
     }
     return out;
   }

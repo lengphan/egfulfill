@@ -120,8 +120,23 @@ export function ProductEditorDialog({
    * and thrown away the moment a product was added.
    */
   const [gallery, setGallery] = useState<string[]>([])
-  /** colour → which gallery image represents it. */
+  /** colour → which gallery image REPRESENTS it. One each; this is what `colorImages` saves,
+   *  and what every other surface reads (swatches, row avatars, print mockups). */
   const [colorImgs, setColorImgs] = useState<Record<string, string>>({})
+  /**
+   * image → which colourway it is a photo OF. The other direction, and the one the grid tags
+   * against.
+   *
+   * A colour has one representative photo but SEVERAL pictures — front, back, side, on-model —
+   * and the grid could only express the first. So the back-views sat there asking "— colour —"
+   * for photos whose colour the supplier had already told us, and tagging one would have
+   * REPLACED the colourway's front shot, because colour → image is a single slot.
+   *
+   * Keeping both maps means the tag and the representative are separate decisions: tagging a
+   * back-view says "this is Navy", not "this is now what Navy looks like". Saved as
+   * `colorGallery`; `colorImages` is still exactly `colorImgs`.
+   */
+  const [imgColor, setImgColor] = useState<Record<string, string>>({})
   /** After an auto-match run: how sure each colour's guess was — 'high' (supplier map or the
    *  colour name is in the filename) shows ✓, 'low' (matched by the photo's dominant colour)
    *  shows ? so you know which few to eyeball. Cleared per run. */
@@ -219,14 +234,37 @@ export function ProductEditorDialog({
       setSizes(p ? (p.sizes ?? []) : DEFAULT_SIZES)
       setTiers(tiersToStr(p?.sizePrices))
       setColors(p?.colorImages ? Object.keys(p.colorImages) : p?.mainColor ? [p.mainColor] : [])
-      // Collect every image we know about — hero, gallery, per-colour — de-duped, so
+      // Collect every image we know about — hero, per-colour fronts, the extra angles — so
       // nothing a supplier sent is dropped just because it wasn't the main shot.
+      //
+      // COLOUR FRONTS BEFORE THE LOOSE GALLERY. `images` used to come first, so a back-view
+      // could sit ahead of its own colourway's front and win any "first one wins" rule
+      // downstream. The representative photo of a colour should be the shot of that colour.
       setGallery(Array.from(new Set([
         p?.img, p?.image, p?.hero,
-        ...(p?.images ?? []),
         ...Object.values(p?.colorImages ?? {}),
+        ...Object.values(p?.colorGallery ?? {}).flat(),
+        ...(p?.images ?? []),
       ].filter((x): x is string => !!x))))
       setColorImgs({ ...((p?.colorImages ?? {}) as Record<string, string>) })
+      /**
+       * SEED THE TAGS FROM WHAT THE SUPPLIER ALREADY SAID.
+       *
+       * colorImages gives one url per colour; colorGallery gives the rest of that colour's
+       * angles. Both are ground truth — nobody has to match photographs to names by eye, and
+       * the "— colour —" tiles that prompted this were all in the second group.
+       *
+       * The front is written last so it wins any duplicate: if the same url appears as both a
+       * colour's front and inside another's gallery, the front is the stronger claim.
+       */
+      {
+        const tags: Record<string, string> = {}
+        for (const [c, urls] of Object.entries(p?.colorGallery ?? {})) {
+          for (const u of urls ?? []) if (u) tags[u] = c
+        }
+        for (const [c, u] of Object.entries(p?.colorImages ?? {})) if (u) tags[u] = c
+        setImgColor(tags)
+      }
       setSideMockups({ ...((p?.side_mockups ?? p?.sideMockups ?? {}) as Record<string, string>) })
       setStatus(p?.status ?? "Active")
       setImg(p ? imageOf(p) : "")
@@ -276,7 +314,11 @@ export function ProductEditorDialog({
       const next: Record<string, string> = { ...colorImgs }
       const conf: Record<string, "high" | "low"> = {}
       const used = new Set(Object.values(next).filter(Boolean))
-      const take = (c: string, u: string, k: "high" | "low") => { next[c] = u; used.add(u); conf[c] = k }
+      // TAG AS WELL AS PLACE. A match tells us two things — which photo represents the colour,
+      // and that the photo IS of that colour — and only the first was being recorded, so an
+      // auto-matched tile still showed "— colour —".
+      const tags: Record<string, string> = { ...imgColor }
+      const take = (c: string, u: string, k: "high" | "low") => { next[c] = u; used.add(u); conf[c] = k; tags[u] = c }
 
       // 1) supplier ground-truth map
       const supplierMap = (product?.colorImages ?? {}) as Record<string, string>
@@ -316,6 +358,7 @@ export function ProductEditorDialog({
         }
       }
       setColorImgs(next)
+      setImgColor(tags)
       setMatchConf(conf)
     } finally {
       setMatching(false)
@@ -381,6 +424,24 @@ export function ProductEditorDialog({
     if (!name.trim()) { setErr("Give the product a name."); return }
     const colorImages: Record<string, string> = {}
     for (const c of colors) colorImages[c] = colorImgs[c] || ""
+    /**
+     * EVERY tagged photo of each colourway, in gallery order.
+     *
+     * Built from the image → colour tags rather than kept as its own list, so what saves is
+     * exactly what the grid shows — there is no second place to forget to update. Gallery
+     * order matters because that order is itself a decision here (the tiles are draggable and
+     * the first is the main image).
+     *
+     * Only colours still on the product are written: deleting a colour should not leave its
+     * photos filed under a name nothing references.
+     */
+    const colorGallery: Record<string, string[]> = {}
+    for (const u of gallery) {
+      const c = imgColor[u]
+      if (!c || !colors.includes(c)) continue
+      if (!colorGallery[c]) colorGallery[c] = []
+      colorGallery[c].push(u)
+    }
     // Product-level cost/base/shipping default = the first size's tier (or the loaded value).
     const firstTierNum = (k: keyof Tier, stateVal: string): number | undefined => {
       const tv = (sizes.length ? tiers[sizes[0]]?.[k] : "")?.trim()
@@ -415,6 +476,9 @@ export function ProductEditorDialog({
       description: desc.trim() || undefined,
       sizes,
       colorImages,
+      // Undefined rather than {} when nothing is tagged, so a product that never had this
+      // doesn't gain an empty object on every save.
+      colorGallery: Object.keys(colorGallery).length ? colorGallery : undefined,
       mainColor: colors[0] || product?.mainColor,
       // Everything we hold, hero first — the gallery is the record, `img` is which one
       // represents the product in the catalog.
@@ -781,7 +845,12 @@ export function ProductEditorDialog({
 
             <div className="flex flex-wrap gap-2.5">
               {gallery.map((u, i) => {
-                const assigned = colors.find((c) => colorImgs[c] === u)
+                // The tag on THIS photo. Read from image → colour, so several photos can carry
+                // the same colourway; the old lookup asked "which colour has this as its
+                // representative", which by definition could only ever answer for one.
+                const assigned = imgColor[u] || undefined
+                // Is it the colour's representative — the one that becomes colorImages[c]?
+                const isRep = !!assigned && colorImgs[assigned] === u
                 return (
                 <div
                   key={u}
@@ -819,11 +888,33 @@ export function ProductEditorDialog({
                         value={assigned ?? ""}
                         onChange={(e) => {
                           const c = e.target.value
-                          setColorImgs((m) => { const n = { ...m }; for (const k of Object.keys(n)) if (n[k] === u) delete n[k]; if (c) n[c] = u; return n })
+                          /**
+                           * TAGGING IS NOT PROMOTING.
+                           *
+                           * This used to move the colour's representative photo on every
+                           * change — `delete` whatever held u, then `n[c] = u` — so tagging a
+                           * back-view as Navy replaced Navy's front shot with the back of the
+                           * cap, on the field the swatches and the print mockup read.
+                           *
+                           * The tag is its own map now. The representative only changes when
+                           * the colour has NONE, which is the case where filling it in is
+                           * plainly right and nothing is displaced.
+                           */
+                          setImgColor((m) => { const n = { ...m }; if (c) n[u] = c; else delete n[u]; return n })
+                          if (c) setColorImgs((m) => (m[c] ? m : { ...m, [c]: u }))
                           if (assigned) setMatchConf((m) => { const n = { ...m }; delete n[assigned]; return n })
                           if (c) setMatchConf((m) => { const n = { ...m }; delete n[c]; return n })
                         }}
-                        className={"eg-select absolute inset-x-1 bottom-1 h-6 w-[calc(100%-0.5rem)] rounded-md border px-1 text-2xs font-medium backdrop-blur transition-colors " + (assigned ? "border-primary/40 bg-primary/90 text-primary-foreground" : "border-border bg-card/90 text-muted-foreground")}
+                        // THREE STATES, because there are now three. Solid = this is the
+                        // colour's photo (what colorImages saves and every other screen
+                        // shows). Tinted = also this colour, an extra angle. Plain = untagged.
+                        // Without the middle one, ten photos of Navy all looked like ten
+                        // competing answers to "which one is Navy".
+                        className={"eg-select absolute inset-x-1 bottom-1 h-6 w-[calc(100%-0.5rem)] rounded-md border px-1 text-2xs font-medium backdrop-blur transition-colors "
+                          + (isRep ? "border-primary/40 bg-primary/90 text-primary-foreground"
+                            : assigned ? "border-primary/30 bg-primary/20 text-primary"
+                              : "border-border bg-card/90 text-muted-foreground")}
+                        title={isRep ? `${assigned} — this colour's photo` : assigned ? `${assigned} — extra angle` : "Tag this photo's colour"}
                         aria-label="Tag this photo's colour"
                       >
                         <option value="">— colour —</option>
@@ -838,8 +929,9 @@ export function ProductEditorDialog({
                       setGallery((g) => g.filter((x) => x !== u))
                       if (img === u) setImg("")
                       // Drop any colour or side pointing at it, or they'd reference a
-                      // picture that no longer exists.
+                      // picture that no longer exists — including its own colour tag.
                       setColorImgs((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
+                      setImgColor((m) => { const n = { ...m }; delete n[u]; return n })
                       setSideMockups((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
                     }}
                     className="absolute -right-1.5 -top-1.5 z-10 hidden size-6 place-items-center rounded-full bg-foreground/75 text-background group-hover:grid"
