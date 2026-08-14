@@ -836,6 +836,19 @@ export type CatalogProduct = {
    * untouched. This is the extra angles, keyed by the same colour names.
    */
   colorGallery?: Record<string, string[]>
+  /**
+   * HOW THE MAIN PHOTO IS FRAMED ON A CARD — zoom percent and the vertical point to hold.
+   *
+   * Supplier photography has whitespace baked into the file: a cap sits small in the middle
+   * of its own frame, so object-cover crops to a square and still shows a small cap. There is
+   * nothing to fix in the layout — the padding is IN the image — so the only cure is to
+   * scale it up and choose which part stays centred.
+   *
+   * Stored per product because it is a property of that photo, not a global taste. Absent
+   * means 100% / centre, which is exactly the old behaviour, so nothing already saved moves.
+   */
+  imgZoom?: number
+  imgFocusY?: number
   // The uploaded blank mockup graphic (the 2D garment image), + per-side variants
   // ({front, back, left, right, ...}) for placing artwork on more than one face.
   mockup?: string

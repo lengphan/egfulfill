@@ -141,6 +141,9 @@ export function ProductEditorDialog({
    * `colorGallery`; `colorImages` is still exactly `colorImgs`.
    */
   const [imgColor, setImgColor] = useState<Record<string, string>>({})
+  /** How the main photo is framed on a card. 100/50 = untouched, the old behaviour. */
+  const [imgZoom, setImgZoom] = useState(100)
+  const [imgFocusY, setImgFocusY] = useState(50)
   /** After an auto-match run: how sure each colour's guess was — 'high' (supplier map or the
    *  colour name is in the filename) shows ✓, 'low' (matched by the photo's dominant colour)
    *  shows ? so you know which few to eyeball. Cleared per run. */
@@ -251,6 +254,8 @@ export function ProductEditorDialog({
         ...(p?.images ?? []),
       ].filter((x): x is string => !!x))))
       setColorImgs({ ...((p?.colorImages ?? {}) as Record<string, string>) })
+      setImgZoom(Number(p?.imgZoom) > 0 ? Number(p!.imgZoom) : 100)
+      setImgFocusY(Number.isFinite(Number(p?.imgFocusY)) ? Number(p!.imgFocusY) : 50)
       /**
        * SEED THE TAGS FROM WHAT THE SUPPLIER ALREADY SAID.
        *
@@ -483,6 +488,10 @@ export function ProductEditorDialog({
       // Undefined rather than {} when nothing is tagged, so a product that never had this
       // doesn't gain an empty object on every save.
       colorGallery: Object.keys(colorGallery).length ? colorGallery : undefined,
+      // Only stored when it differs from the default, so an untouched product does not gain
+      // two fields on every save.
+      imgZoom: imgZoom !== 100 ? imgZoom : undefined,
+      imgFocusY: imgFocusY !== 50 ? imgFocusY : undefined,
       mainColor: colors[0] || product?.mainColor,
       // Everything we hold, hero first — the gallery is the record, `img` is which one
       // represents the product in the catalog.
@@ -520,13 +529,26 @@ export function ProductEditorDialog({
                 Nothing about the mockup's BEHAVIOUR changes: `img` is still the value the
                 Design Maker treats as the blank and the item rows hydrate from. This is
                 purely where it's uploaded and how it's shown. */}
+            <div className="shrink-0 space-y-1.5">
             <div
-              className="relative flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40"
+              className="relative flex size-28 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40"
               title={img ? "The main image, chosen in Images below" : "No image yet — add one in Images below"}
             >
               {img ? (
+                /**
+                 * FRAMED THE WAY THE CARD WILL FRAME IT.
+                 *
+                 * object-contain here and object-cover on the card meant this preview could
+                 * never show the problem it exists to solve. Same fit, same zoom, same focal
+                 * point — so what you set is what the grid shows.
+                 */
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={img} alt="" className="size-full object-contain" />
+                <img
+                  src={img}
+                  alt=""
+                  className="size-full object-cover"
+                  style={{ transform: `scale(${(imgZoom || 100) / 100})`, objectPosition: `center ${imgFocusY ?? 50}%` }}
+                />
               ) : typeMockup ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -538,6 +560,48 @@ export function ProductEditorDialog({
                   <ImageIcon size={22} weight="duotone" /><span className="text-xs">Main image</span>
                 </div>
               )}
+            </div>
+            {/**
+              * ZOOM AND VERTICAL POSITION — the two things that fix a small product in a big
+              * white photo, and the only two.
+              *
+              * The whitespace is IN the supplier's file, so no amount of layout work moves it;
+              * the card can only scale the picture up and choose which band of it to keep.
+              * Horizontal is deliberately absent: studio shots are centred left-to-right, and
+              * a control nobody needs is a control somebody will nudge by accident.
+              *
+              * Only when there is an image, and Reset only once it has been changed — so the
+              * common case is two sliders and nothing else.
+              */}
+            {img && (
+              <div className="space-y-1">
+                <label className="flex items-center gap-1.5">
+                  <span className="w-8 shrink-0 text-3xs uppercase tracking-wider text-muted-foreground">Zoom</span>
+                  <input
+                    type="range" min={100} max={300} step={5} value={imgZoom || 100}
+                    onChange={(e) => setImgZoom(Number(e.target.value))}
+                    className="h-1 flex-1 accent-primary" aria-label="Main image zoom"
+                  />
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <span className="w-8 shrink-0 text-3xs uppercase tracking-wider text-muted-foreground">Up/dn</span>
+                  <input
+                    type="range" min={0} max={100} step={1} value={imgFocusY ?? 50}
+                    onChange={(e) => setImgFocusY(Number(e.target.value))}
+                    className="h-1 flex-1 accent-primary" aria-label="Main image vertical position"
+                  />
+                </label>
+                {((imgZoom || 100) !== 100 || (imgFocusY ?? 50) !== 50) && (
+                  <button
+                    type="button"
+                    onClick={() => { setImgZoom(100); setImgFocusY(50) }}
+                    className="w-full text-3xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                  >
+                    Reset framing
+                  </button>
+                )}
+              </div>
+            )}
             </div>
             <div className="flex-1 space-y-2">
               <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>

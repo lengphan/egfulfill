@@ -340,13 +340,31 @@ export function ProductsCatalog() {
                     )}
                   </div>
                   {img ? (
-                    <Image
-                      src={img}
-                      alt={p.name ?? "Product"}
-                      fill
-                      unoptimized
-                      className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                    />
+                    /**
+                     * THE FRAMING SET IN THE EDITOR.
+                     *
+                     * Supplier photos carry their own whitespace, so a cap ends up small in
+                     * the middle of a square that is already cropped as far as object-cover
+                     * can crop it. Zoom lives on a WRAPPER rather than on the image, so it
+                     * composes with the hover scale instead of overwriting it — an inline
+                     * transform on the <Image> would win against the group-hover class and
+                     * kill the lift on every product somebody had framed.
+                     *
+                     * Absent values are 100 / 50, which is exactly the previous behaviour.
+                     */
+                    <div
+                      className="absolute inset-0"
+                      style={{ transform: `scale(${(Number(p.imgZoom) || 100) / 100})` }}
+                    >
+                      <Image
+                        src={img}
+                        alt={p.name ?? "Product"}
+                        fill
+                        unoptimized
+                        className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                        style={{ objectPosition: `center ${Number.isFinite(Number(p.imgFocusY)) ? Number(p.imgFocusY) : 50}%` }}
+                      />
+                    </div>
                   ) : (
                     <div className={"flex size-full items-center justify-center " + PLACEHOLDER}>
                       <span className="font-title text-4xl font-semibold">
