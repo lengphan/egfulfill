@@ -354,40 +354,30 @@ export function ProductsCatalog() {
                       </span>
                     </div>
                   )}
-                  {/* Two facts, stacked, because they are genuinely two: `status` is whether we
-                      still sell it, `pub` is whether the marketing site shows it. Reading the
-                      green "Active" badge as "it is on our site" is the misreading this whole
-                      screen kept producing. Staff only — a seller does not control publishing. */}
-                  <div className="absolute left-3 top-3 flex flex-col items-start gap-1">
+                  {/* ONE PILL. It was two, and on a "Sellers only" product both of them
+                      said "Sellers only" — the status and the public state are the same
+                      sentence whenever the status is the reason the site doesn't show it.
+                      Stacking a label under its own duplicate reads as a rendering fault.
+
+                      So the card says the one thing worth knowing: what the status is, or
+                      — for the case the status can't express — that it is Active and still
+                      held back for want of a price. The full reason stays in the title. */}
+                  <div className="absolute left-3 top-3">
                     <span
+                      title={pub.why ?? undefined}
                       className={
                         "inline-flex items-center rounded-full px-2.5 py-1 text-2xs font-medium backdrop-blur " +
-                        (status === "Active"
+                        (pub.live
                           ? "bg-emerald-500/15 text-emerald-700"
                           : status === "Draft"
                             ? "bg-muted/70 text-muted-foreground"
                             : "bg-amber-500/15 text-amber-700")
                       }
                     >
-                      {status}
+                      {/* "No price" only reaches here when the status is Active — any other
+                          status is its own explanation and says itself. */}
+                      {isStaff && !pub.live && pub.label !== status ? pub.label : status}
                     </span>
-                    {/* ONLY WHEN IT IS NOT WHAT THE STATUS ABOVE ALREADY SAYS.
-                        "Active" and "On the site" under it are the same sentence twice, and
-                        a pill that is present on every healthy card teaches the eye to skip
-                        the place where the exceptions appear. The cases worth a second pill
-                        are the ones where Active does NOT mean public — no price, sellers
-                        only, staff only — so those keep it and the agreeing case drops. */}
-                    {isStaff && !pub.live && (
-                      <span
-                        title={pub.why ?? undefined}
-                        className={
-                          "inline-flex items-center rounded-full px-2.5 py-1 text-2xs font-medium backdrop-blur " +
-                          (pub.why ? "bg-amber-500/20 text-amber-800" : "bg-background/70 text-muted-foreground")
-                        }
-                      >
-                        {pub.label}
-                      </span>
-                    )}
                   </div>
                 </div>
 
