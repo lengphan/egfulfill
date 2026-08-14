@@ -414,7 +414,7 @@ export function ShipmentDetailDialog({
 
           <div>
             <Row label="Carrier says">
-              {s.delivery ? (DELIVERY_WORD[s.delivery] ?? s.delivery) : <span className="text-muted-foreground">Not checked yet</span>}
+              {s.delivery ? (DELIVERY_WORD[s.delivery] ?? s.delivery) : <span className="text-muted-foreground">Not asked yet</span>}
             </Row>
             {s.deliveryDetail && <Row label="Detail">{s.deliveryDetail}</Row>}
             <Row label="Last checked">{when(s.deliveryCheckedAt) ?? <span className="text-muted-foreground">never</span>}</Row>
@@ -495,35 +495,27 @@ export function ShipmentDetailDialog({
             above the buttons rather than in a second dialog: what it is asking about is the
             tracking number in the column above, and a stacked modal would cover it. */}
         {confirmDetach && (
-            <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 dark:border-amber-500/30 dark:bg-amber-500/10">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-                <Warning size={16} weight="fill" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">Take this tracking off the order?</p>
-                <p className="mt-0.5 font-mono text-2xs text-muted-foreground">{s.tracking}</p>
-                <ul className="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground">
-                  <li>The order goes back to unlabelled, so a correct label can be bought.</li>
-                  <li>The postage stays bought and stays charged — <strong className="font-medium text-foreground">this is not a refund</strong>.</li>
-                  <li>The parcel keeps moving. If the buyer already has this number, it still works for them.</li>
-                  <li>You can put it back from this window afterwards.</li>
-                </ul>
-                {/* The two things the presser may have actually wanted, named rather than
-                    left to be discovered — "wrong order" is three different problems. */}
-                <p className="mt-2 border-t border-amber-200/70 pt-2 text-xs leading-relaxed text-muted-foreground dark:border-amber-500/20">
-                  If the <em>label</em> is wrong rather than the order, <span className="font-medium text-foreground">Refund postage</span> is
-                  the one that gets the money back. To find the order this parcel really belongs to, unlink it here
-                  first — its matching orders are then offered.
-                </p>
-                <div className="mt-3 flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => void detach()} disabled={detaching} className="bg-card">
-                    {detaching ? <CircleNotch size={13} className="animate-spin" /> : <LinkBreak size={13} weight="bold" />}
-                    Yes, unlink it
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmDetach(false)} disabled={detaching}>
-                    Keep it
-                  </Button>
-                </div>
+            // ONE LINE. A four-bullet brief with a paragraph under it was a page to read
+            // before a click that is now reversible anyway — and the length itself said
+            // "this is dangerous", which is exactly the wrong signal for the safe half of
+            // the pair. What survives is the only fact that can still surprise someone:
+            // money does not come back. The rest is on screen either side of it.
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 dark:border-amber-500/30 dark:bg-amber-500/10">
+              <Warning size={16} weight="fill" className="shrink-0 text-amber-700 dark:text-amber-300" />
+              <p className="min-w-0 flex-1 text-sm">
+                Take this tracking off the order?{" "}
+                <span className="text-muted-foreground">
+                  The postage stays bought — <strong className="font-medium text-foreground">not a refund</strong> — and you can put it back.
+                </span>
+              </p>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="outline" onClick={() => void detach()} disabled={detaching} className="bg-card">
+                  {detaching ? <CircleNotch size={13} className="animate-spin" /> : <LinkBreak size={13} weight="bold" />}
+                  Yes, unlink it
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmDetach(false)} disabled={detaching}>
+                  Keep it
+                </Button>
               </div>
             </div>
           )}

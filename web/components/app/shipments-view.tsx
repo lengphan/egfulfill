@@ -63,7 +63,7 @@ const when = (s: string | null) =>
  *
  * Not one pill per DELIVERY key: "Returning" and "Failed" are the same job (a parcel that
  * needs a human) and splitting them makes you check two pills to ask one question. And
- * "Not checked" is a pill in its own right because a null delivery is NOT a state the
+ * "Not asked yet" is a pill in its own right because a null delivery is NOT a state the
  * carrier reported — it's us never having asked, which is the difference between a quiet
  * parcel and an unmonitored one.
  *
@@ -77,7 +77,7 @@ const FILTERS: { key: string; label: string; match: (s: ShipmentRow) => boolean 
   { key: "awaiting_pickup", label: "Not collected", match: (s) => s.delivery === "awaiting_pickup" },
   { key: "delivered", label: "Delivered", match: (s) => s.delivery === "delivered" },
   { key: "problem", label: "Needs a look", match: (s) => s.delivery === "returned" || s.delivery === "failed" },
-  { key: "unchecked", label: "Not checked", match: (s) => !s.delivery },
+  { key: "unchecked", label: "Not asked yet", match: (s) => !s.delivery },
   { key: "refunded", label: "Refunded", match: (s) => (s.refunded ?? 0) > 0 },
   { key: "test", label: "Test", match: (s) => s.test },
 ]
@@ -476,9 +476,13 @@ export function ShipmentsView() {
                       ) : d ? (
                         <Badge variant="secondary" className={d.cls}>{d.label}</Badge>
                       ) : (
-                        // Never blank. "Not checked" and "checked, nothing yet" are
-                        // different facts and the difference decides whether to chase.
-                        <span className="text-xs text-muted-foreground">Not checked</span>
+                        // Never blank, and it names WHO hasn't acted. "Not checked" was read
+                        // as a claim about the parcel — something wrong with it — when it is
+                        // a fact about US: nobody has asked the carrier yet. The carrier is
+                        // polled in the background, twelve rows a page load, so this clears
+                        // itself. "Not asked yet" and "asked, nothing yet" are different
+                        // facts, and the difference decides whether to chase.
+                        <span className="text-xs text-muted-foreground">Not asked yet</span>
                       )}
                       {s.deliveryCheckedAt && (s.refunded ?? 0) === 0 && (
                         <div className="mt-1 text-2xs text-muted-foreground">checked {when(s.deliveryCheckedAt)}</div>
