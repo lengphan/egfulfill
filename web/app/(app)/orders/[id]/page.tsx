@@ -933,9 +933,11 @@ export default function OrderDetailPage() {
           item={customize}
           initialDesign={designSrc(designForLine(designs, customize)?.data)}
           initialPos={designForLine(designs, customize)?.pos}
-          // A submitted order's files are settled for the seller — the buttons stay visible
-          // and disabled, and the chat is the way to ask.
-          filesLocked={!preSubmit && !isStaff}
+          // OPPOSITE SIDES OF THE SAME MOMENT. Before submit the order is the seller's
+          // draft and the factory has no business swapping their file; after it, the job is
+          // ours and the seller asks in chat instead. Whoever is locked sees the buttons
+          // disabled with the reason, not a "forbidden" after the click.
+          filesLocked={isStaff ? preSubmit : !preSubmit}
           siblings={items.filter((it) => (it.line_id ?? it.sku) !== (customize.line_id ?? customize.sku))}
           designs={designs}
           onSaved={reloadDesigns}

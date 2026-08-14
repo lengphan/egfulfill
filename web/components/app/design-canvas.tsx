@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
-import { getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -767,6 +767,11 @@ export function DesignCanvasDialog({
   // The stitch preview of this line's machine file, and whether the stage is showing it.
   // Fetched once, on the first switch — a render costs a Wilcom call, and the server keeps
   // the result against the file's hash, so switching back and forth is free after that.
+  // Which side of submit the lock is on — the two are opposite and the tooltip must say
+  // which one applies to the person reading it.
+  const lockedWhy = getUser()?.role === "seller"
+    ? "The order is submitted — ask the factory in chat to change this file"
+    : "Not submitted yet — this is still the seller's draft"
   const [stitchPng, setStitchPng] = useState<string | null>(null)
   const [stitchState, setStitchState] = useState<"idle" | "loading" | "none">("idle")
   const [showStitch, setShowStitch] = useState(false)
@@ -1025,27 +1030,17 @@ export function DesignCanvasDialog({
     if (!ok) return
     setFileBusy(true); setDlErr(null)
     try {
-      const r = await downloadDesignFile(latestMachine.designId)
-      const data = r.data
-      // BYTES OR NOTHING. This used to fall back to `r.url` when the download route handed
-      // back a storage link instead of the file — and re-uploading a link re-files the
-      // LINK: the server base64-decodes it into a few dozen bytes of noise and writes that
-      // over the object. One click, and the machine file for every item on the order is
-      // gone. Refusing is the only safe answer; the route now returns the real bytes, so
-      // this is the belt to that braces.
-      if (!data || !data.startsWith("data:")) throw new Error("Couldn't read the file back to re-file it.")
-      const up = await uploadDesignFile({
-        designId: latestMachine.designId, orderId,
-        // null, not undefined — the whole point is to CLEAR the line and go order-wide.
-        lineId: null, name: latestMachine.name, data,
-      })
+      // Metadata, not bytes: the file already lives on the order, so widening it is one
+      // column. Round-tripping it through download+upload cost a seller their own click —
+      // they cannot download an .emb — and moved the whole file to change a scope.
+      const up = await scopeDesignFile(latestMachine.designId, null)
       if (up?.error) throw new Error(up.error)
       setAttached(`${latestMachine.name} now applies to every item on this order.`)
       onSaved?.()
     } catch (e) {
       setDlErr(e instanceof Error ? e.message : "Couldn't apply that file to all items.")
     } finally { setFileBusy(false) }
-  }, [latestMachine, orderId, confirm, onSaved])
+  }, [latestMachine, confirm, onSaved])
 
   const applyToAll = useCallback(async () => {
     const others = siblings ?? []
@@ -1575,7 +1570,7 @@ export function DesignCanvasDialog({
                 <Button
                   variant="outline" size="sm"
                   disabled={filesLocked}
-                  title={filesLocked ? "The order is submitted — ask the factory in chat to change this file" : undefined}
+                  title={filesLocked ? lockedWhy : undefined}
                   onClick={() => machineRef.current?.click()}
                 >
                   {hasMachineFile ? "Replace file" : "Attach file"}
@@ -1632,7 +1627,7 @@ export function DesignCanvasDialog({
                     variant="outline"
                     size="sm"
                     disabled={fileBusy || filesLocked}
-                    title={filesLocked ? "The order is submitted — ask the factory in chat to remove this file" : undefined}
+                    title={filesLocked ? lockedWhy : undefined}
                     className="text-muted-foreground hover:text-destructive"
                     onClick={async () => {
                       const ok = await confirm({

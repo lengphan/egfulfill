@@ -1299,6 +1299,13 @@ export function downloadDesignFile(designId: string) {
 }
 /** Remove a file from an order (staff only). The Design readiness tag reverts once it's
  *  gone; the server records it in the order's tag history and broadcasts a refresh. */
+/** Widen a file to the whole order (lineId null) or pin it back to one line. Metadata only
+ *  — no bytes move, so it works for a seller, who cannot download their own machine file. */
+export function scopeDesignFile(designId: string, lineId: string | null) {
+  return api<{ ok?: boolean; lineId?: string | null; error?: string }>(
+    `/api/design_files/${encodeURIComponent(designId)}/scope`,
+    { method: "POST", body: JSON.stringify({ lineId }) })
+}
 export function deleteDesignFile(designId: string) {
   return api<{ ok?: boolean; error?: string }>(`/api/design_files/${encodeURIComponent(designId)}`, { method: "DELETE" })
 }

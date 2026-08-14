@@ -578,6 +578,34 @@ export function designFilesRoutes(app, requireAuth) {
     return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, lineId: x.line_id, name: x.file_name, mime: x.mime, kind: x.kind, source: x.source || "factory", price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user) }));
   });
 
+  /**
+   * RE-SCOPE A FILE — this line only, or the whole order. Metadata, no bytes.
+   *
+   * "Apply file to all items" used to download the file and re-upload it with line_id
+   * null. A seller cannot download their own .emb (the download route serves them 'pes'
+   * only), so their click died on `forbidden` before it started — and even for staff it
+   * moved megabytes through the browser to change one column.
+   */
+  app.post('/api/design_files/:designId/scope', { preHandler: requireAuth }, async (req, reply) => {
+    const id = String(req.params.designId);
+    const row = (await q('select design_id, order_id, seller_id, sku from design_file_data where design_id=$1', [id])).rows[0];
+    if (!row) { reply.code(404); return { error: 'not found' }; }
+    if (!isStaff(req.user)) {
+      const eff = await effectiveSeller(req.user);
+      if (row.seller_id && String(row.seller_id) !== String(eff)) { reply.code(403); return { error: 'forbidden' }; }
+    }
+    const b = req.body || {};
+    // null / '' = the whole order. A real line id scopes it back to one line.
+    const lineId = b.lineId ? String(b.lineId) : null;
+    await q('update design_file_data set line_id=$2, updated_at=now() where design_id=$1', [id, lineId]);
+    audit(req, 'design_file.scoped', {
+      entityType: 'order', entityId: String(row.order_id || ''),
+      after: { design_id: id, line_id: lineId, sku: row.sku || null },
+    });
+    egBroadcast({ type: 'design-file', orderId: row.order_id || null });
+    return { ok: true, lineId };
+  });
+
   // Download a machine file. Staff any; a seller only their own AND only once paid.
   app.get('/api/design_files/:designId', { preHandler: requireAuth }, async (req, reply) => {
     const r = await q('select design_id, order_id, sku, seller_id, file_name, mime, data, url, storage_key, price, kind from design_file_data where design_id=$1', [String(req.params.designId)]);
