@@ -1604,7 +1604,10 @@ export function OrdersHub() {
                 // Its Columns button moved up to the toolbar beside Filters: sitting here it
                 // was rendered in the header's own type, on the same line as ORDER and AGE,
                 // and read as a column named "Columns".
-                <span key={id} />
+                // Sticky like the cells below it — the header scrolls in the same container,
+                // so without this a column title would slide underneath the pinned actions.
+                // relative, for the tint overlay that matches the strip's own background.
+                <span key={id} className="relative sticky right-0 z-10 -mr-5 bg-card pr-5 before:absolute before:inset-0 before:bg-muted/30" />
               ) : (
                 // A header now does two jobs: DRAG reorders the column, CLICK sorts by it.
                 // They coexist because a drag never ends in a click. `ready` (the List
@@ -2005,7 +2008,22 @@ export function OrdersHub() {
                       const primary: "start" | null = canStart ? "start" : null
                       const busyO = busy?.startsWith(o.id)
                       return (
-                        <div className="flex items-center justify-end gap-2 sm:shrink-0">
+                        /**
+                          * PINNED TO THE RIGHT EDGE, so the row's action is reachable at any
+                          * width.
+                          *
+                          * The row has a hard minimum of ~1196px (gridMinPx), so on anything
+                          * narrower the board scrolls sideways — and this column is LAST, so
+                          * the one control you came for was the one thing off screen. You
+                          * scrolled right to press Start, then left to read who it was for.
+                          *
+                          * bg-inherit, not a fixed colour: the row paints hover and selected
+                          * states, and a hardcoded background would leave a pale rectangle
+                          * sitting over them. -mr-5/pr-5 lets it cover the row's own right
+                          * gutter rather than stopping short of it and letting content show
+                          * through the gap.
+                          */
+                        <div className="sticky right-0 z-10 -mr-5 flex items-center justify-end gap-2 bg-inherit pl-3 pr-5 sm:shrink-0">
                           {/* Buttons hug the RIGHT edge (justify-end), aligned with the
                               header's Columns control above — the action column is fixed, so
                               left-aligning left an awkward gap before the row padding.
