@@ -43,12 +43,20 @@ export function OrderedVariant({ item, className = "", after }: { item: OrderIte
   if (!ordered && !sku) return null
 
   /**
-   * ONE WRAPPING LINE, not three stacked ones.
+   * TWO ROWS: what they ordered, then how we refer to it.
    *
-   * These are three short values whose LABELS are longer than their data, and as full-width
-   * rows they cost ~34px of height on every line of every expanded order — which in turn was
-   * what forced the thumbnail up to 136px to avoid a half-empty left column. Inline, they
-   * read as one sentence about the line and wrap only when the width genuinely runs out.
+   * This was ONE wrapping line — Ordered · Listing SKU · Qty — on the reasoning that three
+   * short values whose labels outrun their data read better as a sentence than as a stack.
+   * That reasoning holds only while the values are short, and `ordered` is not one of them:
+   * a personalised listing puts a paragraph in it ("Apron w/ Name, Ink, 1. Caitlin, Sarah,
+   * Kailey, Valerie, Kristie, Ashley, Amber, Erica, Jess 2. cream 3. #7"). It wrapped, and
+   * the separator dots landed at the START of the following lines, so the SKU and the count
+   * — the two things you scan for — were wherever the buyer's text happened to stop.
+   *
+   * So the buyer's words get their own row and are allowed to be as long as they are, and
+   * the identifiers sit on a fixed second row where the eye can find them without reading
+   * the first. Still two rows, not four: the sku and the count are short and belong
+   * together, which was the original insight and is kept.
    *
    * The labels STAY. "Listing SKU" is not the blank sku we buy against (CLAUDE.md §5), and a
    * bare mono string next to a size and a count is exactly the ambiguity that distinction
@@ -59,7 +67,6 @@ export function OrderedVariant({ item, className = "", after }: { item: OrderIte
    * times.
    */
   const parts: React.ReactNode[] = []
-  if (ordered) parts.push(<span key="o"><span className="font-medium text-foreground/70">Ordered:</span> {ordered}</span>)
   if (sku) parts.push(<span key="s"><span className="font-medium text-foreground/70">Listing SKU:</span> <span className="font-mono">{sku}</span></span>)
   // ALWAYS PRESENT, including x1. An absent count and a count of one must never look the
   // same to someone pulling stock. Emphasised past one so a 6 catches the eye where a 1
@@ -76,13 +83,20 @@ export function OrderedVariant({ item, className = "", after }: { item: OrderIte
   if (after) parts.push(<span key="a">{after}</span>)
 
   return (
-    <div className={"mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs leading-snug text-muted-foreground " + className}>
-      {parts.map((p, i) => (
-        <span key={i} className="inline-flex items-baseline gap-2">
-          {i > 0 && <span aria-hidden className="text-border">·</span>}
-          {p}
-        </span>
-      ))}
+    <div className={"mt-0.5 space-y-0.5 text-xs leading-snug text-muted-foreground " + className}>
+      {ordered && (
+        <div>
+          <span className="font-medium text-foreground/70">Ordered:</span> {ordered}
+        </div>
+      )}
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        {parts.map((p, i) => (
+          <span key={i} className="inline-flex items-baseline gap-2">
+            {i > 0 && <span aria-hidden className="text-border">·</span>}
+            {p}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

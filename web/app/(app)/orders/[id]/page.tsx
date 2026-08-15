@@ -554,7 +554,12 @@ export default function OrderDetailPage() {
                                 <span className="font-medium text-foreground">{card.lane_label || card.col || "Incoming"}</span>
                               </span>
                             )}
-                            {it.sku && <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{it.sku}</div>}
+                            {/* The bare mono sku that sat here is gone: it printed the SAME
+                                string the strip above already labels "Listing SKU", one row
+                                below it and with nothing to say which of the two skus it
+                                was — the listing's, or the blank we buy against. An
+                                unlabelled duplicate of a labelled value is worse than
+                                either alone (CLAUDE.md §5 on why the two are kept apart). */}
                           </div>
                           {/* "$0.00 · 1 × $0.00" IS NOT A PRICE, it is the absence of one.
                               A line whose blank doesn't resolve is missing from the quote

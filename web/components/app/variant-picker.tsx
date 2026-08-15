@@ -158,11 +158,13 @@ export function VariantPicker({
           label="Size" value={item.size || ""} options={sizeList}
           disabled={busy === "size"} onChange={(v) => save({ size: v }, "size")}
         />
-        {/* Says WHY it is empty rather than just being dead — the same words orders/new
-            uses, because it is the same fact about the same product. */}
+        {/* Says WHY it is empty rather than just being dead. ONE WORD, not the sentence
+            orders/new can afford: this field is a quarter of a four-column strip, so
+            "Method · None on this blank" truncated to "Method · …" — which says less than
+            nothing, since the reason was the part that got cut. "Method · none" fits. */}
         <VariantField
           label="Method" value={item.print_type || ""} options={methodList}
-          emptyLabel="None on this blank"
+          emptyLabel="none"
           disabled={busy === "printType"} onChange={(v) => save({ printType: v }, "printType")}
         />
       </div>
@@ -173,16 +175,24 @@ export function VariantPicker({
           selection. The feedback was redundant anyway — the field being saved is passed
           `disabled` and visibly dims, which already says "working" without moving
           anything. An error still takes space, because a failed save has to be seen. */}
-      {/* A DEAD FIELD MUST SAY WHERE IT IS FIXED. "None on this blank" states the fact and
-          leaves you looking at a control that won't open; the gap is on the product, and
-          that is one page away. Only when the blank RESOLVED — an unresolved one gets the
-          full list and has nothing to report. */}
-      {product && methodOpts.length === 0 && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {blankLabel || "This blank"} lists no print method, so there is nothing to choose here.
-          {/* WHERE IT IS FIXED, only to whoever can fix it. A seller cannot edit a product,
-              so telling them to is an instruction they can't act on. */}
-          {isStaff && " Set its methods on the product."}
+      {/**
+        * WHERE IT IS FIXED — for the one person who can fix it, in the fewest words it
+        * takes to say.
+        *
+        * This was a two-clause sentence naming the blank and explaining the situation, and
+        * it ran the full width under the strip: a paragraph of grey on a row whose other
+        * lines are a title, a variant and four controls. The FACT is already on the field
+        * itself ("Method · none"), so repeating it in prose bought nothing and cost the
+        * row its shape.
+        *
+        * What the field cannot say is where to go, so that is all that is left here — and
+        * only to staff. A seller cannot edit a product; telling them to is an instruction
+        * they can't act on, and it turned an ordinary state of their order into something
+        * that looked like their problem.
+        */}
+      {product && methodOpts.length === 0 && isStaff && (
+        <p className="mt-1.5 text-2xs text-muted-foreground">
+          No print method on this blank — set them on the product.
         </p>
       )}
       {err && (
