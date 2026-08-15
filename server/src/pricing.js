@@ -141,10 +141,20 @@ function tierFor(d, size) {
   return d.sizePrices.find((t) => t && t.size != null && String(t.size).trim().toLowerCase() === want) || null;
 }
 
-// Per-unit cost = the size's base price (else the product's base) + the print method's
-// add-on. Mirrors productUnitPrice in eg-design-tools.js, which is what the boards show
-// the seller — if these two disagree, the quote lies about the price on screen.
-function unitCostOf(row, item, fees) {
+/**
+ * WHAT A UNIT COST IS MADE OF — the blank, and the technique — as two numbers.
+ *
+ * The ladder lives here and `unitCostOf` sums it, so the split a line SHOWS and the total
+ * it is CHARGED can never come from two different rules. It was called from quoteOrder
+ * without ever being written: a ReferenceError inside a function throws only when the
+ * function runs, so the server booted clean and every single /quote 500'd instead. The
+ * Summary card swallowed that and rendered as an order with no base cost, no shipping and
+ * no fees — see the note on the quote fetch in web/app/(app)/orders/[id]/page.tsx.
+ *
+ * `base` is null when nothing in the ladder answers — the caller's cue that the line is
+ * unpriceable, never a reason to bill 0.
+ */
+function costPartsOf(row, item, fees) {
   const d = row.data || {};
   const markup = num(fees && fees.base_markup) || 0;
   // BASE COST is what the seller pays before the print-method surcharge. It comes from
@@ -164,10 +174,19 @@ function unitCostOf(row, item, fees) {
   if (base == null && tier && tier.cost != null) { const c = num(tier.cost); if (c != null && c > 0) base = c + markup; }
   if (base == null) base = num(d.basePrice ?? d.base_price ?? row.base_price);
   if (base == null) { const c = num(d.productCost ?? d.product_cost); if (c != null && c > 0) base = c + markup; }
-  if (base == null) return null;
+  // No base, no surcharge to report: a method fee on a line we can't price is a number
+  // with nothing to sit on top of.
+  return { base, method: base == null ? 0 : methodAddOn(d, item.print_type, fees) };
+}
+
+// Per-unit cost = the size's base price (else the product's base) + the print method's
+// add-on. Mirrors productUnitPrice in eg-design-tools.js, which is what the boards show
+// the seller — if these two disagree, the quote lies about the price on screen.
+function unitCostOf(row, item, fees) {
   // The method surcharge sits ON TOP of the base cost, never inside it — so changing
   // the markup never silently changes what embroidery adds.
-  return base + methodAddOn(d, item.print_type, fees);
+  const { base, method } = costPartsOf(row, item, fees);
+  return base == null ? null : base + method;
 }
 
 /**
