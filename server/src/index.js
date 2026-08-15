@@ -434,7 +434,25 @@ app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
       vals
     );
   } catch (e) {
-    if (e.code === '23505') { reply.code(409); return { error: 'That username is already taken' }; }
+    /**
+     * TWO UNIQUE CONSTRAINTS, AND THIS BLAMED ONE OF THEM FOR BOTH.
+     *
+     * `users_email_key` and `users_username_lower_idx` both raise 23505, and every one of
+     * them came back as "That username is already taken" — so repairing a placeholder
+     * email to an address another account already holds produced a USERNAME error under a
+     * field labelled Email, about a field this form doesn't even show. The person is left
+     * to guess which of the two things they typed was wrong, when neither was: the address
+     * simply belongs to somebody else.
+     *
+     * Same test signup() has used since usernames existed (auth.js) — Postgres names the
+     * index it tripped, so there is nothing to infer.
+     */
+    if (e.code === '23505') {
+      reply.code(409);
+      return { error: String(e.detail || e.constraint || '').includes('username')
+        ? 'That username is already taken'
+        : 'That email is already registered to another account.' };
+    }
     throw e;
   }
   if (!r.rows.length) { reply.code(404); return { error: 'User not found' }; }
