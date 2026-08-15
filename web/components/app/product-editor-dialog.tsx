@@ -740,6 +740,20 @@ export function ProductEditorDialog({
                     )
                   })}
                 </div>
+                {/* UNTICKING THE LAST ONE IS A DECISION WITH CONSEQUENCES ELSEWHERE, and
+                    they were invisible from here. A supplier style is staged with one
+                    already ticked (S&S "DTG", Otto "Embroidery"), so the first click on
+                    that chip REMOVES it — and the product saves with no technique at all.
+                    Downstream that blank can't be given a method on a manual order or an
+                    open one; both fields go dead reading "None on this blank". Said here,
+                    where it can still be undone with one click.
+                    --primary, not amber: amber is a reserved floor status (warning / on
+                    hold), and this is a form telling you what a field will do. */}
+                {pickedKeys.length === 0 && (
+                  <p className="text-xs text-primary">
+                    No method picked — an order for this blank won&apos;t be able to choose one.
+                  </p>
+                )}
               </div>
               {typeMockup && !img && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
 import { resolveProduct, colorsOf, methodsOf, sizesOf } from "@/lib/variant-resolve"
 import { PRODUCT_METHODS } from "@/lib/print-method"
+import { getUser } from "@/lib/auth"
 import { VariantField } from "@/components/app/variant-field"
 
 // What the fields offer when the blank can't be resolved — see the note on colorList.
@@ -27,6 +28,8 @@ export function VariantPicker({
 }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  // Same read as every other role check in components/app — anyone who isn't a seller.
+  const isStaff = (getUser()?.role || "seller") !== "seller"
 
   const product = useMemo(() => resolveProduct(item, catalog), [item, catalog])
   const blankLabel = product?.name || item.blank || ""
@@ -66,7 +69,21 @@ export function VariantPicker({
   const keep = (value: string, opts: string[]) => (value && !opts.includes(value) ? [value, ...opts] : opts)
   const colorList = keep(item.color || "", colorOpts.length ? colorOpts : catalogColors)
   const sizeList = keep(item.size || "", sizeOpts.length ? sizeOpts : FALLBACK_SIZES)
-  const methodList = keep(item.print_type || "", methodOpts.length ? methodOpts : FALLBACK_METHODS)
+  /**
+   * THE FALLBACK IS FOR AN UNRESOLVED BLANK, NOT FOR A PRODUCT THAT SAYS NOTHING.
+   *
+   * `methodOpts.length ? … : FALLBACK_METHODS` could not tell those two apart, so a blank
+   * that resolves perfectly well and simply lists no technique offered all eight — and
+   * picking one put a method on the line the catalogue never claimed, priced by a
+   * surcharge that may not exist and unmakeable on the floor. It also disagreed with
+   * orders/new, which refuses that trade for the same product: one screen said "None on
+   * this blank" while the other offered the full list.
+   *
+   * A RESOLVED PRODUCT IS THE AUTHORITY, including when its answer is "none" — that is a
+   * gap to fix on the product, not one to paper over here. Colour and size keep their
+   * fallbacks: those are free choices that don't decide how the thing gets made.
+   */
+  const methodList = keep(item.print_type || "", product ? methodOpts : FALLBACK_METHODS)
 
   // Keep a blank the catalog no longer lists so an existing line can't silently lose it.
   const blankOptions = useMemo(() => {
@@ -141,8 +158,11 @@ export function VariantPicker({
           label="Size" value={item.size || ""} options={sizeList}
           disabled={busy === "size"} onChange={(v) => save({ size: v }, "size")}
         />
+        {/* Says WHY it is empty rather than just being dead — the same words orders/new
+            uses, because it is the same fact about the same product. */}
         <VariantField
           label="Method" value={item.print_type || ""} options={methodList}
+          emptyLabel="None on this blank"
           disabled={busy === "printType"} onChange={(v) => save({ printType: v }, "printType")}
         />
       </div>
@@ -153,6 +173,18 @@ export function VariantPicker({
           selection. The feedback was redundant anyway — the field being saved is passed
           `disabled` and visibly dims, which already says "working" without moving
           anything. An error still takes space, because a failed save has to be seen. */}
+      {/* A DEAD FIELD MUST SAY WHERE IT IS FIXED. "None on this blank" states the fact and
+          leaves you looking at a control that won't open; the gap is on the product, and
+          that is one page away. Only when the blank RESOLVED — an unresolved one gets the
+          full list and has nothing to report. */}
+      {product && methodOpts.length === 0 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {blankLabel || "This blank"} lists no print method, so there is nothing to choose here.
+          {/* WHERE IT IS FIXED, only to whoever can fix it. A seller cannot edit a product,
+              so telling them to is an instruction they can't act on. */}
+          {isStaff && " Set its methods on the product."}
+        </p>
+      )}
       {err && (
         <div className="mt-2 flex items-center gap-1.5 text-xs">
           <span className="text-destructive">{err}</span>
