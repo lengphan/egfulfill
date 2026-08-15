@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, DownloadSimple, ArrowsOutCardinal, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, PaperPlaneTilt } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, PaperPlaneTilt } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -232,8 +232,29 @@ export function DesignStage({
     ctx.strokeRect(c - z / 2 - 1.5, c - z / 2 - 1.5, z + 3, z + 3)
   }
 
+  /**
+   * The eight grips, as unit directions in the LAYER'S OWN frame.
+   *
+   * Every one of them scales about the centre — which is what `pos.x`/`pos.y` mean, so
+   * there is no opposite corner to pin and no re-centring to undo. A grip's direction is
+   * all that changes between them: which way is "outwards" for this one.
+   */
+  // `cls` anchors the grip to its point on the box; every one is then pulled back by half
+  // its own size, so the MARK sits centred on the corner or edge rather than beside it.
+  const GRIPS = [
+    { k: "nw", ux: -1, uy: -1, cls: "left-0 top-0", cur: "cursor-nwse-resize" },
+    { k: "n", ux: 0, uy: -1, cls: "left-1/2 top-0", cur: "cursor-ns-resize" },
+    { k: "ne", ux: 1, uy: -1, cls: "left-full top-0", cur: "cursor-nesw-resize" },
+    { k: "e", ux: 1, uy: 0, cls: "left-full top-1/2", cur: "cursor-ew-resize" },
+    { k: "se", ux: 1, uy: 1, cls: "left-full top-full", cur: "cursor-nwse-resize" },
+    { k: "s", ux: 0, uy: 1, cls: "left-1/2 top-full", cur: "cursor-ns-resize" },
+    { k: "sw", ux: -1, uy: 1, cls: "left-0 top-full", cur: "cursor-nesw-resize" },
+    { k: "w", ux: -1, uy: 0, cls: "left-0 top-1/2", cur: "cursor-ew-resize" },
+  ] as const
+
   // target: "image" or a text-layer id. mode: move | resize | rotate.
-  const startDrag = (target: string, mode: "move" | "resize" | "rotate") => (e: React.PointerEvent) => {
+  // `grip` — which of the eight was grabbed. Only read when mode is "resize".
+  const startDrag = (target: string, mode: "move" | "resize" | "rotate", grip?: { ux: number; uy: number }) => (e: React.PointerEvent) => {
     if (!stageRef.current) return
     e.preventDefault(); e.stopPropagation()
     onSelect?.(target)
@@ -246,6 +267,20 @@ export function DesignStage({
     const px = e.clientX, py = e.clientY
     const cx = rect.left + (startX / 100) * rect.width
     const cy = rect.top + (startY / 100) * rect.height
+    /**
+     * THE LAYER'S OWN HALF-EXTENTS, measured once at grab time.
+     *
+     * offsetWidth/Height, not getBoundingClientRect: the layer is rotated, and the rect of
+     * a rotated box is its axis-aligned bounding box — bigger than the box, and bigger by a
+     * different amount at every angle. The offsets are the untransformed CSS size, which is
+     * the frame the grip directions are expressed in.
+     *
+     * The grips are rendered INSIDE the layer, so the button's parent is that layer.
+     */
+    const layerEl = (e.currentTarget as HTMLElement).parentElement
+    const halfX = ((layerEl?.offsetWidth ?? 0) / 2 / rect.width) * 100
+    const halfY = ((layerEl?.offsetHeight ?? 0) / 2 / rect.height) * 100
+    const startSize = isText ? (layer?.size ?? 8) : pos.w
     function apply(patch: { x?: number; y?: number; w?: number; size?: number; r?: number }) {
       if (isText && layer) updateText?.(target, { x: patch.x, y: patch.y, size: patch.w ?? patch.size, r: patch.r } as Partial<TextLayer>)
       else setPos((p) => ({ ...p, ...(patch.x != null ? { x: patch.x } : {}), ...(patch.y != null ? { y: patch.y } : {}), ...(patch.w != null ? { w: patch.w } : {}), ...(patch.r != null ? { r: patch.r } : {}) }))
@@ -256,13 +291,35 @@ export function DesignStage({
         const dy = ((ev.clientY - py) / rect.height) * 100
         apply({ x: clamp(startX + dx, 0, 100), y: clamp(startY + dy, 0, 100) })
       } else if (mode === "resize") {
+        /**
+         * ONE SCALE FACTOR, WHICHEVER GRIP YOU GRABBED.
+         *
+         * The pointer is rotated back into the layer's own frame, then compared with where
+         * that grip STARTED. The ratio is how much bigger the layer should be — so the grip
+         * stays under the finger, and a corner keeps the aspect instead of stretching, which
+         * is what an aspect-locked drag means.
+         *
+         * Three cases, because a grip only measures along the axes it actually moves on:
+         * a side grip that read both would resize when you slid along its own edge, which
+         * feels like the artwork fighting you.
+         */
         const vx = ev.clientX - cx, vy = ev.clientY - cy
         const rad = (-startR * Math.PI) / 180
-        const localX = vx * Math.cos(rad) - vy * Math.sin(rad)
-        const wPct = (2 * Math.abs(localX) / rect.width) * 100
+        const localX = (vx * Math.cos(rad) - vy * Math.sin(rad)) / rect.width * 100
+        const localY = (vx * Math.sin(rad) + vy * Math.cos(rad)) / rect.height * 100
+        const gx = (grip?.ux ?? 1) * halfX, gy = (grip?.uy ?? 1) * halfY
+        const den = gx * gx + gy * gy
+        // den > 0 is also the guard for a layer that has not laid out yet (an image still
+        // loading measures 0 tall): every half-extent a branch below divides by is one of
+        // the terms in den, so a zero can only reach here as den === 0.
+        const scale = den <= 0 ? 1
+          : grip && grip.ux === 0 ? Math.abs(localY) / halfY            // top / bottom
+            : grip && grip.uy === 0 ? Math.abs(localX) / halfX          // left / right
+              : (localX * gx + localY * gy) / den                       // a corner
         // maxW, not a flat 100: the ceiling is whatever keeps the artwork's own height
-        // inside the bed, so dragging the handle stops at the edge instead of past it.
-        apply(isText ? { size: clamp(wPct / 3, 2, 40) } : { w: clamp(wPct, 8, maxW) })
+        // inside the bed, so dragging a grip stops at the edge instead of past it.
+        const next = startSize * Math.max(scale, 0)
+        apply(isText ? { size: clamp(next, 2, 40) } : { w: clamp(next, 8, maxW) })
       } else {
         const ang = (Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180) / Math.PI + 90
         apply({ r: Math.round(ang) })
@@ -273,11 +330,42 @@ export function DesignStage({
     window.addEventListener("pointerup", up)
   }
 
+  /**
+   * EIGHT GRIPS, NOT ONE.
+   *
+   * There used to be a single resize button on the bottom-right corner, and it carried the
+   * move icon — so the one control that changed the SIZE looked like the one that changed
+   * the position, and the other seven places a person reaches for did nothing. Dragging a
+   * dropped image bigger read as impossible.
+   *
+   * Corners are round, edges are bars: the shape says which axis a grip works on before you
+   * touch it. Both are 12px of visible mark with a 24px hit area padded around them, so a
+   * grip is easy to grab on a trackpad and possible to grab on a phone without the marks
+   * crowding a small design.
+   */
   const handles = (target: string) => (
     <>
       <div className="pointer-events-none absolute inset-0 rounded-sm outline outline-2 -outline-offset-1 outline-primary/70" />
-      <button onPointerDown={startDrag(target, "rotate")} className="absolute -top-7 left-1/2 flex size-6 -translate-x-1/2 cursor-grab items-center justify-center rounded-full bg-primary text-primary-foreground shadow touch-none" aria-label="Rotate"><ArrowClockwise size={13} weight="bold" /></button>
-      <button onPointerDown={startDrag(target, "resize")} className="absolute -bottom-2.5 -right-2.5 flex size-6 cursor-nwse-resize items-center justify-center rounded-full bg-primary text-primary-foreground shadow touch-none" aria-label="Resize"><ArrowsOutCardinal size={12} weight="bold" /></button>
+      <button onPointerDown={startDrag(target, "rotate")} className="absolute -top-8 left-1/2 flex size-6 -translate-x-1/2 cursor-grab items-center justify-center rounded-full bg-primary text-primary-foreground shadow touch-none" aria-label="Rotate"><ArrowClockwise size={13} weight="bold" /></button>
+      {GRIPS.map((g) => (
+        <button
+          key={g.k}
+          onPointerDown={startDrag(target, "resize", g)}
+          // The BUTTON is the hit area and is deliberately bigger than the mark inside it —
+          // a 12px target is a miss on a touchscreen, and eight misses is worse than one.
+          className={`absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center touch-none ${g.cur} ${g.cls}`}
+          aria-label={`Resize ${g.k}`}
+        >
+          <span
+            className={
+              "block bg-background shadow-sm ring-1 ring-primary " +
+              (g.ux === 0 ? "h-1.5 w-4 rounded-full"          // top / bottom: a horizontal bar
+                : g.uy === 0 ? "h-4 w-1.5 rounded-full"        // left / right: a vertical bar
+                  : "size-3 rounded-full")                     // corners
+            }
+          />
+        </button>
+      ))}
     </>
   )
 
@@ -360,7 +448,10 @@ export function DesignStage({
           />
           {!picking && (selected == null || selected === "image") && handles("image")}
           {onRemove && (selected == null || selected === "image") && (
-            <button onPointerDown={(e) => e.stopPropagation()} onClick={onRemove} className="absolute -right-2.5 -top-2.5 flex size-6 items-center justify-center rounded-full bg-foreground text-background shadow" aria-label="Remove artwork"><X size={12} weight="bold" /></button>
+            /* Pushed diagonally clear of the north-east grip, which now sits ON the corner.
+               At -2.5 the two overlapped, so the control that DELETES the artwork was under
+               the one you reach for to make it bigger. */
+            <button onPointerDown={(e) => e.stopPropagation()} onClick={onRemove} className="absolute -right-9 -top-9 flex size-6 items-center justify-center rounded-full bg-foreground text-background shadow" aria-label="Remove artwork"><X size={12} weight="bold" /></button>
           )}
         </div>
       )}
