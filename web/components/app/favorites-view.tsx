@@ -12,6 +12,7 @@ import {
 } from "@/lib/api"
 import { ssCatalogProduct, ottoCatalogProduct } from "@/lib/supplier-catalog"
 import { getToken } from "@/lib/auth"
+import { nextEgSku } from "@/lib/sku"
 
 // Otto images are Google Drive links — rewrite to the embeddable thumbnail URL.
 function driveImg(url?: string | null): string {
@@ -59,8 +60,9 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
        * THE SAME BUILDER THE BROWSE GRID USES. This was a private copy, and it had drifted
        * in the two ways a copy always does:
        *
-       *  - `sku: f.id` wrote S&S's INTERNAL style id ("16") as the product's sku. The shared
-       *    builder writes the style NUMBER ("5000") — the code on the spec sheet.
+       *  - `sku: f.id` wrote S&S's INTERNAL style id ("16") into OUR sku — the field publish
+       *    writes onto the seller's listing. A supplier's code belongs in supplierSku, which
+       *    sellerSafe strips; the shared builder puts it there.
        *  - it put the supplier's wholesale price into `price` AND `basePrice`, which is the
        *    exact mistake the shared builder documents against: base cost is meant to DERIVE
        *    as productCost + the base_markup setting, so writing cost into base charged the
@@ -68,9 +70,12 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
        *
        * CLAUDE.md §5: import shared logic, never re-derive it.
        */
-      const product: CatalogProduct = f.supplier === "ss"
+      const built: CatalogProduct = f.supplier === "ss"
         ? await ssCatalogProduct(f.id, { title: f.title, price: f.price, image: f.image, colors: f.colors })
         : await ottoCatalogProduct(f.id, { name: f.title, price: f.price, image: f.image, colors: f.colors })
+      // This tab saves straight through with no review step, so the sku the builders leave
+      // unset has to be assigned here — a product without one can't be stocked or resolved.
+      const product: CatalogProduct = built.sku ? built : { ...built, sku: nextEgSku(existing) }
       const next = existing.some((p) => p.id === product.id) ? existing.map((p) => (p.id === product.id ? product : p)) : [...existing, product]
       await saveCatalogProducts(next)
       setAdded((prev) => new Set(prev).add(keyOf(f)))

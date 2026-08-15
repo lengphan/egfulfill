@@ -162,7 +162,11 @@ export function ProductsCatalog() {
     return (products ?? []).filter((p) => {
       if (cat !== "All" && p.type !== cat) return false
       if (!query) return true
-      const hay = `${p.name ?? ""} ${p.sku ?? ""} ${p.type ?? ""}`.toLowerCase()
+      // The supplier's code is searchable too — it is how a blank is referred to on a spec
+      // sheet or a purchase order, and it is the only identifier a product has until ours is
+      // assigned. Only ever PRESENT for staff: sellerSafe strips supplierSku server-side, so
+      // a seller's copy has nothing here to match on.
+      const hay = `${p.name ?? ""} ${p.sku ?? ""} ${p.supplierSku ?? ""} ${p.type ?? ""}`.toLowerCase()
       return hay.includes(query.toLowerCase())
     })
   }, [products, cat, query])
@@ -378,7 +382,11 @@ export function ProductsCatalog() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate font-semibold">{p.name ?? "Untitled"}</div>
-                      <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{p.sku ?? "—"}</div>
+                      {/* Ours, else theirs. A product should always have ours — but the ones
+                          that don't are exactly the ones you need to find, and a row reading
+                          "—" tells you nothing about which blank it is. sellerSafe strips
+                          supplierSku, so a seller sees "—" here, never a supplier's code. */}
+                      <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{p.sku || p.supplierSku || "—"}</div>
                     </div>
                     <div className="shrink-0 font-semibold tabular-nums">{usd(priceOf(p))}</div>
                   </div>

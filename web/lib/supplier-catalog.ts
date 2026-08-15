@@ -44,20 +44,24 @@ export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<Catal
     productCost: d.price ?? fb.price ?? undefined,
     sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: colorNames(d.colors)[0] ?? fb.colors?.[0],
     /**
-     * THE SKU IS THE STYLE NUMBER — "5000", not "16".
+     * THEIRS, IN THE FIELD FOR THEIRS. `sku` is left UNSET on purpose.
      *
-     * `styleID` is S&S's INTERNAL row id. It is the right thing to put in their URLs and it
-     * is what every fetch here is keyed by, but it is not an identifier that means anything
-     * outside their database: nobody types it, no spec sheet carries it, and no other
-     * supplier's product would ever collide with it in a way a human could spot. Otto and
-     * SanMar both store the real style code here (`PC61`, an Otto part number), so S&S was
-     * the only one whose blanks carried a number that matched nothing a person could look up.
+     * The two-sku split exists because publish sends the blank's `sku` as `sku_base` — so
+     * anything written there ends up on the seller's Etsy and Shopify listings. That is how
+     * Otto's own style number reached four live listings (see catalog.js), and it is why a
+     * supplier's code goes in `supplierSku`, which sellerSafe strips from a seller's copy.
      *
-     * Falls back through partNumber and then the internal id, because a blank with no sku at
-     * all is worse than one with an unfamiliar number.
+     * Leaving `sku` unset hands it to the editor, which offers the next free EG-#### — ours,
+     * dull, and safe to print on someone else's shop page.
+     *
+     * The VALUE is the style number ("5000"), not `styleID`. styleID is S&S's internal row
+     * id — the right thing in their URLs and the key every fetch here uses, but a number
+     * that appears on no spec sheet and no purchase order. Falls back to partNumber, then
+     * the id, because an unfamiliar code still tells two blanks apart and a blank field
+     * doesn't.
      */
     img: d.image ?? fb.image ?? undefined, images: d.extraImages ?? [],
-    sku: d.styleName || d.partNumber || styleID,
+    supplierSku: d.styleName || d.partNumber || styleID,
     // The back / side / on-model shots, still attached to the colourway S&S sent them for.
     // `images` keeps the same pictures as a flat gallery for readers that want one.
     colorGallery: d.colorExtras ?? undefined,
@@ -74,7 +78,10 @@ export async function ottoCatalogProduct(style: string, fb: OttoFb): Promise<Cat
     // productCost + markup). See the S&S note above.
     productCost: Number(d?.price ?? fb.price) || undefined,
     sizes: d?.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (fb.colors ?? [])[0],
-    img: driveImg(d?.image ?? fb.image) || undefined, sku: d?.skus?.[0] || style,
+    // THEIRS — see the note in ssCatalogProduct. Unchanged in value (the first variant sku,
+    // which is what older order lines were matched on), only moved out of `sku`, which
+    // publish would have written onto the seller's listing.
+    img: driveImg(d?.image ?? fb.image) || undefined, supplierSku: d?.skus?.[0] || style,
     description: d?.description ?? undefined, supplier: "Otto Cap",
   }
 }
@@ -89,7 +96,9 @@ export async function sanmarCatalogProduct(style: string, fb: SanmarFb): Promise
     id: "SANMAR-" + style, name: d?.name || fb.name || style, type: "Apparel", method: "DTG", status: "Active",
     productCost: Number(d?.price ?? fb.price) || undefined,
     sizes: d?.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (fb.colors ?? [])[0],
-    img: (d?.image ?? fb.image) || undefined, sku: style,
+    // THEIRS — see the note in ssCatalogProduct. SanMar's style code ("PC61") identifies the
+    // blank on their side; ours is assigned by the editor.
+    img: (d?.image ?? fb.image) || undefined, supplierSku: style,
     description: d?.description ?? undefined, supplier: "SanMar",
   }
 }

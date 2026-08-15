@@ -23,6 +23,7 @@ import {
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { driveImg, prettyColor, driveMap, ssCatalogProduct, ssStockByColor, ottoCatalogProduct, sanmarCatalogProduct } from "@/lib/supplier-catalog"
+import { nextEgSku } from "@/lib/sku"
 
 const PAGE = 30
 
@@ -116,6 +117,8 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   const [previewKey, setPreviewKey] = useState<string | null>(null)
   /** Per-colour supplier stock for the review step. null = not asked (Otto / SanMar). */
   const [previewStock, setPreviewStock] = useState<Record<string, number> | null>(null)
+  /** The next free EG-#### to offer in the review step — see addToCatalog. */
+  const [previewNextSku, setPreviewNextSku] = useState<string | undefined>(undefined)
   // S&S only returns sizes on the STYLE DETAIL, which is the same request the colour
   // swatches already make — so cache both from that one call rather than fetching twice.
   const [detailSizes, setDetailSizes] = useState<Record<string, string[]>>({})
@@ -290,6 +293,12 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
           ? await ottoCatalogProduct(it.id, { name: it.otto.name, price: it.otto.price, image: it.otto.image, colors: it.otto.colors })
           : await sanmarCatalogProduct(it.id, { name: it.sanmar.name, price: it.sanmar.price, image: it.sanmar.fullImage || it.sanmar.image, colors: it.sanmar.colors ?? [] })
       setPreview(product); setPreviewKey(keyOf(it))
+      // OUR sku, offered in the review step. The builders deliberately leave `sku` unset —
+      // the supplier's code belongs in supplierSku, because publish writes `sku` onto the
+      // seller's listing — so without a number to offer here the field would open blank and
+      // the product would save with no sku at all. confirmAdd assigns one regardless; this
+      // is so the operator SEES which one before agreeing to it.
+      getCatalogProducts().then((ps) => setPreviewNextSku(nextEgSku(ps))).catch(() => {})
       // Stock for the review step, so a style can be trimmed to what the supplier can
       // actually fill BEFORE it becomes a product. S&S only — the other two would cost a
       // call per sku / per style, and null means "not asked", never "none".
@@ -303,7 +312,16 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
     setMsg(null)
     try {
       const existing = await getCatalogProducts().catch(() => [] as CatalogProduct[])
-      const next = existing.some((p) => p.id === product.id) ? existing.map((p) => (p.id === product.id ? product : p)) : [...existing, product]
+      /**
+       * A PRODUCT WITHOUT OUR SKU CAN'T BE STOCKED OR RESOLVED, so one is assigned here —
+       * against the catalogue as it is at SAVE time, which is the only moment that answer is
+       * authoritative. The number offered in the review step was computed when the window
+       * opened, so adding two blanks in a row would otherwise hand both the same one.
+       *
+       * Only when it is missing: whatever the operator typed wins, always.
+       */
+      const withSku = product.sku ? product : { ...product, sku: nextEgSku(existing) }
+      const next = existing.some((p) => p.id === withSku.id) ? existing.map((p) => (p.id === withSku.id ? withSku : p)) : [...existing, withSku]
       await saveCatalogProducts(next)
       if (previewKey) setAdded((prev) => new Set(prev).add(previewKey))
       setPreview(null); setPreviewKey(null)
@@ -679,6 +697,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
         product={preview}
         onSave={confirmAdd}
         newIdSeed={0}
+        nextSku={previewNextSku}
         title="Review before adding"
         ctaLabel="Add to Products"
         stockByColor={previewStock}
