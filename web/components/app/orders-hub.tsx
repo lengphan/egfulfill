@@ -248,10 +248,12 @@ const openLabel = (r: UspsLabelResult) => {
 // action set adapts to the role: operators review artwork + drive production, warehouse
 // receives + ships, admin does everything.
 /**
- * Age as ONE token — `4h`, `3d`, `6w`, `1y` — because it sits in a 4rem column beside the
- * order number and is read by scanning down, not by reading across. Under an hour reads
- * "new" rather than "0h": the distinction that matters at that end is "this just landed",
- * not how many minutes ago.
+ * Age as ONE token — `0h`, `4h`, `3d`, `6w`, `1y` — because it sits in a 4rem column beside
+ * the order number and is read by scanning DOWN, not across. Every value is therefore a
+ * number and a unit, including the first hour: it used to read "new", which was the only
+ * word in a column of measurements and broke the shape the eye is following. "This just
+ * landed" is already said twice over on the row — by the status pill and by the order's
+ * position in the sort — so the column can stay a ruler.
  *
  * Weeks, not months, between 14 and 60 days: a floor asks "how many weeks has this been
  * sitting?" and "2mo" rounds away the difference between 5 and 8 weeks, which is exactly
@@ -262,7 +264,7 @@ function ageOf(iso: string | null | undefined): string {
   const t = new Date(iso).getTime()
   if (isNaN(t)) return "—"
   const mins = Math.floor((Date.now() - t) / 60000)
-  if (mins < 60) return "new"
+  if (mins < 60) return "0h"
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h`
   const days = Math.floor(hrs / 24)
