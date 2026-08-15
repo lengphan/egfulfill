@@ -1057,11 +1057,15 @@ export function DesignCanvasDialog({
       // image so the stitch file has somewhere to sit on the mockup); the seller sees a plain
       // success line, no fee explainer.
       setJustAttachedFile(true)
-      setAttached(isStaff
-        ? `${f.name} filed as the machine file. Add an image too so it shows on the mockup.`
-        : `Embroidery file added — ${f.name}.`)
+      // ONE LINE, AND IT ONLY CONFIRMS. Staff used to get "…Add an image too so it shows on
+      // the mockup" tacked on: an instruction, in the same green as the success, for a
+      // second upload nobody had asked about — and it appeared every single time a file
+      // was filed, whether or not the line already had artwork. The confirmation stays,
+      // because the canvas cannot render a .emb and a window that looks identical before
+      // and after reads as the drop having failed.
+      setAttached(`Embroidery file added — ${f.name}.`)
     } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
-  }, [orderId, item.line_id, item.sku, isStaff])
+  }, [orderId, item.line_id, item.sku])
 
   /**
    * Put THIS line's artwork on every other line of the order.
