@@ -585,7 +585,7 @@ function CustomerFileThumb({ src }: { src: string }) {
 
 export function DesignCanvasDialog({
   open, onOpenChange, orderId, item, initialDesign, initialPos, onSaved, catalog,
-  siblings, designs, onSendToDesigner, filesLocked,
+  siblings, designs, onSendToDesigner, filesLocked, sideFee,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -598,6 +598,10 @@ export function DesignCanvasDialog({
   /** The order's OTHER lines, for "use on every line". Absent → the control isn't offered,
    *  which is right for a surface that only ever holds one line. */
   siblings?: OrderItem[]
+  /** What each ADDITIONAL printed face adds per unit (settings: method_side). Shown on the
+   *  side pills so the cost is known BEFORE a second face is committed to, not discovered on
+   *  the Summary afterwards. null/0 ⇒ extra sides are free and nothing is said. */
+  sideFee?: number | null
   /** Every design on the order, keyed as the server keys them (line first, sku as fallback).
    *  Only used to count how many lines "use on every line" would OVERWRITE before it does. */
   designs?: Record<string, { data?: string } | undefined> | null
@@ -652,6 +656,8 @@ export function DesignCanvasDialog({
    */
   type FaceArt = { data: string; pos: Pos; name: string | null }
   const [faceArt, setFaceArt] = useState<Record<string, FaceArt | null> | null>(null)
+  /** What the SERVER holds for each face, so Save only sends what actually changed. */
+  const [savedFaces, setSavedFaces] = useState<Record<string, { data: string; pos: Pos }>>({})
   /** Stash what is on screen back into the face it belongs to, before leaving it. */
   const stashCurrentFace = useCallback(() => {
     setFaceArt((prev) => ({
@@ -671,6 +677,7 @@ export function DesignCanvasDialog({
     setPos(art?.pos ?? DEFAULT_POS)
     setErr(null)
   }
+  /** True when ANY face has artwork — what Save is actually able to act on. */
   /** Which faces carry artwork, for the tabs — counting what is on screen for the live one. */
   const facesWithArt = useMemo(() => {
     const out: Record<string, boolean> = {}
@@ -678,6 +685,22 @@ export function DesignCanvasDialog({
     out[sideName] = !!designUrl
     return out
   }, [faceArt, sideName, designUrl])
+  const anyFaceHasArt = Object.values(facesWithArt).some(Boolean)
+  /**
+   * The faces that are ADDING to the price: every printed face except the first.
+   *
+   * Ordered by the garment's own face list, so the answer is stable — "the first" is front
+   * on anything that has one, not whichever row the server happened to return first.
+   */
+  const costingFaces = useMemo(() => {
+    const out: Record<string, boolean> = {}
+    let seen = 0
+    for (const f of faces) {
+      const k = (f.side || "front").toLowerCase()
+      if (facesWithArt[k]) { seen += 1; out[k] = seen > 1 }
+    }
+    return out
+  }, [faces, facesWithArt])
 
   // Thread match (EMB only): sample the artwork's dominant colours → nearest in-stock
   // threads, so the factory knows which cones to load. Re-runs when the design changes.
@@ -979,6 +1002,9 @@ export function DesignCanvasDialog({
             seeded[sd] = src ? { data: src, pos: d.pos ? { x: d.pos.x, y: d.pos.y, w: d.pos.w, r: d.pos.r ?? 0 } : DEFAULT_POS, name: d.name ?? null } : null
           }
           setFaceArt(seeded)
+          const conf: Record<string, { data: string; pos: Pos }> = {}
+          for (const [sd, a] of Object.entries(seeded)) if (a?.data) conf[sd] = { data: a.data, pos: a.pos }
+          setSavedFaces(conf)
         })
         .catch(() => { if (live) setFaceArt({}) })
     }, 0)
@@ -1223,7 +1249,7 @@ export function DesignCanvasDialog({
     if (!designUrl || !others.length) return
     const willReplace = others.filter((it) => !!designs?.[(it.line_id ?? it.sku) as string]?.data).length
     const ok = await confirm({
-      title: `Use this artwork on all ${others.length} other line${others.length === 1 ? "" : "s"}?`,
+      title: `Put this ${sideName} artwork on all ${others.length} other line${others.length === 1 ? "" : "s"}?`,
       body: willReplace ? `${willReplace} of them already ${willReplace === 1 ? "has artwork and it" : "have artwork and they"} will be replaced.` : undefined,
       confirmLabel: "Apply to all",
       destructive: false,
@@ -1234,7 +1260,12 @@ export function DesignCanvasDialog({
     for (const it of others) {
       try {
         const r = await postOrderDesign(orderId, {
-          sku: it.sku ?? "", line_id: it.line_id ?? undefined, data: designUrl,
+          sku: it.sku ?? "", line_id: it.line_id ?? undefined,
+          // ONTO THE SAME FACE. Without this every copy landed on the front, so applying a
+          // BACK design to nine sizes printed nine fronts — and left each of those lines'
+          // real front artwork overwritten. It copies the face you are standing on, which is
+          // the one shown in the confirm.
+          side: sideName, data: designUrl,
           // The same file, so the same NAME on every line it lands on — copying the source
           // line's item name onto five other garments labelled them all as that garment.
           name: designName || item.name || undefined, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r },
@@ -1246,7 +1277,7 @@ export function DesignCanvasDialog({
     if (failed.length) setErr(`Couldn't apply to: ${failed.join(", ")}`)
     const done = others.length - failed.length
     if (done > 0) { setAttached(`Applied to ${done} other line${done === 1 ? "" : "s"}.`); onSaved?.() }
-  }, [designUrl, designName, siblings, designs, orderId, item.name, pos, onSaved, confirm])
+  }, [designUrl, designName, sideName, siblings, designs, orderId, item.name, pos, onSaved, confirm])
 
   /**
    * TAKE IT OFF, for real.
@@ -1278,6 +1309,7 @@ export function DesignCanvasDialog({
       if (r?.error) throw new Error(r.error)
       setDesignUrl(""); setDesignName(null)
       setFaceArt((prev) => ({ ...(prev ?? {}), [sideName]: null }))
+      setSavedFaces((prev) => { const n = { ...prev }; delete n[sideName]; return n })
       onSaved?.()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't remove the artwork.")
@@ -1287,8 +1319,30 @@ export function DesignCanvasDialog({
   /** `close` is false when saving as a STEP in something else (sending to a designer),
    *  where closing the window mid-flow would look like the action had finished.
    *  Returns whether it persisted, so a caller can stop rather than carry on regardless. */
+  /**
+   * SAVE MEANS EVERY FACE, not the one you happen to be looking at.
+   *
+   * Each face holds its own artwork, and only the visible one was ever written — so placing
+   * on the front, switching to the back, placing there and pressing Save wrote the BACK and
+   * silently dropped the front. The work was in `faceArt` the whole time; nothing sent it.
+   *
+   * Only what CHANGED is sent. `savedFaces` is what the server last confirmed, so reopening
+   * a finished job and pressing Save doesn't re-upload three unchanged images — which on a
+   * multi-face garment is megabytes of base64 for no edit.
+   */
   const save = async (close = true): Promise<boolean> => {
-    if (!designUrl) { setErr("Upload artwork first."); return false }
+    // Everything on screen belongs to the face it is on before anything is compared.
+    const pending: Record<string, FaceArt | null> = {
+      ...(faceArt ?? {}),
+      [sideName]: designUrl ? { data: designUrl, pos, name: designName } : null,
+    }
+    const samePos = (a: Pos, b?: Pos | null) => !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.r === b.r
+    const changed = Object.entries(pending).filter(([sd, art]) => {
+      if (!art?.data) return false
+      const was = savedFaces[sd]
+      return !was || was.data !== art.data || !samePos(art.pos, was.pos)
+    })
+    if (!changed.length && !designUrl) { setErr("Upload artwork first."); return false }
     // Artwork attaches to a LINE, keyed line-first (server: coalesce('L:'||line_id,'S:'||sku)).
     // A marketplace line arrives with its variant — and thus SKU — unset, but always carries a
     // line_id. Requiring a SKU here mislabelled a present design as "no artwork" on exactly
@@ -1299,13 +1353,22 @@ export function DesignCanvasDialog({
       // Fingerprint the artwork as it's saved, so the factory can later tell that this
       // design has already been digitised. Best-effort: a null phash costs us fuzzy
       // matching, never the save.
-      const phash = await perceptualHash(designUrl).catch(() => null)
-      const r = await postOrderDesign(orderId, { sku: item.sku ?? "", line_id: item.line_id, side: sideName, data: designUrl, name: designName || item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
-      if (r.error) throw new Error(r.error)
-      // The number the save minted (or reused, if these exact bytes have been seen before).
-      // Replacing the image is different artwork and therefore a different number, so this
-      // has to follow every save rather than being read once on open.
-      if (r.design_no != null) setDesignNo(r.design_no)
+      const done: Record<string, { data: string; pos: Pos }> = { ...savedFaces }
+      for (const [sd, art] of changed) {
+        if (!art?.data) continue
+        const phash = await perceptualHash(art.data).catch(() => null)
+        const r = await postOrderDesign(orderId, {
+          sku: item.sku ?? "", line_id: item.line_id, side: sd, data: art.data,
+          name: art.name || item.name, pos: { x: art.pos.x, y: art.pos.y, w: art.pos.w, r: art.pos.r }, phash,
+        })
+        if (r.error) throw new Error(r.error)
+        done[sd] = { data: art.data, pos: art.pos }
+        // The number the save minted (or reused, if these exact bytes have been seen
+        // before). Taken from the face on screen — that is the one the rail is describing.
+        if (sd === sideName && r.design_no != null) setDesignNo(r.design_no)
+      }
+      setSavedFaces(done)
+      setFaceArt(pending)
       // Persist the matched threads alongside the design so the factory loads the right
       // cones. Best-effort — a design still saves even if the thread write hiccups. Keyed by
       // sku, so skip when the line has none yet (it can be re-matched after variant setup).
@@ -1414,8 +1477,28 @@ export function DesignCanvasDialog({
                 <button key={f.side} onClick={() => goToSide(i)}
                   title={has ? `${f.side} — has artwork` : `${f.side} — empty`}
                   className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors " + (i === side ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent")}>
-                  <span className={"size-1.5 rounded-full " + (has ? (i === side ? "bg-primary-foreground" : "bg-success") : (i === side ? "bg-primary-foreground/35" : "bg-muted-foreground/30"))} />
+                  {/* ONLY when the face has artwork. A faded dot on an empty face is a mark
+                      that means "nothing", and three of them read as three states rather
+                      than as one filled and two blank. */}
+                  {has && <span className={"size-1.5 rounded-full " + (i === side ? "bg-primary-foreground" : "bg-success")} />}
                   {f.side}
+                  {/**
+                    * WHAT THIS FACE COSTS, before it is chosen.
+                    *
+                    * The surcharge is per ADDITIONAL face, so the first one printed is
+                    * included and every one after adds this per unit. A seller found that
+                    * out on the Summary AFTER placing the artwork; the pill is where the
+                    * decision is actually made.
+                    *
+                    * Shown on a face that already costs, and on an empty one that WOULD —
+                    * which is only true once something else is printed. Nothing at all when
+                    * the rate is 0: an empty "+$0.00" is noise.
+                    */}
+                  {!!sideFee && sideFee > 0 && (has ? costingFaces[(f.side || "front").toLowerCase()] : anyFaceHasArt) && (
+                    <span className={"tabular-nums " + (i === side ? "text-primary-foreground/80" : "text-muted-foreground/80")}>
+                      +{sideFee.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                    </span>
+                  )}
                 </button>
               )
             })}
@@ -1969,7 +2052,7 @@ export function DesignCanvasDialog({
             <div className="flex flex-wrap gap-1.5">
               {designUrl && (
                 <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}>
-                  {applying ? "Applying…" : "Apply image to all items"}
+                  {applying ? "Applying…" : `Apply ${sideName} image to all items`}
                 </Button>
               )}
               {latestMachine && (
@@ -2164,7 +2247,11 @@ export function DesignCanvasDialog({
           )}
           <div className="flex items-center justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={() => void save()} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
+            {/* "Save", not "Save design" — it saves the item: every face's artwork at once,
+                and the threads with it. And enabled whenever ANY face carries artwork, not
+                just the visible one: standing on an empty back with a finished front is not
+                a reason to grey out Save. */}
+            <Button onClick={() => void save()} disabled={saving || !anyFaceHasArt}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save"}</Button>
           </div>
         </div>
         </div>

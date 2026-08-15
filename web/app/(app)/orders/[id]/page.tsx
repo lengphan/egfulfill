@@ -119,6 +119,8 @@ export default function OrderDetailPage() {
    *  identically — an order with no prices on it — while /quote was 500ing for every
    *  order on the platform. */
   const [quoteErr, setQuoteErr] = useState<string | null>(null)
+  /** Bumped whenever something that AFFECTS the price changes — see the quote effect. */
+  const [quoteNonce, setQuoteNonce] = useState(0)
   const [charges, setCharges] = useState<OrderCharges | null>(null)
 
   // Staff processing controls (stage moves + labels). Gated exactly like the boards:
@@ -244,7 +246,10 @@ export default function OrderDetailPage() {
         .catch((e) => { if (live) { setQuote(null); setQuoteErr(e instanceof Error ? e.message : "Couldn't load the price for this order.") } })
     }, 0)
     return () => { live = false; clearTimeout(id) }
-  }, [order, submittable])
+    // `quoteNonce` — artwork decides the price now. A second printed side adds a surcharge
+    // per unit (pricing.js sideAddOn), so placing or removing a design changes the total,
+    // and without this the Summary kept the figure it had loaded on arrival.
+  }, [order, submittable, quoteNonce])
 
   // What was ACTUALLY charged, from the ledger — the only complete source. The quote
   // above covers production + shipping and is the right thing to show BEFORE submit
@@ -999,7 +1004,11 @@ export default function OrderDetailPage() {
           filesLocked={isStaff ? preSubmit : !preSubmit}
           siblings={items.filter((it) => (it.line_id ?? it.sku) !== (customize.line_id ?? customize.sku))}
           designs={designs}
-          onSaved={reloadDesigns}
+          onSaved={() => { reloadDesigns(); setQuoteNonce((n) => n + 1) }}
+          /* What a SECOND printed face adds per unit, so the side pills can say so before
+             anyone commits to one. From the quote, which is the same settings the charge
+             reads — a number typed here would be a second opinion about the price. */
+          sideFee={quote?.fees?.method_side ?? null}
           catalog={catalog}
         />
       )}

@@ -1938,7 +1938,9 @@ export type OrderQuote = {
     baseCost?: number | null; methodFee?: number
     supplierCost?: number | null }[]
   unpriced: { sku: string; name: string }[]
-  fees: { ship_extra: number }
+  /** The live fee settings the charge itself reads. `method_side` is what each
+   *  ADDITIONAL printed face adds per unit — 0 means a second side is free. */
+  fees: { ship_extra: number; method_side?: number }
   subtotal: number
   shipping: number
   units: number
