@@ -570,16 +570,12 @@ export default function OrderDetailPage() {
                                 <div className="font-medium tabular-nums">
                                   {usd(unit)} <span className="text-muted-foreground">× {qty}</span>
                                 </div>
-                                {/* WHERE THE NUMBER COMES FROM. The catalogue says $13.50
-                                    and the order says $18.50, and until this line existed
-                                    those looked like two prices for one product. They are
-                                    the blank and the technique. Shown only when the
-                                    technique actually adds something. */}
-                                {qLine?.baseCost != null && (qLine.methodFee ?? 0) > 0 && (
-                                  <div className="text-2xs tabular-nums text-muted-foreground/80">
-                                    {usd(qLine.baseCost)} blank + {usd(qLine.methodFee ?? 0)} {it.print_type || "print"}
-                                  </div>
-                                )}
+                                {/* The "$17.46 blank + $5.00 Embroidery" breakdown was here.
+                                    It answered a question the row wasn't asking — the row is
+                                    a price and a quantity — and it put a third and fourth
+                                    figure under a number that is already the sum of them.
+                                    The split still exists on the quote (baseCost, methodFee,
+                                    sideFee) for anywhere that needs to explain a price. */}
                               </>
                             ) : quote === null ? (
                               // STILL LOADING. The quote arrives a moment after the rows, and
@@ -828,7 +824,31 @@ export default function OrderDetailPage() {
                   </div>
                   {designFees?.items?.map((f, i) => (
                     <div key={i} className="flex justify-between">
-                      <dt className="text-muted-foreground">{f.label}{f.name ? <span className="opacity-70"> · {f.name}</span> : null}</dt>
+                      {/**
+                        * THE ITEM'S NUMBER, NOT ITS TITLE.
+                        *
+                        * A marketplace product name is a keyword list — "Custom Embroidered
+                        * Apron with Name, Personalized Kitchen Apron, Cafe Barista Soft
+                        * Uniform, Custom Cooking Aprons, Mom Dad Gift" — and printing it
+                        * beside a $1.00 fee wrapped five lines and buried the money in a
+                        * summary whose whole job is money.
+                        *
+                        * Dropping it entirely would leave two identical "Check fee" rows on
+                        * an order with two designs, so it carries the number instead: the
+                        * same one on the item row and on the file row, and short enough to
+                        * sit on one line. One fee covering several lines names them all.
+                        */}
+                      <dt className="text-muted-foreground">
+                        {f.label}
+                        {(() => {
+                          const covered = (f.lines?.length ? f.lines : [{ line_id: f.line_id, sku: f.sku }])
+                            .map((l) => items.findIndex((x) => (l.line_id && x.line_id === l.line_id) || (!l.line_id && !!l.sku && x.sku === l.sku)))
+                            .filter((n) => n >= 0)
+                            .map((n) => n + 1)
+                          if (!covered.length) return null
+                          return <span className="opacity-70"> · Item{covered.length > 1 ? "s" : ""} {covered.join(", ")}</span>
+                        })()}
+                      </dt>
                       <dd className="tabular-nums">{f.amount == null ? <span className="italic text-muted-foreground">To Be Determined</span> : usd(f.amount)}</dd>
                     </div>
                   ))}

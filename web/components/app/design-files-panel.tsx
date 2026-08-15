@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, Trash } from "@phosphor-icons/react"
+import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getDesignFiles, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, indexDesigns, designForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
@@ -158,7 +158,9 @@ function PlacedArtworkList({ rows }: { rows: PlacedRow[] }) {
               {r.item ? `${r.item} · ` : ""}placed in the designer
             </div>
           </div>
-          <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-3xs font-bold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">ARTWORK</span>
+          {/* The ARTWORK badge is gone. The row already carries a picture of the artwork and
+              says "placed in the designer" underneath — a coloured chip repeating that was
+              the third mark on one row and the least informative of them. */}
         </div>
       ))}
     </div>
@@ -345,7 +347,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
           {orderFiles(shown).map((f) => {
             const k = KIND_META[f.kind || "other"] ?? KIND_META.other
             return (
-              <div key={f.designId} className="flex items-center gap-2 p-2">
+              <div key={f.designId} className="relative flex items-center gap-2 p-2">
                 <span className={"flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-3xs font-bold " + k.cls}>{k.icon} {k.label}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -377,9 +379,16 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
                 <Button size="sm" variant="ghost" className="shrink-0" disabled={busy === f.designId} onClick={() => get(f)} title="Download">
                   {busy === f.designId ? <CircleNotch size={12} className="animate-spin" /> : <FileArrowDown size={13} weight="bold" />}
                 </Button>
-                <Button size="sm" variant="ghost" className="shrink-0 text-muted-foreground hover:text-destructive" disabled={busy === f.designId} onClick={() => remove(f)} title="Remove this file">
-                  <Trash size={13} weight="bold" />
-                </Button>
+                {/* Corner X, matching the seller card — see the note there. */}
+                <button
+                  onClick={() => remove(f)}
+                  disabled={busy === f.designId}
+                  title="Remove this file"
+                  aria-label={`Remove ${f.name}`}
+                  className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+                >
+                  <X size={10} weight="bold" />
+                </button>
               </div>
             )
           })}
@@ -603,19 +612,28 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   /**
    * The order's lines as picker options, plus the whole-order default.
    *
-   * NUMBERED, and numbered the SAME WAY the item rows above are: "dc21" and "dc22" are two
-   * characters apart in a list of six, and a dropdown full of near-identical names is a
-   * thing you have to read twice. The number is the handle — pick 3 here, look for ③ on the
-   * order. Position in the order, which is what the row badge shows.
+   * THE NUMBER, AND ONLY THE NUMBER.
+   *
+   * It used to be "3 · <the product's name> ×2", and on a marketplace order the name is a
+   * keyword list — "Custom Embroidered Apron with Name, Personalized Kitchen Apron, Cafe
+   * Barista Soft Uniform, Custom Cooking Aprons, Mom Dad Gift". A select is as wide as its
+   * widest option, so one such line stretched the control across the card and its open menu
+   * past the edge of it.
+   *
+   * The number alone is enough BECAUSE the badge exists: the same figure is on the item row,
+   * on the file row and here, so picking 3 and finding 3 is one glance. That was already the
+   * stated intent of numbering these — the name was belt and braces, and it cost the layout.
    */
-  const targetLabel = (it: OrderItem, i: number) =>
-    `${i + 1} · ${it.name || it.sku || "Item"}` + (Number(it.qty) > 1 ? ` ×${it.qty}` : "")
+  const targetLabel = (it: OrderItem, i: number) => `Item ${i + 1}`
   // The number a line shows is its position in the ORDER, not in the filtered list — the
   // badge on the row must be the one you read in the dropdown, or the number is a lie.
   const numberOf = (it: OrderItem) => items.findIndex((x) => (x.line_id || x.sku) === (it.line_id || it.sku))
+  // The whole-order choice. Kept short for the same reason the item labels are: a select is
+  // as wide as its widest option, and "All embroidery items" was setting that on its own.
+  const allLabel = (image: boolean) => (image ? "All items" : "All embroidery")
   const optionsFor = (image: boolean) => {
     const pool = targetsFor(image)
-    return [image ? "All items" : "All embroidery items", ...pool.map((it) => targetLabel(it, numberOf(it)))]
+    return [allLabel(image), ...pool.map((it) => targetLabel(it, numberOf(it)))]
   }
   const keyAt = (image: boolean, label: string) => {
     const opts = optionsFor(image)
@@ -625,7 +643,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   }
   const labelFor = (image: boolean, key: string) => {
     const it = items.find((x) => (x.line_id || x.sku) === key)
-    return it ? targetLabel(it, numberOf(it)) : (image ? "All items" : "All embroidery items")
+    return it ? targetLabel(it, numberOf(it)) : allLabel(image)
   }
 
   /** WHAT IS ABOUT TO HAPPEN, one row per file, before anything is written. */
@@ -654,7 +672,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             </div>
             {items.length > 0 && (targetsFor(s.image).length > 0 ? (
               <VariantField
-                label="Goes on" compact className="w-44"
+                label="Goes on" compact className="w-32"
                 value={labelFor(s.image, s.target)} options={optionsFor(s.image)}
                 onChange={(v) => setStaged((prev) => prev.map((x) => (x.name === s.name ? { ...x, target: keyAt(s.image, v) } : x)))}
               />
@@ -667,9 +685,10 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             ))}
             <button
               onClick={() => setStaged((prev) => prev.filter((x) => x.name !== s.name))}
-              title="Take this one out" className="shrink-0 text-muted-foreground hover:text-destructive"
+              title="Take this one out" aria-label={`Take ${s.name} out`}
+              className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
             >
-              <Trash size={13} weight="bold" />
+              <X size={11} weight="bold" />
             </button>
           </div>
         ))}
@@ -777,7 +796,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
       {notices}
       <PlacedArtworkList rows={placed} />
       {orderFiles(files).map((f) => (
-        <div key={f.designId} className="flex items-center gap-3 rounded-xl border border-border p-3">
+        <div key={f.designId} className="relative flex items-center gap-3 rounded-xl border border-border p-3">
           {/**
             * WHICH ITEM THIS FILE IS FOR — the number, not a glyph.
             *
@@ -833,7 +852,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             */}
           {items.length > 0 && (
             <VariantField
-              label="Goes on" compact className="w-40 shrink-0"
+              label="Goes on" compact className="w-32 shrink-0"
               value={labelFor(f.kind === "image", f.lineId || ALL)}
               options={optionsFor(f.kind === "image")}
               onChange={(v) => void rescope(f, keyAt(f.kind === "image", v))}
@@ -871,10 +890,26 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
                 : <>Buy ${f.price} &amp; download</>}
             </Button>
           )}
+          {/**
+            * REMOVE SITS ON THE CORNER, NOT IN THE LINE.
+            *
+            * A trash button in the row's own flow is one more control competing with the
+            * things you came to read — the name, where it goes, the download — and it was
+            * the widest-reaching of them sitting closest to the one you press most.
+            *
+            * Top-right, small, outside the content: the same place a dismiss lives
+            * everywhere else in this app, so it is found without being looked at.
+            */}
           {canRemove && (
-            <Button size="sm" variant="ghost" className="shrink-0 text-muted-foreground hover:text-destructive" disabled={busy === f.designId} onClick={() => remove(f)} title="Remove this file">
-              <Trash size={13} weight="bold" />
-            </Button>
+            <button
+              onClick={() => remove(f)}
+              disabled={busy === f.designId}
+              title="Remove this file"
+              aria-label={`Remove ${f.name}`}
+              className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-destructive/40 hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+            >
+              <X size={10} weight="bold" />
+            </button>
           )}
         </div>
       ))}
