@@ -936,6 +936,10 @@ export function OrdersHub() {
       },
       items: (a, b) => (a.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0)
                      - (b.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0),
+      // The Items column sorts on the same figure it prints — biggest orders first, which
+      // is how a floor picks what to batch.
+      units: (a, b) => (a.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0)
+                     - (b.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0),
     }
 
     const chosen = sort && cmp[sort.key]
@@ -1691,6 +1695,26 @@ export function OrdersHub() {
                     ].join(" · ")}
                   >
                     {ageOf(o.created_at)}
+                  </div>
+                ),
+                /**
+                 * HOW BIG THE ORDER IS, in units.
+                 *
+                 * Set HEAVIER than its neighbours on purpose. Age is muted grey because it
+                 * is context; this is the quantity someone is deciding capacity from, so it
+                 * carries the row's own ink and a semibold weight — at 12px muted it read as
+                 * another piece of metadata and the eye slid past it. Everything around it
+                 * stays quiet, which is what lets one number be loud.
+                 *
+                 * Tabular figures so the column reads as a column: 1 over 12 over 8 has to
+                 * line up on the right edge or scanning down it means re-reading each one.
+                 */
+                units: (
+                  <div
+                    className="text-sm font-semibold tabular-nums text-foreground"
+                    title={`${items.length} line${items.length === 1 ? "" : "s"} · ${units} unit${units === 1 ? "" : "s"}`}
+                  >
+                    {units || "—"}
                   </div>
                 ),
                 tracking: (

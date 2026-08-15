@@ -200,7 +200,11 @@ const vi: Dict = {
   "col.Tracking": "Mã vận đơn",
   "col.Store": "Cửa hàng",
   "col.Customer": "Khách hàng",
-  "col.Items": "Sản phẩm",
+  // "Items" is the UNIT COUNT column now, so it takes the quantity word. The photos-and-
+  // listing-name column it used to name is "Product", which is what this string already
+  // said in Vietnamese — it just moves to the key that now carries that meaning.
+  "col.Items": "Số lượng",
+  "col.Product": "Sản phẩm",
   "col.List": "Danh mục",
   "col.Age": "Tuổi đơn",
   // Readiness tags

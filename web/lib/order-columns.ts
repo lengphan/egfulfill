@@ -93,7 +93,7 @@ export function reorderCols(ids: OrderColId[], id: OrderColId, toIndex: number):
 // `grid` (not a Tailwind width class) because this table is a CSS grid, not a <table>: an
 // order row and its expanded detail have to share one row container, and a grid lets the
 // detail sit as a full-width sibling instead of being forced into a colspan cell.
-export type FactoryColId = "status" | "order" | "age" | "tracking" | "store" | "customer" | "items" | "ready" | "action"
+export type FactoryColId = "status" | "order" | "age" | "units" | "tracking" | "store" | "customer" | "items" | "ready" | "action"
 
 export type FactoryColDef = { id: FactoryColId; label: string; grid: string; align?: "left" | "right" }
 
@@ -119,6 +119,17 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // Narrow on purpose: "3d" is the whole content, and it sits beside Order where you are
   // already looking.
   age:      { id: "age",      label: "Age",      grid: "4rem", align: "right" },
+  // HOW MUCH IS IN THIS ORDER — one unit count, beside Age because that is the other
+  // number you scan down a queue for: how old, and how big.
+  //
+  // UNITS, not lines. Two lines of the same tee at 6 each is twelve garments to print and
+  // one box to pack, and 12 is the figure that decides whether a row is a five-minute job
+  // or an afternoon. The line count is still on the Product cell's sub-line for anyone who
+  // needs the split.
+  //
+  // 3rem holds four digits at the weight this is set in; anything larger is an order that
+  // wants opening anyway.
+  units:    { id: "units",    label: "Items",    grid: "3rem", align: "right" },
   tracking: { id: "tracking", label: "Tracking", grid: "12rem" },
   store:    { id: "store",    label: "Store",    grid: "7rem" },
   // CAPPED, not flexible. As the only 1fr track it swallowed every spare pixel, so a board
@@ -130,7 +141,12 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // the first thing squeezed: an Etsy title runs 130 characters and truncates whatever
   // width it gets, so spending the table's flexible space on it starves everything that
   // WOULD have fitted whole.
-  items:    { id: "items",    label: "Items",    grid: "minmax(0,1.2fr)" },
+  // "Product", not "Items" — this cell is the photos and the listing NAME, and the name is
+  // what it is for. It kept the label until a real Items column existed (the unit count
+  // above); two headers reading "Items", one of them a paragraph of title text, would be
+  // the worse of the two problems. The ID stays `items`: it is the localStorage key for
+  // saved column layouts, and renaming it would silently reset everyone's board.
+  items:    { id: "items",    label: "Product",  grid: "minmax(0,1.2fr)" },
   // Four solid coloured pills — Label · Scan · Design + the Stock chip, all tinted by state.
   //
   // Titled "List". Earlier names each failed differently: "Ready" claimed a verdict four
@@ -158,7 +174,7 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
  *  loadFactoryColOrder; the columns shown are that list minus loadFactoryHiddenCols. Kept
  *  because it documents the intended left-to-right order, but edit the two loaders below to
  *  change what a board actually opens with. */
-export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "age", "tracking", "store", "customer", "items", "ready", "action"]
+export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "age", "units", "tracking", "store", "customer", "items", "ready", "action"]
 
 /**
  * HIDDEN on a board nobody has customised — `items`, and only `items`. One click in the
@@ -190,7 +206,7 @@ export function factoryGridTemplate(ids: FactoryColId[], lead: number): string {
 // Only the DATA columns reorder/hide. `action` (the buttons) is pinned last and always
 // shown, and `order` (the identifier) can never be hidden — a row must stay identifiable
 // and actionable. Same localStorage-backed model as the seller table above.
-export const FACTORY_DATA_COLS: FactoryColId[] = ["status", "order", "age", "tracking", "store", "customer", "items", "ready"]
+export const FACTORY_DATA_COLS: FactoryColId[] = ["status", "order", "age", "units", "tracking", "store", "customer", "items", "ready"]
 const FACTORY_LOCKED: FactoryColId[] = ["order"]
 export const isFactoryColLocked = (id: FactoryColId) => FACTORY_LOCKED.includes(id)
 const isFactoryDataId = (v: unknown): v is FactoryColId => typeof v === "string" && (FACTORY_DATA_COLS as string[]).includes(v)
@@ -205,8 +221,28 @@ export function loadFactoryColOrder(): FactoryColId[] {
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return [...FACTORY_DATA_COLS]
     const saved = parsed.filter(isFactoryDataId)
-    const missing = FACTORY_DATA_COLS.filter((id) => !saved.includes(id))
-    return [...saved, ...missing]   // heal: new columns append rather than vanish
+    /**
+     * Heal: a column added after this layout was saved has to APPEAR, and it has to appear
+     * WHERE IT BELONGS.
+     *
+     * Appending put it last — so `units`, whose whole point is sitting beside Age, would
+     * arrive on the far right of every board that had ever been customised, and read as
+     * having been added to the wrong place.
+     *
+     * It follows its NEIGHBOUR instead: the column that precedes it in FACTORY_DATA_COLS,
+     * wherever the saved layout has put that. A board that dragged Customer to the front
+     * still gets Items immediately after Age, because Age is what it belongs beside — an
+     * index alone would have dropped it wherever position 3 happened to land. Falls back to
+     * the canonical index when the neighbour was hidden or is itself new.
+     */
+    const healed = [...saved]
+    for (const id of FACTORY_DATA_COLS) {
+      if (healed.includes(id)) continue
+      const canonical = FACTORY_DATA_COLS.indexOf(id)
+      const after = healed.indexOf(FACTORY_DATA_COLS[canonical - 1])
+      healed.splice(after >= 0 ? after + 1 : Math.min(canonical, healed.length), 0, id)
+    }
+    return healed
   } catch { return [...FACTORY_DATA_COLS] }
 }
 export function saveFactoryColOrder(ids: FactoryColId[]) { try { localStorage.setItem(FACTORY_ORDER_KEY, JSON.stringify(ids)) } catch {} }
