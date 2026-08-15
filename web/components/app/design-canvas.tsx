@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
-import { deleteOrderDesign, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { designSrc } from "@/lib/order-image"
+import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -636,6 +637,47 @@ export function DesignCanvasDialog({
   }, [item, catalog])
   const [side, setSide] = useState(0)
   const activeMockup = faces[side]?.url || item.img || ""
+  const sideName = (faces[side]?.side || "front").toLowerCase()
+
+  /**
+   * ONE ARTWORK PER FACE, held here while the window is open.
+   *
+   * The stage shows ONE design at a time — whichever face you are on — so switching tabs has
+   * to put the current face's work away and bring the next one out. Without this the face
+   * tabs only changed the mockup underneath: the same picture followed you round the
+   * garment, and saving on the back overwrote the front.
+   *
+   * Keyed by side name, seeded from the server on open. `null` for a face means "nothing on
+   * it", which is different from "not loaded yet" — the latter is `faceArt === null`.
+   */
+  type FaceArt = { data: string; pos: Pos; name: string | null }
+  const [faceArt, setFaceArt] = useState<Record<string, FaceArt | null> | null>(null)
+  /** Stash what is on screen back into the face it belongs to, before leaving it. */
+  const stashCurrentFace = useCallback(() => {
+    setFaceArt((prev) => ({
+      ...(prev ?? {}),
+      [sideName]: designUrl ? { data: designUrl, pos, name: designName } : null,
+    }))
+  }, [sideName, designUrl, pos, designName])
+  /** Move to a face: put this one away, bring that one out. */
+  const goToSide = (i: number) => {
+    if (i === side) return
+    stashCurrentFace()
+    const next = (faces[i]?.side || "front").toLowerCase()
+    const art = (faceArt ?? {})[next]
+    setSide(i)
+    setDesignUrl(art?.data ?? "")
+    setDesignName(art?.name ?? null)
+    setPos(art?.pos ?? DEFAULT_POS)
+    setErr(null)
+  }
+  /** Which faces carry artwork, for the tabs — counting what is on screen for the live one. */
+  const facesWithArt = useMemo(() => {
+    const out: Record<string, boolean> = {}
+    for (const [k, v] of Object.entries(faceArt ?? {})) out[k] = !!v?.data
+    out[sideName] = !!designUrl
+    return out
+  }, [faceArt, sideName, designUrl])
 
   // Thread match (EMB only): sample the artwork's dominant colours → nearest in-stock
   // threads, so the factory knows which cones to load. Re-runs when the design changes.
@@ -914,6 +956,34 @@ export function DesignCanvasDialog({
    */
   const [designNo, setDesignNo] = useState<number | null>(item.design_no ?? null)
   const [artAtOpen] = useState<string>(initialDesign ?? "")
+  /**
+   * LOAD EVERY FACE, once, on open.
+   *
+   * The page hands us `initialDesign` — one image, the front — because that is all its map
+   * holds (indexDesigns is deliberately singular). The back and the sleeves are only in the
+   * order's design rows, so they are read here. The face you opened on keeps what is already
+   * on screen: it is the same row, and replacing it would discard an edit made in the gap.
+   */
+  useEffect(() => {
+    if (!open || !orderId) return
+    let live = true
+    const t = setTimeout(() => {
+      getOrderDesigns(orderId)
+        .then((r) => {
+          if (!live) return
+          const list = Array.isArray(r) ? r : (r?.designs ?? [])
+          const mine = sidesForLine(designsBySide(list), { line_id: item.line_id, sku: item.sku })
+          const seeded: Record<string, FaceArt | null> = {}
+          for (const [sd, d] of Object.entries(mine)) {
+            const src = designSrc(d.data)
+            seeded[sd] = src ? { data: src, pos: d.pos ? { x: d.pos.x, y: d.pos.y, w: d.pos.w, r: d.pos.r ?? 0 } : DEFAULT_POS, name: d.name ?? null } : null
+          }
+          setFaceArt(seeded)
+        })
+        .catch(() => { if (live) setFaceArt({}) })
+    }, 0)
+    return () => { live = false; clearTimeout(t) }
+  }, [open, orderId, item.line_id, item.sku])
   const artworkChangedSinceSend = sentToPartner && designUrl !== artAtOpen
   /** The partner send, for print methods. A dialog rather than an inline form because it
    *  asks for Pink's own fields (product type, design type, board) that mean nothing here. */
@@ -1146,7 +1216,7 @@ export function DesignCanvasDialog({
     } catch (e) {
       setDlErr(e instanceof Error ? e.message : "Couldn't apply that file to all items.")
     } finally { setFileBusy(false) }
-  }, [latestMachine, confirm, onSaved])
+  }, [latestMachine, confirm, onSaved, setFileBusy, setDlErr, setAttached])
 
   const applyToAll = useCallback(async () => {
     const others = siblings ?? []
@@ -1194,7 +1264,7 @@ export function DesignCanvasDialog({
   const removeArtwork = async () => {
     if (removing) return   // a second click would open a second confirm over the first
     const saved = !!artAtOpen && !!designUrl
-    if (!saved) { setDesignUrl(""); setDesignName(null); return }
+    if (!saved) { setDesignUrl(""); setDesignName(null); setFaceArt((prev) => ({ ...(prev ?? {}), [sideName]: null })); return }
     if (!(await confirm({
       title: "Take this artwork off the item?",
       body: "It comes off this line. Any design charge already made stays — ask us if it needs reversing.",
@@ -1203,9 +1273,11 @@ export function DesignCanvasDialog({
     }))) return
     setRemoving(true); setErr(null)
     try {
-      const r = await deleteOrderDesign(orderId, { line_id: item.line_id ?? undefined, sku: item.sku ?? undefined })
+      // THIS FACE ONLY. Removing the front must not take the back off with it.
+      const r = await deleteOrderDesign(orderId, { line_id: item.line_id ?? undefined, sku: item.sku ?? undefined, side: sideName })
       if (r?.error) throw new Error(r.error)
       setDesignUrl(""); setDesignName(null)
+      setFaceArt((prev) => ({ ...(prev ?? {}), [sideName]: null }))
       onSaved?.()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't remove the artwork.")
@@ -1228,7 +1300,7 @@ export function DesignCanvasDialog({
       // design has already been digitised. Best-effort: a null phash costs us fuzzy
       // matching, never the save.
       const phash = await perceptualHash(designUrl).catch(() => null)
-      const r = await postOrderDesign(orderId, { sku: item.sku ?? "", line_id: item.line_id, data: designUrl, name: designName || item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
+      const r = await postOrderDesign(orderId, { sku: item.sku ?? "", line_id: item.line_id, side: sideName, data: designUrl, name: designName || item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
       if (r.error) throw new Error(r.error)
       // The number the save minted (or reused, if these exact bytes have been seen before).
       // Replacing the image is different artwork and therefore a different number, so this
@@ -1322,14 +1394,31 @@ export function DesignCanvasDialog({
             asked for a percentage OF that column — a circular reference resolving to nothing. */}
         <div className="lg:sticky lg:top-0 lg:w-[min(70vh,50vw)] lg:self-start">
         {/* Side tabs — only when the blank has more than one face to place art on. */}
+        {/**
+          * A SIDE LIST, not just a mockup switcher.
+          *
+          * These tabs used to change only the picture underneath — the artwork followed you
+          * round the garment, and saving on the back wrote over the front. Each face now
+          * holds its own design, and each tab says whether that face has one: a filled dot
+          * means there is artwork on it, so "what is still empty" is answered without
+          * clicking through every face.
+          *
+          * A side is one print — one hooping, one platen pass — which is also how the
+          * surcharge bills it, so the list is the job as the floor will run it.
+          */}
         {faces.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
-            {faces.map((f, i) => (
-              <button key={f.side} onClick={() => setSide(i)}
-                className={"rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors " + (i === side ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent")}>
-                {f.side}
-              </button>
-            ))}
+            {faces.map((f, i) => {
+              const has = facesWithArt[(f.side || "front").toLowerCase()]
+              return (
+                <button key={f.side} onClick={() => goToSide(i)}
+                  title={has ? `${f.side} — has artwork` : `${f.side} — empty`}
+                  className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors " + (i === side ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent")}>
+                  <span className={"size-1.5 rounded-full " + (has ? (i === side ? "bg-primary-foreground" : "bg-success") : (i === side ? "bg-primary-foreground/35" : "bg-muted-foreground/30"))} />
+                  {f.side}
+                </button>
+              )
+            })}
           </div>
         )}
         {/* THE STAGE IS THE DROP TARGET.

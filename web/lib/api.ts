@@ -1827,7 +1827,9 @@ export type NewOrderItem = {
 export type DesignPos = { x: number; y: number; w: number; h?: number; r: number }
 /** Artwork on one order LINE. `line_id` is the identity; `sku` is what rows saved before
  *  line tracking have, and is only a fallback. Look up as `map[line_id] ?? map[sku]`. */
-export type OrderDesign = { sku?: string; line_id?: string | null; kind?: string; data?: string; name?: string; pos?: DesignPos | null }
+export type OrderDesign = { sku?: string; line_id?: string | null; kind?: string; data?: string; name?: string; pos?: DesignPos | null
+  /** Which face of the garment. Absent = front, which is what every pre-per-side row is. */
+  side?: string | null }
 
 /**
  * Index designs so both keys resolve. A line-keyed row is stored under its line_id AND
@@ -1849,9 +1851,52 @@ export function indexDesigns(list: OrderDesign[]): Record<string, OrderDesign> {
   //
   // So the fallback can only ever reach a genuinely unattributed row, which is what it is
   // for: artwork saved before lines were tracked, where the sku is all we have.
-  for (const d of list) if (!d?.line_id && d?.sku) by[d.sku] = d
-  for (const d of list) if (d?.line_id) by[d.line_id] = d
+  //
+  // ONE PER LINE, AND IT IS THE FRONT. A line now holds a row PER SIDE, so several rows
+  // share a key and the last one written would win — meaning the order page could draw the
+  // BACK design on the mockup, decided by nothing but row order. Every caller of this map
+  // wants "the design for this line" in the singular, and for a garment that is the front.
+  //
+  // A row with no side is front too: that is what every row written before per-side artwork
+  // existed already is (server: coalesce(side,'front')).
+  const isFront = (d: OrderDesign) => !d.side || String(d.side).toLowerCase() === "front"
+  const put = (k: string, d: OrderDesign) => {
+    const cur = by[k]
+    // First writer wins UNLESS this one is the front and the sitting one is not — so a line
+    // whose only artwork is on the back still resolves to something rather than to nothing.
+    if (!cur || (isFront(d) && !isFront(cur))) by[k] = d
+  }
+  for (const d of list) if (!d?.line_id && d?.sku) put(d.sku, d)
+  for (const d of list) if (d?.line_id) put(d.line_id, d)
   return by
+}
+
+/**
+ * EVERY SIDE OF EVERY LINE — line key → side → design.
+ *
+ * indexDesigns answers "what does this line look like"; this answers "what is on each face",
+ * which is what the designer needs to place artwork per side and what a side list reads. Same
+ * keying rule, so the two can never disagree about which line a row belongs to.
+ */
+export function designsBySide(list: OrderDesign[]): Record<string, Record<string, OrderDesign>> {
+  const by: Record<string, Record<string, OrderDesign>> = {}
+  const put = (k: string, d: OrderDesign) => {
+    const side = String(d.side || "front").toLowerCase()
+    if (!by[k]) by[k] = {}
+    if (!by[k][side]) by[k][side] = d
+  }
+  for (const d of list) if (!d?.line_id && d?.sku) put(d.sku, d)
+  for (const d of list) if (d?.line_id) put(d.line_id, d)
+  return by
+}
+
+/** The faces of ONE line, by side name. Same fallback as designForLine: its own, else its sku. */
+export function sidesForLine(
+  map: Record<string, Record<string, OrderDesign>> | undefined,
+  line: { line_id?: string | null; sku?: string | null },
+): Record<string, OrderDesign> {
+  if (!map) return {}
+  return (line.line_id ? map[line.line_id] : undefined) ?? (line.sku ? map[line.sku] : undefined) ?? {}
 }
 
 /** The artwork for one line: its own, else whatever is filed under its SKU. */
@@ -2057,7 +2102,7 @@ export function getOrderDesigns(id: string) {
 }
 /** Attach artwork to a LINE. Pass `line_id` — without it the design keys on sku alone
  *  and two lines of the same sku overwrite each other. */
-export function postOrderDesign(id: string, body: { sku: string; line_id?: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null }) {
+export function postOrderDesign(id: string, body: { sku: string; line_id?: string; /** Which face. Omitted = front, which is what the server assumes. */ side?: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null }) {
   /** `design_no`/`design_id` come back from the save: the number minted for these exact
    *  bytes, or the existing one if this artwork has been seen before (server/design-id.js). */
   return api<{ ok?: boolean; error?: string; design_no?: number | null; design_id?: string | null }>(`/api/orders/${encodeURIComponent(id)}/designs`, {
