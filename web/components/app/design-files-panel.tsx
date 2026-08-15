@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, indexDesigns, designForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
+import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, designsBySide, sidesForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
 import { designSrc } from "@/lib/order-image"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -88,6 +88,9 @@ function orderFiles(files: DesignFileRow[]): OrderedFile[] {
  * screen.
  */
 type PlacedRow = { key: string; name: string; src: string; no: number | null; item: string | null
+  /** Which FACE this row is. One row per printed side — a line with a front and a back is
+   *  two jobs, two hoopings and two rows, not one. */
+  side: string
   /** Which line to detach. Sent to DELETE /api/orders/:id/designs, which is line-first. */
   lineId?: string | null; sku?: string | null }
 
@@ -99,22 +102,41 @@ type PlacedRow = { key: string; name: string; src: string; no: number | null; it
  * passes that card's line alone, where an index would be 1 for every line on the order —
  * a confident, wrong number, which is worse than none.
  */
-function placedRows(designs: Record<string, OrderDesign> | undefined, items: OrderItem[], numbered = true): PlacedRow[] {
-  if (!designs) return []
+/**
+ * ONE ROW PER PRINTED FACE.
+ *
+ * This listed one row per LINE, from the singular designForLine — so a garment with a front,
+ * a back and a sleeve reported a single design and the card said nothing about the other two.
+ * Three prints, three surcharge lines on the invoice, one row on screen.
+ *
+ * Ordered front first, then whatever else the line carries, so the row order matches the
+ * order the pills are read in.
+ */
+const SIDE_ORDER = ["front", "back", "left", "right", "hood", "pocket"]
+function placedRows(bySide: Record<string, Record<string, OrderDesign>> | undefined, items: OrderItem[], numbered = true): PlacedRow[] {
+  if (!bySide) return []
   const out: PlacedRow[] = []
   items.forEach((it, i) => {
-    const d = designForLine(designs, { line_id: it.line_id ?? undefined, sku: it.sku ?? undefined })
-    if (!d?.data) return
-    out.push({
-      key: String(it.line_id || it.sku || i),
-      // The stored name is the FILE's now; older rows carry the item's name instead, and
-      // that is still better than "Artwork" — it is what someone typed or picked.
-      name: d.name || it.name || it.sku || "Artwork",
-      src: designSrc(d.data),
-      no: numbered ? i + 1 : null,
-      item: it.name || it.sku || null,
-      lineId: it.line_id ?? null, sku: it.sku ?? null,
+    const faces = sidesForLine(bySide, { line_id: it.line_id, sku: it.sku })
+    const names = Object.keys(faces).sort((a, b) => {
+      const ia = SIDE_ORDER.indexOf(a), ib = SIDE_ORDER.indexOf(b)
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b)
     })
+    for (const sd of names) {
+      const d = faces[sd]
+      if (!d?.data) continue
+      out.push({
+        key: `${it.line_id || it.sku || i}:${sd}`,
+        // The stored name is the FILE's now; older rows carry the item's name instead, and
+        // that is still better than "Artwork" — it is what someone typed or picked.
+        name: d.name || it.name || it.sku || "Artwork",
+        src: designSrc(d.data),
+        no: numbered ? i + 1 : null,
+        item: it.name || it.sku || null,
+        side: sd,
+        lineId: it.line_id ?? null, sku: it.sku ?? null,
+      })
+    }
   })
   return out
 }
@@ -157,8 +179,8 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
             <button
               onClick={() => onRemove(r)}
               disabled={busy === r.key}
-              title="Take this artwork off the item"
-              aria-label={`Take ${r.name} off item ${r.no ?? ""}`.trim()}
+              title={`Take the ${r.side} artwork off this item`}
+              aria-label={`Take ${r.name} off the ${r.side} of item ${r.no ?? ""}`.trim()}
               className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
             >
               <X size={10} weight="bold" />
@@ -173,8 +195,11 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
           <img src={r.src} alt="" className="size-9 shrink-0 rounded-md border border-border bg-white object-contain" />
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-medium">{r.name}</div>
-            <div className="truncate text-3xs text-muted-foreground">
-              {r.item ? `${r.item} · ` : ""}placed in the designer
+            <div className="flex flex-wrap items-center gap-1.5 text-3xs text-muted-foreground">
+              {/* The FACE, as a chip — it is the thing that makes two otherwise identical
+                  rows different, so it should not be buried mid-sentence. */}
+              <span className="rounded bg-muted px-1.5 py-0.5 font-medium capitalize text-foreground/70">{r.side}</span>
+              <span className="truncate">{r.item ? `${r.item} · ` : ""}placed in the designer</span>
             </div>
           </div>
           {/* The ARTWORK badge is gone. The row already carries a picture of the artwork and
@@ -228,7 +253,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
    * hold design CARDS, not order designs. One call, and only when a card is open: this panel
    * renders inside an expanded card, never in the list.
    */
-  const [placedMap, setPlacedMap] = useState<Record<string, OrderDesign> | null>(null)
+  const [placedMap, setPlacedMap] = useState<Record<string, Record<string, OrderDesign>> | null>(null)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -254,7 +279,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
     // Best-effort: the files list is the subject of this panel, and failing to learn what
     // artwork is placed must not empty it.
     getOrderDesigns(orderId)
-      .then((r) => setPlacedMap(indexDesigns(Array.isArray(r) ? r : (r?.designs ?? []))))
+      .then((r) => setPlacedMap(designsBySide(Array.isArray(r) ? r : (r?.designs ?? []))))
       .catch(() => setPlacedMap({}))
   }, [orderId])
   useEffect(() => {
@@ -437,10 +462,10 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   /** The order's lines, so a dropped file can be pointed at one. Empty ⇒ everything a
    *  seller drops applies to the whole order, which is how this panel behaved before. */
   items?: OrderItem[]
-  /** The artwork already ON the lines, indexed by the page that draws the mockups. Passed
-   *  in rather than fetched: the page has it, the bytes are large, and a second copy could
+  /** The artwork already on the lines, BY FACE — line key → side → design. Passed in rather
+   *  than fetched: the page has the rows, the bytes are large, and a second copy could
    *  disagree with the picture on screen. Absent ⇒ this card simply shows files, as before. */
-  designs?: Record<string, OrderDesign>
+  designs?: Record<string, Record<string, OrderDesign>>
   /** Artwork went onto a line — the page reloads its designs so the canvas shows it. */
   onAttached?: () => void
 }) {
@@ -492,6 +517,19 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    */
   type Staged = { file: File; name: string; target: string; image: boolean }
   const [staged, setStaged] = useState<Staged[]>([])
+  /**
+   * A CEILING ON THE QUEUE, and it is about legibility rather than bytes.
+   *
+   * Every staged row is a decision — which item does this one go on — and the whole point of
+   * staging is that a wrong guess is obvious while it is still free to fix. Forty rows is not
+   * a list anybody checks; it is a list somebody scrolls past and presses Attach on. Each one
+   * is also a separate upload of up to 50MB, so a careless multi-select is a very long
+   * request nobody asked for.
+   *
+   * Twenty is comfortably above a real order (a nine-line order needs nine) and well below
+   * "I selected my whole downloads folder".
+   */
+  const MAX_STAGED = 20
   const stage = (list: FileList | File[]) => {
     const arr = Array.from(list)
     if (!arr.length) return
@@ -506,15 +544,24 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
     const big = arr.filter((f) => f.size > 50 * 1024 * 1024)
     if (big.length) setErr(`${big.map((f) => f.name).join(", ")} — over the 50 MB limit.`)
     const ok = arr.filter((f) => (MACHINE_RE.test(f.name) || isImg(f)) && f.size <= 50 * 1024 * 1024)
-    setStaged((prev) => [
+    setStaged((prev) => {
+      const fresh = ok.filter((f) => !prev.some((s) => s.name === f.name))
+      const room = Math.max(0, MAX_STAGED - prev.length)
+      if (fresh.length > room) {
+        // Named, not silently truncated: a queue that quietly drops half a selection is a
+        // queue you believe you attached.
+        setErr(`Too many files at once — ${MAX_STAGED} is the limit, so ${fresh.length - room} ${fresh.length - room === 1 ? "was" : "were"} left out. Attach these, then drop the rest.`)
+      }
+      return [
       ...prev,
-      ...ok.filter((f) => !prev.some((s) => s.name === f.name))
+      ...fresh.slice(0, room)
         .map((f) => {
           const image = isImg(f)
           const allowed = image ? items : items.filter((it) => isEmbroidery(it.print_type))
           return { file: f, name: f.name, target: allowed.length ? matchLine(f.name, allowed) : ALL, image }
         }),
-    ])
+      ]
+    })
   }
 
   const readDataUrl = (f: File) => new Promise<string>((res, rej) => {
@@ -765,16 +812,16 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * the same map), so the page re-reads and this list follows. Editing a copy here would
    * leave the row gone and the garment still wearing it.
    */
-  const detach = async (r: { key: string; name: string; lineId?: string | null; sku?: string | null }) => {
+  const detach = async (r: { key: string; name: string; side: string; lineId?: string | null; sku?: string | null }) => {
     if (!(await confirm({
-      title: `Take ${r.name} off this item?`,
+      title: `Take ${r.name} off the ${r.side}?`,
       body: "It comes off the line. Any design charge already made stays — ask an admin if it needs reversing.",
       confirmLabel: "Remove artwork",
       destructive: true,
     }))) return
     setBusy(r.key); setErr(null)
     try {
-      const res = await deleteOrderDesign(orderId, { line_id: r.lineId ?? undefined, sku: r.sku ?? undefined })
+      const res = await deleteOrderDesign(orderId, { line_id: r.lineId ?? undefined, sku: r.sku ?? undefined, side: r.side })
       if (res?.error) throw new Error(res.error)
       onAttached?.()
     } catch (e) {

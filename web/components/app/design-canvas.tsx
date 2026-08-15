@@ -1418,7 +1418,21 @@ export function DesignCanvasDialog({
           // The intent is unambiguous: they have a machine file and dropped it on the
           // window that was open. So take it, file it against this line, and say which of
           // the two things happened.
-          if (MACHINE_RE.test(f.name)) { void attachMachineFile(f); return }
+          /**
+            * A STITCH FILE ONLY FITS AN EMBROIDERED LINE.
+            *
+            * On a DTG or a laser line there is no machine to run it and no check to perform,
+            * so filing one there is not a near-miss — it is a fee raised for a file nothing
+            * can use. The seller card has always refused this; this window took the drop and
+            * attached it, which is the same mistake with fewer words.
+            */
+          if (MACHINE_RE.test(f.name)) {
+            if (!isEmb) {
+              setErr(`${f.name} is an embroidery file, and this line is ${item.print_type || "not embroidered"} — there is no machine to run it. Drop a PNG or JPG instead.`)
+              return
+            }
+            void attachMachineFile(f); return
+          }
           if (!/^image\//.test(f.type)) {
             setErr(`${f.name} isn't an image or a machine file, so there's nothing to do with it here.`)
             return
@@ -1462,9 +1476,8 @@ export function DesignCanvasDialog({
           *
           * These tabs used to change only the picture underneath — the artwork followed you
           * round the garment, and saving on the back wrote over the front. Each face now
-          * holds its own design, and each tab says whether that face has one: a filled dot
-          * means there is artwork on it, so "what is still empty" is answered without
-          * clicking through every face.
+          * holds its own design, and each tab says whether that face has one by how it is
+          * PAINTED, so "what is still empty" is answered without clicking through every face.
           *
           * A side is one print — one hooping, one platen pass — which is also how the
           * surcharge bills it, so the list is the job as the floor will run it.
@@ -1473,14 +1486,27 @@ export function DesignCanvasDialog({
           <div className="flex flex-wrap gap-1.5">
             {faces.map((f, i) => {
               const has = facesWithArt[(f.side || "front").toLowerCase()]
+              /**
+               * THE PILL ITSELF CARRIES THE STATE — no dot.
+               *
+               * A dot is a second mark inside a control that could just BE the mark, and next
+               * to a filled pill it read as a third state rather than as "this one has
+               * something on it". Three appearances, one property:
+               *
+               *   solid    — the face you are on
+               *   tinted   — has artwork, not selected
+               *   plain    — empty
+               *
+               * Primary, not a status colour: emerald/amber/red are spoken for on the floor
+               * (shipped, hold, alert) and a designer tab is not a floor status.
+               */
               return (
                 <button key={f.side} onClick={() => goToSide(i)}
                   title={has ? `${f.side} — has artwork` : `${f.side} — empty`}
-                  className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors " + (i === side ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent")}>
-                  {/* ONLY when the face has artwork. A faded dot on an empty face is a mark
-                      that means "nothing", and three of them read as three states rather
-                      than as one filled and two blank. */}
-                  {has && <span className={"size-1.5 rounded-full " + (i === side ? "bg-primary-foreground" : "bg-success")} />}
+                  className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors "
+                    + (i === side ? "bg-primary text-primary-foreground"
+                      : has ? "bg-primary/10 text-primary hover:bg-primary/15"
+                        : "bg-muted text-muted-foreground hover:bg-accent")}>
                   {f.side}
                   {/**
                     * WHAT THIS FACE COSTS, before it is chosen.

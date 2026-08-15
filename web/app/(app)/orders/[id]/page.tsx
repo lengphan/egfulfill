@@ -26,6 +26,7 @@ import {
   getOrders,
   getOrder,
   indexDesigns,
+  designsBySide,
   designForLine,
   getOrderDesigns,
   getOrderMessages,
@@ -97,6 +98,14 @@ export default function OrderDetailPage() {
   const [ttLabelBusy, setTtLabelBusy] = useState(false)
   const [ttLabelErr, setTtLabelErr] = useState<string | null>(null)
   const [designs, setDesigns] = useState<Record<string, OrderDesign>>({})
+  /**
+   * The same rows, BY FACE. `designs` is deliberately singular — one design per line, the
+   * front — because that is what a mockup, an avatar and a readiness dot each want. The
+   * Design files card wants every printed face, which is a different question about the same
+   * data, so it gets its own map rather than the singular one being widened underneath the
+   * things that rely on it.
+   */
+  const [designSides, setDesignSides] = useState<Record<string, Record<string, OrderDesign>>>({})
   // What the buyer paid, when nothing recorded it — a manual order has no marketplace to
   // ask, so it is typed here or it is never known.
   const [editRetail, setEditRetail] = useState(false)
@@ -167,7 +176,11 @@ export default function OrderDetailPage() {
   const reloadDesigns = () => {
     getOrderDesigns(id)
       .then((r) => {
-        setDesigns(indexDesigns(Array.isArray(r) ? r : (r?.designs ?? [])))
+        {
+          const list = Array.isArray(r) ? r : (r?.designs ?? [])
+          setDesigns(indexDesigns(list))
+          setDesignSides(designsBySide(list))
+        }
       })
       .catch(() => {})
   }
@@ -191,7 +204,9 @@ export default function OrderDetailPage() {
     if (id) {
       getOrderDesigns(id)
         .then((r) => {
-          const by = indexDesigns(Array.isArray(r) ? r : (r?.designs ?? []))
+          const list0 = Array.isArray(r) ? r : (r?.designs ?? [])
+          setDesignSides(designsBySide(list0))
+          const by = indexDesigns(list0)
           if (alive) setDesigns(by)
         })
         .catch(() => {})
@@ -647,7 +662,7 @@ export default function OrderDetailPage() {
             {/* `designs` is the same map the item rows draw their mockups from, so the card
                 lists the artwork that is already ON this order instead of announcing that
                 nothing has arrived. */}
-            <div className="p-5"><SellerDesignFiles orderId={String(id)} items={items} designs={designs} onAttached={reloadDesigns} /></div>
+            <div className="p-5"><SellerDesignFiles orderId={String(id)} items={items} designs={designSides} onAttached={reloadDesigns} /></div>
           </SectionCard>
 
           {/* FACTORY ONLY. A seller's order page shows them what they need to act on; the
