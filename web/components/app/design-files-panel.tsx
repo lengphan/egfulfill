@@ -689,9 +689,12 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
                 {items.length > 0 && s.target !== ALL ? " · matched by name" : ""}
               </div>
             </div>
+            {/* text-xs, matching the file name beside it — the field was two steps smaller
+                than everything in its own row. clearable={false}: see the note on the prop;
+                "no line at all" is not a state a file can hold. */}
             {items.length > 0 && (targetsFor(s.image).length > 0 ? (
               <VariantField
-                label="Goes on" compact className="w-32"
+                label="Goes on" compact clearable={false} className="w-32 text-xs"
                 value={labelFor(s.image, s.target)} options={optionsFor(s.image)}
                 onChange={(v) => setStaged((prev) => prev.map((x) => (x.name === s.name ? { ...x, target: keyAt(s.image, v) } : x)))}
               />
@@ -894,9 +897,13 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             * a non-staff caller may only re-scope a file on their OWN order, so this control
             * is safe to give to every role that can already see the row.
             */}
+          {/* SIZED TO ITS NEIGHBOURS. This sat at text-2xs beside a text-sm file name and a
+              text-sm Download button, at the same height as the button — so the row had two
+              controls the same size holding type two steps apart, which is what made it
+              read as uneven rather than as a pair. */}
           {items.length > 0 && (
             <VariantField
-              label="Goes on" compact className="w-32 shrink-0"
+              label="Goes on" compact clearable={false} className="w-32 shrink-0 text-sm"
               value={labelFor(f.kind === "image", f.lineId || ALL)}
               options={optionsFor(f.kind === "image")}
               onChange={(v) => void rescope(f, keyAt(f.kind === "image", v))}
@@ -929,8 +936,12 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
               only ever produce "forbidden". */}
           {f.source !== "seller" && (
             <Button size="sm" variant={f.paid || !f.price ? "outline" : "default"} disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
+              {/* Word alone. The glyph said nothing "Download" doesn't, and it made this
+                  button visibly heavier than the field beside it — the pair is a control
+                  and its action, so they should look like a pair. The spinner stays: that
+                  one carries information the word cannot. */}
               {busy === f.designId ? <CircleNotch size={13} className="animate-spin" />
-                : (f.paid || !f.price) ? <><FileArrowDown size={13} weight="bold" /> Download</>
+                : (f.paid || !f.price) ? "Download"
                 : <>Buy ${f.price} &amp; download</>}
             </Button>
           )}

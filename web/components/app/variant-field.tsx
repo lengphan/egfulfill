@@ -42,6 +42,7 @@ export function VariantField({
   swatches,
   compact,
   className,
+  clearable = true,
 }: {
   label: string
   value: string
@@ -57,6 +58,17 @@ export function VariantField({
   compact?: boolean
   /** Extra classes merged into the trigger (e.g. a height override for a form row). */
   className?: string
+  /**
+   * Can this field go back to having no value?
+   *
+   * Colour/Size/Method can — a line legitimately returns to unset — so the menu opens with
+   * a row naming the field, and picking it clears. "Goes on" cannot: a design file is
+   * attached to a line or to the whole order, and there is no third state, so that row was
+   * a header the label already provided and a choice that could not be made. Off by
+   * exception, never by default: silently losing the clear on a field that needs it is the
+   * worse failure.
+   */
+  clearable?: boolean
 }) {
   // A product that declares no options for this attribute is a free choice, not a bug —
   // the field says "Any" and there's nothing to open.
@@ -136,10 +148,13 @@ export function VariantField({
     <DropdownMenu>
       {trigger}
       <DropdownMenuContent align="start" className="max-h-64 w-[--anchor-width] min-w-44 overflow-y-auto">
-        {/* Clearing is a real choice — a line can legitimately go back to unset. */}
-        <DropdownMenuItem onClick={() => onChange("")} className="text-muted-foreground">
-          {ph}
-        </DropdownMenuItem>
+        {/* Clearing is a real choice — a line can legitimately go back to unset. Not for
+            every field though: see `clearable`. */}
+        {clearable && (
+          <DropdownMenuItem onClick={() => onChange("")} className="text-muted-foreground">
+            {ph}
+          </DropdownMenuItem>
+        )}
         {options.map((o) => (
           <DropdownMenuItem key={o} onClick={() => onChange(o)} className="gap-2">
             {swatches && <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: swatchHex(o) }} />}
