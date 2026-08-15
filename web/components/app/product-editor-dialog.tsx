@@ -16,6 +16,7 @@ import { normalizeMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-meth
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 import { packagingHint } from "@/lib/dim-weight"
 import { cleanSku } from "@/lib/sku"
+import { framingStyle, FOCUS_MIN, FOCUS_MAX, ZOOM_MIN, ZOOM_MAX } from "@/lib/product-framing"
 
 // Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
 // surcharges cannot drift apart again.
@@ -601,7 +602,10 @@ export function ProductEditorDialog({
                   src={img}
                   alt=""
                   className="size-full object-cover"
-                  style={{ transform: `scale(${(imgZoom || 100) / 100})`, objectPosition: `center ${imgFocusY ?? 50}%` }}
+                  // The SAME function every other surface frames with (lib/product-framing),
+                  // so "what you set is what the grid shows" stays true of the product page
+                  // and the public catalogue too — which it was not.
+                  style={framingStyle({ imgZoom, imgFocusY })}
                 />
               ) : typeMockup ? (
                 <>
@@ -632,15 +636,19 @@ export function ProductEditorDialog({
                 <label className="flex items-center gap-1.5">
                   <span className="w-8 shrink-0 text-3xs uppercase tracking-wider text-muted-foreground">Zoom</span>
                   <input
-                    type="range" min={100} max={300} step={5} value={imgZoom || 100}
+                    type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={5} value={imgZoom || 100}
                     onChange={(e) => setImgZoom(Number(e.target.value))}
                     className="h-1 flex-1 accent-primary" aria-label="Main image zoom"
                   />
                 </label>
                 <label className="flex items-center gap-1.5">
                   <span className="w-8 shrink-0 text-3xs uppercase tracking-wider text-muted-foreground">Up/dn</span>
+                  {/* The ENDS are the same numbers they always were (0–100, 50 centre) — what
+                      grew is how far each one moves the picture. It used to pan through the
+                      cover overflow, which on a 4:3 photo in a square box is zero: the slider
+                      travelled its whole length and nothing happened. See FOCUS_TRAVEL_PCT. */}
                   <input
-                    type="range" min={0} max={100} step={1} value={imgFocusY ?? 50}
+                    type="range" min={FOCUS_MIN} max={FOCUS_MAX} step={1} value={imgFocusY ?? 50}
                     onChange={(e) => setImgFocusY(Number(e.target.value))}
                     className="h-1 flex-1 accent-primary" aria-label="Main image vertical position"
                   />

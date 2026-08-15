@@ -7,6 +7,7 @@ import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/ma
 import { ShippingFees } from "@/components/shipping-fees"
 import type { ShipBands } from "@/lib/api"
 import type { PublicProduct } from "@/lib/api"
+import { framingStyle } from "@/lib/product-framing"
 
 /**
  * Products, showing the REAL catalogue rather than a written-out list of categories.
@@ -102,14 +103,20 @@ export function BoldCatalog({ products, shipping }: {
                         photo should look unfinished, not broken. */}
                     <div className="relative aspect-square overflow-hidden" style={{ background: ACCENT }}>
                       {p.image ? (
-                        <Image
-                          src={p.image}
-                          alt={p.name}
-                          fill
-                          unoptimized
-                          sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw"
-                          className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                        />
+                        /* The crop set in the product editor, on a WRAPPER rather than on the
+                           image: the hover lift is a class-based transform and an inline one
+                           would win against it, killing the lift on every framed product.
+                           Same arrangement the staff grid uses. */
+                        <div className="absolute inset-0" style={framingStyle(p)}>
+                          <Image
+                            src={p.image}
+                            alt={p.name}
+                            fill
+                            unoptimized
+                            sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw"
+                            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                          />
+                        </div>
                       ) : (
                         <div className="flex size-full items-center justify-center text-[#FAF8F3]/45">
                           <TShirt size={40} weight="duotone" />

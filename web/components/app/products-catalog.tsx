@@ -70,6 +70,7 @@ const publicStateOf = (p: CatalogProduct): PublicState => {
 }
 
 import { sizesOf } from "@/lib/variant-resolve"
+import { framingStyle } from "@/lib/product-framing"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -348,17 +349,13 @@ export function ProductsCatalog() {
                      *
                      * Absent values are 100 / 50, which is exactly the previous behaviour.
                      */
-                    <div
-                      className="absolute inset-0"
-                      style={{ transform: `scale(${(Number(p.imgZoom) || 100) / 100})` }}
-                    >
+                    <div className="absolute inset-0" style={framingStyle(p)}>
                       <Image
                         src={img}
                         alt={p.name ?? "Product"}
                         fill
                         unoptimized
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                        style={{ objectPosition: `center ${Number.isFinite(Number(p.imgFocusY)) ? Number(p.imgFocusY) : 50}%` }}
                       />
                     </div>
                   ) : (

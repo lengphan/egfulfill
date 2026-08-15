@@ -945,6 +945,11 @@ export type PublicProduct = {
   methods: string[]
   colors: PublicColor[]
   sizes: string[]
+  /** How the photo is framed — the crop set in the product editor, so the public site shows
+   *  the same composition the app does. Null when nobody has framed it. See
+   *  lib/product-framing.ts; the server clamps both to the editor's own bounds. */
+  imgZoom?: number | null
+  imgFocusY?: number | null
   /** Garment measurements, straight from the supplier's /specs feed and cached server-side.
    *  Generic {size, spec, value} rows because the measurements differ per garment
    *  ("Chest Width", "Bill/ Brim Length"), so a chart is PIVOTED from these rather than read

@@ -119,6 +119,13 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * not something a public page can render, and emitting one would leak an internal detail
    * AND draw a broken image.
    */
+  /** A stored number, or null when it is absent or outside what the editor can produce.
+   *  Null means "unframed" to the client, which is a different thing from a clamped 0. */
+  const clampNum = (v, lo, hi) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null;
+  };
+
   const publicImage = (d) => {
     const cands = [d.img, d.image, d.hero, Array.isArray(d.images) ? d.images[0] : null,
       d.colorImages && typeof d.colorImages === 'object' ? Object.values(d.colorImages)[0] : null];
@@ -328,6 +335,21 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       methods,
       colors,
       sizes: Array.isArray(d.sizes) ? d.sizes.filter((s) => typeof s === 'string' && s.trim()) : [],
+      /**
+       * HOW THE PHOTO IS FRAMED — two numbers, and nothing else about it.
+       *
+       * Added to the allow-list deliberately, not by widening it: a supplier's studio shot
+       * is a small garment in a large white field, and the crop someone sets in the product
+       * editor is the difference between a card that looks composed and one that looks like
+       * a stock photo. Without these the public site was the one surface that ignored it.
+       *
+       * Safe to publish by the test this list exists for (CLAUDE.md 2.8): a scale factor and
+       * a vertical offset say nothing about who makes the blank or what it costs us. Clamped
+       * to the editor's own bounds rather than passed through, so a hand-edited row can't
+       * put an arbitrary transform on a public page.
+       */
+      imgZoom: clampNum(d.imgZoom, 100, 300),
+      imgFocusY: clampNum(d.imgFocusY, 0, 100),
     };
   };
 

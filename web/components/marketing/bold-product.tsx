@@ -8,6 +8,7 @@ import { ACCENT, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bol
 import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
+import { framingStyle } from "@/lib/product-framing"
 
 /**
  * One published product, in public shape.
@@ -132,6 +133,10 @@ export function BoldProduct({ product, shipping }: {
                     priority
                     sizes="(max-width:1024px) 100vw, 60vw"
                     className="object-cover"
+                    /* The crop set in the product editor. The public pages were the last
+                       surface still ignoring it, so a product framed for the app arrived
+                       here uncropped — see lib/product-framing. */
+                    style={framingStyle(product)}
                   />
                 ) : (
                   /* Accent, not a grey box — a product without a photo should read as
