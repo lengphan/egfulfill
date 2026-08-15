@@ -6,12 +6,24 @@ import { PaperPlaneTilt, Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { updateOrder, getOrderQuote, getOrderLimitStatus, ApiError, type OrderRow, type OrderQuote } from "@/lib/api"
+import { isFactoryOrder } from "@/lib/factory-status"
 
 const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toFixed(2)}`
 
-/** An order can only be submitted before the factory has it. */
-export const isSubmittable = (o: { factory_status?: string | null }) =>
-  ["", "new", "draft"].includes(String(o.factory_status || ""))
+/**
+ * An order can only be submitted before the factory has it — and only if there is a seller
+ * to submit it.
+ *
+ * NOT ON THE FACTORY'S OWN ORDERS. Submit is the CHARGE point: it takes money from a
+ * seller's wallet and parks the order at Pending for us to accept. A factory-owned order
+ * has neither half — the server never charges it (the charge sits inside `if (sel)`, and
+ * staff resolve to sel = null) and `in_review` isn't even on its pipeline (FACTORY_LINE
+ * in server/src/routes/orders.js). So the button offered to bill nobody and move an order
+ * to a stage it cannot occupy, beside "Start", which is the real one — the button that
+ * accepts the job, pulls the blanks out of inventory, and means production has begun.
+ */
+export const isSubmittable = (o: { factory_status?: string | null; factory_order?: boolean | null }) =>
+  !isFactoryOrder(o) && ["", "new", "draft"].includes(String(o.factory_status || ""))
 
 /**
  * Submit to production — the CHARGE point.
