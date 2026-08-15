@@ -1226,7 +1226,7 @@ export function DesignCanvasDialog({
         // 380px rail, the 24px gap and the 48px of padding. A fixed 1180px gave the rail far
         // more room than it uses and the surplus read as blank around the window. max-w-fit
         // does not work here — it under-measures the grid and clips the rail off the edge.
-        className="sm:max-w-2xl lg:max-w-[min(96vw,calc(min(62vh,46vw)+452px))]"
+        className="sm:max-w-2xl lg:max-w-[min(96vw,calc(min(70vh,50vw)+452px))]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -1286,7 +1286,7 @@ export function DesignCanvasDialog({
         {/* Both terms are viewport units on purpose. `min(100%,78vh)` collapsed the column to
             zero: the column is `auto`, so its width comes from its content, and the content
             asked for a percentage OF that column — a circular reference resolving to nothing. */}
-        <div className="lg:sticky lg:top-0 lg:w-[min(62vh,46vw)] lg:self-start">
+        <div className="lg:sticky lg:top-0 lg:w-[min(70vh,50vw)] lg:self-start">
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {faces.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
@@ -1393,7 +1393,15 @@ export function DesignCanvasDialog({
                 }}
               >
                 <UploadSimple size={20} weight="duotone" />
-                <span className="text-xs font-medium leading-tight">Drop artwork<br />or click to browse</span>
+                {/* SAY WHAT TO DROP, and say it differently for a line that can take a stitch
+                    file. "Drop artwork" is true and useless: an embroidered line accepts a
+                    PNG we digitise OR a machine file we only check, and which one you have
+                    decides both the fee and the wait. A DTG line has no such choice, so it
+                    is not offered one. */}
+                <span className="text-xs font-medium leading-tight">Drop a file<br />or click to browse</span>
+                <span className="text-3xs font-normal leading-tight opacity-80">
+                  {isEmb ? "PNG or JPG — or a .EMB / .PES / .DST" : "PNG or JPG"}
+                </span>
               </span>
             </button>
           )}
@@ -1584,10 +1592,15 @@ export function DesignCanvasDialog({
               them as two numbered slots — the image (what shows on the mockup) and the
               machine file (the stitch file) — each with its own state, so it reads as a
               two-item checklist instead of a row of same-looking buttons. */}
-          {/* STACKED, not side by side. Two cards in a row are read as a pair of options;
-              stacked and numbered they are read as an order of work, which is what they are.
-              It also fixes the window: a tall narrow rail sits beside a big square garment
-              with no dead band, where a short wide row left one. */}
+          {/* STACKED, not side by side: a tall narrow rail sits beside a big square garment
+              with no dead band, where a short wide row left one.
+
+              NOT NUMBERED. They were "1" and "2", which asserts an order of work that is not
+              true for most lines — a DTG line has no second step at all, and an embroidered
+              one where the seller sent their own stitch file has no first one in the sense
+              the number implied. Two cards that each say what they are, and tick when they
+              are done, carry the same information without instructing anybody. The marker is
+              a dot until then: the card is a state, not a task list. */}
           <div className="flex flex-col gap-2">
             {/* 1 — Design image */}
             {/* ONE GREEN. This step hand-picked emerald-300/50 while step 2 below used the
@@ -1596,7 +1609,7 @@ export function DesignCanvasDialog({
             <div className={cn("rounded-lg border p-2.5", designUrl ? "border-success/40 bg-success/5" : "border-dashed border-border bg-muted/20")}>
               <div className="flex items-start gap-2">
                 <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold", designUrl ? "bg-success text-white" : "border border-border bg-background text-muted-foreground")}>
-                  {designUrl ? <Check size={12} weight="bold" /> : "1"}
+                  {designUrl ? <Check size={12} weight="bold" /> : <span className="size-1.5 rounded-full bg-muted-foreground/50" />}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">Your design</div>
@@ -1641,7 +1654,7 @@ export function DesignCanvasDialog({
                   : "border border-border bg-background text-muted-foreground")}>
                   {hasMachineFile ? <Check size={12} weight="bold" />
                     : sentToDesigner ? <PaperPlaneTilt size={11} weight="fill" />
-                    : "2"}
+                    : <span className="size-1.5 rounded-full bg-muted-foreground/50" />}
                 </span>
                 <div className="min-w-0 flex-1">
                   {/* "Machine file" is our word for it. Every format this step accepts is an
