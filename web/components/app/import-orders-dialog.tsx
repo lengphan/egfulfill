@@ -307,7 +307,14 @@ export function ImportOrdersDialog({
           // nothing. Persisted to the line's design_src.
           designSrc: it.designUrl || undefined,
         }))
-        const total = orderTotal(items.map((it) => ({ qty: it.qty ?? 1, unitPrice: it.unitPrice ?? 0, size: it.size })), []).total
+        /**
+         * THE SALE, not a fulfilment estimate. `.total` added OUR shipping fee ladder to
+         * the buyer's money and stored the sum as the order's total — two pots in one
+         * number. `.subtotal` is Σ(Item Price × qty), which is exactly what the template
+         * says that column is: "what the BUYER paid per unit … it does NOT set the
+         * fulfilment charge". What we charge is quoted at submit.
+         */
+        const total = orderTotal(items.map((it) => ({ qty: it.qty ?? 1, unitPrice: it.unitPrice ?? 0, size: it.size })), []).subtotal
         const hasAddress = !!(o.address.street || o.address.city)
         // Shipping Service + Internal Notes were also parsed but dropped — keep them on the
         // order's meta so they survive the import instead of vanishing.
@@ -315,6 +322,10 @@ export function ImportOrdersDialog({
         if (o.service) meta.shippingService = o.service
         if (o.notes) meta.notes = o.notes
         if (o.orderNumber) meta.sourceOrderNumber = o.orderNumber
+        // The sheet CARRIED a sale price, so this order's total is a recorded fact rather
+        // than something the importer added up — which is what lets the order page show it
+        // as "Customer paid" instead of "not recorded". No Item Price column, no flag.
+        if (total > 0) meta.retail_set = true
         const r = await createOrder({
           id: nextOrderId(),
           seq: baseSeq + i,

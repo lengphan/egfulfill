@@ -327,11 +327,19 @@ export default function OrderDetailPage() {
    * make, and the card reported a $35.99 loss in red. The loss is arithmetic on a number
    * that was never a retail price.
    *
-   * So a manual order's revenue comes from the LINES, which is where a seller actually
-   * records what the buyer paid. Nothing there means nothing recorded — stated as such,
-   * with no profit figure, which is the existing honest path for this case. A marketplace
-   * order is unaffected: etsy.js sets `total` from the receipt grandtotal, and that IS the
-   * buyer's money.
+   * NOR DO THE LINES ANSWER IT. Falling back to Σ(unit_price × qty) was the next attempt,
+   * on the argument that a seller records the buyer's price there. On a manual order they
+   * often don't: the create form prefilled that column with the blank's BASE COST — what
+   * we charge THEM — so the card reported our own invoice back as "Customer paid $7.16",
+   * and the profit line subtracted a number from itself. The form no longer prefills it
+   * (see orders/new), but orders created before that still carry those figures.
+   *
+   * SO THERE IS EXACTLY ONE SOURCE: a total someone deliberately recorded.
+   *   · a marketplace order — etsy.js/shopify set `total` from the receipt grandtotal,
+   *     which IS the buyer's money, so it syncs on its own;
+   *   · `retail_set` — typed into this card, or imported from a sheet's Item Price column.
+   * Anything else reads "not recorded", with no profit figure. A manual order left blank
+   * is the normal case, not a defect: nobody but the seller knows what their buyer paid.
    */
   const lineRevenue = (order.items ?? []).reduce(
     (s, it) => s + (Number(it.unit_price) || 0) * (Number(it.qty) || 1), 0)
@@ -347,7 +355,10 @@ export default function OrderDetailPage() {
       .catch(() => {})
     reloadOne()
   }
-  const revenue = fromMarketplace || retailSet ? (Number(order.total ?? 0) || 0) || lineRevenue : lineRevenue
+  // The line fallback survives for a MARKETPLACE order only, where unit_price is the
+  // seller's own listing price and the grandtotal is occasionally missing. A manual order
+  // gets no fallback at all — see above.
+  const revenue = fromMarketplace || retailSet ? (Number(order.total ?? 0) || 0) || (fromMarketplace ? lineRevenue : 0) : 0
   const hasRevenue = revenue > 0
   // COST is what the seller paid US, read off the ledger — every part, including the ones
   // the quote can't see. Falls back to the quote before submit, when nothing is charged yet.
