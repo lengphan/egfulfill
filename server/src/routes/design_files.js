@@ -154,7 +154,11 @@ export function designFilesRoutes(app, requireAuth) {
           and art_hash is not null
           and ( ($3::text is not null and line_id = $3)
              or (line_id is null and (sku = $2 or ($3::text is not null and sku = $3))) )
-        order by (line_id is not null) desc, (sku = $3) desc, updated_at desc nulls last
+        -- The FRONT first, for the same reason the order list prefers it: a line holds a
+        -- row per side, and "is this artwork already digitised" should be asked about the
+        -- design the item is identified by, not about whichever face was saved last.
+        order by (line_id is not null) desc, (sku = $3) desc,
+                 (coalesce(side,'front') = 'front') desc, updated_at desc nulls last
         limit 1`,
       [orderId, sku, lineId]).then((r) => r.rows[0]).catch(() => null);
     if (!src || !src.art_hash) return { exact: [], similar: [], hashed: false };

@@ -326,9 +326,11 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     // sku alone would put this artwork on whichever sibling the key happened to reach and
     // leave the other showing it too.
     await q(
-      `insert into order_designs (order_id, sku, line_id, kind, data, storage_key, name, art_hash, updated_at)
-       values ($1,$2,$7,'raster',$3,$4,$5,$6, now())
-       on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind) do update set
+      // 'front', and the conflict target names side: a design card has no face of its own,
+      // and the index this used to conflict on has been replaced by the per-side one.
+      `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, art_hash, updated_at)
+       values ($1,$2,$7,'raster','front',$3,$4,$5,$6, now())
+       on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind, (coalesce(side,'front'))) do update set
          data=excluded.data, storage_key=excluded.storage_key, name=excluded.name,
          art_hash=excluded.art_hash, updated_at=now()`,
       // `card.thumb` as the last resort for `data`. The guard above already accepted a card

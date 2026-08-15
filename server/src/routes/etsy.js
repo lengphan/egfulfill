@@ -383,9 +383,14 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
           // next restart. The attach below needs it on the order that just landed.
           const artHash = hashOf(built.design_data);
           await q(
-            `insert into order_designs (order_id, sku, line_id, kind, data, name, pos, art_hash, updated_at)
-             values ($1,$2,$3,'raster',$4,$5,$6,$7, now())
-             on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind) do nothing`,
+            // side: the front. Published artwork is the listing's main image, and per-side
+            // artwork is placed by a person in the designer, not inferred from a listing.
+            // The conflict target MUST name side too — the three-column index it used to
+            // use no longer exists (see the migration in orders.js), and this insert
+            // swallows its errors, so a stale target here fails silently forever.
+            `insert into order_designs (order_id, sku, line_id, kind, side, data, name, pos, art_hash, updated_at)
+             values ($1,$2,$3,'raster','front',$4,$5,$6,$7, now())
+             on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind, (coalesce(side,'front'))) do nothing`,
             [id, tr.sku || null, lineId, built.design_data, 'Published artwork', built.design_pos || null, artHash]
           ).catch(() => {});
           if (artHash) await attachKnownMachineFile({ orderId: id, sku: tr.sku || null, lineId, artHash, sellerId: conn.connected_by });

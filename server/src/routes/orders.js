@@ -1049,6 +1049,11 @@ export function ordersRoutes(app, requireAuth) {
            )
          order by (d.line_id is not null) desc,   -- a line-keyed row beats a guess
                   (d.sku = i.line_id) desc,       -- then one naming this exact line
+                  -- THE FRONT, before "most recently touched". A line holds a row per side
+                  -- now, so without this a back design saved after the front would name the
+                  -- item in every list — the same trap indexDesigns() has on the client, and
+                  -- the two must agree or the board and the page disagree about one line.
+                  (coalesce(d.side,'front') = 'front') desc,
                   d.updated_at desc nulls last
          limit 1
       ) dz on true`;

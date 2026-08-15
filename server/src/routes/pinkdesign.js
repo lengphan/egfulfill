@@ -635,9 +635,12 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
         } catch { storageKey = null; }   // fall through to storing their URL
       }
       await q(
-        `insert into order_designs (order_id, sku, kind, data, storage_key, name, updated_at)
-         values ($1,$2,'partner',$3,$4,$5, now())
-         on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind) do update set
+        // Same two corrections as the other writers: an explicit side, and a conflict
+        // target that names it. This one also swallows errors, so a stale target would
+        // have lost every partner deliverable quietly.
+        `insert into order_designs (order_id, sku, kind, side, data, storage_key, name, updated_at)
+         values ($1,$2,'partner','front',$3,$4,$5, now())
+         on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind, (coalesce(side,'front'))) do update set
            data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, updated_at=now()`,
         [card.order_id, card.sku, storageKey ? null : url, storageKey, 'Pink Design deliverable']
       ).catch(() => {});
