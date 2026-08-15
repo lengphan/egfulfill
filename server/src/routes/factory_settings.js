@@ -31,6 +31,10 @@ const KEYS = [
   // a key that didn't exist ('method_screen print') and returned 0, so screen-print,
   // sublimation and vinyl work carried NO surcharge at all.
   'method_scr', 'method_sub', 'method_vnl',
+  // Per ADDITIONAL printed face on a line. The first side is what the blank's base cost
+  // already pays for, so this only ever multiplies sides 2, 3, 4 — see sideAddOn in
+  // pricing.js. 0 keeps a second print free, which is what it was before this existed.
+  'method_side',
   // Markup added to a supplier's PRODUCT COST to get the base cost we charge sellers.
   // Supplier syncs (S&S, Otto) fill in product cost; this turns it into a sell price
   // without anyone retyping a number per size.
@@ -130,6 +134,10 @@ export const SETTING_DEFAULTS = {
   method_scr: 2,      // screen print — setup per colour
   method_sub: 1,      // sublimation
   method_vnl: 2,      // heat-transfer vinyl, cut + weed
+  // 0 by default ON PURPOSE. Every order already on the platform was priced with one
+  // print in mind; shipping a non-zero default would re-price the back of every garment
+  // that already carries artwork, without anyone choosing it.
+  method_side: 0,
   base_markup: 0,     // 0 = base cost equals product cost until someone sets a margin
   // Expedited dispatch (label pre-scan). The seller pays expedite_fee; the partner
   // invoices us expedite_cost per label. Both are recorded so the margin between them is

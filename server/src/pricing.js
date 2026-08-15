@@ -32,6 +32,8 @@ const FEE_KEYS = [
   'ship_cap', 'ship_heavy', 'ship_garment',
   'method_dtg', 'method_dtf', 'method_emb', 'method_apl', 'method_lsr',
   'method_scr', 'method_sub', 'method_vnl',
+  // Per ADDITIONAL printed face — see sideAddOn.
+  'method_side',
   'base_markup',
 ];
 export async function feeSettings() {
@@ -179,14 +181,33 @@ function costPartsOf(row, item, fees) {
   return { base, method: base == null ? 0 : methodAddOn(d, item.print_type, fees) };
 }
 
+/**
+ * WHAT THE EXTRA SIDES ADD, per unit.
+ *
+ * Charged per ADDITIONAL side, not per side. The first one is what the base cost already
+ * pays for — every blank in the catalogue was priced on the assumption of one print — so
+ * billing per side would have raised the price of every single-side order on the platform
+ * the moment this shipped, retroactively and for nothing that changed.
+ *
+ * `sides` is how many faces of this line actually carry artwork, counted from order_designs.
+ * 0 or 1 adds nothing, which is also what a line with no artwork yet must cost: a seller
+ * who has not placed a design has not asked for a second print.
+ */
+function sideAddOn(sides, fees) {
+  const rate = num(fees && fees.method_side) || 0;
+  const extra = Math.max(0, (Number(sides) || 0) - 1);
+  return rate > 0 && extra > 0 ? rate * extra : 0;
+}
+
 // Per-unit cost = the size's base price (else the product's base) + the print method's
 // add-on. Mirrors productUnitPrice in eg-design-tools.js, which is what the boards show
 // the seller — if these two disagree, the quote lies about the price on screen.
-function unitCostOf(row, item, fees) {
+function unitCostOf(row, item, fees, sides = 1) {
   // The method surcharge sits ON TOP of the base cost, never inside it — so changing
-  // the markup never silently changes what embroidery adds.
+  // the markup never silently changes what embroidery adds. The per-side charge sits on
+  // top of both, for the same reason.
   const { base, method } = costPartsOf(row, item, fees);
-  return base == null ? null : base + method;
+  return base == null ? null : base + method + sideAddOn(sides, fees);
 }
 
 /**
@@ -295,17 +316,34 @@ export async function quoteSpec({ blank, sku, size, printType }) {
 // `unpriced` is the caller's cue to refuse: an item with no catalog match has no cost,
 // and charging 0 for it would fulfil it for free — silently, forever.
 export async function quoteOrder(orderId) {
-  const [items, fees, idx] = await Promise.all([
-    q('select id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee from order_items where order_id=$1 order by id', [orderId]).then((r) => r.rows),
+  const [items, fees, idx, sideRows] = await Promise.all([
+    q('select id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee, line_id from order_items where order_id=$1 order by id', [orderId]).then((r) => r.rows),
     feeSettings(),
     catalogIndex(),
+    /**
+     * HOW MANY FACES EACH LINE PRINTS, counted from the artwork itself rather than from a
+     * number somebody typed. A side exists when there is a design on it; nothing else can
+     * make one true.
+     *
+     * Keyed exactly the way order_designs is — line first, sku only for rows written before
+     * line_id existed — so a line and its same-sku sibling are counted apart. Best-effort:
+     * a deployment that has not run the side migration yet answers nothing, and a missing
+     * count must charge for ONE side, never for none and never for more.
+     */
+    q(`select coalesce('L:' || line_id, 'S:' || sku) as key, count(distinct coalesce(side,'front'))::int as sides
+          from order_designs where order_id=$1 group by 1`, [orderId])
+      .then((r) => r.rows).catch(() => []),
   ]);
+  const sidesByKey = new Map(sideRows.map((r) => [r.key, r.sides]));
+  const sidesOf = (it) => sidesByKey.get(it.line_id ? `L:${it.line_id}` : `S:${it.sku}`) ?? 1;
   const lines = [];
   const unpriced = [];
   for (const it of items) {
     const qty = Math.max(1, parseInt(it.qty, 10) || 1);
+    const sides = sidesOf(it);
     // A frozen cost wins: once charged, an order's price is history and must not move
-    // when someone edits the catalog.
+    // when someone edits the catalog — which is also what stops artwork added to a second
+    // side AFTER submit from silently re-pricing an order that has already been paid for.
     let cost = num(it.unit_cost), ship = num(it.ship_fee);
     let extra = fees.ship_extra;
     if (cost == null || ship == null) {
@@ -313,7 +351,7 @@ export async function quoteOrder(orderId) {
       // No product = no cost. The variants haven't been chosen yet (a marketplace order
       // arrives with none), so the caller must ask for them rather than invent a price.
       if (!row) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '', reason: 'no-product' }); continue; }
-      if (cost == null) cost = unitCostOf(row, it, fees);
+      if (cost == null) cost = unitCostOf(row, it, fees, sides);
       if (ship == null) ship = shipFeeOf(row, it.size, fees);
       extra = extraFeeOf(row, fees);
       if (cost == null) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '', reason: 'no-cost' }); continue; }
@@ -331,6 +369,10 @@ export async function quoteOrder(orderId) {
                  unitCost: money(cost), shipFee: money(ship), extraFee: money(extra),
                  baseCost: parts.base == null ? null : money(parts.base),
                  methodFee: money(parts.method || 0),
+                 // What the line is PRINTED on, and what the extra faces added. Shown as its
+                 // own number for the same reason methodFee is: a blank quoting more than
+                 // its base cost has to be able to say which surcharge did it.
+                 sides, sideFee: money(sideAddOn(sides, fees)),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
   const totals = computeTotals(lines, fees);

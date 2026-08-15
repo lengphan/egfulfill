@@ -763,6 +763,42 @@ export function ordersRoutes(app, requireAuth) {
         .then((r) => r.rowCount).catch(() => 0);
       if (!ok) console.error('[order_designs] order_designs_line_key IS MISSING. Artwork uploads are broken. Create it by hand.');
     })
+    /**
+     * A SIDE IS PART OF A DESIGN'S IDENTITY.
+     *
+     * A line could hold ONE artwork. The garment has a front, a back and two sleeves, and
+     * the designer's face tabs only chose which mockup you were looking at — saving on the
+     * back overwrote the front, because (order, line, kind) was the whole key.
+     *
+     * Existing rows have no side and are FRONT: that is what they have always been, every
+     * mockup drew them there, and coalescing rather than backfilling means a deployment
+     * that never gets this far still reads them correctly.
+     *
+     * THE ORDER OF THESE THREE STATEMENTS IS THE MIGRATION.
+     *
+     * The old index enforces one row per (order, line, kind), so it must go or a back
+     * design is refused — but it is also the ON CONFLICT target every artwork save used
+     * until this deploy. Dropping it before its replacement exists is a window where every
+     * save 500s with 42P10. So: create the new one, PROVE it is there, and only then drop
+     * the old. If the create fails the old index survives and the worst case is what we
+     * already had — one side per line — rather than no artwork saves at all.
+     */
+    .then(async () => {
+      await q('alter table order_designs add column if not exists side text')
+        .catch((e) => console.error('[order_designs] could not add side:', e.message));
+      await q(`create unique index if not exists order_designs_line_side_key
+                 on order_designs (order_id, (${DESIGN_KEY}), kind, coalesce(side,'front'))`)
+        .catch((e) => console.error('[order_designs] COULD NOT CREATE order_designs_line_side_key — per-side artwork is off and saves keep the old one-per-line behaviour:', e.message));
+      const ok = await q("select 1 from pg_indexes where tablename='order_designs' and indexname='order_designs_line_side_key'")
+        .then((r) => r.rowCount).catch(() => 0);
+      if (!ok) {
+        console.error('[order_designs] order_designs_line_side_key IS MISSING — keeping the old index, because dropping it now would break every artwork save.');
+        return;
+      }
+      // Safe: its replacement is in place and covers strictly more.
+      await q('drop index if exists order_designs_line_key')
+        .catch((e) => console.error('[order_designs] could not drop the superseded order_designs_line_key — a second side will be refused until it goes:', e.message));
+    })
     .then(async () => {
       // Say out loud how much is left unattributable. Silence here would read as "clean".
       const r = await q(`
@@ -1801,6 +1837,18 @@ export function ordersRoutes(app, requireAuth) {
     // Line identity, when the caller knows it. Falls back to sku-keying so older clients
     // and marketplace sync keep working — see the migration above.
     const lineId = (req.body || {}).line_id ? String((req.body || {}).line_id) : null;
+    /**
+     * WHICH FACE OF THE GARMENT. Absent means front, which is what every row written before
+     * per-side artwork existed already is.
+     *
+     * Normalised to lower-case and length-capped, and deliberately NOT checked against a
+     * fixed list: the faces a blank has come from its own mockups and its product type
+     * (front/back/left/right, plus hood or pocket on some), so an enum here would refuse a
+     * face the catalogue legitimately offers. The value only ever selects a row.
+     */
+    const side = (req.body || {}).side
+      ? (String((req.body || {}).side).trim().toLowerCase().slice(0, 24) || 'front')
+      : 'front';
     // Artwork keys line-first (coalesce('L:'||line_id,'S:'||sku)), so a marketplace line whose
     // SKU is still unset attaches by line_id. Require DATA + a line identity, not specifically
     // a SKU — the old `!sku` check rejected exactly those lines with "sku and data required".
@@ -1878,11 +1926,11 @@ export function ordersRoutes(app, requireAuth) {
       // link, which is what it is; readers already render `data` as an <img src>.
     }
     await q(
-      `insert into order_designs (order_id, sku, line_id, kind, data, storage_key, name, pos, art_hash, art_phash, updated_at)
-       values ($1,$2,$10,$3,$4,$9,$5,$6,$7,$8, now())
-       on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
+      `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, updated_at)
+       values ($1,$2,$10,$3,$11,$4,$9,$5,$6,$7,$8, now())
+       on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind, (coalesce(side,'front'))) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
          art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash), updated_at=now()`,
-      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId]
+      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId, side]
     );
     // The artwork now has a number, minted on first sight of these exact bytes and reused
     // every time they turn up again — see design-id.js. Handed back so the uploader sees it
@@ -2382,14 +2430,14 @@ export function ordersRoutes(app, requireAuth) {
     // SIGNED CROSS-ORIGIN link instead — which expires, taints the canvas so the thread
     // matcher reports "couldn't open this image to read its colours", and is the string the
     // client hands back on the next save.
-    const r = await q(`select sku, line_id, kind, data, storage_key, art_hash, name, pos from order_designs where order_id=$1`, [req.params.id]);
+    const r = await q(`select sku, line_id, kind, coalesce(side,'front') as side, data, storage_key, art_hash, name, pos from order_designs where order_id=$1`, [req.params.id]);
     // Minted per read, not stored: a signed URL expires, so a persisted one would go
     // stale. Returned through `data` because that's what every client already renders
     // (an <img src> takes a URL or a data-URL either way).
     return r.rows.map((row) => {
       const url = designUrlOf(row);
       // line_id is what a caller should key on; sku stays for rows that predate it.
-      return { sku: row.sku, line_id: row.line_id, kind: row.kind, name: row.name, pos: row.pos, data: url || row.data, url };
+      return { sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, name: row.name, pos: row.pos, data: url || row.data, url };
     });
   });
 

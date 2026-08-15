@@ -1918,6 +1918,15 @@ function PlatformPanel() {
           <MoneyField label="Appliqué" value={bands.method_apl ?? ""} onChange={(v) => setBand("method_apl", v)} />
           <MoneyField label="Laser" value={bands.method_lsr ?? ""} onChange={(v) => setBand("method_lsr", v)} />
         </div>
+        {/* Per EXTRA face, not per face. Its own row under a rule, because it multiplies by
+            something different from everything above it — sides, not units of technique. */}
+        <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
+          <MoneyField
+            label="Each additional side"
+            hint="The first print is in the base cost. A front-and-back item pays this once; front, back and sleeve pays it twice."
+            value={bands.method_side ?? ""} onChange={(v) => setBand("method_side", v)}
+          />
+        </div>
       </Fold>
       </FoldGroup>
       {/* Save stays OUTSIDE the search filter and always visible: a filtered page still
