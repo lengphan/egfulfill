@@ -610,6 +610,17 @@ export function DesignCanvasDialog({
   filesLocked?: boolean
 }) {
   const [designUrl, setDesignUrl] = useState(initialDesign ?? "")
+  /**
+   * THE FILE'S OWN NAME, kept so the row that appears afterwards can say which file it is.
+   *
+   * The save wrote `name: item.name` — the ITEM's name — so every design on an order was
+   * recorded under the garment it sat on, and the Design files card had nothing to print but
+   * "Gildan Unisex Heavy Cotton T-Shirt" for a file actually called "love-bug.png".
+   *
+   * null when the artwork didn't come from a file the person picked (the library, or the
+   * line's existing design), in which case the item name is still the honest label.
+   */
+  const [designName, setDesignName] = useState<string | null>(null)
   // Background removal, shared with the Design maker so the two behave identically.
   const bg = useBackgroundRemoval(designUrl, setDesignUrl)
   const [pos, setPos] = useState<Pos>(initialPos ? { x: initialPos.x, y: initialPos.y, w: initialPos.w, r: initialPos.r } : DEFAULT_POS)
@@ -1150,7 +1161,9 @@ export function DesignCanvasDialog({
       try {
         const r = await postOrderDesign(orderId, {
           sku: it.sku ?? "", line_id: it.line_id ?? undefined, data: designUrl,
-          name: item.name ?? undefined, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r },
+          // The same file, so the same NAME on every line it lands on — copying the source
+          // line's item name onto five other garments labelled them all as that garment.
+          name: designName || item.name || undefined, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r },
         })
         if (r?.error) throw new Error(r.error)
       } catch (e) { failed.push(`${it.sku ?? "line"}${e instanceof Error ? ` (${e.message})` : ""}`) }
@@ -1159,7 +1172,7 @@ export function DesignCanvasDialog({
     if (failed.length) setErr(`Couldn't apply to: ${failed.join(", ")}`)
     const done = others.length - failed.length
     if (done > 0) { setAttached(`Applied to ${done} other line${done === 1 ? "" : "s"}.`); onSaved?.() }
-  }, [designUrl, siblings, designs, orderId, item.name, pos, onSaved, confirm])
+  }, [designUrl, designName, siblings, designs, orderId, item.name, pos, onSaved, confirm])
 
   /** `close` is false when saving as a STEP in something else (sending to a designer),
    *  where closing the window mid-flow would look like the action had finished.
@@ -1177,7 +1190,7 @@ export function DesignCanvasDialog({
       // design has already been digitised. Best-effort: a null phash costs us fuzzy
       // matching, never the save.
       const phash = await perceptualHash(designUrl).catch(() => null)
-      const r = await postOrderDesign(orderId, { sku: item.sku ?? "", line_id: item.line_id, data: designUrl, name: item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
+      const r = await postOrderDesign(orderId, { sku: item.sku ?? "", line_id: item.line_id, data: designUrl, name: designName || item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
       if (r.error) throw new Error(r.error)
       // The number the save minted (or reused, if these exact bytes have been seen before).
       // Replacing the image is different artwork and therefore a different number, so this
@@ -1237,7 +1250,7 @@ export function DesignCanvasDialog({
             setErr(`${f.name} isn't an image or a machine file, so there's nothing to do with it here.`)
             return
           }
-          readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr)
+          readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setDesignName(f.name); setPos(DEFAULT_POS) }, setErr)
         }}
       >
         {/* Dropping anywhere in the window still works — but it no longer outlines the WHOLE
@@ -1559,7 +1572,7 @@ export function DesignCanvasDialog({
               always shown too: the empty stage alone wasn't discoverable, which left people
               staring at a greyed-out Save with no obvious way to add the image. */}
           <input ref={uploadRef} type="file" accept="image/*" className="hidden"
-            onChange={(e) => { readImageFile(e.target.files?.[0], (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr); e.target.value = "" }} />
+            onChange={(e) => { const f = e.target.files?.[0]; readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setDesignName(f?.name ?? null); setPos(DEFAULT_POS) }, setErr); e.target.value = "" }} />
           <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void attachMachineFile(f); e.target.value = "" }} />
 

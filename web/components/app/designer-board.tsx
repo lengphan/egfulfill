@@ -1359,7 +1359,11 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             <span className="text-sm font-medium">Files</span>
             {/* The card already knows its LINE (design_cards.line_id) — pass it, or a file a
                 designer uploads here lands on every sibling of the same SKU. */}
-            <DesignFilesPanel orderId={String(card.order_id)} sku={card.sku || undefined} lineId={card.line_id || undefined} />
+            {/* `item` is what lets the panel NAME the artwork already placed on this line —
+                the card knows the line, the panel fetches the design. Without it the panel
+                still lists files; it just can't say which item a placed design is on. */}
+            <DesignFilesPanel orderId={String(card.order_id)} sku={card.sku || undefined} lineId={card.line_id || undefined}
+              item={{ line_id: card.line_id || undefined, sku: card.sku || undefined, name: card.title || undefined }} />
             {/* Who touched this design and when. A designer is gated to the design story
                 server-side; operator/warehouse/admin see the order's full history here
                 too, including which team member uploaded or removed a file. */}

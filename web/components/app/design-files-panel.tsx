@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, type DesignFileRow, type OrderItem } from "@/lib/api"
+import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, indexDesigns, designForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
+import { designSrc } from "@/lib/order-image"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { VariantField } from "@/components/app/variant-field"
@@ -73,6 +74,66 @@ function orderFiles(files: DesignFileRow[]): OrderedFile[] {
   })
 }
 
+/**
+ * ARTWORK PLACED IN THE DESIGNER IS A FILE ON THIS ORDER — this card just could not see it.
+ *
+ * Two stores, and the card only ever read one. A drop into the designer writes
+ * `order_designs` (the artwork ON a line, with its position); a drop into the zone below
+ * writes `design_files`. So an order could carry artwork on every item, show it on every
+ * mockup, and still say "No files on this order yet" over an empty dropzone — which reads
+ * as "nothing arrived", and is why the same file kept being dropped a second time.
+ *
+ * These rows are DERIVED, not fetched: the order page already holds the designs it draws the
+ * mockups from, so saying what is there costs nothing and can never disagree with what is on
+ * screen.
+ */
+type PlacedRow = { key: string; name: string; src: string; no: number | null; item: string | null }
+
+function placedRows(designs: Record<string, OrderDesign> | undefined, items: OrderItem[]): PlacedRow[] {
+  if (!designs) return []
+  const out: PlacedRow[] = []
+  items.forEach((it, i) => {
+    const d = designForLine(designs, { line_id: it.line_id ?? undefined, sku: it.sku ?? undefined })
+    if (!d?.data) return
+    out.push({
+      key: String(it.line_id || it.sku || i),
+      // The stored name is the FILE's now; older rows carry the item's name instead, and
+      // that is still better than "Artwork" — it is what someone typed or picked.
+      name: d.name || it.name || it.sku || "Artwork",
+      src: designSrc(d.data),
+      no: i + 1,
+      item: it.name || it.sku || null,
+    })
+  })
+  return out
+}
+
+/** One row per placed artwork. Module-level: `react-hooks/static-components`. */
+function PlacedArtworkList({ rows }: { rows: PlacedRow[] }) {
+  if (!rows.length) return null
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+      {rows.map((r) => (
+        <div key={r.key} className="flex items-center gap-3 p-2.5">
+          {/* The artwork itself, small. A name alone still leaves "is that the right one?"
+              unanswered, and the picture is already loaded for the mockup above. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={r.src} alt="" className="size-9 shrink-0 rounded-md border border-border bg-white object-contain" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xs font-medium">{r.name}</div>
+            {/* WHERE IT IS ASSIGNED, in the same numbering the item rows and the target
+                dropdown use — pick 3 there, read 3 here. */}
+            <div className="truncate text-3xs text-muted-foreground">
+              On item {r.no}{r.item ? ` · ${r.item}` : ""} · placed in the designer
+            </div>
+          </div>
+          <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-3xs font-bold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">ARTWORK</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const KIND_META: Record<string, { label: string; hint: string; cls: string; icon: React.ReactNode }> = {
   pes: { label: "PES", hint: "seller deliverable · paid", cls: "bg-violet-100 text-violet-700", icon: <FileArrowDown size={12} weight="fill" /> },
   emb: { label: "EMB", hint: "factory working file", cls: "bg-amber-100 text-amber-700", icon: <FileZip size={12} weight="fill" /> },
@@ -105,8 +166,17 @@ function scopeLabel(f: DesignFileRow): string {
   return f.sku ? `Item ${f.sku} · ` : "This item (variant not chosen yet) · "
 }
 
-export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: string; sku?: string; lineId?: string | null; compact?: boolean }) {
+export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orderId: string; sku?: string; lineId?: string | null; compact?: boolean
+  /** The line this panel is mounted for, so a placed artwork row can name it. */
+  item?: OrderItem }) {
   const [files, setFiles] = useState<DesignFileRow[] | null>(null)
+  /**
+   * The artwork ON the line, which lives in a DIFFERENT table to the files below — see
+   * placedRows. Fetched here rather than passed in, because the boards that mount this panel
+   * hold design CARDS, not order designs. One call, and only when a card is open: this panel
+   * renders inside an expanded card, never in the list.
+   */
+  const [placedMap, setPlacedMap] = useState<Record<string, OrderDesign> | null>(null)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -129,6 +199,11 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: s
 
   const load = useCallback(() => {
     getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
+    // Best-effort: the files list is the subject of this panel, and failing to learn what
+    // artwork is placed must not empty it.
+    getOrderDesigns(orderId)
+      .then((r) => setPlacedMap(indexDesigns(Array.isArray(r) ? r : (r?.designs ?? []))))
+      .catch(() => setPlacedMap({}))
   }, [orderId])
   useEffect(() => {
     const id = setTimeout(() => { setRole(getUser()?.role || ""); load() }, 0)
@@ -223,6 +298,11 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: s
 
       {err && <div className="flex items-center gap-1.5 text-xs text-destructive"><Warning size={12} weight="fill" /> {err}</div>}
 
+      {/* The artwork placed on this line, named — it is a file on this job whichever table
+          it happens to live in, and a panel that showed only one of the two reported "no
+          files" for a line that had a design on it. */}
+      <PlacedArtworkList rows={placedRows(placedMap ?? undefined, item ? [item] : [])} />
+
       {files === null ? (
         <div className="flex justify-center py-3 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /></div>
       ) : shown.length === 0 ? (
@@ -291,11 +371,15 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact }: { orderId: s
  * `price` defaults to 0, the download route only charges when `price > 0`, and only
  * admin/warehouse can ever set a price. Verified against design_files.js, not assumed.
  */
-export function SellerDesignFiles({ orderId, items = [], onAttached }: {
+export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: {
   orderId: string
   /** The order's lines, so a dropped file can be pointed at one. Empty ⇒ everything a
    *  seller drops applies to the whole order, which is how this panel behaved before. */
   items?: OrderItem[]
+  /** The artwork already ON the lines, indexed by the page that draws the mockups. Passed
+   *  in rather than fetched: the page has it, the bytes are large, and a second copy could
+   *  disagree with the picture on screen. Absent ⇒ this card simply shows files, as before. */
+  designs?: Record<string, OrderDesign>
   /** Artwork went onto a line — the page reloads its designs so the canvas shows it. */
   onAttached?: () => void
 }) {
@@ -435,20 +519,31 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
     if (images) onAttached?.()
   }
 
-  const dropZone = (
+  /**
+   * `slim` — the zone STOPS BEING THE PAGE once there is something to look at.
+   *
+   * A tall dashed rectangle is the right thing when the card is empty: it is the only thing
+   * to do, so it should be the biggest thing there. Under a list of files it is the loudest
+   * element on a card whose actual subject is the list — which is what made an order that
+   * already had artwork look like one still waiting for it.
+   */
+  const dropZone = (slim = false) => (
     <div
       onDragOver={(e) => { e.preventDefault(); setOver(true) }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
       onClick={() => inputRef.current?.click()}
       className={
-        "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center transition-colors " +
+        "flex cursor-pointer rounded-xl border border-dashed transition-colors " +
+        (slim ? "items-center justify-center gap-2 px-3 py-2 " : "flex-col items-center justify-center gap-1 border-2 p-4 text-center ") +
         (over ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-accent/40")
       }
     >
-      {busy ? <CircleNotch size={18} className="animate-spin text-muted-foreground" /> : <UploadSimple size={18} weight="bold" className="text-muted-foreground" />}
-      <span className="text-xs font-medium">{busy ? `Sending ${busy}…` : "Have a machine file or a design image? Drop it here"}</span>
-      <span className="text-3xs text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>
+      {busy ? <CircleNotch size={slim ? 14 : 18} className="animate-spin text-muted-foreground" /> : <UploadSimple size={slim ? 14 : 18} weight="bold" className="text-muted-foreground" />}
+      <span className={slim ? "text-2xs font-medium text-muted-foreground" : "text-xs font-medium"}>
+        {busy ? `Sending ${busy}…` : slim ? "Add another machine file or design image" : "Have a machine file or a design image? Drop it here"}
+      </span>
+      {!slim && <span className="text-3xs text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>}
       <input ref={inputRef} type="file" multiple accept={MACHINE_ACCEPT + ",image/*"} className="hidden"
         onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = "" }} />
     </div>
@@ -582,16 +677,21 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
 
   if (files === null) return <div className="flex justify-center py-4 text-muted-foreground"><CircleNotch size={16} className="animate-spin" /></div>
 
+  const placed = placedRows(designs, items)
+
   // NOTHING TO BUY is a real state and it now says so. Returning null here left the card
   // above it showing a title and blank space — a promise of files with no files and no
   // explanation, which reads exactly like a fetch that failed.
-  if (!files.length) {
+  //
+  // "No files" now means no files AND no placed artwork. It used to mean only the first, so
+  // an order whose every item was already designed announced that nothing had arrived.
+  if (!files.length && !placed.length) {
     return (
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">
           No files on this order yet. Machine files appear here once we&apos;ve cut them — or send us your own machine file or a design image.
         </p>
-        {dropZone}
+        {dropZone()}
         {queue}
         {notices}
       </div>
@@ -601,6 +701,7 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
   return (
     <div className="space-y-2">
       {notices}
+      <PlacedArtworkList rows={placed} />
       {orderFiles(files).map((f) => (
         <div key={f.designId} className="flex items-center gap-3 rounded-xl border border-border p-3">
           {/**
@@ -663,7 +764,7 @@ export function SellerDesignFiles({ orderId, items = [], onAttached }: {
       ))}
       {/* Offered alongside existing files too, not only when the list is empty — a seller
           may send a corrected file after we've already delivered one. */}
-      {dropZone}
+      {dropZone(true)}
       {queue}
     </div>
   )

@@ -115,6 +115,10 @@ export default function OrderDetailPage() {
   useEffect(() => { const t = setTimeout(loadDesignStatus, 0); return () => clearTimeout(t) }, [loadDesignStatus])
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   const [quote, setQuote] = useState<OrderQuote | null>(null)
+  /** The quote FAILED, as against "there is no quote to fetch". Two states that rendered
+   *  identically — an order with no prices on it — while /quote was 500ing for every
+   *  order on the platform. */
+  const [quoteErr, setQuoteErr] = useState<string | null>(null)
   const [charges, setCharges] = useState<OrderCharges | null>(null)
 
   // Staff processing controls (stage moves + labels). Gated exactly like the boards:
@@ -230,8 +234,14 @@ export default function OrderDetailPage() {
     // guidance) rejects a straight setState in an effect body; it cascades a render.
     const id = setTimeout(() => {
       if (!live) return
-      if (!order || !submittable) { setQuote(null); return }
-      getOrderQuote(order.id).then((q) => { if (live) setQuote(q) }).catch(() => {})
+      if (!order || !submittable) { setQuote(null); setQuoteErr(null); return }
+      // A SWALLOWED ERROR IS NOT AN EMPTY ORDER. `.catch(() => {})` left `quote` null,
+      // which the Summary renders as an order that simply has no base cost, shipping or
+      // fees — the exact picture a 500 from /quote produced, for months, with nothing on
+      // screen suggesting anything had gone wrong.
+      getOrderQuote(order.id)
+        .then((q) => { if (live) { setQuote(q); setQuoteErr(null) } })
+        .catch((e) => { if (live) { setQuote(null); setQuoteErr(e instanceof Error ? e.message : "Couldn't load the price for this order.") } })
     }, 0)
     return () => { live = false; clearTimeout(id) }
   }, [order, submittable])
@@ -617,7 +627,10 @@ export default function OrderDetailPage() {
               filtered out server-side and the bytes are paywalled there too, so this
               renders nothing when there's nothing they can buy. */}
           <SectionCard title="Design files">
-            <div className="p-5"><SellerDesignFiles orderId={String(id)} items={items} onAttached={reloadDesigns} /></div>
+            {/* `designs` is the same map the item rows draw their mockups from, so the card
+                lists the artwork that is already ON this order instead of announcing that
+                nothing has arrived. */}
+            <div className="p-5"><SellerDesignFiles orderId={String(id)} items={items} designs={designs} onAttached={reloadDesigns} /></div>
           </SectionCard>
 
           {/* FACTORY ONLY. A seller's order page shows them what they need to act on; the
@@ -778,6 +791,13 @@ export default function OrderDetailPage() {
               falls back to the order's own totals. */}
           <SectionCard title="Summary">
             <dl className="space-y-2 p-5 text-sm">
+              {/* THE PRICE IS MISSING BECAUSE WE COULDN'T GET IT — said out loud, because
+                  the alternative is a card that looks like an order nobody has priced. */}
+              {quoteErr && submittable && (
+                <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive">
+                  Couldn&apos;t load this order&apos;s price. Nothing has been charged — reload, and tell us if it keeps failing.
+                </p>
+              )}
               {quote && !quote.unpriced?.length ? (
                 <>
                   {/* BASE COST, the same word the product editor uses for this number —
