@@ -5,7 +5,7 @@ import { VariantField } from "@/components/app/variant-field"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, Plus, Trash, CheckCircle, WarningCircle, CircleNotch, Package, Storefront, X } from "@phosphor-icons/react"
+import { ArrowLeft, Plus, CheckCircle, WarningCircle, CircleNotch, Package, Storefront, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -126,7 +126,8 @@ export default function NewOrderPage() {
       sku: p.sku,
       blank: p.name,
       img: p.img,
-      price: p.price ? String(p.price) : "",
+      // No price prefill — see the note on the inline combobox's onPick. This column is
+      // the buyer's money; the blank's base cost is ours to quote.
       color: p.color,
       size: p.sizes[0] ?? "",
       colors: p.colors,
@@ -199,7 +200,13 @@ export default function NewOrderPage() {
         status: "new",
         customer: { name: parsed.name, email: email.trim() || undefined },
         address,
-        total: pricing.total,
+        // The SALE, not the fulfilment charge — and flagged as deliberately recorded, which
+        // is what lets the order page trust it as revenue (a manual order's total is
+        // otherwise whatever the create form happened to add up; see the note on `revenue`
+        // in orders/[id]). Left unflagged when no price was typed, so "nothing recorded"
+        // stays distinguishable from "sold for $0".
+        total: pricing.subtotal,
+        meta: pricing.subtotal > 0 ? { retail_set: true } : undefined,
         items,
       })
       if (r.error) throw new Error(r.error)
@@ -276,7 +283,22 @@ export default function NewOrderPage() {
       >
         <div className="divide-y divide-border">
           {lines.map((l, i) => (
-            <div key={i} className="flex items-start gap-3 px-5 py-4">
+            <div key={i} className="relative flex items-start gap-3 px-5 pb-4 pt-8">
+              {/* Removing a line is a CORNER action, not a column. As a track it took ~46px
+                  of width off fields that were already overflowing the row at narrow
+                  widths — "DTG printing" showed as "DTG printi…", a colourway as "Cam…" —
+                  and it is used once in a while, unlike the four fields beside it. It sits
+                  where the image slot already puts its own remove: a small ✕ in the corner. */}
+              <button
+                type="button"
+                onClick={() => removeLine(i)}
+                disabled={lines.length === 1}
+                aria-label="Remove item"
+                title="Remove item"
+                className="absolute right-3 top-1.5 flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-red-600 disabled:pointer-events-none disabled:opacity-30"
+              >
+                <X size={13} weight="bold" />
+              </button>
               {/* Image slot — drag-drop / click to upload, or pick from catalog. Optional. */}
               <label
                 onDragOver={(e) => { e.preventDefault(); setDragLine(i) }}
@@ -309,8 +331,14 @@ export default function NewOrderPage() {
               {/* The blank is the most important control on the line — it drives price,
                   production and the stock barcode — so it gets the flexible column and
                   everything else is sized to its content. Method was as wide as Product
-                  while holding one short word. */}
-              <div className="grid flex-1 grid-cols-[minmax(0,1fr)_60px_80px_auto] items-end gap-2.5 sm:grid-cols-[minmax(170px,1.3fr)_60px_78px_minmax(94px,1fr)_minmax(58px,0.6fr)_minmax(104px,1fr)_auto]">
+                  while holding one short word.
+                  The trailing `auto` track was the delete button; with it lifted to the
+                  row's corner that width goes back to Colour, Size and Method — the three
+                  that were clipping ("DTG printi…"). The MINIMUMS still add up to less
+                  than before (652px of track vs 660px): raising them instead would push
+                  the grid past the card at the breakpoint, which is what was cutting the
+                  strip off on the right to begin with. */}
+              <div className="grid flex-1 grid-cols-[minmax(0,1fr)_60px_80px] items-end gap-2.5 sm:grid-cols-[minmax(170px,1.2fr)_60px_78px_minmax(108px,1.1fr)_minmax(70px,0.65fr)_minmax(116px,1.15fr)]">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Product</span>
                 <ProductCombobox
@@ -324,7 +352,13 @@ export default function NewOrderPage() {
                   // the identical product picked through the dialog offered it fine.
                   onPick={(p) => setLine(i, {
                     name: p.name, sku: p.sku, blank: p.name, img: p.img,
-                    price: p.price ? String(p.price) : "",
+                    // NO PRICE PREFILL. This column is what the BUYER paid (order_items.
+                    // unit_price — the same field the CSV template calls "Item Price" and
+                    // documents as "records only; it does NOT set the fulfilment charge").
+                    // It was being filled with the blank's BASE COST, which is what we
+                    // charge the seller — so the order page then reported our own charge
+                    // back to them as "Customer paid", and every manual order's estimated
+                    // profit was arithmetic on one number labelled two ways.
                     color: p.color, size: p.sizes[0] ?? "", colors: p.colors, sizes: p.sizes,
                     methods: p.methods ?? [],
                     // One technique is not a choice — pre-select it, as applyPick does.
@@ -338,9 +372,13 @@ export default function NewOrderPage() {
                 <span className="text-xs text-muted-foreground">Qty</span>
                 <Input value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value.replace(/[^0-9]/g, "") })} className="h-9" inputMode="numeric" />
               </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Price</span>
-                <Input value={l.price} onChange={(e) => setLine(i, { price: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="0.00" className="h-9" inputMode="decimal" />
+              {/* "Sold for", not "Price" — one word decides which pot of money this is,
+                  and the ambiguous one is why the blank's base cost was being typed (and
+                  prefilled) here and read back as the buyer's payment. Optional: an order
+                  with nothing here is one whose sale price nobody recorded. */}
+              <label className="flex flex-col gap-1" title="What the buyer paid per unit — your records. It does not set what we charge to make this; that is quoted on the order.">
+                <span className="text-xs text-muted-foreground">Sold for</span>
+                <Input value={l.price} onChange={(e) => setLine(i, { price: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="—" className="h-9" inputMode="decimal" />
               </label>
               <label className="hidden flex-col gap-1 sm:flex">
                 <span className="text-xs text-muted-foreground">Color</span>
@@ -377,33 +415,29 @@ export default function NewOrderPage() {
                   onChange={(v) => setLine(i, { method: v })} placeholder="Method"
                 />
               </label>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => removeLine(i)}
-                disabled={lines.length === 1}
-                className="text-muted-foreground hover:text-red-600"
-                aria-label="Remove item"
-              >
-                <Trash size={15} weight="bold" />
-              </Button>
               </div>
             </div>
           ))}
         </div>
+        {/* TWO POTS OF MONEY, AND THIS FORM ONLY HOLDS ONE.
+            It read "Subtotal / Shipping / Total" — Σ(item price × qty) plus OUR fulfilment
+            shipping fee — which quietly added the buyer's money to our charge and called
+            the sum a total. Nothing is billed off it either: the charge is the quote at
+            submit, computed from the blank, the size and the technique. So the card states
+            the sale, and says where the other number comes from. */}
         <div className="space-y-1.5 border-t border-border px-5 py-4">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Subtotal</span>
-            <span className="tabular-nums">{usd(pricing.subtotal)}</span>
+          <div className="flex items-center justify-between border-border font-semibold">
+            <span>Customer paid</span>
+            <span className="text-lg tabular-nums">
+              {pricing.subtotal > 0
+                ? usd(pricing.subtotal)
+                : <span className="text-base font-normal italic text-muted-foreground">not recorded</span>}
+            </span>
           </div>
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Shipping</span>
-            <span className="tabular-nums">{usd(pricing.shipping)}</span>
-          </div>
-          <div className="flex items-center justify-between border-t border-border pt-1.5 font-semibold">
-            <span>Total</span>
-            <span className="text-lg tabular-nums">{usd(pricing.total)}</span>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            What the buyer paid you, for your own records. What WE charge to make this is quoted
+            on the order once it&apos;s created — the blank, its size and the print method.
+          </p>
         </div>
       </SectionCard>
 
