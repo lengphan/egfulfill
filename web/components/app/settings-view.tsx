@@ -154,6 +154,18 @@ function ProfilePanel() {
 
   const save = async () => {
     if (!dirty) return
+    // A username is a way IN to the account (sign-in takes it in place of the email), so it
+    // holds the same 12-character floor as the password. The server says the same thing —
+    // this only saves a round trip and words it in the field's own terms.
+    //
+    // Exempt the same case the server exempts: on a broken account this field is PREFILLED
+    // with the old identifier, which predates the floor. Blocking that would leave the person
+    // unable to save the very repair this page exists to offer.
+    const keepingOld = needsEmail && !!storedEmail && uname.trim().toLowerCase() === storedEmail.toLowerCase()
+    if (!keepingOld && uname.trim() && uname.trim().length < 12) {
+      setErr("Username must be at least 12 characters — it's a way to sign in, so it holds the same floor as the password.")
+      return
+    }
     setSaving(true); setErr(null); setSaved(false)
     try {
       // Send null (not "") to clear — the server treats null as "back to the initial".
@@ -161,6 +173,8 @@ function ProfilePanel() {
         name: name.trim(),
         // The broken account keeps its old identifier as the username: it is what they type
         // to sign in, and the server falls back to it only when this field is left empty.
+        // Sending the identifier back unchanged is the one thing exempt from the 12-character
+        // floor — it already exists, so rejecting it would only lose it.
         username: uname.trim() ? uname.trim().toLowerCase()
           : needsEmail && storedEmail ? storedEmail.toLowerCase()
             : null,
@@ -220,11 +234,11 @@ function ProfilePanel() {
             value={uname}
             onChange={(e) => { setUname(e.target.value); setSaved(false) }}
             onKeyDown={(e) => { if (e.key === "Enter") save() }}
-            placeholder="yourname"
+            placeholder="yourstorename2026"
             disabled={!user}
             className="max-w-sm"
           />
-          <span className="text-xs text-muted-foreground">3–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.</span>
+          <span className="text-xs text-muted-foreground">12–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.</span>
         </label>
 
         {/* Avatar — an emoji + a colour. Deliberately not an image upload: no file

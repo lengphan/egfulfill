@@ -80,15 +80,15 @@
       var name = (document.getElementById('nu-name').value || '').trim();
       var pass = document.getElementById('nu-pass').value, role = document.getElementById('nu-role').value;
       if (!email || !pass) { msg('Email and password are required', false); return; }
-      if (pass.length < 8) { msg('Password must be at least 8 characters', false); return; }
+      if (pass.length < 12) { msg('Password must be at least 12 characters, with upper and lower case, a number and a symbol', false); return; }
       api('/users', { method: 'POST', body: { email: email, name: name, password: pass, role: role } }).then(function (r) {
         if (r.error) { msg('Error: ' + r.error, false); return; }
         EGAdminUsers.load(); setTimeout(function () { msg('Created ' + email, true); }, 200);
       });
     },
     resetPw: function (id, email) {
-      var p = prompt('New password for ' + email + ' (min 8 characters):'); if (p == null) return;
-      if (p.length < 8) { msg('Password must be at least 8 characters', false); return; }
+      var p = prompt('New password for ' + email + ' (min 12 characters, upper + lower case, a number and a symbol):'); if (p == null) return;
+      if (p.length < 12) { msg('Password must be at least 12 characters, with upper and lower case, a number and a symbol', false); return; }
       api('/users/' + id, { method: 'PATCH', body: { password: p } }).then(function (r) { msg(r.error ? ('Error: ' + r.error) : ('Password reset for ' + email), !r.error); });
     },
     del: function (id, email) {

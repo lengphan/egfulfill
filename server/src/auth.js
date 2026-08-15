@@ -25,12 +25,24 @@ const SECRET = (() => {
 // never be shaped like someone else's email, so "is this an email or a username?"
 // is decidable from the string alone and nobody can squat an address they don't own.
 // Stored lower-case; matched lower-case.
-const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
-export function normalizeUsername(raw) {
+//
+// TWELVE characters, the same floor as passwordProblem() — a username is half of a
+// credential pair here (sign-in accepts it in place of the email), so a three-character
+// one narrows the guessing space for every account that has one. The floor was 3, which
+// is why this had to move.
+const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{11,29}$/;
+// Only for an identifier that ALREADY EXISTS and is being moved, not chosen — see the
+// email repair in index.js, where an account whose "email" was really a username gets it
+// migrated into the username column. Rejecting a short one there doesn't enforce anything;
+// it just deletes the string the person signs in with. Never reachable from user input.
+const LEGACY_USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
+export function normalizeUsername(raw, { grandfather = false } = {}) {
   const u = String(raw || '').trim().toLowerCase();
   if (!u) return null;
   if (u.includes('@')) throw new Error('Usernames cannot contain @ — that looks like an email address');
-  if (!USERNAME_RE.test(u)) throw new Error('Username must be 3–30 characters: letters, numbers, dot, dash or underscore');
+  if (!(grandfather ? LEGACY_USERNAME_RE : USERNAME_RE).test(u)) {
+    throw new Error('Username must be 12–30 characters: letters, numbers, dot, dash or underscore');
+  }
   return u;
 }
 const looksLikeEmail = (s) => String(s || '').includes('@');

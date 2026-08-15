@@ -374,10 +374,19 @@ app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
     put('avatar_color', c || null);
   }
   if (b.notify_sound !== undefined) put('notify_sound', !!b.notify_sound);
-  // Username — a second way to sign in. null/'' clears it back to email-only.
+  // Username — a second way to sign in, so it carries the same 12-character floor as the
+  // password. null/'' clears it back to email-only.
   if (b.username !== undefined) {
     await ensureUsernameColumn().catch(() => {});
-    try { put('username', b.username === null || b.username === '' ? null : normalizeUsername(b.username)); }
+    // ONE exemption, and it isn't a choice: an account whose stored "email" is really a
+    // username (see the repair below) submits that identifier here, and it may predate the
+    // floor. Holding it to 12 characters wouldn't strengthen anything — the string already
+    // exists and is what they sign in with — it would just refuse to save the repair. Any
+    // other value, including a different short one, is a NEW username and is held to it.
+    const cur = (await q('select email, username from users where id=$1', [req.user.sub])).rows[0] || {};
+    const own = !EMAIL_RE.test(String(cur.email || '')) && String(cur.email || '').toLowerCase();
+    const moving = !!own && String(b.username || '').trim().toLowerCase() === own;
+    try { put('username', b.username === null || b.username === '' ? null : normalizeUsername(b.username, { grandfather: moving })); }
     catch (e) { reply.code(400); return { error: e.message }; }
   }
   /**
@@ -409,7 +418,10 @@ app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
     // write it twice in one statement.
     if (b.username === undefined && !cur.username && cur.email) {
       await ensureUsernameColumn().catch(() => {});
-      try { put('username', normalizeUsername(cur.email)); } catch { /* not a legal username; let it go */ }
+      // grandfather: this identifier already exists and is only MOVING columns. Holding it
+      // to the 12-character floor would silently drop the string they sign in with, which
+      // is the lock-out this whole branch exists to avoid.
+      try { put('username', normalizeUsername(cur.email, { grandfather: true })); } catch { /* not a legal username; let it go */ }
     }
   }
   if (!sets.length) { reply.code(400); return { error: 'Nothing to update' }; }

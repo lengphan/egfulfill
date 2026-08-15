@@ -8728,14 +8728,14 @@ function showPsTab(id) {
         </div>
         <div style="margin-bottom:12px">
           <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">New Password</label>
-          <input class="input" type="password" placeholder="Min 8 chars, 1 uppercase, 1 number" style="background:#fff"/>
+          <input class="input" type="password" placeholder="Min 12 chars, 1 uppercase, 1 number, 1 symbol" style="background:#fff"/>
         </div>
         <div style="margin-bottom:20px">
           <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Confirm New Password</label>
           <input class="input" type="password" placeholder="Re-enter new password" style="background:#fff"/>
         </div>
         <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400e;margin-bottom:20px">
-          ⚠ Password must be at least 8 characters and include a number and uppercase letter.
+          ⚠ Password must be at least 12 characters and include upper and lower case, a number and a symbol.
         </div>
         <div style="display:flex;justify-content:flex-end">
           <button class="btn btn-dk" onclick="alert('Password updated successfully.')">Update Password</button>
@@ -11153,9 +11153,9 @@ function admRenderResetRequests() {
     }).catch(function () {});
 }
 function admResolveReset(id, email) {
-  var pw = prompt('Set a new password for ' + email + ' (min 6 chars). Share it with them securely:');
+  var pw = prompt('Set a new password for ' + email + ' (min 12 chars, upper + lower case, a number and a symbol). Share it with them securely:');
   if (pw == null) return;
-  if (pw.length < 6) { alert('Password must be at least 6 characters.'); return; }
+  if (pw.length < 12) { alert('Password must be at least 12 characters, with upper and lower case, a number and a symbol.'); return; }
   var tok = localStorage.getItem('eg_token');
   fetch('/api/auth/reset-requests/' + id + '/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ password: pw }) })
     .then(function (r) { return r.json(); })

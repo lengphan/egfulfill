@@ -75,7 +75,7 @@
         <div style="margin-bottom:16px">
           <label>Password</label>
           <div class="pw-wrap">
-            <input id="su-password" class="input" type="password" placeholder="At least 8 characters" autocomplete="new-password" style="padding-right:44px"/>
+            <input id="su-password" class="input" type="password" placeholder="At least 12 characters" autocomplete="new-password" style="padding-right:44px"/>
             <button type="button" class="pw-toggle" onclick="togglePw('su-password')">
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>
             </button>
@@ -183,7 +183,7 @@
     else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ document.getElementById('err-email').textContent = 'Enter a valid email'; document.getElementById('su-email').classList.add('err'); ok = false; }
 
     if(!pw){ document.getElementById('err-password').textContent = 'Password is required'; document.getElementById('su-password').classList.add('err'); ok = false; }
-    else if(pw.length < 8){ document.getElementById('err-password').textContent = 'Use at least 8 characters'; document.getElementById('su-password').classList.add('err'); ok = false; }
+    else if(pw.length < 12){ document.getElementById('err-password').textContent = 'Use at least 12 characters, with upper and lower case, a number and a symbol'; document.getElementById('su-password').classList.add('err'); ok = false; }
 
     if(!confirm){ document.getElementById('err-confirm').textContent = 'Please confirm your password'; document.getElementById('su-confirm').classList.add('err'); ok = false; }
     else if(confirm !== pw){ document.getElementById('err-confirm').textContent = 'Passwords don\'t match'; document.getElementById('su-confirm').classList.add('err'); ok = false; }
