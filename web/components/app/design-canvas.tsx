@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
-import { scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { deleteOrderDesign, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -1178,6 +1178,40 @@ export function DesignCanvasDialog({
     if (done > 0) { setAttached(`Applied to ${done} other line${done === 1 ? "" : "s"}.`); onSaved?.() }
   }, [designUrl, designName, siblings, designs, orderId, item.name, pos, onSaved, confirm])
 
+  /**
+   * TAKE IT OFF, for real.
+   *
+   * The ✕ used to call setDesignUrl("") and stop there. That clears the canvas and nothing
+   * else: save() refuses an empty design ("Upload artwork first"), so the row survived and
+   * reopening the window brought the artwork straight back. Anyone who pressed it and closed
+   * the window believed the line was blank when it was not — which on the floor is a garment
+   * printed with a design somebody thought they had removed.
+   *
+   * Artwork that was never saved (picked a moment ago, not yet committed) has nothing to
+   * delete, so that case stays local and instant.
+   */
+  const [removing, setRemoving] = useState(false)
+  const removeArtwork = async () => {
+    if (removing) return   // a second click would open a second confirm over the first
+    const saved = !!artAtOpen && !!designUrl
+    if (!saved) { setDesignUrl(""); setDesignName(null); return }
+    if (!(await confirm({
+      title: "Take this artwork off the item?",
+      body: "It comes off this line. Any design charge already made stays — ask us if it needs reversing.",
+      confirmLabel: "Remove artwork",
+      destructive: true,
+    }))) return
+    setRemoving(true); setErr(null)
+    try {
+      const r = await deleteOrderDesign(orderId, { line_id: item.line_id ?? undefined, sku: item.sku ?? undefined })
+      if (r?.error) throw new Error(r.error)
+      setDesignUrl(""); setDesignName(null)
+      onSaved?.()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't remove the artwork.")
+    } finally { setRemoving(false) }
+  }
+
   /** `close` is false when saving as a STEP in something else (sending to a designer),
    *  where closing the window mid-flow would look like the action had finished.
    *  Returns whether it persisted, so a caller can stop rather than carry on regardless. */
@@ -1315,7 +1349,7 @@ export function DesignCanvasDialog({
             className="w-full" mockup={activeMockup}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
             pos={pos} setPos={setPos}
-            onRemove={() => setDesignUrl("")} picking={picking} onPickColor={onPickColor}
+            onRemove={() => void removeArtwork()} picking={picking} onPickColor={onPickColor}
             // Suppress the stage's OWN "Pick a blank to start designing" placeholder: the
             // overlay below is already the empty state, and rendering both stacked two
             // different sentences on top of each other in the same 40px. An empty fragment

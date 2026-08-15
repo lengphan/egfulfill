@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDesignFiles, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, indexDesigns, designForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
+import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, indexDesigns, designForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
 import { designSrc } from "@/lib/order-image"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -87,7 +87,9 @@ function orderFiles(files: DesignFileRow[]): OrderedFile[] {
  * mockups from, so saying what is there costs nothing and can never disagree with what is on
  * screen.
  */
-type PlacedRow = { key: string; name: string; src: string; no: number | null; item: string | null }
+type PlacedRow = { key: string; name: string; src: string; no: number | null; item: string | null
+  /** Which line to detach. Sent to DELETE /api/orders/:id/designs, which is line-first. */
+  lineId?: string | null; sku?: string | null }
 
 /**
  * `numbered` — whether the caller's `items` are THE ORDER, in order.
@@ -111,6 +113,7 @@ function placedRows(designs: Record<string, OrderDesign> | undefined, items: Ord
       src: designSrc(d.data),
       no: numbered ? i + 1 : null,
       item: it.name || it.sku || null,
+      lineId: it.line_id ?? null, sku: it.sku ?? null,
     })
   })
   return out
@@ -139,12 +142,28 @@ function ItemNumberBadge({ no, title }: { no: number | null; title?: string }) {
 }
 
 /** One row per placed artwork. Module-level: `react-hooks/static-components`. */
-function PlacedArtworkList({ rows }: { rows: PlacedRow[] }) {
+function PlacedArtworkList({ rows, onRemove, busy }: {
+  rows: PlacedRow[]
+  /** Absent ⇒ no ✕. A row that cannot be acted on must not offer a control that errors. */
+  onRemove?: (r: PlacedRow) => void
+  busy?: string | null
+}) {
   if (!rows.length) return null
   return (
     <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
       {rows.map((r) => (
-        <div key={r.key} className="flex items-center gap-3 p-2.5">
+        <div key={r.key} className="relative flex items-center gap-3 p-2.5">
+          {onRemove && (
+            <button
+              onClick={() => onRemove(r)}
+              disabled={busy === r.key}
+              title="Take this artwork off the item"
+              aria-label={`Take ${r.name} off item ${r.no ?? ""}`.trim()}
+              className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+            >
+              <X size={10} weight="bold" />
+            </button>
+          )}
           {/* The artwork itself, small. A name alone still leaves "is that the right one?"
               unanswered, and the picture is already loaded for the mockup above. */}
           {/* WHERE IT IS ASSIGNED — the badge, not a sentence. Same mark as the item row it
@@ -735,6 +754,31 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
     } finally { setBusy(null) }
   }
 
+  /**
+   * Take a placed artwork off its line — the delete that did not exist until now, and the
+   * reason these rows had no ✕ while every other row did.
+   *
+   * onAttached, not a local edit: the artwork belongs to the PAGE (it draws the mockups from
+   * the same map), so the page re-reads and this list follows. Editing a copy here would
+   * leave the row gone and the garment still wearing it.
+   */
+  const detach = async (r: { key: string; name: string; lineId?: string | null; sku?: string | null }) => {
+    if (!(await confirm({
+      title: `Take ${r.name} off this item?`,
+      body: "It comes off the line. Any design charge already made stays — ask an admin if it needs reversing.",
+      confirmLabel: "Remove artwork",
+      destructive: true,
+    }))) return
+    setBusy(r.key); setErr(null)
+    try {
+      const res = await deleteOrderDesign(orderId, { line_id: r.lineId ?? undefined, sku: r.sku ?? undefined })
+      if (res?.error) throw new Error(res.error)
+      onAttached?.()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't take that artwork off.")
+    } finally { setBusy(null) }
+  }
+
   /** Optimistic, then reconciled — the same shape the designer board's panel uses. */
   const priceIt = async (f: DesignFileRow, v: string) => {
     const n = Math.max(0, Number(v) || 0)
@@ -794,7 +838,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   return (
     <div className="space-y-2">
       {notices}
-      <PlacedArtworkList rows={placed} />
+      <PlacedArtworkList rows={placed} onRemove={(r) => void detach(r)} busy={busy} />
       {orderFiles(files).map((f) => (
         <div key={f.designId} className="relative flex items-center gap-3 rounded-xl border border-border p-3">
           {/**

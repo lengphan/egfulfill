@@ -2065,6 +2065,20 @@ export function postOrderDesign(id: string, body: { sku: string; line_id?: strin
     body: JSON.stringify(body),
   })
 }
+/**
+ * Take the artwork OFF a line — the thing the designer's ✕ only ever pretended to do.
+ *
+ * `side` absent removes every side on the line; naming one removes just that face. The
+ * server decides who may: before submit the order is the seller's, after it the factory's,
+ * and admin either way. It does NOT reverse a design charge — that is somebody's decision,
+ * not a side effect.
+ */
+export function deleteOrderDesign(id: string, body: { line_id?: string | null; sku?: string | null; side?: string | null }) {
+  return api<{ ok?: boolean; removed?: number; error?: string }>(`/api/orders/${encodeURIComponent(id)}/designs`, {
+    method: "DELETE",
+    body: JSON.stringify(body),
+  })
+}
 // The messages endpoint returns reconstructed chat entries (NOT raw rows):
 // { id, by, role, text, ts, system?, attachment? }. Order chat AND support chat
 // (order id `support-<sellerId>`) share these endpoints.

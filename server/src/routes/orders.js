@@ -1939,6 +1939,70 @@ export function ordersRoutes(app, requireAuth) {
     audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null, design_no: designNo } });
     return { ok: true, design_no: designNo, design_id: designLabel(designNo) };
   });
+
+  /**
+   * TAKE THE ARTWORK OFF A LINE. This never existed.
+   *
+   * The designer has always had a ✕ on the artwork, and it only ever called setDesignUrl("")
+   * — it cleared the CANVAS. Saving then refused ("Upload artwork first"), so the row stayed
+   * exactly where it was and reopening the window brought the design back. A control that
+   * looks like a delete and silently changes nothing is worse than no control, because the
+   * person believes the job is now blank.
+   *
+   * WHOSE ZONE, mirroring `filesLocked` on the order page rather than inventing a new rule:
+   * before submit the order is the seller's to change and staff keep their hands off; after
+   * submit it is in production and the seller's is settled. Admin is the escape hatch, as
+   * everywhere else here.
+   *
+   * WHAT IT DOES NOT DO: it does not touch design_charged_at. If the work was billed, it was
+   * billed — the fee paid for a person's time, and deleting the picture afterwards does not
+   * give that time back. Refunds are a decision someone makes, not a side effect of a delete
+   * (see recorded history: settled records stay settled, and the audit carries the removal).
+   */
+  app.delete('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    const b = req.body || {};
+    const lineId = b.line_id ? String(b.line_id) : null;
+    const sku = b.sku ? String(b.sku) : null;
+    // Absent = every side on the line. A caller that knows the side removes only that one,
+    // which is what a per-side ✕ needs.
+    const side = b.side ? String(b.side).trim().toLowerCase().slice(0, 24) : null;
+    if (!lineId && !sku) { reply.code(400); return { error: 'line id or sku required' }; }
+
+    const ord = (await q('select factory_status from orders where id=$1', [req.params.id])).rows[0];
+    const preSubmit = ['', 'new', 'draft'].includes(String((ord && ord.factory_status) || ''));
+    const staff = isStaff(req.user);
+    const admin = req.user && req.user.role === 'admin';
+    if (!admin && (staff ? preSubmit : !preSubmit)) {
+      reply.code(409);
+      return { error: staff
+        ? 'This order is still with the seller — artwork is theirs to change until it is submitted.'
+        : 'This order is in production, so its artwork is settled. Ask us to change it.' };
+    }
+
+    /**
+     * Matched the way the row was WRITTEN: line-first, with the sku slot reachable only for
+     * rows that carry no line at all. Letting a sku match a line-keyed row would delete a
+     * SIBLING's artwork on an order with two lines of the same sku — the exact bug the
+     * line_id migration exists to prevent, in its most destructive form.
+     */
+    const r = await q(
+      `delete from order_designs
+        where order_id = $1
+          and ( ($2::text is not null and line_id = $2)
+             or (line_id is null and $3::text is not null and sku = $3) )
+          and ($4::text is null or coalesce(side,'front') = $4)`,
+      [req.params.id, lineId, sku, side]
+    );
+    const removed = r.rowCount || 0;
+    if (removed) {
+      audit(req, 'design.removed', {
+        entityType: 'order', entityId: req.params.id,
+        before: { line_id: lineId, sku, side: side || 'all sides', rows: removed },
+      });
+    }
+    return { ok: true, removed };
+  });
   /**
    * Charge a seller for design work on ONE line.
    *
