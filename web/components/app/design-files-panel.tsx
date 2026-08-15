@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDesignFiles, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, indexDesigns, designForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
+import { getDesignFiles, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, indexDesigns, designForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
 import { designSrc } from "@/lib/order-image"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -393,6 +393,10 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   // Only staff may remove a file — this card is also shown to sellers, who must never be
   // able to delete a factory working file.
   const canRemove = !!role && role !== "seller"
+  // The card is shown to the seller AND to every staff role on the same order page, so the
+  // copy has to know which of them is reading it. Unknown role reads as the seller: that is
+  // the cautious side — it never tells a seller that somebody else sent their own file.
+  const isSeller = !role || role === "seller"
 
   const load = useCallback(() => {
     getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
@@ -655,6 +659,43 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
     </>
   )
 
+  /**
+   * Move a file to one line, or back to the whole order.
+   *
+   * `key` is a line id when the picked item has one, and a bare sku otherwise. Only a line id
+   * may be sent: the column IS line_id, and writing a sku into it would file the row against
+   * an identity that does not exist — worse than leaving it where it was, because everything
+   * downstream reads it as a line. Orders backfill line_id on read (orders.js), so the
+   * fallback is the honest failure, not the normal path.
+   */
+  const rescope = async (f: DesignFileRow, key: string) => {
+    const it = key === ALL ? null : items.find((x) => (x.line_id || x.sku) === key)
+    if (it && !it.line_id) { setErr(`${it.name || it.sku || "That item"} has no line id yet, so a file can't be filed against it on its own.`); return }
+    const lineId = it?.line_id ?? null
+    if ((f.lineId ?? null) === lineId) return
+    setBusy(f.designId); setErr(null)
+    try {
+      const r = await scopeDesignFile(f.designId, lineId)
+      if (r?.error) throw new Error(r.error)
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not move that file to another item.")
+    } finally { setBusy(null) }
+  }
+
+  /** Optimistic, then reconciled — the same shape the designer board's panel uses. */
+  const priceIt = async (f: DesignFileRow, v: string) => {
+    const n = Math.max(0, Number(v) || 0)
+    setFiles((prev) => (prev ?? []).map((x) => (x.designId === f.designId ? { ...x, price: n } : x)))
+    try {
+      const r = await setDesignFilePrice(f.designId, n)
+      if (r?.error) throw new Error(r.error)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not set that price.")
+      load()
+    }
+  }
+
   const buyAndGet = async (f: DesignFileRow) => {
     setBusy(f.designId); setErr(null)
     try {
@@ -738,13 +779,59 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             </div>
             <div className="text-xs text-muted-foreground">
               {f.sku ? `Item ${f.sku} · ` : ""}
-              {/* A file the SELLER sent says who sent it and when, and says nothing about
-                  money — it is already theirs. Only what we made carries a price. */}
-              {f.source === "seller" ? `You sent this${f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })}` : ""}`
+              {/* WHO SENT IT, from the reader's side. "You sent this" is true for the seller
+                  and false for every operator, warehouse hand and admin looking at the same
+                  card — they are told who it was instead. */}
+              {f.source === "seller"
+                ? `${isSeller ? "You sent this" : "Sent by the seller"}${f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })}` : ""}`
                 : f.kind === "image" ? "Design image"
                   : f.paid ? "Purchased" : f.price ? `$${f.price} — pays from your wallet` : "Free"}
             </div>
           </div>
+
+          {/**
+            * WHICH ITEM IT GOES ON — CHANGEABLE, not just displayed.
+            *
+            * The target was picked once, in the staging list, and then never again. A file
+            * that landed on the wrong line (or on the whole order because its name matched
+            * nothing) could not be moved without deleting and re-dropping it — which for a
+            * seller's own machine file means losing the row we had already checked.
+            *
+            * /api/design_files/:id/scope has existed the whole time and nothing called it.
+            * It is metadata only — no bytes move — and it is permission-checked server-side:
+            * a non-staff caller may only re-scope a file on their OWN order, so this control
+            * is safe to give to every role that can already see the row.
+            */}
+          {items.length > 0 && (
+            <VariantField
+              label="Goes on" compact className="w-40 shrink-0"
+              value={labelFor(f.kind === "image", f.lineId || ALL)}
+              options={optionsFor(f.kind === "image")}
+              onChange={(v) => void rescope(f, keyAt(f.kind === "image", v))}
+            />
+          )}
+          {/**
+            * WHAT THE SELLER PAYS, set by the people whose job that is.
+            *
+            * Only .pes is sold, and only admin/warehouse may price it — `canPrice` comes
+            * from the SERVER (it decides, and rejects anyone else regardless), so this is
+            * not a second opinion about who is allowed. It existed on the designer board's
+            * panel and not here, which is the card admin and warehouse actually open, so a
+            * deliverable could only be priced from a board that neither of them lives on.
+            */}
+          {f.kind === "pes" && f.canPrice && (
+            <label className="flex shrink-0 items-center gap-1" title="What the seller pays to download this">
+              <CurrencyDollar size={11} className="text-muted-foreground" />
+              <Input
+                defaultValue={String(f.price ?? 0)}
+                onBlur={(e) => void priceIt(f, e.target.value)}
+                inputMode="decimal"
+                aria-label={`Price for ${f.name}`}
+                className="h-7 w-16 text-center text-xs"
+              />
+            </label>
+          )}
+
           {/* No download for their own upload: the file came FROM this browser, and the
               route refuses a non-deliverable to a seller anyway — so a button here would
               only ever produce "forbidden". */}
