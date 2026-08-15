@@ -356,7 +356,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   // The server reads the copy already on its disk instead.
   const [importOpen, setImportOpen] = useState(false)
   /** The blank whose full detail is open. Null = closed. */
-  const [detail, setDetail] = useState<{ item: Item; supplier: "ss" | "otto" | "sanmar"; styleId: string; seed: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null } } | null>(null)
+  const [detail, setDetail] = useState<{ item: Item; supplier: "ss" | "otto" | "sanmar"; styleId: string; seed: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null; styleNo?: string | null } } | null>(null)
 
   /**
    * The one refresh worth a button.
@@ -602,7 +602,11 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
                       item: it,
                       supplier: it.supplier,
                       styleId: String(c.id),
+                      // Otto and SanMar are keyed by their real style code, so the id IS the
+                      // number. S&S is keyed by an internal row id, and its number comes
+                      // alongside — without this the window opened saying "16".
                       seed: { name: c.title, brand: c.brand, image: c.image,
+                              styleNo: it.supplier === "ss" ? (it.ss.styleName || it.ss.partNumber || null) : String(c.id),
                               price: c.price != null ? (c.priceMax != null && c.priceMax !== c.price ? `$${c.price}–$${c.priceMax}` : `$${c.price}`) : null },
                     })
                   }}

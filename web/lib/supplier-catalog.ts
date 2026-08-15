@@ -43,7 +43,21 @@ export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<Catal
     // margin. Base is left blank so it derives as productCost + the base_markup setting.
     productCost: d.price ?? fb.price ?? undefined,
     sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: colorNames(d.colors)[0] ?? fb.colors?.[0],
-    img: d.image ?? fb.image ?? undefined, images: d.extraImages ?? [], sku: styleID,
+    /**
+     * THE SKU IS THE STYLE NUMBER — "5000", not "16".
+     *
+     * `styleID` is S&S's INTERNAL row id. It is the right thing to put in their URLs and it
+     * is what every fetch here is keyed by, but it is not an identifier that means anything
+     * outside their database: nobody types it, no spec sheet carries it, and no other
+     * supplier's product would ever collide with it in a way a human could spot. Otto and
+     * SanMar both store the real style code here (`PC61`, an Otto part number), so S&S was
+     * the only one whose blanks carried a number that matched nothing a person could look up.
+     *
+     * Falls back through partNumber and then the internal id, because a blank with no sku at
+     * all is worse than one with an unfamiliar number.
+     */
+    img: d.image ?? fb.image ?? undefined, images: d.extraImages ?? [],
+    sku: d.styleName || d.partNumber || styleID,
     // The back / side / on-model shots, still attached to the colourway S&S sent them for.
     // `images` keeps the same pictures as a flat gallery for readers that want one.
     colorGallery: d.colorExtras ?? undefined,

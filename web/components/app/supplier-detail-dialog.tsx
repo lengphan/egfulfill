@@ -28,6 +28,9 @@ type Supplier = "ss" | "otto" | "sanmar"
 /** The common shape the three detail endpoints collapse to. */
 type Detail = {
   name: string
+  /** The style code a person uses — "5000", "PC61". NOT the key this window fetches by:
+   *  S&S's is an internal row id, so the two differ for exactly one of the three suppliers. */
+  styleNo?: string | null
   brand?: string | null
   category?: string | null
   description?: string | null
@@ -76,7 +79,7 @@ export function SupplierDetailDialog({
   /** What the card already knows, shown immediately so the window has content before the
    *  fetch lands — opening onto a spinner for a style you can already see is a step
    *  backwards from the tile you clicked. */
-  seed?: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null }
+  seed?: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null; styleNo?: string | null }
   onOrder?: () => void
   onAddToCatalog?: () => void
   added?: boolean
@@ -115,6 +118,9 @@ export function SupplierDetailDialog({
           if (raw?.error) { setErr(String(raw.error)); return }
           setD({
             name: String(raw.name ?? raw.title ?? seed?.name ?? styleId),
+            // S&S answers with styleName/partNumber; Otto and SanMar are already keyed by
+            // their real style code, so for them the fetch key IS the number.
+            styleNo: (raw.styleName as string) || (raw.partNumber as string) || (supplier === "ss" ? null : styleId),
             brand: (raw.brand as string) ?? seed?.brand ?? null,
             category: (raw.category as string) ?? null,
             description: (raw.description as string) ?? null,
@@ -140,6 +146,10 @@ export function SupplierDetailDialog({
   }, [open, supplier, styleId])
 
   if (!open || !supplier || !styleId) return null
+
+  // The card already knows the number for S&S, so the header doesn't have to wait on the
+  // fetch to stop being wrong — and once the detail lands, its own value wins.
+  const styleNo = d?.styleNo || seed?.styleNo || (supplier === "ss" ? null : styleId)
 
   /**
    * EVERY ANGLE OF WHAT YOU ARE LOOKING AT.
@@ -199,7 +209,18 @@ export function SupplierDetailDialog({
               {d?.name || seed?.name || styleId}
             </span>
             <span className="flex flex-wrap items-baseline gap-x-2 text-xs font-normal text-muted-foreground">
-              <span>{[SUPPLIER_NAME[supplier], styleId, d?.category].filter(Boolean).join(" · ")}</span>
+              {/**
+                * THE NUMBER ON THE SPEC SHEET, not the one in their database.
+                *
+                * `styleId` is what every fetch in this window is keyed by, and for S&S that is
+                * an INTERNAL row id — so a Gildan 5000 introduced itself as "16", a number
+                * that appears on no label, no spec sheet and no purchase order. Otto and
+                * SanMar key by the real style code, which is why only S&S read wrong.
+                *
+                * Falls back to the id rather than showing nothing: an unfamiliar number still
+                * tells you two products apart, and a blank gap doesn't.
+                */}
+              <span>{[SUPPLIER_NAME[supplier], styleNo, d?.category].filter(Boolean).join(" · ")}</span>
               {seed?.price && <span className="font-semibold text-foreground">{seed.price}</span>}
             </span>
           </DialogTitle>

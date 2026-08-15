@@ -10,6 +10,7 @@ import {
   getCatalogProducts, saveCatalogProducts, colorNames,
   type SsStyle, type OttoFav, type CatalogProduct,
 } from "@/lib/api"
+import { ssCatalogProduct, ottoCatalogProduct } from "@/lib/supplier-catalog"
 import { getToken } from "@/lib/auth"
 
 // Otto images are Google Drive links — rewrite to the embeddable thumbnail URL.
@@ -54,25 +55,22 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
     setAddingId(keyOf(f))
     try {
       const existing = await getCatalogProducts().catch(() => [] as CatalogProduct[])
-      let product: CatalogProduct
-      if (f.supplier === "ss") {
-        const d = await getSsStyle(f.id)
-        product = {
-          id: "SS-" + f.id, name: d.title || f.title, type: "Apparel", method: "DTG", status: "Active",
-          price: d.price ?? f.price ?? 0, basePrice: d.price ?? f.price ?? 0,
-          sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: colorNames(d.colors)[0],
-          img: d.image ?? f.image ?? undefined, sku: f.id, description: d.description ?? undefined, supplier: "S&S",
-        }
-      } else {
-        const d = await getOttoStyle(f.id).catch(() => null)
-        const colorImages = d && !d.error ? driveMap(d.colorImages) : {}
-        product = {
-          id: "OTTO-" + f.id, name: d?.name || f.title, type: "Headwear", method: "Embroidery", status: "Active",
-          price: Number(d?.price ?? f.price) || 0, basePrice: Number(d?.price ?? f.price) || 0,
-          sizes: d?.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0],
-          img: driveImg(d?.image ?? f.image) || undefined, sku: d?.skus?.[0] || f.id, description: d?.description ?? undefined, supplier: "Otto Cap",
-        }
-      }
+      /**
+       * THE SAME BUILDER THE BROWSE GRID USES. This was a private copy, and it had drifted
+       * in the two ways a copy always does:
+       *
+       *  - `sku: f.id` wrote S&S's INTERNAL style id ("16") as the product's sku. The shared
+       *    builder writes the style NUMBER ("5000") — the code on the spec sheet.
+       *  - it put the supplier's wholesale price into `price` AND `basePrice`, which is the
+       *    exact mistake the shared builder documents against: base cost is meant to DERIVE
+       *    as productCost + the base_markup setting, so writing cost into base charged the
+       *    seller our raw cost with no margin.
+       *
+       * CLAUDE.md §5: import shared logic, never re-derive it.
+       */
+      const product: CatalogProduct = f.supplier === "ss"
+        ? await ssCatalogProduct(f.id, { title: f.title, price: f.price, image: f.image, colors: f.colors })
+        : await ottoCatalogProduct(f.id, { name: f.title, price: f.price, image: f.image, colors: f.colors })
       const next = existing.some((p) => p.id === product.id) ? existing.map((p) => (p.id === product.id ? product : p)) : [...existing, product]
       await saveCatalogProducts(next)
       setAdded((prev) => new Set(prev).add(keyOf(f)))

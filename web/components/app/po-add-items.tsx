@@ -294,7 +294,11 @@ export function POAddItems({
       if (!g.has(key)) {
         g.set(key, {
           key, title: ssTitle(p) || p.sku, brand: p.brand ?? null,
-          styleNo: p.style_id ? String(p.style_id) : null,
+          // "Style 5000", not "Style 16". style_id is S&S's internal row id — printing it
+          // under a label that says Style put a number on screen that matches nothing on
+          // the spec sheet you're ordering from. Still grouped BY style_id; only shown as
+          // style_no. Falls back to the id so a row synced before this stays identifiable.
+          styleNo: p.style_no ? String(p.style_no) : p.style_id ? String(p.style_id) : null,
           image: p.image ?? null, priceLo: Infinity, priceHi: 0, rows: [],
         })
       }

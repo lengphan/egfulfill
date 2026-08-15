@@ -662,7 +662,14 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       // synced list can carry them for free, exactly as the Otto list does. Without this
       // the browse card had no sizes until a colour swatch was clicked (which is what
       // triggered the per-style detail call), so every S&S row read "—" until touched.
+      // THE STYLE NUMBER, which is not style_id. `style_id` is S&S's own row id — 16 — and
+      // `style_name` is the marketing title. The number a person says out loud, prints on a
+      // PO and searches for ("5000") is styleName on the PRODUCT feed, and it was only ever
+      // kept inside `data`. Without it here the browse grid, the detail window and the
+      // number-search below all had nothing but 16 to show, and the search filter that
+      // reads s.styleName was matching against undefined on every row.
       const g = await q(`select style_id, min(brand) as brand, min(style_name) as title, min(category) as category,
+                                min(data->>'styleName') as style_no,
                                 (array_agg(image) filter (where image is not null))[1] as image,
                                 array_agg(distinct color) filter (where color is not null) as colors,
                                 array_agg(distinct size) filter (where size is not null) as sizes,
@@ -678,6 +685,8 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       try { const fr = await q('select style_id from ss_favorites'); favs = new Set(fr.rows.map((r) => String(r.style_id))); } catch (e) {}
       let list = g.rows.map((r) => ({
         styleID: String(r.style_id), brand: r.brand || '', title: r.title || ('Style ' + r.style_id),
+        // Same key the LIVE /api/ss/styles list uses, so a card reads the same either way.
+        styleName: r.style_no || '', partNumber: '',
         category: r.category || '', image: proxify(r.image), price: r.price != null ? Number(r.price) : null,
         colors: Array.isArray(r.colors) ? r.colors : [],
         // Present (possibly empty) so the client can tell "synced, no size dimension" —
@@ -1083,10 +1092,15 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       // accounts/styles omit `description`, so we guard and fall back gracefully.
       let title = ((brand ? brand + ' ' : '') + (styleName || '')).trim() || styleName || ('Style ' + id);
       let description = '';
+      let partNumber = null;
       try {
-        const sr = await ssGet('/styles/' + encodeURIComponent(id) + '?fields=styleID,brandName,title,baseCategory,description,styleImage');
+        // partNumber alongside the rest: the two identifiers a person can actually use. `id`
+        // is S&S's internal row id and belongs in the URL, not on the screen.
+        const sr = await ssGet('/styles/' + encodeURIComponent(id) + '?fields=styleID,partNumber,styleName,brandName,title,baseCategory,description,styleImage');
         const meta = Array.isArray(sr.data) ? sr.data[0] : sr.data;
         if (sr.ok && meta) {
+          if (meta.partNumber) partNumber = String(meta.partNumber);
+          if (!styleName && meta.styleName) styleName = String(meta.styleName);
           const mBrand = meta.brandName || brand || '';
           const mTitle = meta.title || styleName || '';
           const t = ((mBrand ? mBrand + ' ' : '') + mTitle).trim();
@@ -1115,7 +1129,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         const list = urls.filter((u) => !frontUrls.has(u)).map(proxify).filter(Boolean);
         if (list.length) colorExtrasProx[c] = list;
       }
-      const out = { styleID: id, title, brand: brand || null, description, image: proxify(image), price, colors, sizes, colorImages: colorImagesProx, extraImages,
+      const out = { styleID: id, styleName: styleName || null, partNumber, title, brand: brand || null, description, image: proxify(image), price, colors, sizes, colorImages: colorImagesProx, extraImages,
                     colorExtras: colorExtrasProx, stockByColor, stockByVariant, stockTotal };
       _styleCache.set(id, { at: Date.now(), data: out });   // cache for repeat opens
       return out;
@@ -1536,6 +1550,10 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       where.push(`(lower(sku) like $${i} or lower(coalesce(style_name,'')) like $${i}
                    or lower(coalesce(brand,'')) like $${i} or lower(coalesce(color,'')) like $${i}
                    or lower(coalesce(size,'')) like $${i} or lower(coalesce(style_id,'')) like $${i}
+                   -- The style NUMBER ("5000"). style_id is S&S's internal row id (16) and
+                   -- style_name is the marketing title, so neither of them matches what
+                   -- someone types off a spec sheet.
+                   or lower(coalesce(data->>'styleName','')) like $${i}
                    or lower(coalesce(category,'')) like $${i})`);
     }
     if (brand) { args.push(brand); where.push(`brand = $${args.length}`); }
@@ -1543,7 +1561,8 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     try {
       const cnt = await q(`select count(*)::int as n from ss_products ${wc}`, args);
       args.push(limit); args.push(offset);
-      const r = await q(`select sku, style_id, brand, style_name, color, color_code, size, price, map_price, qty, warehouses, image, category, synced_at
+      const r = await q(`select sku, style_id, brand, style_name, data->>'styleName' as style_no,
+                                color, color_code, size, price, map_price, qty, warehouses, image, category, synced_at
                          from ss_products ${wc} order by brand, style_name, size limit $${args.length - 1} offset $${args.length}`, args);
       // Route every image through OUR proxy at read time. Rows synced before the proxy
       // existed hold the raw cdn.ssactivewear.com URL, which a browser can't load from our

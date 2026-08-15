@@ -1040,8 +1040,13 @@ export function ssSync(styleIds: string[]) {
 }
 // Synced S&S products at SKU level (style search only gets you a style — a PO line
 // needs the orderable sku, i.e. a specific colour + size).
+/**
+ * `style_id` is S&S's INTERNAL row id (16) and `style_name` is the marketing title — neither
+ * is the number on the spec sheet. `style_no` is that number ("5000"), read out of the raw
+ * product row the sync already stores. Show style_no; key by style_id.
+ */
 export type SsProduct = {
-  sku: string; style_id?: string | null; brand?: string | null; style_name?: string | null
+  sku: string; style_id?: string | null; brand?: string | null; style_name?: string | null; style_no?: string | null
   color?: string | null; size?: string | null; price?: number | string | null; qty?: number | null
   image?: string | null; category?: string | null
 }
