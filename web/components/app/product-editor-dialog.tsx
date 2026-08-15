@@ -218,9 +218,15 @@ export function ProductEditorDialog({
     const p = product
     const id = setTimeout(() => {
       setName(p?.name ?? "")
-      // An existing product keeps its sku; a new one is offered the next free number, so
-      // the common case is "accept it and move on" rather than "invent one".
-      setSku(String(p?.sku ?? "") || (p ? "" : (nextSkuRef.current ?? "")))
+      // A product that HAS a sku keeps it, always. Anything else is offered the next free
+      // number, so the common case is "accept it and move on" rather than "invent one".
+      //
+      // Keyed on the sku, not on whether `product` is set: a supplier import passes a staged
+      // product that does not exist yet and carries no sku of its own (the supplier's code
+      // goes to supplierSku, because publish writes `sku` onto the seller's listing). Under
+      // the old `p ? "" : …` test that opened blank, and the field's hardcoded "EG-1005"
+      // placeholder made the blank look filled.
+      setSku(String(p?.sku ?? "") || nextSkuRef.current || "")
       setSupplierSku(String(p?.supplierSku ?? ""))
       setType(p?.type ?? "Apparel")
       setMethod(p?.method ?? "DTG")
@@ -298,6 +304,54 @@ export function ProductEditorDialog({
     if (v && !colors.some((x) => x.toLowerCase() === v.toLowerCase())) setColors((p) => [...p, v])
     setColorInput("")
   }
+
+  /**
+   * Remove photos and every reference to them in one move.
+   *
+   * Anything that points at a picture — the hero, a colour's representative, its tag, a
+   * side override — has to let go at the same moment, or the editor holds a url that is
+   * no longer in the gallery and saves it.
+   */
+  const dropImages = (urls: Set<string>) => {
+    if (!urls.size) return
+    const left = gallery.filter((u) => !urls.has(u))
+    setGallery(left)
+    // Losing the hero must not leave the product picture-less while photos remain — the
+    // next surviving tile takes over, which is the same rule the grid already states
+    // ("first tile is main"). Blank only when nothing is left.
+    if (urls.has(img)) setImg(left[0] ?? "")
+    setColorImgs((m) => Object.fromEntries(Object.entries(m).filter(([, u]) => !urls.has(u))))
+    setImgColor((m) => Object.fromEntries(Object.entries(m).filter(([u]) => !urls.has(u))))
+    setSideMockups((m) => Object.fromEntries(Object.entries(m).filter(([, u]) => !urls.has(u))))
+  }
+
+  /**
+   * Remove colourways AND the photos that belong to them.
+   *
+   * A COLOUR OWNS ITS PICTURES — the representative shot in `colorImgs` and every extra
+   * angle tagged with it in `imgColor`. Dropping the chip alone left those tiles behind
+   * untagged, so clearing 40 supplier colours off an import meant hunting ~200 orphan
+   * photos by hand, one X at a time. The chip is the whole set now.
+   */
+  /** How many gallery photos a colour owns — so the X can say what it is about to take. */
+  const colorPhotoCount = (c: string) => {
+    const urls = new Set(Object.entries(imgColor).filter(([, x]) => x === c).map(([u]) => u))
+    if (colorImgs[c]) urls.add(colorImgs[c])
+    return urls.size
+  }
+
+  const dropColors = (names: string[]) => {
+    const gone = new Set(names)
+    if (!gone.size) return
+    const urls = new Set<string>()
+    for (const [u, c] of Object.entries(imgColor)) if (gone.has(c)) urls.add(u)
+    for (const c of names) { const u = colorImgs[c]; if (u) urls.add(u) }
+    setColors((p) => p.filter((c) => !gone.has(c)))
+    setColorImgs((m) => Object.fromEntries(Object.entries(m).filter(([c]) => !gone.has(c))))
+    setMatchConf((m) => Object.fromEntries(Object.entries(m).filter(([c]) => !gone.has(c))))
+    dropImages(urls)
+  }
+
   const supplier = product?.supplier
 
   // Lowercase word tokens of a colour name, for matching against an image filename/URL:
@@ -611,7 +665,9 @@ export function ProductEditorDialog({
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">
                   <span className="text-sm text-muted-foreground">Our SKU</span>
-                  <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="EG-1005" className="h-9 font-mono" />
+                  {/* The placeholder is the number this product would ACTUALLY get, not a
+                      hardcoded example — "EG-1005" over an empty field reads as filled. */}
+                  <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={nextSku ?? "EG-1005"} className="h-9 font-mono" />
                   <span className="text-2xs text-muted-foreground">Stock is held against this, and the seller sees it on their listing.</span>
                 </label>
                 <label className="flex flex-col gap-1">
@@ -927,13 +983,11 @@ export function ProductEditorDialog({
                       onClick={() => {
                         const keep = new Set(colors.filter((c) => (stockByColor[c] ?? 0) > 0))
                         const gone = colors.filter((c) => !keep.has(c))
-                        setColors((cs) => cs.filter((c) => keep.has(c)))
-                        setColorImgs((m) => Object.fromEntries(Object.entries(m).filter(([c]) => keep.has(c))))
-                        // The tags go too, or a photo stays filed under a colour the product
-                        // no longer has and colorGallery saves a name nothing references.
-                        setImgColor((m) => Object.fromEntries(Object.entries(m).filter(([, c]) => keep.has(c))))
-                        setMatchConf((m) => Object.fromEntries(Object.entries(m).filter(([c]) => keep.has(c))))
-                        setErr(`Removed ${gone.length} out-of-stock colour${gone.length === 1 ? "" : "s"}: ${gone.map(prettyColorName).join(", ")}`)
+                        // Their photos go with them — a picture of a colourway the product
+                        // no longer offers is exactly as unsellable as the colour was.
+                        const shots = gone.reduce((n, c) => n + colorPhotoCount(c), 0)
+                        dropColors(gone)
+                        setErr(`Removed ${gone.length} out-of-stock colour${gone.length === 1 ? "" : "s"}${shots ? ` and ${shots} photo${shots === 1 ? "" : "s"}` : ""}: ${gone.map(prettyColorName).join(", ")}`)
                       }}
                       className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100"
                       title={dead.map((c) => `${prettyColorName(c)} — 0`).join("\n")}
@@ -1034,15 +1088,23 @@ export function ProductEditorDialog({
                   </div>
                   <button
                     type="button"
-                    aria-label="Remove image"
+                    aria-label={isRep ? `Remove ${prettyColorName(assigned!)} and its other angles` : "Remove image"}
+                    title={isRep
+                      ? `Remove this photo${colorPhotoCount(assigned!) > 1 ? ` and the other ${colorPhotoCount(assigned!) - 1} ${prettyColorName(assigned!)} angle${colorPhotoCount(assigned!) === 2 ? "" : "s"}` : ""}`
+                      : "Remove this photo"}
                     onClick={() => {
-                      setGallery((g) => g.filter((x) => x !== u))
-                      if (img === u) setImg("")
-                      // Drop any colour or side pointing at it, or they'd reference a
-                      // picture that no longer exists — including its own colour tag.
-                      setColorImgs((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
-                      setImgColor((m) => { const n = { ...m }; delete n[u]; return n })
-                      setSideMockups((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
+                      /**
+                       * Deleting a colour's MAIN shot deletes its side angles too.
+                       *
+                       * They are one set — the back and the on-model only mean anything as
+                       * pictures of that colourway. Left behind, the next auto-match or a
+                       * stray tag promotes a back-view into the swatch every other screen
+                       * reads. Removing a photo that is NOT the representative is still
+                       * just that photo. The colour itself stays; use its chip to drop it.
+                       */
+                      const urls = new Set([u])
+                      if (isRep && assigned) for (const [x, c] of Object.entries(imgColor)) if (c === assigned) urls.add(x)
+                      dropImages(urls)
                     }}
                     className="absolute -right-1.5 -top-1.5 z-10 hidden size-6 place-items-center rounded-full bg-foreground/75 text-background group-hover:grid"
                   >
@@ -1159,7 +1221,15 @@ export function ProductEditorDialog({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Colors</span>
-              {colors.length > 0 && <button onClick={() => setColors([])} className="text-xs font-medium text-primary hover:underline">Clear</button>}
+              {/* Same rule in bulk: the colours go and so do their photos. Untagged
+                  pictures are nobody's, so they stay. */}
+              {colors.length > 0 && (
+                <button
+                  onClick={() => dropColors(colors)}
+                  title="Remove every colour and the photos tagged to them"
+                  className="text-xs font-medium text-primary hover:underline"
+                >Clear</button>
+              )}
             </div>
             {/* Photo↔colour tagging now lives on the tiles in the Photo section above; this
                 section just manages WHICH colours exist. */}
@@ -1168,7 +1238,13 @@ export function ProductEditorDialog({
                 {colors.map((c) => (
                   <span key={c} title={c} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 py-0.5 pl-2.5 pr-1 text-xs font-medium text-primary">
                     {prettyColorName(c)}
-                    <button onClick={() => setColors((p) => p.filter((x) => x !== c))} className="flex size-4 items-center justify-center rounded-full hover:bg-primary/20"><X size={9} weight="bold" /></button>
+                    {/* Takes this colour's photos with it — its main shot and every angle
+                        tagged with it. See dropColors. */}
+                    <button
+                      onClick={() => dropColors([c])}
+                      title={`Remove ${prettyColorName(c)}${colorPhotoCount(c) ? ` and its ${colorPhotoCount(c)} photo${colorPhotoCount(c) === 1 ? "" : "s"}` : ""}`}
+                      className="flex size-4 items-center justify-center rounded-full hover:bg-primary/20"
+                    ><X size={9} weight="bold" /></button>
                   </span>
                 ))}
               </div>
