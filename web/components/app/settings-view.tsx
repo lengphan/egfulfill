@@ -1904,8 +1904,11 @@ function PlatformPanel() {
         </div>
       </Fold>
 
-      {/* Per-method surcharge on top of the blank's base cost. */}
-      <Fold title="Print method surcharge" hint="added per unit by technique">
+      {/* Surcharges on top of the blank's base cost. Named for what the section IS rather
+          than for the one kind of surcharge that was in it first — the per-side charge
+          belongs here too, and "Print method surcharge" would have read as the wrong home
+          for it. */}
+      <Fold title="Surcharge" hint="added per unit on top of the base cost">
 
         <p className="mb-3 text-xs text-muted-foreground">Added to the base cost per unit. A product can override this for its own methods.</p>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
