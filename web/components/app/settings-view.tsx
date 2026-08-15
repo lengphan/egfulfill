@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useContext, createContext, isValidEle
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, X, DownloadSimple, Database } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, X, DownloadSimple, Database, ArrowSquareOut } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -76,7 +76,7 @@ import {
   type BackupsState,
 } from "@/lib/api"
 import { TabLabel } from "@/components/app/tab-label"
-import { getShippoBilling, type ShippoBilling } from "@/lib/api"
+import { getShippoBilling, SHIPPO_BILLING_URL, type ShippoBilling } from "@/lib/api"
 import { useLabelT } from "@/lib/i18n"
 
 const fmtDate = (s?: string | null) => {
@@ -3028,12 +3028,21 @@ function BackupsPanel() {
 
 
 /**
- * The card Shippo bills postage to — read-only.
+ * The card Shippo bills postage to — read-only, and it CANNOT be otherwise.
  *
- * Deliberately NOT an editor. Storing or accepting card details would put us in scope for
- * obligations we currently avoid entirely by never touching them; Shippo's dashboard already
- * does that job. This answers "which card is being charged, and is it about to expire",
- * which is the question that shows up as a failed label at the worst moment.
+ * Two separate reasons, and only one of them is our choice:
+ *
+ *  1. Shippo publishes NO payment-method API. Their own docs index lists refunds and
+ *     invoices under billing and nothing else — there is no endpoint to add a card, and
+ *     none to change which card is charged. So "pick a card here" is not a thing we have
+ *     declined to build; there is nothing to call.
+ *  2. Taking card numbers ourselves would put us in PCI scope, which we currently avoid
+ *     entirely by never touching them.
+ *
+ * What this panel CAN do is make the trip to Shippo short and make the failure predictable:
+ * say which card is charged, say when one is expired or about to be, and link straight to
+ * the page that changes it. A card that runs out of money is an outage we cannot fix from
+ * here; a card that expires next month is one we can warn about.
  */
 function ShippoBillingPanel() {
   const [b, setB] = useState<ShippoBilling | null>(null)
@@ -3057,7 +3066,10 @@ function ShippoBillingPanel() {
           Billing is blocked on this Shippo account — labels will fail until it&apos;s resolved in Shippo.
         </p>
       )}
-      {b.current && (
+      {/* Only when it ISN'T one of the rows below — otherwise this was the same card printed
+          twice, once here and once in the list, which is half of what made five rows look
+          like five cards. */}
+      {b.current && b.currentUnlisted && (
         <p className="text-sm">
           Charging <span className="font-medium">{b.current.brand || "card"}</span>{" "}
           <span className="tabular-nums">•••• {b.current.last4}</span>
@@ -3071,12 +3083,20 @@ function ShippoBillingPanel() {
       ) : (
         <div className="rounded-lg border border-border">
           {b.methods.map((m, i) => (
-            <div key={i} className="flex items-center gap-2 border-b border-border/60 px-3 py-2 text-sm last:border-b-0">
+            <div key={i} className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2 text-sm last:border-b-0">
               <span className="font-medium">{m.brand || "Card"}</span>
               <span className="tabular-nums text-muted-foreground">•••• {m.last4 || "????"}</span>
-              {m.expires && <span className="text-xs text-muted-foreground">exp {m.expires}</span>}
-              <span className="ml-auto flex gap-1.5">
-                {m.default && <Badge variant="secondary" className="bg-primary/10 text-primary">Default</Badge>}
+              {/* The expiry stops being grey the moment it starts mattering. */}
+              {m.expires && (
+                <span className={"text-xs " + (m.expired ? "font-medium text-destructive" : m.expiringSoon ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
+                  exp {m.expires}{m.expired ? " · expired" : m.expiringSoon ? " · expiring" : ""}
+                </span>
+              )}
+              <span className="ml-auto flex flex-wrap gap-1.5">
+                {/* CHARGING, not just Default: the one Shippo actually bills is the fact you
+                    came here for, and it is not always the one flagged default. */}
+                {m.charging && <Badge variant="secondary" className="bg-primary text-primary-foreground">Charging</Badge>}
+                {m.default && !m.charging && <Badge variant="secondary" className="bg-primary/10 text-primary">Default</Badge>}
                 <Badge variant="secondary" className={m.active ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-muted text-muted-foreground"}>
                   {m.active ? "Active" : "Inactive"}
                 </Badge>
@@ -3085,9 +3105,27 @@ function ShippoBillingPanel() {
           ))}
         </div>
       )}
+      {/**
+        * THE WAY OUT, one click.
+        *
+        * Shippo has no payment-method API — there is no endpoint to add a card or to choose
+        * which one is charged — so this genuinely cannot be done here, and the honest thing
+        * is to say so and make the trip short rather than leave "change it in Shippo's
+        * dashboard" as an instruction with no address.
+        *
+        * The path is written out as well as linked: a deep link into somebody else's app is
+        * the kind of thing that moves, and when it does the words still get you there.
+        */}
+      <a
+        href={SHIPPO_BILLING_URL} target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:border-primary/50 hover:bg-accent/40"
+      >
+        Change the card in Shippo <ArrowSquareOut size={12} weight="bold" />
+      </a>
       <p className="text-2xs text-muted-foreground">
-        Postage is charged per label to this card — Shippo keeps no prepaid balance, so there is none to show here.
-        Change the card in Shippo&apos;s dashboard. Your postage SPEND is in Finance › Wallet, as label costs.
+        Cards are added and switched in Shippo (Settings › Billing) — they publish no API for it, so it can&apos;t be done from here.
+        Postage is charged per label to that card; Shippo keeps no prepaid balance, so there is none to show.
+        Your postage SPEND is in Finance › Wallet, as label costs.
       </p>
     </div>
   )

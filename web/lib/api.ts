@@ -224,8 +224,15 @@ export type ShippoBilling = {
   /** The card Shippo says it is charging right now (its top-level stripe_cc_* fields),
    *  which is the one fact worth leading with — `methods` is every card on file. */
   current?: { brand: string | null; last4: string; expires: string | null } | null
-  methods: { brand: string | null; last4: string | null; expires: string | null; active: boolean; default: boolean; authorized: boolean }[]
+  /** `current` isn't one of `methods` — then it has to be shown on its own line. */
+  currentUnlisted?: boolean
+  /** DEDUPED — Shippo returns one row per (card × account), so the same card arrives
+   *  several times. `charging` marks the one the top-level stripe_cc_* names. */
+  methods: { brand: string | null; last4: string | null; expires: string | null; active: boolean; default: boolean; authorized: boolean
+    charging?: boolean; expired?: boolean; expiringSoon?: boolean }[]
 }
+/** Shippo has no public API for payment methods — see the panel. Settings → Billing. */
+export const SHIPPO_BILLING_URL = "https://apps.goshippo.com/settings/billing"
 export function getShippoBilling() {
   return api<ShippoBilling>(`/api/shipping/billing`)
 }

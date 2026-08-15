@@ -627,20 +627,75 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
       // account with five. Shippo also names the CURRENT card at the top level
       // (stripe_cc_*), which is the single fact worth leading with.
       const cards = Array.isArray(d.accounts) ? d.accounts : [];
+      /**
+       * ONE ROW PER CARD.
+       *
+       * Shippo returns an ACCOUNT list, and the same card appears once per account it is
+       * attached to — so a two-account setup printed "MasterCard 3042" twice and "Visa
+       * 8693" twice, which reads as four cards and makes the one being charged impossible
+       * to pick out. A card is the brand, the last four and the expiry; anything matching
+       * on all three is the same piece of plastic however many rows mention it.
+       *
+       * The flags are OR-ed across the duplicates rather than taken from whichever copy
+       * happened to be first: a card that is default on one account and not listed as such
+       * on another is still the default.
+       */
+      const byCard = new Map();
+      for (const c of cards) {
+        const brand = c.cc_brand || null, last4 = c.last_four || null;
+        const key = `${brand || ''}|${last4 || ''}|${c.exp_month || ''}|${c.exp_year || ''}`;
+        const prev = byCard.get(key);
+        const row = {
+          brand, last4,
+          expires: c.exp_month && c.exp_year ? `${c.exp_month}/${c.exp_year}` : null,
+          expMonth: Number(c.exp_month) || null, expYear: Number(c.exp_year) || null,
+          active: !!c.is_active, default: !!c.is_default, authorized: !!c.is_authorized,
+        };
+        byCard.set(key, prev
+          ? { ...prev, active: prev.active || row.active, default: prev.default || row.default, authorized: prev.authorized || row.authorized }
+          : row);
+      }
+      /**
+       * DEAD OR DYING, said before a label fails rather than after.
+       *
+       * "My card is out of money" is the report, and an expired card is the same outage with
+       * a cause we can see coming. Computed here because Shippo gives the month and year and
+       * nothing else — a two-digit year is normalised, since 26 and 2026 are the same card.
+       */
+      const now = new Date();
+      const thisMonth = now.getUTCFullYear() * 12 + now.getUTCMonth();
+      const stamp = (m, y) => {
+        if (!m || !y) return null;
+        const yr = y < 100 ? 2000 + y : y;
+        return yr * 12 + (m - 1);
+      };
+      const methods = [...byCard.values()].map((m) => {
+        const at = stamp(m.expMonth, m.expYear);
+        return {
+          ...m,
+          expired: at != null && at < thisMonth,
+          // Three months, because a card is replaced by post and a label is bought today.
+          expiringSoon: at != null && at >= thisMonth && at - thisMonth <= 3,
+        };
+      });
+      const current = d.stripe_cc_last4
+        ? { brand: d.stripe_cc_brand || null, last4: d.stripe_cc_last4,
+            expires: d.stripe_cc_exp_month && d.stripe_cc_exp_year ? `${d.stripe_cc_exp_month}/${d.stripe_cc_exp_year}` : null }
+        : null;
+      // Which row IS the one being charged, so the panel can mark it in place instead of
+      // printing it a second time above the list.
+      const sameCard = (m) => current && String(m.last4 || '') === String(current.last4 || '')
+        && String(m.brand || '').toLowerCase() === String(current.brand || '').toLowerCase();
+      for (const m of methods) m.charging = !!sameCard(m);
       return {
         configured: true,
         paymentType: d.payment_type || null,
         blocked: !!d.blocked_billing,
         currency: d.payment_currency || null,
-        current: d.stripe_cc_last4
-          ? { brand: d.stripe_cc_brand || null, last4: d.stripe_cc_last4,
-              expires: d.stripe_cc_exp_month && d.stripe_cc_exp_year ? `${d.stripe_cc_exp_month}/${d.stripe_cc_exp_year}` : null }
-          : null,
-        methods: cards.map((c) => ({
-          brand: c.cc_brand || null, last4: c.last_four || null,
-          expires: c.exp_month && c.exp_year ? `${c.exp_month}/${c.exp_year}` : null,
-          active: !!c.is_active, default: !!c.is_default, authorized: !!c.is_authorized,
-        })),
+        current,
+        /** True when `current` is not one of the rows — then it has to be shown on its own. */
+        currentUnlisted: !!current && !methods.some((m) => m.charging),
+        methods,
       };
     } catch (e) {
       return { configured: true, error: (e && e.message) || 'failed', methods: [] };
