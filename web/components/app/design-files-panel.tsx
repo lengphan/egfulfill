@@ -89,7 +89,15 @@ function orderFiles(files: DesignFileRow[]): OrderedFile[] {
  */
 type PlacedRow = { key: string; name: string; src: string; no: number | null; item: string | null }
 
-function placedRows(designs: Record<string, OrderDesign> | undefined, items: OrderItem[]): PlacedRow[] {
+/**
+ * `numbered` — whether the caller's `items` are THE ORDER, in order.
+ *
+ * The number is a position on the order, and it is only meaningful when the list it is
+ * counted from is the whole order. The designer board mounts this panel for ONE card and
+ * passes that card's line alone, where an index would be 1 for every line on the order —
+ * a confident, wrong number, which is worse than none.
+ */
+function placedRows(designs: Record<string, OrderDesign> | undefined, items: OrderItem[], numbered = true): PlacedRow[] {
   if (!designs) return []
   const out: PlacedRow[] = []
   items.forEach((it, i) => {
@@ -101,11 +109,33 @@ function placedRows(designs: Record<string, OrderDesign> | undefined, items: Ord
       // that is still better than "Artwork" — it is what someone typed or picked.
       name: d.name || it.name || it.sku || "Artwork",
       src: designSrc(d.data),
-      no: i + 1,
+      no: numbered ? i + 1 : null,
       item: it.name || it.sku || null,
     })
   })
   return out
+}
+
+/**
+ * THE LINE'S NUMBER, in the ONE shape it has anywhere on the order.
+ *
+ * Mirrors the badge on the item rows in app/(app)/orders/[id]/page.tsx — round, filled with
+ * --primary, tabular. That badge is how you find item 3 by eye, so a file row claiming to
+ * belong to item 3 has to carry the SAME mark: a tinted square next to a filled circle
+ * reads as a different kind of fact, and the whole point is that it is the same fact.
+ *
+ * `null` is a file that applies to the WHOLE order rather than a line. It says "All" instead
+ * of borrowing a number, at a smaller size so three characters still fit the circle.
+ */
+function ItemNumberBadge({ no, title }: { no: number | null; title?: string }) {
+  return (
+    <span
+      className={"flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-bold tabular-nums text-primary-foreground " + (no == null ? "text-3xs" : "text-xs")}
+      title={title ?? (no == null ? "Applies to every item on this order" : `Item ${no}`)}
+    >
+      {no ?? "All"}
+    </span>
+  )
 }
 
 /** One row per placed artwork. Module-level: `react-hooks/static-components`. */
@@ -117,14 +147,15 @@ function PlacedArtworkList({ rows }: { rows: PlacedRow[] }) {
         <div key={r.key} className="flex items-center gap-3 p-2.5">
           {/* The artwork itself, small. A name alone still leaves "is that the right one?"
               unanswered, and the picture is already loaded for the mockup above. */}
+          {/* WHERE IT IS ASSIGNED — the badge, not a sentence. Same mark as the item row it
+              belongs to, so the two are matched by eye instead of by reading. */}
+          {r.no != null && <ItemNumberBadge no={r.no} title={`Item ${r.no}${r.item ? ` — ${r.item}` : ""}`} />}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={r.src} alt="" className="size-9 shrink-0 rounded-md border border-border bg-white object-contain" />
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-medium">{r.name}</div>
-            {/* WHERE IT IS ASSIGNED, in the same numbering the item rows and the target
-                dropdown use — pick 3 there, read 3 here. */}
             <div className="truncate text-3xs text-muted-foreground">
-              On item {r.no}{r.item ? ` · ${r.item}` : ""} · placed in the designer
+              {r.item ? `${r.item} · ` : ""}placed in the designer
             </div>
           </div>
           <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-3xs font-bold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">ARTWORK</span>
@@ -301,7 +332,9 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
       {/* The artwork placed on this line, named — it is a file on this job whichever table
           it happens to live in, and a panel that showed only one of the two reported "no
           files" for a line that had a design on it. */}
-      <PlacedArtworkList rows={placedRows(placedMap ?? undefined, item ? [item] : [])} />
+      {/* `false` — this panel is mounted for ONE line, so an index here would number every
+          card "1". No number is better than a confident wrong one. */}
+      <PlacedArtworkList rows={placedRows(placedMap ?? undefined, item ? [item] : [], false)} />
 
       {files === null ? (
         <div className="flex justify-center py-3 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /></div>
@@ -762,15 +795,11 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             const it = items.find((x) =>
               (f.lineId && x.line_id === f.lineId) || (!f.lineId && !!f.sku && x.sku === f.sku))
             const n = it ? numberOf(it) + 1 : null
-            const tone = f.kind === "image" ? "bg-sky-100 text-sky-700" : "bg-violet-100 text-violet-700"
-            return (
-              <span
-                className={"flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums " + tone}
-                title={n ? `Item ${n}${it?.name ? ` — ${it.name}` : ""}` : "Applies to every item on this order"}
-              >
-                {n ?? "All"}
-              </span>
-            )
+            // The SAME badge the item row carries — it was a tinted rounded square, which
+            // reads as a category chip rather than as "this is item 3". Two shapes for one
+            // fact is what made matching a file to its row a reading exercise. The kind is
+            // still said, in words, on the line below.
+            return <ItemNumberBadge no={n} title={n ? `Item ${n}${it?.name ? ` — ${it.name}` : ""}` : undefined} />
           })()}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
