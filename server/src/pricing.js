@@ -287,7 +287,10 @@ export function shipFeeOf(row, size, fees) {
 // The extra-item fee for additional units. A product may set its own
 // (additionalItemShipping) — a second hoodie adds more weight than a second sticker —
 // otherwise the platform's ship_extra applies.
-function extraFeeOf(row, fees) {
+/** The EXTRA-item fee for a product: its own override, else the platform default.
+ *  Exported so the lookbook's price table quotes the number that actually bills — a
+ *  document handed to a wholesale buyer must not carry a second, parallel fee rule. */
+export function extraFeeOf(row, fees) {
   const own = num((row.data || {}).additionalItemShipping);
   return own != null ? own : fees.ship_extra;
 }

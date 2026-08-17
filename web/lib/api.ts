@@ -734,6 +734,14 @@ export type LookbookStyle = {
   /** Garment measurements from S&S, as generic name/value pairs per size — their /specs
    *  feed has no fixed columns, so a chart is pivoted from these rather than read. */
   specs: { size: string; order: string; spec: string; value: string }[]
+  /** What it costs to send one of these as the FIRST item in a parcel, and what each
+   *  additional unit in the same box adds. Straight from pricing.js's shipFeeOf/extraFeeOf,
+   *  so the price table quotes what actually bills.
+   *
+   *  OPTIONAL because a SAVED export is a snapshot: copies written before this existed have
+   *  no fees, and null means "we don't know", never "free". The table prints a dash. */
+  ship?: number | null
+  shipExtra?: number | null
 }
 export function getLookbook() {
   return api<{ styles: LookbookStyle[] }>(`/api/catalog/lookbook`)

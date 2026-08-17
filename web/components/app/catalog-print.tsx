@@ -29,6 +29,29 @@ const HOUSE = {
   ink: "#0B0B0C",
   paper: "#FAF8F3",
 }
+
+/**
+ * THE PLATE EVERY PRODUCT PHOTO SITS ON.
+ *
+ * Supplier photography is a garment cut out on WHITE. On a white sheet that means a shirt
+ * with no edges — the picture and the page are the same colour, so a cap floats in the
+ * middle of nothing and the swatch grid reads as text with gaps. The wells were
+ * `bg-neutral-50` (#FAFAFA), which is white for any practical purpose and did nothing.
+ *
+ * A grey plate is the whole fix, and it is the cheap one: the alternative is cutting the
+ * background out of every supplier image, which is per-image work we would redo on every
+ * sync. One panel behind the picture gives the product its edge back and costs nothing.
+ *
+ * #EDECE9 is warm rather than a neutral grey, so it belongs to the same paper as the rest
+ * of the document instead of reading as a screenshot dropped onto it. Light enough to print
+ * without eating toner across twenty pages, dark enough that a white garment has a border.
+ * The covers already force print-color-adjust: exact, so it survives Chrome's
+ * drop-the-backgrounds default.
+ */
+/* Exported because the curation list shows the SAME supplier photographs while you pick
+   what goes in the book. Two plates defined separately would drift, and the screen you
+   choose from should look like the document you are choosing for. */
+export const PLATE = "#EDECE9"
 /** Only a real hex survives — a half-typed value in settings must not paint the cover. */
 const hexOr = (v: unknown, fallback: string) =>
   typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim() : fallback
@@ -217,7 +240,12 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   {/* No fixed aspect: the hero takes the room the copy doesn't. On a style
                       with no description that is most of the column, which is exactly the
                       gap that made the page look unfinished. */}
-                  <div className="flex min-h-[80mm] flex-1 w-full items-center justify-center overflow-hidden rounded-lg bg-neutral-50">
+                  {/* p-4 so the garment has air inside its plate rather than touching the
+                      corners, and min-h raised from 80mm: on a style with no description
+                      this column is the page, and the hero was sitting small in the middle
+                      of it. */}
+                  <div className="flex min-h-[120mm] flex-1 w-full items-center justify-center overflow-hidden rounded-lg p-4"
+                       style={{ background: PLATE }}>
                     {st.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={st.image} alt={st.name} className="size-full object-contain" />
@@ -260,10 +288,19 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     // the overflow is stated rather than silently dropped.
                     // auto-rows-min keeps swatches their natural height while the column
                     // stretches, so they sit at the top rather than smearing down the page.
-                    <div className="mt-2 grid auto-rows-min grid-cols-4 gap-x-3 gap-y-4">
-                      {st.colors.slice(0, 20).map((c) => (
+                    <div className="mt-2 grid auto-rows-min grid-cols-3 gap-x-3 gap-y-4">
+                      {st.colors.slice(0, 12).map((c) => (
                         <div key={c.name + c.sku} className="flex flex-col items-center">
-                          <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded bg-neutral-50">
+                          {/* THREE ACROSS, SQUARE. Four columns made each well ~19mm wide, and
+                              since these photos are wider than they are tall the picture was
+                              width-limited — so the garment printed about 12mm across and the
+                              rest of a 3:4 well was empty plate. Three columns is ~42% more
+                              width, which is the whole of the "way too small". Square rather
+                              than 3:4 for the same reason: the letterboxing above and below
+                              was padding, not picture. Twelve rather than twenty because the
+                              bigger cells cost rows — the remainder is still stated below. */}
+                          <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded p-1"
+                               style={{ background: PLATE }}>
                             {c.image ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={c.image} alt={c.name} className="size-full object-contain" />
@@ -279,9 +316,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       ))}
                     </div>
                   )}
-                  {st.colors.length > 20 && (
+                  {st.colors.length > 12 && (
                     <p className="mt-2 text-[9px] text-neutral-500">
-                      + {st.colors.length - 20} more colours — ask us for the full range.
+                      + {st.colors.length - 12} more colours — ask us for the full range.
                     </p>
                   )}
                   {/* The size run and the chart live in the RIGHT column, under the
@@ -367,6 +404,96 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               </footer>
             </section>
           ))}
+
+          {/* ── PRICE LIST ───────────────────────────────────────────────────────────
+              Every style on one run of tables, immediately before the back cover.
+
+              THE SPREADS SELL, THIS ONE IS ORDERED FROM. A buyer who has been through
+              twenty pages of photography is comparing, and comparing means holding numbers
+              side by side — which a page-per-style layout makes impossible however good
+              each page is. Same figures, gathered.
+
+              THREE COLUMNS, BECAUSE A UNIT PRICE IS NOT WHAT ANYTHING COSTS. Base is the
+              garment; first item is the parcel it travels in; additional item is each extra
+              in that same box, and it is the number that decides whether ordering six at
+              once is worth it. Quoting only the first would understate a single unit and
+              overstate a carton.
+
+              Paginated in code rather than left to the browser. These sheets are fixed A4
+              with a footer pinned to the bottom, so a table that flows past the page edge
+              simply gets cut — 22 rows a page is what fits with the header and the note. */}
+          {(() => {
+            const ROWS_PER_PAGE = 22
+            const pages: LookbookStyle[][] = []
+            for (let i = 0; i < rows.length; i += ROWS_PER_PAGE) pages.push(rows.slice(i, i + ROWS_PER_PAGE))
+            // Every fee we could not read, so the note under the table can say whether the
+            // dashes mean "free" (they never do) or "we could not price it".
+            const unpriced = rows.filter((r) => r.ship == null).length
+            return pages.map((page, pi) => (
+              <section
+                key={`prices-${pi}`}
+                className="eg-sheet mx-auto mb-6 flex w-[210mm] flex-col bg-white p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+                style={{ minHeight: "297mm" }}
+              >
+                <div className="mb-5 h-1.5 w-full rounded-full" style={{ background: brand.accent }} />
+                <div className="mb-6 border-b border-neutral-200 pb-4">
+                  <h2 className="font-title text-3xl font-bold uppercase leading-none tracking-tight">
+                    Price list
+                  </h2>
+                  <p className="mt-1.5 text-xs text-neutral-500">
+                    Per unit, in USD{pages.length > 1 ? ` · sheet ${pi + 1} of ${pages.length}` : ""}
+                  </p>
+                </div>
+
+                <table className="w-full border-collapse text-[10px]">
+                  <thead>
+                    <tr className="border-b border-neutral-300 text-left align-bottom">
+                      <th className="pb-2 pr-3 font-semibold uppercase tracking-wider text-neutral-500">Style</th>
+                      <th className="pb-2 pr-3 font-semibold uppercase tracking-wider text-neutral-500">Sku</th>
+                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Base</th>
+                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Ship<br />1st item</th>
+                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Ship<br />each extra</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {page.map((st, ri) => (
+                      /* Keyed by ref+sku, not name: two styles can share a name and React
+                         would reconcile them into one row — on a price list that is a line
+                         item silently missing from a quote. */
+                      <tr key={`${st.ref}-${st.sku}-${ri}`} className={ri % 2 ? "" : "bg-neutral-50"}>
+                        <td className="max-w-[70mm] truncate py-1.5 pr-3 font-medium">{st.name}</td>
+                        <td className="py-1.5 pr-3 font-mono text-[9px] text-neutral-500">{st.sku}</td>
+                        {/* A DASH, NEVER A ZERO. An unpriced style on a price list that
+                            printed $0.00 would be quoting a wholesale buyer a free garment,
+                            and it is the one mistake here nobody could walk back. */}
+                        <td className="py-1.5 pl-3 text-right tabular-nums">
+                          {st.price == null ? <span className="text-neutral-400">—</span> : money(st.price)}
+                        </td>
+                        <td className="py-1.5 pl-3 text-right tabular-nums">
+                          {st.ship == null ? <span className="text-neutral-400">—</span> : money(st.ship)}
+                        </td>
+                        <td className="py-1.5 pl-3 text-right tabular-nums">
+                          {st.shipExtra == null ? <span className="text-neutral-400">—</span> : money(st.shipExtra)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="mt-auto pt-6">
+                  <p className="text-[9px] leading-relaxed text-neutral-500">
+                    One parcel is charged the first-item rate once, plus the each-extra rate for
+                    every other unit in it. Base cost is the garment before decoration.
+                    {unpriced > 0 && ` A dash means we haven't priced that line yet — it is not zero; ask us and we'll quote it. (${unpriced} of ${rows.length}.)`}
+                  </p>
+                  <footer className="mt-3 flex items-center justify-between border-t border-neutral-200 pt-3 text-[9px] text-neutral-400">
+                    <span className="font-title text-sm font-semibold tracking-tight text-neutral-700">{brand.title}</span>
+                    <span>{new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+                  </footer>
+                </div>
+              </section>
+            ))
+          })()}
 
           {/* ── BACK COVER ───────────────────────────────────────────────────────────
               A catalogue that stops dead on its last spec sheet leaves the reader with no

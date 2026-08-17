@@ -9,7 +9,7 @@ import {
   getCatalogProducts, setCatalogSelection, setCatalogPrice, applyCatalogMarkup,
   catalogExportUrl, type CatalogProduct,
 } from "@/lib/api"
-import { CatalogPrint } from "@/components/app/catalog-print"
+import { CatalogPrint, PLATE } from "@/components/app/catalog-print"
 import { SupplierStylesPicker } from "@/components/app/supplier-styles-picker"
 import { CatalogExportHistory } from "@/components/app/catalog-export-history"
 import { CatalogSummaryBar } from "@/components/app/catalog-summary-bar"
@@ -257,7 +257,14 @@ export function CatalogView() {
                             actually choosing between. A name and a SKU is a spreadsheet;
                             a catalogue is chosen by eye. */}
                         <div className="flex items-start gap-3">
-                          <div className="size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                          {/* 56px was smaller than the row of colour chips beside it, on the
+                              screen where you decide which products go in a printed catalogue
+                              — a choice made by eye, from a thumbnail too small to see the
+                              garment in. 96px, on the same warm plate the lookbook uses,
+                              because these are the same cut-out-on-white supplier photos and
+                              a white shirt on a white tile has no edges. */}
+                          <div className="size-24 shrink-0 overflow-hidden rounded-lg border border-border p-1"
+                               style={{ background: PLATE }}>
                             {imageOf(p) ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={imageOf(p)} alt="" className="size-full object-contain" />

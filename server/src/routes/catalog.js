@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto';
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
-import { quoteSpec, shipFeeOf, feeSettings } from '../pricing.js';
+import { quoteSpec, shipFeeOf, extraFeeOf, feeSettings } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
@@ -995,6 +995,21 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     ).catch(() => ({ rows: [] }))).rows;
 
     /**
+     * THE PARCEL, quoted from the function that bills it.
+     *
+     * The lookbook's price table states a first-item and an additional-item fee per style,
+     * and both come from pricing.js — shipFeeOf resolves the product's own fee or its
+     * garment band, extraFeeOf its own override or the platform default. A second fee rule
+     * written here would be a document quoting a wholesale buyer numbers we do not charge,
+     * which is worse than quoting none.
+     *
+     * A failed settings read leaves them NULL rather than 0: "we could not price the
+     * postage" and "the postage is free" are different sentences, and the table prints the
+     * first as a dash instead of inventing the second.
+     */
+    const fees = await feeSettings().catch(() => null);
+
+    /**
      * PREFER THE SUPPLIER'S PHOTOGRAPHY over whatever was uploaded on our product.
      *
      * A product's own image is whatever someone attached while setting it up — a phone
@@ -1051,6 +1066,10 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         colors: (supplierColours && supplierColours.length)
           ? supplierColours
           : Object.keys(ci).map((name) => ({ name, sku: '', image: ci[name] || '' })),
+        // What it costs to send one, and each extra in the same box. Same numbers the
+        // order quote uses — see the note on `fees` above.
+        ship: fees ? shipFeeOf(row, null, fees) : null,
+        shipExtra: fees ? extraFeeOf(row, fees) : null,
         // Our own products carry no supplier spec chart unless their sku resolves to a
         // style; filled below for the ones that do.
         specs: [],
@@ -1115,6 +1134,15 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       sizes: p.sizes || [],
       colors: coloursByStyle.get(p.ref) || [],
       specs: specsByStyle.get(p.ref) || [],
+      /**
+       * A picked supplier style has no catalog_products row, so it has no per-product
+       * shipping override to read — it lands on its garment BAND, which is what shipFeeOf
+       * resolves from the type/name text. Handing it a row-shaped object keeps that one
+       * function the only thing deciding a parcel's price; band selection here and in
+       * pricing.js would be two rules for the same question.
+       */
+      ship: fees ? shipFeeOf({ data: { name: p.name || '', type: '' } }, null, fees) : null,
+      shipExtra: fees ? extraFeeOf({ data: {} }, fees) : null,
     }));
 
     return { styles: [...mine, ...supplier] };
