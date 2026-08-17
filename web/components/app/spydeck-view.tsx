@@ -191,23 +191,38 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
       <div className="relative aspect-square overflow-hidden bg-muted/40">
-        {cover ? (
-          // The whole cover is the target — a small zoom affordance in a corner is a thing
-          // you have to find. The magnifier appears on hover to say the click does something.
-          <button
-            type="button" onClick={() => setZoom(true)}
-            className="group/img absolute inset-0 cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
-            title="See the full image and what was published"
-            aria-label="See the full published image"
-          >
+        {/**
+          * THE ZOOM IS NOT CONDITIONAL ON THE THUMBNAIL.
+          *
+          * It used to be: no stored cover meant no button, so the cards whose picture did not
+          * survive were exactly the ones you could not open to find out why — the failure hid
+          * its own diagnosis. And a missing thumbnail does NOT mean a missing listing: the
+          * photos are on the marketplace, this row just has no local copy of one.
+          *
+          * So the well is always the target. With a cover it shows it; without one it shows
+          * the placeholder AND still opens, because the dialog can fetch the live photos and,
+          * failing that, says which of the two happened.
+          */}
+        <button
+          type="button" onClick={() => setZoom(true)}
+          className="group/img absolute inset-0 cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+          title={cover ? "See the full image and what was published" : "No local copy of this photo — open to fetch it from the marketplace"}
+          aria-label="See the full published image"
+        >
+          {cover ? (
             <Image src={cover} alt={title} fill unoptimized sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover" />
-            <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover/img:bg-black/25 group-hover/img:opacity-100">
-              <span className="rounded-full bg-white/90 p-2 text-neutral-900"><MagnifyingGlassPlus size={18} weight="bold" /></span>
+          ) : (
+            <span className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
+              <Package size={22} weight="duotone" />
+              {/* Says WHICH thing is missing. "No image" beside a listing that has images on
+                  the marketplace reads as "this publish failed", and it did not. */}
+              <span className="px-2 text-center text-3xs leading-tight">no saved photo</span>
             </span>
-          </button>
-        ) : (
-          <div className="flex size-full items-center justify-center text-muted-foreground"><Package size={22} weight="duotone" /></div>
-        )}
+          )}
+          <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover/img:bg-black/25 group-hover/img:opacity-100">
+            <span className="rounded-full bg-white/90 p-2 text-neutral-900"><MagnifyingGlassPlus size={18} weight="bold" /></span>
+          </span>
+        </button>
         {/* State, not a "trending" flag — the one thing you open this tab to check. Every
             publish lands as a DRAFT; the seller activates it on the marketplace. */}
         <span className={
@@ -216,9 +231,11 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
         }>
           {live ? <><CheckCircle size={11} weight="fill" /> Live</> : <>Draft</>}
         </span>
-        <span className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-3xs font-bold uppercase tracking-wide text-white backdrop-blur">
-          {platform}
-        </span>
+        {/* The channel pill that sat here is gone. It covered the top-right corner of every
+            product photo to repeat something the card already says twice — the Channel row
+            in the details, and the "Open on <platform>" link. A badge over the picture has
+            to earn the pixels it hides, and Draft/Live does (it is the one thing you cannot
+            read anywhere else on the card). */}
         {p?.price != null && p.price > 0 && (
           <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-sm font-bold tabular-nums text-white backdrop-blur">
             ${p.price.toFixed(2)}

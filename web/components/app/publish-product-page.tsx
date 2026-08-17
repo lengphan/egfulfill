@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
-import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle, Sparkle, Check } from "@phosphor-icons/react"
+import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle, Sparkle, ArrowCounterClockwise } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -395,13 +395,22 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   const [title, setTitle] = useState("")
   const [desc, setDesc] = useState("")
   /**
-   * The assistant's PROPOSAL, held beside the seller's copy rather than written into it.
+   * APPLIED STRAIGHT INTO THE FIELDS, with one snapshot to undo it.
    *
-   * Never auto-applied and never auto-requested: `runRewrite` is bound to a button, so no
-   * effect can fire it and no keystroke can. A model editing a listing in place is a change
-   * nobody reviewed, on text that is the seller's voice and their legal exposure.
+   * This first shipped as a proposal you had to accept — two extra clicks per attempt, on a
+   * control whose whole point is trying it again until the wording lands. Reviewing a
+   * suggestion beside the original is the same act as reading the field after it changed,
+   * so the confirm step bought nothing and cost the iteration speed.
+   *
+   * `aiPrev` is what makes that safe: the text as it was immediately before the last
+   * rewrite, restorable in one click. Only ONE level deep, deliberately — this is an escape
+   * hatch for "that was worse", not an edit history, and a stack would imply a promise about
+   * older versions that nothing here keeps.
+   *
+   * Still never auto-requested: `runRewrite` is bound to a button, so no effect fires it and
+   * no keystroke does.
    */
-  const [aiDraft, setAiDraft] = useState<{ title?: string; description?: string } | null>(null)
+  const [aiPrev, setAiPrev] = useState<{ title: string; description: string } | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
   const [aiErr, setAiErr] = useState<string | null>(null)
   const [retail, setRetail] = useState("")
@@ -431,7 +440,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    */
   const runRewrite = async () => {
     if (aiBusy) return
-    setAiBusy(true); setAiErr(null); setAiDraft(null)
+    setAiBusy(true); setAiErr(null)
     try {
       const r = await rewriteListingCopy({
         title, description: desc,
@@ -440,7 +449,11 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         method: blank?.method ?? undefined,
       })
       if (r.error) throw new Error(r.error)
-      setAiDraft({ title: r.title, description: r.description })
+      // Snapshot BEFORE writing, so undo restores what the seller had rather than what the
+      // previous rewrite produced.
+      setAiPrev({ title, description: desc })
+      if (r.title) setTitle(r.title)
+      if (r.description) setDesc(r.description)
     } catch (e) {
       setAiErr(e instanceof Error ? e.message : "The assistant couldn't rewrite this.")
     } finally { setAiBusy(false) }
@@ -1294,47 +1307,25 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               </label>
 
               {/* THE ASSIST, ON A BUTTON. Nothing here runs until it is pressed — no call on
-                  open, none on keystroke — because each one costs money and a wait. */}
+                  open, none on keystroke — because each one costs money and a wait. Pressing
+                  it again simply rewrites again, which is how it is actually used. */}
               <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="outline" onClick={runRewrite} disabled={aiBusy || (!title.trim() && !desc.trim())}
-                  title="Rewrite the title and description — you review the result before anything changes">
+                  title="Rewrite the title and description in place">
                   {aiBusy ? <CircleNotch size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
-                  {aiBusy ? "Rewriting…" : "Rewrite with AI"}
+                  {aiBusy ? "Rewriting…" : aiPrev ? "Rewrite again" : "Rewrite with AI"}
                 </Button>
-                <span className="text-2xs text-muted-foreground">Suggests a cleaner title and description. Nothing changes until you apply it.</span>
+                {aiPrev && !aiBusy && (
+                  <Button size="sm" variant="ghost" onClick={() => { setTitle(aiPrev.title); setDesc(aiPrev.description); setAiPrev(null) }}
+                    title="Put back the title and description as they were before the last rewrite">
+                    <ArrowCounterClockwise size={14} weight="bold" /> Undo
+                  </Button>
+                )}
+                <span className="text-2xs text-muted-foreground">
+                  {aiPrev ? "Applied — press again for another take, or undo." : "Rewrites the title and description in place."}
+                </span>
               </div>
               {aiErr && <p className="text-xs text-destructive">{aiErr}</p>}
-
-              {/* THE PROPOSAL, SIDE BY SIDE WITH WHAT YOU WROTE. Applying is a separate,
-                  explicit act — and each half applies on its own, because a good title and a
-                  worse description is the common result and should not be all-or-nothing. */}
-              {aiDraft && (
-                <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/[0.04] p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-2xs font-semibold uppercase tracking-wide text-primary">Suggested</span>
-                    <button type="button" onClick={() => setAiDraft(null)} className="text-2xs text-muted-foreground underline underline-offset-2 hover:text-foreground">Discard</button>
-                  </div>
-                  {aiDraft.title && (
-                    <div className="space-y-1">
-                      <p className="text-sm">{aiDraft.title}</p>
-                      <Button size="sm" variant="outline" onClick={() => { setTitle(aiDraft.title!); setAiDraft((d) => (d ? { ...d, title: undefined } : d)) }}>
-                        <Check size={13} weight="bold" /> Use this title
-                      </Button>
-                    </div>
-                  )}
-                  {aiDraft.description && (
-                    <div className="space-y-1">
-                      <p className="whitespace-pre-line text-sm text-muted-foreground">{aiDraft.description}</p>
-                      <Button size="sm" variant="outline" onClick={() => { setDesc(aiDraft.description!); setAiDraft((d) => (d ? { ...d, description: undefined } : d)) }}>
-                        <Check size={13} weight="bold" /> Use this description
-                      </Button>
-                    </div>
-                  )}
-                  {!aiDraft.title && !aiDraft.description && (
-                    <p className="text-xs text-muted-foreground">Both applied.</p>
-                  )}
-                </div>
-              )}
 
               <div className="space-y-1.5">
                 <div className="text-sm font-medium">Tags <span className="text-muted-foreground">({tags.length}/{MAX_TAGS})</span></div>
