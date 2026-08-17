@@ -480,6 +480,27 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
 
   // Create a label. body: { to:{name,street,street2,city,state,zip}, from:{...},
   //   weightOz, length, width, height, mailClass, imageType('PDF'|'ZPL...'), orderId }
+/**
+ * SHIPPO'S BILLING REFUSAL, ANSWERED WITH THE ACTION THAT FIXES IT.
+ *
+ * Its message is accurate and easy to misread: "your request has failed due to a billing
+ * issue … Labels are not available while invoices are past due." The obvious response is to
+ * put a working card on the account — and that does not help, because the amount is already
+ * an INVOICE. Postage bills per label; a failed charge becomes an invoice, and only paying it
+ * unblocks labels. Somebody who swaps the card and sees the same error concludes the app is
+ * showing them something stale.
+ *
+ * Shippo's own words are kept — they carry the invoice link — and one sentence is added in
+ * front saying which of the two things to do.
+ */
+const BILLING_RE = /billing issue|invoices are past due|past due/i;
+function withBillingHint(msg) {
+  const m = String(msg || '');
+  if (!BILLING_RE.test(m)) return m;
+  return 'Shippo is refusing labels because invoices on the account are past due — PAY THEM, '
+    + 'not the card: changing the card does not settle an amount already owed. Shippo says: ' + m;
+}
+
   app.post('/api/usps/label', { preHandler: requireStaff }, async (req, reply) => {
     try {
       const b = req.body || {};
@@ -505,7 +526,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
           }
           reply.code(502); return { error: 'The shipping provider returned no label for that rate. Nothing was charged.' };
         } catch (e0) {
-          reply.code(502); return { error: 'Label purchase failed: ' + (e0 && e0.message ? e0.message : String(e0)) };
+          reply.code(502); return { error: 'Label purchase failed: ' + withBillingHint(e0 && e0.message ? e0.message : String(e0)) };
         }
       }
       // PREFERRED PATH — when a shipping aggregator (Shippo/EasyPost) is configured,
@@ -532,7 +553,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to, 
           // your credit card" — an EPS error for an account the aggregator path never
           // needed, which sends you debugging the wrong system entirely.
           reply.code(502);
-          return { error: 'Label purchase failed: ' + (e2 && e2.message ? e2.message : String(e2)) };
+          return { error: 'Label purchase failed: ' + withBillingHint(e2 && e2.message ? e2.message : String(e2)) };
         }
       }
       // No aggregator configured, and USPS-direct wasn't explicitly asked for. Say so

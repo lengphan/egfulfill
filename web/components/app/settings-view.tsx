@@ -3061,10 +3061,27 @@ function ShippoBillingPanel() {
 
   return (
     <div className="space-y-2">
+      {/**
+        * WHAT ACTUALLY UNBLOCKS IT, because the obvious guess is wrong.
+        *
+        * Shippo's own refusal reads "Labels are not available while invoices are PAST DUE".
+        * Postage is billed per label to the card; when a charge fails the amount becomes an
+        * invoice, and swapping in a card with money on it does not settle an invoice that is
+        * already outstanding. So "I changed the card and it still fails" is the expected
+        * result, not a stale reading — this panel is fetched live on every open.
+        */}
       {b.blocked && (
-        <p className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
-          Billing is blocked on this Shippo account — labels will fail until it&apos;s resolved in Shippo.
-        </p>
+        <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+          <p className="font-medium">Shippo is refusing labels on this account.</p>
+          <p className="mt-1">
+            It is <strong>unpaid invoices</strong>, not the card on file — changing the card doesn&apos;t settle an amount
+            already outstanding. Pay the past-due invoices in Shippo and labels resume straight away.
+          </p>
+          <a href={SHIPPO_BILLING_URL} target="_blank" rel="noopener noreferrer"
+            className="mt-1.5 inline-flex items-center gap-1 font-medium underline underline-offset-2">
+            Open Shippo invoices <ArrowSquareOut size={11} weight="bold" />
+          </a>
+        </div>
       )}
       {/* Only when it ISN'T one of the rows below — otherwise this was the same card printed
           twice, once here and once in the list, which is half of what made five rows look

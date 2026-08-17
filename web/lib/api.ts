@@ -231,8 +231,15 @@ export type ShippoBilling = {
   methods: { brand: string | null; last4: string | null; expires: string | null; active: boolean; default: boolean; authorized: boolean
     charging?: boolean; expired?: boolean; expiringSoon?: boolean }[]
 }
-/** Shippo has no public API for payment methods — see the panel. Settings → Billing. */
-export const SHIPPO_BILLING_URL = "https://apps.goshippo.com/settings/billing"
+/**
+ * Shippo has no public API for payment methods — see the panel.
+ *
+ * This is the address SHIPPO'S OWN error names when it refuses a label ("Review the payment
+ * status of your invoices at https://shippo.com/user/billing/"), which beats a path guessed
+ * from the dashboard's URL shape: it is the page that lists the invoices, not just the page
+ * that holds the cards, and an unpaid invoice is what actually blocks a label.
+ */
+export const SHIPPO_BILLING_URL = "https://shippo.com/user/billing/"
 export function getShippoBilling() {
   return api<ShippoBilling>(`/api/shipping/billing`)
 }
