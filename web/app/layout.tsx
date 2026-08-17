@@ -66,18 +66,29 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, playfair.variable)}
     >
-      {/* Zoom, applied BEFORE first paint.
-          Same trick next-themes uses for dark mode, and for the same reason: read from a
-          React effect and every load renders at 100% for a frame and then jumps, which reads
-          as "my setting didn't save" rather than as a repaint. This is a blocking inline
-          script by design — it must run before the body is painted. Kept to one guarded
-          statement so a corrupt value can never stop the page booting. */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `try{var z=parseFloat(localStorage.getItem('eg_zoom'));if(z>0.5&&z<3)document.documentElement.style.setProperty('--eg-zoom',String(z))}catch(e){}`,
-        }}
-      />
       <body>
+        {/* Zoom, applied BEFORE first paint.
+            Same trick next-themes uses for dark mode, and for the same reason: read from a
+            React effect and every load renders at 100% for a frame and then jumps, which reads
+            as "my setting didn't save" rather than as a repaint. This is a blocking inline
+            script by design — it must run before the body is painted. Kept to one guarded
+            statement so a corrupt value can never stop the page booting.
+
+            FIRST CHILD OF <body>, not a child of <html>. React 19 refuses to place a sync
+            script between <html> and <body> — "Cannot render a sync or defer <script> outside
+            the main document without knowing its order" — and the mismatch it causes takes
+            HYDRATION down with it, so the whole app stops at its loading spinner and never
+            issues a single request. That is what it was doing in dev: a blank shell, no
+            network, no error visible on the page itself.
+
+            The behaviour is unchanged. The browser still executes this synchronously while
+            parsing, before anything below it is painted, and document.documentElement exists
+            by then — it is the element we are already inside. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var z=parseFloat(localStorage.getItem('eg_zoom'));if(z>0.5&&z<3)document.documentElement.style.setProperty('--eg-zoom',String(z))}catch(e){}`,
+          }}
+        />
         <ThemeProvider>
           <LanguageProvider>
             {/* The zoom lives HERE, not on <body>, and that placement is load-bearing.
