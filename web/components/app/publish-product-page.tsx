@@ -560,6 +560,23 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   const [destErr, setDestErr] = useState("")
   /** Ticked shops, by connection_id. Everything ticked gets the same listing. */
   const [picked, setPicked] = useState<string[]>([])
+  /**
+   * DRAFT OR LIVE, one choice for the whole run.
+   *
+   * Every channel was hardcoded to a draft, on the reasoning that nothing should reach a
+   * buyer before a person has looked at it. That is the right DEFAULT and the wrong rule:
+   * a seller republishing a listing they have already checked ended up opening three shop
+   * admins to press activate three times.
+   *
+   * It is per-run rather than per-shop deliberately. The thing being published is one
+   * product, the decision is "is this ready?", and that answer does not change between a
+   * seller's own two shops — a checkbox per row would ask the same question three times
+   * and let the answers disagree.
+   *
+   * Defaults to draft, and resets to draft on nothing: an unticked box is the safe state,
+   * so a seller can never go live by not noticing a control.
+   */
+  const [goLive, setGoLive] = useState(false)
   /** Per-shop TikTok fields, keyed by connection_id — see TtFields. */
   const [tt, setTt] = useState<Record<string, TtFields>>({})
   /** What happened at each shop, keyed by connection_id. Survives a retry so a shop that
@@ -869,6 +886,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
         sku_base: blank?.sku ?? undefined,
         size_prices: Object.fromEntries(sizeRows.filter((r) => r.price > 0).map((r) => [r.size, r.price])),
+        save_mode: goLive ? "LISTING" : "AS_DRAFT",
         category_id: f.category.id, warehouse_id: f.warehouse,
         package_weight: f.weight, weight_unit: f.unit,
         blank: blank?.sku ?? undefined, printType: method || undefined,
@@ -892,7 +910,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         // the server, to erase whatever Etsy had put there.
         listing_id: r.product_id ?? undefined,
         title: title.trim(), price: basePrice, image: recordCover(null),
-        state: "draft",
+        state: goLive ? "active" : "draft",
         blank_sku: blank?.sku ?? undefined, blank_name: blank?.name ?? undefined,
         print_type: method || undefined,
         colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
@@ -900,7 +918,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       })
       return {
         state: "ok",
-        text: "Draft product created",
+        text: goLive ? "Product listed" : "Draft product created",
         note: r.warnings?.length ? r.warnings.map((w) => w.message).filter(Boolean).join(" ") : undefined,
       }
     } catch (e) {
@@ -927,6 +945,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         colors: blank ? pickedColors : [], sizes: blank ? pickedSizes : [],
         blank_sku: blank?.sku ?? undefined, print_type: method || undefined,
         design_id: prefill?.designId, design_data: prefill?.designUrl, design_pos: prefill?.designPos,
+        state: goLive ? "active" : "draft",
       })
       if (r.error) throw new Error(r.error)
       onPublished?.(r.url, recordCover(r.primary_image), {
@@ -943,7 +962,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       })
       return {
         state: "ok",
-        text: "Draft product created",
+        // Shopify takes the status at creation, so what came back is what it is.
+        text: r.state === "active" ? "Listed live" : "Draft product created",
         url: r.url,
         // Say when photos didn't all land. The product exists either way — the server
         // deliberately doesn't fail a publish over an image — so silence here would leave a
@@ -995,6 +1015,9 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         // The seller's own declaration — always sent explicitly. Never let the server's
         // backward-compat fallback decide this on their behalf.
         who_made: whoMade,
+        // Etsy creates the draft, uploads the photos, then flips it — it will not activate
+        // a listing that has no image. `activation_error` below is that last step refusing.
+        state: goLive ? "active" : "draft",
       })
       if (r.error) throw new Error(r.error)
 
@@ -1029,13 +1052,24 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         variants_error: r.variants_error ?? null,
         images_uploaded: r.images_uploaded ?? 0,
       })
+      // SAY WHICH ONE IT ACTUALLY IS. Etsy is asked to activate only after the photos and
+      // variants are on, and that call can refuse on its own — an incomplete shop profile,
+      // a listing Etsy won't take live yet. Reporting "listed live" off the button that was
+      // pressed rather than off the state that came back is how a draft gets left sitting in
+      // a shop while the seller believes it is selling.
+      const live = r.state === "active"
       return {
         state: "ok",
-        text: "Draft listing created",
+        text: live ? "Listed live" : "Draft listing created",
         url: r.url,
         // The one thing worth interrupting for: the listing exists but has no variants, so
         // it is a flat listing and somebody has to decide whether that will do.
-        note: r.variants_error ? `Variants were rejected (${r.variants_error}), so it listed flat.` : undefined,
+        note: [
+          r.variants_error ? `Variants were rejected (${r.variants_error}), so it listed flat.` : "",
+          r.activation_error
+            ? `It's still a draft — Etsy wouldn't activate it (${r.activation_error}). Activate it in Shop Manager.`
+            : "",
+        ].filter(Boolean).join(" ") || undefined,
       }
     } catch (e) {
       return { state: "fail", text: e instanceof Error ? e.message : "Publish failed." }
@@ -1648,6 +1682,52 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   </div>
                 )}
               </div>
+
+              {/* DRAFT OR LIVE — asked once, for every shop ticked above.
+                  Two radio rows rather than a "publish live" checkbox: a checkbox states one
+                  option and leaves the other implied, and the implied one here is the one
+                  that puts a product in front of buyers. Both outcomes are written down, and
+                  the sentence under each says what actually happens rather than what it is
+                  called, because "draft" means a slightly different thing in each of the
+                  three admins this can reach. */}
+              {dests !== null && dests.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">When it&apos;s created</span>
+                  <div className="grid gap-1 sm:grid-cols-2">
+                    {[
+                      { live: false, label: "Save as draft", hint: "You review and activate it in the shop." },
+                      { live: true, label: "Publish live", hint: "It goes on sale as soon as it's created." },
+                    ].map((o) => (
+                      <label
+                        key={o.label}
+                        className={"flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-sm transition-colors " +
+                          (goLive === o.live ? "border-primary/60 bg-primary/5" : "border-border hover:bg-muted/60")}
+                      >
+                        <input
+                          type="radio"
+                          name="publish-state"
+                          checked={goLive === o.live}
+                          onChange={() => { setResult(null); setGoLive(o.live) }}
+                          className="mt-0.5 size-3.5 accent-[var(--primary)]"
+                        />
+                        <span className="min-w-0">
+                          <span className={"block font-medium " + (goLive === o.live ? "text-primary" : "")}>{o.label}</span>
+                          <span className="block text-2xs text-muted-foreground">{o.hint}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {/* Etsy is the one that can say yes to the button and no to the listing, and
+                      it is worth saying so BEFORE the publish rather than only in the outcome:
+                      Etsy will not take a listing live without a photo, and photos are uploaded
+                      after the listing exists. */}
+                  {goLive && pickedDests.some((d) => d.platform === "etsy") && (
+                    <p className="text-2xs text-muted-foreground">
+                      Etsy activates after the photos upload — if it refuses, the listing stays a draft and we&apos;ll say why.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* ONE BLOCK PER TICKED TIKTOK SHOP. A category tree is read against a shop's
                   cipher and a warehouse belongs to one shop, so two TikTok shops get two

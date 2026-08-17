@@ -3024,11 +3024,15 @@ export type EtsyConfig = {
 /** Etsy's own declaration of who physically made the item. The seller's statement about
  *  their shop — always send it explicitly rather than letting the server fall back. */
 export type EtsyWhoMade = "i_did" | "someone_else" | "collective"
-export function publishEtsy(body: { connection_id?: string; title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string; who_made?: EtsyWhoMade }) {
+export function publishEtsy(body: { connection_id?: string; title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string; who_made?: EtsyWhoMade;
+  /** "draft" (default) or "active" — whether the listing goes in front of buyers straight
+   *  away. Etsy can't activate a listing before its photos exist, so the server creates the
+   *  draft, uploads, then flips it; `activation_error` says so if that last step refused. */
+  state?: "draft" | "active" }) {
   // `primary_image` is Etsy's OWN url for the cover photo after upload. Prefer it over the
   // source we sent: a local upload is a multi-megabyte data: URL, and storing that as a
   // card thumbnail put a base64 blob in the database on every publish.
-  return api<{ listing_id?: number; url?: string; error?: string; state?: string; images_uploaded?: number; primary_image?: string | null; tags_applied?: number; variants_applied?: number; variant_skus?: string[]; variants_error?: string | null }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
+  return api<{ listing_id?: number; url?: string; error?: string; state?: string; images_uploaded?: number; primary_image?: string | null; tags_applied?: number; variants_applied?: number; variant_skus?: string[]; variants_error?: string | null; activation_error?: string | null }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
 }
 export function getEtsyConnections() {
   return api<EtsyConnection[]>(`/api/etsy/connections`)
@@ -3281,6 +3285,8 @@ export function publishShopify(body: {
   colors?: string[]; sizes?: string[]
   blank_sku?: string; print_type?: string
   design_id?: string | number; design_data?: string; design_pos?: unknown
+  /** "draft" (default) or "active". Shopify takes this at creation. */
+  state?: "draft" | "active"
 }) {
   return api<{
     ok?: boolean; error?: string

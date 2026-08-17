@@ -1818,6 +1818,20 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // The trade-off is written up at the whoMade constant in publish-product-dialog.tsx.
       const whoMade = WHO_MADE.includes(String(b.who_made)) ? String(b.who_made) : 'i_did';
 
+      /**
+       * DRAFT OR LIVE — the seller's call, made in the publish form.
+       *
+       * It is still CREATED as a draft either way, and that is not a half-measure. Etsy
+       * refuses to activate a listing that has no image, and images are uploaded after the
+       * listing exists (they need its id), so "create it active" is an order of operations
+       * Etsy does not offer. Going live is therefore a second call, made at the very end
+       * once the photos and the variants are actually on it.
+       *
+       * The default stays draft. A missing or unrecognised value must never be the one that
+       * puts something in front of buyers.
+       */
+      const goLive = String(b.state || '').toLowerCase() === 'active';
+
       // Create the DRAFT listing.
       const form = new URLSearchParams({
         quantity: String(b.quantity || 999),
@@ -1966,6 +1980,30 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         }
       }
 
+      /**
+       * LIVE, if that is what was asked for — last, after the photos and the variants.
+       *
+       * A failure here does NOT fail the publish. The listing exists, complete, in the
+       * seller's shop; the only thing that didn't happen is the flip to active, and
+       * throwing would report "publish failed" for a listing that is sitting right there.
+       * The reason is returned instead, so the form can say "created, but it's still a
+       * draft because …" rather than leaving them to find out from Etsy.
+       */
+      let finalState = listing.state || 'draft';
+      let activation_error = null;
+      if (goLive) {
+        try {
+          const patched = await etsyFetch(conn, `/shops/${conn.shop_id}/listings/${listingId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ state: 'active' }),
+          });
+          finalState = (patched && patched.state) || 'active';
+        } catch (e) {
+          activation_error = e && e.message ? String(e.message).slice(0, 300) : 'could not activate';
+        }
+      }
+
       // WHO published WHAT, WHEN, and what they DECLARED. Without this row a seller whose
       // shop is actioned can only be answered from memory: published_listings records what
       // was sent but not who sent it, when, or which who_made they chose. Fire-and-forget —
@@ -1979,16 +2017,16 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           title: title.slice(0, 140),
           who_made: whoMade,
           when_made: 'made_to_order',
-          state: listing.state || 'draft',
+          state: finalState,
           price,
           blank: b.blank || null,
           variant_skus: variantSkus,
         },
-        note: `Published as draft, declared who_made=${whoMade}`,
+        note: `Published as ${finalState}, declared who_made=${whoMade}`,
       });
 
       return {
-        ok: true, listing_id: listingId, state: listing.state || 'draft', images_uploaded: uploaded,
+        ok: true, listing_id: listingId, state: finalState, activation_error, images_uploaded: uploaded,
         primary_image: primaryImage,
         tags_applied: uniqueTags.length,
         variants_applied, variant_skus: variantSkus, variants_error,

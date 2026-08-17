@@ -579,9 +579,10 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
    * images, and a row in published_listings so the Uploaded card can describe what we made
    * rather than what it was copied from.
    *
-   * SHOPIFY HAS NO DRAFT/ACTIVE AMBIGUITY to hide behind — `status: 'draft'` is explicit and
-   * is what we send, for the same reason Etsy gets a draft: nothing reaches a buyer until
-   * the seller looks at it. Their own admin is where it gets activated.
+   * DRAFT OR ACTIVE is the seller's choice in the publish form, and Shopify takes it at
+   * creation — unlike Etsy, which cannot activate a listing before its photos exist and so
+   * needs a second call. The default is draft: an absent or unrecognised value must never
+   * be the one that puts something in front of buyers.
    *
    * The connection is the CALLER's own shop, never "the first row in the table" — writing a
    * product into a shop you do not own is the same violation the Etsy route was fixed for.
@@ -665,7 +666,7 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
       // HTML field, which renders as one unbroken paragraph — the wall a seller sees in
       // the Shopify editor. Same parser as the other channels.
       body_html: descriptionHtml(b.description, b.title),
-      status: 'draft',
+      status: String(b.state || '').toLowerCase() === 'active' ? 'active' : 'draft',
       tags: (Array.isArray(b.tags) ? b.tags : []).map(String).filter(Boolean).join(', '),
       product_type: String(b.print_type || ''),
       ...(options.length ? { options } : {}),
@@ -733,7 +734,7 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
     audit(req, 'shopify.publish', {
       entityType: 'listing', entityId: String(p.id),
       after: { title, variants: variants.length, images: uploaded, blank: b.blank_sku || null },
-      note: `Published "${title}" to ${conn.shop_id} as a draft`,
+      note: `Published "${title}" to ${conn.shop_id} as ${product.status === 'active' ? 'live' : 'a draft'}`,
     });
 
     return {
