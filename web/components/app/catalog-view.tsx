@@ -37,6 +37,9 @@ export function CatalogView() {
   const [rows, setRows] = useState<CatalogProduct[] | null>(null)
   const [q, setQ] = useState("")
   const [busy, setBusy] = useState(false)
+  /** Rows with a publish/unpublish in flight. Per row on purpose — a page-wide flag makes
+   *  one tick disable every other one. */
+  const [pending, setPending] = useState<Set<string>>(new Set())
   const [err, setErr] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [pct, setPct] = useState("60")
@@ -72,14 +75,34 @@ export function CatalogView() {
 
   const published = (rows ?? []).filter((p) => p.inCatalog).length
 
-  /** Publish or unpublish ONE product, immediately — the tick is the decision. */
+  /**
+   * Publish or unpublish ONE product, immediately — the tick is the decision.
+   *
+   * OPTIMISTIC, AND LOCAL TO ONE ROW. This used to set the page-wide `busy` flag and then
+   * re-read the whole catalogue: every checkbox on screen went disabled for the round trip
+   * and the entire table re-rendered from a fresh array when it came back, which is the
+   * flash — one tick greying out and repainting forty rows that did not change.
+   *
+   * The tick moves at once because the answer is already known; only the row being toggled
+   * waits, and it waits without going grey. A failure puts the box back and says so, which
+   * is the one case where the screen must not keep a state the server refused.
+   */
   const toggleOne = async (id: string, include: boolean) => {
-    setBusy(true); setErr(null); setNote(null)
+    setErr(null); setNote(null)
+    setRows((prev) => (prev ?? []).map((p) => (idOf(p) === id ? { ...p, inCatalog: include } : p)))
+    setPending((prev) => new Set(prev).add(id))
     try {
       const r = await setCatalogSelection([id], include)
       if (r.error) throw new Error(r.error)
-      load()
-    } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
+      // updated:0 is a SUCCESSFUL response that changed nothing — an id no row matched. The
+      // tick has to go back, or the screen keeps a decision the catalogue never recorded.
+      if (r.updated === 0) throw new Error("That product is no longer in the catalogue list — reload and try again.")
+    } catch (e) {
+      setRows((prev) => (prev ?? []).map((p) => (idOf(p) === id ? { ...p, inCatalog: !include } : p)))
+      setErr((e as Error).message)
+    } finally {
+      setPending((prev) => { const n = new Set(prev); n.delete(id); return n })
+    }
   }
 
 
@@ -239,7 +262,7 @@ export function CatalogView() {
                         <input
                           type="checkbox"
                           checked={!!p.inCatalog}
-                          disabled={busy}
+                          disabled={busy || pending.has(id)}
                           aria-label={`${p.inCatalog ? "Remove" : "Add"} ${p.name || id} ${p.inCatalog ? "from" : "to"} the catalogue`}
                           onChange={(e) => void toggleOne(id, e.target.checked)}
                         />
