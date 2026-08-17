@@ -1083,8 +1083,69 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * Colourways come from ss_products, grouped per style, so a picked style carries the
    * supplier's own photo of each colour rather than one image repeated ten times.
    */
+  /**
+   * WHAT THE SHEET SAYS, when it should not say what the record says.
+   *
+   * A lookbook is a document, and preparing one is mostly rewriting: a supplier's style name
+   * is a part number, their description is three lines of fabric weight, and the photo on our
+   * own product is whatever someone attached while setting it up. Until now the only way to
+   * fix any of that was to leave the preview, edit the product, and come back — so nobody did,
+   * and the catalogue went out reading like a stock feed.
+   *
+   * A SEPARATE TABLE, NOT THE RECORD ITSELF. Two reasons, and both have teeth:
+   *
+   *   - A PICKED SUPPLIER STYLE HAS NO RECORD OF OURS. Its name and description live in
+   *     ss_products, which is the supplier's data on their schedule — the next sync would
+   *     overwrite an edit written there, and writing to it at all makes our copy of their
+   *     catalogue untrue.
+   *   - OUR OWN PRODUCTS FEED ORDERS AND THE PUBLIC SITE. `data.name` is on invoices and
+   *     `data.description` is on the marketing catalogue; retitling a page of a brochure must
+   *     not rename the thing a seller is buying.
+   *
+   * So this is a presentation layer, keyed by the same (source, ref) the sheet already uses,
+   * and it is READ ONLY BY THE LOOKBOOK. Price is deliberately NOT here — see the PATCH.
+   */
+  q(`create table if not exists lookbook_overrides (
+       source text not null,
+       ref text not null,
+       name text,
+       description text,
+       image text,
+       updated_at timestamptz not null default now(),
+       updated_by text,
+       primary key (source, ref)
+     )`).catch(() => {});
+
+  /** Every override, as source:ref → row. One read per lookbook rather than one per style. */
+  const lookbookOverrides = async () => {
+    const r = await q('select source, ref, name, description, image from lookbook_overrides')
+      .catch(() => ({ rows: [] }));
+    const m = new Map();
+    for (const row of r.rows) m.set(`${row.source}:${row.ref}`, row);
+    return m;
+  };
+
+  /**
+   * Apply one. A null column means "nothing was overridden here" and leaves the source value
+   * alone — which is what makes clearing a single field a revert rather than a blanking.
+   */
+  const withOverride = (style, ov) => {
+    if (!ov) return style;
+    return {
+      ...style,
+      name: ov.name != null && ov.name !== '' ? ov.name : style.name,
+      description: ov.description != null ? ov.description : style.description,
+      image: ov.image != null && ov.image !== '' ? ov.image : style.image,
+      // Said out loud so the sheet can mark an edited page and offer to put it back. A
+      // document you cannot tell you have altered is one you cannot check.
+      edited: !!(ov.name || ov.description != null || ov.image),
+    };
+  };
+
   app.get('/api/catalog/lookbook', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+
+    const overrides = await lookbookOverrides();
 
     // base_price is selected because the seller price below coalesces onto it LAST, exactly
     // as publicShape does. Reading `data` alone left that final term undefined, so a product
@@ -1154,8 +1215,9 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const ci = (d.colorImages && typeof d.colorImages === 'object') ? d.colorImages : {};
       const sid = styleIdOf(d.sku);
       const supplierColours = supplierArt.get('c:' + sid);
-      return {
-        ref: String(d.id ?? d.sku ?? ''), name: d.name || '', sku: d.sku || '',
+      const ref = String(d.id ?? d.sku ?? '');
+      return withOverride({
+        ref, source: 'mine', name: d.name || '', sku: d.sku || '',
         description: d.description || '', brand: notSupplier(d.brand),
         image: supplierArt.get(sid) || d.image || d.img || '',
         price: row.catalog_price == null ? null : Number(row.catalog_price),
@@ -1192,7 +1254,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         // Our own products carry no supplier spec chart unless their sku resolves to a
         // style; filled below for the ones that do.
         specs: [],
-      };
+      }, overrides.get('mine:' + ref));
     });
 
     // Picked supplier styles — colourways rolled up from their sku rows. One row per
@@ -1243,8 +1305,8 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       if (rows.length) specsByStyle.set(ref, rows);
     }
 
-    const supplier = picked.map((p) => ({
-      ref: p.ref, name: p.name || p.ref, sku: p.ref,
+    const supplier = picked.map((p) => withOverride({
+      ref: p.ref, source: 'ss', name: p.name || p.ref, sku: p.ref,
       // The lookbook PRINTS this next to the style name (catalog-print.tsx), so `|| 'S&S'`
       // put our supplier's name on every page of a catalogue handed to a buyer.
       description: descs.get(p.ref) || '', brand: notSupplier(p.brand),
@@ -1265,9 +1327,115 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
        */
       ship: fees ? shipFeeOf({ data: { name: p.name || '', type: '' } }, null, fees) : null,
       shipExtra: fees ? extraFeeOf({ data: {} }, fees) : null,
-    }));
+    }, overrides.get('ss:' + p.ref)));
 
     return { styles: [...mine, ...supplier] };
+  });
+
+  /**
+   * EDIT ONE PAGE OF THE SHEET.
+   *
+   * `name`, `description` and `image` land in lookbook_overrides — a presentation layer over
+   * whichever source the style came from (see the table's note). `price` does NOT: it is
+   * written straight to the number that already holds it, catalog_products.catalog_price for
+   * our own products and catalog_picks.catalog_price for a picked style, which are the exact
+   * columns the Catalogue page edits and the markup button writes.
+   *
+   * That split is the whole design. A price kept here as well would be a SECOND catalogue
+   * price, and the first thing that happens is someone runs the markup, sees the page still
+   * showing the old figure, and runs it again. One number, one home; the other three have no
+   * home outside this document and get one here.
+   *
+   * A FIELD SET TO null CLEARS IT — the page goes back to what the source says, which is what
+   * makes an edit reversible rather than a one-way overwrite. `reset: true` clears all three.
+   */
+  app.patch('/api/catalog/lookbook/:source/:ref', { preHandler: requireStaff }, async (req, reply) => {
+    const source = String((req.params && req.params.source) || '');
+    const ref = String((req.params && req.params.ref) || '');
+    if (!ref) { reply.code(400); return { error: 'No style.' }; }
+    if (source !== 'mine' && source !== 'ss') { reply.code(400); return { error: 'Unknown source.' }; }
+    const b = req.body || {};
+
+    if (b.reset === true) {
+      await q('delete from lookbook_overrides where source=$1 and ref=$2', [source, ref]).catch(() => {});
+      audit(req, 'catalog.lookbook.reset', { entityType: 'catalog', entityId: `${source}:${ref}` });
+      return { ok: true, reset: true };
+    }
+
+    /**
+     * AN IMAGE ARRIVES AS BYTES AND IS STORED AS AN ADDRESS.
+     *
+     * byAddress puts an uploaded data: URL in catalog_img_refs and hands back
+     * /api/catalog/img/<hash>, so this table holds ~35 characters instead of a megabyte of
+     * base64 — the same treatment product artwork already gets on the way out, and the reason
+     * the lookbook response doesn't grow by the size of every photo somebody attaches.
+     *
+     * ONLY AN UPLOAD OR ONE OF OUR OWN PATHS. An arbitrary https address is refused rather
+     * than stored: the obvious thing to paste here is the picture you just found on a supplier
+     * site, and that address would then be printed into a document we hand to a buyer — §2.9,
+     * through the `image` field rather than a field called `supplier`.
+     */
+    let image;
+    if (b.image !== undefined) {
+      if (b.image === null || b.image === '') image = null;
+      else {
+        const v = String(b.image);
+        if (/^data:image\//i.test(v)) image = await byAddress(v);
+        else if (v.startsWith('/api/')) image = v;
+        else { reply.code(400); return { error: 'Attach a file — a link to someone else\'s image can\'t go in a catalogue.' }; }
+      }
+    }
+
+    const name = b.name === undefined ? undefined : (b.name === null ? null : String(b.name).trim().slice(0, 200));
+    const description = b.description === undefined ? undefined : (b.description === null ? null : String(b.description).slice(0, 4000));
+
+    if (name !== undefined || description !== undefined || image !== undefined) {
+      // COALESCE ON THE EXISTING ROW so a one-field edit doesn't blank the other two, and an
+      // explicit null still clears — that is why the "was it sent" test is done in JS above
+      // and only the resolved values reach SQL.
+      await q(
+        `insert into lookbook_overrides (source, ref, name, description, image, updated_by)
+         values ($1,$2,$3,$4,$5,$6)
+         on conflict (source, ref) do update set
+           name        = case when $7 then excluded.name        else lookbook_overrides.name end,
+           description = case when $8 then excluded.description else lookbook_overrides.description end,
+           image       = case when $9 then excluded.image       else lookbook_overrides.image end,
+           updated_at  = now(), updated_by = excluded.updated_by`,
+        [source, ref, name ?? null, description ?? null, image ?? null,
+          String((req.user && req.user.sub) || ''),
+          name !== undefined, description !== undefined, image !== undefined]
+      );
+    }
+
+    // The price goes to its own column, by source. Not found is a 404 rather than a silent
+    // success: "we saved it" about a row that doesn't exist is the worst answer available.
+    let catalogPrice;
+    if (b.price !== undefined) {
+      const price = b.price === null || b.price === '' ? null : Math.max(0, Number(b.price));
+      if (price !== null && !isFinite(price)) { reply.code(400); return { error: 'Price must be a number.' }; }
+      if (source === 'mine') {
+        const r = await q('update catalog_products set catalog_price=$2 where id=$1', [ref, price]);
+        if (!r.rowCount) { reply.code(404); return { error: 'No such product.' }; }
+      } else {
+        await q(
+          `insert into catalog_picks (source, ref, catalog_price) values ('ss',$1,$2)
+           on conflict (source, ref) do update set catalog_price = excluded.catalog_price`,
+          [ref, price]);
+      }
+      catalogPrice = price;
+    }
+
+    audit(req, 'catalog.lookbook.edit', {
+      entityType: 'catalog', entityId: `${source}:${ref}`,
+      after: {
+        ...(name !== undefined ? { name } : {}),
+        ...(description !== undefined ? { description: description == null ? null : description.slice(0, 80) } : {}),
+        // The address, never the bytes — an audit row is not a place to put a photograph.
+        ...(image !== undefined ? { image } : {}),
+        ...(catalogPrice !== undefined ? { catalogPrice } : {}),
+      },
+    });
+    return { ok: true, source, ref, ...(catalogPrice !== undefined ? { catalogPrice } : {}) };
   });
 
   /**

@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { X, Printer, CircleNotch } from "@phosphor-icons/react"
+import { X, Printer, CircleNotch, PencilSimple, Image as ImageIcon, ArrowCounterClockwise } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, type LookbookStyle } from "@/lib/api"
+import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, saveLookbookStyle, type LookbookStyle } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
 
 /**
@@ -27,6 +27,74 @@ const sheetPrice = (st: LookbookStyle): number | null =>
 
 const money = (n: number | null | undefined) =>
   n == null ? "" : `$${(Number(n) || 0).toFixed(2)}`
+
+/**
+ * THE PHOTO THIS PAGE CAN ACTUALLY SHOW.
+ *
+ * A style's own image, or failing that the first colourway that has one — a swatch of this
+ * garment is a picture of this garment, and the page was printing an empty plate while
+ * holding twelve photographs of the thing it was describing.
+ */
+const heroImage = (st: LookbookStyle) => st.image || st.colors.find((c) => c.image)?.image || ""
+
+/**
+ * A FIELD YOU CAN REWRITE WITHOUT LEAVING THE SHEET.
+ *
+ * Off the edit toggle it renders exactly what it always rendered — no dotted underlines, no
+ * hit areas, nothing that could print. On, it is a button; clicking swaps in the input and
+ * blur or Enter commits, which is the same click-to-edit the users directory uses for order
+ * limits rather than a second idiom for the same gesture.
+ *
+ * `children` is the DISPLAY (a headline, a price block, a bullet list) and `value` is the raw
+ * text being edited. They are different on purpose: a description prints as bullets and edits
+ * as the paragraph it is stored as, and pretending otherwise would mean parsing the display
+ * back into a value.
+ */
+function Editable({
+  editing, value, onSave, placeholder, multiline, className, inputClassName, children,
+}: {
+  editing: boolean
+  value: string
+  onSave: (v: string) => void
+  placeholder?: string
+  multiline?: boolean
+  className?: string
+  inputClassName?: string
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  if (!editing) return <>{children}</>
+  const commit = (v: string) => { setOpen(false); if (v !== value) onSave(v) }
+  if (!open) {
+    return (
+      <button
+        type="button" onClick={() => setOpen(true)}
+        title="Click to edit — this changes the catalogue, not the product"
+        className={"text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:decoration-neutral-500 " + (className ?? "")}
+      >
+        {value ? children : <span className="text-neutral-400">{placeholder ?? "Add"}</span>}
+      </button>
+    )
+  }
+  return multiline ? (
+    <textarea
+      autoFocus defaultValue={value} rows={8} placeholder={placeholder}
+      onBlur={(e) => commit(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Escape") setOpen(false) }}
+      className={"w-full rounded border border-neutral-400 p-2 text-[11px] leading-relaxed outline-none " + (inputClassName ?? "")}
+    />
+  ) : (
+    <input
+      autoFocus defaultValue={value} placeholder={placeholder}
+      onBlur={(e) => commit(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.preventDefault(); commit((e.target as HTMLInputElement).value) }
+        else if (e.key === "Escape") setOpen(false)
+      }}
+      className={"w-full rounded border border-neutral-400 px-1.5 py-0.5 outline-none " + (inputClassName ?? "")}
+    />
+  )
+}
 
 /**
  * BRANDING, editable rather than compiled in.
@@ -150,6 +218,98 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
     } catch (e) { setErr((e as Error).message) }
   }
 
+  /**
+   * EDITING IS A MODE, and it is off by default.
+   *
+   * The sheet is a document you mostly look at, so click-to-edit everywhere would put a
+   * dotted underline under every headline on a page whose whole job is to look finished.
+   *
+   * NEVER ON A SAVED COPY. An export is the record of what was actually sent — editing one
+   * would change what a partner was quoted, after the fact and with nothing to show for it.
+   */
+  const [editing, setEditing] = useState(false)
+  const [savingRef, setSavingRef] = useState<string | null>(null)
+  const [editErr, setEditErr] = useState<string | null>(null)
+  const canEdit = !exportId
+  const fileFor = useRef<LookbookStyle | null>(null)
+  const fileInput = useRef<HTMLInputElement | null>(null)
+
+  const reload = () =>
+    getLookbook().then((r) => setRows(r.styles ?? [])).catch((e: Error) => setEditErr(e.message))
+
+  /**
+   * Write one field, showing it immediately and PUTTING IT BACK if the server refuses.
+   *
+   * The optimistic half is what makes this feel like editing a page rather than filing a
+   * change request. The revert half is what keeps it honest: a sheet that goes on displaying
+   * an edit the server rejected is a document lying about its own contents, and this one gets
+   * printed and sent.
+   */
+  const patch = async (
+    st: LookbookStyle,
+    body: { name?: string | null; description?: string | null; image?: string | null; price?: number | null },
+    optimistic: Partial<LookbookStyle>,
+  ) => {
+    if (!st.source) {
+      setEditErr("This page came from a saved copy, so there's nothing live to edit.")
+      return
+    }
+    const before = rows
+    setEditErr(null)
+    setSavingRef(st.ref)
+    setRows((prev) => (prev ?? []).map((r) => (r.ref === st.ref && r.source === st.source ? { ...r, ...optimistic, edited: true } : r)))
+    try {
+      const r = await saveLookbookStyle(st.source, st.ref, body)
+      if (r?.error) throw new Error(r.error)
+      // An image is stored as an ADDRESS, not the bytes we just sent — re-read so the page
+      // (and anything saved from it) carries the short path rather than a megabyte of base64.
+      if (body.image !== undefined) await reload()
+    } catch (e) {
+      setRows(before)
+      setEditErr((e as Error).message)
+    } finally { setSavingRef(null) }
+  }
+
+  /** Put a page back to what its source says. Re-read rather than guessed: the original name
+   *  and photo live on the server, and inventing them here is how a "revert" invents copy. */
+  const revert = async (st: LookbookStyle) => {
+    if (!st.source) return
+    setSavingRef(st.ref); setEditErr(null)
+    try {
+      const r = await saveLookbookStyle(st.source, st.ref, { reset: true })
+      if (r?.error) throw new Error(r.error)
+      await reload()
+    } catch (e) { setEditErr((e as Error).message) } finally { setSavingRef(null) }
+  }
+
+  /**
+   * Attach a photograph. Read to a data: URL here and turned into an address server-side.
+   *
+   * CAPPED, because this file rides in the JSON body and then in any export saved from it —
+   * a 20MB phone photo would be ~27MB of base64 in a request, and again in every snapshot.
+   * Refused with the size rather than silently truncated.
+   */
+  const MAX_IMAGE_MB = 6
+  const onFile = async (f: File | null) => {
+    const st = fileFor.current
+    fileFor.current = null
+    if (!f || !st) return
+    if (!/^image\//.test(f.type)) { setEditErr("That isn't an image file."); return }
+    if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+      setEditErr(`That photo is ${(f.size / 1024 / 1024).toFixed(1)}MB — ${MAX_IMAGE_MB}MB is the limit for a catalogue image.`)
+      return
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(String(fr.result))
+      fr.onerror = () => reject(new Error("Couldn't read that file."))
+      fr.readAsDataURL(f)
+    }).catch((e: Error) => { setEditErr(e.message); return "" })
+    if (!dataUrl) return
+    await patch(st, { image: dataUrl }, { image: dataUrl })
+  }
+  const pickFile = (st: LookbookStyle) => { fileFor.current = st; fileInput.current?.click() }
+
   // Nothing to portal into until the effect has run — and on the server there is no document.
   if (!host) return null
 
@@ -169,18 +329,47 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
         </span>
         <div className="ml-auto flex items-center gap-2">
           {saved && <span className="text-xs text-emerald-700">Saved — you can reopen this later.</span>}
+          {editErr && <span className="text-xs text-destructive">{editErr}</span>}
+          {savingRef && <CircleNotch size={14} className="animate-spin text-muted-foreground" />}
+          {/* Editing changes THIS DOCUMENT. Said on the button rather than in a help panel,
+              because the reasonable assumption is the opposite — that typing a new name here
+              renames the product. */}
+          {canEdit && (
+            <Button
+              size="sm" variant={editing ? "default" : "outline"}
+              onClick={() => { setEditing((v) => !v); setEditErr(null) }}
+              disabled={!rows?.length}
+              title="Rewrite names, copy, prices and photos for this catalogue. The product itself is untouched."
+            >
+              <PencilSimple size={14} weight="bold" /> {editing ? "Done editing" : "Edit"}
+            </Button>
+          )}
           {/* Saving is separate from printing on purpose. Printing is a preview you might do
               five times; a saved copy is a record of what you SENT, and five identical rows
               in the history is a worse record than none. */}
           {!exportId && !saved && (
             <Button size="sm" variant="outline" onClick={save} disabled={!rows?.length}>Save this version</Button>
           )}
-          <Button size="sm" onClick={() => window.print()} disabled={!rows?.length}>
+          {/* EDIT MODE OFF FIRST. A field left open is a text input, and an input prints as a
+              box with a cursor in it. Leaving the mode is a state change, so the print call
+              waits a frame for the sheet to render as a page again. */}
+          <Button
+            size="sm"
+            onClick={() => { setEditing(false); requestAnimationFrame(() => window.print()) }}
+            disabled={!rows?.length}
+          >
             <Printer size={14} weight="bold" /> Print / Save as PDF
           </Button>
           <Button size="sm" variant="outline" onClick={onClose}><X size={14} weight="bold" /> Close</Button>
         </div>
       </div>
+
+      {/* One input for every page — a file field per style would put 200 of them in the DOM
+          for a gesture only one style at a time can make. */}
+      <input
+        ref={fileInput} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0] ?? null; e.target.value = ""; onFile(f) }}
+      />
 
       <div className="print-area mx-auto">
         {rows === null ? (
@@ -234,7 +423,16 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             </div>
           </section>
 
-          {rows.map((st) => (
+          {rows.map((st) => {
+            // The photo this page can show, and whether the left column has anything at all
+            // to hold. In EDIT mode it always does — the attach-a-photo and add-a-description
+            // affordances are the reason you opened the mode on a page that has neither.
+            const hero = heroImage(st)
+            const twoUp = !!hero || !!st.description || editing
+            // Wider cells when the swatches have the whole sheet: three across a full page
+            // would print them at hero size, which is not what a colour grid is for.
+            const colCap = twoUp ? 12 : 20
+            return (
             // ONE STYLE PER PAGE. A4 at 210×297mm with the page break forced after each,
             // so a colourway grid never starts on one sheet and finishes on the next —
             // which is the one thing that makes a printed catalogue look homemade.
@@ -252,18 +450,66 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               <div className="mb-5 h-1.5 w-full rounded-full" style={{ background: brand.accent }} />
               <div className="mb-6 flex items-start justify-between gap-6 border-b border-neutral-200 pb-4">
                 <div className="min-w-0">
-                  <h2 className="font-title text-3xl font-bold uppercase leading-none tracking-tight">{st.name}</h2>
+                  <h2 className="font-title text-3xl font-bold uppercase leading-none tracking-tight">
+                    <Editable
+                      editing={editing} value={st.name} placeholder="Name this style"
+                      // uppercase RE-DECLARED on the button: Tailwind's preflight sets
+                      // `text-transform: none` on button/input, so the h2's uppercase stops at
+                      // the edit affordance and the headline changed case when you toggled the
+                      // mode — which reads as the edit having already done something.
+                      className="uppercase"
+                      inputClassName="font-title text-3xl font-bold uppercase leading-none tracking-tight"
+                      onSave={(v) => patch(st, { name: v || null }, { name: v })}
+                    >
+                      {st.name}
+                    </Editable>
+                  </h2>
                   <div className="mt-1.5 flex items-baseline gap-2 text-xs text-neutral-500">
+                    {/* The sku and the brand are NOT editable. One is how a buyer orders the
+                        thing and the other is whose garment it is — a document where those
+                        can be retyped is a document that can quote a style nobody can supply. */}
                     <span className="font-mono">{st.sku}</span>
                     {st.brand && <span>· {st.brand}</span>}
+                    {editing && st.edited && (
+                      <button
+                        type="button" onClick={() => revert(st)} disabled={savingRef === st.ref}
+                        className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-200 print:hidden"
+                        title="Put the name, copy and photo back to what the catalogue says"
+                      >
+                        <ArrowCounterClockwise size={10} weight="bold" /> Edited · undo
+                      </button>
+                    )}
                   </div>
                 </div>
-                {sheetPrice(st) != null && (
-                  /* The price is the thing a buyer came for, so it is the one filled block
-                     on the page — ink on lime, 16.6:1, and impossible to miss. */
+                {/* The price is the thing a buyer came for, so it is the one filled block
+                    on the page — ink on lime, 16.6:1, and impossible to miss.
+                    In edit mode it shows even when there ISN'T one: an unpriced style is
+                    exactly the page you opened this to fix, and it can't be fixed if the
+                    block it lives in only appears once a price exists. */}
+                {(sheetPrice(st) != null || editing) && (
                   <div className="shrink-0 rounded-xl px-4 py-2.5 text-right"
-                       style={{ background: HOUSE.lime, color: HOUSE.ink }}>
-                    <div className="font-title text-4xl font-bold leading-none tabular-nums">{money(sheetPrice(st))}</div>
+                       style={{ background: sheetPrice(st) != null ? HOUSE.lime : "#F1F0EC", color: HOUSE.ink }}>
+                    <div className={sheetPrice(st) != null
+                      ? "font-title text-4xl font-bold leading-none tabular-nums"
+                      : "py-2 text-sm font-medium leading-none"}>
+                      <Editable
+                        editing={editing}
+                        value={sheetPrice(st) == null ? "" : String(sheetPrice(st))}
+                        placeholder="Set price"
+                        className="font-title text-4xl font-bold leading-none tabular-nums"
+                        inputClassName="w-28 text-right font-title text-2xl font-bold tabular-nums"
+                        onSave={(v) => {
+                          const n = v.trim() === "" ? null : Number(v.replace(/[^0-9.]/g, ""))
+                          if (n != null && !isFinite(n)) return
+                          // Straight to catalog_price — the same number the Catalogue page and
+                          // the markup button write. See the route: a price kept with the
+                          // lookbook's own copy would be a second, disagreeing price.
+                          patch(st, { price: n }, { price: n })
+                        }}
+                      >
+                        {money(sheetPrice(st))}
+                      </Editable>
+                    </div>
                     <div className="mt-0.5 text-[9px] font-bold uppercase tracking-widest opacity-70">per unit</div>
                   </div>
                 )}
@@ -271,9 +517,15 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
 
               {/* flex-1 on the grid was not enough — the CHILDREN also have to stretch, or
                   a short left column leaves the sheet half empty regardless of how tall the
-                  grid is. items-stretch plus min-h-0 lets both columns own the page. */}
-              <div className="grid min-h-0 flex-1 grid-cols-2 items-stretch gap-8">
-                {/* LEFT — the product itself, big. */}
+                  grid is. items-stretch plus min-h-0 lets both columns own the page.
+
+                  ONE COLUMN WHEN THE LEFT ONE HAS NOTHING TO SAY. With no photo and no copy,
+                  the two-up grid printed an empty half-page beside the swatches — a hole in
+                  the middle of the sheet, which reads worse than a shorter page. The colours
+                  and the charts take the full width instead. */}
+              <div className={"grid min-h-0 flex-1 items-stretch gap-8 " + (twoUp ? "grid-cols-2" : "grid-cols-1")}>
+                {/* LEFT — the product itself, big. Omitted entirely when there is neither. */}
+                {twoUp && (
                 <div className="flex flex-col">
                   {/* No fixed aspect: the hero takes the room the copy doesn't. On a style
                       with no description that is most of the column, which is exactly the
@@ -282,35 +534,63 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       corners, and min-h raised from 80mm: on a style with no description
                       this column is the page, and the hero was sitting small in the middle
                       of it. */}
-                  <div className="flex min-h-[120mm] flex-1 w-full items-center justify-center overflow-hidden rounded-lg border p-4"
-                       style={{ background: PLATE, borderColor: PLATE_EDGE }}>
-                    {st.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={st.image} alt={st.name} className="size-full object-contain" />
-                    ) : (
-                      <span className="text-xs text-neutral-400">no image</span>
-                    )}
-                  </div>
+                  {/* AN EMPTY PLATE IS WORSE THAN NO PLATE. A 120mm bordered box reading "no
+                      image" is the most conspicuous thing on the sheet — it looks like the
+                      document failed rather than like a style we haven't shot yet. So the
+                      plate is drawn only when there is something to put in it; the copy takes
+                      the column otherwise, and in edit mode the space offers to fix it. */}
+                  {hero ? (
+                    <div className="group relative flex min-h-[120mm] w-full flex-1 items-center justify-center overflow-hidden rounded-lg border p-4"
+                         style={{ background: PLATE, borderColor: PLATE_EDGE }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={hero} alt={st.name} className="size-full object-contain" />
+                      {editing && (
+                        <button
+                          type="button" onClick={() => pickFile(st)} disabled={savingRef === st.ref}
+                          className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-neutral-700 shadow-sm hover:bg-white print:hidden"
+                        >
+                          <ImageIcon size={11} weight="bold" /> Replace photo
+                        </button>
+                      )}
+                    </div>
+                  ) : editing ? (
+                    // print:hidden — this is a control, not part of the document. A sheet
+                    // printed mid-edit must show the page as it will be sent.
+                    <button
+                      type="button" onClick={() => pickFile(st)} disabled={savingRef === st.ref}
+                      className="flex min-h-[60mm] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-neutral-300 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 print:hidden"
+                    >
+                      <ImageIcon size={14} weight="bold" /> Attach a photo for this style
+                    </button>
+                  ) : null}
 
-                  {st.description
-                    ? (
-                      // Same split as every other surface — a printed lookbook page is the
-                      // one place a wall of run-together specs is hardest to skim.
-                      <ul className="mt-4 space-y-0.5 text-[11px] leading-relaxed text-neutral-600">
-                        {descriptionLines(st.description).map((line, i) => (
-                          <li key={i} className="flex items-start gap-1.5">
-                            <span className="mt-[0.6em] size-[3px] shrink-0 rounded-full bg-neutral-400" />
-                            <span>{line}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )
-                    // No description on most supplier styles, and an empty column reads as
-                    // an unfinished page. The size run fills it as a chart instead, which
-                    // is the thing a buyer would otherwise have to ask for.
-                    : null}
+                  <Editable
+                    editing={editing} value={st.description} multiline
+                    placeholder="Add a description"
+                    className={hero ? "mt-4 block text-[11px] text-neutral-500" : "block text-[11px] text-neutral-500"}
+                    onSave={(v) => patch(st, { description: v.trim() === "" ? null : v }, { description: v })}
+                  >
+                    {st.description
+                      ? (
+                        // Same split as every other surface — a printed lookbook page is the
+                        // one place a wall of run-together specs is hardest to skim.
+                        <ul className={(hero ? "mt-4 " : "") + "space-y-0.5 text-[11px] leading-relaxed text-neutral-600"}>
+                          {descriptionLines(st.description).map((line, i) => (
+                            <li key={i} className="flex items-start gap-1.5">
+                              <span className="mt-[0.6em] size-[3px] shrink-0 rounded-full bg-neutral-400" />
+                              <span>{line}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                      // No description on most supplier styles, and an empty column reads as
+                      // an unfinished page. The size run fills it as a chart instead, which
+                      // is the thing a buyer would otherwise have to ask for.
+                      : null}
+                  </Editable>
 
                 </div>
+                )}
 
                 {/* RIGHT — every colourway, captioned. */}
                 <div className="flex min-h-0 flex-col">
@@ -321,13 +601,28 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     <p className="mt-2 text-[11px] text-neutral-400">
                       No colourway images on this style.
                     </p>
+                  ) : !st.colors.some((c) => c.image) ? (
+                    /* NAMES, when there are no pictures of them. A grid of bordered wells
+                       each holding a colour name in 7px grey is twelve small versions of the
+                       empty plate this page just stopped printing — the border promises a
+                       photograph the row cannot deliver. The range is still stated, as a
+                       list, which is what it actually is. */
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {st.colors.map((c) => (
+                        <span key={c.name + c.sku}
+                              className="rounded border border-neutral-200 px-2 py-1 text-[10px] leading-tight text-neutral-700">
+                          {c.name}
+                          {c.sku && <span className="ml-1.5 font-mono text-[9px] text-neutral-400">{c.sku}</span>}
+                        </span>
+                      ))}
+                    </div>
                   ) : (
                     // Five columns, capped at 20. Past that a page stops being readable and
                     // the overflow is stated rather than silently dropped.
                     // auto-rows-min keeps swatches their natural height while the column
                     // stretches, so they sit at the top rather than smearing down the page.
-                    <div className="mt-2 grid auto-rows-min grid-cols-3 gap-x-3 gap-y-4">
-                      {st.colors.slice(0, 12).map((c) => (
+                    <div className={"mt-2 grid auto-rows-min gap-x-3 gap-y-4 " + (twoUp ? "grid-cols-3" : "grid-cols-5")}>
+                      {st.colors.slice(0, colCap).map((c) => (
                         <div key={c.name + c.sku} className="flex flex-col items-center">
                           {/* THREE ACROSS, SQUARE. Four columns made each well ~19mm wide, and
                               since these photos are wider than they are tall the picture was
@@ -354,9 +649,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       ))}
                     </div>
                   )}
-                  {st.colors.length > 12 && (
+                  {st.colors.length > colCap && (
                     <p className="mt-2 text-[9px] text-neutral-500">
-                      + {st.colors.length - 12} more colours — ask us for the full range.
+                      + {st.colors.length - colCap} more colours — ask us for the full range.
                     </p>
                   )}
                   {/* The size run and the chart live in the RIGHT column, under the
@@ -365,7 +660,11 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       catalogue read as unfinished. mt-auto pins them to the foot of the
                       column, so any slack sits BETWEEN the swatches and the chart rather
                       than trailing off the bottom of the page. */}
-                  <div className="mt-auto pt-5">
+                  {/* mt-auto only while there IS a left column. On a one-column page pushing
+                      the charts to the foot leaves the slack in the MIDDLE of the sheet, which
+                      reads as something failing to render; at the bottom it reads as a page
+                      with less on it, which is the truth. */}
+                  <div className={twoUp ? "mt-auto pt-5" : "pt-5"}>
                     {st.sizes.length > 0 && (
                       <div className="mt-5">
                         <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
@@ -438,7 +737,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 <span>{new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
               </footer>
             </section>
-          ))}
+          )})}
 
           {/* ── PRICE LIST ───────────────────────────────────────────────────────────
               Every style on one run of tables, immediately before the back cover.
