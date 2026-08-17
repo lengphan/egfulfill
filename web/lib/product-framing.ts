@@ -48,16 +48,34 @@ type Framed = { imgZoom?: number | string | null; imgFocusY?: number | string | 
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
+/**
+ * ABSENT IS NOT ZERO — and on this slider zero is the far end, not the neutral value.
+ *
+ * `Number(null)` is `0`, and `0` is finite, so reading these fields with a bare `Number()`
+ * turned "this product has no framing" into "shove the picture 40% down". The public API
+ * emits `imgFocusY: null` for every unframed product (a missing key becomes an explicit
+ * null over JSON), so that was ALL of them: every photo on /catalog and every product page
+ * sank out of its own well and left the accent plate showing above it.
+ *
+ * So absence is checked before the cast, never after it. Only a number somebody actually
+ * stored is allowed to move a picture.
+ */
+const stored = (v: number | string | null | undefined): number | null => {
+  if (v === null || v === undefined || v === "") return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
 /** The stored zoom as a multiplier. 1 when unset or unreadable. */
 export function zoomOf(p: Framed | null | undefined): number {
-  const z = Number(p?.imgZoom)
-  return Number.isFinite(z) && z > 0 ? clamp(z, ZOOM_MIN, ZOOM_MAX) / 100 : 1
+  const z = stored(p?.imgZoom)
+  return z !== null && z > 0 ? clamp(z, ZOOM_MIN, ZOOM_MAX) / 100 : 1
 }
 
 /** The stored vertical focus, 0–100. 50 (centre) when unset or unreadable. */
 export function focusOf(p: Framed | null | undefined): number {
-  const y = Number(p?.imgFocusY)
-  return Number.isFinite(y) ? clamp(y, FOCUS_MIN, FOCUS_MAX) : FOCUS_CENTRE
+  const y = stored(p?.imgFocusY)
+  return y === null ? FOCUS_CENTRE : clamp(y, FOCUS_MIN, FOCUS_MAX)
 }
 
 /**

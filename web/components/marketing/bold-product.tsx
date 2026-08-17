@@ -92,15 +92,37 @@ export function BoldProduct({ product, shipping }: {
           {/* The two hero columns arrive from DIFFERENT directions — the picture settles down
               into place, the copy drifts in from the side. Both rising together is one slab
               moving, which is the gesture that made every page feel like the last one. */}
-          <Rise preset="settle">
+          {/* min-w-0 because a grid item's default `min-width: auto` lets it push PAST its own
+              track, and the phone layout puts a 6,200px-wide thumbnail strip inside this one:
+              the track measured a correct 357px while the item sat at 5,916 and took the page
+              with it. The track can only hold what the item agrees to shrink to. */}
+          <Rise preset="settle" className="min-w-0">
             {/* Rail LEFT of the hero, not under it. A vertical strip is how every product
                 page of this kind is read — thumbnails scanned down the edge while the main
                 shot holds its size — and it stops the hero being pushed up the page by a
                 row of squares beneath it. Falls back to a single column on phones, where a
                 64px rail beside the image would leave the hero too narrow to judge. */}
-            <div className="flex flex-col-reverse gap-3 sm:flex-row">
+            {/* items-start, and the rail SCROLLS rather than growing.
+                `aspect-square` on the hero is a ratio, not a height, and it loses outright to
+                a flex row's default stretch: the rail is one thumbnail per colourway, so an
+                82-colour tee made the row ~6,600px tall, dragged the hero to 468×6,600 and
+                left object-cover upscaling a 500px photo thirteen times over — the product
+                page opened on a blank white field with a smear of garment far below the fold.
+                A rail can't be allowed to set the height of the picture it sits beside. */}
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-start">
               {product.colors.some((c) => c.image) && (
-                <div className="flex shrink-0 gap-3 overflow-x-auto sm:w-20 sm:flex-col sm:overflow-visible">
+                /* The strip is taken OUT OF FLOW at sm and up (absolute inset-0), so its
+                   length can't reach the row: this box stretches to the hero's own square and
+                   the thumbnails scroll inside it. In the phone layout it stays in flow, where
+                   it is a horizontal strip above the picture and its height is wanted. */
+                /* THE SCROLL CONTAINER MOVES BETWEEN THE TWO ELEMENTS, and it has to.
+                   Below sm it is this box: a row of 82 thumbnails is ~6,200px of max-content,
+                   and until something clips it the grid track above sizes to it — the phone
+                   layout went out to 5,916px wide the moment the strip alone carried the
+                   overflow and this wrapper did not. Above sm the strip is out of flow instead,
+                   so there is nothing here to clip and the scrolling belongs to the strip. */
+                <div className="relative shrink-0 overflow-x-auto sm:w-20 sm:self-stretch sm:overflow-x-visible">
+                  <div className="flex gap-3 sm:absolute sm:inset-0 sm:flex-col sm:overflow-y-auto">
                   {product.colors.map((c, i) =>
                     c.image ? (
                       <button
@@ -118,6 +140,7 @@ export function BoldProduct({ product, shipping }: {
                       </button>
                     ) : null
                   )}
+                  </div>
                 </div>
               )}
               <div

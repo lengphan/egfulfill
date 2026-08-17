@@ -120,8 +120,11 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * AND draw a broken image.
    */
   /** A stored number, or null when it is absent or outside what the editor can produce.
-   *  Null means "unframed" to the client, which is a different thing from a clamped 0. */
+   *  Null means "unframed" to the client, which is a different thing from a clamped 0 —
+   *  and `Number(null)` is `0`, so absence has to be caught BEFORE the cast or a stored
+   *  null arrives at the browser as a real, far-end framing value. */
   const clampNum = (v, lo, hi) => {
+    if (v === null || v === undefined || v === '') return null;
     const n = Number(v);
     return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null;
   };
