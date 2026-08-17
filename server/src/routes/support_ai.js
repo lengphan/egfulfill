@@ -437,11 +437,21 @@ async function postAnthropic(key, body) {
  * Throws { disabled: true } when no key is set, so callers can say so precisely
  * instead of reporting a generic failure.
  */
-export async function aiComplete({ system, messages, maxTokens = 900 }) {
+export async function aiComplete({ system, messages, maxTokens = 900, keepEmoji = false }) {
   const cfg = await aiConfig();
-    const { key, model } = cfg;
+  const { key, model } = cfg;
   if (!key) { const e = new Error('The assistant is off — an admin can add the AI key in Settings › Integrations.'); e.disabled = true; e.status = 503; throw e; }
-  return postAnthropic(key, JSON.stringify({ model, max_tokens: maxTokens, system, messages }));
+  const out = await postAnthropic(key, JSON.stringify({ model, max_tokens: maxTokens, system, messages }));
+  /*
+   * Stripped HERE, not at each call site, so a feature added later is emoji-free without
+   * anyone having to remember. The chat assistant was only the visible half — order briefs,
+   * SpyDeck advice and supplier suggestions all come through this function and are all read
+   * by a person.
+   *
+   * `keepEmoji` is for copy destined somewhere OTHER than our own UI — a marketplace listing,
+   * where an emoji may be a deliberate part of the writing rather than a chatbot tic.
+   */
+  return keepEmoji ? out : stripEmoji(out);
 }
 
 /*
