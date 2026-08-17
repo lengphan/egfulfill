@@ -1,14 +1,14 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User, Smiley, Paperclip, X, FileText } from "@phosphor-icons/react"
+import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User, Smiley, Paperclip, X, FileText, ImageSquare, FilmSlate } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment } from "@/lib/api"
+import { generateDeskImage, generateDeskVideo, getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
-import { GenerateButton, AnimateImageButton } from "@/components/app/generate-menu"
+import { GenerateButton, AnimateImageButton, type GenSettings } from "@/components/app/generate-menu"
 import { UserAvatar } from "@/components/app/user-avatar"
 
 const nowMs = () => Date.now()
@@ -91,6 +91,10 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
   const [aiNote, setAiNote] = useState<string | null>(null)
+  /* What the message box is armed to MAKE. Null = it posts a message, as always. Set from
+     the ✨ panel or from Animate on a picture; shown as a pill above the box so the mode and
+     its price stay visible the whole time you're typing, not just when you chose them. */
+  const [gen, setGen] = useState<GenSettings | null>(null)
   const [office, setOffice] = useState<SupportAvailability | null>(null)
   const [hoursOpen, setHoursOpen] = useState(false)  // staff: support-hours editor dialog
   const [emojiOpen, setEmojiOpen] = useState(false)  // composer emoji picker
@@ -374,8 +378,55 @@ export default function ChatPage() {
     tick()
   })
 
+  /*
+   * The composer is armed: this text is a PROMPT, not a message. Same box, same Enter key —
+   * the pill above it is what says where the words are going. Generation posts its own
+   * result into the thread, so nothing is echoed here first.
+   */
+  const generateFromComposer = async (text: string) => {
+    if (!gen || !text) return
+    setSending(true); setAiNote(null)
+    try {
+      if (gen.mode === "image") {
+        const refs = pendingAtt?.url && pendingAtt.mime?.startsWith("image/")
+          ? [pendingAtt.url.split("/api/support/asset/")[1]].filter(Boolean)
+          : []
+        const r = await generateDeskImage({
+          prompt: text, aspectRatio: gen.ratio, imageSize: gen.size, model: gen.model,
+          imageNames: refs.length ? refs : undefined,
+        })
+        if (!r.ok || !r.attachment) {
+          // Keep the words the user typed — losing a prompt to a transient failure means
+          // typing it again, and an overload is exactly the case that wants a second press.
+          setInput(text)
+          setAiNote(r.error || "That didn't work.")
+          return
+        }
+        setInput(""); setPendingAtt(null)
+        await load()
+      } else {
+        const r = await generateDeskVideo({
+          prompt: text, aspectRatio: gen.ratio, resolution: gen.resolution,
+          durationSeconds: gen.seconds, model: gen.model, imageName: gen.imageName,
+        })
+        if (!r.ok || !r.jobId) { setInput(text); setAiNote(r.error || "That didn't work."); return }
+        setInput("")
+        setAiNote(`Making a ${r.seconds ?? gen.seconds}s clip (~$${(r.usd ?? gen.usd).toFixed(2)}) — it lands in this chat in a minute or two.`)
+        setTimeout(() => setAiNote(null), 12000)
+      }
+    } catch (e) {
+      setInput(text)
+      setAiNote(e instanceof Error ? e.message : "That didn't work.")
+    } finally {
+      setSending(false)
+    }
+  }
+
   const submit = async (raw: string) => {
     const text = raw.trim()
+    // Armed = the box is a prompt. Checked before the attachment-only case below, because a
+    // generation always needs words even though a plain message doesn't.
+    if (gen) { await generateFromComposer(text); return }
     // A message may be just an attachment (no text), so allow either.
     if ((!text && !pendingAtt) || !activeId || sending) return
     setSending(true)
@@ -743,15 +794,7 @@ export default function ChatPage() {
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={att.url} alt={att.name || "attachment"} className="max-h-60 max-w-full rounded-lg border border-border object-contain" />
                                   {canAnimate && (
-                                    <AnimateImageButton
-                                      imageName={assetName}
-                                      prompt={input}
-                                      onConsumePrompt={() => setInput("")}
-                                      onStarted={({ usd, seconds }) => {
-                                        setAiNote(`Animating that still — a ${seconds}s clip (~$${usd.toFixed(2)}) lands here in a minute or two.`)
-                                        setTimeout(() => setAiNote(null), 12000)
-                                      }}
-                                    />
+                                    <AnimateImageButton imageName={assetName} onArm={setGen} />
                                   )}
                                 </>
                               ) : (
@@ -830,6 +873,28 @@ export default function ChatPage() {
           </div>
         )}
 
+        {/* ARMED PILL. The one piece of state that changes what Enter does, so it sits
+            directly above the box it changes and carries the price the whole time you type —
+            not only at the moment the model was chosen. ✕ puts the box back to normal. */}
+        {gen && (
+          <div className="flex items-center gap-2 border-t border-border px-3 pt-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-2xs font-medium text-primary">
+              {gen.mode === "image" ? <ImageSquare size={12} weight="fill" /> : <FilmSlate size={12} weight="fill" />}
+              {gen.label}
+              <span className="tabular-nums opacity-70">~${gen.usd.toFixed(gen.usd < 1 ? 3 : 2)}</span>
+              <button type="button" onClick={() => setGen(null)} aria-label="Cancel generating"
+                className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20">
+                <X size={10} weight="bold" />
+              </button>
+            </span>
+            <span className="truncate text-2xs text-muted-foreground">
+              {gen.mode === "image"
+                ? "Type what to make and press Enter."
+                : "Describe the motion and press Enter — clips take 1–3 minutes."}
+            </span>
+          </div>
+        )}
+
         {/* composer */}
         <div className="flex items-center gap-2 border-t border-border p-3">
           {isInbox && (
@@ -844,28 +909,8 @@ export default function ChatPage() {
           {isStaffUser && activeId === supportId && (
             <GenerateButton
               disabled={signedOut || !activeId}
-              // The panel holds settings only; the words come from the composer, so there
-              // is one box to type in rather than a second one hidden inside a popover.
-              prompt={input}
-              // A photo staged with the paperclip becomes a REFERENCE for the image. It is
-              // already uploaded and stored, so all the server needs is its asset name —
-              // which is also why only our own attachments can be used.
-              referenceNames={
-                pendingAtt?.url && pendingAtt.mime?.startsWith("image/")
-                  ? [pendingAtt.url.split("/api/support/asset/")[1]].filter(Boolean)
-                  : []
-              }
-              onConsumePrompt={() => { setInput(""); setPendingAtt(null) }}
-              // The server already posted it into this thread — just pull the thread again
-              // so it lands as a normal message rather than a second, client-only bubble.
-              onImage={() => { void load() }}
-              // A clip is NOT here yet. Say when it will be and what it cost, because the
-              // thread will look unchanged for the next couple of minutes and silence there
-              // is indistinguishable from a failure.
-              onVideoStarted={({ usd, seconds }) => {
-                setAiNote(`Making a ${seconds}s clip (~$${usd.toFixed(2)}) — it lands in this chat in a minute or two.`)
-                setTimeout(() => setAiNote(null), 12000)
-              }}
+              armed={gen}
+              onArm={setGen}
             />
           )}
           {/* Attach a file (images downsized before upload) */}
@@ -941,12 +986,15 @@ export default function ChatPage() {
                 }
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() }
               }}
-              placeholder={signedOut ? "Sign in to send a message" : readOnly ? "Only EGFUL can post announcements" : "Type a message…  @ to tag an order"}
+              placeholder={signedOut ? "Sign in to send a message"
+                : readOnly ? "Only EGFUL can post announcements"
+                : gen ? (gen.mode === "image" ? "Describe the image…" : "Describe the motion…")
+                : "Type a message…  @ to tag an order"}
               disabled={signedOut || !activeId || readOnly}
               className="h-10 w-full"
             />
           </div>
-          <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !activeId || readOnly || (!input.trim() && !pendingAtt) || sending}>
+          <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !activeId || readOnly || (!input.trim() && !(pendingAtt && !gen)) || sending}>
             <PaperPlaneTilt size={16} weight="fill" />
           </Button>
         </div>
