@@ -2862,6 +2862,21 @@ export type PublishDestination = {
   /** Publishing here creates nothing yet — said on the row, not discovered afterwards. */
   dry_run: boolean
 }
+/**
+ * Ask the assistant to rewrite listing copy. CALLED ON A CLICK, never from an effect —
+ * every call costs money and a second of waiting, and a dialog that regenerated copy while
+ * you typed would spend both on work nobody asked for.
+ *
+ * Returns a SUGGESTION. The caller shows it for review; it must not be written straight
+ * into the fields, because the copy is the seller's voice and their legal exposure.
+ */
+export function rewriteListingCopy(body: {
+  title?: string; description?: string
+  product?: string; colors?: string[]; sizes?: string[]; method?: string
+}) {
+  return api<{ title?: string; description?: string; error?: string; disabled?: boolean }>(
+    `/api/publish/rewrite`, { method: "POST", body: JSON.stringify(body) })
+}
 export function getPublishDestinations() {
   return api<{ destinations: PublishDestination[] }>(`/api/publish/destinations`)
 }

@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
-import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle } from "@phosphor-icons/react"
+import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle, Sparkle, Check } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
+import { rewriteListingCopy } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -393,6 +394,16 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   const [blankText, setBlankText] = useState("")
   const [title, setTitle] = useState("")
   const [desc, setDesc] = useState("")
+  /**
+   * The assistant's PROPOSAL, held beside the seller's copy rather than written into it.
+   *
+   * Never auto-applied and never auto-requested: `runRewrite` is bound to a button, so no
+   * effect can fire it and no keystroke can. A model editing a listing in place is a change
+   * nobody reviewed, on text that is the seller's voice and their legal exposure.
+   */
+  const [aiDraft, setAiDraft] = useState<{ title?: string; description?: string } | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiErr, setAiErr] = useState<string | null>(null)
   const [retail, setRetail] = useState("")
   const [qty, setQty] = useState("999")
   const [tags, setTags] = useState<string[]>([])
@@ -414,6 +425,27 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * Reads title, description AND tags together, because a term stripped from the title and
    * left in the tags is still on the listing.
    */
+  /**
+   * ONE CALL, ON A CLICK. Guarded on `aiBusy` so a double-press cannot bill twice, and it
+   * writes to `aiDraft` — the fields the seller is editing are never touched here.
+   */
+  const runRewrite = async () => {
+    if (aiBusy) return
+    setAiBusy(true); setAiErr(null); setAiDraft(null)
+    try {
+      const r = await rewriteListingCopy({
+        title, description: desc,
+        product: blank?.name ?? undefined,
+        colors: pickedColors, sizes: pickedSizes,
+        method: blank?.method ?? undefined,
+      })
+      if (r.error) throw new Error(r.error)
+      setAiDraft({ title: r.title, description: r.description })
+    } catch (e) {
+      setAiErr(e instanceof Error ? e.message : "The assistant couldn't rewrite this.")
+    } finally { setAiBusy(false) }
+  }
+
   const tmHits = useMemo(
     () => detectTrademarks([title, desc, tags.join(" ")].filter(Boolean).join(" \n ")),
     [title, desc, tags],
@@ -1260,6 +1292,49 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               <label className="flex flex-col gap-1"><span className="text-sm font-medium">Description</span>
                 <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder="Describe the product…" className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
               </label>
+
+              {/* THE ASSIST, ON A BUTTON. Nothing here runs until it is pressed — no call on
+                  open, none on keystroke — because each one costs money and a wait. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onClick={runRewrite} disabled={aiBusy || (!title.trim() && !desc.trim())}
+                  title="Rewrite the title and description — you review the result before anything changes">
+                  {aiBusy ? <CircleNotch size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
+                  {aiBusy ? "Rewriting…" : "Rewrite with AI"}
+                </Button>
+                <span className="text-2xs text-muted-foreground">Suggests a cleaner title and description. Nothing changes until you apply it.</span>
+              </div>
+              {aiErr && <p className="text-xs text-destructive">{aiErr}</p>}
+
+              {/* THE PROPOSAL, SIDE BY SIDE WITH WHAT YOU WROTE. Applying is a separate,
+                  explicit act — and each half applies on its own, because a good title and a
+                  worse description is the common result and should not be all-or-nothing. */}
+              {aiDraft && (
+                <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/[0.04] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-2xs font-semibold uppercase tracking-wide text-primary">Suggested</span>
+                    <button type="button" onClick={() => setAiDraft(null)} className="text-2xs text-muted-foreground underline underline-offset-2 hover:text-foreground">Discard</button>
+                  </div>
+                  {aiDraft.title && (
+                    <div className="space-y-1">
+                      <p className="text-sm">{aiDraft.title}</p>
+                      <Button size="sm" variant="outline" onClick={() => { setTitle(aiDraft.title!); setAiDraft((d) => (d ? { ...d, title: undefined } : d)) }}>
+                        <Check size={13} weight="bold" /> Use this title
+                      </Button>
+                    </div>
+                  )}
+                  {aiDraft.description && (
+                    <div className="space-y-1">
+                      <p className="whitespace-pre-line text-sm text-muted-foreground">{aiDraft.description}</p>
+                      <Button size="sm" variant="outline" onClick={() => { setDesc(aiDraft.description!); setAiDraft((d) => (d ? { ...d, description: undefined } : d)) }}>
+                        <Check size={13} weight="bold" /> Use this description
+                      </Button>
+                    </div>
+                  )}
+                  {!aiDraft.title && !aiDraft.description && (
+                    <p className="text-xs text-muted-foreground">Both applied.</p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <div className="text-sm font-medium">Tags <span className="text-muted-foreground">({tags.length}/{MAX_TAGS})</span></div>
