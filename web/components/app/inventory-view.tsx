@@ -764,7 +764,17 @@ function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () =
  * screens writing two different key shapes for one shelf is the split that made "do we have
  * it?" unanswerable in the first place.
  */
-function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog }: { open: boolean; onOpenChange: (v: boolean) => void; onAdd: (items: InventoryItem[]) => void; existing: string[]; catalog: CatalogProduct[] }) {
+/**
+ * ADD A BLANK TO THE INVENTORY LIST — exported, because the other place this is needed is an
+ * ORDER LINE. A line whose blank is not on the list reads "Not tracked", and the answer to
+ * that is this dialog; opening the Inventory page, finding the blank and typing its sku again
+ * is the same work done by hand. §5: import it, don't build a second one.
+ *
+ * `seedQuery` pre-fills the catalogue search so the caller can hand it the sku it is asking
+ * about. It is a SEARCH, not a selection — the person still picks, because a sku that matches
+ * nothing must not silently add the wrong blank.
+ */
+export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, seedQuery }: { open: boolean; onOpenChange: (v: boolean) => void; onAdd: (items: InventoryItem[]) => void; existing: string[]; catalog: CatalogProduct[]; seedQuery?: string }) {
   const [mode, setMode] = useState<"catalog" | "manual">("catalog")
   const [sku, setSku] = useState("")
   const [name, setName] = useState("")
@@ -787,10 +797,10 @@ function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog }: { open:
     const id = setTimeout(() => {
       setMode(catalog.length ? "catalog" : "manual")
       setSku(""); setName(""); setVariant(""); setStock(""); setReorder("25"); setCategory(""); setSupplier(""); setVisibility("factory"); setErr(null)
-      setQ(""); setPickedId(null); setChosen(new Set())
+      setQ(seedQuery ?? ""); setPickedId(null); setChosen(new Set())
     }, 0)
     return () => clearTimeout(id)
-  }, [open, catalog.length])
+  }, [open, catalog.length, seedQuery])
 
   const withSku = useMemo(() => catalog.filter((p) => String(p.sku || "").trim()), [catalog])
   const matches = useMemo(() => {

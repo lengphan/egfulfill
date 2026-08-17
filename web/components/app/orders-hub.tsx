@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
+import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
@@ -33,6 +33,7 @@ import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
 import { filterOrders, matchesStatus, isRush, isOverdue, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
+import { AddItemDialog } from "@/components/app/inventory-view"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
 import { useT, useLabelT } from "@/lib/i18n"
@@ -65,7 +66,7 @@ const NOT_STARTED = ["", "new", "draft", "in_review"]
  * (CLAUDE.md §4). Stock is held against the BLANK sku, so an unpicked line has no key to
  * look up — it is not a stock problem, it is a setup one.
  */
-function LineStock({ item, catalog, stock, pos, orderId, show }: {
+function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
   item: OrderItem
   catalog: CatalogProduct[]
   stock: Record<string, number>
@@ -73,6 +74,9 @@ function LineStock({ item, catalog, stock, pos, orderId, show }: {
   pos: PurchaseOrder[]
   orderId: string
   show: boolean
+  /** Opens the inventory dialog for an untracked blank. Absent on surfaces that cannot add
+   *  one (a seller's own view), where the chip stays a plain statement. */
+  onTrack?: (sku: string) => void
 }) {
   if (!show) return null
   const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium"
@@ -82,7 +86,27 @@ function LineStock({ item, catalog, stock, pos, orderId, show }: {
   if (!blankSku) return null
   const have = stock[String(blankSku).toUpperCase()]
   if (have == null) {
-    return (
+    /**
+     * NOT TRACKED IS A SETUP STATE, SO IT IS THE WAY OUT OF ITSELF.
+     *
+     * It cannot honestly print 0: we do not hold zero of this blank, we hold no OPINION about
+     * it — nobody has put it on the inventory list, and "0" would send someone to reorder
+     * something that may be sitting on a shelf. The two readings are opposite instructions.
+     *
+     * So it says what is true and offers the fix: the same Add-to-inventory dialog the
+     * Inventory page uses, seeded with this blank's sku. Once the row exists the chip becomes
+     * a real count — 0 if that is what it is, which by then is a fact rather than a guess.
+     */
+    return onTrack ? (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onTrack(blankSku) }}
+        className={pill + " bg-muted text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"}
+        title={`${blankSku} isn't on the inventory list — click to add it`}
+      >
+        Not tracked
+      </button>
+    ) : (
       <span className={pill + " bg-muted text-muted-foreground"} title={`${blankSku} is not on the inventory list`}>
         Not tracked
       </span>
@@ -383,6 +407,8 @@ export function OrdersHub() {
   const [threads, setThreads] = useState<Record<string, OrderThreadRow[]>>({})
   const [dfiles, setDfiles] = useState<Record<string, DesignFileRow[]>>({})
   const [stock, setStock] = useState<Record<string, number>>({})
+  /** The blank an order line wants put on the inventory list. Null = the dialog is closed. */
+  const [trackSku, setTrackSku] = useState<string | null>(null)
   // Draft/placed POs, so the stock chip's hover can show "already on PO #x" and the
   // send-to-PO action can append to an existing draft rather than mint a new one each click.
   const [pos, setPos] = useState<PurchaseOrder[]>([])
@@ -2398,7 +2424,7 @@ export function OrdersHub() {
                               className="sm:pr-[15rem]"
                               after={
                                 <>
-                                  <LineStock item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} />
+                                  <LineStock item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} onTrack={isStaff ? setTrackSku : undefined} />
                                   {(() => {
                                     /**
                                      * THREADS ONLY ONCE A BLANK IS CHOSEN.
@@ -2882,6 +2908,28 @@ export function OrdersHub() {
       {/* One sticker per UNIT (qty), so a x3 line prints 3 — that's what goes on the
           boxes. Lines with no chosen variant are skipped: labelling an undecided
           blank is worse than not labelling it. */}
+      {/* THE SAME DIALOG THE INVENTORY PAGE USES, opened from a "Not tracked" chip and seeded
+          with that blank's sku. Adding the row here updates this screen's stock map straight
+          away, so the chip it was opened from becomes a real count without a reload. */}
+      <AddItemDialog
+        open={!!trackSku}
+        onOpenChange={(v) => { if (!v) setTrackSku(null) }}
+        seedQuery={trackSku ?? ""}
+        catalog={catalog}
+        existing={Object.keys(stock)}
+        onAdd={(batch) => {
+          setTrackSku(null)
+          setStock((prev) => {
+            const next = { ...prev }
+            for (const it of batch) next[String(it.sku).toUpperCase()] = Number(it.in_stock) || 0
+            return next
+          })
+          // Fire-and-forget, same as the Inventory page: the row is the point, and a failure
+          // surfaces there where the numbers live.
+          Promise.all(batch.map((it) => addInventoryItem(it).catch(() => null)))
+        }}
+      />
+
       <LabelSheet
         open={!!barcodeOrder}
         onClose={() => setBarcodeOrder(null)}
