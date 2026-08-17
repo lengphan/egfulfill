@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
   getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsOrder, getSsInventory, getSsDaysInTransit, getOttoInventory, type PoReturn, type SsShipment,
-  ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, setFactorySettings, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine, type PaymentProfile,
+  ssOrder, resolveSuppliers, getSupplierOptions, setFactorySettings, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine, type PaymentProfile,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -127,6 +127,30 @@ function SourceTags({ line }: { line: POLine }) {
  *
  * Once one real response has been seen, replace this with the actual field.
  */
+/**
+ * OTTO IS NEVER PLACED FROM HERE.
+ *
+ * The connector exists and is double-gated off server-side (OTTOCAP_ORDER_LIVE), and its
+ * payload has never been validated against a live account. An order that reaches a supplier
+ * wrong is not a bug you roll back: somebody ships blanks, or does not, against a purchase
+ * nobody can find. So the button does not offer it and the placing loops step over it.
+ *
+ * A MIXED CART STILL GOES. The Otto group is held back and every other supplier is placed —
+ * the only behaviour that does not punish a whole cart for containing one Otto line. The
+ * held-back group is reported by name, never silently dropped.
+ */
+const NO_AUTO_ORDER: ReadonlySet<string> = new Set(["otto"])
+const placeable = (api: string | null | undefined) => !!api && !NO_AUTO_ORDER.has(api)
+const HELD_BACK = "Otto is ordered by hand — those lines were left in the cart."
+
+/**
+ * Otto's own minimum: 24 pieces an order. A smaller one is refused after somebody has keyed
+ * it in, which is when it is most annoying to learn. WARNED, not blocked — the minimum is
+ * theirs and negotiable per account, and a rule we enforce is one we have to keep in step
+ * with a rule we do not control.
+ */
+const OTTO_MIN_UNITS = 24
+
 function ottoQty(r: unknown): number | null {
   const seen = new Set<unknown>()
   const walk = (v: unknown, depth: number): number | null => {
@@ -463,17 +487,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
           // The rest of what a purchase order needs: where it goes, how it ships, how it
           // pays, and a PO number that ties their confirmation back to this row.
           if (g.api === "otto") {
-            const r = await ottoOrder(payload, {
-              shipping_address: opts.shipTo,
-              shipping_method: opts.defaults.otto_shipping_method || undefined,
-              payment_method: opts.defaults.otto_payment_method || undefined,
-              // Same card the place-all path sends — the one saved in this browser at Order
-              // settings › Payment. Without it a credit-card order is rejected by Otto, and
-              // this path had no way to supply one at all.
-              card_details: usableCard() ?? undefined,
-              customer_po: po.num,
-            })
-            if (r.error) throw new Error(r.error); resp = r
+            // HELD BACK, not sent — see NO_AUTO_ORDER. Thrown so this group lands in
+            // the same "did not place" path a failure uses, which already reports the
+            // supplier by name and leaves its lines in the cart.
+            throw new Error(HELD_BACK)
           } else if (g.api === "ss") {
             const r = await ssOrder(payload, {
               shippingAddress: opts.shipTo,
@@ -813,6 +830,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     return [...g.values()]
   }, [saved, supByS])
   const toOrderTotal = toOrderGroups.reduce((s, g) => s + g.total, 0)
+  /** Split by what this screen can actually send. Otto is in `handGroups` by rule, not by
+   *  accident — see NO_AUTO_ORDER. */
+  const autoGroups = toOrderGroups.filter((g) => placeable(g.api))
+  const handGroups = toOrderGroups.filter((g) => !placeable(g.api))
 
   /**
    * WHAT FREIGHT ACTUALLY COST LAST TIME, per supplier.
@@ -928,20 +949,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         let ok = true
         try {
           if (g.api === "otto") {
-            const r = await ottoOrder(payload, {
-              shipping_address: opts.shipTo,
-              // Otto require billing too, and it's the same warehouse.
-              billing_address: opts.shipTo,
-              shipping_method: opts.defaults.otto_shipping_method || undefined,
-              payment_method: opts.defaults.otto_payment_method || undefined,
-              customer: opts.defaults.otto_customer || undefined,
-              contact: opts.defaults.otto_contact || undefined,
-              // Sent, never saved server-side: it's stripped from anything echoed back, so
-              // it can't reach purchase_orders.meta.
-              card_details: ottoCard,
-              customer_po: poNum,
-            })
-            if (r.error) throw new Error(r.error); resp = r
+            // HELD BACK, not sent — see NO_AUTO_ORDER. Thrown so this group lands in
+            // the same "did not place" path a failure uses, which already reports the
+            // supplier by name and leaves its lines in the cart.
+            throw new Error(HELD_BACK)
           } else if (g.api === "ss") {
             const r = await ssOrder(payload, {
               shippingAddress: opts.shipTo, shippingMethod: opts.defaults.ss_shipping_method || undefined,
@@ -1599,9 +1610,20 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
               <Button size="sm" variant="outline" onClick={() => setAddTo(POOL)}>
                 Add items
               </Button>
-              <Button size="sm" onClick={() => void placeAllGroups()} disabled={!saved.length || busy === "place-all"}>
+              {/* COUNTS WHAT WILL ACTUALLY GO. The label said "Place 2 orders" over a cart
+                  whose second supplier is ordered by hand, and the button stayed live on a
+                  cart that was ALL Otto — a press that could only fail. Disabled with the
+                  reason on the tooltip when there is nothing this button can send. */}
+              <Button
+                size="sm"
+                onClick={() => void placeAllGroups()}
+                disabled={!autoGroups.length || busy === "place-all"}
+                title={autoGroups.length
+                  ? undefined
+                  : (handGroups.length ? "Every supplier in this cart is ordered by hand." : "Nothing to place.")}
+              >
                 {busy === "place-all" && <CircleNotch size={14} className="animate-spin" />}
-                {toOrderGroups.length > 1 ? `Place ${toOrderGroups.length} orders` : "Place order"}
+                {autoGroups.length > 1 ? `Place ${autoGroups.length} orders` : "Place order"}
               </Button>
             </div>
           }
@@ -1620,8 +1642,16 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                     {/* Only the exception is worth a chip. "Orders via API" was on the
                         majority of rows saying nothing actionable; "order by hand" is the
                         one that changes what you do next. */}
-                    {!g.api && (
+                    {!placeable(g.api) && (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">order by hand</span>
+                    )}
+                    {/* THEIR MINIMUM, said before it is keyed in rather than after they refuse
+                        it. Amber, not an error: this cart is legal, it just cannot be sent yet,
+                        and only Otto imposes it. */}
+                    {g.api === "otto" && g.lines.reduce((n, l) => n + num(l.qty), 0) < OTTO_MIN_UNITS && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">
+                        under Otto&apos;s {OTTO_MIN_UNITS}-piece minimum
+                      </span>
                     )}
                     <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{g.lines.length} line{g.lines.length === 1 ? "" : "s"} · {g.lines.reduce((s, l) => s + num(l.qty), 0)} units</span>
