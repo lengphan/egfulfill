@@ -1032,6 +1032,13 @@ export function DesignCanvasDialog({
   // stitch" for a line with no file at all. It also flipped the suggested design tier to
   // 'supplied' (the cheap check fee, for a file the seller never sent). The fact lives in
   // `justAttachedFile` now; this string only ever speaks.
+  /**
+   * The name of the file just attached, before the server's list comes back.
+   *
+   * `latestMachine` is filled from a re-read, so for the second or two after a drop the box
+   * knew a file existed and not what it was called — it said "Added" while a separate green
+   * sentence underneath named the file. One of those had to go, and it is not the name.
+   */
   const [attached, setAttached] = useState<string | null>(null)
   /** A machine file was filed in THIS window — the one thing that legitimately makes step ②
    *  done before the server has been re-read. */
@@ -1319,7 +1326,8 @@ export function DesignCanvasDialog({
       // was filed, whether or not the line already had artwork. The confirmation stays,
       // because the canvas cannot render a .emb and a window that looks identical before
       // and after reads as the drop having failed.
-      setAttached(`Embroidery file added — ${f.name}.`)
+      // The NAME, not a sentence: it is rendered inside the box as the file's label now.
+      setAttached(f.name)
     } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
   }, [orderId, item.line_id, item.sku])
 
@@ -2112,8 +2120,8 @@ export function DesignCanvasDialog({
                 <span className="shrink-0 text-sm font-medium">
                   Embroidery file{!isStaff && <span className="font-normal text-muted-foreground"> (optional)</span>}
                 </span>
-                <span className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || undefined}>
-                  {hasMachineFile ? (latestMachine?.name || "Added")
+                <span className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || attached || undefined}>
+                  {hasMachineFile ? (latestMachine?.name || attached || "Added")
                     : boardCard ? (isStaff
                         ? `Sent · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
                         : "Sent — with our team")
@@ -2293,10 +2301,11 @@ export function DesignCanvasDialog({
               design" three days ago and "Approved" are very different answers, and the lane
               is the one the board itself shows. */}
           {err && <div className="text-sm text-destructive">{err}</div>}
-          {/* A machine file was filed. Green, not red, and it says what it did AND what it
-              deliberately didn't — the canvas is unchanged, which without a word reads as
-              the drop having failed. */}
-          {attached && <div className="text-sm text-emerald-700">{attached}</div>}
+          {/* NO STANDALONE "Embroidery file added — x.EMB" LINE. It said what the box two
+              rows up was already showing — the file's own name — and it said it as an
+              extra row with its own top margin, so filing a file grew the dialog by a
+              line of blank space and a sentence. The box carries the name; the name is
+              the confirmation. */}
           {/* WHAT THE SELLER PAYS. Staff only — the person being charged must not be the
               one setting the charge. Collapsed by default so the seller-shaped window stays
               a design window; the summary line carries the answer, so staff only expand
