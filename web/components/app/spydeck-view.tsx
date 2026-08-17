@@ -572,6 +572,21 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
   )
 })
 
+/**
+ * HOW DEEP A SEARCH GOES, and why these numbers.
+ *
+ * 100 is Etsy's per-call maximum for findAllListingsActive, so PAGE_SIZE is the most
+ * results per request that exists — anything smaller just costs more calls for the same
+ * depth. Four pages total (one + three) is 400 listings, which is deep enough that
+ * "embroidered" stops claiming to be one page and shallow enough to stay well inside the
+ * keystring's DAILY budget: our app key is shared by every seller, and order sync depends
+ * on the same allowance a research grid would spend.
+ *
+ * The server clamps both independently, so these are a request, not a guarantee.
+ */
+const PAGE_SIZE = 100
+const EXTRA_PAGES = 3
+
 // Curated popular POD niches for the discovery cloud (before a search). Weight = heat.
 const SEED_NICHES: { text: string; weight: number }[] = [
   { text: "custom name necklace", weight: 10 }, { text: "comfort colors tee", weight: 10 },
@@ -641,6 +656,10 @@ export function SpyDeckView() {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<EtsyListing[] | null>(null)
   const [loading, setLoading] = useState(false)
+  // Separate from `loading`: the grid already has results on screen while this is true,
+  // so it must read as "more coming" and never as "still searching" — a spinner over a
+  // full grid says the results you are looking at are not real yet.
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState("")
   const [view, setView] = useState<"trending" | "search" | "saved" | "uploaded" | "account" | "stores">("trending")
@@ -991,15 +1010,50 @@ export function SpyDeckView() {
       const sortMap: Record<string, { sort?: string; sortOrder?: string }> = {
         relevance: {}, newest: { sort: "created" }, price_asc: { sort: "price", sortOrder: "asc" }, price_desc: { sort: "price", sortOrder: "desc" },
       }
-      const r = await searchEtsy(q, {
-        limit: 48,
+      const shape = {
+        limit: PAGE_SIZE,
         ...sortMap[sortSel],
         taxonomyId: cat || undefined,
         minPrice: Number(minPrice) || undefined,
         maxPrice: Number(maxPrice) || undefined,
-      })
-      setResults(r.results ?? [])
+      }
+      /**
+       * FIRST PAGE PAINTS, THE REST ARRIVES BEHIND IT.
+       *
+       * Asking for all four pages in one request made a search four times slower to show
+       * anything — the grid sat empty while Etsy was walked, which is a worse experience
+       * than the 48 results it replaced even though it ends up with eight times as many.
+       *
+       * So: one page, render, then continue from where it stopped. Both calls live in this
+       * click handler. That matters — incremental loading here is an EVENT and cannot
+       * re-enter itself, rather than an effect watching the list it is appending to
+       * (CLAUDE.md 2.8, which cost this project a machine).
+       */
+      const first = await searchEtsy(q, { ...shape, pages: 1 })
+      const firstRows = first.results ?? []
+      setResults(firstRows)
       setSearched(q)
+      setLoading(false)
+
+      // Nothing more to ask for when Etsy already returned a short page.
+      if (firstRows.length >= PAGE_SIZE) {
+        setLoadingMore(true)
+        try {
+          const more = await searchEtsy(q, { ...shape, pages: EXTRA_PAGES, offset: PAGE_SIZE })
+          const extra = more.results ?? []
+          if (extra.length) {
+            setResults((prev) => {
+              // `results` is null before a search has ever run. Appending to the first page
+              // we just set is the normal path; the ?? [] is what keeps a race — a second
+              // search clearing state mid-flight — from throwing instead of just appending.
+              const base = prev ?? []
+              const seen = new Set(base.map((x) => String(x.listing_id)))
+              return [...base, ...extra.filter((x) => !seen.has(String(x.listing_id)))]
+            })
+          }
+        } catch { /* the first page is a real result — a failed continuation must not erase it */ }
+        finally { setLoadingMore(false) }
+      }
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) setError("Sign in to research Etsy listings.")
       else if (e instanceof ApiError && e.status === 500) setError("Etsy isn't configured on the server yet.")
@@ -1322,6 +1376,16 @@ export function SpyDeckView() {
               />
             ))}
           </div>
+          {/* SAYS THE GRID IS STILL GROWING. Without it the first page lands, the pager
+              reads "Page 1 / 1", and three seconds later the count jumps — which looks like
+              a glitch rather than the second half of the search arriving. It also stops
+              anyone concluding, again, that this is all Etsy has. */}
+          {loadingMore && (
+            <p className="px-5 pb-2 text-xs text-muted-foreground" role="status" aria-live="polite">
+              <CircleNotch size={12} className="mr-1 inline animate-spin" />
+              Fetching more results…
+            </p>
+          )}
           <Pagination page={resultsPaged.page} pageCount={resultsPaged.pageCount} perPage={resultsPaged.perPage} total={resultsPaged.total} start={resultsPaged.start} onPage={resultsPaged.setPage} onPerPage={resultsPaged.setPerPage} perPageOptions={[24, 48, 96]} />
           </>
         )}

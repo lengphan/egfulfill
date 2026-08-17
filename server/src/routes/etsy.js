@@ -534,7 +534,12 @@ async function syncAllEtsy(opts = {}) {
 export async function etsyPublicGet(path) {
   if (!KEYSTRING) return { ok: false, status: 500, data: { error: 'Server missing ETSY_KEYSTRING' } };
   try {
+    // Through the SAME global limiter every other Etsy call uses. The keystring is OURS and
+    // shared by every seller on the platform, so an unpaced research surface spends a budget
+    // that order sync also depends on — a ban here stops shops importing, not just browsing.
+    await rateLimit();
     const r = await fetch(API + path, { headers: { 'x-api-key': API_KEY_HEADER } });
+    recordUsage('etsy', { endpoint: path.split('?')[0], ok: r.ok });
     const data = await r.json().catch(() => ({}));
     return { ok: r.ok, status: r.status, data };
   } catch (e) {
@@ -545,9 +550,46 @@ export async function etsyPublicGet(path) {
 // Public listing search (keystring only, no seller OAuth) → normalized cards. Reused
 // by the /api/etsy/search route AND the SpyDeck trending aggregator. Throws on failure
 // with an `.status` for the caller to map.
+/**
+ * ONE SEARCH PAGE, CACHED FOR TEN MINUTES.
+ *
+ * The ceiling that actually bites is the DAILY one, and the traffic shape here is the worst
+ * case for it: everyone researches the same handful of terms, and paging back and forth
+ * re-asks Etsy for pages we fetched seconds ago. A page walk of 4 now costs up to 12 calls
+ * (a search plus its enrichment batch each time), so repeat work is the thing to remove
+ * before adding depth — otherwise "more results" is just "more requests".
+ *
+ * Keyed on the FULL query shape including offset, so page 3 of "embroidered" is its own
+ * entry and a different price filter is a different search. Ten minutes because a research
+ * tool wants today's market, not this second's, and a listing's stats do not move in
+ * minutes.
+ *
+ * Bounded at CACHE_MAX entries and swept oldest-first, so a busy day cannot grow this
+ * without limit — an unbounded cache on a 2GB box is a slower version of the OOM this
+ * repo has already had once.
+ */
+const SEARCH_TTL_MS = 10 * 60 * 1000;
+const CACHE_MAX = 300;
+const _searchCache = new Map();
+function cacheGet(key) {
+  const hit = _searchCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > SEARCH_TTL_MS) { _searchCache.delete(key); return null; }
+  return hit.value;
+}
+function cacheSet(key, value) {
+  _searchCache.set(key, { at: Date.now(), value });
+  // Map preserves insertion order, so the first keys are the oldest.
+  while (_searchCache.size > CACHE_MAX) _searchCache.delete(_searchCache.keys().next().value);
+}
+
 export async function searchListings(query, opts = {}) {
   if (!KEYSTRING) { const e = new Error('Server missing ETSY_KEYSTRING'); e.status = 500; throw e; }
-  const limit = Math.min(48, Math.max(1, parseInt(opts.limit, 10) || 24));
+  // 100 is what findAllListingsActive actually allows. The 48 that used to be here was our
+  // own ceiling, not Etsy's, and it was the whole reason a search came back with one page:
+  // the grid asked for 48, got 48, and reported "Page 1 / 1" as though that were the end of
+  // the results. The listings/batch enrichment below takes 100 ids, so the two line up.
+  const limit = Math.min(100, Math.max(1, parseInt(opts.limit, 10) || 24));
   const offset = Math.max(0, parseInt(opts.offset, 10) || 0);
   const sort = ['created', 'price'].includes(opts.sort) ? opts.sort : 'score';
   const sortOrder = opts.sortOrder === 'asc' ? 'asc' : opts.sortOrder === 'desc' ? 'desc' : null;
@@ -560,7 +602,15 @@ export async function searchListings(query, opts = {}) {
   const minP = Number(opts.minPrice); if (minP > 0) params.push('min_price=' + minP);
   const maxP = Number(opts.maxPrice); if (maxP > 0) params.push('max_price=' + maxP);
   const u = API + '/listings/active?' + params.join('&');
+  // The url IS the cache key — every filter, sort, limit and offset is already encoded in
+  // it, so two searches share an entry exactly when they are the same search.
+  const cached = cacheGet(u);
+  if (cached) return cached;
+  // Paced. This was a bare fetch, so SpyDeck was the one surface in the file that could
+  // burst — fine at one call per search, not fine now a search walks several pages.
+  await rateLimit();
   const r = await fetch(u, { headers: { 'x-api-key': API_KEY_HEADER } });
+  recordUsage('etsy', { endpoint: '/listings/active', ok: r.ok });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) { const e = new Error((d && d.error) || ('Etsy search error ' + r.status)); e.status = (r.status >= 400 && r.status < 500) ? r.status : 502; throw e; }
   const base = d.results || [];
@@ -591,7 +641,9 @@ export async function searchListings(query, opts = {}) {
      */
     const batch = async (includes) => {
       const bu = API + '/listings/batch?listing_ids=' + ids.slice(0, 100).join(',') + '&includes=' + includes;
+      await rateLimit();
       const br = await fetch(bu, { headers: { 'x-api-key': API_KEY_HEADER } });
+      recordUsage('etsy', { endpoint: '/listings/batch', ok: br.ok });
       if (br.ok) return br.json().catch(() => ({}));
       // Say WHY, once, with the status and a snippet. A silent catch here is what let this
       // run for weeks: the feed looked built, and only the images were missing.
@@ -624,7 +676,11 @@ export async function searchListings(query, opts = {}) {
     }
   }
   const results = await attachUsd(base.map((l) => mapListing(l, imgsById, rangeById)));
-  return { count: d.count || results.length, query, offset, limit, results };
+  const out = { count: d.count || results.length, query, offset, limit, results };
+  // Only a page that actually came back with rows is worth keeping — caching an empty or
+  // failed answer for ten minutes turns one bad moment at Etsy into ten bad minutes here.
+  if (results.length) cacheSet(u, out);
+  return out;
 }
 
 /**
@@ -999,11 +1055,65 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     const query = String((qy.q || qy.keywords) || '').trim();
     const hasFilter = !!(qy.taxonomyId || qy.taxonomy_id || qy.minPrice || qy.maxPrice);
     if (!query && !hasFilter) { reply.code(400); return { error: 'Enter a search term or pick a filter (category / price).' }; }
+    /**
+     * MORE THAN ONE PAGE, because "embroidered" has thousands of listings on Etsy and this
+     * route was answering with 48 — one call, offset 0, and a grid that then said
+     * "Page 1 / 1" as though it had reached the end of the results.
+     *
+     * Walked with `offset`, which is Etsy's own paging, and BOUNDED THREE WAYS:
+     *   - `pages` is clamped to MAX_PAGES, so a hand-typed ?pages=999 cannot spend the rate
+     *     limit,
+     *   - the loop STOPS EARLY the moment a page comes back short, which is Etsy telling us
+     *     there is no more — a genuinely narrow search costs one call, as it did before,
+     *   - a page that throws ends the walk and keeps what we already have, so a rate-limited
+     *     third page degrades to 200 results instead of failing a search that had them.
+     *
+     * Sequential on purpose. Each page also fires a listings/batch enrichment, so three
+     * pages is up to six requests; firing them concurrently is how a research tool gets the
+     * app's keystring rate-limited for everyone (CLAUDE.md — the keystring is OURS, shared
+     * by every seller, never theirs).
+     *
+     * This is a LOOP WITH A CEILING driven by one search click — not an effect that refetches
+     * on what its own fetch wrote (CLAUDE.md 2.8). It cannot re-enter itself.
+     */
+    const MAX_PAGES = 5;
+    const limit = Math.min(100, Math.max(1, parseInt(qy.limit, 10) || 48));
+    const pages = Math.min(MAX_PAGES, Math.max(1, parseInt(qy.pages, 10) || 1));
+    const startOffset = Math.max(0, parseInt(qy.offset, 10) || 0);
+    const opts = {
+      limit, sort: qy.sort, sortOrder: qy.sortOrder,
+      taxonomyId: qy.taxonomyId || qy.taxonomy_id, minPrice: qy.minPrice, maxPrice: qy.maxPrice,
+    };
     try {
-      return await searchListings(query, {
-        limit: qy.limit, offset: qy.offset, sort: qy.sort, sortOrder: qy.sortOrder,
-        taxonomyId: qy.taxonomyId || qy.taxonomy_id, minPrice: qy.minPrice, maxPrice: qy.maxPrice,
-      });
+      const seen = new Set();
+      const results = [];
+      let count = 0, fetched = 0, truncated = false;
+      for (let i = 0; i < pages; i++) {
+        let page;
+        try {
+          page = await searchListings(query, { ...opts, offset: startOffset + i * limit });
+        } catch (e) {
+          // The FIRST page failing is a failed search and must surface. A later one failing
+          // is a shorter answer, which is a different thing and must not throw away the
+          // pages that worked.
+          if (i === 0) throw e;
+          truncated = true;
+          break;
+        }
+        fetched++;
+        count = page.count || count;
+        const rows = page.results || [];
+        // Deduped by listing_id: Etsy's offset paging can repeat a row when the underlying
+        // ordering shifts between calls, and a duplicate card in a research grid reads as
+        // two competitors selling the same thing.
+        for (const l of rows) {
+          const k = String(l && l.listing_id);
+          if (!l || !l.listing_id || seen.has(k)) continue;
+          seen.add(k); results.push(l);
+        }
+        if (rows.length < limit) break;   // Etsy has no more to give
+      }
+      return { count, query, offset: startOffset, limit, pages: fetched, truncated, results };
     } catch (e) { reply.code(e.status || 502); return { error: e.message }; }
   });
 

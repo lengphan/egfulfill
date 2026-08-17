@@ -3297,16 +3297,30 @@ export function deleteSpydeckUpload(listingId: number | string) {
   return api<{ ok?: boolean }>(`/api/spydeck/uploads/${encodeURIComponent(String(listingId))}`, { method: "DELETE" })
 }
 
-export type EtsySearchOpts = { sort?: string; sortOrder?: string; limit?: number; taxonomyId?: string | number; minPrice?: number; maxPrice?: number }
+export type EtsySearchOpts = { sort?: string; sortOrder?: string; limit?: number
+  /** How many pages of `limit` to walk, server-clamped to 5. Etsy pages at `offset`,
+   *  and asking for one page is why a search for a broad term reported 'Page 1 / 1'. */
+  pages?: number
+  /** Where the walk starts, in listings. Used to continue a search rather than repeat it. */
+  offset?: number
+  taxonomyId?: string | number; minPrice?: number; maxPrice?: number }
 export function searchEtsy(q: string, opts?: EtsySearchOpts) {
   const p = new URLSearchParams({ q })
   if (opts?.sort) p.set("sort", opts.sort)
   if (opts?.sortOrder) p.set("sortOrder", opts.sortOrder)
   if (opts?.limit) p.set("limit", String(opts.limit))
+  if (opts?.pages) p.set("pages", String(opts.pages))
+  if (opts?.offset) p.set("offset", String(opts.offset))
   if (opts?.taxonomyId) p.set("taxonomyId", String(opts.taxonomyId))
   if (opts?.minPrice) p.set("minPrice", String(opts.minPrice))
   if (opts?.maxPrice) p.set("maxPrice", String(opts.maxPrice))
-  return api<{ count: number; query: string; results: EtsyListing[] }>(`/api/etsy/search?${p.toString()}`)
+  return api<{
+    count: number; query: string; results: EtsyListing[]
+    /** How many pages actually came back, and whether the walk stopped early on an Etsy
+     *  error. `truncated` is the difference between "that is everything" and "that is what
+     *  we could get" — the grid must not present the second as the first. */
+    pages?: number; truncated?: boolean
+  }>(`/api/etsy/search?${p.toString()}`)
 }
 export type EtsyCategory = { id: number; name: string }
 export function getEtsyCategories() {
