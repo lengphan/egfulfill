@@ -130,6 +130,19 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   const art = designSrc(design?.data) || designSrc(item.design_src)
   const { url: blank, missing: blankMissing, chosen: blankChosen } = blankOf(item, catalog)
   const listing = item.img || ""
+  /**
+   * NO BLANK PICKED — and the tile must not paper over it with the listing photo.
+   *
+   * `blankOf` falls back to `item.img` so a manual order never renders an empty square, and
+   * that fallback reaches all the way here: clearing the Blank field put the BUYER'S photo
+   * in the print position, which made unpicking a blank look like progress. It is the same
+   * stand-in as a chosen-but-pictureless blank, with its own caption.
+   *
+   * NOT on `listingFirst` callers. Those are the dense row strips, where showing the buyer's
+   * photo is the whole point and is stated as such — a board of dashed squares would be a
+   * worse answer to a different question.
+   */
+  const blankUnpicked = !blankChosen && !listingFirst
   // Only worth offering the swap when the two views actually differ.
   const canSwap = !!(art && listing && listing !== blank)
   /**
@@ -206,7 +219,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         className={"relative block shrink-0 overflow-hidden rounded-md bg-muted " + (bare ? "" : "border border-border ") + (className ?? "")}
         style={{ width: size, height: size }}
       >
-        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} color={item.color} />
+        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} blankUnpicked={blankUnpicked} color={item.color} />
       </span>
     )
   }
@@ -233,7 +246,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             + (showBoth && !listingFront ? " z-20 border-2 border-background shadow-md" : " z-0")}
           style={{ left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
         >
-          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} color={item.color} />
+          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} blankUnpicked={blankUnpicked} color={item.color} />
           {/* Affordance only where there's something to do — and only on hover, so the
               row stays quiet until you're actually pointing at it. */}
           <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-md bg-black/45 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 sm:flex">
@@ -312,7 +325,13 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           </DialogHeader>
           <div className="space-y-3 px-1 pb-1">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted">
-              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} blankMissing={blankMissing} color={item.color} fit="contain" />
+              {/* THE ZOOM IS FOR LOOKING, so it may show the listing photo the tile refuses
+                  to. With no blank picked and no artwork there is nothing else to show, and
+                  someone who clicked a thumbnail wants a picture, not a bigger placeholder —
+                  the same "one click away" the row strips already rely on. With artwork the
+                  stand-in stays, because a design floating on the buyer's photo is the
+                  misleading composite this whole component avoids. */}
+              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} blankMissing={blankMissing} blankUnpicked={blankUnpicked && !!art} color={item.color} fit="contain" />
             </div>
             {canSwap && (
               <button
@@ -343,7 +362,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
  * so the same numbers hold at 44px in a row and at full size in the preview — one model,
  * no per-surface maths.
  */
-function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissing, color }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string; fit?: "cover" | "contain"; blankMissing?: boolean; color?: string | null }) {
+function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissing, blankUnpicked, color }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string; fit?: "cover" | "contain"; blankMissing?: boolean; blankUnpicked?: boolean; color?: string | null }) {
   /**
    * NO PHOTO, BUT WE DO KNOW THE COLOUR — so stand in with the colour.
    *
@@ -364,18 +383,31 @@ function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissi
    * table). It keeps the neutral tile and prints the NAME, because painting a guess is the
    * one thing worse than not painting.
    */
-  const swatch = blankMissing && !showListing ? swatchBg(color || "") : null
+  /**
+   * NO BLANK PICKED IS THE SAME PROBLEM, and it was the loud one.
+   *
+   * `blankMissing` only covers a blank that IS chosen and has no imagery. Clear the Blank
+   * field and `blankOf` falls all the way back to `item.img` — so the print card quietly
+   * became the buyer's listing photo again, on the component whose premise is that it never
+   * shows one. Unpicking a blank made the tile look MORE finished, not less.
+   *
+   * Both states get the same stand-in, because they are the same sentence: we cannot show
+   * you the garment. They differ only in the caption.
+   */
+  const noBlank = (blankMissing || blankUnpicked) && !showListing
+  const swatch = noBlank ? swatchBg(color || "") : null
   // THE DASHES HAVE TO SURVIVE THE FILL. Ink at 25% is invisible on Black — the exact tile
   // where a solid square is most likely to be mistaken for a photograph of a black apron.
   // Same perceived-luminance rule the user chips use (user-avatar.tsx).
   const onDark = swatch ? isDarkHex(swatchHex(color || "")) : false
-  if (blankMissing && !showListing) {
+  if (noBlank) {
+    const why = blankUnpicked ? "No blank picked" : "No blank photo"
     return (
       <span
         className={"relative grid size-full place-items-center overflow-hidden rounded-[inherit] border border-dashed bg-muted/60 text-center text-muted-foreground "
           + (onDark ? "border-white/50" : "border-foreground/25")}
         style={swatch ? { background: swatch } : undefined}
-        title={color ? `${prettyColorName(color)} — no photo of this blank` : "No photo of this blank"}
+        title={color ? `${prettyColorName(color)} — ${why.toLowerCase()}` : why}
       >
         {art ? <ArtLayer art={art} pos={pos} /> : swatch ? (
           // The colour IS the message; a caption over it would only obscure the thing it
@@ -384,7 +416,7 @@ function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissi
         ) : (
           <span className="grid place-items-center gap-1 p-1">
             <Package size={15} />
-            <span className="text-[9px] font-medium leading-tight">{color ? prettyColorName(color) : "No blank photo"}</span>
+            <span className="text-[9px] font-medium leading-tight">{color ? prettyColorName(color) : why}</span>
           </span>
         )}
       </span>
