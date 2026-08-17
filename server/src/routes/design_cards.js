@@ -378,7 +378,36 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     return r.rows;
   });
 
+  /**
+   * IS THE WILCOM PREVIEW CACHE THERE AT ALL?
+   *
+   * `wilcom_previews` is created lazily by wilcom.js, the first time somebody asks for a
+   * stitch preview — deliberately, so that removing Wilcom removes its table and nothing
+   * else. But the board's list query JOINS to it for `has_preview`, and Postgres resolves a
+   * missing relation when it PLANS the statement, not when it reaches that row. So on any
+   * deployment where no preview had ever been rendered, the whole list 500'd with
+   * `relation "wilcom_previews" does not exist` — and the board catches its own errors into
+   * an empty array, so the screen said "no cards" while the cards sat in the table.
+   *
+   * That is the bug behind "I sent it to the board and it isn't there": the card was created
+   * every time. The board simply could not read anything, including it.
+   *
+   * Asked once and cached, since a table does not come and go inside a process. False means
+   * the column is a literal `false` — a preview that cannot exist is not cached.
+   */
+  let _pvTable = null;
+  async function previewsExist() {
+    if (_pvTable === null) {
+      _pvTable = (await q(`select to_regclass('public.wilcom_previews') as t`).catch(() => ({ rows: [{ t: null }] })))
+        .rows[0]?.t != null;
+    }
+    return _pvTable;
+  }
+
   app.get('/api/design_cards', { preHandler: requireAuth }, async (req) => {
+    const hasPreviewSql = (await previewsExist())
+      ? `exists (select 1 from wilcom_previews wp where wp.design_id = design_cards.design_id)`
+      : `false`;
     if (isStaff(req.user)) {
       // claimed_role resolves the CLAIMER to a role the SAME way the credit route does, so
       // the board can show whether a payout will actually pay out (designers only) instead of
@@ -407,7 +436,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
            -- Is a stitch preview already rendered for this card's file? The board asks so it
            -- can show a cached one for free and leave the rest to a click — a TrueView costs
            -- a Wilcom call, and a busy board would spend one per card on every load.
-           exists (select 1 from wilcom_previews wp where wp.design_id = design_cards.design_id) as has_preview
+           ${hasPreviewSql} as has_preview
            from design_cards order by id`);
       // Manual cards keep their artwork in object storage, and a signed URL expires — so it
       // is minted per read rather than stored. `thumb` is what every client already renders,

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { PenNib, X, CircleNotch, Storefront, Needle, CurrencyDollar, CheckCircle, CheckSquare, Square, LinkSimple, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash, DotsSixVertical } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Warning, Storefront, Needle, CurrencyDollar, CheckCircle, CheckSquare, Square, LinkSimple, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash, DotsSixVertical } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,14 +46,32 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
     <div className="relative size-full">
       {children}
       {!cached && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); fetchPng() }}
-          disabled={busy}
-          className="absolute inset-x-2 bottom-2 rounded-full border border-border bg-background/90 px-2 py-1 text-2xs font-medium text-muted-foreground backdrop-blur hover:text-foreground disabled:opacity-60"
+        /*
+         * NOT a <button>. Both CardArt call sites wrap this whole preview in a <button> —
+         * the card tile that opens the dialog, and the dialog's own art — and a button
+         * inside a button is invalid HTML, which React reports as a hydration error and
+         * browsers resolve by silently restructuring the DOM.
+         *
+         * A span carrying the button role keeps it operable by mouse and keyboard without
+         * nesting a second interactive ELEMENT. (Nesting interactive roles is still not
+         * ideal for a screen reader; unnesting properly means lifting this control out of
+         * the wrapping button at both call sites, which is a change to the card layout
+         * rather than to this component.)
+         */
+        <span
+          role="button"
+          tabIndex={busy ? -1 : 0}
+          aria-disabled={busy}
+          onClick={(e) => { e.stopPropagation(); if (!busy) fetchPng() }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") return
+            e.preventDefault(); e.stopPropagation()   // Space would scroll the lane
+            if (!busy) fetchPng()
+          }}
+          className={"absolute inset-x-2 bottom-2 cursor-pointer rounded-full border border-border bg-background/90 px-2 py-1 text-center text-2xs font-medium text-muted-foreground backdrop-blur hover:text-foreground " + (busy ? "opacity-60" : "")}
         >
           {busy ? "Rendering…" : "Show stitches"}
-        </button>
+        </span>
       )}
     </div>
   )
@@ -155,6 +173,9 @@ const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).to
 export function DesignerBoard() {
   const confirm = useConfirm()
   const [cards, setCards] = useState<DesignCard[] | null>(null)
+  /** Why the list is empty, when it is empty because the read failed rather than because
+   *  nothing has been sent. Null on a good read — including a legitimately empty one. */
+  const [loadErr, setLoadErr] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | number | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
   // Board-level, distinct from the card panel's own busy/err further down: an upload
@@ -195,9 +216,20 @@ export function DesignerBoard() {
   // Reload the board from the server. Named because a partner push writes the card on the
   // SERVER (vendor badge + their task ref), so the local list has to be re-read rather
   // than patched — the row that matters afterwards isn't the one we were holding.
+  /**
+   * A FAILED READ IS NOT AN EMPTY BOARD.
+   *
+   * This caught every error into `[]`, so when the list query 500'd the screen said "no
+   * cards yet" — indistinguishable from a board nobody has sent anything to. Someone pushed
+   * a design, came here, and was told nothing had arrived; the card was in the table the
+   * whole time. An empty state that cannot be told from a broken feature is the one thing
+   * this app's UI rules forbid outright.
+   */
   const load = useCallback(() => {
     if (!getToken()) { setCards([]); return }
-    getDesignCards().then((r) => setCards(r ?? [])).catch(() => setCards([]))
+    getDesignCards()
+      .then((r) => { setLoadErr(null); setCards(r ?? []) })
+      .catch((e: Error) => { setLoadErr(e?.message || "The design board couldn't be loaded."); setCards([]) })
   }, [])
 
   useEffect(() => {
@@ -551,6 +583,16 @@ export function DesignerBoard() {
         </div>
       )}
 
+      {/* SAY WHICH: a board that could not be READ is not a board with nothing on it, and
+          for anyone who has just pressed "Send to board" those two states give opposite
+          instructions — send it again, or go and find out why. */}
+      {loadErr && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <Warning size={15} weight="fill" className="shrink-0" />
+          <span className="min-w-0 flex-1">Couldn&apos;t load the board — {loadErr} Cards already sent are safe; this is a read failing, not work being lost.</span>
+          <Button size="sm" variant="outline" onClick={load}>Try again</Button>
+        </div>
+      )}
       {cards === null ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
       ) : view === "history" && canSeeHistory ? (
