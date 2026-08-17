@@ -138,6 +138,33 @@ export function publicSupportRoutes(app) {
       [id, finalName, finalEmail, JSON.stringify(messages), ip]
     ).catch(() => {});
 
+    /**
+     * ONCE A PERSON IS IN, THE BOT STEPS BACK — and the visitor keeps talking TO THEM.
+     *
+     * Nothing here read `escalated`, so after a handover two things went wrong at once: the
+     * model kept answering over the top of a human who was already in the conversation, and
+     * everything the visitor typed after that landed in `public_support.messages` where
+     * STAFF NEVER LOOK. They answer in the Conversations rail, which reads order_messages —
+     * so the visitor was talking into a room nobody was in, while being answered by a bot
+     * the human could not see.
+     *
+     * So an escalated conversation posts the message into the rail's channel instead, with
+     * sender_id null (that is what marks it as theirs rather than a staff reply — see the
+     * GET above) and no model call at all. Which also means this path cannot be blocked by
+     * the daily ceiling or a model outage: a conversation a person is handling does not
+     * depend on the machine that stopped handling it.
+     */
+    if (row && row.escalated) {
+      await q(
+        `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+         values ($1, null, 'seller', $2, $3)`,
+        [`support-web-${id}`, text,
+         JSON.stringify({ web: true, name: finalName, email: finalEmail })]
+      ).catch(() => {});
+      return { conversationId: id, messages, escalated: true, reply: null,
+               notice: null, withPerson: true };
+    }
+
     // The question is now stored. Ask who they are BEFORE spending anything on a reply.
     if (!finalEmail) {
       return { conversationId: id, needsIdentity: true, messages };

@@ -65,6 +65,9 @@ export function SupportBubble() {
   const [done, setDone] = useState(false)
   /** Someone asked for a person before there was a conversation to hand over — see escalate. */
   const [pendingEscalate, setPendingEscalate] = useState(false)
+  /** A person is on this conversation. Set by the handover and by every read, so it survives
+   *  a reload — and it is what takes the "talk to support" offer away once it is answered. */
+  const [withPerson, setWithPerson] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
   // Resume on this device. Deferred — localStorage doesn't exist during the prerender, and
@@ -99,7 +102,9 @@ export function SupportBubble() {
         const r = await fetch(`/api/public/support/${encodeURIComponent(convo)}`)
         if (!r.ok) return
         const d = await r.json()
-        if (live && Array.isArray(d.messages)) setMsgs(d.messages)
+        if (!live) return
+        if (Array.isArray(d.messages)) setMsgs(d.messages)
+        if (d.escalated) setWithPerson(true)
       } catch { /* a failed poll is not worth a notice — the next one is 8s away */ }
     }
     const t = setInterval(read, 8000)
@@ -128,6 +133,7 @@ export function SupportBubble() {
       // A refusal (rate limit, or a conversation that has run long) still carries a message
       // the visitor should see rather than a silent dead input.
       if (d.error) setNotice(d.error)
+      if (d.escalated || d.withPerson) setWithPerson(true)
       return d.conversationId ?? convo
     } catch {
       setNotice("We couldn't reach support just now — please try again shortly.")
@@ -144,6 +150,7 @@ export function SupportBubble() {
         body: JSON.stringify({ conversationId: id }),
       })
       setDone(true)
+      setWithPerson(true)
     } catch { setNotice("Couldn't hand that over — email orders@egful.store and we'll pick it up.") }
   }
 
@@ -311,13 +318,23 @@ export function SupportBubble() {
               <PaperPlaneRight size={15} weight="fill" />
             </button>
           </div>
-          {/* Offered as soon as there is anything in the thread — INCLUDING a canned answer,
-              which is exactly when someone decides the answer wasn't theirs. */}
-          {msgs.length > 0 && !done && (
+          {/* OFFERED UNTIL IT IS TAKEN, then gone.
+              It stayed on screen after support had joined and answered — offering to fetch
+              the person who was already typing, under their reply. `withPerson` is set by the
+              handover AND by every read, so it is right after a reload too.
+              "Talk to support", not "talk to a person instead": the visitor is not choosing
+              between two colleagues, and "instead" reads as a rejection of the answer they
+              were just given. */}
+          {msgs.length > 0 && !done && !withPerson && (
             <button onClick={escalate} disabled={busy}
                     className="mt-2 text-xs font-semibold text-black/50 underline underline-offset-4 hover:text-[#0B0B0C]">
-              Talk to a person instead
+              Talk to support
             </button>
+          )}
+          {/* Says who is answering now, in the place the offer used to be — so the space
+              does not simply go blank the moment a person arrives. */}
+          {withPerson && !done && (
+            <p className="mt-2 text-xs text-black/45">You&apos;re talking to EGFUL support.</p>
           )}
         </div>
       )}
