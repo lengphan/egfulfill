@@ -138,6 +138,17 @@ export function SubmitOrderButton({
                 <dt className="text-muted-foreground">Shipping</dt>
                 <dd className="tabular-nums">{money(q.shipping)}</dd>
               </div>
+              {/* This is the dialog someone confirms a CHARGE in, so the discount has to be
+                  on it. A total that is quietly lower than production + shipping reads as an
+                  arithmetic error at exactly the moment a seller is checking the sum. */}
+              {q.volumeDiscount > 0 && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">
+                    Volume discount<span className="opacity-70"> · {q.volumePct}%</span>
+                  </dt>
+                  <dd className="tabular-nums text-success">−{money(q.volumeDiscount)}</dd>
+                </div>
+              )}
               <div className="flex justify-between border-t border-border pt-2 font-semibold">
                 <dt>Total</dt>
                 <dd className="tabular-nums">{money(q.total)}</dd>

@@ -17,8 +17,10 @@
  *   - It gives the seller board something true and specific to say — "40 units from
  *     Tier 3, reach it by Nov 30 and December is 6%" — which is the entire pitch.
  *
- * NOTHING HERE PRICES AN ORDER YET. This module only measures and reports. quoteOrder is
- * untouched, so shipping this cannot change a single charge.
+ * quoteOrder READS THIS. pricing.js resolves a seller's rate through volumeRateFor and
+ * takes it off the goods subtotal, so a tier saved by an admin is a discount on the next
+ * charge. DEFAULT_TIERS is empty and an empty ladder earns every seller 0%, so the feature
+ * is off until somebody deliberately turns it on.
  */
 import { q } from './db.js';
 

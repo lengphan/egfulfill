@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Plus, Trash, FloppyDisk, Warning } from "@phosphor-icons/react"
+import { Plus, Trash, FloppyDisk } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
@@ -84,15 +84,16 @@ export function VolumeTiersPanel() {
       }
     >
       <div className="space-y-4 px-5 pb-5">
-        {/* Nothing here can move money today, and saying so is what stops an admin believing
-            a saved ladder just repriced every open order. */}
-        <div className="flex items-start gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-          <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
-          <span>
-            Saving a ladder does not change any charge. Order pricing does not read these yet —
-            they are measured so the numbers can be trusted before they move money.
-          </span>
-        </div>
+        {/* The "this changes no charge" notice that used to sit here is gone because it
+            stopped being true: quoteOrder reads this ladder now. What replaces it is not
+            reassurance but the one fact an admin needs before typing — a saved rung is
+            money on the next order, and it applies from the next charge, not retroactively
+            to orders already paid for. */}
+        <p className="text-sm text-muted-foreground">
+          A saved ladder prices the next order. Sellers earn a rate from what they ship in a
+          month and spend it the month after, so editing these changes what future orders
+          cost — never what an already-charged order was billed.
+        </p>
 
         <div className="space-y-2">
           {rows.length === 0 && (
@@ -164,7 +165,10 @@ export function VolumeTiersPanel() {
                     <th className="py-1.5 pr-3 text-left font-semibold">Seller</th>
                     <th className="py-1.5 pr-3 text-right font-semibold">Orders</th>
                     <th className="py-1.5 pr-3 text-right font-semibold">Units</th>
-                    <th className="py-1.5 text-right font-semibold">Would earn</th>
+                    {/* "Would earn" while the ladder priced nothing. It does now, and these
+                        units are what set the rate being charged — a conditional heading over
+                        a real number is the same overclaim in reverse. */}
+                    <th className="py-1.5 text-right font-semibold">Earns</th>
                   </tr>
                 </thead>
                 <tbody>

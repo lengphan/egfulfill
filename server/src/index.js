@@ -530,7 +530,7 @@ designLibraryRoutes(app, requireAuth, requireStaff);   // per-seller "my uploads
 designFilesRoutes(app, requireAuth);                   // machine deliverable files (.pes/.emb) stored server-side, access-controlled (staff any; seller own)
 sheetsRoutes(app, requireAuth, requireAdmin);          // Google Sheets order import; admin sets the master template a seller copies
 billingRoutes(app, requireAuth, requireAdmin);                       // subscription plan + SpyDeck add-on, charged from the wallet (402 names the shortfall so the client can offer a top-up)
-planRoutes(app, requireAuth, requireStaff, requireAdmin);  // volume tiers: the admin ladder + a seller's own meter. MEASURES ONLY — quoteOrder does not import it, so a ladder cannot move a charge
+planRoutes(app, requireAuth, requireStaff, requireAdmin);  // volume tiers: the admin ladder + a seller's own meter. PRICES ORDERS — pricing.js reads the same ladder; an empty ladder is the off switch
 consignmentRoutes(app, requireAuth, requireStaff);     // inventory services: seller-owned stock (ASN -> count -> internal SKU + bin); kept OUT of `inventory`, which has no owner column
 mailIngestRoutes(app, requireAuth);                                // inbound Etsy sale emails -> order addresses (shared-secret URL; sender must be a known account)
 walletRoutes(app, requireAuth, requireAdmin);

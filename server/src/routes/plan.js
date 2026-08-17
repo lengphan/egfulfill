@@ -1,10 +1,10 @@
 /**
  * VOLUME TIERS — the admin ladder and the seller's own meter.
  *
- * READ-ONLY WITH RESPECT TO MONEY. Nothing here prices an order: it reports what a seller
- * shipped and what that WOULD earn. quoteOrder does not import this module, so configuring
- * a ladder cannot change a charge. That separation is deliberate for now — the numbers get
- * to be watched for a period before they are allowed to move money.
+ * THIS LADDER NOW PRICES ORDERS. It did not for its first period on purpose — the numbers
+ * were watched before they were allowed to move money — and that gate is gone: pricing.js
+ * reads the same table through volumeRateFor, so a tier saved here is a discount on the
+ * next charge. An empty ladder is still the off switch, and still the default.
  */
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
@@ -22,6 +22,17 @@ async function readTiers() {
 }
 
 export function planRoutes(app, requireAuth, requireStaff, requireAdmin) {
+  /**
+   * The rate a seller was CHARGED at, stamped by freezeQuote when money moved. Added here
+   * because this module owns the volume feature, and idempotently because schema.sql only
+   * runs on a first database init — an existing deployment never sees it otherwise.
+   *
+   * Null means "not charged yet, ask the ladder"; a number means "this is history". Nothing
+   * reads it until an order is charged, so a deployment where this ALTER fails prices
+   * exactly as before rather than breaking a quote.
+   */
+  q('alter table orders add column if not exists volume_pct numeric').catch(() => {});
+
   /**
    * A seller's own meter. Team members resolve to their OWNER, because the owner is who
    * ships and who is billed — a member seeing their own (empty) volume would be reporting
@@ -58,9 +69,11 @@ export function planRoutes(app, requireAuth, requireStaff, requireAdmin) {
    *   earned  — last month's units, which set THIS month's rate. Already decided.
    *   running — this month so far, which sets NEXT month's rate. Still winnable.
    *
-   * `applied: false` is not decoration. Until the pricing half ships, a seller must not be
-   * told they are getting a discount they are not yet getting — an honest "this is what it
-   * would earn" is the whole difference between a preview and a lie.
+   * `applied` is not decoration. It says whether the rate below is money or a forecast, and
+   * a seller must never be told they are getting a discount they are not getting. The
+   * pricing half has now shipped, so `earned` IS being charged — but only when there is a
+   * ladder to earn from: an empty ladder means the programme is off, every rate is 0%, and
+   * claiming it is "applied" would be a promise about nothing.
    */
   app.get('/api/plan/usage', { preHandler: requireAuth }, async (req) => {
     /**
@@ -84,7 +97,7 @@ export function planRoutes(app, requireAuth, requireStaff, requireAdmin) {
     if (!sellerId) {
       // Staff have no volume of their own — hand back the ladder so the admin screen can
       // render without a second call, and say plainly that there is no seller here.
-      return { seller: null, tiers, applied: false };
+      return { seller: null, tiers, applied: tiers.length > 0 };
     }
 
     const [earnedUnits, runningUnits] = await Promise.all([
@@ -95,7 +108,9 @@ export function planRoutes(app, requireAuth, requireStaff, requireAdmin) {
     return {
       seller: String(sellerId),
       tiers,
-      applied: false,   // measuring only — see the module header
+      // quoteOrder takes `earned.pct` off the goods subtotal on the next charge. False when
+      // the ladder is empty, because then there is no programme to apply.
+      applied: tiers.length > 0,
       earned: { period: lastPeriod, appliesTo: thisPeriod, ...tierFor(earnedUnits, tiers) },
       running: { period: thisPeriod, appliesTo: nextPeriod(thisPeriod), ...tierFor(runningUnits, tiers) },
     };

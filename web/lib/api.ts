@@ -1956,6 +1956,18 @@ export type OrderQuote = {
   subtotal: number
   shipping: number
   units: number
+  /** The seller's volume rate for this order, and what it takes off. Off the GOODS only —
+   *  never shipping, which is a courier's price and not ours to discount. 0 when there is
+   *  no ladder configured or the seller earned no rung, which is the default. */
+  volumePct: number
+  volumeDiscount: number
+  /** What earned the rate: units shipped last period, and the 1-based rung. Null once the
+   *  order is charged — `volumeFrozen` — because the stamped rate is then all we know, and
+   *  showing this month's units beside last month's charged rate invites them to be read
+   *  as one statement. */
+  volumeUnits?: number | null
+  volumeTier?: number | null
+  volumeFrozen?: boolean
   total: number
   charged: number
   balance: number

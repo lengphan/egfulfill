@@ -20,6 +20,11 @@
 // order. Cost comes from the catalog's base_price, never from the order's revenue.
 import { q } from './db.js';
 import { shippingBandOf, SETTING_DEFAULTS } from './routes/factory_settings.js';
+// `tierFor` is ALIASED. pricing.js already has a tierFor — the price tier for a SIZE —
+// and importing volume's under the same name is a redeclaration: the module throws at
+// IMPORT time, so Fastify never listens and every /api/* route 502s, not just this one.
+// Two different questions must not share a name in one module.
+import { tierFor as volumeTierFor, normalizeTiers, periodKey, previousPeriod, unitsForSeller } from './volume.js';
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
 const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -296,6 +301,45 @@ function extraFeeOf(row, fees) {
  * order quote uses. A second cost formula for "what shall I charge" would drift from the
  * one that actually bills, and the seller would price against a number we never charge.
  */
+/**
+ * THE SELLER'S VOLUME RATE FOR THIS ORDER — read once, then never re-derived.
+ *
+ * Two sources, and the order matters. A CHARGED order answers from `orders.volume_pct`,
+ * stamped by freezeQuote at the moment money moved; anything else is computed from the
+ * previous period's shipped units. That is the same rule freezeQuote already applies to
+ * unit_cost: once someone has been billed, the price is history, and an admin editing the
+ * ladder afterwards must not be able to rewrite what a seller was charged.
+ *
+ * EARNED LAST MONTH, SPENT THIS MONTH (volume.js). A live rolling count would move the
+ * price between adding an item and submitting the order.
+ *
+ * FAILS TO ZERO, ALWAYS. No ladder configured, no settings table, an unreadable row, a
+ * seller we can't resolve — every one of them returns 0%, which prices exactly as this
+ * module did before volume existed. The failure mode of a discount engine has to be
+ * "charge the list price", never "give it away".
+ */
+async function volumeRateFor(orderId) {
+  const none = { pct: 0, units: 0, index: 0, frozen: false };
+  try {
+    const r = await q('select seller_id::text as seller_id, volume_pct from orders where id=$1', [orderId]);
+    const row = r.rows[0];
+    if (!row) return none;
+    // Already charged: the stamped rate is the fact, whatever the ladder says today.
+    const frozen = num(row.volume_pct);
+    if (frozen != null) return { pct: Math.min(100, Math.max(0, frozen)), units: 0, index: 0, frozen: true };
+    if (!row.seller_id) return none;
+    const tiers = await q('select value from settings where key=$1', ['volume_tiers'])
+      .then((s) => normalizeTiers(s.rows[0]?.value || []))
+      .catch(() => []);
+    if (!tiers.length) return none;              // programme off — do not query orders at all
+    const units = await unitsForSeller(row.seller_id, previousPeriod(periodKey(new Date())));
+    const t = volumeTierFor(units, tiers);
+    return { pct: t.pct, units: t.units, index: t.index, frozen: false };
+  } catch {
+    return none;
+  }
+}
+
 export async function quoteSpec({ blank, sku, size, printType }) {
   const [fees, idx] = await Promise.all([feeSettings(), catalogIndex()]);
   const item = { blank: blank || '', sku: sku || '', size: size || '', print_type: printType || '' };
@@ -375,24 +419,49 @@ export async function quoteOrder(orderId) {
                  sides, sideFee: money(sideAddOn(sides, fees)),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
-  const totals = computeTotals(lines, fees);
+  const volume = await volumeRateFor(orderId);
+  const totals = computeTotals(lines, fees, volume.pct);
   // Null when NOTHING is known — "$0.00 of blanks" and "we don't know" are different
   // answers, and only one of them should be subtracted from anything.
   const known = lines.filter((l) => l.supplierCost != null);
   const supplierTotal = known.length ? money(known.reduce((s, l) => s + l.supplierCost * l.qty, 0)) : null;
-  return { lines, unpriced, fees, supplierTotal, supplierKnown: known.length, ...totals };
+  return {
+    lines, unpriced, fees, supplierTotal, supplierKnown: known.length,
+    // What EARNED the rate, so a seller reading a discount can see where it came from
+    // rather than finding an unexplained deduction. Absent on a frozen quote, because the
+    // stamped rate is all we know about a charge that already happened — reporting this
+    // month's units beside last month's charged rate would invite the two to be read as
+    // one statement.
+    volumeUnits: volume.frozen ? null : volume.units,
+    volumeTier: volume.frozen ? null : volume.index,
+    volumeFrozen: volume.frozen,
+    ...totals,
+  };
 }
 
 // The money formula, kept pure and exported so it can be tested without a database:
 //   subtotal = Σ((base for its size + print-method add-on) × qty)
 //   shipping = the DEAREST line's fee + that product's extra-item fee for every other UNIT
-//   total    = subtotal + shipping
+//   discount = subtotal × the seller's volume rate
+//   total    = subtotal + shipping − discount
 // Note "unit", not "line": 3× of one tee is 3 units in one parcel, so it pays one
 // shipping fee and two extra-item fees — not one extra fee for being a single line.
-export function computeTotals(lines, fees) {
+//
+// THE DISCOUNT COMES OFF THE GOODS, NOT THE POSTAGE. Volume says a seller earned a better
+// price on what we make; it says nothing about what a courier charges us to move it, and
+// discounting shipping would quietly sell parcels below cost on exactly the accounts
+// sending the most of them.
+//
+// It is also NEVER folded into unitCost. A per-line discount would be frozen onto the line
+// by freezeQuote and then discounted AGAIN by the next quote that read it back — the
+// compounding kind of bug that is invisible until someone reconciles a month. Lines carry
+// the list price, the rate is stored once on the order, and the discount is derived.
+export function computeTotals(lines, fees, volumePct = 0) {
   const subtotal = money(lines.reduce((s, l) => s + l.unitCost * l.qty, 0));
   const units = lines.reduce((s, l) => s + l.qty, 0);
-  if (!units) return { subtotal, shipping: 0, units: 0, total: subtotal };
+  const pct = Math.min(100, Math.max(0, Number(volumePct) || 0));
+  const volumeDiscount = money(subtotal * (pct / 100));
+  if (!units) return { subtotal, shipping: 0, units: 0, volumePct: pct, volumeDiscount: 0, total: subtotal };
   /**
    * THE DEAREST LINE SETS THE RATE, not the first one typed.
    *
@@ -413,7 +482,10 @@ export function computeTotals(lines, fees) {
   const first = lines.reduce((a, b) => (num(b.shipFee) > num(a.shipFee) ? b : a), lines[0]);
   const extra = first.extraFee != null ? first.extraFee : (fees.ship_extra || 0);
   const shipping = money(first.shipFee + extra * (units - 1));
-  return { subtotal, shipping, units, total: money(subtotal + shipping) };
+  // Floored at zero. A 100% ladder rung is a real thing an admin can save, and a negative
+  // total would be a CREDIT — moveFunds would pay the seller to place an order.
+  const total = Math.max(0, money(subtotal + shipping - volumeDiscount));
+  return { subtotal, shipping, units, volumePct: pct, volumeDiscount, total };
 }
 
 // Freeze the quoted prices onto the items, so the charge is reproducible and a later
@@ -422,4 +494,18 @@ export async function freezeQuote(orderId, quote) {
   for (const l of quote.lines) {
     await q('update order_items set unit_cost=$1, ship_fee=$2 where id=$3', [l.unitCost, l.shipFee, l.id]).catch(() => {});
   }
+  /**
+   * The RATE, stamped beside the line prices, for the same reason they are: it is an input
+   * to a charge that has now happened.
+   *
+   * Written even when it is 0, and that is the point — 0 is a real answer ("this seller
+   * earned no discount"), and leaving the column null would make a re-quote go and ask the
+   * ladder again. If someone adds a tier next week, that order would silently re-price
+   * itself downward on the next read, and a refund computed from it would return more than
+   * was ever taken.
+   *
+   * `where volume_pct is null` so a re-freeze cannot move a stamped rate.
+   */
+  await q('update orders set volume_pct=$1 where id=$2 and volume_pct is null',
+          [money(quote.volumePct || 0), orderId]).catch(() => {});
 }

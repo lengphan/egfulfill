@@ -865,6 +865,19 @@ export default function OrderDetailPage() {
                     </dt>
                     <dd className="tabular-nums">{usd(quote.shipping)}</dd>
                   </div>
+                  {/* SHOWN, not folded into the base cost. A discount a seller can't see is
+                      one they can't check, and the whole point of the programme is that they
+                      know they earned it. Sits directly under the two numbers it comes off —
+                      it applies to the goods, never to shipping or to design fees, and a row
+                      further down would imply it covered those too. */}
+                  {quote.volumeDiscount > 0 && (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">
+                        Volume discount<span className="opacity-70"> · {quote.volumePct}%</span>
+                      </dt>
+                      <dd className="tabular-nums text-success">−{usd(quote.volumeDiscount)}</dd>
+                    </div>
+                  )}
                   {designFees?.items?.map((f, i) => (
                     <div key={i} className="flex justify-between">
                       {/**
