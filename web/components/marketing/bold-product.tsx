@@ -4,7 +4,7 @@ import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { TShirt, ArrowLeft, Check } from "@phosphor-icons/react"
-import { ACCENT, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
 import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
@@ -269,7 +269,7 @@ export function BoldProduct({ product, shipping }: {
              guidelines that used to sit beside it are now their own full-width band below.
              A two-column grid holding a single item is just a half-width page, which is
              what made this section look broken rather than short. */
-          <div className="mt-16 max-w-3xl">
+          <div className="mt-16 max-w-3xl space-y-12">
             <Rise preset="cut">
                 <h2 className="font-display text-2xl font-black tracking-tight">Size chart</h2>
                 {/* One line, not a paragraph. Only some manufacturers publish a measurement
@@ -344,41 +344,60 @@ export function BoldProduct({ product, shipping }: {
         )}
 
         {/**
-          * FULL WIDTH, and laid out ACROSS it rather than stretched.
+          * THE ONE COLOURED MOMENT ON THE PAGE.
           *
-          * This sat in the two-column grid beside the size chart, so four short facts were
-          * squeezed into half a page while the other half stood empty — and simply widening
-          * the old label/body list would have run each answer to a 100-character line, which
-          * is worse than cramped.
+          * This was a grey spec list on cream, and every attempt to lay it out better was
+          * still a grey spec list on cream. It is the last thing before someone decides to
+          * send us a file, so it earns the plate: "the banner is the colour; the page is
+          * paper" (CLAUDE.md §4), and this is the page's banner.
           *
-          * So the rows become CARDS across the page: each keeps a readable measure, the
-          * whole band uses the width, and the four things you have to know are visible at
-          * once instead of as a list you scan down.
+          * FULL BLEED, with the content still on the page's own 6xl measure — the colour runs
+          * edge to edge, the words line up with everything above them. w-screen + the
+          * 50vw/50% translate is the standard way out of a centred container without knowing
+          * its width.
+          *
+          * CONTRAST IS MEASURED, NOT EYEBALLED. On this accent (#6633FF):
+          *   cream #FAF8F3            5.68:1  — body, comfortably over 4.5
+          *   cream at 80%             4.02:1  — used for the answers, over 3.0 at this size
+          *   ink #0B0B0C              3.26:1  — NOT used; it fails as body on this plate
+          * So the plate carries cream, which is what ACCENT_INK already is.
+          *
+          * NUMBERED, and flowing in columns rather than a fixed grid: five guidelines in four
+          * tracks left one orphan above three empty cells, which is what made the last
+          * attempt worse than the thing it replaced.
           */}
         {product.methods.length > 0 && (
-          <Rise preset="cut" index={2}>
-            <div className="mt-16 border-t border-black/[0.09] pt-10">
-              <h2 className="font-display text-2xl font-black tracking-tight">Artwork guidelines</h2>
-              <p className="mt-1.5 text-sm text-black/50">
-                What to send us for {product.methods.join(" / ")}.
-              </p>
-              <dl className="mt-7 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-                {FILE_GUIDES.filter((g) => g.methods.length === 0 || product.methods.some((m) => g.methods.some((k) => m.toUpperCase().includes(k)))).map((g) => (
-                  <div key={g.label}>
-                    {/* The label sits ON the rule, the way a spec sheet heads a column —
-                        the old 9rem label gutter was most of the width on a narrow column
-                        and none of it here. */}
-                    <dt className="border-t-2 border-[#0B0B0C] pt-2.5 text-sm font-black tracking-tight">{g.label}</dt>
-                    <dd className="mt-2 text-sm leading-relaxed text-black/65">{g.body}</dd>
-                  </div>
-                ))}
-              </dl>
-              <p className="mt-8 max-w-2xl text-sm leading-relaxed text-black/50">
-                Not sure? Send what you have — we check every file before it goes on a machine,
-                and we&apos;ll tell you if something won&apos;t hold up.
-              </p>
+          <div className="relative left-1/2 mt-20 w-screen -translate-x-1/2" style={{ background: ACCENT }}>
+            <div className="mx-auto max-w-6xl px-6 py-16">
+              <Rise preset="cut">
+                <div className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: ACCENT_INK, opacity: 0.7 }}>
+                  What to send us · {product.methods.join(" / ")}
+                </div>
+                <h2 className="mt-2 font-display text-4xl font-black tracking-tight sm:text-5xl" style={{ color: ACCENT_INK }}>
+                  Artwork guidelines
+                </h2>
+                <dl className="mt-10 gap-x-12 sm:columns-2 lg:columns-3">
+                  {FILE_GUIDES.filter((g) => g.methods.length === 0 || product.methods.some((m) => g.methods.some((k) => m.toUpperCase().includes(k)))).map((g, i) => (
+                    <div key={g.label} className="mb-8 break-inside-avoid">
+                      <dt className="flex items-baseline gap-2.5">
+                        <span className="font-mono text-xs font-bold tabular-nums" style={{ color: ACCENT_INK, opacity: 0.55 }}>
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <span className="text-base font-black tracking-tight" style={{ color: ACCENT_INK }}>{g.label}</span>
+                      </dt>
+                      <dd className="mt-1.5 pl-[2.4rem] text-sm leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.8 }}>
+                        {g.body}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-4 max-w-2xl text-sm leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.8 }}>
+                  Not sure? Send what you have — we check every file before it goes on a machine,
+                  and we&apos;ll tell you if something won&apos;t hold up.
+                </p>
+              </Rise>
             </div>
-          </Rise>
+          </div>
         )}
 
       </div>
