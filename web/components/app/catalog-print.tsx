@@ -419,8 +419,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               "colour pop" is that it opened straight onto a white spec sheet. A cover is
               also what makes the PDF read as a document rather than as a print-out. */}
           <section
-            className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between p-[18mm] shadow-sm print:mb-0 print:shadow-none"
-            style={{ minHeight: "210mm", background: brand.accent, color: HOUSE.paper }}
+            className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between overflow-hidden p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+            style={{ height: "210mm", background: brand.accent, color: HOUSE.paper }}
           >
             <div className="flex items-start justify-between">
               <span className="font-title text-2xl font-bold tracking-tight">{brand.title}</span>
@@ -475,8 +475,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             // which is the one thing that makes a printed catalogue look homemade.
             <section
               key={st.ref}
-              className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col bg-white p-[14mm] shadow-sm print:mb-0 print:shadow-none"
-              style={{ minHeight: "210mm" }}
+              className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[14mm] shadow-sm print:mb-0 print:shadow-none"
+              style={{ height: "210mm" }}
             >
               {/* PRICE FIRST, top right, in the display face. It was tucked at the foot of
                   the left column where a buyer had to hunt for it — on a page whose job is
@@ -626,8 +626,12 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       ? (
                         // Same split as every other surface — a printed lookbook page is the
                         // one place a wall of run-together specs is hardest to skim.
+                        /* CAPPED. A supplier description runs to a dozen bullets — the sheet is
+                           fixed at one page now, so an uncapped list does not make the page
+                           longer, it makes the bottom of it disappear silently. Eight lines is
+                           what the column holds beside a square hero and the size charts. */
                         <ul className={(hero ? "mt-4 " : "") + "space-y-0.5 text-[11px] leading-relaxed text-neutral-600"}>
-                          {descriptionLines(st.description).map((line, i) => (
+                          {descriptionLines(st.description).slice(0, 8).map((line, i) => (
                             <li key={i} className="flex items-start gap-1.5">
                               <span className="mt-[0.6em] size-[3px] shrink-0 rounded-full bg-neutral-400" />
                               <span>{line}</span>
@@ -811,16 +815,18 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
 
               Paginated in code rather than left to the browser. These sheets are fixed A4
               with a footer pinned to the bottom, so a table that flows past the page edge
-              simply gets cut — 22 rows a page is what fits with the header and the note. */}
+              simply gets cut — 13 rows a page is what fits on a LANDSCAPE sheet with the
+              header and the note. It was 22, which was right when the page was 297mm tall
+              and cut nine rows off every sheet the moment it turned on its side. */}
           {(() => {
-            const ROWS_PER_PAGE = 22
+            const ROWS_PER_PAGE = 13
             const pages: LookbookStyle[][] = []
             for (let i = 0; i < rows.length; i += ROWS_PER_PAGE) pages.push(rows.slice(i, i + ROWS_PER_PAGE))
             return pages.map((page, pi) => (
               <section
                 key={`prices-${pi}`}
-                className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col bg-white p-[18mm] shadow-sm print:mb-0 print:shadow-none"
-                style={{ minHeight: "210mm" }}
+                className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+                style={{ height: "210mm" }}
               >
                 <div className="mb-5 h-1.5 w-full rounded-full" style={{ background: brand.accent }} />
                 <div className="mb-6 border-b border-neutral-200 pb-4">
@@ -910,8 +916,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               next step. This one says how to order and who to ask — and closes on the same
               plate it opened with, so the document is bookended rather than just ending. */}
           <section
-            className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between p-[18mm] shadow-sm print:mb-0 print:shadow-none"
-            style={{ minHeight: "210mm", background: brand.accent, color: HOUSE.paper }}
+            className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between overflow-hidden p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+            style={{ height: "210mm", background: brand.accent, color: HOUSE.paper }}
           >
             <span className="font-title text-2xl font-bold tracking-tight">{brand.title}</span>
 
