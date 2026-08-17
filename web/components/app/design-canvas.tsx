@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning } from "@phosphor-icons/react"
+import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -75,7 +75,7 @@ function ThreadSelect({ value, options, onChange }: {
 // Reusable place/size/rotate surface — used by the order customizer, the studio, and the
 // full maker. Renders a mockup + a draggable image layer + optional draggable text layers.
 export function DesignStage({
-  mockup, designUrl, pos, setPos, onRemove, className,
+  mockup, designUrl, pos, setPos, onRemove, onCopy, copyLabel, className,
   texts, updateText, selected, onSelect, picking, onPickColor,
   printZone, printLabel, emptyHint,
 }: {
@@ -84,6 +84,11 @@ export function DesignStage({
   pos: Pos
   setPos: (fn: (p: Pos) => Pos) => void
   onRemove?: () => void
+  /** Offered in the action strip when a caller has somewhere to copy TO — the design maker
+   *  and the studio have no second face, so they simply don't pass it and the button is not
+   *  drawn. A control that does nothing is worse than one that isn't there. */
+  onCopy?: () => void
+  copyLabel?: string
   className?: string
   texts?: TextLayer[]
   updateText?: (id: string, patch: Partial<TextLayer>) => void
@@ -119,6 +124,15 @@ export function DesignStage({
   // No reset effect: swapping the artwork triggers a fresh load, and onLoad/onError below
   // set this either way. An effect here would also trip react-hooks/set-state-in-effect.
   const [imgBroken, setImgBroken] = useState(false)
+  /**
+   * PLACEMENT FROZEN, on purpose.
+   *
+   * The whole image is the move target, so a finished placement is one stray drag away from
+   * being wrong — and the only defence until now was not touching it. Local to the stage: it
+   * protects the CURRENT session's fiddling, and nothing about a lock belongs in the saved
+   * design (reopening a job and finding it immovable would be its own puzzle).
+   */
+  const [lockedIds, setLockedIds] = useState<Record<string, boolean>>({})
   const aspect = ar && ar.url === designUrl ? ar.a : 1
   const setAspect = (a: number) => setAr({ url: designUrl || "", a })
   // The widest this artwork may be drawn before its own height would run off the bed. A
@@ -345,11 +359,69 @@ export function DesignStage({
    * grip is easy to grab on a trackpad and possible to grab on a phone without the marks
    * crowding a small design.
    */
-  const handles = (target: string) => (
+  /**
+   * ONE STRIP OF ACTIONS, above the selection.
+   *
+   * Rotate was a lone button on the top edge and Remove was a black ✕ floating off the
+   * top-right corner — two controls, two places, two visual languages, and between them they
+   * covered the artwork you were trying to look at. Everything you do TO the layer now sits
+   * in one bar in one place: copy, rotate, lock, remove.
+   *
+   * LOCK is the one that is new, and it is the reason the others are worth grouping. Placed
+   * artwork is easy to nudge by accident — the whole image is the move target — and until now
+   * the only way to protect a finished placement was not to touch it.
+   *
+   * Rotate stays a POINTER-DRAG rather than a click: it is a continuous gesture, and a button
+   * that rotates by a fixed step is a different, worse control.
+   */
+  const stripBtn = "flex size-7 items-center justify-center rounded-md text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+  const handles = (target: string) => {
+    // Per LAYER. The design maker puts text on this same stage, and a single flag would
+    // freeze the lettering because somebody pinned the picture.
+    const locked = !!lockedIds[target]
+    const setLocked = (fn: (v: boolean) => boolean) =>
+      setLockedIds((m) => ({ ...m, [target]: fn(!!m[target]) }))
+    return (
     <>
       <div className="pointer-events-none absolute inset-0 rounded-sm outline outline-2 -outline-offset-1 outline-primary/70" />
-      <button onPointerDown={startDrag(target, "rotate")} className="absolute -top-8 left-1/2 flex size-6 -translate-x-1/2 cursor-grab items-center justify-center rounded-full bg-primary text-primary-foreground shadow touch-none" aria-label="Rotate"><ArrowClockwise size={13} weight="bold" /></button>
-      {GRIPS.map((g) => (
+      <div
+        className="absolute -top-11 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-border bg-card p-1 shadow-md"
+        // The strip is chrome, not canvas: a drag that starts here must never also start a
+        // move on the layer underneath it.
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {onCopy && (
+          <button type="button" onClick={onCopy} title={copyLabel ?? "Copy to the other sides"} aria-label={copyLabel ?? "Copy to the other sides"} className={stripBtn}>
+            <Copy size={14} weight="bold" />
+          </button>
+        )}
+        <button
+          onPointerDown={locked ? undefined : startDrag(target, "rotate")}
+          disabled={locked}
+          title={locked ? "Locked" : "Drag to rotate"} aria-label="Rotate"
+          className={stripBtn + " touch-none " + (locked ? "" : "cursor-grab")}
+        >
+          <ArrowClockwise size={14} weight="bold" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setLocked((v) => !v)}
+          title={locked ? "Unlock — let it be moved again" : "Lock in place"}
+          aria-label={locked ? "Unlock" : "Lock in place"}
+          aria-pressed={locked}
+          className={stripBtn + (locked ? " bg-primary/10 text-primary" : "")}
+        >
+          {locked ? <Lock size={14} weight="fill" /> : <LockOpen size={14} weight="bold" />}
+        </button>
+        {onRemove && (
+          <button type="button" onClick={onRemove} title="Remove this artwork" aria-label="Remove this artwork" className={stripBtn + " hover:bg-destructive hover:text-destructive-foreground"}>
+            <Trash size={14} weight="bold" />
+          </button>
+        )}
+      </div>
+      {/* Locked: the grips go entirely. Greying eight marks that still look grabbable is a
+          worse answer than not offering them — the strip says why, and one click undoes it. */}
+      {!locked && GRIPS.map((g) => (
         <button
           key={g.k}
           onPointerDown={startDrag(target, "resize", g)}
@@ -369,7 +441,8 @@ export function DesignStage({
         </button>
       ))}
     </>
-  )
+    )
+  }
 
   return (
     // The stage is TRANSPARENT. The grid used to be painted here, so it stopped where the
@@ -415,12 +488,12 @@ export function DesignStage({
       )}
       {designUrl && (
         <div
-          onPointerDown={picking ? undefined : startDrag("image", "move")}
+          onPointerDown={picking || lockedIds.image ? undefined : startDrag("image", "move")}
           onClick={picking ? (e) => sampleAt(e, e.currentTarget) : undefined}
           onMouseMove={picking ? (e) => moveLoupe(e, e.currentTarget) : undefined}
           onMouseLeave={picking ? () => setLoupe(null) : undefined}
           style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${drawW}%`, transform: `translate(-50%,-50%) rotate(${pos.r}deg)` }}
-          className={"absolute touch-none " + (picking ? "cursor-crosshair" : "cursor-move")}
+          className={"absolute touch-none " + (picking ? "cursor-crosshair" : lockedIds.image ? "cursor-default" : "cursor-move")}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -449,12 +522,9 @@ export function DesignStage({
             }}
           />
           {!picking && (selected == null || selected === "image") && handles("image")}
-          {onRemove && (selected == null || selected === "image") && (
-            /* Pushed diagonally clear of the north-east grip, which now sits ON the corner.
-               At -2.5 the two overlapped, so the control that DELETES the artwork was under
-               the one you reach for to make it bigger. */
-            <button onPointerDown={(e) => e.stopPropagation()} onClick={onRemove} className="absolute -right-9 -top-9 flex size-6 items-center justify-center rounded-full bg-foreground text-background shadow" aria-label="Remove artwork"><X size={12} weight="bold" /></button>
-          )}
+          {/* The floating ✕ is gone. Remove is in the action strip with everything else that
+              acts on the layer — a black circle hanging off the corner was a second visual
+              language for the same kind of verb, and it sat where the north-east grip is. */}
         </div>
       )}
 
@@ -482,9 +552,9 @@ export function DesignStage({
       {(texts ?? []).map((t) => (
         <div
           key={t.id}
-          onPointerDown={startDrag(t.id, "move")}
+          onPointerDown={lockedIds[t.id] ? undefined : startDrag(t.id, "move")}
           style={{ left: `${t.x}%`, top: `${t.y}%`, transform: `translate(-50%,-50%) rotate(${t.r}deg)`, color: t.color, fontSize: `${t.size}cqw`, fontWeight: t.bold ? 800 : 600, whiteSpace: "nowrap", lineHeight: 1.1 }}
-          className="absolute cursor-move touch-none"
+          className={"absolute touch-none " + (lockedIds[t.id] ? "cursor-default" : "cursor-move")}
         >
           {t.text || "Text"}
           {selected === t.id && handles(t.id)}
@@ -1317,6 +1387,32 @@ export function DesignCanvasDialog({
     } finally { setRemoving(false) }
   }
 
+  /**
+   * COPY THIS FACE ONTO THE OTHERS.
+   *
+   * Front and back carrying the same design is the ordinary case, and doing it by hand meant
+   * uploading the same file once per face and placing it again each time. Copies the artwork
+   * AND its position, because "the same design" means in the same spot — a copy that lands
+   * centred when the original sits high on the chest is not the thing that was asked for.
+   *
+   * Staged, not saved: it fills the other faces in this window and Save writes them, so it is
+   * undoable by closing without saving, like every other edit here.
+   */
+  const copyToOtherFaces = () => {
+    if (!designUrl || faces.length < 2) return
+    stashCurrentFace()
+    setFaceArt((prev) => {
+      const next = { ...(prev ?? {}) }
+      for (const f of faces) {
+        const k = (f.side || "front").toLowerCase()
+        if (k === sideName) continue
+        next[k] = { data: designUrl, pos: { ...pos }, name: designName }
+      }
+      return next
+    })
+    setAttached(`Copied to the other ${faces.length - 1 === 1 ? "side" : `${faces.length - 1} sides`} — press Save to keep it.`)
+  }
+
   /** `close` is false when saving as a STEP in something else (sending to a designer),
    *  where closing the window mid-flow would look like the action had finished.
    *  Returns whether it persisted, so a caller can stop rather than carry on regardless. */
@@ -1470,7 +1566,11 @@ export function DesignCanvasDialog({
         {/* Both terms are viewport units on purpose. `min(100%,78vh)` collapsed the column to
             zero: the column is `auto`, so its width comes from its content, and the content
             asked for a percentage OF that column — a circular reference resolving to nothing. */}
-        <div className="lg:sticky lg:top-0 lg:w-[min(70vh,50vw)] lg:self-start">
+        {/* top-2, not top-0. Sticking at 0 pinned the column against the scroll container's
+            very edge, and the dialog's rounded corner and padding cut the top off the side
+            pills — the row that was clipped in half. Two units of clearance is enough to
+            keep them whole and still holds the garment in view while the rail scrolls. */}
+        <div className="lg:sticky lg:top-2 lg:w-[min(70vh,50vw)] lg:self-start">
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {/**
           * A SIDE LIST, not just a mockup switcher.
@@ -1548,7 +1648,11 @@ export function DesignCanvasDialog({
             className="w-full" mockup={activeMockup}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
             pos={pos} setPos={setPos}
-            onRemove={() => void removeArtwork()} picking={picking} onPickColor={onPickColor}
+            onRemove={() => void removeArtwork()}
+            // Only when there IS another face to copy to — a one-sided blank gets no button.
+            onCopy={faces.length > 1 && designUrl ? copyToOtherFaces : undefined}
+            copyLabel={`Copy to the other ${faces.length - 1 === 1 ? "side" : "sides"}`}
+            picking={picking} onPickColor={onPickColor}
             // Suppress the stage's OWN "Pick a blank to start designing" placeholder: the
             // overlay below is already the empty state, and rendering both stacked two
             // different sentences on top of each other in the same 40px. An empty fragment
