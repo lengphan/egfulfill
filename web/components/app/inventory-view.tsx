@@ -552,7 +552,18 @@ function ProductGroup({
         />
       </td>
       <td className="px-2 py-2 text-center"><Input value={String(num(it.in_stock))} onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
-      <td className="px-2 py-2 text-center"><Input value={String(num(it.reserved))} onChange={(e) => edit(it.sku, "reserved", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
+      {/* RESERVED IS NOT TYPED ANY MORE — the system holds it. Accepting an order into
+          production reserves its blanks and shipping or cancelling releases them, tracked
+          per order, so a number typed here would be silently corrected the next time either
+          happens. Shown, because it is the difference between In stock and Available. */}
+      <td className="px-2 py-2 text-center">
+        <span
+          className={"inline-block w-16 text-center tabular-nums " + (num(it.reserved) > 0 ? "font-medium" : "text-muted-foreground")}
+          title={num(it.reserved) > 0 ? `${num(it.reserved)} held for orders in production` : "Nothing held for production"}
+        >
+          {num(it.reserved)}
+        </span>
+      </td>
       <td className="px-4 py-2 text-center font-semibold tabular-nums">{avail(it)}</td>
       <td className="px-2 py-2 text-center"><Input value={String(it.reorder_at ?? 25)} onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
       <td className="px-4 py-2">

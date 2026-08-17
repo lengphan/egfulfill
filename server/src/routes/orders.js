@@ -18,6 +18,7 @@ import { readAll } from './factory_settings.js';
 import { orderCharges, refundOrder } from './order_refunds.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
 import { autoReplenish } from '../replenish.js';
+import { reserveForOrder, releaseForOrder } from '../reserve.js';
 import { storageEnabled, putObject, getObject, fromDataUrl, presignGet, publicUrl, designUrlTtlDays } from '../storage.js';
 import { emitWebhook } from '../webhooks.js';
 
@@ -1569,6 +1570,11 @@ export function ordersRoutes(app, requireAuth) {
         });
       })().catch(() => {});
     }
+    // Accepting the WHOLE order into production holds its blanks too — the same act as the
+    // per-line route above, reached from the order screen instead of the board.
+    if (normalizeStage(String(body.factoryStatus ?? body.status ?? '')) === 'working') {
+      await reserveForOrder(req.params.id).catch(() => {});
+    }
     egBroadcast({ type: 'orders' });
     if (_charged || _refunded) egBroadcast({ type: 'wallet' });
     // Tracking arriving IS the shipment as far as a partner is concerned — a label
@@ -1589,6 +1595,17 @@ export function ordersRoutes(app, requireAuth) {
             at: new Date().toISOString(),
           } })]
         ).catch(() => {});
+      }
+      /**
+       * THE HOLD FOLLOWS THE ORDER OUT OF PRODUCTION.
+       *
+       * Whole-order shipped, cancelled or refunded all end the claim these blanks had on
+       * the shelf. Shipped is the one that matters most: the scan that took the units off
+       * is what lowers in_stock, so a reservation surviving it subtracts the same garment
+       * twice and hides real stock. Cancelled and refunded never consumed anything at all.
+       */
+      if (stage === 'shipped' || stage === 'cancelled' || stage === 'refunded') {
+        await releaseForOrder(req.params.id).catch(() => {});
       }
       if (body.tracking !== undefined || stage === 'shipped') {
         notifyOrderEvent(req.params.id, 'order.shipped');
@@ -1754,12 +1771,29 @@ export function ordersRoutes(app, requireAuth) {
     // human sends it (Send to designer / Send to Pink), so a status change — or a label —
     // never floods the board. `design` stays null to keep the response shape stable for
     // existing callers. (autoPushDesigns is now dormant.)
-    let design = null, replenish = null;
+    //
+    // AND IT HOLDS THE BLANKS. Accepting the work is the moment the units stop being
+    // available to anything else, which is what `reserved` was always for and what nothing
+    // ever wrote — so Available read exactly as In stock and two orders for the last six
+    // shirts both looked makeable. Idempotent per order, so bouncing working → hold →
+    // working settles rather than stacks. Only `reserved` moves; a scan is still the only
+    // thing that takes a garment off the shelf.
+    let design = null, replenish = null, reserved = null;
     if (normalizeStage(status) === 'working') {
+      reserved = await reserveForOrder(req.params.id).catch(() => null);
       replenish = await autoReplenish(req.params.id).catch(() => null);
     }
+    // Shipped gives the hold back, and only once EVERY line is out: a hold that survives
+    // the scan which lowered in_stock subtracts the same garment twice.
+    if (normalizeStage(status) === 'shipped') {
+      const left = await q(
+        `select 1 from order_items where order_id=$1 and coalesce(factory_status,'') <> 'shipped' limit 1`,
+        [req.params.id]
+      ).catch(() => ({ rowCount: 1 }));
+      if (!left.rowCount) await releaseForOrder(req.params.id).catch(() => {});
+    }
     egBroadcast({ type: 'item-status' });   // no id/sku — see the note above
-    return { ok: true, design, replenish };
+    return { ok: true, design, replenish, reserved };
   });
 
   // ── Variant setup — the blank/colour/size/method for a line item ────────────

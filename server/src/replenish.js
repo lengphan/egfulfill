@@ -36,7 +36,9 @@ export const stripMethod = (s) => String(s || '').trim().replace(METHOD_SUFFIX, 
  * match, so every line where somebody had chosen a blank was skipped as "not an inventory
  * item" and nothing was ever replenished for it.
  */
-const blankOf = (idx, r) => stripMethod(resolveStockSku(idx, r) || r.blank || r.sku).toUpperCase();
+/** Exported so reserve.js holds units against the SAME sku replenishment counts them
+ *  under. Two resolvers here would reserve one key and buy another. */
+export const blankOf = (idx, r) => stripMethod(resolveStockSku(idx, r) || r.blank || r.sku).toUpperCase();
 
 /**
  * Park this order's short blanks in the shared saved-for-later list.
@@ -48,6 +50,19 @@ export async function autoReplenish(orderId) {
     `select sku, blank, qty, color, size from order_items where order_id=$1`, [orderId]
   ).catch(() => ({ rows: [] }))).rows;
   if (!lines.length) return null;
+
+  /**
+   * THE NUMBER A HUMAN CALLS THIS ORDER, carried onto every parked line.
+   *
+   * `o.id` and `o.num` are not the same string for a marketplace order — the id is
+   * "etsy-3311908445" and the number is "#4099", and the number is what is on the packing
+   * slip, the buyer's email and the shop's own dashboard. A parked shortage tagged only
+   * with the id asks a buyer to go and translate it before they can tell what they are
+   * buying for. Falls back to the id, which is what it used to show.
+   */
+  const orderNum = String(
+    (await q('select num from orders where id=$1', [orderId]).catch(() => ({ rows: [] }))).rows[0]?.num || orderId
+  );
 
   // One catalog read for the whole call — matchProduct walks it per line.
   const idx = await catalogIndex();
@@ -190,7 +205,7 @@ export async function autoReplenish(orderId) {
   for (const [supplier, items] of bySupplier) {
     for (const it of items) {
       const hit = list.find((x) => lineKey(x) === lineKey(it));
-      const src = { order: String(orderId), qty: it.qty };
+      const src = { order: String(orderId), num: orderNum, qty: it.qty };
       if (hit) {
         // Same blank needed by another order: raise the quantity and record who for,
         // rather than a second row saying the same thing with no context.

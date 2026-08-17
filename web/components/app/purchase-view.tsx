@@ -106,12 +106,20 @@ function SourceTags({ line }: { line: POLine }) {
   if (!src.length) return null
   return (
     <span className="mt-0.5 flex flex-wrap items-center gap-1">
-      {src.slice(0, 4).map((s, i) => (
-        <span key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground"
-              title={`${s.qty} of these are for order ${s.order}`}>
-          #{s.order} ×{s.qty}
-        </span>
-      ))}
+      {src.slice(0, 4).map((s, i) => {
+        // THE NUMBER, not the internal id. A marketplace order's id is "etsy-3311908445"
+        // and its number is "#4099" — the number is what is on the packing slip, the
+        // buyer's email and the shop's dashboard, so a chip showing the id asks a buyer to
+        // go and translate it before they know what they are buying for. Older parked
+        // lines have no `num`, and fall back to what they always showed.
+        const label = s.num || `#${s.order}`
+        return (
+          <span key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground"
+                title={`${s.qty} of these are for order ${label}${s.num ? ` (${s.order})` : ""}`}>
+            {label} ×{s.qty}
+          </span>
+        )
+      })}
       {src.length > 4 && <span className="text-3xs text-muted-foreground">+{src.length - 4} more</span>}
     </span>
   )

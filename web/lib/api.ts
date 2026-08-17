@@ -1579,7 +1579,11 @@ export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightO
  *  the invoice arrives. */
 export type POLine = {
   sku: string; name?: string; variant?: string; qty: number; price?: number
-  auto?: boolean; sources?: { order: string; qty: number }[]
+  auto?: boolean
+  /** Which orders drove this line. `order` is the internal id (`etsy-3311908445`); `num` is
+   *  what a human calls it (`#4099`) and is what the cart shows — they are not the same
+   *  string for a marketplace order. `num` is absent on lines parked before it was carried. */
+  sources?: { order: string; num?: string; qty: number }[]
   /** Product thumbnail, captured when the line was picked. Supplier names differ by a
    *  single word, so the picture is what confirms the right sku was chosen. Lines without
    *  one (auto-replenished from inventory) resolve it by sku at render time. */
