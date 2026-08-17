@@ -44,6 +44,9 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: { default: "EGFUL", template: "%s · EGFUL" },
+  // Search Console URL-prefix property for app.egful.store. The DNS method can't be used:
+  // app.egful.store is a CNAME to Vercel, so a TXT record at that name is never resolvable.
+  verification: { google: "iEGQO5RIl12PF_7Mjt00ZtOhbanPeohsHG6Pnd6uCLE" },
   // Lets iOS run the installed app full-screen (Android reads the manifest).
   appleWebApp: { capable: true, title: "EGFUL Staff", statusBarStyle: "black-translucent" },
 }
