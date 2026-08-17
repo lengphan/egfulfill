@@ -860,7 +860,7 @@ export default function ChatPage() {
                           // The server animates by bare asset NAME, so only an image we
                           // stored for this chat can be one — anything else has no name to give.
                           const assetName = isImg ? att.url.split("/api/support/asset/")[1] : undefined
-                          const canAnimate = !!assetName && isStaffUser && activeId === supportId
+                          const canAnimate = !!assetName && isAdmin && activeId === supportId
                           // w-fit, not a bare block: the overlay anchors to this link, and a
                           // full-width block put "Animate" at the BUBBLE's right edge,
                           // floating in space beside the picture instead of on it.
@@ -1086,7 +1086,7 @@ export default function ChatPage() {
               {/* Generate — STAFF ONLY, and only in the staffer's own "My EG" channel. Each
                   generation bills Google, so it is not offered on a seller thread, a factory
                   room or an inbox conversation; the server enforces the same two rules. */}
-              {isStaffUser && activeId === supportId && (
+              {isAdmin && activeId === supportId && (
                 <GenerateButton disabled={signedOut || !activeId} armed={gen} onArm={setGen} />
               )}
               <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />

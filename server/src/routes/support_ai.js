@@ -791,7 +791,23 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     return { ok: true, reply: text };
   });
 
-  // ── Image generation, STAFF ONLY, in the staffer's own "My EG" assistant channel ──
+  /*
+   * GENERATION IS ADMIN-ONLY — image and video alike.
+   *
+   * Not a permissions nicety: every press spends real money at Google (~13c an image, 40c
+   * to $4.80 a clip), and requireStaff means operator, warehouse and designer too. A tool
+   * that bills on click does not belong on the floor, where it would be indistinguishable
+   * from any other button.
+   *
+   * Enforced on the SERVER, not by hiding the control — the client hides it as well, but
+   * that is convenience, and this is the boundary.
+   */
+  const adminOnly = (req, reply) => {
+    if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Generating images and video is admin-only.' }; }
+    return null;
+  };
+
+  // ── Image generation, ADMIN ONLY, in the staffer's own "My EG" assistant channel ──
   //
   // Factory-only on purpose. Every render is real money at Google (~7–13c), so this is not
   // a seller-facing feature that could be looped by anyone with an account — it is a tool on
@@ -801,7 +817,8 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   // parameter here that could aim a billable call at somebody else's channel.
 
   // What the composer needs to draw its picker — and whether the feature is on at all.
-  app.get('/api/desk/image/config', { preHandler: requireStaff }, async () => {
+  app.get('/api/desk/image/config', { preHandler: requireStaff }, async (req, reply) => {
+    const denied = adminOnly(req, reply); if (denied) return denied;
     const cfg = await imageConfig();
     return {
       enabled: !!cfg.key && storageEnabled(),
@@ -816,6 +833,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   });
 
   app.post('/api/desk/image', { preHandler: requireStaff }, async (req, reply) => {
+    const denied = adminOnly(req, reply); if (denied) return denied;
     if (!storageEnabled()) { reply.code(503); return { error: 'File storage is not configured, so a generated image could not be kept.' }; }
     const b = req.body || {};
     const prompt = String(b.prompt || '').trim();
@@ -889,7 +907,8 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   // video does. So POST only STARTS a job; a bounded sweeper below posts the finished clip
   // into the thread, which the chat page is already polling. Same arrival as an AI reply.
 
-  app.get('/api/desk/video/config', { preHandler: requireStaff }, async () => {
+  app.get('/api/desk/video/config', { preHandler: requireStaff }, async (req, reply) => {
+    const denied = adminOnly(req, reply); if (denied) return denied;
     const cfg = await videoConfig();
     return {
       enabled: !!cfg.key && storageEnabled(),
@@ -904,6 +923,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   });
 
   app.post('/api/desk/video', { preHandler: requireStaff }, async (req, reply) => {
+    const denied = adminOnly(req, reply); if (denied) return denied;
     if (!storageEnabled()) { reply.code(503); return { error: 'File storage is not configured, so a generated video could not be kept.' }; }
     const b = req.body || {};
     const prompt = String(b.prompt || '').trim();
@@ -953,6 +973,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   // Has my clip landed yet? The thread itself carries the result; this is only so the
   // composer can keep a spinner honest instead of guessing how long to show one.
   app.get('/api/desk/video/:id', { preHandler: requireStaff }, async (req, reply) => {
+    const denied = adminOnly(req, reply); if (denied) return denied;
     await ensureVideoJobs();
     const r = await q(
       `select id, status, error, seconds, model, resolution, created_at from video_jobs where id=$1 and user_id=$2`,
