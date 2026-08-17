@@ -99,6 +99,43 @@ export function publicSupportRoutes(app) {
    * Answering before that point is what would make this free to abuse.
    */
   /**
+   * THE WHOLE CONVERSATION — both sides, in the order it happened.
+   *
+   * `public_support.messages` holds only the visitor's side (and, historically, the bot's).
+   * A person's replies live in order_messages under support-web-<id>. So a route that
+   * returned the stored column alone was returning HALF the thread — which is what made
+   * support's messages vanish the instant a visitor typed: the POST answered with the
+   * public column, the widget replaced its state with it, and the replies only came back on
+   * the next poll eight seconds later.
+   *
+   * Both endpoints answer with this now, so the shape a send returns is the shape a read
+   * returns and neither can be a subset of the other.
+   *
+   * Merged on the timestamp each row already carries, with original position as the
+   * tiebreak: rows written before `at` existed have no time, and keeping their relative
+   * order beats scattering them through the thread on a parsed zero. Staff rows are the
+   * ones WITH an author — the escalation copies the visitor's own history in with
+   * sender_id null, so this cannot echo their words back at them as replies.
+   */
+  async function fullThread(id, own) {
+    const staff = await q(
+      `select body, created_at from order_messages
+        where order_id = $1 and sender_id is not null
+        order by created_at asc limit 200`, [`support-web-${id}`]
+    ).then((r) => r.rows).catch(() => []);
+    const stamped = [
+      ...(Array.isArray(own) ? own : []).map((m, i) => ({ m, i, t: Date.parse(m.at || '') || 0 })),
+      ...staff.map((m, i) => ({
+        m: { role: 'staff', text: String(m.body || ''), at: m.created_at },
+        i: 100000 + i,
+        t: Date.parse(m.created_at) || 0,
+      })),
+    ];
+    stamped.sort((a, b) => (a.t - b.t) || (a.i - b.i));
+    return stamped.map((x) => x.m);
+  }
+
+  /**
    * PUT THE CONVERSATION IN FRONT OF A PERSON, and mark it as theirs.
    *
    * Extracted so the LENGTH CAP can use it too. That cap used to refuse the message —
@@ -203,7 +240,7 @@ export function publicSupportRoutes(app) {
         [`support-web-${id}`, text,
          JSON.stringify({ web: true, name: finalName, email: finalEmail })]
       ).catch(() => {});
-      return { conversationId: id, messages, escalated: true, reply: null, withPerson: true };
+      return { conversationId: id, messages: await fullThread(id, messages), escalated: true, reply: null, withPerson: true };
     }
 
     // The question is now stored. Ask who they are BEFORE spending anything on a reply.
@@ -235,7 +272,7 @@ export function publicSupportRoutes(app) {
        values ($1, null, 'seller', $2, $3)`,
       [`support-web-${id}`, text, JSON.stringify({ web: true, name: finalName, email: finalEmail })]
     ).catch(() => {});
-    return { conversationId: id, messages, reply: null, escalated: true, withPerson: true };
+    return { conversationId: id, messages: await fullThread(id, messages), reply: null, escalated: true, withPerson: true };
   });
 
   /**
@@ -269,37 +306,8 @@ export function publicSupportRoutes(app) {
     const row = (await q('select id, messages, escalated from public_support where id=$1', [id])).rows[0];
     if (!row) { reply.code(404); return { error: 'Conversation not found' }; }
 
-    const staff = await q(
-      `select body, created_at from order_messages
-        where order_id = $1 and sender_id is not null
-        order by created_at asc limit 100`, [`support-web-${id}`]
-    ).then((r) => r.rows).catch(() => []);
+    const messages = await fullThread(id, row.messages);
 
-    /**
-     * MERGED BY TIME, not concatenated.
-     *
-     * This was `[...theirs, ...staff]`, which put every visitor message first and every
-     * reply after — so a conversation that actually went question, answer, question, answer
-     * was shown as one block from each side, in an order nobody spoke in. Two people
-     * alternating is the ONE thing a chat transcript has to preserve.
-     *
-     * Sorted on the timestamp each row already carries, with the original position as the
-     * tiebreak: rows written before `at` existed have no time, and keeping their relative
-     * order is better than scattering them through the thread on a parsed zero.
-     *
-     * 'staff' rather than 'assistant': the widget says who is talking, and "a person
-     * replied" is the whole point of having escalated.
-     */
-    const stamped = [
-      ...(Array.isArray(row.messages) ? row.messages : []).map((m, i) => ({ m, i, t: Date.parse(m.at || '') || 0 })),
-      ...staff.map((m, i) => ({
-        m: { role: 'staff', text: String(m.body || ''), at: m.created_at },
-        i: 100000 + i,
-        t: Date.parse(m.created_at) || 0,
-      })),
-    ];
-    stamped.sort((a, b) => (a.t - b.t) || (a.i - b.i));
-    const messages = stamped.map((x) => x.m);
     return { conversationId: id, escalated: !!row.escalated, messages };
   });
 
