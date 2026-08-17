@@ -7,7 +7,7 @@ import { TShirt, MagnifyingGlass } from "@phosphor-icons/react"
 import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import type { PublicProduct } from "@/lib/api"
 import { framingStyle } from "@/lib/product-framing"
-import { swatchBg, colorFamily, COLOR_FAMILIES } from "@/lib/color-swatch"
+import { swatchBg, swatchChipStyle, NEUTRAL_CHIP, colorFamily, COLOR_FAMILIES } from "@/lib/color-swatch"
 import { bySize, isOneSize, sizeRangeLabel } from "@/lib/size-order"
 
 /**
@@ -32,13 +32,7 @@ const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits
  *  instead of the colour it exists to communicate. 340% centred lands inside the body of the
  *  garment, which is fabric on every product shot we hold. A neutral is the last resort: a
  *  wrong colour chip is worse than a plain one. */
-const NEUTRAL_CHIP = "#c7c4bd"
-function chipStyle(c: { name: string; image?: string | null }) {
-  const bg = swatchBg(c.name)
-  if (bg) return { background: bg }
-  if (c.image) return { backgroundImage: `url(${c.image})`, backgroundSize: "340%" }
-  return { background: NEUTRAL_CHIP }
-}
+const chipStyle = (c: { name: string; image?: string | null }) => swatchChipStyle(c.name, c.image)
 
 /* ── Facets ──────────────────────────────────────────────────────────────────
    Derived from the products themselves, never a written-out list: a hand-typed set of

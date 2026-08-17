@@ -73,6 +73,30 @@ export function swatchBg(raw: string): string | null {
   return oneHex(raw)
 }
 
+/** A neutral when a name places nowhere. A WRONG colour chip is worse than a plain one. */
+export const NEUTRAL_CHIP = "#c7c4bd"
+
+/**
+ * The CSS for a colourway chip — the one definition, read by the catalogue grid and the
+ * product page.
+ *
+ * Three fallbacks, in order of how much they actually tell you:
+ *   1. the name resolves to a colour (or a two-tone split) — swatchBg;
+ *   2. it doesn't, but the colourway has a PHOTO — a close crop of it, 340% centred, which
+ *      lands inside the body of the garment on every product shot we hold. `cover` scaled a
+ *      whole shirt-on-white into a 16px circle and showed mostly background;
+ *   3. neutral.
+ *
+ * It lived privately in the catalogue grid, and the product page had a wall of NAME pills
+ * instead — 82 of them on one tee. Same question, two answers, and only one of them fits.
+ */
+export function swatchChipStyle(name: string, image?: string | null): { background?: string; backgroundImage?: string; backgroundSize?: string } {
+  const bg = swatchBg(name)
+  if (bg) return { background: bg }
+  if (image) return { backgroundImage: `url(${image})`, backgroundSize: "340%" }
+  return { background: NEUTRAL_CHIP }
+}
+
 /**
  * A supplier colour name folded into ONE OF TWELVE FAMILIES, for filtering a catalogue.
  *

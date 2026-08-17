@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { TShirt, ArrowLeft } from "@phosphor-icons/react"
 import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
+import { swatchChipStyle } from "@/lib/color-swatch"
 import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
@@ -223,8 +224,20 @@ export function BoldProduct({ product, shipping }: {
             {product.methods.length > 0 && <Spec label="Print method" items={product.methods} />}
             {product.colors.length > 0 && (
               <div className="mt-6">
-                <div className="text-xs font-bold uppercase tracking-[0.18em] text-black/45">
-                  Colours <span className="text-black/30">· {product.colors.length}</span>
+                {/* THE NAME OF THE ONE YOU PICKED, not all 82 of them.
+                    This listed every colourway as a text pill: the Gildan tee carries 82, so
+                    the page became twenty-one rows of names between the price and the sizes,
+                    and the one thing a pill is for — telling you what the colour looks like —
+                    a word cannot do. Swatches say it in a glance and in a tenth of the space;
+                    the selected NAME moves up here, where it is read once instead of hunted
+                    for among its neighbours. */}
+                <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-black/45">
+                  <span>Colours <span className="text-black/30">· {product.colors.length}</span></span>
+                  {chosen && (
+                    <span className="truncate text-[13px] font-semibold normal-case tracking-normal text-[#0B0B0C]">
+                      {chosen.name}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {product.colors.map((c, i) => (
@@ -233,15 +246,16 @@ export function BoldProduct({ product, shipping }: {
                       type="button"
                       onClick={() => setColorIdx(i)}
                       aria-pressed={colorIdx === i}
+                      aria-label={c.name}
+                      title={c.name}
                       className={
-                        "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors " +
+                        "size-7 rounded-full border transition-shadow " +
                         (colorIdx === i
-                          ? "border-[#0B0B0C] bg-[#0B0B0C] text-[#D4F897]"
-                          : "border-black/20 text-black/70 hover:border-black/50 hover:text-[#0B0B0C]")
+                          ? "border-black/25 ring-2 ring-[#0B0B0C] ring-offset-2 ring-offset-[#FAF8F3]"
+                          : "border-black/20 hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[#FAF8F3]")
                       }
-                    >
-                      {c.name}
-                    </button>
+                      style={swatchChipStyle(c.name, c.image)}
+                    />
                   ))}
                 </div>
               </div>
@@ -399,7 +413,15 @@ export function BoldProduct({ product, shipping }: {
           * tracks left one orphan above three empty cells, which is what made the last
           * attempt worse than the thing it replaced.
           */}
-        {product.methods.length > 0 && (
+        {/* ON EVERY PRODUCT, not only the ones with a print method declared.
+            This was gated on `product.methods.length > 0`, so three published products —
+            the ones whose method field is empty — ended on cream with no plate at all,
+            while their neighbours ended on the accent. The band read as decoration that
+            came and went rather than as the page's last section.
+            Nothing has to be invented to fill it: FILE_GUIDES entries carrying no methods
+            are the UNIVERSAL ones (size, resolution, background), and they are true of any
+            job whether or not the technique is on the product yet. */}
+        {(
           /* -mb-20 cancels the page container's own pb-20. The band is the LAST thing on the
              page, so that padding was 80px of cream hanging under the colour with nothing in
              it — the plate should end where the page ends. */
@@ -411,7 +433,9 @@ export function BoldProduct({ product, shipping }: {
                     (1.12:1 on paper, where it disappears), so the plate is where the brand's
                     second colour finally gets to appear. */}
                 <div className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: ACID }}>
-                  What to send us · {product.methods.join(" / ")}
+                  {/* The methods, when the product names any. Without them the line still has
+                      to say what the section IS, rather than trailing off after a middot. */}
+                  What to send us{product.methods.length > 0 ? ` · ${product.methods.join(" / ")}` : ""}
                 </div>
                 <h2 className="mt-2 font-display text-4xl font-black tracking-tight sm:text-5xl" style={{ color: ACCENT_INK }}>
                   Artwork guidelines
