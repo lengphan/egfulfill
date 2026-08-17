@@ -68,7 +68,10 @@ export function SupportBubble() {
   /** A person is on this conversation. Set by the handover and by every read, so it survives
    *  a reload — and it is what takes the "talk to support" offer away once it is answered. */
   const [withPerson, setWithPerson] = useState(false)
-  const endRef = useRef<HTMLDivElement>(null)
+  /** The scrolling panel itself. Scrolled directly — see the effect below. */
+  const listRef = useRef<HTMLDivElement>(null)
+  /** What the thread looked like last time we scrolled for it. */
+  const lastSig = useRef("")
 
   // Resume on this device. Deferred — localStorage doesn't exist during the prerender, and
   // reading it at useState-init time would make server and client markup disagree.
@@ -76,7 +79,34 @@ export function SupportBubble() {
     const t = setTimeout(() => { try { setConvo(localStorage.getItem(KEY)) } catch {} }, 0)
     return () => clearTimeout(t)
   }, [])
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }) }, [msgs, needIdentity])
+  /**
+   * STAY AT THE BOTTOM — WITHOUT SCROLLING THE PAGE, AND WITHOUT DOING IT EVERY 8 SECONDS.
+   *
+   * This was an anchor div at the foot of the list plus `scrollIntoView({ behavior:
+   * "smooth" })`, keyed on `msgs`. Two faults,
+   * and the poll made both visible:
+   *
+   *   1. scrollIntoView walks UP the tree and scrolls every ancestor that can move — so a
+   *      widget pinned to the corner was dragging the whole PAGE, which is the "it scrolls
+   *      from the top down" you see. Setting scrollTop on the panel moves the panel and
+   *      nothing else.
+   *   2. the poll replaces `msgs` with a fresh array every 8s, so the identity changed even
+   *      when the words didn't and the panel re-animated a scroll on a conversation nobody
+   *      had added to. It scrolls on a real CHANGE now — the count and the last line — not
+   *      on a new array.
+   *
+   * The first paint jumps rather than animates: a panel that opens by gliding from the top
+   * to the bottom is the same complaint in miniature.
+   */
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    const sig = `${msgs.length}:${msgs[msgs.length - 1]?.text ?? ""}:${needIdentity}`
+    if (sig === lastSig.current) return
+    const first = lastSig.current === ""
+    lastSig.current = sig
+    el.scrollTo({ top: el.scrollHeight, behavior: first ? "auto" : "smooth" })
+  }, [msgs, needIdentity])
 
   /**
    * WATCH FOR A PERSON'S REPLY.
@@ -103,7 +133,11 @@ export function SupportBubble() {
         if (!r.ok) return
         const d = await r.json()
         if (!live) return
-        if (Array.isArray(d.messages)) setMsgs(d.messages)
+        // Identical thread, new array: replacing it re-renders every bubble and re-fires
+        // anything watching `msgs`, eight times a minute, for no change at all.
+        if (Array.isArray(d.messages)) {
+          setMsgs((prev) => (JSON.stringify(prev) === JSON.stringify(d.messages) ? prev : d.messages))
+        }
         if (d.escalated) setWithPerson(true)
       } catch { /* a failed poll is not worth a notice — the next one is 8s away */ }
     }
@@ -223,13 +257,13 @@ export function SupportBubble() {
         <button onClick={() => setOpen(false)} aria-label="Close"><X size={16} weight="bold" /></button>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div ref={listRef} className="flex-1 overflow-y-auto p-4">
         {/* THE FIRST THING SAID IS A GREETING, in the same bubble a reply would arrive in —
             so the panel opens as a conversation someone has started rather than as a form
             with instructions above it. The old grey paragraph explained the widget; this
             asks the question the widget exists for. */}
         {msgs.length === 0 && (
-          <div>
+          <div className="mb-3">
             <span className="inline-block max-w-[85%] rounded-2xl bg-black/[0.05] px-3 py-2 text-sm leading-relaxed text-[#0B0B0C]">
               Hi — how can we help? Ask us anything about products, pricing or how fulfilment
               works, and a person can pick it up whenever you&apos;d rather have one.
@@ -240,7 +274,7 @@ export function SupportBubble() {
             and a row of suggested questions under a conversation that is already going is
             the widget talking over the person using it. */}
         {msgs.length < 4 && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="mb-3 flex flex-wrap gap-1.5">
             {FAQ.filter((f) => !msgs.some((m) => m.text === f.q)).map((f) => (
               <button
                 key={f.q}
@@ -253,15 +287,28 @@ export function SupportBubble() {
             ))}
           </div>
         )}
-        {msgs.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
+        {/**
+          * GROUPED BY WHO IS TALKING.
+          *
+          * Every message carried its own "EGFUL SUPPORT" caption, so three sentences typed
+          * one after another by the same person came out as three labelled announcements —
+          * the label repeated more often than anyone said anything, and a run read as one
+          * block of chrome rather than as somebody talking.
+          *
+          * A run now gets ONE caption and closes up (mt-1 inside, mt-3 between turns), which
+          * is what every chat client does and why a conversation reads as turns.
+          */}
+        {msgs.map((m, i) => {
+          const startsRun = i === 0 || msgs[i - 1].role !== m.role
+          return (
+          <div key={i} className={(m.role === "user" ? "flex flex-col items-end " : "") + (startsRun ? "mt-3 first:mt-0" : "mt-1")}>
             {/* whitespace-pre-wrap, or the line breaks the server just put between numbered
                 steps collapse back into one run-on sentence in the bubble. */}
-            {/* A PERSON'S REPLY SAYS SO. It arrives in the same column as the assistant's,
-                and a visitor who asked for a human needs to be able to tell that they got
-                one — otherwise the escalation looks unanswered while its answer is on
+            {/* A PERSON'S REPLY SAYS SO — once per run. It arrives in the same column as the
+                assistant's, and a visitor who asked for a human needs to be able to tell
+                that they got one, or the escalation looks unanswered while its answer is on
                 screen. */}
-            {m.role === "staff" && (
+            {m.role === "staff" && startsRun && (
               <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">EGFUL support</span>
             )}
             <span className={"inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed " +
@@ -279,11 +326,11 @@ export function SupportBubble() {
               ))}
             </span>
           </div>
-        ))}
-        {busy && <div className="flex items-center gap-2 text-xs text-black/45"><CircleNotch size={13} className="animate-spin" /> thinking…</div>}
-        {notice && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">{notice}</p>}
-        {done && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">Passed to a person — we&apos;ll reply to {email || "your email"}.</p>}
-        <div ref={endRef} />
+          )
+        })}
+        {busy && <div className="mt-3 flex items-center gap-2 text-xs text-black/45"><CircleNotch size={13} className="animate-spin" /> thinking…</div>}
+        {notice && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">{notice}</p>}
+        {done && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">Passed to a person — we&apos;ll reply to {email || "your email"}.</p>}
       </div>
 
       {needIdentity ? (
