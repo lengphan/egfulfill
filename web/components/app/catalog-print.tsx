@@ -497,7 +497,6 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
           {(() => {
             const colourways = rows.reduce((n, st) => n + st.colors.length, 0)
             const sizes = new Set(rows.flatMap((st) => st.sizes))
-            const brands = new Set(rows.map((st) => st.brand).filter(Boolean))
             const priced = rows.filter((st) => sheetPrice(st) != null).length
             const stat = (n: string | number, label: string) => (
               <div key={label}>
@@ -523,7 +522,16 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   {stat(rows.length, "styles in this book")}
                   {stat(colourways, "colourways")}
                   {stat(sizes.size, "sizes")}
-                  {stat(brands.size || "—", brands.size === 1 ? "brand" : "brands")}
+                  {/* SHIPPING SPEED, in the slot a brand count used to occupy.
+                      The brands stat printed a dash on most catalogues by design: §2.9 strips
+                      the supplier from anything a buyer can read, and a picked supplier style
+                      often carries no brand of its own — so it was a permanent blank in a row
+                      of real figures.
+                      2.5 days is a STATED figure, not a computed one — it is what the factory
+                      says it dispatches in, the same standing as the tagline above it. If it
+                      ever needs to change it is this line, and if it ever needs to be measured
+                      it should come off shipped_at minus created_at rather than be typed. */}
+                  {stat("2.5", "days to dispatch")}
                 </div>
 
                 {/* THE DECORATION METHODS, from the same table the product form offers and
