@@ -55,8 +55,15 @@ export function VolumeTiersPanel() {
 
   useEffect(() => { const t = setTimeout(() => loadReport(period), 0); return () => clearTimeout(t) }, [period, loadReport])
 
+  /**
+   * `name` is TEXT; the other two are numbers. Coercing every field through Number() turned a
+   * typed name into NaN on the first keystroke — the empty-string-to-NaN rule exists so a
+   * cleared NUMBER stays distinguishable from a zero, and it has no business near a label.
+   */
   const setCell = (i: number, key: keyof VolumeTier, raw: string) => {
-    setRows((r) => r.map((row, j) => (j === i ? { ...row, [key]: raw === "" ? NaN : Number(raw) } : row)))
+    setRows((r) => r.map((row, j) => (j === i
+      ? { ...row, [key]: key === "name" ? raw : (raw === "" ? NaN : Number(raw)) }
+      : row)))
   }
 
   const save = async () => {
@@ -93,6 +100,24 @@ export function VolumeTiersPanel() {
           )}
           {rows.map((t, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2">
+              {/**
+                * THE RUNG'S NAME, and why it is first.
+                *
+                * Every display called this "Tier 2" from its POSITION in the ladder — which
+                * renumbers itself the moment a rung is inserted below it, so the tier an
+                * admin told a seller they were on silently became a different label. A name
+                * survives an edit, and it is what a programme is actually called.
+                *
+                * Optional: blank falls back to the position, which is what every ladder saved
+                * before now uses, so nothing has to be filled in to keep working.
+                */}
+              <Input
+                value={t.name ?? ""}
+                onChange={(e) => setCell(i, "name", e.target.value)}
+                placeholder={`Tier ${i + 1}`}
+                aria-label={`Name for tier ${i + 1}`}
+                className="h-8 w-32"
+              />
               <Input
                 value={Number.isFinite(t.minUnits) ? String(t.minUnits) : ""}
                 onChange={(e) => setCell(i, "minUnits", e.target.value.replace(/[^\d]/g, ""))}
@@ -117,7 +142,7 @@ export function VolumeTiersPanel() {
               </Button>
             </div>
           ))}
-          <Button size="sm" variant="outline" onClick={() => setRows((r) => [...r, { minUnits: NaN, pct: NaN }])}>
+          <Button size="sm" variant="outline" onClick={() => setRows((r) => [...r, { minUnits: NaN, pct: NaN, name: "" }])}>
             <Plus size={14} weight="bold" /> Add tier
           </Button>
         </div>

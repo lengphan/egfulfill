@@ -23,7 +23,6 @@ import { PanelPicker } from "@/components/app/panel-picker"
 import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { VolumeBoard } from "@/components/app/volume-board"
-import { VolumeTiersPanel } from "@/components/app/volume-tiers-panel"
 import { SiteContentPanel } from "@/components/app/site-content-panel"
 import { SupplierOrderingSettings } from "@/components/app/supplier-ordering-settings"
 import { getUser, updateUser } from "@/lib/auth"
@@ -3274,12 +3273,14 @@ export function SettingsView() {
       )}
       {canPlatform && (
         <TabsContent value="platform">
-          {/* The volume ladder sits with the other platform money settings rather than in
-              its own tab: it is the same kind of decision as a fee, and the seller-facing
-              half of it lives on their Plan tab. */}
+          {/* The volume ladder MOVED to its own admin page (/plans). It sat here beside the
+              base markup and the postage bands, which is the wrong company: a band is a cost
+              we pass on, while the ladder decides what a seller pays us. It is also the thing
+              most likely to be edited in a hurry, and this screen is one you scroll.
+              Operators can open this tab now (for the cone list), and the ladder is not
+              theirs to touch — a second reason it does not belong here. */}
           <div className="space-y-4">
             <PlatformPanel />
-            <VolumeTiersPanel />
           </div>
         </TabsContent>
       )}

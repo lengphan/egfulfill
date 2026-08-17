@@ -45,6 +45,17 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   // Finance = Wallet (balances/transactions) + Partner costs (byeastside/carriers/suppliers)
   // as tabs on one page. Replaces the separate Billing + Wallet items.
   { label: "Finance", href: "/finance", icon: Wallet, roles: ["admin"] },
+  /**
+   * PLANS & VOLUME, admin only.
+   *
+   * Lifted out of Settings › Platform, where they sat beside the base markup and the postage
+   * bands. A band is a cost we pass on; these two decide what a seller PAYS US, and they are
+   * the pair most likely to be changed in a hurry — a peak season, a partner deal, a rung
+   * that turned out too generous. They also interact: the ladder sets the rate, the plan sets
+   * what can be reached, and editing one with the other two tabs away is how a rung gets set
+   * against a plan nobody re-read.
+   */
+  { label: "Plans & volume", href: "/plans", icon: CurrencyDollar, roles: ["admin"] },
   // Campaigns is HIDDEN until Meta/Google connections exist — there are no settings to
   // connect an ad account yet, so the page can only show an empty shell. The route and
   // component are intact; restore the roles here to bring it back.

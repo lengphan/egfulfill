@@ -3608,7 +3608,14 @@ export function grantTrial(body: { userId: string; plan?: string; days?: number 
 }
 
 /** One rung of the volume ladder: ship `minUnits` in a month, earn `pct` the next. */
-export type VolumeTier = { minUnits: number; pct: number }
+export type VolumeTier = {
+  minUnits: number
+  pct: number
+  /** What this rung is CALLED. Optional — blank falls back to its position ("Tier 2"), which
+   *  is what every ladder saved before names existed uses. A position renumbers itself when a
+   *  rung is inserted below it; a name does not. */
+  name?: string | null
+}
 /** A resolved position on the ladder — what a period earned and what is still winnable. */
 export type VolumeStanding = {
   period: string
