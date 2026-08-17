@@ -3716,6 +3716,12 @@ export type PlanPrices = { plans: Record<string, number>; spydeck_addon: number 
 export function getPlanPrices() {
   return api<PlanPrices>(`/api/billing/prices`)
 }
+/** How many ACTIVE sellers sit on each plan, and how many carry the SpyDeck add-on — so a
+ *  price can be read against what it bills rather than on its own. Deactivated accounts and
+ *  staff are excluded server-side: neither is ever renewed. */
+export function getPlanCounts() {
+  return api<{ plans: Record<string, number>; spydeck: number }>(`/api/billing/plan-counts`)
+}
 /**
  * `confirm` is the second press on a price CUT. The server answers 409 with `drops` — the
  * changes named one by one — until it arrives, so the guard holds for a stray API call and

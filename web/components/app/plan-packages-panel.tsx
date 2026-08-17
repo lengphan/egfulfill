@@ -5,7 +5,7 @@ import { CircleNotch, Check } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getPlanPrices, savePlanPrices, type PlanPrices } from "@/lib/api"
+import { getPlanPrices, savePlanPrices, getPlanCounts, type PlanPrices } from "@/lib/api"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
 /**
@@ -20,6 +20,11 @@ import { useConfirm } from "@/components/app/confirm-dialog"
  * per (user, month), so a month already charged stays charged at the figure it was charged at.
  * A new price meets the next renewal.
  */
+/** One set of tracks for the header and every row, so Sellers / Per month / Billing line up
+ *  under their labels. px-5 matches the card header above it — the rows are full width and the
+ *  TEXT is what aligns, rather than a box drawn inside a box. */
+const ROW = "grid grid-cols-[minmax(0,1fr)_5rem_7rem_6rem] items-center gap-x-3 px-5"
+
 export function PlanPackagesPanel() {
   const [prices, setPrices] = useState<PlanPrices | null>(null)
   const [busy, setBusy] = useState(false)
@@ -32,6 +37,26 @@ export function PlanPackagesPanel() {
     }, 0)
     return () => clearTimeout(t)
   }, [])
+
+  /**
+   * HOW MANY SELLERS EACH PRICE APPLIES TO.
+   *
+   * A price list alone cannot be judged: $29 against twenty sellers and $29 against none are
+   * the same screen and completely different decisions. Loaded separately from the prices so a
+   * failure here costs the counts and not the editor — the panel's job is still to save a
+   * price, and `null` prints a dash rather than a zero nobody can distinguish from "none".
+   */
+  const [counts, setCounts] = useState<{ plans: Record<string, number>; spydeck: number } | null>(null)
+  useEffect(() => {
+    const t = setTimeout(() => { getPlanCounts().then(setCounts).catch(() => {}) }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
+  const money0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`
+  /** What a row bills a month: everyone on it, at the price currently in the field — so the
+   *  figure moves as you type and shows what the change is worth before it is saved. */
+  const monthly = (n: number | undefined, price: string) =>
+    n == null || !Number.isFinite(Number(price)) ? null : n * Number(price)
 
   // Text, not number: "" is a state a field can be in while somebody retypes it, and a
   // numeric state collapses it to 0 — which here is a real price.
@@ -79,33 +104,58 @@ export function PlanPackagesPanel() {
 
   return (
     <SectionCard title="Subscription packages" description="What each plan is billed per month.">
-      <div className="space-y-4 px-5 pb-5">
-        {!prices ? (
-          <div className="flex justify-center py-6 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
-        ) : (
-          <>
-            <div className="overflow-hidden rounded-lg border border-border">
-              <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-x-3 border-b border-border bg-muted/40 px-3 py-2.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <span>Plan</span><span className="text-right">Per month</span>
-              </div>
-              <div className="divide-y divide-border">
-                {Object.entries(prices.plans).map(([name, v]) => (
-                  <div key={name} className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-x-3 px-3 py-2.5">
-                    <span className="text-sm font-medium capitalize">{name}</span>
-                    <div className="flex items-center justify-end gap-1">
-                      <span className="text-sm text-muted-foreground">$</span>
-                      <Input
-                        value={shown(`plan:${name}`, v)}
-                        onChange={(e) => setDraft((d) => ({ ...d, [`plan:${name}`]: e.target.value.replace(/[^\d.]/g, "") }))}
-                        inputMode="decimal"
-                        aria-label={`${name} price per month`}
-                        className="h-8 w-20 px-2 text-right tabular-nums"
-                      />
-                    </div>
+      {!prices ? (
+        <div className="flex justify-center py-6 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
+      ) : (
+        <>
+          {/* NO BOX INSIDE THE BOX. This was a bordered table indented 20px inside a bordered
+              card — two frames running parallel down the page, and at the corners they read as
+              one line about to touch another. The card is already the frame; the rows sit
+              directly in it, full width, separated the way every other list in the app is. */}
+          <div className="divide-y divide-border border-b border-border">
+            <div className={ROW + " py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground"}>
+              <span>Plan</span>
+              <span className="text-right">Sellers</span>
+              <span className="text-right">Per month</span>
+              <span className="text-right">Billing</span>
+            </div>
+            {Object.entries(prices.plans).map(([name, v]) => {
+              const n = counts?.plans[name]
+              const bills = monthly(n, shown(`plan:${name}`, v))
+              return (
+                <div key={name} className={ROW + " py-2.5"}>
+                  <span className="text-sm font-medium capitalize">{name}</span>
+                  {/* A DASH IS NOT A ZERO — the counts load separately and can fail on their
+                      own, and "nobody is on Pro" is a very different sentence from "we could
+                      not read who is on Pro". */}
+                  <span className="text-right text-sm tabular-nums text-muted-foreground">
+                    {n == null ? "—" : n}
+                  </span>
+                  <div className="flex items-center justify-end gap-1">
+                    <span className="text-sm text-muted-foreground">$</span>
+                    <Input
+                      value={shown(`plan:${name}`, v)}
+                      onChange={(e) => setDraft((d) => ({ ...d, [`plan:${name}`]: e.target.value.replace(/[^\d.]/g, "") }))}
+                      inputMode="decimal"
+                      aria-label={`${name} price per month`}
+                      className="h-8 w-20 px-2 text-right tabular-nums"
+                    />
                   </div>
-                ))}
-                <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-x-3 px-3 py-2.5">
+                  <span className="text-right text-sm tabular-nums">
+                    {bills == null ? <span className="text-muted-foreground">—</span>
+                      : bills === 0 ? <span className="text-muted-foreground">free</span>
+                        : money0(bills)}
+                  </span>
+                </div>
+              )
+            })}
+            {(() => {
+              const n = counts?.spydeck
+              const bills = monthly(n, shown("addon", prices.spydeck_addon))
+              return (
+                <div className={ROW + " py-2.5"}>
                   <span className="text-sm font-medium">SpyDeck add-on</span>
+                  <span className="text-right text-sm tabular-nums text-muted-foreground">{n == null ? "—" : n}</span>
                   <div className="flex items-center justify-end gap-1">
                     <span className="text-sm text-muted-foreground">$</span>
                     <Input
@@ -116,15 +166,40 @@ export function PlanPackagesPanel() {
                       className="h-8 w-20 px-2 text-right tabular-nums"
                     />
                   </div>
+                  <span className="text-right text-sm tabular-nums">
+                    {bills == null ? <span className="text-muted-foreground">—</span>
+                      : bills === 0 ? <span className="text-muted-foreground">free</span>
+                        : money0(bills)}
+                  </span>
                 </div>
+              )
+            })()}
+            {/* The total, on the same tracks as the column it totals. This is the number the
+                page is really about — every other row is a component of it. */}
+            {counts && (
+              <div className={ROW + " py-2.5"}>
+                <span className="text-sm font-semibold">Every renewal, monthly</span>
+                <span className="text-right text-sm tabular-nums text-muted-foreground">
+                  {Object.values(counts.plans).reduce((a, b) => a + b, 0)}
+                </span>
+                <span />
+                <span className="text-right text-sm font-semibold tabular-nums">
+                  {money0(
+                    Object.entries(prices.plans).reduce((sum, [name, v]) => sum + (monthly(counts.plans[name], shown(`plan:${name}`, v)) ?? 0), 0)
+                    + (monthly(counts.spydeck, shown("addon", prices.spydeck_addon)) ?? 0)
+                  )}
+                </span>
               </div>
-            </div>
+            )}
+          </div>
 
+          <div className="space-y-3 px-5 py-4">
             {/* The one thing worth knowing before typing. A plan at 0 never renews — that is
                 what makes Starter free, rather than a special case in the code. */}
             <p className="text-xs text-muted-foreground">
               A new price applies from the next renewal — a month already charged stays at what it was
-              charged. A plan priced at $0 never renews.
+              charged. A plan priced at $0 never renews. Seller counts exclude deactivated accounts,
+              which are never renewed.
             </p>
 
             <div className="flex items-center gap-3">
@@ -132,9 +207,9 @@ export function PlanPackagesPanel() {
               {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
               {err && <span className="text-sm text-destructive">{err}</span>}
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </SectionCard>
   )
 }

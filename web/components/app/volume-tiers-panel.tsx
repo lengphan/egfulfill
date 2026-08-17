@@ -30,6 +30,10 @@ const prevPeriod = (key: string) => {
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`
 }
 
+/** One set of tracks for the ladder's header and rows, so From / To / Discount / Sellers stack
+ *  as columns — a ladder is read vertically and the comparison is always between two rungs. */
+const TIER_ROW = "grid grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_4.5rem_2.25rem] items-center gap-x-3 px-5"
+
 export function VolumeTiersPanel() {
   const [rows, setRows] = useState<VolumeTier[]>([])
   const [period, setPeriod] = useState(() => prevPeriod(periodOf(new Date())))
@@ -66,6 +70,47 @@ export function VolumeTiersPanel() {
       : row)))
   }
 
+  /**
+   * The rung's upper bound, read off the NEXT rung rather than stored.
+   *
+   * One threshold per tier is the model the engine uses — a seller earns the highest tier they
+   * clear — so a second editable bound could only ever introduce a gap or an overlap that the
+   * engine would then ignore. Sorted rather than assumed in order: the server normalises on
+   * save, but this renders what is typed, and a row added at the bottom starts out unsorted.
+   */
+  const ordered = rows.filter((r) => Number.isFinite(r.minUnits)).map((r) => r.minUnits).sort((a, b) => a - b)
+  const upperOf = (i: number) => {
+    const min = rows[i]?.minUnits
+    if (!Number.isFinite(min)) return "—"
+    const next = ordered.find((v) => v > min)
+    return next == null ? "and up" : (next - 1).toLocaleString()
+  }
+
+  /**
+   * How many sellers in the reported period land on each rung, AS THE LADDER IS TYPED.
+   *
+   * Bucketed by units against the thresholds, not by the `pct` the report came back with: the
+   * report was computed from the SAVED ladder, so reading it back would show the old shape
+   * while you edit the new one — and two rungs can legitimately share a percentage, which
+   * makes pct a lossy key regardless.
+   *
+   * A seller below every threshold lands on no rung and is counted in none, which is the same
+   * thing the engine does with them.
+   */
+  const landing = (() => {
+    const out: Record<number, number> = {}
+    if (!sellers) return out
+    for (const s of sellers) {
+      let best = -1
+      let bestMin = -1
+      rows.forEach((t, i) => {
+        if (Number.isFinite(t.minUnits) && s.units >= t.minUnits && t.minUnits > bestMin) { best = i; bestMin = t.minUnits }
+      })
+      if (best >= 0) out[best] = (out[best] ?? 0) + 1
+    }
+    return out
+  })()
+
   const save = async () => {
     setBusy(true); setErr(null); setNote(null)
     try {
@@ -90,7 +135,7 @@ export function VolumeTiersPanel() {
         </Button>
       }
     >
-      <div className="space-y-4 px-5 pb-5">
+      <div className="space-y-4 pb-5">
 
         {/**
           * A TABLE, not a sentence made of inputs.
@@ -104,22 +149,31 @@ export function VolumeTiersPanel() {
           * right-aligned and tabular so the digits stack; the arrow and the words "units or
           * more" become column headings, said once instead of once per rung.
           */}
-        <div className="space-y-1.5">
+        <div>
           {rows.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+            <div className="mx-5 rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
               No tiers. An empty ladder means the programme is off and every seller earns 0%.
             </div>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-border">
-              <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_2.25rem] items-center gap-x-3 border-b border-border bg-muted/40 px-3 py-2.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+            /* FULL WIDTH, no box. A bordered table inset inside a bordered card drew two
+               frames a few pixels apart — the card is the frame, and the rows belong in it the
+               way every other list in the app sits in one. Same change as the packages table
+               above it, because these two cards sit on one screen. */
+            <div className="divide-y divide-border border-b border-border">
+              <div className={TIER_ROW + " py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground"}>
                 <span>Name</span>
                 <span className="text-right">From (units)</span>
+                {/* The rung's upper bound. It was only ever implied by the NEXT row's
+                    threshold, so reading "what does tier 2 cover" meant reading tier 3 — and
+                    the top rung's "and up" was implied by nothing at all. */}
+                <span className="text-right">To</span>
                 <span className="text-right">Discount</span>
+                <span className="text-right">Sellers</span>
                 <span />
               </div>
               <div className="divide-y divide-border">
                 {rows.map((t, i) => (
-                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_2.25rem] items-center gap-x-3 px-3 py-2.5">
+                  <div key={i} className={TIER_ROW + " py-2.5"}>
                     {/* Optional. Blank shows the position as a placeholder, which is what the
                         rung is called until somebody names it — and what every ladder saved
                         before names existed will keep showing. */}
@@ -138,6 +192,9 @@ export function VolumeTiersPanel() {
                       aria-label={`Minimum units for tier ${i + 1}`}
                       className="h-8 px-2 text-right tabular-nums"
                     />
+                    {/* Derived, never typed: one threshold per rung is the model, and a second
+                        editable bound is a gap or an overlap waiting to be saved. */}
+                    <span className="text-right text-sm tabular-nums text-muted-foreground">{upperOf(i)}</span>
                     <div className="flex items-center justify-end gap-1">
                       <Input
                         value={Number.isFinite(t.pct) ? String(t.pct) : ""}
@@ -149,6 +206,15 @@ export function VolumeTiersPanel() {
                       />
                       <span className="text-sm text-muted-foreground">%</span>
                     </div>
+                    {/* HOW MANY SELLERS THIS RUNG WOULD ACTUALLY HOLD, counted off the same
+                        report below and against the ladder AS TYPED — so a threshold you are
+                        still editing shows what it would do before it is saved, which is the
+                        entire reason the report is on this screen. */}
+                    <span className="text-right text-sm tabular-nums">
+                      {sellers === null ? <span className="text-muted-foreground">—</span>
+                        : landing[i] ? <span className="font-medium">{landing[i]}</span>
+                          : <span className="text-muted-foreground">0</span>}
+                    </span>
                     <Button size="icon-sm" variant="ghost" aria-label={`Remove tier ${i + 1}`}
                       className="text-muted-foreground hover:text-destructive"
                       onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
@@ -159,16 +225,18 @@ export function VolumeTiersPanel() {
               </div>
             </div>
           )}
-          <Button size="sm" variant="outline" onClick={() => setRows((r) => [...r, { minUnits: NaN, pct: NaN, name: "" }])}>
-            <Plus size={14} weight="bold" /> Add tier
-          </Button>
+          <div className="px-5 pt-4">
+            <Button size="sm" variant="outline" onClick={() => setRows((r) => [...r, { minUnits: NaN, pct: NaN, name: "" }])}>
+              <Plus size={14} weight="bold" /> Add tier
+            </Button>
+          </div>
         </div>
 
-        {note && <div className="rounded-md bg-muted px-3 py-2 text-sm">{note}</div>}
-        {err && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>}
+        {note && <div className="mx-5 rounded-md bg-muted px-3 py-2 text-sm">{note}</div>}
+        {err && <div className="mx-5 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>}
 
         {/* WHO THIS WOULD ACTUALLY HIT. */}
-        <div className="border-t border-border pt-4">
+        <div className="border-t border-border px-5 pt-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
               Who lands where

@@ -264,6 +264,35 @@ export function billingRoutes(app, requireAuth, requireAdmin) {
    */
   app.get('/api/billing/prices', { preHandler: requireAdmin }, async () => readPrices());
 
+  /**
+   * WHO IS ACTUALLY ON EACH PLAN — the other half of a price list.
+   *
+   * A price on its own says what Pro costs and nothing about what Pro IS: twenty sellers or
+   * none, $29 either way. Typing a new figure without that is deciding revenue blind, and the
+   * multiplication an admin does in their head is the number they actually wanted.
+   *
+   * ACTIVE SELLERS ONLY. A deactivated account cannot sign in and is never renewed, so
+   * counting it would state monthly income we do not bill. Staff are excluded for the same
+   * reason — they have a `plan` column like everyone else and are never charged for it.
+   *
+   * A seller with no plan set counts as starter, which is what plan.js resolves them to.
+   */
+  app.get('/api/billing/plan-counts', { preHandler: requireAdmin }, async () => {
+    const r = await q(
+      `select coalesce(nullif(plan, ''), 'starter') as plan, count(*)::int as n
+         from users
+        where role = 'seller' and active is not false
+        group by 1`
+    ).catch(() => ({ rows: [] }));
+    const spydeck = await q(
+      `select count(*)::int as n from users
+        where role = 'seller' and active is not false and spydeck_addon = true`
+    ).then((x) => (x.rows[0] && x.rows[0].n) || 0).catch(() => 0);
+    const plans = {};
+    for (const row of r.rows) plans[row.plan] = row.n;
+    return { plans, spydeck };
+  });
+
   app.put('/api/billing/prices', { preHandler: requireAdmin }, async (req, reply) => {
     const b = req.body || {};
     const plans = {};
