@@ -5,6 +5,7 @@ import { CircleNotch, CaretRight, Check, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ProductThumb } from "@/components/app/product-thumb"
 import {
   getPurchaseOrders, savePurchaseOrder, getInventory, addInventoryItem, patchInventoryItem,
   type PurchaseOrder, type InventoryItem,
@@ -60,13 +61,15 @@ export function InboundPanel() {
    * the first had just moved — they are summed here instead, once, before anything is sent.
    */
   const linesOf = (po: PurchaseOrder) => {
-    const by = new Map<string, { sku: string; name?: string; variant?: string; qty: number }>()
+    // `image` rides along with the rest: the rows are folded by sku here, so anything the
+    // row wants to SHOW has to survive the fold or it is not available downstream.
+    const by = new Map<string, { sku: string; name?: string; variant?: string; qty: number; image?: string | null }>()
     for (const l of po.items ?? []) {
       const k = String(l.sku ?? "").trim().toUpperCase()
       if (!k) continue
       const at = by.get(k)
       if (at) at.qty += num(l.qty)
-      else by.set(k, { sku: String(l.sku), name: l.name, variant: l.variant, qty: num(l.qty) })
+      else by.set(k, { sku: String(l.sku), name: l.name, variant: l.variant, qty: num(l.qty), image: l.image })
     }
     return [...by.values()]
   }
@@ -157,6 +160,13 @@ export function InboundPanel() {
                   <div className="border-t border-border bg-muted/20 px-5 py-2">
                     {lines.map((l) => (
                       <div key={l.sku} className="flex items-center gap-3 py-1.5 text-sm">
+                        {/* THE PICTURE, because this is the screen where somebody standing at
+                            a pallet decides whether the box in their hands is this line. A sku
+                            and a supplier title are not how you recognise a garment — the cart
+                            and the purchase order both show the thumbnail already, and only
+                            the receiving screen, the one that is used with the goods in front
+                            of you, did not. POLine has carried `image` all along. */}
+                        <ProductThumb src={l.image ?? ""} alt={l.name || l.sku} className="size-10 shrink-0" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate">{l.name || l.sku}</span>
                           <span className="block truncate font-mono text-2xs text-muted-foreground">{l.sku}{l.variant ? ` · ${l.variant}` : ""}</span>
