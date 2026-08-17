@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { SiteHeader } from "@/components/marketing/site-header"
-import { Pill } from "@/components/marketing/bold-kit"
 import { MotionProvider } from "@/components/marketing/motion-provider"
+import { SupportBubble } from "@/components/marketing/support-bubble"
 import { getSiteContent } from "@/lib/site-content"
 
 /**
@@ -29,33 +29,17 @@ export default async function MarketingLayout({ children }: { children: React.Re
 
       <main className="flex-1">{children}</main>
 
-      {/* WHAT THE BUBBLE WAS ACTUALLY FOR.
-          Its one good argument was that a visitor's question arrives while they are reading
-          a product or a price, not after they have hunted down a contact page — and taking
-          it away without replacing that leaves the gap it was covering. These are the three
-          things people actually asked it, answered by going somewhere rather than by a paid
-          model call: how ordering works, how to reach a person, and where the API lives.
-
-          A STRIP ABOVE THE FOOTER, not a floating cluster. The bubble's other problem was
-          that it sat on top of the page it was meant to help sell — visible on every page,
-          covering the corner of every one. This is in the flow, so it can be scrolled past
-          and never hides a product photo.
-
-          The same three routes are in the footer nav below, and that is not a duplication
-          worth removing: a footer link list is where you look when you already know what you
-          want, and these are sized for someone who does not. */}
-      <section className="border-t border-border px-6 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 text-center">
-          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-            Most asked
-          </span>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Pill href="/how-it-works" tone="ghost" className="!px-5 !py-2.5 !text-sm">How do I order?</Pill>
-            <Pill href="/contact" tone="ghost" className="!px-5 !py-2.5 !text-sm">How do I contact you?</Pill>
-            <Pill href="/docs" tone="ghost" className="!px-5 !py-2.5 !text-sm">API documentation</Pill>
-          </div>
-        </div>
-      </section>
+      {/* MOST ASKED MOVED INTO THE BUBBLE.
+          It was a strip above the footer — the right three questions in the wrong place. The
+          argument for taking them out of the bubble was that the bubble floated over the page
+          it was meant to help sell; the argument against a footer strip is that a visitor's
+          question arrives while they are reading a price, and by the time they have scrolled
+          past everything to the bottom they have either found the answer or gone.
+          They are chips inside the panel now, answered THERE (no model call, no email asked
+          for), with "talk to a person" one press away — which is the point at which a name
+          and an address are worth asking for, and the only point they are needed.
+          The same three routes remain in the footer nav below, which is where you look when
+          you already know what you want. */}
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
@@ -105,7 +89,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
           this comment and un-commenting one line, not rebuilding a feature. /contact is
           still the way to reach a person, and the seller support chat inside the app —
           which is authenticated, per-seller and rate-limited — is untouched. */}
-      {/* <SupportBubble /> */}
+      <SupportBubble />
     </div>
     </MotionProvider>
   )

@@ -21,6 +21,37 @@ type Msg = { role: string; text: string; at?: string }
  */
 const KEY = "eg_support_convo"
 
+/**
+ * THE THREE MOST-ASKED, ANSWERED WITHOUT SPENDING ANYTHING.
+ *
+ * They were a strip above the footer — the right questions in the wrong place, because a
+ * visitor's question arrives while they are reading a price, not after they have scrolled
+ * past everything to the bottom. They live in the bubble now, where the asking happens.
+ *
+ * Answered from HERE, not by the model: these three have one correct answer each, and
+ * paying for a generated one — on an unauthenticated endpoint, at that — would be spending
+ * money to be less accurate. It also means clicking one costs no identity gate: nothing is
+ * owed, so nothing is asked for. The name and the email are collected at the point a PERSON
+ * is wanted, which is the only point they are needed.
+ */
+const FAQ: { q: string; a: string; href: string; hrefLabel: string }[] = [
+  {
+    q: "How do I order?",
+    a: "Connect Etsy, Shopify or TikTok Shop and your orders arrive in one queue. Pick the blank, place the artwork, submit — we print, pack and ship it, and push tracking back to the marketplace. Nothing is charged until you submit an order.",
+    href: "/how-it-works", hrefLabel: "See how it works",
+  },
+  {
+    q: "What does it cost?",
+    a: "You pay the blank's base cost plus one parcel fee per order — the price on each product page is what you pay to make it. No subscription, no per-listing fee, and postage is quoted when the order goes to production.",
+    href: "/pricing", hrefLabel: "See pricing",
+  },
+  {
+    q: "Do you have an API?",
+    a: "Yes — REST, key-authed, with a sandbox that prices and validates exactly as live so you can build against a test key and change one character to go live. Orders, products, stock, billing and webhooks.",
+    href: "/docs", hrefLabel: "API documentation",
+  },
+]
+
 export function SupportBubble() {
   const [open, setOpen] = useState(false)
   const [msgs, setMsgs] = useState<Msg[]>([])
@@ -32,6 +63,8 @@ export function SupportBubble() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  /** Someone asked for a person before there was a conversation to hand over — see escalate. */
+  const [pendingEscalate, setPendingEscalate] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
   // Resume on this device. Deferred — localStorage doesn't exist during the prerender, and
@@ -42,7 +75,9 @@ export function SupportBubble() {
   }, [])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }) }, [msgs, needIdentity])
 
-  const send = async (text: string) => {
+  /** Returns the conversation id, so a caller that created one can act on it immediately —
+   *  `convo` is state and is not set yet on the line after this resolves. */
+  const send = async (text: string): Promise<string | null> => {
     setBusy(true); setNotice(null)
     try {
       const r = await fetch("/api/public/support", {
@@ -61,9 +96,35 @@ export function SupportBubble() {
       // A refusal (rate limit, or a conversation that has run long) still carries a message
       // the visitor should see rather than a silent dead input.
       if (d.error) setNotice(d.error)
+      return d.conversationId ?? convo
     } catch {
       setNotice("We couldn't reach support just now — please try again shortly.")
+      return null
     } finally { setBusy(false) }
+  }
+
+  /** Hand a conversation to a person. Split from `escalate` so both the "already talking"
+   *  path and the "clicked a question, now wants a human" path end in the same call. */
+  const handOver = async (id: string) => {
+    try {
+      await fetch("/api/public/support/escalate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: id }),
+      })
+      setDone(true)
+    } catch { setNotice("Couldn't hand that over — email orders@egful.store and we'll pick it up.") }
+  }
+
+  /**
+   * A canned answer, put into the thread as if it had been asked — because it was.
+   *
+   * Local only: no request, no model call, no identity. The visitor sees their question and
+   * our answer in the same place a real exchange would appear, so "talk to a person" after
+   * it is a continuation rather than a fresh start.
+   */
+  const askFaq = (f: (typeof FAQ)[number]) => {
+    setNotice(null)
+    setMsgs((m) => [...m, { role: "user", text: f.q }, { role: "assistant", text: f.a }])
   }
 
   const onSend = async () => {
@@ -81,20 +142,26 @@ export function SupportBubble() {
     // Re-send the LAST question now that we can be answered — the server has it stored, but
     // it needs a turn to reply to.
     const last = [...msgs].reverse().find((m) => m.role === "user")?.text || "Hello"
-    await send(last)
+    const id = await send(last)
+    // They asked for a person BEFORE there was a conversation — the identity form was the
+    // only thing standing in the way, so finish the handover rather than making them press
+    // it a second time.
+    if (pendingEscalate && id) { setPendingEscalate(false); await handOver(id) }
   }
 
   const escalate = async () => {
-    if (!convo) return
+    /**
+     * NO CONVERSATION YET — which is the normal case after clicking a question, since those
+     * are answered here and never reach the server. This used to `return` on that, so the
+     * one control a visitor reaches for after reading an answer did nothing at all.
+     *
+     * Ask who they are; onIdentity creates the conversation with their question and hands it
+     * over in the same step.
+     */
+    if (!convo) { setPendingEscalate(true); setNeedIdentity(true); setNotice(null); return }
     setBusy(true)
-    try {
-      await fetch("/api/public/support/escalate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: convo }),
-      })
-      setDone(true)
-    } catch { setNotice("Couldn't hand that over — email orders@egful.store and we'll pick it up.") }
-    finally { setBusy(false) }
+    await handOver(convo)
+    setBusy(false)
   }
 
   if (!open) {
@@ -124,6 +191,23 @@ export function SupportBubble() {
             it up if you&apos;d rather.
           </p>
         )}
+        {/* MOST ASKED, in the bubble. Shown while the thread is short — they are a way IN,
+            and a row of suggested questions under a conversation that is already going is
+            the widget talking over the person using it. */}
+        {msgs.length < 4 && (
+          <div className="flex flex-wrap gap-1.5">
+            {FAQ.filter((f) => !msgs.some((m) => m.text === f.q)).map((f) => (
+              <button
+                key={f.q}
+                type="button"
+                onClick={() => askFaq(f)}
+                className="rounded-full border border-black/15 px-3 py-1.5 text-xs font-semibold text-black/70 transition-colors hover:border-black/45 hover:text-[#0B0B0C]"
+              >
+                {f.q}
+              </button>
+            ))}
+          </div>
+        )}
         {msgs.map((m, i) => (
           <div key={i} className={m.role === "assistant" ? "" : "flex justify-end"}>
             {/* whitespace-pre-wrap, or the line breaks the server just put between numbered
@@ -131,6 +215,14 @@ export function SupportBubble() {
             <span className={"inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed " +
               (m.role === "assistant" ? "bg-black/[0.05] text-[#0B0B0C]" : "bg-[#0B0B0C] text-[#D4F897]")}>
               {m.text}
+              {/* The page that answers it properly. On the canned replies only — a model
+                  answer has no fixed destination, and inventing one would send people to a
+                  page that may not say what the sentence above it just did. */}
+              {m.role === "assistant" && FAQ.filter((f) => f.a === m.text).map((f) => (
+                <a key={f.href} href={f.href} className="mt-1.5 block font-semibold underline underline-offset-4">
+                  {f.hrefLabel} →
+                </a>
+              ))}
             </span>
           </div>
         ))}
@@ -144,14 +236,18 @@ export function SupportBubble() {
         /* The question is already saved server-side, which is why this can be asked calmly
            rather than as a gate the visitor must pass to be heard. */
         <div className="space-y-2 border-t border-black/10 p-3">
-          <p className="text-xs leading-relaxed text-black/55">Who should we reply to? We&apos;ll email you if you close this.</p>
+          <p className="text-xs leading-relaxed text-black/55">
+            {pendingEscalate
+              ? "Who are we passing this to a person for? We'll reply by email — you can close this."
+              : "Who should we reply to? We'll email you if you close this."}
+          </p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name"
                  className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50" />
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" type="email"
                  className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50" />
           <button onClick={onIdentity} disabled={busy}
                   className="w-full rounded-lg bg-[#0B0B0C] px-3 py-2 text-sm font-semibold text-[#D4F897] disabled:opacity-60">
-            Continue
+            {pendingEscalate ? "Send to support" : "Continue"}
           </button>
         </div>
       ) : (
@@ -168,6 +264,8 @@ export function SupportBubble() {
               <PaperPlaneRight size={15} weight="fill" />
             </button>
           </div>
+          {/* Offered as soon as there is anything in the thread — INCLUDING a canned answer,
+              which is exactly when someone decides the answer wasn't theirs. */}
           {msgs.length > 0 && !done && (
             <button onClick={escalate} disabled={busy}
                     className="mt-2 text-xs font-semibold text-black/50 underline underline-offset-4 hover:text-[#0B0B0C]">
