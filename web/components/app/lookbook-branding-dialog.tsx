@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getFactorySettings, setFactorySettings } from "@/lib/api"
 
-export type LookbookBrand = { title: string; tagline: string; accent: string; contact: string }
+/** `title` is who publishes it — the wordmark on the cover and in every footer. `headline` is
+ *  what this edition is CALLED, set in 72px on the cover. Two different things: a private-label
+ *  buyer changes one of them and not the other. */
+export type LookbookBrand = { title: string; headline: string; tagline: string; accent: string; contact: string }
 
 /**
  * THE COVER, EDITED WHERE THE COVER IS.
@@ -32,6 +35,7 @@ export function LookbookBrandingDialog({
   onSaved: (b: LookbookBrand) => void
 }) {
   const [title, setTitle] = useState(brand.title)
+  const [headline, setHeadline] = useState(brand.headline)
   const [tagline, setTagline] = useState(brand.tagline)
   const [accent, setAccent] = useState(brand.accent)
   const [contact, setContact] = useState(brand.contact)
@@ -45,7 +49,8 @@ export function LookbookBrandingDialog({
   useEffect(() => {
     if (!open) return
     const t = setTimeout(() => {
-      setTitle(brand.title); setTagline(brand.tagline); setAccent(brand.accent); setContact(brand.contact)
+      setTitle(brand.title); setHeadline(brand.headline)
+      setTagline(brand.tagline); setAccent(brand.accent); setContact(brand.contact)
       setErr(null)
     }, 0)
     return () => clearTimeout(t)
@@ -67,12 +72,17 @@ export function LookbookBrandingDialog({
       const r = await setFactorySettings({
         ...cur,
         lookbook_title: title.trim(),
+        lookbook_headline: headline.trim(),
         lookbook_tagline: tagline.trim(),
         lookbook_accent: accent.trim(),
         lookbook_contact: contact,
       } as Parameters<typeof setFactorySettings>[0])
       if ((r as { error?: string })?.error) throw new Error((r as { error?: string }).error!)
-      onSaved({ title: title.trim() || "EGFUL", tagline: tagline.trim(), accent: accent.trim(), contact })
+      onSaved({
+        title: title.trim() || "EGFUL",
+        headline: headline.trim() || "The catalogue",
+        tagline: tagline.trim(), accent: accent.trim(), contact,
+      })
       onOpenChange(false)
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save the branding.")
@@ -88,6 +98,16 @@ export function LookbookBrandingDialog({
             <span className="text-sm font-medium">Name on the cover</span>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="EGFUL" className="h-9" />
             <span className="block text-2xs text-muted-foreground">Also the wordmark in each page footer.</span>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Lookbook name</span>
+            <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="The catalogue" className="h-9" />
+            {/* Said because the cover sets it in 72px and breaks it before the last word: a
+                long name is a small name. */}
+            <span className="block text-2xs text-muted-foreground">
+              The big words on the cover. Two or three words print best — the last one drops to
+              its own line.
+            </span>
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-medium">Cover tagline</span>

@@ -6,6 +6,7 @@ import { X, Printer, CircleNotch, PencilSimple, Image as ImageIcon, ArrowCounter
 import { Button } from "@/components/ui/button"
 import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, saveLookbookStyle, type LookbookStyle } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
+import type { LookbookBrand } from "@/components/app/lookbook-branding-dialog"
 import { getUser } from "@/lib/auth"
 import { LookbookBrandingDialog } from "@/components/app/lookbook-branding-dialog"
 
@@ -181,8 +182,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
   const [err, setErr] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
   const [title, setTitle] = useState<string | null>(null)
-  const [brand, setBrand] = useState<{ title: string; tagline: string; accent: string; contact: string }>({
-    title: "EGFUL", tagline: "Print-on-demand, made to order", accent: HOUSE.accent, contact: "",
+  const [brand, setBrand] = useState<LookbookBrand>({
+    title: "EGFUL", headline: "The catalogue", tagline: "Print-on-demand, made to order",
+    accent: HOUSE.accent, contact: "",
   })
   // Best-effort: a settings read that fails must not stop a catalogue printing. The
   // defaults above are the house brand, so a failure prints the house cover.
@@ -192,6 +194,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
         const g = (k: string) => String((s as Record<string, unknown>)[k] ?? "").trim()
         setBrand({
           title: g("lookbook_title") || "EGFUL",
+          // What the cover is CALLED, as opposed to who publishes it. "The catalogue" was set
+          // in the markup, so a seasonal or private-label edition needed a deploy to be named.
+          headline: g("lookbook_headline") || "The catalogue",
           tagline: g("lookbook_tagline") || "Print-on-demand, made to order",
           accent: hexOr(g("lookbook_accent"), HOUSE.accent),
           contact: g("lookbook_contact"),
@@ -414,8 +419,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               "colour pop" is that it opened straight onto a white spec sheet. A cover is
               also what makes the PDF read as a document rather than as a print-out. */}
           <section
-            className="eg-sheet eg-cover mx-auto mb-6 flex w-[210mm] flex-col justify-between p-[18mm] shadow-sm print:mb-0 print:shadow-none"
-            style={{ minHeight: "297mm", background: brand.accent, color: HOUSE.paper }}
+            className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+            style={{ minHeight: "210mm", background: brand.accent, color: HOUSE.paper }}
           >
             <div className="flex items-start justify-between">
               <span className="font-title text-2xl font-bold tracking-tight">{brand.title}</span>
@@ -426,8 +431,16 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             </div>
 
             <div>
-              <h1 className="font-title font-black leading-[0.88] tracking-tight" style={{ fontSize: "76px" }}>
-                The<br />catalogue
+              {/* BROKEN AT THE LAST SPACE, not typed with a <br>. The cover name is editable
+                  now, so the line break cannot be part of the string — "The catalogue" has to
+                  set the way it always did while "Spring Blanks 2026" sets on its own terms.
+                  A single word simply fills one line. */}
+              <h1 className="font-title font-black leading-[0.88] tracking-tight" style={{ fontSize: "72px" }}>
+                {(() => {
+                  const words = brand.headline.trim().split(/\s+/)
+                  if (words.length < 2) return brand.headline
+                  return <>{words.slice(0, -1).join(" ")}<br />{words[words.length - 1]}</>
+                })()}
               </h1>
               <p className="mt-6 max-w-[105mm] text-base leading-relaxed" style={{ color: "rgba(250,248,243,0.75)" }}>
                 {brand.tagline}
@@ -455,15 +468,15 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             const twoUp = !!hero || !!st.description || editing
             // Wider cells when the swatches have the whole sheet: three across a full page
             // would print them at hero size, which is not what a colour grid is for.
-            const colCap = twoUp ? 12 : 20
+            const colCap = twoUp ? 20 : 32
             return (
-            // ONE STYLE PER PAGE. A4 at 210×297mm with the page break forced after each,
+            // ONE STYLE PER PAGE. A4 LANDSCAPE at 297×210mm with the page break forced after
             // so a colourway grid never starts on one sheet and finishes on the next —
             // which is the one thing that makes a printed catalogue look homemade.
             <section
               key={st.ref}
-              className="eg-sheet mx-auto mb-6 flex w-[210mm] flex-col bg-white p-[14mm] shadow-sm print:mb-0 print:shadow-none"
-              style={{ minHeight: "297mm" }}
+              className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col bg-white p-[14mm] shadow-sm print:mb-0 print:shadow-none"
+              style={{ minHeight: "210mm" }}
             >
               {/* PRICE FIRST, top right, in the display face. It was tucked at the foot of
                   the left column where a buyer had to hunt for it — on a page whose job is
@@ -547,7 +560,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   the two-up grid printed an empty half-page beside the swatches — a hole in
                   the middle of the sheet, which reads worse than a shorter page. The colours
                   and the charts take the full width instead. */}
-              <div className={"grid min-h-0 flex-1 items-stretch gap-8 " + (twoUp ? "grid-cols-2" : "grid-cols-1")}>
+              <div className={"grid min-h-0 flex-1 items-stretch gap-8 " + (twoUp ? "grid-cols-[92mm_minmax(0,1fr)]" : "grid-cols-1")}>
                 {/* LEFT — the product itself, big. Omitted entirely when there is neither. */}
                 {twoUp && (
                 <div className="flex flex-col">
@@ -573,7 +586,13 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                        The trade is real and worth naming — a white or pale garment now has no
                        boundary of its own. If that reads as floating, the answer is a soft
                        shadow under the product, not a line around the box. */
-                    <div className="group relative flex min-h-[120mm] w-full flex-1 items-center justify-center overflow-hidden rounded-lg p-4"
+                    /* A SQUARE, not a column-height well. The sheet is 210mm tall now, and
+                       min-h-[120mm] plus flex-1 made the hero eat all of it — a garment
+                       stretched down a strip with white either side, which is the "main image
+                       way too long". A square is the shape these shots are framed in
+                       everywhere else in the app, so the same photo reads the same here, and
+                       the height it stops taking goes to the copy underneath it. */
+                    <div className="group relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg p-3"
                          style={{ background: PLATE }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={hero} alt={st.name} className="size-full object-contain" />
@@ -622,75 +641,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       : null}
                   </Editable>
 
-                </div>
-                )}
-
-                {/* RIGHT — every colourway, captioned. */}
-                <div className="flex min-h-0 flex-col">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                    Available colours
-                  </div>
-                  {st.colors.length === 0 ? (
-                    <p className="mt-2 text-[11px] text-neutral-400">
-                      No colourway images on this style.
-                    </p>
-                  ) : !st.colors.some((c) => c.image) ? (
-                    /* NAMES, when there are no pictures of them. A grid of bordered wells
-                       each holding a colour name in 7px grey is twelve small versions of the
-                       empty plate this page just stopped printing — the border promises a
-                       photograph the row cannot deliver. The range is still stated, as a
-                       list, which is what it actually is. */
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {st.colors.map((c) => (
-                        <span key={c.name + c.sku}
-                              className="rounded border border-neutral-200 px-2 py-1 text-[10px] leading-tight text-neutral-700">
-                          {c.name}
-                          {c.sku && <span className="ml-1.5 font-mono text-[9px] text-neutral-400">{c.sku}</span>}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    // Five columns, capped at 20. Past that a page stops being readable and
-                    // the overflow is stated rather than silently dropped.
-                    // auto-rows-min keeps swatches their natural height while the column
-                    // stretches, so they sit at the top rather than smearing down the page.
-                    <div className={"mt-2 grid auto-rows-min gap-x-3 gap-y-4 " + (twoUp ? "grid-cols-3" : "grid-cols-5")}>
-                      {st.colors.slice(0, colCap).map((c) => (
-                        <div key={c.name + c.sku} className="flex flex-col items-center">
-                          {/* THREE ACROSS, SQUARE. Four columns made each well ~19mm wide, and
-                              since these photos are wider than they are tall the picture was
-                              width-limited — so the garment printed about 12mm across and the
-                              rest of a 3:4 well was empty plate. Three columns is ~42% more
-                              width, which is the whole of the "way too small". Square rather
-                              than 3:4 for the same reason: the letterboxing above and below
-                              was padding, not picture. Twelve rather than twenty because the
-                              bigger cells cost rows — the remainder is still stated below. */}
-                          {/* Same reasoning as the hero: no rule around a cut-out on white.
-                              Twelve of these in a grid made twelve boxes, which read as a
-                              table of frames rather than a set of colourways. */}
-                          <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded p-1"
-                               style={{ background: PLATE }}>
-                            {c.image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={c.image} alt={c.name} className="size-full object-contain" />
-                            ) : (
-                              <span className="px-1 text-center text-[7px] leading-tight text-neutral-400">{c.name}</span>
-                            )}
-                          </div>
-                          {/* SKU then colour, the way a buyer reads it back to you when
-                              they order — the name alone is not orderable. */}
-                          {c.sku && <div className="mt-1.5 w-full truncate text-center font-mono text-[7px] text-neutral-500">{c.sku}</div>}
-                          <div className="w-full truncate text-center text-[8px] font-medium leading-tight text-neutral-700">{c.name}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {st.colors.length > colCap && (
-                    <p className="mt-2 text-[9px] text-neutral-500">
-                      + {st.colors.length - colCap} more colours — ask us for the full range.
-                    </p>
-                  )}
-                  {/* The size run and the chart live in the RIGHT column, under the
+                  {/* The size run and the chart sit UNDER THE HERO, in the left column.
                       swatches. On the left they left the bottom-right of every sheet
                       empty — a page that dead-ends in white is most of what made this
                       catalogue read as unfinished. mt-auto pins them to the foot of the
@@ -700,7 +651,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       the charts to the foot leaves the slack in the MIDDLE of the sheet, which
                       reads as something failing to render; at the bottom it reads as a page
                       with less on it, which is the truth. */}
-                  <div className={twoUp ? "mt-auto pt-5" : "pt-5"}>
+                  <div className="pt-4">
                     {st.sizes.length > 0 && (
                       <div className="mt-5">
                         <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
@@ -765,6 +716,75 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       )
                     })()}
                   </div>
+
+                </div>
+                )}
+
+                {/* RIGHT — every colourway, captioned. */}
+                <div className="flex min-h-0 flex-col">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+                    Available colours
+                  </div>
+                  {st.colors.length === 0 ? (
+                    <p className="mt-2 text-[11px] text-neutral-400">
+                      No colourway images on this style.
+                    </p>
+                  ) : !st.colors.some((c) => c.image) ? (
+                    /* NAMES, when there are no pictures of them. A grid of bordered wells
+                       each holding a colour name in 7px grey is twelve small versions of the
+                       empty plate this page just stopped printing — the border promises a
+                       photograph the row cannot deliver. The range is still stated, as a
+                       list, which is what it actually is. */
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {st.colors.map((c) => (
+                        <span key={c.name + c.sku}
+                              className="rounded border border-neutral-200 px-2 py-1 text-[10px] leading-tight text-neutral-700">
+                          {c.name}
+                          {c.sku && <span className="ml-1.5 font-mono text-[9px] text-neutral-400">{c.sku}</span>}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    // Five columns, capped at 20. Past that a page stops being readable and
+                    // the overflow is stated rather than silently dropped.
+                    // auto-rows-min keeps swatches their natural height while the column
+                    // stretches, so they sit at the top rather than smearing down the page.
+                    <div className={"mt-2 grid auto-rows-min gap-x-3 gap-y-4 " + (twoUp ? "grid-cols-5" : "grid-cols-8")}>
+                      {st.colors.slice(0, colCap).map((c) => (
+                        <div key={c.name + c.sku} className="flex flex-col items-center">
+                          {/* THREE ACROSS, SQUARE. Four columns made each well ~19mm wide, and
+                              since these photos are wider than they are tall the picture was
+                              width-limited — so the garment printed about 12mm across and the
+                              rest of a 3:4 well was empty plate. Three columns is ~42% more
+                              width, which is the whole of the "way too small". Square rather
+                              than 3:4 for the same reason: the letterboxing above and below
+                              was padding, not picture. Twelve rather than twenty because the
+                              bigger cells cost rows — the remainder is still stated below. */}
+                          {/* Same reasoning as the hero: no rule around a cut-out on white.
+                              Twelve of these in a grid made twelve boxes, which read as a
+                              table of frames rather than a set of colourways. */}
+                          <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded p-1"
+                               style={{ background: PLATE }}>
+                            {c.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={c.image} alt={c.name} className="size-full object-contain" />
+                            ) : (
+                              <span className="px-1 text-center text-[7px] leading-tight text-neutral-400">{c.name}</span>
+                            )}
+                          </div>
+                          {/* SKU then colour, the way a buyer reads it back to you when
+                              they order — the name alone is not orderable. */}
+                          {c.sku && <div className="mt-1.5 w-full truncate text-center font-mono text-[7px] text-neutral-500">{c.sku}</div>}
+                          <div className="w-full truncate text-center text-[8px] font-medium leading-tight text-neutral-700">{c.name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {st.colors.length > colCap && (
+                    <p className="mt-2 text-[9px] text-neutral-500">
+                      + {st.colors.length - colCap} more colours — ask us for the full range.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -799,8 +819,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             return pages.map((page, pi) => (
               <section
                 key={`prices-${pi}`}
-                className="eg-sheet mx-auto mb-6 flex w-[210mm] flex-col bg-white p-[18mm] shadow-sm print:mb-0 print:shadow-none"
-                style={{ minHeight: "297mm" }}
+                className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col bg-white p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+                style={{ minHeight: "210mm" }}
               >
                 <div className="mb-5 h-1.5 w-full rounded-full" style={{ background: brand.accent }} />
                 <div className="mb-6 border-b border-neutral-200 pb-4">
@@ -890,8 +910,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               next step. This one says how to order and who to ask — and closes on the same
               plate it opened with, so the document is bookended rather than just ending. */}
           <section
-            className="eg-sheet eg-cover mx-auto mb-6 flex w-[210mm] flex-col justify-between p-[18mm] shadow-sm print:mb-0 print:shadow-none"
-            style={{ minHeight: "297mm", background: brand.accent, color: HOUSE.paper }}
+            className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+            style={{ minHeight: "210mm", background: brand.accent, color: HOUSE.paper }}
           >
             <span className="font-title text-2xl font-bold tracking-tight">{brand.title}</span>
 
@@ -946,7 +966,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
           print-color-adjust: exact !important;
         }
         @media print {
-          @page { size: A4; margin: 0; }
+          @page { size: A4 landscape; margin: 0; }
           .eg-sheet { break-after: page; page-break-after: always; box-shadow: none !important; margin: 0 !important; }
           .eg-sheet:last-child { break-after: auto; page-break-after: auto; }
           .eg-print-root { background: #fff !important; }
