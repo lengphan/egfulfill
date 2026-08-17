@@ -21,6 +21,7 @@ import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
 import { isApprovable } from "@/components/app/approve-order-button"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
+import { useIsNarrow } from "@/lib/use-narrow"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
 import { setInternalNote } from "@/lib/api"
@@ -1083,6 +1084,28 @@ export function OrdersHub() {
   /** One grid template for the header and every row. Lead tracks (caret, + checkbox when
    *  dispatch is on) precede the data columns; action is pinned last. */
   const gridTmpl = factoryGridTemplate(gridCols, dispatchOn ? 2 : 1)
+
+  /*
+   * PHONE LAYOUT. The desktop row is ten fixed tracks that demand 1224px, so on a 390px
+   * screen you scrolled sideways three times to read one order — and the checkbox and the
+   * actions sat at opposite ends of that journey.
+   *
+   * Same cells, same data, different shape: below md the row becomes a two-column card
+   * (label, value) carrying only what identifies an order on a phone. Everything else stays
+   * one tap away in the order itself, which is where you were going anyway.
+   *
+   * Driven from the SAME `cell` map as the table — a separate mobile renderer would be a
+   * second place for "what does Status mean", and those drift.
+   */
+  const narrow = useIsNarrow()
+  const NARROW_COLS: FactoryColId[] = ["order", "status", "age", "units"]
+  const rowCols = useMemo(
+    () => (narrow ? visibleData.filter((id) => NARROW_COLS.includes(id)) : visibleData),
+    // NARROW_COLS is a module-level constant in spirit; listing it would only churn the memo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [narrow, visibleData],
+  )
+  const rowTmpl = narrow ? "auto minmax(0,1fr)" : gridTmpl
   /**
    * The width this table actually WANTS, so it can scroll instead of bursting its card.
    *
@@ -1116,6 +1139,10 @@ export function OrdersHub() {
     // gap-x-3 is 0.75rem between every track, and px-5 is 1.25rem of gutter each side.
     return Math.round((fixed + gridCols.length * 0.75 + 2.5) * 16)
   }, [gridCols, dispatchOn])
+
+  // No minWidth on a phone: that figure is precisely what forces the sideways scroll, and a
+  // stacked row has no need of it.
+  const rowMinPx = narrow ? undefined : gridMinPx
   /**
    * SELECTION IS NEUTRAL; ACTIONS ARE OPINIONATED.
    *
@@ -1678,8 +1705,8 @@ export function OrdersHub() {
                (Deliberately NOT an app-wide sweep: `uppercase tracking-wide` is the idiom for
                section labels, the sidebar's TOOLS/ACCOUNT and the stat cards. This is the one
                place two type treatments collide inside a single control strip.) */
-            className="grid items-center gap-x-3 border-b border-border bg-muted/30 px-5 py-2 text-xs font-semibold text-muted-foreground"
-            style={{ gridTemplateColumns: gridTmpl, minWidth: gridMinPx }}
+            className={"items-center gap-x-3 border-b border-border bg-muted/30 px-5 py-2 text-xs font-semibold text-muted-foreground " + (narrow ? "hidden" : "grid")}
+            style={{ gridTemplateColumns: rowTmpl, minWidth: rowMinPx }}
           >
             {dispatchOn && <span />}
             <span />
@@ -1915,8 +1942,8 @@ export function OrdersHub() {
                       table has been a real table all along; this is the same idea, driven
                       from the same lib/order-columns.ts. */}
                   <div
-                    className="mb-3 grid items-center gap-x-3 gap-y-1"
-                    style={{ gridTemplateColumns: gridTmpl }}
+                    className={"mb-3 grid gap-x-3 " + (narrow ? "items-start gap-y-2" : "items-center gap-y-1")}
+                    style={{ gridTemplateColumns: rowTmpl }}
                   >
                     {/* A box on EVERY row, disabled where it can't be used. Rendering it
                         only on dispatchable rows reads as a half-built feature: most orders
@@ -1941,7 +1968,14 @@ export function OrdersHub() {
                     {/* DATA COLUMNS — rendered in the user's saved order (drag/hide via the
                         header). Cells are defined above; the action cluster stays pinned
                         immediately after this, always last. */}
-                    {visibleData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
+                    {narrow
+                      ? rowCols.map((id) => (
+                        <Fragment key={id}>
+                          <span className="pt-0.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">{FACTORY_COLS[id].label}</span>
+                          <span className="min-w-0">{cell[id]}</span>
+                        </Fragment>
+                      ))
+                      : visibleData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
 
                     {/* One PRIMARY action for the current stage/role; everything rarer
                         (flag/status, labels, the non-primary of ship/advance) tucks into a
