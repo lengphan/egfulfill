@@ -151,6 +151,50 @@ export function typeSidesOf(p: CatalogProduct | null): string[] {
   return specFor(p)?.sides ?? ["front"]
 }
 
+/**
+ * EVERY SIDE THIS PRODUCT CAN BE DESIGNED ON — the product's own photo per side, and the
+ * category's outline wherever it has none.
+ *
+ * THE FALLBACK IS PER SIDE, and it has to be. The design maker used to choose between the
+ * two sets whole: more than one own face meant use only those, otherwise use only the
+ * type's. Since `mockupFaces` counts the hero photo as the front, ANY product with a
+ * picture plus one side override already had two — so overriding a single side on a
+ * six-side type silently deleted the other four faces from the maker. The admin outlines
+ * were not a fallback at all; they were an alternative, discarded the moment a product
+ * disagreed about one face.
+ *
+ * That was survivable while a side could only be set by picking an existing gallery image.
+ * It stops being survivable now the product editor takes a dropped file per side, because
+ * filling one side is exactly the gesture that used to empty the rest.
+ *
+ * Type order first — it is the order an admin arranged the sides in — then any face the
+ * product has that its type does not list, which is a printable surface and must not be
+ * hidden just because the category was defined without it.
+ *
+ * The rule per side, in full:
+ *   every side   this product's own photo for it, else the type's outline
+ *   front only   …where "its own photo" already means the colourway's shot, then an
+ *                explicit front, then the product's hero (mockupFaces resolves that chain).
+ * So a product with a real photograph designs against the photograph and a product with
+ * none designs against the category outline — the same product-beats-category order
+ * `bestMockup` and design-maker's own `mockupOf` already use. NB the editor's side tiles
+ * label front "From <type>" in that case, because they describe overrides rather than what
+ * the stage will load; they are reporting a different question, not disagreeing.
+ */
+export function designFaces(p: CatalogProduct | null): MockupFace[] {
+  if (!p) return []
+  const own = new Map(mockupFaces(p, null).map((f) => [f.side, f.url]))
+  const out: MockupFace[] = []
+  for (const side of typeSidesOf(p)) {
+    const url = own.get(side) || typeMockupOf(p, side)
+    if (url) out.push({ side, url })
+  }
+  for (const [side, url] of own) {
+    if (url && !out.some((f) => f.side === side)) out.push({ side, url })
+  }
+  return out
+}
+
 export function bestMockup(p: CatalogProduct | null, color?: string | null, fallback?: string): string {
   // The category stand-in sits between the product's own imagery and the caller's
   // fallback: better than a listing photo, worse than a real mockup of this product.

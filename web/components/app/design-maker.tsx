@@ -13,7 +13,7 @@ import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getP
 import { canvasReadableSrc } from "@/lib/thread-match"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
-import { mockupFaces, setTypeMockups, typeMockupOf, typeSidesOf } from "@/lib/variant-resolve"
+import { designFaces, setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
 import { stashPublishDraft } from "@/lib/publish-draft"
 import { DesignLabTabs } from "@/components/app/design-lab-tabs"
@@ -149,15 +149,13 @@ export function DesignMaker() {
   // a different print zone on each, so the side has to drive BOTH the image and the zone —
   // designing a back print against the front's zone puts the artwork in the wrong place.
   const [side, setSide] = useState("front")
-  // A product's OWN per-side images win. Otherwise fall back to the category's sides and
-  // outlines — that's the whole point of defining them once per type: fifty hats inherit
-  // four faces without fifty uploads.
-  const ownFaces = mockupFaces(product, null)
-  const faces = ownFaces.length > 1
-    ? ownFaces
-    : typeSidesOf(product)
-        .map((sd) => ({ side: sd, url: typeMockupOf(product, sd) || (sd === "front" ? ownFaces[0]?.url ?? "" : "") }))
-        .filter((f) => f.url)
+  // A product's OWN photo wins PER SIDE, and the category's outline stands in on every side
+  // it hasn't got one for — which is the point of defining them once per type: fifty hats
+  // inherit four faces without fifty uploads, and a hat that disagrees about its back still
+  // inherits the other three. The rule lives in variant-resolve rather than here, because a
+  // per-side fallback written out at each call site is the kind that drifts one branch at a
+  // time — which is how this one came to discard the category outlines wholesale.
+  const faces = designFaces(product)
   // Fall back to the single mockup when a product defines no per-side images, so a blank
   // without them behaves exactly as before rather than losing its picture.
   const faceUrl = faces.find((f) => f.side === side)?.url || (side === "front" ? typeMockupOf(product) : "")

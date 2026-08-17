@@ -214,6 +214,32 @@ export function ProductEditorDialog({
     }, setErr))
   }
 
+  /**
+   * A photo dropped straight onto ONE SIDE.
+   *
+   * The side tiles could only ever choose from pictures already in the gallery, so setting
+   * a real back-of-garment mockup meant adding it as a product photo first and then coming
+   * back down here to pick it — two steps, in two different parts of the dialog, for one
+   * intention. Dropping a file on the tile now does both.
+   *
+   * It STILL JOINS THE GALLERY rather than being stashed only on the side. A side mockup is
+   * a picture of this product, everything else that lists the product's images would
+   * otherwise never see it, and dropImages already clears any side pointing at a photo that
+   * gets removed — so keeping the one set is also what keeps deletion honest.
+   *
+   * Only the first file: a side is one face, and quietly dropping the rest of a multi-file
+   * selection into the gallery unassigned would look like the upload half-failed.
+   */
+  const setSideFromFiles = (side: string, files: File[]) => {
+    const f = files.filter((x) => x.type.startsWith("image/"))[0]
+    if (!f) return
+    readImageFile(f, (u) => {
+      setGallery((g) => (g.includes(u) ? g : [...g, u]))
+      setImg((cur) => cur || u)
+      setSideMockups((m) => ({ ...m, [side]: u }))
+    }, setErr)
+  }
+
   useEffect(() => {
     if (!open) return
     const p = product
@@ -1165,6 +1191,15 @@ export function ProductEditorDialog({
                 <span className="text-sm font-medium">Print sides</span>
                 <span className="text-xs text-muted-foreground">from {type} · override only if this blank differs</span>
               </div>
+              {/* SAY WHICH WAY THE FALLBACK RUNS. Three ways to fill a side and one to empty
+                  it is not something a tile can express on its own, and the rule — the type's
+                  photo stands in whenever this product has nothing — is the reason clearing a
+                  side is safe rather than destructive. */}
+              <p className="text-xs text-muted-foreground">
+                Drop a photo on a side, or use ↑ to upload one; click a tile to pick from this
+                product&apos;s images. Anything you don&apos;t set falls back to the {type} photo from
+                Settings › Platform, and clearing a side returns it to that.
+              </p>
               <div className="flex flex-wrap gap-2">
                 {typeSides.map((sd) => {
                   const override = sideMockups[sd] || ""
@@ -1180,7 +1215,20 @@ export function ProductEditorDialog({
                        following settings is the default and needs no instruction. Now:
                        click the tile to change it, X to clear it back to settings, and a
                        small tag only when this product actually disagrees with its type. */
-                    <div key={sd} className="group/side flex w-28 flex-col gap-1.5">
+                    /* DROPPABLE. The tile takes a file directly now — the Images grid above
+                       accepts a drop and this did not, so the two picture wells in one dialog
+                       behaved differently for the same gesture. */
+                    <div
+                      key={sd}
+                      className="group/side relative flex w-28 flex-col gap-1.5"
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                      onDrop={(e) => {
+                        // stopPropagation, or the panel's own handler ALSO catches this and
+                        // files the photo in the gallery unassigned — one drop, two homes.
+                        e.preventDefault(); e.stopPropagation()
+                        setSideFromFiles(sd, Array.from(e.dataTransfer.files))
+                      }}
+                    >
                       <label className="relative block cursor-pointer">
                         {shown ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -1230,6 +1278,23 @@ export function ProductEditorDialog({
                             <X size={12} weight="bold" />
                           </button>
                         )}
+                      </label>
+                      {/* UPLOAD, as a sibling of the tile's label rather than inside it —
+                          a label nested in a label is invalid, and the outer one already owns
+                          every click on the picture for the gallery picker. Its own hidden
+                          input, so no ref plumbing and no second click target on the tile.
+                          Left corner, because the right one is the clear button and a pair of
+                          controls that both live top-right is a mis-click waiting to happen. */}
+                      <label
+                        title="Upload a photo for this side"
+                        className="absolute -left-1.5 -top-1.5 z-10 grid size-6 cursor-pointer place-items-center rounded-full bg-foreground/75 text-background opacity-0 transition-opacity group-hover/side:opacity-100 focus-within:opacity-100"
+                      >
+                        <UploadSimple size={12} weight="bold" />
+                        <input
+                          type="file" accept="image/*" className="hidden"
+                          aria-label={`Upload a photo for the ${sd} side`}
+                          onChange={(e) => { setSideFromFiles(sd, Array.from(e.target.files ?? [])); e.target.value = "" }}
+                        />
                       </label>
                       <span className="truncate text-xs font-medium capitalize">{sd}</span>
                     </div>
