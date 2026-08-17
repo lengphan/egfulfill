@@ -225,9 +225,28 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return t ? t.slice(0, max) : null;
   };
 
+  /**
+   * EVERY SUPPLIER PROXY PREFIX WE MINT, not just S&S.
+   *
+   * This list is the third supplier's turn at the same bug. `/api/sanmar/img-proxy` is what
+   * sanmar.js stores — SanMar's image columns are bare filenames, so the importer builds a
+   * proxy path exactly the way ss.js does — and it was never added here, so every SanMar
+   * style published to the marketing site came out with `image: null` and drew the "Photo
+   * coming" plate. The picture was fine and the route serving it has existed the whole time;
+   * only this predicate disagreed.
+   *
+   * Adding a supplier means adding its prefix HERE. That is the actual coupling, and it is
+   * easy to miss because the importer works, the staff grid works, and only the public page
+   * — which nobody re-checks after an import — goes blank.
+   *
+   * `/api/etsy/img-proxy` is deliberately absent. That one carries BUYER artwork from an
+   * order, not a product photograph; it has no business being a catalogue image, and
+   * whitelisting it would widen what the public shape can emit for no reason anyone wants.
+   */
+  const SUPPLIER_IMG_PREFIXES = ['/api/ss/img', '/api/sanmar/img-proxy'];
   const renderable = (v) =>
     typeof v === 'string' && (/^(https?:\/\/|data:image\/)/i.test(v)
-      || v.startsWith('/api/ss/img')
+      || SUPPLIER_IMG_PREFIXES.some((p) => v.startsWith(p))
       // Our own image address. fattenImages puts the bytes back on write, so this should
       // not reach storage — but a path that DID slip through still serves the picture, and
       // treating it as unrenderable would blank a product that is perfectly fine.
@@ -590,7 +609,11 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     // Location header, which defeats the entire point of the opaque path — the known hole
     // noted on /api/public/products/:slug/img, closed here because this one is handed out in
     // a document rather than rendered by our own page.
-    const proxied = raw.startsWith('/api/ss/img') ? upsizeSupplierImg(raw)
+    // Same omission as `renderable` had: a SanMar path fell through to null, then failed the
+    // https test, and the row's image 404'd in a document we hand to an outside company.
+    // upsizeSupplierImg returns anything that isn't an S&S path untouched, so one branch
+    // covers both — the S&S size-swap still happens, SanMar dispatches as stored.
+    const proxied = SUPPLIER_IMG_PREFIXES.some((p) => raw.startsWith(p)) ? upsizeSupplierImg(raw)
       : SUPPLIER_HOST.test(raw) ? '/api/ss/img?u=' + encodeURIComponent(raw)
         : null;
     if (proxied) {
