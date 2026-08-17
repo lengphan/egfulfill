@@ -185,7 +185,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
   const [title, setTitle] = useState<string | null>(null)
   const [brand, setBrand] = useState<LookbookBrand>({
     title: "EGFUL", headline: "The catalogue", tagline: "Print-on-demand, made to order",
-    accent: HOUSE.accent, contact: "",
+    accent: HOUSE.accent, contact: "", email: "", phone: "", site: "", address: "",
   })
   // Best-effort: a settings read that fails must not stop a catalogue printing. The
   // defaults above are the house brand, so a failure prints the house cover.
@@ -201,6 +201,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
           tagline: g("lookbook_tagline") || "Print-on-demand, made to order",
           accent: hexOr(g("lookbook_accent"), HOUSE.accent),
           contact: g("lookbook_contact"),
+          email: g("lookbook_email"), phone: g("lookbook_phone"),
+          site: g("lookbook_site"), address: g("lookbook_address"),
         })
       }).catch(() => {})
     }, 0)
@@ -634,8 +636,11 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                      The house move instead: ink at size, with the accent as a hairline rule
                      above it. Same hierarchy, no ornament — and the accent stays the one
                      colour on the page rather than a second one competing with the top rule. */
-                  <div className="shrink-0 border-t-[3px] pt-2 text-right"
-                       style={{ borderColor: brand.accent, color: HOUSE.ink }}>
+                  /* No rule either. The page already carries the accent across its top, and a
+                     second stroke over the price was the pill's ghost — a container drawn
+                     around a number that does not need one. The figure alone is the loudest
+                     thing on the sheet because nothing else is set at that size. */
+                  <div className="shrink-0 text-right" style={{ color: HOUSE.ink }}>
                     <div className={sheetPrice(st) != null
                       ? "font-title text-4xl font-bold leading-none tabular-nums"
                       : "py-2 text-sm font-medium leading-none"}>
@@ -1071,8 +1076,24 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
 
             <div>
               <div className="h-1.5 w-28 rounded-full" style={{ background: HOUSE.lime }} />
-              {/* Only printed when someone has SET it. An empty contact block on a back
-                  cover is worse than none — it reads as a template nobody finished. */}
+              {/* THE WAYS TO REACH US, each labelled and each its own field — a back cover
+                  that says "get in touch" and gives one line is a dead end, and a single
+                  free-text blob cannot be laid out or checked for what is missing.
+                  Every row is printed ONLY when it has been set: an empty labelled row on a
+                  back cover reads as a template nobody finished, which is worse than none. */}
+              {(brand.email || brand.phone || brand.site || brand.address) && (
+                <dl className="mt-5 grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+                  {([["Email", brand.email], ["Phone", brand.phone], ["Online", brand.site], ["Address", brand.address]] as const)
+                    .filter(([, v]) => !!v)
+                    .map(([k, v]) => (
+                      <div key={k}>
+                        <dt className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+                            style={{ color: "rgba(250,248,243,0.6)" }}>{k}</dt>
+                        <dd className="mt-0.5 whitespace-pre-line leading-relaxed">{v}</dd>
+                      </div>
+                    ))}
+                </dl>
+              )}
               {brand.contact && (
                 <p className="mt-5 whitespace-pre-line text-sm leading-relaxed">{brand.contact}</p>
               )}

@@ -9,7 +9,12 @@ import { getFactorySettings, setFactorySettings } from "@/lib/api"
 /** `title` is who publishes it — the wordmark on the cover and in every footer. `headline` is
  *  what this edition is CALLED, set in 72px on the cover. Two different things: a private-label
  *  buyer changes one of them and not the other. */
-export type LookbookBrand = { title: string; headline: string; tagline: string; accent: string; contact: string }
+export type LookbookBrand = {
+  title: string; headline: string; tagline: string; accent: string; contact: string
+  /** The back cover's reach-us block, one field each so it can be laid out and so a missing
+   *  one is visible rather than buried in a paragraph. Blank rows are not printed. */
+  email: string; phone: string; site: string; address: string
+}
 
 /**
  * THE COVER, EDITED WHERE THE COVER IS.
@@ -39,6 +44,10 @@ export function LookbookBrandingDialog({
   const [tagline, setTagline] = useState(brand.tagline)
   const [accent, setAccent] = useState(brand.accent)
   const [contact, setContact] = useState(brand.contact)
+  const [email, setEmail] = useState(brand.email)
+  const [phone, setPhone] = useState(brand.phone)
+  const [site, setSite] = useState(brand.site)
+  const [address, setAddress] = useState(brand.address)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -51,6 +60,7 @@ export function LookbookBrandingDialog({
     const t = setTimeout(() => {
       setTitle(brand.title); setHeadline(brand.headline)
       setTagline(brand.tagline); setAccent(brand.accent); setContact(brand.contact)
+      setEmail(brand.email); setPhone(brand.phone); setSite(brand.site); setAddress(brand.address)
       setErr(null)
     }, 0)
     return () => clearTimeout(t)
@@ -76,12 +86,17 @@ export function LookbookBrandingDialog({
         lookbook_tagline: tagline.trim(),
         lookbook_accent: accent.trim(),
         lookbook_contact: contact,
+        lookbook_email: email.trim(),
+        lookbook_phone: phone.trim(),
+        lookbook_site: site.trim(),
+        lookbook_address: address,
       } as Parameters<typeof setFactorySettings>[0])
       if ((r as { error?: string })?.error) throw new Error((r as { error?: string }).error!)
       onSaved({
         title: title.trim() || "EGFUL",
         headline: headline.trim() || "The catalogue",
         tagline: tagline.trim(), accent: accent.trim(), contact,
+        email: email.trim(), phone: phone.trim(), site: site.trim(), address,
       })
       onOpenChange(false)
     } catch (e) {
@@ -131,8 +146,26 @@ export function LookbookBrandingDialog({
               Prints full-bleed on the covers with the title reversed out — keep it dark.
             </span>
           </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Email</span>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="orders@egful.store" className="h-9" />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Phone</span>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 …" className="h-9" />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Online</span>
+              <Input value={site} onChange={(e) => setSite(e.target.value)} placeholder="egful.store" className="h-9" />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Address</span>
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="City, country" className="h-9" />
+            </label>
+          </div>
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Back-cover contact</span>
+            <span className="text-sm font-medium">Anything else on the back cover</span>
             <textarea
               value={contact}
               onChange={(e) => setContact(e.target.value)}
