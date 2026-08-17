@@ -308,6 +308,51 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
     return { ok: true, item: upd.rows[0] || null };
   });
 
+  /**
+   * SET THE SHELF FOR A PRODUCT'S VARIANTS, in one write.
+   *
+   * The product editor holds a size × colour grid, and "apply to all" can touch every cell
+   * of it — a tee with 8 sizes and 62 colours is 496 rows. One request, not 496 PATCHes.
+   *
+   * NOT the bulk POST above, which writes every column from the caller's snapshot: this one
+   * only ever moves `in_stock` (plus the name/variant labels a new row needs to be readable
+   * in the Inventory table and on a scanner). `reserved`, `reorder_at`, `category`,
+   * `supplier` and `visibility` are left exactly as they are, so setting a count cannot
+   * quietly reset a reorder point somebody chose or publish a factory-only sku.
+   *
+   * NEVER PRUNES. Removing a colour from a product is not a statement that its shelf is
+   * empty — the stock is still on the rack. Deleting a stock row stays an explicit act
+   * through DELETE below.
+   *
+   * A null/absent `in_stock` means "don't track this variant": the row is skipped rather
+   * than written as 0, because stock-status.ts reads an absent sku as "we don't stock this"
+   * and a 0 as "we are out", and those two send a person to different places.
+   */
+  app.post('/api/inventory/stock', { preHandler: requireWarehouse }, async (req, reply) => {
+    const rows = Array.isArray(req.body && req.body.rows) ? req.body.rows : [];
+    if (!rows.length) { reply.code(400); return { error: 'rows required' }; }
+    let written = 0;
+    for (const r of rows) {
+      const sku = String(r && r.sku != null ? r.sku : '').trim();
+      if (!sku) continue;
+      if (r.in_stock == null || r.in_stock === '') continue;
+      const n = Math.round(Number(r.in_stock));
+      if (!Number.isFinite(n)) continue;
+      await q(
+        `insert into inventory (sku, name, variant, in_stock)
+         values ($1,$2,$3,$4)
+         on conflict (sku) do update set
+           name = coalesce(excluded.name, inventory.name),
+           variant = coalesce(excluded.variant, inventory.variant),
+           in_stock = excluded.in_stock,
+           updated_at = now()`,
+        [sku, r.name || null, r.variant || null, n]
+      );
+      written++;
+    }
+    return { ok: true, written };
+  });
+
   app.delete('/api/inventory/:sku', { preHandler: requireWarehouse }, async (req) => {
     await q('delete from inventory where sku=$1', [req.params.sku]);
     return { ok: true };

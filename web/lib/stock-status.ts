@@ -3,6 +3,7 @@
 // resolver — mirrors the server) so a line resolves here exactly as it does for pricing and
 // the barcode. Stock is held against the BLANK sku, so that's what we look up.
 import { resolveProduct } from "@/lib/variant-resolve"
+import { variantSku } from "@/lib/variant-sku"
 import type { CatalogProduct, OrderItem } from "@/lib/api"
 
 /**
@@ -51,11 +52,29 @@ export type OrderStock = {
   why: string
 }
 
-// The blank SKU a line draws stock from (picked blank wins, else the resolved catalog
-// blank), uppercased to match the stock map. "" when nothing resolves — an unstocked or
-// not-yet-assigned line, which reads as the grey "unknown" state, not "out".
-export function stockSkuOf(item: OrderItem, catalog: CatalogProduct[]): string {
-  return stripMethod(String(resolveProduct(item, catalog)?.sku || item.blank || "")).toUpperCase()
+/**
+ * The SKU a line draws stock from — THE VARIANT first, the product only as a fallback.
+ *
+ * A shelf holds a size in a colour, not a product. This resolved to the product's own sku,
+ * so a line for a 3XL in Forest Green was answered by one number covering every size and
+ * colour the product has: "in stock" could be true of the product and false of the only
+ * thing being made.
+ *
+ * `stock` is optional and is EVIDENCE, not decoration: the variant key wins only when the
+ * map actually holds it. A product stocked the old way — one row, product sku — keeps being
+ * read that way, so nothing has to be migrated for this to be safe, and a variant nobody
+ * has counted yet falls back rather than reporting a confident zero.
+ *
+ * "" when nothing resolves — an unstocked or not-yet-assigned line, which reads as the grey
+ * "unknown" state, not "out".
+ */
+export function stockSkuOf(item: OrderItem, catalog: CatalogProduct[], stock?: Record<string, number>): string {
+  const product = resolveProduct(item, catalog)
+  const base = stripMethod(String(product?.sku || item.blank || "")).toUpperCase()
+  if (!base) return ""
+  const variant = variantSku(product?.sku || "", item.size, item.color)
+  if (variant && (!stock || Object.prototype.hasOwnProperty.call(stock, variant))) return variant
+  return base
 }
 
 /**
@@ -81,7 +100,18 @@ export function orderStock(items: OrderItem[], catalog: CatalogProduct[], stock:
      * dressed as instruction. When a product resolved, its sku is the only valid key; when
      * none did, the blank may genuinely be one (a line carrying EG-5000).
      */
-    const sku = productSku || (product ? "" : stripMethod(String(it.blank || "")).toUpperCase())
+    const base = productSku || (product ? "" : stripMethod(String(it.blank || "")).toUpperCase())
+    /**
+     * THE VARIANT'S OWN ROW WINS — when there is one.
+     *
+     * Same rule as stockSkuOf above, and it has to be applied HERE too because this walks
+     * the lines itself: a chip built on the product row answers "have we got the product",
+     * and the floor is asking "have we got the 3XL in Forest Green". The map decides — a
+     * variant nobody has counted falls back to the product row rather than reporting a
+     * confident zero for a shelf that was never split.
+     */
+    const variant = variantSku(product?.sku || "", it.size, it.color)
+    const sku = variant && Object.prototype.hasOwnProperty.call(stock, variant) ? variant : base
     const have = sku && Object.prototype.hasOwnProperty.call(stock, sku) ? stock[sku] : null
     // Which link broke, in the order the chain runs. A product that resolved but carries no
     // sku is the interesting one: it looks set up from every other screen, and is the exact

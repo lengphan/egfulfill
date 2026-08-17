@@ -1224,6 +1224,23 @@ export function addInventoryItem(item: InventoryItem) {
 export function deleteInventoryItem(sku: string) {
   return api<{ ok?: boolean }>(`/api/inventory/${encodeURIComponent(sku)}`, { method: "DELETE" })
 }
+/**
+ * Set the shelf count for a product's VARIANTS — one request for the whole grid.
+ *
+ * Only `in_stock` moves (plus the labels a new row needs to be readable). Reorder points,
+ * category, supplier and visibility are left as they are, which is what makes this safe to
+ * call from the product editor: setting a count must never quietly republish a factory-only
+ * sku or reset a reorder level somebody chose. Nothing is pruned — dropping a colour from a
+ * product does not empty its shelf.
+ *
+ * A row with `in_stock: null` is SKIPPED, not written as 0: an absent sku reads as "we don't
+ * stock this" and a 0 reads as "we are out", and those send a person to different places.
+ */
+export function saveVariantStock(rows: { sku: string; name?: string | null; variant?: string | null; in_stock: number | null }[]) {
+  return api<{ ok?: boolean; written?: number; error?: string }>(`/api/inventory/stock`, {
+    method: "POST", body: JSON.stringify({ rows }),
+  })
+}
 
 // ── Ads (Meta + Google) ──
 // Spend/budget are already normalised to whole currency server-side (Meta reports

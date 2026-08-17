@@ -7,15 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readImageFile } from "@/components/app/design-canvas"
 import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
-import { getFactorySettings, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
+import { getFactorySettings, getInventory, saveVariantStock, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
 import { shipBandKey } from "@/lib/ship-band"
-import { swatchHex } from "@/lib/color-swatch"
+import { swatchHex, swatchBg } from "@/lib/color-swatch"
 import { extractDominant, hexToRgb, rgbToOklab } from "@/lib/thread-match"
 import { normalizeMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 import { packagingHint } from "@/lib/dim-weight"
 import { cleanSku } from "@/lib/sku"
+import { variantSku, variantLabel, variantPairs } from "@/lib/variant-sku"
 import { framingStyle, FOCUS_MIN, FOCUS_MAX, ZOOM_MIN, ZOOM_MAX } from "@/lib/product-framing"
 
 // Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
@@ -191,6 +192,20 @@ export function ProductEditorDialog({
   const [bulkBase, setBulkBase] = useState("")
   const [bulkShip, setBulkShip] = useState("")
   const [bulkPct, setBulkPct] = useState(false)
+  /**
+   * THE SHELF, PER VARIANT — variantSku -> units, as TEXT.
+   *
+   * Text rather than numbers because "" is a value here and 0 is a different one: blank
+   * means we don't track that variant, 0 means it is empty. A numeric state would collapse
+   * them the moment anyone cleared a cell.
+   *
+   * `loadedStock` is what the server had when the dialog opened, so save can write only the
+   * cells that actually changed — a grid can hold 496 of them and re-asserting untouched
+   * counts would clobber anything the floor scanned in while this window was open.
+   */
+  const [stock, setStock] = useState<Record<string, string>>({})
+  const [loadedStock, setLoadedStock] = useState<Record<string, string>>({})
+  const [bulkStock, setBulkStock] = useState("")
   const [colorInput, setColorInput] = useState("")
   const [status, setStatus] = useState("Active")
   const [img, setImg] = useState("")
@@ -510,6 +525,52 @@ export function ProductEditorDialog({
     })
   }
 
+  /** OUR sku, as it will be saved — the stock grid keys off it, so it has to be the same
+   *  string `save` writes and not the raw field. */
+  const ourSku = cleanSku(sku) || cleanSku(nextSku ?? "")
+
+  /**
+   * What the shelf holds for this product's variants, read once per opening.
+   *
+   * Only rows whose sku starts with this product's — the inventory table is the whole
+   * factory, and pulling it all into the grid would put another product's counts in these
+   * cells the moment two skus shared a prefix.
+   */
+  useEffect(() => {
+    if (!open || !ourSku) return
+    let live = true
+    const t = setTimeout(() => {
+      getInventory().then((rows) => {
+        if (!live) return
+        const mine: Record<string, string> = {}
+        const want = new Set(variantPairs(sizes, colors).map((v) => variantSku(ourSku, v.size, v.color)))
+        for (const r of rows ?? []) {
+          const key = String(r.sku || "").toUpperCase()
+          if (want.has(key) && r.in_stock != null) mine[key] = String(r.in_stock)
+        }
+        setStock(mine); setLoadedStock(mine)
+      }).catch(() => {})
+    }, 0)
+    return () => { live = false; clearTimeout(t) }
+    // sizes/colors deliberately absent: adding a size must not re-read and wipe unsaved
+    // edits. A variant added after opening simply starts blank, which is correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, ourSku])
+
+  /** Put the bulk number in every cell, or in one colourway's row. */
+  const fillStock = (color?: string) => {
+    const v = bulkStock.trim()
+    if (v === "") return
+    setStock((m) => {
+      const next = { ...m }
+      for (const pair of variantPairs(sizes, color ? [color] : colors)) {
+        const key = variantSku(ourSku, pair.size, pair.color)
+        if (key) next[key] = v
+      }
+      return next
+    })
+  }
+
   const save = () => {
     if (!name.trim()) { setErr("Give the product a name."); return }
     const colorImages: Record<string, string> = {}
@@ -581,6 +642,42 @@ export function ProductEditorDialog({
       // writing {} explicitly is how a product goes back to following settings.
       side_mockups: Object.fromEntries(Object.entries(sideMockups).filter(([, v]) => !!v)),
       img, // the hero — what the catalog shows
+      /**
+       * THE VARIANT SKUS THIS PRODUCT OWNS, written onto the product so the rest of the
+       * system can match a line to a shelf without recomputing the scheme. pricing.js's
+       * candidateSkus() already reads this field — it has been in the shape all along and
+       * nothing was ever filling it in.
+       */
+      variantSkus: colors.length && sizes.length && ourSku
+        ? variantPairs(sizes, colors).map((v) => ({ sku: variantSku(ourSku, v.size, v.color), color: v.color, size: v.size }))
+        : product?.variantSkus,
+    }
+    /**
+     * ONLY THE CELLS THAT MOVED.
+     *
+     * The grid holds up to 496 counts and the floor scans against the same rows while this
+     * window is open. Re-asserting every cell would overwrite a delivery someone booked in
+     * two minutes ago with whatever this dialog happened to load — the exact clobber the
+     * whole-list inventory POST is warned about in api.ts.
+     *
+     * Fire-and-forget on purpose: the product save below is what the person pressed the
+     * button for, and blocking it on an inventory write would hold the dialog open behind a
+     * request that has nothing to do with the product record. A failure surfaces on the
+     * Inventory page, where the numbers live.
+     */
+    const moved = Object.entries(stock).filter(([k, v]) => (loadedStock[k] ?? "") !== v)
+    if (moved.length) {
+      void saveVariantStock(moved.map(([sku, v]) => {
+        const pair = variantPairs(sizes, colors).find((p) => variantSku(ourSku, p.size, p.color) === sku)
+        return {
+          sku,
+          name: name.trim() || undefined,
+          variant: pair ? variantLabel(pair.size, pair.color) : undefined,
+          // "" is CLEARED, not zero — the row is left untracked rather than written as empty
+          // stock. Skipped server-side for the same reason.
+          in_stock: v.trim() === "" ? null : Number(v),
+        }
+      })).catch(() => {})
     }
     onSave(next)
     onOpenChange(false)
@@ -948,6 +1045,114 @@ export function ProductEditorDialog({
                 )}
               </div>
           </div>
+
+          {/**
+            * STOCK, PER VARIANT — its own card, deliberately not a column in the table above.
+            *
+            * Sizes & pricing is MONEY, and money is per size: a 3XL costs more to buy and to
+            * ship, and colour changes neither. Stock is the opposite — it is the shelf, and a
+            * shelf is per size AND colour. Putting a stock column in that table would have
+            * been one number covering 17 colours, which is the very thing that made "do we
+            * have it?" unanswerable: `inventory` is keyed by sku, and until now an order line
+            * resolved to the PRODUCT's sku, so one Gildan 5000 had a single count across 8
+            * sizes and 62 colours.
+            *
+            * A GRID, NOT A LIST OF 496 FIELDS. Colours down, sizes across, so a row is a
+            * colourway and a column is a size — the two ways anyone actually asks the
+            * question ("how many black?", "are we out of 3XL?").
+            *
+            * EMPTY IS NOT ZERO, and the grid must keep them apart: blank means we don't track
+            * that variant and the boards read it as "unknown"; 0 means the shelf is empty and
+            * reads as "out". stock-status.ts has always drawn that line — this is the first
+            * screen that can express it.
+            */}
+          {ourSku && colors.length > 0 && sizes.length > 0 && (
+            <div className="rounded-xl border border-border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium">
+                  Stock
+                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                    {sizes.length} size{sizes.length === 1 ? "" : "s"} × {colors.length} colour{colors.length === 1 ? "" : "s"}
+                  </span>
+                </span>
+                {/* The pricing card's "Apply to all", in the same words and the same place,
+                    because it is the same gesture on the same shape of table. */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Input
+                    value={bulkStock}
+                    onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder="units" inputMode="numeric"
+                    className="h-7 w-20 text-center text-xs"
+                    aria-label="Units to apply"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fillStock()}
+                    disabled={bulkStock.trim() === ""}
+                    className="rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
+                  >
+                    Apply to all
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full border-separate border-spacing-0 text-xs">
+                  <thead>
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-card pb-1.5 pr-2 text-left font-medium text-muted-foreground">Colour</th>
+                      {sizes.map((s) => (
+                        <th key={s} className="px-1 pb-1.5 text-center font-medium text-muted-foreground">{s}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {colors.map((c) => (
+                      <tr key={c}>
+                        <th className="sticky left-0 z-10 max-w-[9rem] truncate bg-card py-0.5 pr-2 text-left font-normal" title={prettyColorName(c)}>
+                          <span className="flex items-center gap-1.5">
+                            <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: swatchBg(c) ?? "#c7c4bd" }} />
+                            <span className="truncate">{prettyColorName(c)}</span>
+                            {/* One colourway at a time — the common case is a delivery of
+                                one colour in every size, which "apply to all" would spread
+                                across the whole product. */}
+                            <button
+                              type="button"
+                              onClick={() => fillStock(c)}
+                              disabled={bulkStock.trim() === ""}
+                              title={`Put ${bulkStock || "…"} in every size of ${prettyColorName(c)}`}
+                              className="ml-auto shrink-0 rounded px-1 text-2xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-0"
+                            >
+                              fill
+                            </button>
+                          </span>
+                        </th>
+                        {sizes.map((s) => {
+                          const key = variantSku(ourSku, s, c)
+                          return (
+                            <td key={s} className="px-1 py-0.5">
+                              <Input
+                                value={stock[key] ?? ""}
+                                onChange={(e) => setStock((m) => ({ ...m, [key]: e.target.value.replace(/[^0-9]/g, "") }))}
+                                placeholder="—" inputMode="numeric"
+                                className="h-7 w-14 text-center text-xs"
+                                aria-label={`Stock for ${prettyColorName(c)} ${s}`}
+                                title={key}
+                              />
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Blank means we don&apos;t track that variant — different from 0, which says the shelf is
+                empty. Each cell is stocked against its own sku ({variantSku(ourSku, sizes[0], colors[0])}).
+              </p>
+            </div>
+          )}
 
           {/* Shipping physicals + dim-weight guard. Carriers bill the greater of actual and
               dimensional weight (L×W×H÷166); keep the box under the ceiling so you're always
