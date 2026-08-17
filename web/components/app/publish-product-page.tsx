@@ -205,6 +205,38 @@ type Outcome = { state: "running" | "ok" | "dry" | "fail"; text: string; note?: 
  * a new type every frame, so React remounts it and every keystroke in the search box would
  * lose focus (the repo's react-hooks/static-components rule).
  */
+/**
+ * THE LAST CATEGORY YOU PICKED, PER SHOP.
+ *
+ * TikTok requires a LEAF category and there are thousands of them, so finding the right one
+ * is a genuine search — and a seller publishing shirt after shirt was repeating that search
+ * every single time, for the same answer. Remembered per connection_id rather than globally,
+ * because two shops can sell different things and the right default for one is a wrong
+ * default for the other.
+ *
+ * A DEFAULT, NOT A DECISION. It prefills and can be changed before publishing; nothing is
+ * sent that the seller has not seen in the field. Stored per shop, so clearing one does not
+ * touch another.
+ *
+ * localStorage rather than the server: it is a UI convenience with no consequence if it is
+ * lost, and a round trip to store it would be more machinery than the preference is worth.
+ */
+const CAT_KEY = (cid: string) => `eg_tt_cat_${cid}`
+function rememberCategory(cid: string, c: TiktokCategory | null) {
+  try {
+    if (c) localStorage.setItem(CAT_KEY(cid), JSON.stringify({ id: c.id, local_name: c.local_name }))
+    else localStorage.removeItem(CAT_KEY(cid))
+  } catch { /* private mode / quota — a lost preference must never break publishing */ }
+}
+function recallCategory(cid: string): TiktokCategory | null {
+  try {
+    const raw = localStorage.getItem(CAT_KEY(cid))
+    if (!raw) return null
+    const v = JSON.parse(raw)
+    return v && v.id ? (v as TiktokCategory) : null
+  } catch { return null }
+}
+
 function TiktokFields({ dest, fields, onChange }: {
   dest: PublishDestination
   fields: TtFields
@@ -238,21 +270,37 @@ function TiktokFields({ dest, fields, onChange }: {
           disabled={!fields.categories.length && !!fields.loadErr}
           className="h-8 text-xs"
         />
-        {fields.query.trim() && (
-          <div className="max-h-36 overflow-y-auto rounded-md border border-border">
-            {matches.length === 0 ? (
-              <div className="px-2 py-1.5 text-xs text-muted-foreground">No leaf category matches.</div>
-            ) : matches.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onChange({ category: c, query: "" })}
-                className={"flex w-full items-center justify-between px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted " + (fields.category?.id === c.id ? "bg-primary/10 text-primary" : "")}
-              >
-                <span className="truncate">{c.local_name || c.id}</span>
-              </button>
-            ))}
-          </div>
+        {/* A DROPDOWN, with the box above it as a filter rather than as the only way in.
+            It used to be search-only: the list appeared while you typed and vanished when you
+            stopped, so with an empty box there was nothing to open and no way to see what was
+            on offer — on a required field whose valid values are a tree of thousands. The
+            select is always there; typing narrows it. */}
+        <select
+          value={fields.category?.id ?? ""}
+          onChange={(e) => {
+            const c = fields.categories.find((x) => String(x.id) === e.target.value) ?? null
+            onChange({ category: c, query: "" })
+            rememberCategory(dest.connection_id, c)
+          }}
+          disabled={!fields.categories.length}
+          aria-label="TikTok leaf category"
+          className="eg-select h-8 w-full rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        >
+          <option value="">
+            {fields.categories.length ? "Choose a category…" : fields.loadErr ? "Couldn't load categories" : "Loading categories…"}
+          </option>
+          {/* The current pick is listed even when the filter excludes it, or typing would
+              silently clear a category that is still selected. */}
+          {fields.category && !matches.some((c) => c.id === fields.category!.id) && (
+            <option value={fields.category.id}>{fields.category.local_name || fields.category.id}</option>
+          )}
+          {matches.map((c) => <option key={c.id} value={c.id}>{c.local_name || c.id}</option>)}
+        </select>
+        {fields.query.trim() && matches.length === 0 && (
+          <p className="text-xs text-muted-foreground">No leaf category matches that.</p>
+        )}
+        {fields.query.trim() && matches.length > 0 && (
+          <p className="text-3xs text-muted-foreground">Showing {matches.length} match{matches.length === 1 ? "" : "es"}.</p>
         )}
       </div>
 
@@ -610,7 +658,23 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
             ...m,
             [cid]: r.error
               ? { ...(m[cid] ?? TT_EMPTY), loadErr: r.error }
-              : { ...(m[cid] ?? TT_EMPTY), loadErr: "", categories: (r.categories ?? []).filter((c) => c.is_leaf !== false) },
+              : (() => {
+                const cats = (r.categories ?? []).filter((c) => c.is_leaf !== false)
+                const cur = m[cid] ?? TT_EMPTY
+                /**
+                 * PREFILL THE REMEMBERED CATEGORY — but only against THIS shop's list.
+                 *
+                 * Resolved from `cats` rather than trusted from storage, so a category that
+                 * has been retired, renamed, or that this shop cannot sell into simply does
+                 * not come back — a stale id restored blind is a publish that fails at
+                 * TikTok with a category error nobody typed.
+                 *
+                 * Never overrides a choice already made in this dialog.
+                 */
+                const remembered = cur.category ? null : recallCategory(cid)
+                const match = remembered ? cats.find((c) => String(c.id) === String(remembered.id)) : null
+                return { ...cur, loadErr: "", categories: cats, category: cur.category ?? match ?? null }
+              })(),
           })))
           .catch((e) => setTt((m) => ({ ...m, [cid]: { ...(m[cid] ?? TT_EMPTY), loadErr: e instanceof Error ? e.message : "Couldn't load TikTok categories" } })))
         getTiktokWarehouses(cid)
