@@ -189,7 +189,9 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
                           <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
                             <span className="font-mono">{st.ref}</span>
                             {st.brand && <span>{st.brand}</span>}
-                            {st.picked && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">published</span>}
+                            {/* No "published" pill — the tick at the head of this row already
+                                says it, and this tab sits beside Our products, which no longer
+                                carries one either. */}
                           </div>
                           {/* Counts, not the full lists. A 40-colour style would otherwise
                               own the row; the detail belongs on the printed catalogue. */}

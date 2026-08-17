@@ -263,18 +263,12 @@ export function CatalogView() {
                           <ProductThumb src={imageOf(p)} alt={p.name || id} />
                           <div className="min-w-0">
                             <div className="max-w-[20rem] truncate font-medium">{p.name || id}</div>
+                            {/* Just the sku. The "published" pill repeated the tick in this
+                                row's own first column, and the price warning repeated the
+                                price cell beside it — three readings of two facts, on the
+                                screen where the facts are already the columns. */}
                             <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
                               <span className="font-mono">{p.sku || id}</span>
-                              {p.inCatalog && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">published</span>}
-                              {/* Published but with no price from EITHER source, so the public
-                                  site drops it. Without this the row looks fully live and
-                                  silently isn't — the exact case where an empty state is
-                                  indistinguishable from a broken one. */}
-                              {p.inCatalog && p.catalogPrice == null && !(Number(p.price) > 0) && (
-                                <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800">
-                                  needs a price to show publicly
-                                </span>
-                              )}
                             </div>
                             {/* Colourways as their own supplier photos where we have them.
                                 Capped at eight with a count — a 40-colour style would
