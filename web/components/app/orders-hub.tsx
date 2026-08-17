@@ -99,17 +99,16 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
   const have = stock[String(blankSku).toUpperCase()]
   if (have == null) {
     /**
-     * NOT TRACKED IS A SETUP STATE, SO IT IS THE WAY OUT OF ITSELF.
+     * NO ROW YET IS A SETUP STATE, SO IT IS THE WAY OUT OF ITSELF.
      *
-     * It cannot honestly print 0: we do not hold zero of this blank, we hold no OPINION about
-     * it — nobody has put it on the inventory list, and "0" would send someone to reorder
+     * It cannot print 0: we do not hold zero of this blank, we hold no OPINION about it —
+     * nobody has put it on the inventory list, and "0" would send someone to reorder
      * something that may be sitting on a shelf. The two readings are opposite instructions.
      *
-     * So it says what is true and offers the fix: the same Add-to-inventory dialog the
-     * Inventory page uses, seeded with this blank's sku. Once the row exists the chip becomes
-     * a real count — 0 if that is what it is, which by then is a fact rather than a guess.
-     */
-    /**
+     * So it offers the fix: the same Add-to-inventory dialog the Inventory page uses, seeded
+     * with this blank's sku. Once the row exists the chip becomes a real count — 0 if that is
+     * what it is, which by then is a fact rather than a guess.
+     *
      * THE FIX, NOT THE DIAGNOSIS. "Not tracked" named a state of our own setup and left the
      * reader to work out that it was theirs to fix — and it is a state that should not
      * survive being looked at, because the answer is one click: file the row.
