@@ -133,6 +133,22 @@ export function DesignStage({
    * design (reopening a job and finding it immovable would be its own puzzle).
    */
   const [lockedIds, setLockedIds] = useState<Record<string, boolean>>({})
+  /**
+   * WHICH LAYER IS SELECTED — locally, when nobody else is holding it.
+   *
+   * The design maker owns selection (it has text layers to switch between); the mini designer
+   * passes neither prop, so `selected` was permanently undefined there — and the image's
+   * handles rendered on `selected == null`, i.e. ALWAYS. The outline, the strip and the eight
+   * grips sat on the artwork whether or not you were working on it, and there was no way to
+   * put them away and simply look at the mockup you came to judge.
+   *
+   * Selection is a real state either way now: the caller's when it manages one, this when it
+   * doesn't. Clicking the stage clears it; clicking a layer picks it up again.
+   */
+  const [selfSel, setSelfSel] = useState<string | null>(null)
+  const managed = !!onSelect
+  const sel = managed ? selected ?? null : selfSel
+  const select = (id: string | null) => { if (managed) onSelect?.(id); else setSelfSel(id) }
   const aspect = ar && ar.url === designUrl ? ar.a : 1
   const setAspect = (a: number) => setAr({ url: designUrl || "", a })
   // The widest this artwork may be drawn before its own height would run off the bed. A
@@ -273,7 +289,7 @@ export function DesignStage({
   const startDrag = (target: string, mode: "move" | "resize" | "rotate", grip?: { ux: number; uy: number }) => (e: React.PointerEvent) => {
     if (!stageRef.current) return
     e.preventDefault(); e.stopPropagation()
-    onSelect?.(target)
+    select(target)
     const rect = stageRef.current.getBoundingClientRect()
     const isText = target !== "image"
     const layer = isText ? texts?.find((t) => t.id === target) : null
@@ -450,7 +466,7 @@ export function DesignStage({
     // The backdrop now belongs to the surrounding panel (see .eg-studio-bed), which fills
     // the whole column, while this element stays square purely so the design's %-coords
     // and the print zone keep a stable frame to measure against.
-    <div ref={stageRef} onPointerDown={() => onSelect?.(null)} style={{ containerType: "size" }} className={"relative aspect-square select-none " + (className ?? "w-full")}>
+    <div ref={stageRef} onPointerDown={() => select(null)} style={{ containerType: "size" }} className={"relative aspect-square select-none " + (className ?? "w-full")}>
 
       {mockup ? (
         // p-[6%] lets the garment fill more of the bed than a raw object-contain, which
@@ -488,7 +504,12 @@ export function DesignStage({
       )}
       {designUrl && (
         <div
-          onPointerDown={picking || lockedIds.image ? undefined : startDrag("image", "move")}
+          onPointerDown={picking ? undefined
+            : lockedIds.image
+              // Locked: pick it up, don't move it. Without this the strip holding Unlock
+              // could not be reached, and the lock would be a one-way door.
+              ? (e) => { e.stopPropagation(); select("image") }
+              : startDrag("image", "move")}
           onClick={picking ? (e) => sampleAt(e, e.currentTarget) : undefined}
           onMouseMove={picking ? (e) => moveLoupe(e, e.currentTarget) : undefined}
           onMouseLeave={picking ? () => setLoupe(null) : undefined}
@@ -521,7 +542,11 @@ export function DesignStage({
               if (el.naturalWidth > 0 && el.naturalHeight > 0) setAspect(el.naturalWidth / el.naturalHeight)
             }}
           />
-          {!picking && (selected == null || selected === "image") && handles("image")}
+          {/* ONLY WHEN SELECTED — and the outline lives inside handles(), so the box goes with
+              the controls. This read `selected == null || selected === "image"`, which on a
+              caller that manages no selection is true forever: the reason none of it ever
+              went away. */}
+          {!picking && sel === "image" && handles("image")}
           {/* The floating ✕ is gone. Remove is in the action strip with everything else that
               acts on the layer — a black circle hanging off the corner was a second visual
               language for the same kind of verb, and it sat where the north-east grip is. */}
@@ -552,12 +577,14 @@ export function DesignStage({
       {(texts ?? []).map((t) => (
         <div
           key={t.id}
-          onPointerDown={lockedIds[t.id] ? undefined : startDrag(t.id, "move")}
+          onPointerDown={lockedIds[t.id]
+            ? (e) => { e.stopPropagation(); select(t.id) }
+            : startDrag(t.id, "move")}
           style={{ left: `${t.x}%`, top: `${t.y}%`, transform: `translate(-50%,-50%) rotate(${t.r}deg)`, color: t.color, fontSize: `${t.size}cqw`, fontWeight: t.bold ? 800 : 600, whiteSpace: "nowrap", lineHeight: 1.1 }}
           className={"absolute touch-none " + (lockedIds[t.id] ? "cursor-default" : "cursor-move")}
         >
           {t.text || "Text"}
-          {selected === t.id && handles(t.id)}
+          {sel === t.id && handles(t.id)}
         </div>
       ))}
     </div>
