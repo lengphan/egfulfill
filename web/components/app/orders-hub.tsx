@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
-import { orderStock } from "@/lib/stock-status"
+import { orderStock, stockSkuOf } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
 import { labelableOrders, buyLabelsFor, summarise, releaseLabelBlobs, DEFAULT_BULK_PARCEL } from "@/lib/bulk-labels"
 import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
@@ -35,7 +35,7 @@ import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { AddItemDialog } from "@/components/app/inventory-view"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
-import { ReadinessStrip } from "@/components/app/readiness-dots"
+import { ReadinessStrip, CHIP_TONE } from "@/components/app/readiness-dots"
 import { useT, useLabelT } from "@/lib/i18n"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -80,7 +80,19 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
 }) {
   if (!show) return null
   const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium"
-  const blankSku = resolveProduct(item, catalog)?.sku || item.blank || ""
+  /**
+   * THE KEY THE SHELF IS ACTUALLY UNDER — stockSkuOf, not a private re-derivation.
+   *
+   * This read `resolveProduct(...).sku` alone: the PRODUCT's key, never the variant's. So a
+   * line for a Red L/XL cap was answered by a lookup for the whole style, and a shelf
+   * counted per colourway — which is how stock is held, and what an order line names — came
+   * back undefined and printed "Not tracked" on a blank somebody had just added.
+   *
+   * stock-status.ts owns that ladder (colour+size, then size, then the style) and the boards
+   * and the shortage queue already run on it. A second copy here is the exact failure §5
+   * names: three private copies of one resolver, disagreeing the moment one is touched.
+   */
+  const blankSku = stockSkuOf(item, catalog, stock)
   // Nothing before a blank is chosen: it sits beside Qty now, and stock against no blank is
   // not a fact about stock.
   if (!blankSku) return null
@@ -122,7 +134,11 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
   ))?.num ?? null
   return (
     <span
-      className={pill + " " + (enough ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-800")}
+      // Same two tones as the Stock chip that summarises these lines, dark step included —
+      // the per-line detail and the row pill are one statement seen at two zoom levels.
+      className={pill + " " + (enough
+        ? "bg-primary/10 text-primary"
+        : "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300")}
       title={enough
         ? `${have} of ${blankSku} on the shelf — this line needs ${need}`
         : `Only ${have} of ${blankSku} in stock, this line needs ${need}${poNum ? ` — on PO ${poNum}` : ""}`}
@@ -150,10 +166,9 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
   // purple = ready/in-stock, amber = needs action/out, grey = unknown. The colour IS the
   // status, and it recomputes every render — so picking a blank on a line flips it live. The
   // per-line NUMBERS live in the expanded detail, not here, to keep the row a clean pill.
-  const tone =
-    state === "in" ? "bg-primary/10 text-primary hover:bg-primary/15"
-    : state === "out" ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
-    : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
+  // The literal same strings the three chips beside it use — imported, not re-typed, so a
+  // tone can never drift between the fourth pill and the other three.
+  const tone = state === "in" ? CHIP_TONE.done : state === "out" ? CHIP_TONE.doing : CHIP_TONE.todo
   // Always "Stock" — it used to say "In stock" / "No stock" / "Stock", which broke the one
   // rule the three chips beside it keep (see readiness-dots.tsx): a chip whose text changes
   // row to row can't be compared down a column, and it was the widest thing in the cell for
@@ -1408,7 +1423,7 @@ export function OrdersHub() {
         </div>
       )}
       {actionErr && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />
           <span className="flex-1">{actionErr}</span>
           <button onClick={() => setActionErr(null)} className="shrink-0 font-medium underline underline-offset-2">{tl("ui", "Dismiss")}</button>
@@ -2645,7 +2660,7 @@ export function OrdersHub() {
                                 value={normalizeStage(it.factory_status)}
                                 onChange={(e) => advanceItem(o, it, e.target.value)}
                                 disabled={busy === key}
-                                className={"eg-select h-8 shrink-0 rounded-lg border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-border bg-card hover:border-primary/40")}
+                                className={"eg-select h-8 shrink-0 rounded-lg border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300" : "border-border bg-card hover:border-primary/40")}
                                 aria-label={`Status for ${it.name || it.sku}`}
                                 title={tl("ui", "Set this item's status — forward or back")}
                               >
