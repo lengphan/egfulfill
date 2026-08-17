@@ -16,7 +16,7 @@ import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, getCatalogProducts, type CatalogProduct, type InventoryItem, type OrderItem, type ScanRow, type SkuVisibility } from "@/lib/api"
 import { getToken } from "@/lib/auth"
-import { resolveProduct, sizesOf } from "@/lib/variant-resolve"
+import { resolveProduct, sizesOf, colorsOf } from "@/lib/variant-resolve"
 import { variantSku, variantLabel } from "@/lib/variant-sku"
 import { prettyColorName } from "@/lib/color-name"
 import { PageTitle } from "@/components/app/page-title"
@@ -810,30 +810,34 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
   }, [withSku, q])
   const picked = useMemo(() => withSku.find((p) => String(p.id ?? p.sku) === pickedId) ?? null, [withSku, pickedId])
   const pickedSizes = useMemo(() => (picked ? sizesOf(picked) : []), [picked])
+  const pickedColors = useMemo(() => (picked ? colorsOf(picked) : []), [picked])
 
-  /** What each ticked size will be filed as, and whether that row is already on the shelf. */
+  /**
+   * ONE ROW PER VARIANT — colour AND size, because that is what the shelf holds and what an
+   * order line asks for ("Red · L/XL"). Filing per size alone produced counts no line could
+   * draw from, and printed "Not tracked" beside blanks that were in the building.
+   *
+   * `chosen` holds the sku itself rather than a size, since the grid is now two dimensions
+   * and a size string can no longer name a row on its own.
+   */
   const rows = useMemo(() => {
     if (!picked) return []
     const base = String(picked.sku || "").trim()
-    const list = pickedSizes.length ? pickedSizes : [""]
-    return list.map((sz) => {
-      const k = variantSku(base, sz || null, null)
-      return { size: sz, sku: k, exists: existing.some((e) => e.toUpperCase() === k.toUpperCase()) }
-    })
-  }, [picked, pickedSizes, existing])
+    const szs = pickedSizes.length ? pickedSizes : [""]
+    const cls = pickedColors.length ? pickedColors : [""]
+    const out: { size: string; color: string; sku: string; exists: boolean }[] = []
+    for (const c of cls) for (const sz of szs) {
+      const k = variantSku(base, sz || null, c || null)
+      out.push({ size: sz, color: c, sku: k, exists: existing.some((e) => e.toUpperCase() === k.toUpperCase()) })
+    }
+    return out
+  }, [picked, pickedSizes, pickedColors, existing])
 
   const pick = (p: CatalogProduct) => {
     setPickedId(String(p.id ?? p.sku))
-    // Every size that is not already stocked. Re-adding an existing row would only rewrite
-    // its count with a zero, so the ones we hold start unticked.
-    const base = String(p.sku || "").trim()
-    const szs = sizesOf(p)
-    const next = new Set<string>()
-    for (const sz of (szs.length ? szs : [""])) {
-      const k = variantSku(base, sz || null, null)
-      if (!existing.some((e) => e.toUpperCase() === k.toUpperCase())) next.add(sz)
-    }
-    setChosen(next)
+    // Nothing pre-ticked once a product can have sixty variants: "select all" is one click
+    // away and a dialog that arrives with 66 rows armed is one mis-click from filing them.
+    setChosen(new Set())
     setErr(null)
   }
 
@@ -846,12 +850,12 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
 
   const saveCatalog = () => {
     if (!picked) { setErr("Pick a product first."); return }
-    const take = rows.filter((r) => chosen.has(r.size) && !r.exists)
-    if (!take.length) { setErr("Nothing to add — every ticked size is already on the shelf."); return }
+    const take = rows.filter((r) => chosen.has(r.sku) && !r.exists)
+    if (!take.length) { setErr("Nothing to add — every ticked variant is already on the shelf."); return }
     onAdd(take.map((r) => ({
       sku: r.sku,
       name: picked.name || undefined,
-      variant: r.size ? variantLabel(r.size, null) : undefined,
+      variant: (r.size || r.color) ? variantLabel(r.size || null, r.color || null) : undefined,
       in_stock: Number(stock) || 0,
       reorder_at: Number(reorder) || 25,
       category: picked.type || category.trim() || undefined,
@@ -921,32 +925,67 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                     </div>
                     <Button size="sm" variant="outline" onClick={() => { setPickedId(null); setChosen(new Set()) }}>Change</Button>
                   </div>
+                  {/* GROUPED BY COLOURWAY, sizes inside it. A flat list of 66 variants is a
+                      scroll; the question anyone actually has is "which colours are we
+                      stocking, and in what sizes", and that is two shallow lists. */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Sizes to stock</span>
+                      <span>Variants to stock{chosen.size ? ` — ${chosen.size} picked` : ""}</span>
                       <button
                         type="button"
                         className="font-medium text-primary hover:underline"
-                        onClick={() => setChosen(chosen.size === rows.filter((r) => !r.exists).length ? new Set() : new Set(rows.filter((r) => !r.exists).map((r) => r.size)))}
+                        onClick={() => setChosen(chosen.size ? new Set() : new Set(rows.filter((r) => !r.exists).map((r) => r.sku)))}
                       >
                         {chosen.size ? "Clear" : "Select all"}
                       </button>
                     </div>
-                    <div className="max-h-48 divide-y divide-border overflow-auto rounded-lg border border-border">
-                      {rows.map((r) => (
-                        <label key={r.size || "one"} className={"flex items-center gap-2 px-3 py-1.5 text-sm " + (r.exists ? "opacity-50" : "cursor-pointer")}>
-                          <input
-                            type="checkbox"
-                            checked={chosen.has(r.size)}
-                            disabled={r.exists}
-                            onChange={(e) => setChosen((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.size); else n.delete(r.size); return n })}
-                            className="size-3.5 accent-[var(--primary)]"
-                          />
-                          <span className="w-16 shrink-0 font-medium">{r.size || "One size"}</span>
-                          <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{r.sku}</span>
-                          {r.exists && <span className="shrink-0 text-2xs text-muted-foreground">already stocked</span>}
-                        </label>
-                      ))}
+                    <div className="max-h-56 space-y-2 overflow-auto rounded-lg border border-border p-2">
+                      {Object.entries(rows.reduce((acc, r) => {
+                        (acc[r.color] ??= []).push(r); return acc
+                      }, {} as Record<string, typeof rows>)).map(([color, group]) => {
+                        const free = group.filter((r) => !r.exists)
+                        const allOn = free.length > 0 && free.every((r) => chosen.has(r.sku))
+                        return (
+                          <div key={color || "one"}>
+                            <div className="mb-1 flex items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                checked={allOn}
+                                disabled={free.length === 0}
+                                aria-label={`All sizes of ${color ? prettyColorName(color) : "this product"}`}
+                                onChange={(e) => setChosen((prev) => {
+                                  const n = new Set(prev)
+                                  for (const r of free) { if (e.target.checked) n.add(r.sku); else n.delete(r.sku) }
+                                  return n
+                                })}
+                                className="size-3.5 accent-[var(--primary)]"
+                              />
+                              <span className="text-xs font-medium">{color ? prettyColorName(color) : "All sizes"}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 pl-5">
+                              {group.map((r) => (
+                                <label
+                                  key={r.sku}
+                                  title={r.exists ? `${r.sku} — already stocked` : r.sku}
+                                  className={"inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs "
+                                    + (r.exists ? "border-border opacity-40"
+                                      : chosen.has(r.sku) ? "cursor-pointer border-primary bg-primary/10 text-primary"
+                                        : "cursor-pointer border-border")}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={chosen.has(r.sku)}
+                                    disabled={r.exists}
+                                    onChange={(e) => setChosen((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.sku); else n.delete(r.sku); return n })}
+                                    className="sr-only"
+                                  />
+                                  {r.size || "One size"}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 </>
