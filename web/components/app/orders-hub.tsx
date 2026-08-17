@@ -132,18 +132,36 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
   const poNum = enough ? null : pos.find((p) => (p.items ?? []).some(
     (pi) => String(pi.sku).toUpperCase() === skuU && (pi.sources ?? []).some((s) => s.order === orderId)
   ))?.num ?? null
+  /**
+   * THREE READINGS, and the shortest wording each one can have.
+   *
+   * "Short — 0 of 1" spent eleven characters restating the quantity column beside it to say
+   * one thing: none. An empty shelf is the only state that has to stop somebody, so it is
+   * the only one that shouts — a red 0, no sentence. Everything else is a number you glance
+   * at: "Stock: 4" reads the same whether the line needs one or three, and the tone carries
+   * whether it is enough.
+   *
+   *   0            red     nothing on the shelf
+   *   Stock: 4     amber   some, but fewer than this line needs
+   *   Stock: 40    purple  enough
+   */
+  const none = have <= 0
   return (
     <span
-      // Same two tones as the Stock chip that summarises these lines, dark step included —
-      // the per-line detail and the row pill are one statement seen at two zoom levels.
-      className={pill + " " + (enough
-        ? "bg-primary/10 text-primary"
-        : "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300")}
-      title={enough
-        ? `${have} of ${blankSku} on the shelf — this line needs ${need}`
-        : `Only ${have} of ${blankSku} in stock, this line needs ${need}${poNum ? ` — on PO ${poNum}` : ""}`}
+      // Same tones as the Stock chip that summarises these lines, dark step included — the
+      // per-line detail and the row pill are one statement seen at two zoom levels.
+      className={pill + " " + (none
+        ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
+        : enough
+          ? "bg-primary/10 text-primary"
+          : "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300")}
+      title={none
+        ? `None of ${blankSku} on the shelf — this line needs ${need}${poNum ? ` — on PO ${poNum}` : ""}`
+        : enough
+          ? `${have} of ${blankSku} on the shelf — this line needs ${need}`
+          : `Only ${have} of ${blankSku} in stock, this line needs ${need}${poNum ? ` — on PO ${poNum}` : ""}`}
     >
-      {enough ? `${have} in stock` : `Short — ${have} of ${need}`}{poNum ? ` · ${poNum}` : ""}
+      {none ? "0" : `Stock: ${have}`}{poNum ? ` · ${poNum}` : ""}
     </span>
   )
 }
