@@ -209,14 +209,16 @@ export function ProductEditorDialog({
   const [colorInput, setColorInput] = useState("")
   const [status, setStatus] = useState("Active")
   /**
-   * WHICH PRODUCTS LEAD THE PUBLIC CATALOGUE — an ORDERING flag, not a second visibility
-   * switch.
+   * WHICH PRODUCTS LEAD THE PUBLIC CATALOGUE — the Starter essentials row on the marketing
+   * site (bold-catalog.tsx takes the first four `featured` products).
    *
-   * Status answers "may this be seen at all" (Active · Sellers only · Staff only · Draft ·
-   * Archived). This answers "of the things people can see, which four do we put first" —
-   * the Starter essentials row. They cannot disagree, because the row is drawn from
-   * published products only: untick Active and a featured product simply stops being
-   * published, and the row stops showing it.
+   * NO LONGER EDITABLE HERE. The tick was removed from this form, but the value is still
+   * READ from the product and SENT back on save: dropping it from the payload would silently
+   * unfeature every product the next time anyone opened its editor, which is a change to the
+   * public site made by looking at a form.
+   *
+   * So nothing in the app sets it now. If the row should stop being hand-picked, the place to
+   * change that is the marketing catalogue, not here.
    */
   const [featured, setFeatured] = useState(false)
   const [img, setImg] = useState("")
@@ -846,30 +848,11 @@ export function ProductEditorDialog({
                   </select>
                 </label>
               </div>
-              {/* NOT A SECOND VISIBILITY SWITCH — an ordering one, and the wording says so.
-                  Status decides whether the public site shows this at all; this decides
-                  whether it LEADS, in the Starter essentials row above the grid. The two
-                  cannot disagree: that row is drawn from published products, so setting a
-                  featured product back to Draft removes it from the row by removing it from
-                  the site. Shown only on Active, because featuring something nobody can see
-                  is a setting with no effect. */}
-              {status === "Active" && (
-                <label className="flex items-start gap-2 rounded-lg border border-border p-2.5">
-                  <input
-                    type="checkbox"
-                    checked={featured}
-                    onChange={(e) => setFeatured(e.target.checked)}
-                    className="mt-0.5 size-3.5 accent-primary"
-                  />
-                  <span className="text-xs">
-                    <span className="font-medium">Show first on the marketing site</span>
-                    <span className="block text-muted-foreground">
-                      Puts it in the hand-picked “Starter essentials” row above the catalogue. Doesn&apos;t
-                      change who can see it — that&apos;s Status.
-                    </span>
-                  </span>
-                </label>
-              )}
+              {/* The "Show first on the marketing site" tick used to sit here. Removed from
+                  the editor — Status is the only visibility control this form carries now.
+                  The STORED flag is untouched and still round-trips through save (see the
+                  payload below), so a product already in the Starter essentials row stays in
+                  it; there is simply no control here that changes it. */}
               <p className="-mt-1 text-xs text-muted-foreground">
                 {status === "Active"
                   ? "On the public marketing site, and orderable by sellers."
