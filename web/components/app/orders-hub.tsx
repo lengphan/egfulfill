@@ -1105,7 +1105,7 @@ export function OrdersHub() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [narrow, visibleData],
   )
-  const rowTmpl = narrow ? "auto minmax(0,1fr)" : gridTmpl
+  const rowTmpl = narrow ? "auto auto minmax(0,1fr) auto" : gridTmpl
   /**
    * The width this table actually WANTS, so it can scroll instead of bursting its card.
    *
@@ -1942,7 +1942,7 @@ export function OrdersHub() {
                       table has been a real table all along; this is the same idea, driven
                       from the same lib/order-columns.ts. */}
                   <div
-                    className={"mb-3 grid gap-x-3 " + (narrow ? "w-full items-start gap-y-2" : "items-center gap-y-1")}
+                    className={"mb-3 grid gap-x-3 " + (narrow ? "w-full items-center gap-y-1" : "items-center gap-y-1")}
                     style={{ gridTemplateColumns: rowTmpl }}
                   >
                     {/* A box on EVERY row, disabled where it can't be used. Rendering it
@@ -1968,14 +1968,35 @@ export function OrdersHub() {
                     {/* DATA COLUMNS — rendered in the user's saved order (drag/hide via the
                         header). Cells are defined above; the action cluster stays pinned
                         immediately after this, always last. */}
-                    {narrow
-                      ? rowCols.map((id) => (
-                        <Fragment key={id}>
-                          <span className="pt-0.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">{FACTORY_COLS[id].label}</span>
-                          <span className="min-w-0">{cell[id]}</span>
-                        </Fragment>
-                      ))
-                      : visibleData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
+                    {narrow ? (
+                      /*
+                       * A CARD, not a transposed table. The first attempt printed a label
+                       * beside every value — STATUS / ORDER / AGE / ITEMS — which is what a
+                       * table does when you turn it on its side: four uppercase words
+                       * repeated on every row, saying the same thing each time, and the
+                       * order number given no more weight than its own label.
+                       *
+                       * A phone row answers one question at a glance — which order, and
+                       * what state is it in. So the number is the headline, the stage sits
+                       * opposite it, and everything else is one quiet line underneath.
+                       * Same `cell` renders as the table; only the arrangement differs.
+                       */
+                      <div className="min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate">{cell.order}</span>
+                          <span className="shrink-0">{cell.status}</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                          {cell.age}
+                          <span aria-hidden>·</span>
+                          {cell.units}
+                          {/* `units` is the summed QUANTITY, not the number of lines — the
+                              column's own tooltip already draws that distinction ("1 line ·
+                              2 units"), and pluralising on the line count printed "2 item". */}
+                          <span>{units === 1 ? "unit" : "units"}</span>
+                        </div>
+                      </div>
+                    ) : visibleData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
 
                     {/* One PRIMARY action for the current stage/role; everything rarer
                         (flag/status, labels, the non-primary of ship/advance) tucks into a
@@ -1983,7 +2004,7 @@ export function OrdersHub() {
                     {/* Shipped orders keep the ⋯ menu (so admin can still Refund) — the old
                         "✓ Shipped" badge REPLACED the whole action cluster, hiding it. The
                         menu greys every stage except Refunded for a shipped order. */}
-                    <span className={narrow ? "col-span-2 flex flex-wrap items-center gap-1.5 pt-1" : "contents"}>
+                    <span className={narrow ? "flex shrink-0 items-start" : "contents"}>
                     {(() => {
                       /**
                        * EVERY stage is listed; the ones this role can't use from here are
