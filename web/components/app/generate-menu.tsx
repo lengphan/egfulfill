@@ -9,26 +9,19 @@ import {
   type DeskImageConfig, type DeskVideoConfig, type ChatAttachment,
 } from "@/lib/api"
 
-/** A still already in this thread, offered as the first frame for an animation. */
-export type FrameChoice = { name: string; url: string; label: string }
-
-type Mode = "image" | "video" | "animate"
+type Mode = "image" | "video"
 
 /**
  * Generate an image or a video into the staffer's own assistant channel.
  *
- * Three modes rather than a chain, because you don't always want to go through a still:
- * sometimes it's a picture, sometimes a clip straight from a description, and sometimes
- * animating a product shot you already rendered so the garment stays the one you approved.
+ * A still or a clip, chosen from one control rather than two buttons.
  *
  * Factory-only and billed per generation — 13¢ an image, 40¢ to $4.80 a clip — so the
  * price of the CURRENT selection is always on the button before it's pressed. Config is
  * fetched on OPEN, an event, never from an effect watching state the fetch would rewrite.
  */
-export function GenerateButton({ disabled, frames, onImage, onVideoStarted }: {
+export function GenerateButton({ disabled, onImage, onVideoStarted }: {
   disabled?: boolean
-  /** Recent stills from this thread, newest first — the pool for "Animate a still". */
-  frames?: FrameChoice[]
   onImage: (att: ChatAttachment) => void
   onVideoStarted: (info: { jobId: string; usd: number; seconds: number }) => void
 }) {
@@ -46,13 +39,12 @@ export function GenerateButton({ disabled, frames, onImage, onVideoStarted }: {
   const [vidRes, setVidRes] = useState("")
   const [vidRatio, setVidRatio] = useState("9:16")
   const [secs, setSecs] = useState(8)
-  const [frame, setFrame] = useState<string>("")
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const promptRef = useRef<HTMLInputElement>(null)
 
-  const isVideo = mode === "video" || mode === "animate"
+  const isVideo = mode === "video"
   const imgSpec = img?.models.find((m) => m.id === imgModel) || null
   const vidSpec = vid?.models.find((m) => m.id === vidModel) || null
   // A resolution one variant offers may not exist on another (Lite has no 4K), so switching
@@ -88,16 +80,9 @@ export function GenerateButton({ disabled, frames, onImage, onVideoStarted }: {
     }
   }, [open, img, vid, loading])
 
-  const pickMode = (m: Mode) => {
-    setMode(m); setErr(null)
-    // Animating needs a frame; default to the newest so the common case is one click.
-    if (m === "animate" && !frame && frames?.length) setFrame(frames[0].name)
-  }
-
   const run = async () => {
     const text = prompt.trim()
     if (!text || busy) return
-    if (mode === "animate" && !frame) { setErr("Pick which still to animate."); return }
     setBusy(true); setErr(null)
     try {
       if (mode === "image") {
@@ -108,7 +93,6 @@ export function GenerateButton({ disabled, frames, onImage, onVideoStarted }: {
         const r = await generateDeskVideo({
           prompt: text, aspectRatio: vidRatio, resolution: effVidRes,
           durationSeconds: secs, model: vidModel,
-          imageName: mode === "animate" ? frame : undefined,
         })
         if (!r.ok || !r.jobId) { setErr(r.error || (r.disabled ? "Video generation is off — an admin can add the Google AI key in Settings › Integrations." : "That didn't work.")); return }
         onVideoStarted({ jobId: r.jobId, usd: r.usd ?? usd, seconds: r.seconds ?? secs })
@@ -167,38 +151,19 @@ export function GenerateButton({ disabled, frames, onImage, onVideoStarted }: {
               <div className="space-y-2.5">
                 <div>
                   <div className="mb-1 text-2xs text-muted-foreground">What are we making?</div>
-                  <select value={mode} onChange={(e) => pickMode(e.target.value as Mode)} disabled={busy} className={selectCls}>
+                  <select value={mode} onChange={(e) => { setMode(e.target.value as Mode); setErr(null) }} disabled={busy} className={selectCls}>
                     <option value="image">Image — a still</option>
                     <option value="video">Video — from a description</option>
-                    <option value="animate" disabled={!frames?.length}>
-                      {frames?.length ? "Animate a still from this chat" : "Animate a still — none in this chat yet"}
-                    </option>
                   </select>
                 </div>
 
-                {mode === "animate" && !!frames?.length && (
-                  <div>
-                    <div className="mb-1 text-2xs text-muted-foreground">First frame</div>
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {frames.slice(0, 8).map((f) => (
-                        <button
-                          key={f.name} type="button" onClick={() => setFrame(f.name)} title={f.label}
-                          className={"size-14 shrink-0 overflow-hidden rounded-md border-2 transition-colors " + (frame === f.name ? "border-primary" : "border-transparent hover:border-border")}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={f.url} alt={f.label} className="size-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <Input
                   ref={promptRef} value={prompt} onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run() } }}
-                  placeholder={mode === "animate"
-                    ? "Slow push-in, fabric shifting gently in the light…"
-                    : isVideo ? "A folded tee on warm oak, camera drifting past…" : "A folded heather-grey tee on warm oak, soft daylight…"}
+                  placeholder={isVideo
+                    ? "A folded tee on warm oak, camera drifting past…"
+                    : "A folded heather-grey tee on warm oak, soft daylight…"}
                   className="h-9 text-sm" disabled={busy}
                 />
 
@@ -265,7 +230,7 @@ export function GenerateButton({ disabled, frames, onImage, onVideoStarted }: {
                   <p className="text-2xs text-muted-foreground">Clips take 1–3 minutes. It appears in this chat when it&rsquo;s ready — you can carry on meanwhile.</p>
                 )}
 
-                <Button className="h-9 w-full gap-1.5" onClick={run} disabled={busy || !prompt.trim() || (mode === "animate" && !frame)}>
+                <Button className="h-9 w-full gap-1.5" onClick={run} disabled={busy || !prompt.trim()}>
                   {busy ? <CircleNotch size={14} className="animate-spin" /> : isVideo ? <FilmSlate size={14} /> : <ImageSquare size={14} />}
                   {busy ? (isVideo ? "Starting…" : "Generating…") : `Generate · ~$${usd.toFixed(usd < 1 ? 3 : 2)}`}
                 </Button>
@@ -275,5 +240,148 @@ export function GenerateButton({ disabled, frames, onImage, onVideoStarted }: {
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * "Animate" — sits ON the image it would animate, in the chat.
+ *
+ * This started life as a third mode in the menu above, which was the wrong shape: it made
+ * you pick a mode, then pick which picture, when the picture was already on screen in front
+ * of you. Here the subject is implicit — you press it on the still you mean — and the only
+ * thing left to say is how it should move.
+ *
+ * The server takes the bare asset NAME, never a URL, so it can only ever read back an object
+ * we already stored for this chat.
+ */
+export function AnimateImageButton({ imageName, onStarted }: {
+  imageName: string
+  onStarted: (info: { jobId: string; usd: number; seconds: number }) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [cfg, setCfg] = useState<DeskVideoConfig | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [prompt, setPrompt] = useState("")
+  const [model, setModel] = useState("")
+  const [res, setRes] = useState("")
+  const [ratio, setRatio] = useState("9:16")
+  const [secs, setSecs] = useState(8)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const promptRef = useRef<HTMLInputElement>(null)
+
+  const spec = cfg?.models.find((m) => m.id === model) || null
+  const effRes = spec ? (spec.resolutions.includes(res) ? res : spec.defaultResolution) : res
+  const usd = spec ? (spec.usdPerSec[effRes] ?? 0) * secs : 0
+
+  const toggle = useCallback(async (e: React.MouseEvent) => {
+    // The image sits inside a link to the full-size file; opening the panel must not
+    // navigate away from the conversation.
+    e.preventDefault(); e.stopPropagation()
+    const next = !open
+    setOpen(next)
+    if (!next || cfg || loading) return
+    setLoading(true)
+    try {
+      const c = await getDeskVideoConfig()
+      setCfg(c); setModel(c.model)
+      setRes(c.models.find((m) => m.id === c.model)?.defaultResolution || "1080p")
+      setTimeout(() => promptRef.current?.focus(), 0)
+    } catch (e2) {
+      setErr(e2 instanceof Error ? `Couldn't load the video settings — ${e2.message}` : "Couldn't load the video settings.")
+    } finally {
+      setLoading(false)
+    }
+  }, [open, cfg, loading])
+
+  const run = async () => {
+    const text = prompt.trim()
+    if (!text || busy) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await generateDeskVideo({ prompt: text, aspectRatio: ratio, resolution: effRes, durationSeconds: secs, model, imageName })
+      if (!r.ok || !r.jobId) { setErr(r.error || "That didn't work."); return }
+      onStarted({ jobId: r.jobId, usd: r.usd ?? usd, seconds: r.seconds ?? secs })
+      setPrompt(""); setOpen(false)
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : "That didn't work.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const selectCls = "h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+
+  return (
+    <>
+      <button
+        type="button" onClick={toggle} aria-label="Animate this image"
+        className="absolute right-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-md bg-background/85 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur-sm transition-colors hover:bg-background"
+      >
+        {busy ? <CircleNotch size={12} className="animate-spin" /> : <FilmSlate size={12} weight="duotone" />}
+        Animate
+      </button>
+
+      {open && (
+        <>
+          <button aria-hidden tabIndex={-1} className="fixed inset-0 z-20 cursor-default"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false) }} />
+          <div
+            className="absolute right-1.5 top-9 z-30 w-72 rounded-lg border border-border bg-card p-2.5 text-left shadow-lg"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+          >
+            <div className="mb-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Animate this still</div>
+
+            {loading && <div className="py-4 text-center"><CircleNotch size={14} className="mx-auto animate-spin text-muted-foreground" /></div>}
+
+            {!loading && !cfg && (
+              <p className="text-xs text-destructive">{err || "Couldn't load the video settings."}</p>
+            )}
+
+            {cfg && !cfg.enabled && (
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                {!cfg.keySet ? "No Google AI key is set — an admin can add one in Settings › Integrations." : "File storage isn't configured, so a clip couldn't be kept."}
+              </p>
+            )}
+
+            {cfg?.enabled && (
+              <div className="space-y-2">
+                <Input
+                  ref={promptRef} value={prompt} onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run() } }}
+                  placeholder="Slow push-in, light moving across the fabric…"
+                  className="h-8 text-xs" disabled={busy}
+                />
+                <select value={model} disabled={busy} className={selectCls}
+                  onChange={(e) => {
+                    const id = e.target.value; setModel(id)
+                    const m = cfg.models.find((x) => x.id === id)
+                    if (m && !m.resolutions.includes(res)) setRes(m.defaultResolution)
+                  }}>
+                  {cfg.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <select value={ratio} onChange={(e) => setRatio(e.target.value)} disabled={busy} className={selectCls}>
+                    {cfg.ratios.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <select value={effRes} onChange={(e) => setRes(e.target.value)} disabled={busy} className={selectCls}>
+                    {(spec?.resolutions || []).map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <select value={secs} onChange={(e) => setSecs(Number(e.target.value))} disabled={busy} className={selectCls}>
+                    {(cfg.durations || [8]).map((d) => <option key={d} value={d}>{d}s</option>)}
+                  </select>
+                </div>
+                {err && <p className="text-xs text-destructive">{err}</p>}
+                <p className="text-2xs text-muted-foreground">Takes 1–3 minutes; it appears in this chat when it&rsquo;s ready.</p>
+                <Button className="h-8 w-full gap-1.5 text-xs" onClick={run} disabled={busy || !prompt.trim()}>
+                  {busy ? <CircleNotch size={12} className="animate-spin" /> : <FilmSlate size={12} />}
+                  {busy ? "Starting…" : `Animate · ~$${usd.toFixed(2)}`}
+                </Button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </>
   )
 }
