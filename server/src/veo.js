@@ -135,8 +135,9 @@ export async function startVideo({ prompt, aspectRatio = '9:16', resolution, dur
   }
   const body = JSON.stringify({
     instances: [instance],
-    // durationSeconds is a STRING in this API, not a number.
-    parameters: { aspectRatio: ratio, resolution: res, durationSeconds: String(secs) },
+    // A NUMBER. The docs example quotes it ("8"), which is what I copied — and Google
+    // rejects that outright: "The value type for `durationSeconds` needs to be a number."
+    parameters: { aspectRatio: ratio, resolution: res, durationSeconds: secs },
   });
 
   const r = await fetch(`${BASE}/models/${model}:predictLongRunning`, {

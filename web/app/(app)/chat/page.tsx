@@ -95,11 +95,26 @@ export default function ChatPage() {
      the ✨ panel or from Animate on a picture; shown as a pill above the box so the mode and
      its price stay visible the whole time you're typing, not just when you chose them. */
   const [gen, setGen] = useState<GenSettings | null>(null)
+  /* When a clip was requested. The server posts the finished video into the thread minutes
+     later, so the indicator can't hang off the request — it hangs off "no video newer than
+     this has arrived yet". Cleared by a ceiling so a job that never lands stops pretending. */
+  const [videoAt, setVideoAt] = useState<number | null>(null)
+  const videoWorking = useMemo(() => {
+    if (!videoAt) return false
+    return !(messages ?? []).some((m) => {
+      const a = m.attachment as ChatAttachment | undefined
+      return a?.mime?.startsWith("video/") && (m.ts ?? 0) >= videoAt
+    })
+  }, [videoAt, messages])
   const [office, setOffice] = useState<SupportAvailability | null>(null)
   const [hoursOpen, setHoursOpen] = useState(false)  // staff: support-hours editor dialog
   const [emojiOpen, setEmojiOpen] = useState(false)  // composer emoji picker
   const [pendingAtt, setPendingAtt] = useState<ChatAttachment | null>(null)  // staged attachment
   const [attaching, setAttaching] = useState(false)
+  /* Drag counter, not a boolean. dragenter/dragleave fire for every child element the
+     pointer crosses, so a plain flag flickers off the moment you move over a message. */
+  const dragDepth = useRef(0)
+  const [dragging, setDragging] = useState(false)
   const attachRef = useRef<HTMLInputElement>(null)
   // @-mention autocomplete: the seller's own orders power the suggestions, and `mention`
   // tracks the token being typed after an "@".
@@ -315,6 +330,14 @@ export default function ChatPage() {
     } finally { setAttaching(false); if (attachRef.current) attachRef.current.value = "" }
   }
 
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    dragDepth.current = 0; setDragging(false)
+    if (signedOut || !activeId || readOnly) return
+    const file = e.dataTransfer.files?.[0]
+    if (file) void onAttach(file)
+  }
+
   // Insert an emoji at the caret (or replacing a selection), then refocus after it.
   const insertEmoji = (emoji: string) => {
     const el = composerRef.current
@@ -433,6 +456,9 @@ export default function ChatPage() {
         })
         if (!r.ok || !r.jobId) { setInput(text); setAiNote(r.error || "That didn't work."); return }
         setInput("")
+        setVideoAt(nowMs())
+        // Matches the server's 12-minute abandon ceiling, plus slack for the upload.
+        setTimeout(() => setVideoAt(null), 13 * 60 * 1000)
         setAiNote(`Making a ${r.seconds ?? gen.seconds}s clip (~$${(r.usd ?? gen.usd).toFixed(2)}) — it lands in this chat in a minute or two.`)
         setTimeout(() => setAiNote(null), 12000)
       }
@@ -739,7 +765,19 @@ export default function ChatPage() {
         )}
 
         {/* messages */}
-        <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
+        <div
+          ref={scrollRef}
+          className={"relative min-h-0 flex-1 space-y-3 overflow-y-auto p-5 " + (dragging ? "ring-2 ring-inset ring-primary/50" : "")}
+          onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; if (e.dataTransfer.types?.includes("Files")) setDragging(true) }}
+          onDragOver={(e) => e.preventDefault()}
+          onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
+          onDrop={onDrop}
+        >
+          {dragging && (
+            <div className="pointer-events-none sticky top-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/50 bg-primary/5 py-6 text-sm font-medium text-primary">
+              Drop to attach{gen ? " as a reference" : ""}
+            </div>
+          )}
           {signedOut ? (
             <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Sign in to chat.</div>
           ) : messages === null ? (
@@ -833,7 +871,7 @@ export default function ChatPage() {
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={att.url} alt={att.name || "attachment"} className="max-h-60 max-w-full rounded-lg border border-border object-contain" />
                                   {canAnimate && (
-                                    <AnimateImageButton imageName={assetName} onArm={setGen} />
+                                    <AnimateImageButton imageName={assetName} imageUrl={att.url} onArm={setGen} />
                                   )}
                                 </>
                               ) : (
@@ -862,6 +900,20 @@ export default function ChatPage() {
                   </Fragment>
                 )
               })}
+              {((gen && sending) || videoWorking) && (
+                <div className="flex items-start">
+                  <div className="flex items-center gap-2 rounded-2xl bg-muted px-3.5 py-2.5">
+                    <span className="flex items-center gap-1">
+                      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.2s]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.1s]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {videoWorking ? "Making your clip — this takes 1–3 minutes…" : "Making your image…"}
+                    </span>
+                  </div>
+                </div>
+              )}
               {aiTyping && !streaming && (
                 <div className="flex items-start">
                   <div className="flex items-center gap-1 rounded-2xl bg-muted px-3.5 py-2.5">
@@ -899,154 +951,172 @@ export default function ChatPage() {
         )}
 
         {/* staged attachment preview */}
-        {pendingAtt && (
-          <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-2 py-1.5 text-xs">
-            {pendingAtt.mime?.startsWith("image/") ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={pendingAtt.url} alt="" className="size-8 rounded border border-border object-cover" />
-            ) : (
-              <FileText size={16} weight="duotone" className="text-muted-foreground" />
-            )}
-            <span className="truncate font-medium">{pendingAtt.name}</span>
-            <button onClick={() => setPendingAtt(null)} className="ml-auto shrink-0 text-muted-foreground hover:text-foreground" aria-label="Remove attachment"><X size={14} /></button>
-          </div>
-        )}
+        {/* COMPOSER — one container, the way a modern chat box reads: what you've attached
+            sits on top, the words go in the middle, and the controls live underneath instead
+            of crowding the text field from both sides. The whole box takes the focus ring, so
+            it behaves as a single control rather than an input with buttons parked beside it. */}
+        <div className="border-t border-border p-3">
+          <div className={"rounded-2xl border bg-card transition-colors focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/30 " + (dragging ? "border-primary/50" : "border-input")}>
 
-        {/* ARMED PILL. The one piece of state that changes what Enter does, so it sits
-            directly above the box it changes and carries the price the whole time you type —
-            not only at the moment the model was chosen. ✕ puts the box back to normal. */}
-        {gen && (
-          <div className="flex items-center gap-2 border-t border-border px-3 pt-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-2xs font-medium text-primary">
-              {gen.mode === "image" ? <ImageSquare size={12} weight="fill" /> : <FilmSlate size={12} weight="fill" />}
-              {gen.label}
-              <span className="tabular-nums opacity-70">~${gen.usd.toFixed(gen.usd < 1 ? 3 : 2)}</span>
-              <button type="button" onClick={() => setGen(null)} aria-label="Cancel generating"
-                className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20">
-                <X size={10} weight="bold" />
-              </button>
-            </span>
-            <span className="truncate text-2xs text-muted-foreground">
-              {gen.mode === "image"
-                ? "Type what to make and press Enter."
-                : "Describe the motion and press Enter — clips take 1–3 minutes."}
-            </span>
-          </div>
-        )}
-
-        {/* composer */}
-        <div className="flex items-center gap-2 border-t border-border p-3">
-          {isInbox && (
-            <Button variant="outline" size="sm" className="h-10 shrink-0 gap-1.5" onClick={draftWithAi} disabled={drafting}>
-              {drafting ? <CircleNotch size={14} className="animate-spin" /> : null}
-              Draft with AI
-            </Button>
-          )}
-          {/* Generate an image or video — STAFF ONLY, and only in the staffer's own "My EG"
-              channel. Each generation bills Google, so it is not offered on a seller thread,
-              a factory room or an inbox conversation; the server enforces the same two rules. */}
-          {isStaffUser && activeId === supportId && (
-            <GenerateButton
-              disabled={signedOut || !activeId}
-              armed={gen}
-              onArm={setGen}
-            />
-          )}
-          {/* Attach a file (images downsized before upload) */}
-          <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />
-          <Button variant="ghost" size="icon" className="size-10 shrink-0" onClick={() => attachRef.current?.click()}
-            disabled={signedOut || !activeId || readOnly || attaching} aria-label="Attach a file">
-            {attaching ? <CircleNotch size={16} className="animate-spin" /> : <Paperclip size={18} />}
-          </Button>
-          {/* Emoji picker */}
-          <div className="relative shrink-0">
-            <Button variant="ghost" size="icon" className="size-10" onClick={() => setEmojiOpen((o) => !o)}
-              disabled={signedOut || !activeId || readOnly} aria-label="Emoji">
-              <Smiley size={18} />
-            </Button>
-            {emojiOpen && (
-              <>
-                {/* click-away to close */}
-                <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setEmojiOpen(false)} />
-                <div className="absolute bottom-full left-0 z-20 mb-1 grid w-72 grid-cols-8 gap-0.5 rounded-lg border border-border bg-card p-2 shadow-lg">
-                  {EMOJIS.map((e) => (
-                    <button key={e} type="button" onMouseDown={(ev) => { ev.preventDefault(); insertEmoji(e) }}
-                      className="rounded p-1 text-lg leading-none hover:bg-accent" aria-label={`Insert ${e}`}>{e}</button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-          <div className="relative flex-1">
-            {/* @-mention autocomplete: type "@" then part of a teammate's name or an order
-                number/name, and pick one — a person gets notified, an order gets tagged.
-                Keyboard-navigable, dropped in above the box. */}
-            {mention && mentionMatches.length > 0 && (
-              <div className="absolute bottom-full left-0 z-20 mb-1 w-full max-w-md overflow-hidden rounded-lg border border-border bg-card shadow-lg">
-                <div className="border-b border-border px-3 py-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Mention a teammate or tag an order</div>
-                {mentionMatches.map((it, i) => (
+            {/* Attachment as a THUMBNAIL, not a filename row. You attached a picture to look
+                at it; a row of text made you take that on trust. */}
+            {/* ANIMATING a still: show WHICH one. Pressing Animate on a picture used to look
+                exactly like choosing Video in the panel — same armed button, no sign of the
+                frame — so it was impossible to tell whether the cat was involved. */}
+            {gen?.imageUrl && (
+              <div className="flex items-center gap-2 p-2 pb-0">
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={gen.imageUrl} alt="" className="size-16 rounded-lg border border-border object-cover" />
                   <button
-                    key={it.kind === "person" ? `p-${it.p.id}` : `o-${it.o.id}`}
-                    type="button"
-                    // mousedown, not click: fire before the input blurs so the caret + token
-                    // are still intact when we splice the tag in.
-                    onMouseDown={(e) => { e.preventDefault(); pickMention(it) }}
-                    onMouseEnter={() => setMentionIdx(i)}
-                    className={"flex w-full items-center gap-2 px-3 py-2 text-left text-sm " + (i === mentionIdx ? "bg-accent" : "hover:bg-muted/60")}
+                    onClick={() => setGen(null)} aria-label="Don't animate this"
+                    className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
                   >
-                    {it.kind === "person" ? (
-                      <>
-                        <User size={13} weight="duotone" className="shrink-0 text-primary" />
-                        <span className="font-medium">{it.p.name}</span>
-                        <span className="ml-auto shrink-0 text-2xs capitalize text-muted-foreground">{it.p.role}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Package size={13} weight="duotone" className="shrink-0 text-muted-foreground" />
-                        <span className="font-medium tabular-nums">#{it.o.seq ?? it.o.id}</span>
-                        <span className="truncate text-xs text-muted-foreground">{it.o.customer?.name || it.o.store || it.o.source || ""}</span>
-                        <span className="ml-auto shrink-0 text-2xs text-muted-foreground">{it.o.factory_status || it.o.status || ""}</span>
-                      </>
-                    )}
+                    <X size={11} weight="bold" />
                   </button>
-                ))}
+                </div>
+                <span className="text-2xs text-muted-foreground">animating this still</span>
               </div>
             )}
-            <Input
-              ref={composerRef}
-              value={input}
-              onChange={(e) => { setInput(e.target.value); if (!readOnly) detectMention(e.target.value, e.target.selectionStart ?? e.target.value.length) }}
-              onKeyDown={(e) => {
-                if (mention && mentionMatches.length) {
-                  if (e.key === "ArrowDown") { e.preventDefault(); setMentionIdx((i) => (i + 1) % mentionMatches.length); return }
-                  if (e.key === "ArrowUp") { e.preventDefault(); setMentionIdx((i) => (i - 1 + mentionMatches.length) % mentionMatches.length); return }
-                  if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickMention(mentionMatches[mentionIdx]); return }
-                  if (e.key === "Escape") { e.preventDefault(); setMention(null); return }
-                }
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() }
-              }}
-              placeholder={signedOut ? "Sign in to send a message"
-                : readOnly ? "Only EGFUL can post announcements"
-                : gen ? (gen.mode === "image" ? "Describe the image…" : "Describe the motion…")
-                : "Type a message…  @ to tag an order"}
-              disabled={signedOut || !activeId || readOnly}
-              className="h-10 w-full"
-            />
+            {pendingAtt && (
+              <div className="flex flex-wrap gap-2 p-2 pb-0">
+                <div className="group relative">
+                  {pendingAtt.mime?.startsWith("image/") ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={pendingAtt.url} alt={pendingAtt.name} className="size-16 rounded-lg border border-border object-cover" />
+                  ) : (
+                    <div className="flex size-16 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-muted/50 px-1">
+                      <FileText size={18} weight="duotone" className="text-muted-foreground" />
+                      <span className="w-full truncate text-center text-3xs text-muted-foreground">{pendingAtt.name}</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setPendingAtt(null)} aria-label="Remove attachment"
+                    className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
+                  >
+                    <X size={11} weight="bold" />
+                  </button>
+                </div>
+                {gen && <span className="self-end pb-1 text-2xs text-muted-foreground">used as a reference</span>}
+              </div>
+            )}
+
+            <div className="relative">
+              {/* @-mention autocomplete: type "@" then part of a teammate's name or an order
+                  number/name, and pick one — a person gets notified, an order gets tagged. */}
+              {mention && mentionMatches.length > 0 && (
+                <div className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-md overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                  <div className="border-b border-border px-3 py-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Mention a teammate or tag an order</div>
+                  {mentionMatches.map((it, i) => (
+                    <button
+                      key={it.kind === "person" ? `p-${it.p.id}` : `o-${it.o.id}`}
+                      type="button"
+                      // mousedown, not click: fire before the input blurs so the caret + token
+                      // are still intact when we splice the tag in.
+                      onMouseDown={(e) => { e.preventDefault(); pickMention(it) }}
+                      onMouseEnter={() => setMentionIdx(i)}
+                      className={"flex w-full items-center gap-2 px-3 py-2 text-left text-sm " + (i === mentionIdx ? "bg-accent" : "hover:bg-muted/60")}
+                    >
+                      {it.kind === "person" ? (
+                        <>
+                          <User size={13} weight="duotone" className="shrink-0 text-primary" />
+                          <span className="font-medium">{it.p.name}</span>
+                          <span className="ml-auto shrink-0 text-2xs capitalize text-muted-foreground">{it.p.role}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Package size={13} weight="duotone" className="shrink-0 text-muted-foreground" />
+                          <span className="font-medium tabular-nums">#{it.o.seq ?? it.o.id}</span>
+                          <span className="truncate text-xs text-muted-foreground">{it.o.customer?.name || it.o.store || it.o.source || ""}</span>
+                          <span className="ml-auto shrink-0 text-2xs text-muted-foreground">{it.o.factory_status || it.o.status || ""}</span>
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Input
+                ref={composerRef}
+                value={input}
+                onChange={(e) => { setInput(e.target.value); if (!readOnly) detectMention(e.target.value, e.target.selectionStart ?? e.target.value.length) }}
+                onKeyDown={(e) => {
+                  if (mention && mentionMatches.length) {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setMentionIdx((i) => (i + 1) % mentionMatches.length); return }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setMentionIdx((i) => (i - 1 + mentionMatches.length) % mentionMatches.length); return }
+                    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickMention(mentionMatches[mentionIdx]); return }
+                    if (e.key === "Escape") { e.preventDefault(); setMention(null); return }
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() }
+                }}
+                placeholder={signedOut ? "Sign in to send a message"
+                  : readOnly ? "Only EGFUL can post announcements"
+                  : gen ? (gen.mode === "image" ? "Describe the image…"
+                    : gen.imageName ? "Describe the motion for this still…"
+                    : "Describe the video to make…")
+                  : "Type a message…  @ to tag an order"}
+                disabled={signedOut || !activeId || readOnly}
+                // Borderless: the CONTAINER is the control now, so a second border inside it
+                // would draw a box within a box.
+                className="h-12 w-full rounded-none border-0 bg-transparent px-3 text-sm shadow-none focus-visible:ring-0"
+              />
+            </div>
+
+            {/* Controls UNDER the text, not flanking it — the field gets its full width back,
+                which is what makes a long prompt readable while you write it. */}
+            <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
+              {/* Generate — STAFF ONLY, and only in the staffer's own "My EG" channel. Each
+                  generation bills Google, so it is not offered on a seller thread, a factory
+                  room or an inbox conversation; the server enforces the same two rules. */}
+              {isStaffUser && activeId === supportId && (
+                <GenerateButton disabled={signedOut || !activeId} armed={gen} onArm={setGen} />
+              )}
+              <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />
+              <Button variant="ghost" size="icon" className="size-9 shrink-0" onClick={() => attachRef.current?.click()}
+                disabled={signedOut || !activeId || readOnly || attaching} aria-label="Attach a file">
+                {attaching ? <CircleNotch size={16} className="animate-spin" /> : <Paperclip size={17} />}
+              </Button>
+              <div className="relative shrink-0">
+                <Button variant="ghost" size="icon" className="size-9" onClick={() => setEmojiOpen((o) => !o)}
+                  disabled={signedOut || !activeId || readOnly} aria-label="Emoji">
+                  <Smiley size={17} />
+                </Button>
+                {emojiOpen && (
+                  <>
+                    {/* click-away to close */}
+                    <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setEmojiOpen(false)} />
+                    <div className="absolute bottom-full left-0 z-20 mb-1 grid w-72 grid-cols-8 gap-0.5 rounded-lg border border-border bg-card p-2 shadow-lg">
+                      {EMOJIS.map((e) => (
+                        <button key={e} type="button" onMouseDown={(ev) => { ev.preventDefault(); insertEmoji(e) }}
+                          className="rounded p-1 text-lg leading-none hover:bg-accent" aria-label={`Insert ${e}`}>{e}</button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              {isInbox && (
+                <Button variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5 text-muted-foreground" onClick={draftWithAi} disabled={drafting}>
+                  {drafting ? <CircleNotch size={14} className="animate-spin" /> : null}
+                  Draft with AI
+                </Button>
+              )}
+
+              <div className="ml-auto" />
+
+              {/* ARMED: this button IS the generate button — it must not still look like
+                  "post a message" when pressing it spends money. */}
+              <Button
+                size={gen ? "sm" : "icon"}
+                className={gen ? "h-9 shrink-0 gap-1.5 rounded-full px-3" : "size-9 rounded-full"}
+                onClick={send}
+                disabled={signedOut || !activeId || readOnly || (!input.trim() && !(pendingAtt && !gen)) || sending}
+              >
+                {sending && gen ? <CircleNotch size={15} className="animate-spin" />
+                  : gen ? (gen.mode === "image" ? <ImageSquare size={15} weight="fill" /> : <FilmSlate size={15} weight="fill" />)
+                  : <PaperPlaneTilt size={15} weight="fill" />}
+                {gen && <span className="text-xs font-medium">Generate · ~${gen.usd.toFixed(gen.usd < 1 ? 3 : 2)}</span>}
+              </Button>
+            </div>
           </div>
-          {/* ARMED: the send button BECOMES the generate button. Same position, same key —
-              but it must not still look like "post a message" when pressing it spends money,
-              so it takes the mode's icon, says Generate, and carries the price. */}
-          <Button
-            size={gen ? "sm" : "icon"}
-            className={gen ? "h-10 shrink-0 gap-1.5 px-3" : "size-10"}
-            onClick={send}
-            disabled={signedOut || !activeId || readOnly || (!input.trim() && !(pendingAtt && !gen)) || sending}
-          >
-            {sending && gen ? <CircleNotch size={16} className="animate-spin" />
-              : gen ? (gen.mode === "image" ? <ImageSquare size={16} weight="fill" /> : <FilmSlate size={16} weight="fill" />)
-              : <PaperPlaneTilt size={16} weight="fill" />}
-            {gen && <span className="text-xs font-medium">Generate · ~${gen.usd.toFixed(gen.usd < 1 ? 3 : 2)}</span>}
-          </Button>
         </div>
       </div>
     </div>

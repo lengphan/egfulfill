@@ -23,6 +23,9 @@ export type GenSettings = {
   seconds?: number
   /** video only — animate this stored still as the first frame */
   imageName?: string
+  /** …and its URL, so the composer can SHOW which picture is being animated. Without it,
+   *  "Video" armed from the panel and "Animate" pressed on a photo looked identical. */
+  imageUrl?: string
   /** Cost of one generation with these settings, shown on the pill before anything runs. */
   usd: number
   /** Short human label for the pill. */
@@ -241,9 +244,20 @@ export function GenerateButton({ disabled, armed, onArm }: {
 
                 {/* Arms the composer; it does not spend anything yet. The price rides onto the
                     pill so it stays visible while you type, not only at the moment of choosing. */}
-                <Button variant="outline" className="h-9 w-full" onClick={() => setOpen(false)}>Done</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="h-9 flex-1" onClick={() => setOpen(false)}>Done</Button>
+                  {/* The pill above the composer used to carry the ✕ that turned this off.
+                      With the pill gone (it repeated what the Send button already says), the
+                      way back to a plain chat box has to live here instead. */}
+                  {armed && (
+                    <Button variant="ghost" className="h-9 flex-1 text-muted-foreground"
+                      onClick={() => { onArm(null); setOpen(false) }}>
+                      Back to chat
+                    </Button>
+                  )}
+                </div>
                 <p className="text-2xs text-muted-foreground">
-                  Already armed — type in the message box and press Enter. The Send button now says Generate.
+                  Type in the message box and press Enter — the Send button now says Generate.
                 </p>
               </div>
             )}
@@ -261,8 +275,9 @@ export function GenerateButton({ disabled, armed, onArm }: {
  * the first frame. The flow never changes: press it, then describe the motion in the box you
  * were already typing in.
  */
-export function AnimateImageButton({ imageName, onArm }: {
+export function AnimateImageButton({ imageName, imageUrl, onArm }: {
   imageName: string
+  imageUrl: string
   onArm: (g: GenSettings) => void
 }) {
   const [busy, setBusy] = useState(false)
@@ -279,7 +294,7 @@ export function AnimateImageButton({ imageName, onArm }: {
       const res = m.defaultResolution
       onArm({
         mode: "video", model: m.id, ratio: "9:16", resolution: res, seconds: 8,
-        imageName, usd: (m.usdPerSec[res] ?? 0) * 8,
+        imageName, imageUrl, usd: (m.usdPerSec[res] ?? 0) * 8,
         label: `Animate · ${res} · 8s`,
       })
     } catch { /* the pill is the feedback; a failed arm simply doesn't arm */ } finally {
