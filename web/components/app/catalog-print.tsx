@@ -626,8 +626,16 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     exactly the page you opened this to fix, and it can't be fixed if the
                     block it lives in only appears once a price exists. */}
                 {(sheetPrice(st) != null || editing) && (
-                  <div className="shrink-0 rounded-xl px-4 py-2.5 text-right"
-                       style={{ background: sheetPrice(st) != null ? HOUSE.lime : "#F1F0EC", color: HOUSE.ink }}>
+                  /* NO PILL. A filled lime lozenge is a badge, and a badge is what you put on
+                     a thing to draw attention to it — on a page with one number, the number
+                     already has the attention. It also pinned the sheet to a colour that has
+                     to stay a FILL (lime on paper measures 1.1:1, so it can never carry type),
+                     which is why the price sat in a block of it.
+                     The house move instead: ink at size, with the accent as a hairline rule
+                     above it. Same hierarchy, no ornament — and the accent stays the one
+                     colour on the page rather than a second one competing with the top rule. */
+                  <div className="shrink-0 border-t-[3px] pt-2 text-right"
+                       style={{ borderColor: brand.accent, color: HOUSE.ink }}>
                     <div className={sheetPrice(st) != null
                       ? "font-title text-4xl font-bold leading-none tabular-nums"
                       : "py-2 text-sm font-medium leading-none"}>
@@ -649,7 +657,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                         {money(sheetPrice(st))}
                       </Editable>
                     </div>
-                    <div className="mt-0.5 text-[9px] font-bold uppercase tracking-widest opacity-70">per unit</div>
+                    <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral-500">per unit</div>
                   </div>
                 )}
               </div>
