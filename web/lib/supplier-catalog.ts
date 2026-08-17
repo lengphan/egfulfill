@@ -1,4 +1,5 @@
 import { getSsStyle, getOttoStyle, getSanmarCatalogStyle, colorNames, type CatalogProduct } from "@/lib/api"
+import { shipBandKey } from "@/lib/ship-band"
 
 // Otto's Product Data stores images as Google Drive links, which don't render in an <img>
 // (Drive blocks hotlinking). Rewrite to Drive's embeddable thumbnail URL.
@@ -10,6 +11,29 @@ export function driveImg(url?: string | null): string {
 }
 export const driveMap = (m?: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(m ?? {}).map(([k, v]) => [k, driveImg(v)]))
+
+
+/**
+ * WHICH KIND OF THING THIS IS, from what the supplier called it.
+ *
+ * S&S and SanMar were both hardcoded to "Apparel", so every cap, beanie and tote they
+ * carry arrived typed as clothing. That is not cosmetic: `type` is what the public
+ * catalogue groups by, what the product page shows, and — through shipBandKey — a hint
+ * about postage. The published catalogue listed three caps under Apparel and had a
+ * Headwear section that did not contain them.
+ *
+ * The CAP test is shipBandKey's, not a second list of words: that rule already decides
+ * cap-vs-garment for money, and two copies of "is this a cap" is how the two drift. The
+ * others are new because nothing classified them before — kept narrow, and anything
+ * unrecognised stays Apparel, which is what it was.
+ */
+function typeFromName(name: string): string {
+  const t = String(name || "").toLowerCase()
+  if (shipBandKey(t) === "ship_cap") return "Headwear"
+  if (/\b(tote|duffel|backpack|bag|pouch|sack)\b/.test(t)) return "Bags"
+  if (/\b(mug|tumbler|bottle|can cooler|koozie|flask)\b/.test(t)) return "Drinkware"
+  return "Apparel"
+}
 
 type SsFb = { title?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null }
 type OttoFb = { name?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null }
@@ -37,7 +61,7 @@ export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<Catal
   const d = await getSsStyle(styleID)
   if (d.error) throw new Error(d.error)
   return {
-    id: "SS-" + styleID, name: d.title || fb.title || styleID, type: "Apparel", method: "DTG", status: "Active",
+    id: "SS-" + styleID, name: d.title || fb.title || styleID, type: typeFromName(d.title || fb.title || ""), method: "DTG", status: "Active",
     // The supplier's price IS our cost (S&S returns wholesale/net). It belongs in Product
     // cost, NOT Base cost — writing it to Base cost charged the seller our raw cost with no
     // margin. Base is left blank so it derives as productCost + the base_markup setting.
@@ -93,7 +117,7 @@ export async function sanmarCatalogProduct(style: string, fb: SanmarFb): Promise
   const colorImages = d && !d.error ? { ...d.colorImages } : {}
   if (Object.keys(colorImages).length === 0) for (const c of fb.colors ?? []) colorImages[c] = fb.image ?? ""
   return {
-    id: "SANMAR-" + style, name: d?.name || fb.name || style, type: "Apparel", method: "DTG", status: "Active",
+    id: "SANMAR-" + style, name: d?.name || fb.name || style, type: typeFromName(d?.name || fb.name || ""), method: "DTG", status: "Active",
     productCost: Number(d?.price ?? fb.price) || undefined,
     sizes: d?.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (fb.colors ?? [])[0],
     // THEIRS — see the note in ssCatalogProduct. SanMar's style code ("PC61") identifies the
