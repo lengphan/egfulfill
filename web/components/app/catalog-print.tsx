@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { X, Printer, CircleNotch, PencilSimple, Image as ImageIcon, ArrowCounterClockwise } from "@phosphor-icons/react"
+import { X, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, saveLookbookStyle, type LookbookStyle } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
@@ -369,7 +369,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               disabled={!rows?.length}
               title="Rewrite names, copy, prices and photos for this catalogue. The product itself is untouched."
             >
-              <PencilSimple size={14} weight="bold" /> {editing ? "Done editing" : "Edit"}
+              {editing ? "Done editing" : "Edit"}
             </Button>
           )}
           {/* Saving is separate from printing on purpose. Printing is a preview you might do
@@ -386,7 +386,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             onClick={() => { setEditing(false); requestAnimationFrame(() => window.print()) }}
             disabled={!rows?.length}
           >
-            <Printer size={14} weight="bold" /> Print / Save as PDF
+            Print / Save as PDF
           </Button>
           <Button size="sm" variant="outline" onClick={onClose}><X size={14} weight="bold" /> Close</Button>
         </div>
@@ -615,7 +615,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                         className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-200 print:hidden"
                         title="Put the name, copy and photo back to what the catalogue says"
                       >
-                        <ArrowCounterClockwise size={10} weight="bold" /> Edited · undo
+                        Edited · undo
                       </button>
                     )}
                   </div>
@@ -712,7 +712,12 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                        way too long". A square is the shape these shots are framed in
                        everywhere else in the app, so the same photo reads the same here, and
                        the height it stops taking goes to the copy underneath it. */
-                    <div className="group relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg p-3"
+                    /* THE HERO YIELDS, THE COPY DOES NOT. A fixed square took half the column
+                       whatever else was on the page, so a style with seven bullets had five of
+                       them clipped away by the page bound — silently, which is worse than the
+                       overflow it replaced. The photo is object-contain, so capping its height
+                       just makes the garment smaller; the description keeps what is left. */
+                    <div className="group relative flex max-h-[46%] w-full flex-1 items-center justify-center overflow-hidden rounded-lg p-3"
                          style={{ background: PLATE }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={hero} alt={st.name} className="size-full object-contain" />
@@ -721,7 +726,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                           type="button" onClick={() => pickFile(st)} disabled={savingRef === st.ref}
                           className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-neutral-700 shadow-sm hover:bg-white print:hidden"
                         >
-                          <ImageIcon size={11} weight="bold" /> Replace photo
+                          Replace photo
                         </button>
                       )}
                     </div>
@@ -732,7 +737,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       type="button" onClick={() => pickFile(st)} disabled={savingRef === st.ref}
                       className="flex min-h-[60mm] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-neutral-300 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 print:hidden"
                     >
-                      <ImageIcon size={14} weight="bold" /> Attach a photo for this style
+                      Attach a photo for this style
                     </button>
                   ) : null}
 
