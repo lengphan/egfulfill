@@ -370,14 +370,14 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                       />
                     </th>
                     <th className="px-4 py-2.5 font-medium">Item</th>
-                    <th className="px-4 py-2.5 font-medium">SKU</th>
-                    <th className="px-2 py-2.5 text-center font-medium">Labels</th>
+                    <th className="px-4 py-2.5 font-medium hidden md:table-cell">SKU</th>
+                    <th className="px-2 py-2.5 text-center font-medium hidden md:table-cell">Labels</th>
                     <th className="px-4 py-2.5 text-center font-medium">In stock</th>
-                    <th className="px-4 py-2.5 text-center font-medium">Reserved</th>
+                    <th className="px-4 py-2.5 text-center font-medium hidden md:table-cell">Reserved</th>
                     <th className="px-4 py-2.5 text-center font-medium">Available</th>
-                    <th className="px-4 py-2.5 text-center font-medium">Reorder&nbsp;at</th>
+                    <th className="px-4 py-2.5 text-center font-medium hidden md:table-cell">Reorder&nbsp;at</th>
                     <th className="px-4 py-2.5 font-medium">Status</th>
-                    <th className="px-4 py-2.5 font-medium">Visibility</th>
+                    <th className="px-4 py-2.5 font-medium hidden md:table-cell">Visibility</th>
                     <th className="px-4 py-2.5" />
                   </tr>
                 </thead>
@@ -510,8 +510,8 @@ function ProductGroup({
             photo started 20px right of a single product's and the thumbnails never lined
             up — a column of pictures that is not a column is harder to scan than no
             pictures at all. */}
-        <div className={"flex w-[23rem] items-center gap-2.5 " + (indented ? "pl-[4.25rem]" : "")}>
-          {!indented && <Thumb src={group.image} name={group.name} />}
+        <div className={"flex w-auto min-w-0 items-center gap-2.5 md:w-[23rem] " + (indented ? "pl-[4.25rem]" : "")}>
+          {!indented && <span className="hidden md:contents"><Thumb src={group.image} name={group.name} /></span>}
           <div className="min-w-0">
             {/* TWO LINES, then ellipsis. One line at 220px cut "OTTO CAP OTTO FLEX Fitte…"
                 off before the part that tells it from the next Otto cap; letting it run
@@ -538,7 +538,7 @@ function ProductGroup({
           </div>
         </div>
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-2 hidden md:table-cell">
         {/* SKU as TEXT. The inline barcode was a 22px thumbnail no scanner could read, and
             the icon beside it spent a column on a dialog nobody opened twice — the SKU
             itself opens it, for the one moment someone wants to scan off the screen. */}
@@ -551,7 +551,7 @@ function ProductGroup({
           {it.sku}
         </button>
       </td>
-      <td className="px-2 py-2 text-center">
+      <td className="px-2 py-2 text-center hidden md:table-cell">
         {/* How many stickers for THIS variant. Only meaningful once it's ticked, so it's
             disabled until then. */}
         <Input
@@ -568,7 +568,7 @@ function ProductGroup({
           production reserves its blanks and shipping or cancelling releases them, tracked
           per order, so a number typed here would be silently corrected the next time either
           happens. Shown, because it is the difference between In stock and Available. */}
-      <td className="px-2 py-2 text-center">
+      <td className="px-2 py-2 text-center hidden md:table-cell">
         <span
           className={"inline-block w-16 text-center tabular-nums " + (num(it.reserved) > 0 ? "font-medium" : "text-muted-foreground")}
           title={num(it.reserved) > 0 ? `${num(it.reserved)} held for orders in production` : "Nothing held for production"}
@@ -577,7 +577,7 @@ function ProductGroup({
         </span>
       </td>
       <td className="px-4 py-2 text-center font-semibold tabular-nums">{avail(it)}</td>
-      <td className="px-2 py-2 text-center"><Input value={String(it.reorder_at ?? 25)} onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
+      <td className="px-2 py-2 text-center hidden md:table-cell"><Input value={String(it.reorder_at ?? 25)} onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
       <td className="px-4 py-2">
         {/* nowrap: the visibility column narrowed this one enough that "In stock" wrapped
             onto two lines and the row grew a step. */}
@@ -585,7 +585,7 @@ function ProductGroup({
           : isLow(it) ? <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Low</span>
             : <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-2 hidden md:table-cell">
         <select
           value={visOf(it)}
           onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
@@ -632,7 +632,7 @@ function ProductGroup({
           </div>
         </td>
         <td className="px-4 py-2">
-          <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-[23rem] items-center gap-2.5 text-left">
+          <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-auto min-w-0 items-center gap-2.5 md:w-[23rem] text-left">
             <Thumb src={group.image} name={group.name} />
             <span className="min-w-0">
               <span className="line-clamp-2 font-medium leading-tight" title={group.name}>{group.name}</span>
@@ -640,22 +640,22 @@ function ProductGroup({
             </span>
           </button>
         </td>
-        <td className="px-4 py-2 text-xs text-muted-foreground">
+        <td className="px-4 py-2 text-xs text-muted-foreground hidden md:table-cell">
           {/* NOT one of the variants' skus. Printing the first would read as the product's
               own code and get scanned as one. */}
           <span className="font-mono">{group.rows.length} SKUs</span>
         </td>
-        <td className="px-2 py-2" />
+        <td className="px-2 py-2 hidden md:table-cell" />
         <td className="px-2 py-2 text-center font-semibold tabular-nums">{stock}</td>
-        <td className="px-2 py-2 text-center tabular-nums">{reserved}</td>
+        <td className="px-2 py-2 text-center tabular-nums hidden md:table-cell">{reserved}</td>
         <td className="px-4 py-2 text-center font-semibold tabular-nums">{stock - reserved}</td>
-        <td className="px-2 py-2" />
+        <td className="px-2 py-2 hidden md:table-cell" />
         <td className="px-4 py-2">
           {out === group.rows.length ? <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">All out</span>
             : out || low ? <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{out ? `${out} out` : `${low} low`}</span>
               : <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
         </td>
-        <td className="px-4 py-2 text-xs text-muted-foreground">
+        <td className="px-4 py-2 text-xs text-muted-foreground hidden md:table-cell">
           {/* One word only when the variants agree. Showing the first row's setting as if it
               were the product's is how a public sku hides behind a "Factory only" label. */}
           {group.rows.every((r) => visOf(r) === visOf(group.rows[0]))
