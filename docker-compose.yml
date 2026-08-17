@@ -188,6 +188,12 @@ services:
       SPACES_SECRET: ${SPACES_SECRET:-}
       SPACES_CDN: ${SPACES_CDN:-}
       DESIGN_URL_TTL_DAYS: ${DESIGN_URL_TTL_DAYS:-7}
+      # Google image generation (Nano Banana) for the staff assistant. A key saved in
+      # Settings › Integrations overrides this; the env line is the fallback. Like every
+      # key above, a line in .env alone does NOTHING unless it is forwarded BY NAME here.
+      # Generation also needs SPACES_* — the image has to be stored to be shown.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_IMAGE_MODEL: ${GEMINI_IMAGE_MODEL:-}
       # Google Sheets order import (API key reads link-shared sheets) + optional
       # service account to auto-CREATE a ready-filled sheet, + optional copy link.
       GOOGLE_SHEETS_API_KEY: ${GOOGLE_SHEETS_API_KEY:-}

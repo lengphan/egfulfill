@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ArrowsClockwise, Sparkle, Check, PencilSimple, X, CircleNotch, Warning } from "@phosphor-icons/react"
+import { ArrowsClockwise, Sparkle, Check, PencilSimple, X, CircleNotch, Warning, ImageSquare } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { PanelPicker, type PickerOption } from "@/components/app/panel-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { api, ApiError, getAdminSecrets, setAdminSecret, getAiConfig, setAiConfig, testAiKey, type SecretMeta, type AiConfig } from "@/lib/api"
+import { api, ApiError, getAdminSecrets, setAdminSecret, getAiConfig, setAiConfig, testAiKey, getImageAiConfig, setImageAiConfig, testImageAiKey, type SecretMeta, type AiConfig, type ImageAiConfig } from "@/lib/api"
 
 // One integration credential row — read-only status, plus inline edit for whitelisted
 // secrets (saved to the DB and to process.env live). Whether a change takes effect
@@ -282,6 +282,10 @@ const GROUPS = ["Channels", "Ads", "Payments", "Shipping", "Suppliers", "Embroid
 /** The AI card is picked from the same control as the rest, so it needs a key of its own
  *  that can never collide with an integration's. */
 const AI_KEY = "__ai"
+// A SECOND assistant credential, not a variant of the first: different provider, different
+// job (pictures, not words), and it bills per render rather than per question. Sharing one
+// card would imply a single key covers both, which is exactly the confusion to avoid.
+const IMAGE_KEY = "__img"
 
 /**
  * The one word that goes in the option label. This is the whole point of the screen: a
@@ -324,6 +328,9 @@ export function IntegrationsPanel() {
   // whether a key is set). The editable card below fetches its own.
   const [aiCfg, setAiCfg] = useState<AiConfig | null>(null)
   useEffect(() => { const id = setTimeout(() => { getAiConfig().then(setAiCfg).catch(() => {}) }, 0); return () => clearTimeout(id) }, [])
+  // Same again for the image key — the collapsed row's summary only.
+  const [imgCfg, setImgCfg] = useState<ImageAiConfig | null>(null)
+  useEffect(() => { const id = setTimeout(() => { getImageAiConfig().then(setImgCfg).catch(() => {}) }, 0); return () => clearTimeout(id) }, [])
 
   // Re-fetch just the secret metadata (after an edit) — no full integration recheck.
   const reloadSecrets = useCallback(() => {
@@ -380,11 +387,19 @@ export function IntegrationsPanel() {
   // version number where a state word belongs.
   const aiModelLabel = aiCfg?.models?.find((m) => m.id === aiCfg.model)?.label || aiCfg?.model
   const aiStatus = aiCfg == null ? "checking…" : (aiCfg.keySet || aiCfg.fromEnv ? (aiModelLabel || "key set") : "no key")
+  // A key alone isn't enough here — a generated image has to be STORED, so object storage
+  // being off is a distinct half-working state and the row says so rather than "key set".
+  const imgModelLabel = imgCfg?.models?.find((m) => m.id === imgCfg.model)?.label || imgCfg?.model
+  const imgStatus = imgCfg == null ? "checking…"
+    : !(imgCfg.keySet || imgCfg.fromEnv) ? "no key"
+    : imgCfg.storageReady === false ? "no storage"
+    : (imgModelLabel || "key set")
   // Ordered by GROUPS rather than by the INTEGRATIONS array — that array is append-order
   // (byeastside is Shipping but sits last), and the picker's headings should read in the
   // order the groups were designed in.
   const options: PickerOption[] = [
     { value: AI_KEY, label: "AI Assistant (Claude)", group: "Assistant", status: aiStatus },
+    { value: IMAGE_KEY, label: "Image AI (Nano Banana)", group: "Assistant", status: imgStatus },
     ...GROUPS.flatMap((g) =>
       INTEGRATIONS.filter((i) => i.group === g).map((i): PickerOption => {
         const res = results[i.key] ?? { level: "checking" as Level }
@@ -471,6 +486,8 @@ export function IntegrationsPanel() {
         <div key={sel} className="px-5 py-4">
           {sel === AI_KEY ? (
             <AiAssistantCard onChanged={() => getAiConfig().then(setAiCfg).catch(() => {})} />
+          ) : sel === IMAGE_KEY ? (
+            <ImageAiCard onChanged={() => getImageAiConfig().then(setImgCfg).catch(() => {})} />
           ) : active && activeRes && activeMeta ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -683,6 +700,164 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
         </div>
       )}
       <p className="mt-2 text-xs text-muted-foreground">A saved key overrides the server env. Haiku 4.5 runs about a fifth of a cent per question. Admin only.</p>
+    </div>
+  )
+}
+
+// ── Image AI (Nano Banana) — the Google key behind staff image generation ─────
+// Mirrors AiAssistantCard, with two deliberate differences: the model select carries a
+// PRICE, and "Test key" warns that it spends money. There is no free ping on an image
+// endpoint — a test is a real render — so the button must not read like the Claude one.
+function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
+  const [cfg, setCfg] = useState<ImageAiConfig | null>(null)
+  const [keyInput, setKeyInput] = useState("")
+  const [editingKey, setEditingKey] = useState(false)
+  const [model, setModel] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  const load = useCallback(() => {
+    getImageAiConfig()
+      .then((c) => { setCfg(c); setModel(c.model ?? "") })
+      .catch(() => setCfg({ models: [] }))
+  }, [])
+  useEffect(() => {
+    const id = setTimeout(load, 0)
+    return () => clearTimeout(id)
+  }, [load])
+
+  const dirty = !!keyInput.trim() || (!!cfg && model !== (cfg.model ?? ""))
+  const save = async () => {
+    setSaving(true); setErr(null); setSaved(false)
+    try {
+      const r = await setImageAiConfig({ key: keyInput.trim() || undefined, model: model || undefined })
+      if (r.error) throw new Error(r.error)
+      setCfg((prev) => ({ ...(prev ?? {}), ...r }))
+      setKeyInput(""); setEditingKey(false); setSaved(true)
+      onChanged?.()
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't save. Admin only.")
+    } finally { setSaving(false) }
+  }
+  const removeKey = async () => {
+    setSaving(true); setErr(null)
+    try {
+      const r = await setImageAiConfig({ clearKey: true })
+      setCfg((prev) => ({ ...(prev ?? {}), ...r }))
+      onChanged?.()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't remove the key.")
+    } finally { setSaving(false) }
+  }
+  const test = async () => {
+    setTesting(true); setTestResult(null)
+    try {
+      const typed = keyInput.trim()
+      const r = await testImageAiKey(typed || undefined)
+      setTestResult(r.ok
+        ? { ok: true, msg: `${typed ? "Pasted key works" : "Working"} — rendered ${Math.round((r.bytes ?? 0) / 1024)}KB. ${r.costNote ?? ""}`.trim() }
+        : { ok: false, msg: r.error || "Failed" })
+    } catch (e) {
+      setTestResult({ ok: false, msg: e instanceof Error ? e.message : "Test failed" })
+    } finally { setTesting(false) }
+  }
+
+  const models = cfg?.models ?? []
+  const spec = models.find((m) => m.id === model)
+  const active = !!(cfg?.keySet || cfg?.fromEnv)
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <ImageSquare size={16} weight="fill" />
+          </span>
+          <div>
+            <div className="font-semibold">Image AI (Nano Banana)</div>
+            <div className="text-xs text-muted-foreground">Product images from a prompt, in staff&rsquo;s own My EG chat. Not offered to sellers.</div>
+          </div>
+        </div>
+        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+          {active ? "Active" : "Inactive"}
+        </span>
+      </div>
+
+      {/* A key with no bucket behind it is half-configured, and the failure would only
+          appear at the moment someone spends money on a render. Say it up front. */}
+      {active && cfg?.storageReady === false && (
+        <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <Warning size={14} className="mt-0.5 shrink-0" />
+          <span>The key is set, but object storage isn&rsquo;t configured — a generated image couldn&rsquo;t be kept, so generation stays off.</span>
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Google AI API key</span>
+          {cfg?.keySet && !editingKey ? (
+            <div className="flex h-9 items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3">
+              <span className="flex-1 truncate font-mono text-xs text-foreground">{cfg.masked || `••••${cfg.last4 ?? ""}`}</span>
+              {cfg.fromEnv
+                ? <span className="shrink-0 text-2xs text-muted-foreground">from env</span>
+                : <button type="button" onClick={() => setEditingKey(true)} className="shrink-0 text-xs font-medium text-primary hover:underline">Replace</button>}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Input
+                type="password" value={keyInput}
+                onChange={(e) => { setKeyInput(e.target.value); setSaved(false) }}
+                placeholder="AIza…" className="flex-1 font-mono text-xs" autoFocus={editingKey}
+              />
+              {editingKey && <button type="button" onClick={() => { setEditingKey(false); setKeyInput("") }} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">Cancel</button>}
+            </div>
+          )}
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Model</span>
+          <select
+            value={model}
+            onChange={(e) => { setModel(e.target.value); setSaved(false) }}
+            className="eg-select h-9 rounded-2xl border border-border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 transition-colors hover:border-primary/40 focus-visible:outline-none"
+          >
+            {models.length === 0 && <option value={model}>{model || "—"}</option>}
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>{m.label} — ${m.usd[m.defaultSize]?.toFixed(3)}/image</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {spec && <p className="mt-2 text-xs leading-snug text-muted-foreground">{spec.note}</p>}
+      {cfg?.staleModel && (
+        <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+          The saved model <span className="font-mono">{cfg.staleModel}</span> is no longer offered — using {model} until you pick one.
+        </p>
+      )}
+
+      {err && <div className="mt-2 text-sm text-destructive">{err}</div>}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Button size="sm" onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
+        {(cfg?.keySet || keyInput.trim()) && (
+          // Says what it costs, because unlike the Claude test this one spends money.
+          <Button size="sm" variant="outline" onClick={test} disabled={testing}>{testing ? "Rendering…" : "Test key (~$0.03)"}</Button>
+        )}
+        {cfg?.keySet && !cfg.fromEnv && (
+          <Button size="sm" variant="outline" onClick={removeKey} disabled={saving}>Remove key</Button>
+        )}
+        {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
+      </div>
+      {testResult && (
+        <div className={"mt-2 text-sm " + (testResult.ok ? "text-success" : "text-destructive")}>
+          {testResult.ok ? "✓ " : "✗ "}{testResult.msg}
+        </div>
+      )}
+      <p className="mt-2 text-xs text-muted-foreground">
+        A saved key overrides the server env. Get one from Google AI Studio. Testing renders a real image, so it costs about 3&cent;. Admin only.
+      </p>
     </div>
   )
 }
