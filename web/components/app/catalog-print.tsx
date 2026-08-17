@@ -6,6 +6,7 @@ import { X, Printer, CircleNotch, PencilSimple, Image as ImageIcon, ArrowCounter
 import { Button } from "@/components/ui/button"
 import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, saveLookbookStyle, type LookbookStyle } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
+import { PRODUCT_METHODS } from "@/lib/print-method"
 import type { LookbookBrand } from "@/components/app/lookbook-branding-dialog"
 import { getUser } from "@/lib/auth"
 import { LookbookBrandingDialog } from "@/components/app/lookbook-branding-dialog"
@@ -430,24 +431,51 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               </span>
             </div>
 
-            <div>
-              {/* BROKEN AT THE LAST SPACE, not typed with a <br>. The cover name is editable
-                  now, so the line break cannot be part of the string — "The catalogue" has to
-                  set the way it always did while "Spring Blanks 2026" sets on its own terms.
-                  A single word simply fills one line. */}
-              <h1 className="font-title font-black leading-[0.88] tracking-tight" style={{ fontSize: "72px" }}>
-                {(() => {
-                  const words = brand.headline.trim().split(/\s+/)
-                  if (words.length < 2) return brand.headline
-                  return <>{words.slice(0, -1).join(" ")}<br />{words[words.length - 1]}</>
-                })()}
-              </h1>
-              <p className="mt-6 max-w-[105mm] text-base leading-relaxed" style={{ color: "rgba(250,248,243,0.75)" }}>
-                {brand.tagline}
-              </p>
-              {/* The lime rule — one bright line, the counterpart colour doing the job it
-                  can do on a dark ground where it measures 16.6:1. */}
-              <div className="mt-8 h-1.5 w-28 rounded-full" style={{ background: HOUSE.lime }} />
+            {/* TWO COLUMNS, because the sheet turned on its side and the type did not.
+                A portrait cover is a column of words with the plate around it; the same
+                arrangement on a 297mm page is that column pinned to the left edge with half
+                a sheet of empty colour beside it. The words keep the left, and the right
+                carries the thing the document is about — the products, in a grid, off the
+                catalogue itself. Nothing invented: they are the first styles in the book. */}
+            <div className="grid flex-1 grid-cols-[minmax(0,1fr)_118mm] items-center gap-10">
+              <div>
+                {/* BROKEN AT THE LAST SPACE, not typed with a <br>. The cover name is editable
+                    now, so the line break cannot be part of the string — "The catalogue" has to
+                    set the way it always did while "Spring Blanks 2026" sets on its own terms.
+                    A single word simply fills one line. */}
+                <h1 className="font-title font-black leading-[0.88] tracking-tight" style={{ fontSize: "68px" }}>
+                  {(() => {
+                    const words = brand.headline.trim().split(/\s+/)
+                    if (words.length < 2) return brand.headline
+                    return <>{words.slice(0, -1).join(" ")}<br />{words[words.length - 1]}</>
+                  })()}
+                </h1>
+                <p className="mt-5 max-w-[105mm] text-base leading-relaxed" style={{ color: "rgba(250,248,243,0.75)" }}>
+                  {brand.tagline}
+                </p>
+                {/* The lime rule — one bright line, the counterpart colour doing the job it
+                    can do on a dark ground where it measures 16.6:1. */}
+                <div className="mt-7 h-1.5 w-28 rounded-full" style={{ background: HOUSE.lime }} />
+              </div>
+
+              {/* FOUR REAL PRODUCTS, on white tiles so the garments read against the plate.
+                  Only styles that actually have a photograph — a cover is the one page that
+                  cannot afford an empty well, so a thin catalogue simply shows fewer. */}
+              {(() => {
+                const shots = rows.map(heroImage).filter(Boolean).slice(0, 4)
+                if (!shots.length) return <span />
+                return (
+                  <div className={"grid gap-3 " + (shots.length === 1 ? "grid-cols-1" : "grid-cols-2")}>
+                    {shots.map((src, i) => (
+                      <div key={i} className="flex aspect-square items-center justify-center overflow-hidden rounded-xl p-3"
+                           style={{ background: PLATE }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt="" className="size-full object-contain" />
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
 
             <div className="flex items-end justify-between text-xs" style={{ color: "rgba(250,248,243,0.7)" }}>
@@ -459,6 +487,72 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               {title && <span>{title}</span>}
             </div>
           </section>
+
+          {/* ── WHAT WE DO ───────────────────────────────────────────────────────────
+              A catalogue that opens on a spec sheet is a price list with a cover. This is
+              the page a buyer reads before deciding whether to read the rest — and every
+              figure on it is COUNTED FROM THIS DOCUMENT rather than claimed. Styles,
+              colourways, sizes and decoration methods are what the pages behind it contain,
+              so the sheet cannot overstate the catalogue it introduces. */}
+          {(() => {
+            const colourways = rows.reduce((n, st) => n + st.colors.length, 0)
+            const sizes = new Set(rows.flatMap((st) => st.sizes))
+            const brands = new Set(rows.map((st) => st.brand).filter(Boolean))
+            const priced = rows.filter((st) => sheetPrice(st) != null).length
+            const stat = (n: string | number, label: string) => (
+              <div key={label}>
+                <div className="font-title text-4xl font-bold leading-none tabular-nums">{n}</div>
+                <div className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">{label}</div>
+              </div>
+            )
+            return (
+              <section
+                className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+                style={{ height: "210mm" }}
+              >
+                <div className="mb-6 h-1.5 w-full rounded-full" style={{ background: brand.accent }} />
+                <h2 className="font-title text-4xl font-bold uppercase leading-none tracking-tight">
+                  What we make, and how
+                </h2>
+                <p className="mt-2 max-w-[150mm] text-sm leading-relaxed text-neutral-600">
+                  Blanks held and decorated to order — no minimums per design, and every piece
+                  printed, packed and shipped from one floor.
+                </p>
+
+                <div className="mt-8 grid grid-cols-4 gap-6 border-y border-neutral-200 py-6">
+                  {stat(rows.length, "styles in this book")}
+                  {stat(colourways, "colourways")}
+                  {stat(sizes.size, "sizes")}
+                  {stat(brands.size || "—", brands.size === 1 ? "brand" : "brands")}
+                </div>
+
+                {/* THE DECORATION METHODS, from the same table the product form offers and
+                    pricing surcharges — so this page cannot advertise a technique the factory
+                    does not have a price for. */}
+                <div className="mt-8">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+                    Decoration
+                  </div>
+                  <div className="mt-3 grid grid-cols-4 gap-3">
+                    {PRODUCT_METHODS.map((m) => (
+                      <div key={m.key} className="rounded-lg border border-neutral-200 px-3 py-2.5">
+                        <div className="text-sm font-semibold">{m.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-auto flex items-end justify-between border-t border-neutral-200 pt-4 text-[10px] text-neutral-500">
+                  <span>
+                    {priced === rows.length
+                      ? "Every style in this book is priced."
+                      : `${priced} of ${rows.length} styles priced — ask us for the rest.`}
+                  </span>
+                  <span className="font-title text-sm font-semibold tracking-tight text-neutral-700">{brand.title}</span>
+                </div>
+              </section>
+            )
+          })()}
 
           {rows.map((st) => {
             // The photo this page can show, and whether the left column has anything at all
