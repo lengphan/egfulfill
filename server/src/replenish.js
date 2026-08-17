@@ -15,6 +15,7 @@
 //     minus everything already promised to unshipped orders.
 import { q } from './db.js';
 import { catalogIndex, resolveStockSku } from './pricing.js';
+import { variantSku } from './variant-sku.js';
 
 const AUTO_PO = (supplier) => 'PO-AUTO-' + String(supplier || 'UNASSIGNED').toUpperCase().replace(/[^A-Z0-9]+/g, '-').slice(0, 24);
 
@@ -36,9 +37,45 @@ export const stripMethod = (s) => String(s || '').trim().replace(METHOD_SUFFIX, 
  * match, so every line where somebody had chosen a blank was skipped as "not an inventory
  * item" and nothing was ever replenished for it.
  */
-/** Exported so reserve.js holds units against the SAME sku replenishment counts them
- *  under. Two resolvers here would reserve one key and buy another. */
-export const blankOf = (idx, r) => stripMethod(resolveStockSku(idx, r) || r.blank || r.sku).toUpperCase();
+const blankOf = (idx, r) => stripMethod(resolveStockSku(idx, r) || r.blank || r.sku).toUpperCase();
+
+/**
+ * THE KEY A LINE'S SHELF IS ACTUALLY UNDER — the same three rungs the boards use.
+ *
+ * blankOf answers with the PRODUCT's sku, which is where stock lived when one row covered
+ * eight sizes and sixty colours. It does not any more: the product editor and the inventory
+ * dialog both file per colourway (EG-1007-OSFM-ADULT-RED), and a line looked up under
+ * EG-1007 finds nothing at all. Nothing is not zero — replenish skipped those lines as "not
+ * an inventory item", so pressing Working parked NOTHING for a variant that was genuinely
+ * out, and reserve.js held units against a row that does not exist.
+ *
+ * Mirrors stockKeys in web/lib/stock-status.ts — change both:
+ *   colour+size  ->  size  ->  the product's own sku
+ * The inventory table decides which rung applies, so nothing has to be migrated and a
+ * product still stocked the old way keeps being read the old way.
+ *
+ * `known` is the set of uppercased skus inventory actually holds; without it (nothing read
+ * yet) the most specific key is returned, which is what a writer wants.
+ */
+export function stockKeysFor(idx, r) {
+  const base = blankOf(idx, r);
+  if (!base) return [];
+  const out = [];
+  const withColor = variantSku(base, r.size, r.color);
+  const sizeOnly = variantSku(base, r.size, null);
+  if (withColor) out.push(withColor);
+  if (sizeOnly && sizeOnly !== withColor) out.push(sizeOnly);
+  out.push(base);
+  return out;
+}
+
+/** The first rung inventory actually holds, else the product's own sku. */
+export function stockKeyOf(idx, r, known) {
+  const keys = stockKeysFor(idx, r);
+  if (!keys.length) return '';
+  if (!known) return keys[0];
+  return keys.find((k) => known.has(k)) || keys[keys.length - 1];
+}
 
 /**
  * Park this order's short blanks in the shared saved-for-later list.
@@ -81,13 +118,33 @@ export async function autoReplenish(orderId) {
    * line and a picked one merge instead of sitting beside each other saying the same thing.
    */
   const variantOf = (r) => [r.color, r.size].map((v) => String(v ?? '').trim()).filter(Boolean).join(' / ');
-  const need = new Map();          // blank sku -> total units
-  const byVariant = new Map();     // blank sku -> Map(variant -> units)
+  /**
+   * WHICH SHELF EACH LINE DRAWS FROM, decided by what inventory actually holds.
+   *
+   * Every rung a line could be stocked under is asked for at once, and the row that comes
+   * back picks the key. Grouping on the product sku first — which is what this did — meant a
+   * product stocked per colourway had no row under the key being asked about, and every one
+   * of its lines was skipped as "not an inventory item" while sitting at zero.
+   */
+  const candidates = new Set();
+  for (const r of lines) for (const k of stockKeysFor(idx, r)) candidates.add(k);
+  if (!candidates.size) return null;
+  const inv = (await q(
+    `select upper(sku) as sku, in_stock, reorder_at, supplier from inventory where upper(sku) = any($1)`,
+    [[...candidates]]
+  ).catch(() => ({ rows: [] }))).rows;
+  const bySku = new Map(inv.map((r) => [r.sku, r]));
+  const known = new Set(bySku.keys());
+
+  const need = new Map();          // stock key -> total units
+  const byVariant = new Map();     // stock key -> Map(variant -> units)
+  const keyOf = new Map();         // stock key -> the product sku it belongs to (for reporting)
   for (const r of lines) {
-    const sku = blankOf(idx, r);
+    const sku = stockKeyOf(idx, r, known);
     if (!sku) continue;
     const qty = Number(r.qty) || 1;
     need.set(sku, (need.get(sku) || 0) + qty);
+    keyOf.set(sku, blankOf(idx, r));
     if (!byVariant.has(sku)) byVariant.set(sku, new Map());
     const v = byVariant.get(sku);
     const key = variantOf(r);
@@ -95,12 +152,6 @@ export async function autoReplenish(orderId) {
   }
   const wanted = [...need.keys()];
   if (!wanted.length) return null;
-
-  const inv = (await q(
-    `select upper(sku) as sku, in_stock, reorder_at, supplier from inventory where upper(sku) = any($1)`,
-    [wanted]
-  ).catch(() => ({ rows: [] }))).rows;
-  const bySku = new Map(inv.map((r) => [r.sku, r]));
 
   /**
    * WHAT OTHER UNSHIPPED ORDERS HAVE ALREADY CLAIMED. This is the "reserved" number the
@@ -123,7 +174,9 @@ export async function autoReplenish(orderId) {
         and coalesce(o.status,'') not in ('cancelled','canceled','refunded')
         and i.order_id <> $1`, [orderId]
   ).catch(() => ({ rows: [] }))).rows) {
-    const sku = blankOf(idx, r);
+    // Resolved through the SAME ladder, or another order's claim on the Red L/XL shelf would
+    // be counted against the product row and quietly subtracted from a different colourway.
+    const sku = stockKeyOf(idx, r, known);
     if (!sku || !need.has(sku)) continue;   // only the blanks this order touches
     committed.set(sku, (committed.get(sku) || 0) + (Number(r.qty) || 1));
   }

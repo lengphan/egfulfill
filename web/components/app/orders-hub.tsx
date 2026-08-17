@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, ArrowUUpLeft, BookmarkSimple } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, Truck, Printer, Warning, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, BookmarkSimple } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -1617,10 +1617,10 @@ export function OrdersHub() {
             <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-5 py-2.5">
               <span className="text-sm text-muted-foreground">{selected.size} selected</span>
               <Button size="sm" variant="outline" onClick={doBulkSlips} disabled={pushing || !!buying}>
-                <Package size={13} weight="bold" /> Packing slips
+                Packing slips
               </Button>
               <Button size="sm" variant="outline" onClick={doBulkStart} disabled={pushing || !!buying}>
-                <PaperPlaneTilt size={13} weight="bold" /> Start
+                Start
               </Button>
               <Button size="sm" onClick={doPush} disabled={pushing}>
                 {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
@@ -2126,7 +2126,7 @@ export function OrdersHub() {
                                     onClick={() => setOrderStatus(o, holdFrom!)}
                                     title={`Take this order off hold and return it to ${backLabel}`}
                                   >
-                                    <ArrowUUpLeft size={12} weight="bold" /> Back to {backLabel}
+                                    Back to {backLabel}
                                   </Button>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">resolve in ⋯</span>

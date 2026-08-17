@@ -23,7 +23,7 @@
 //     garment is subtracted twice. Cancelled: the work will never happen.
 import { q } from './db.js';
 import { catalogIndex } from './pricing.js';
-import { blankOf } from './replenish.js';
+import { stockKeysFor, stockKeyOf } from './replenish.js';
 
 let ready = null;
 async function ensure() {
@@ -39,17 +39,32 @@ async function ensure() {
   return ready;
 }
 
-/** What this order needs, per inventory sku. Uses replenishment's own resolver so a hold
- *  and a purchase are counted against the same key. */
+/**
+ * What this order needs, per inventory sku.
+ *
+ * Through replenishment's own ladder, so a hold and a purchase land on the SAME row. Holding
+ * against the product sku while the shelf is kept per colourway reserves units on a row that
+ * does not exist — nothing moves, and Available keeps reading as though the order were not
+ * in production.
+ */
 async function needsOf(orderId) {
   const lines = (await q(
     'select sku, blank, qty, color, size from order_items where order_id=$1', [orderId]
   ).catch(() => ({ rows: [] }))).rows;
   if (!lines.length) return new Map();
   const idx = await catalogIndex();
+  // Which rungs exist, asked once for every line's candidates.
+  const candidates = new Set();
+  for (const r of lines) for (const k of stockKeysFor(idx, r)) candidates.add(k);
+  const known = new Set(
+    candidates.size
+      ? (await q('select upper(sku) as sku from inventory where upper(sku) = any($1)', [[...candidates]])
+          .catch(() => ({ rows: [] }))).rows.map((r) => r.sku)
+      : []
+  );
   const need = new Map();
   for (const r of lines) {
-    const sku = blankOf(idx, r);
+    const sku = stockKeyOf(idx, r, known);
     if (!sku) continue;
     need.set(sku, (need.get(sku) || 0) + (Number(r.qty) || 1));
   }
