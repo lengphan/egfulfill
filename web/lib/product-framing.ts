@@ -97,49 +97,21 @@ export function framingStyle(p: Framed | null | undefined): CSSProperties {
   const zoom = zoomOf(p)
   const focus = focusOf(p)
   if (zoom === 1 && focus === FOCUS_CENTRE) return {}
-  return { transform: `scale(${framingZoom(zoom, focus).toFixed(3)}) translateY(${translatePct(zoom, focus).toFixed(2)}%)` }
-}
-
-/**
- * A PAN CAN ONLY SPEND THE SLACK THE ZOOM CREATED.
- *
- * `object-fit: cover` plus `scale(z)` leaves (z − 1) / 2 of the box hidden above and below.
- * Move the picture further than that and it stops covering: the far edge crosses into the
- * box and you get an empty band on one side and a lost band on the other. At z = 1 the slack
- * is ZERO, which is why every pan on an unzoomed photo cut it off.
- *
- * So the zoom is raised to exactly what the requested pan needs and no further — the picture
- * always fills its well, and the slider's ends still mean what they always meant. It does
- * mean panning crops: you cannot move a photograph inside a fixed window without something
- * leaving it, and the editor says so under the sliders.
- */
-function framingZoom(zoom: number, focus: number): number {
-  const shiftFrac = Math.abs((FOCUS_CENTRE - focus) / FOCUS_CENTRE) * (FOCUS_TRAVEL_PCT / 100)
-  return Math.max(zoom, 1 + 2 * shiftFrac)
-}
-
-/**
- * The translate, as a percentage of the image's own height.
- *
- * translateY sits INSIDE scale(), so a percentage here is multiplied by the zoom before it
- * reaches the screen. Dividing it back out is what makes the slider's travel a fraction of
- * the BOX rather than of whatever the zoom happens to be — the same drag moved the picture
- * three times as far at 300% as at 100%, which is why the control felt uncontrollable
- * exactly where it was needed most.
- *
- * 0 → the picture moves DOWN, so the top of it is what stays in frame. Same direction the
- * object-position version had, so stored values keep their meaning.
- */
-function translatePct(zoom: number, focus: number): number {
-  const shiftFrac = ((FOCUS_CENTRE - focus) / FOCUS_CENTRE) * (FOCUS_TRAVEL_PCT / 100)
-  return (shiftFrac * 100) / framingZoom(zoom, focus)
-}
-
-/**
- * The zoom a surface will actually render at — the set zoom, or more if the pan needed it.
- * Exported so the editor can say when panning has zoomed the picture rather than leaving the
- * reader to wonder why 100% does not look like 100%.
- */
-export function renderedZoom(p: Framed | null | undefined): number {
-  return framingZoom(zoomOf(p), focusOf(p))
+  /**
+   * UP/DN MOVES THE PICTURE. IT DOES NOT ZOOM IT.
+   *
+   * A version of this raised the zoom to whatever kept the well covered, so that panning
+   * could never expose the box behind. That is a legitimate way to crop and it is NOT this
+   * control: dragging "up/down" and watching the picture grow is two things happening under
+   * one slider, and the one you asked for is the one that stops working.
+   *
+   * So the transform is the pan and the zoom is the zoom. The two sliders do one thing each,
+   * and whatever the pan uncovers is the well's own background — which is white wherever a
+   * product photo sits, the same white these cut-out studio shots are already on.
+   *
+   * 0 → the picture moves DOWN, so the top of it is what stays in frame. Same direction the
+   * object-position version had, so stored values keep their meaning.
+   */
+  const shift = ((FOCUS_CENTRE - focus) / FOCUS_CENTRE) * FOCUS_TRAVEL_PCT
+  return { transform: `scale(${zoom}) translateY(${shift.toFixed(2)}%)` }
 }

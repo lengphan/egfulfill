@@ -142,7 +142,7 @@ export default function ProductDetailPage() {
         {/* Gallery sticks while the (much taller) info column scrolls — otherwise the
             left column dead-ends under the thumbnails and leaves a tall empty well. */}
         <div className="space-y-3 lg:sticky lg:top-6">
-          <div className="relative aspect-square overflow-hidden rounded-2xl border border-border bg-muted/40">
+          <div className="relative aspect-square overflow-hidden rounded-2xl border border-border bg-white">
             {gallery.length ? (
               /* FRAMED AS THE PRODUCT SAYS. This page ignored imgZoom/imgFocusY entirely, so
                  the framing set in the editor held on the grid and then evaporated the

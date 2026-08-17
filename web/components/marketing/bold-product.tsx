@@ -145,7 +145,7 @@ export function BoldProduct({ product, shipping }: {
                 </div>
               )}
               <div
-                className="relative aspect-square min-w-0 flex-1 overflow-hidden rounded-2xl border border-black/[0.09]"
+                className="relative aspect-square min-w-0 flex-1 overflow-hidden rounded-2xl border border-black/[0.09] bg-white"
                 style={{ background: hero ? "#fff" : ACCENT }}
               >
                 {hero ? (

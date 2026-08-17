@@ -319,7 +319,7 @@ export function ProductsCatalog() {
                 className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 {/* image / placeholder */}
-                <div className="relative aspect-square overflow-hidden bg-muted/40">
+                <div className="relative aspect-square overflow-hidden bg-white">
                   {/* Card actions — Design (everyone) + Edit/Delete (staff). */}
                   <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <button
