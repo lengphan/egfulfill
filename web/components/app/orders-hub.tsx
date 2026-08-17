@@ -109,20 +109,24 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
      * Inventory page uses, seeded with this blank's sku. Once the row exists the chip becomes
      * a real count — 0 if that is what it is, which by then is a fact rather than a guess.
      */
+    /**
+     * THE FIX, NOT THE DIAGNOSIS. "Not tracked" named a state of our own setup and left the
+     * reader to work out that it was theirs to fix — and it is a state that should not
+     * survive being looked at, because the answer is one click: file the row.
+     *
+     * Nothing at all for anyone who cannot file it. A seller does not keep our shelf, so a
+     * grey chip about our inventory list is a fact about us on a screen about their order.
+     */
     return onTrack ? (
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onTrack(blankSku) }}
-        className={pill + " bg-muted text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"}
-        title={`${blankSku} isn't on the inventory list — click to add it`}
+        className={pill + " border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"}
+        title={`${blankSku} has no inventory row yet — click to add it`}
       >
-        Not tracked
+        Add to inventory
       </button>
-    ) : (
-      <span className={pill + " bg-muted text-muted-foreground"} title={`${blankSku} is not on the inventory list`}>
-        Not tracked
-      </span>
-    )
+    ) : null
   }
   const need = Number(item.qty) || 1
   const enough = have >= need
@@ -2941,7 +2945,7 @@ export function OrdersHub() {
       {/* One sticker per UNIT (qty), so a x3 line prints 3 — that's what goes on the
           boxes. Lines with no chosen variant are skipped: labelling an undecided
           blank is worse than not labelling it. */}
-      {/* THE SAME DIALOG THE INVENTORY PAGE USES, opened from a "Not tracked" chip and seeded
+      {/* THE SAME DIALOG THE INVENTORY PAGE USES, opened from an "Add to inventory" chip and seeded
           with that blank's sku. Adding the row here updates this screen's stock map straight
           away, so the chip it was opened from becomes a real count without a reload. */}
       <AddItemDialog
