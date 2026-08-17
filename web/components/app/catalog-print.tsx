@@ -950,11 +950,11 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
 
               Paginated in code rather than left to the browser. These sheets are fixed A4
               with a footer pinned to the bottom, so a table that flows past the page edge
-              simply gets cut — 13 rows a page is what fits on a LANDSCAPE sheet with the
+              simply gets cut — 11 rows a page is what fits on a LANDSCAPE sheet with the
               header and the note. It was 22, which was right when the page was 297mm tall
               and cut nine rows off every sheet the moment it turned on its side. */}
           {(() => {
-            const ROWS_PER_PAGE = 13
+            const ROWS_PER_PAGE = 11
             const pages: LookbookStyle[][] = []
             for (let i = 0; i < rows.length; i += ROWS_PER_PAGE) pages.push(rows.slice(i, i + ROWS_PER_PAGE))
             return pages.map((page, pi) => (
@@ -973,21 +973,21 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   </p>
                 </div>
 
-                <table className="w-full border-collapse text-[10px]">
+                <table className="w-full border-collapse text-[13px]">
                   <thead>
                     <tr className="border-b border-neutral-300 text-left align-bottom">
-                      <th className="pb-2 pr-3 font-semibold uppercase tracking-wider text-neutral-500">Style</th>
-                      <th className="pb-2 pr-3 font-semibold uppercase tracking-wider text-neutral-500">Sku</th>
+                      <th className="pb-2 pr-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Style</th>
+                      <th className="pb-2 pr-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Sku</th>
                       {/* "Base" was wrong: it printed catalog_price, the trade rate. This is the number
                           a reader orders at, whichever of the two it resolves to. */}
                       {/* ONE COLUMN PER TECHNIQUE. "Unit" was the base plus whichever
                           surcharge the product's first listed method carried, so a blank
                           offered in both was quoted at one of them and the sheet was wrong
                           about the other. Stitches cost more than ink. */}
-                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Printing</th>
-                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Embroidery</th>
-                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">First item<br />shipping</th>
-                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Additional item<br />shipping</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Printing</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Embroidery</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-500">First item<br />shipping</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Additional item<br />shipping</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -996,8 +996,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                          would reconcile them into one row — on a price list that is a line
                          item silently missing from a quote. */
                       <tr key={`${st.ref}-${st.sku}-${ri}`} className={ri % 2 ? "" : "bg-neutral-50"}>
-                        <td className="max-w-[70mm] truncate py-1.5 pr-3 font-medium">{st.name}</td>
-                        <td className="py-1.5 pr-3 font-mono text-[9px] text-neutral-500">{st.sku}</td>
+                        <td className="max-w-[90mm] truncate py-2 pr-3 font-medium">{st.name}</td>
+                        <td className="py-2 pr-3 font-mono text-[11px] text-neutral-500">{st.sku}</td>
                         {/* A DASH, NEVER A ZERO. An unpriced style on a price list that
                             printed $0.00 would be quoting a wholesale buyer a free garment,
                             and it is the one mistake here nobody could walk back. */}
@@ -1008,24 +1008,24 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                             Falls back to the sheet price when a SAVED export predates the
                             per-method figures — an older document keeps quoting what it
                             always did rather than going blank. */}
-                        <td className="py-1.5 pl-3 text-right tabular-nums">
+                        <td className="py-2 pl-3 text-right tabular-nums">
                           {st.priceByMethod
                             ? (st.priceByMethod.print == null
                                 ? <span className="text-neutral-400">N/A</span>
                                 : money(st.priceByMethod.print))
                             : (sheetPrice(st) == null ? <span className="text-neutral-400">—</span> : money(sheetPrice(st)))}
                         </td>
-                        <td className="py-1.5 pl-3 text-right tabular-nums">
+                        <td className="py-2 pl-3 text-right tabular-nums">
                           {st.priceByMethod
                             ? (st.priceByMethod.embroidery == null
                                 ? <span className="text-neutral-400">N/A</span>
                                 : money(st.priceByMethod.embroidery))
                             : <span className="text-neutral-400">—</span>}
                         </td>
-                        <td className="py-1.5 pl-3 text-right tabular-nums">
+                        <td className="py-2 pl-3 text-right tabular-nums">
                           {st.ship == null ? <span className="text-neutral-400">—</span> : money(st.ship)}
                         </td>
-                        <td className="py-1.5 pl-3 text-right tabular-nums">
+                        <td className="py-2 pl-3 text-right tabular-nums">
                           {st.shipExtra == null ? <span className="text-neutral-400">—</span> : money(st.shipExtra)}
                         </td>
                       </tr>
