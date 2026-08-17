@@ -31,22 +31,57 @@ export const FOCUS_MAX = 100
 export const FOCUS_CENTRE = 50
 
 /**
- * How far each end of the slider moves the picture, as a percentage of the BOX's height.
+ * THE SMALLEST TRAVEL THE SLIDER EVER HAS — a nudge, as a fraction of the BOX's height.
  *
- * This used to be a percentage of the image's own height applied on top of whatever zoom was
- * set, deliberately past the point where the picture still covered its box — the note here
- * said so, and called it a choice someone could undo with Reset.
+ * The ends used to move the picture 40% of its own height, INSIDE the scale, so the actual
+ * displacement multiplied with the zoom: 40% of the well at zoom 100 and 120% at zoom 300.
+ * Rendering the whole slider against a real cap showed what that costs — of twenty
+ * zoom × up/dn positions only about five kept the garment in the frame. The rest pushed it
+ * out of the top or the bottom, which is a control that spends most of its travel destroying
+ * the shot, and it is why framing looked like it did not work.
  *
- * It was not a choice, it was the picture falling out of the frame. At zoom 100 there is no
- * overflow to pan through, so the whole travel ran off the edge: the garment slid out of the
- * bottom of the well and the empty box showed above it. That is the "I move the image down
- * and it gets cut off" — the pan was moving the photo OUT rather than moving the crop.
- *
- * Kept at 40% because that is the travel the slider ends have always meant. What changed is
- * that the zoom is now raised to cover it (see framingStyle), so the travel is real and the
- * frame stays full.
+ * At zoom 100 a photo has almost nothing to give: the picture is already sized to the well,
+ * so any real movement takes the subject somewhere it cannot come back from. 12% is a nudge —
+ * enough to lift a cap sitting low in its frame, not enough to lose it.
+ */
+export const FOCUS_TRAVEL_MIN = 0.12
+
+/**
+ * Kept as the old name and the old number for anything still importing it. The travel is no
+ * longer a fixed percentage — see panFraction.
+ * @deprecated read panFraction instead
  */
 export const FOCUS_TRAVEL_PCT = 40
+
+/**
+ * HOW FAR THE SLIDER MAY MOVE THE PICTURE, as a fraction of the box, at this zoom.
+ *
+ * The rule every crop tool uses: you may pan as far as the zoom made room for. Scaling a
+ * picture by z hides (z − 1) / 2 of the box above and below, and that hidden part is exactly
+ * what panning is for — bringing it back into view. Below zoom ~1.24 that slack is smaller
+ * than a useful nudge, so the floor takes over.
+ *
+ * The consequence worth stating: the ends of the slider mean DIFFERENT distances at different
+ * zooms, and that is correct. At 100% there is nothing to explore and the ends are a nudge; at
+ * 300% there is a whole picture behind the well and the ends reach it.
+ */
+export function panFraction(zoom: number): number {
+  /**
+   * The slack, computed against the PAINTED picture rather than the box.
+   *
+   * These wells are object-contain, so a 4:3 photo paints about three quarters of the box's
+   * height and the rest is white — (z − 1) / 2 over-states what there is to pan through by
+   * exactly that margin, which is why the ends of the slider still emptied the well at 300%.
+   * 0.75 is the worst realistic case (a 4:3 cap shot in a square); anything squarer has more.
+   *
+   * AND A CEILING, because covering the box is not the same as keeping the GARMENT in it. The
+   * subject sits in the middle of a studio shot, so a pan of half the box takes it past the
+   * edge however full the frame stays. CSS cannot know where the garment is — it can only be
+   * kept from travelling far enough to lose it. 35% is that limit: visibly different from
+   * centre at every zoom, never far enough to push the product out of its own picture.
+   */
+  return clamp((0.75 * zoom - 1) / 2, FOCUS_TRAVEL_MIN, 0.35)
+}
 
 export const ZOOM_MIN = 100
 export const ZOOM_MAX = 300
@@ -111,7 +146,13 @@ export function framingStyle(p: Framed | null | undefined): CSSProperties {
    *
    * 0 → the picture moves DOWN, so the top of it is what stays in frame. Same direction the
    * object-position version had, so stored values keep their meaning.
+   *
+   * HOW FAR is panFraction's decision — the slack this zoom created, never less than a nudge.
+   * And the percentage is divided by the zoom before it goes out, because translateY sits
+   * INSIDE scale() and would otherwise be multiplied by it: the same drag moved the picture
+   * three times as far at 300% as at 100%, which is how the ends of the slider ended up
+   * throwing the garment clean out of the frame.
    */
-  const shift = ((FOCUS_CENTRE - focus) / FOCUS_CENTRE) * FOCUS_TRAVEL_PCT
-  return { transform: `scale(${zoom}) translateY(${shift.toFixed(2)}%)` }
+  const shift = ((FOCUS_CENTRE - focus) / FOCUS_CENTRE) * panFraction(zoom)
+  return { transform: `scale(${zoom}) translateY(${((shift * 100) / zoom).toFixed(2)}%)` }
 }
