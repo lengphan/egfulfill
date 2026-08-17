@@ -78,11 +78,14 @@ export type ItemAvatarProps = {
  * `missing` is that fact, kept separate so the caller can say it out loud instead — CLAUDE.md
  * §4: an empty state must never be indistinguishable from a broken one.
  */
-function blankOf(item: OrderItem, catalog?: CatalogProduct[]): { url: string; missing: boolean } {
+function blankOf(item: OrderItem, catalog?: CatalogProduct[]): { url: string; missing: boolean; chosen: boolean } {
   const p = catalog?.length ? resolveProduct(item, catalog) : null
   // No fallback — this is the blank's OWN imagery or nothing.
   const own = bestMockup(p, item.color, "")
-  return { url: own || item.img || "", missing: !!p && !own }
+  // `chosen` — a blank RESOLVES for this line, so there is a second thing to look at. Kept
+  // separate from `url`, which falls back to the listing photo and therefore cannot answer
+  // "do we know what we are making yet".
+  return { url: own || item.img || "", missing: !!p && !own, chosen: !!p }
 }
 
 export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, listingFirst, onDropImage, bare, className }: ItemAvatarProps) {
@@ -114,7 +117,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   // earlier never appeared on the thumbnail and looked like it hadn't saved.
   const design = designForLine(designs ?? undefined, item) ?? null
   const art = designSrc(design?.data) || designSrc(item.design_src)
-  const { url: blank, missing: blankMissing } = blankOf(item, catalog)
+  const { url: blank, missing: blankMissing, chosen: blankChosen } = blankOf(item, catalog)
   const listing = item.img || ""
   // Only worth offering the swap when the two views actually differ.
   const canSwap = !!(art && listing && listing !== blank)
@@ -142,8 +145,17 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
    * AND A CHOSEN-BUT-PICTURELESS BLANK IS STILL TWO THINGS. Without blankMissing the pair
    * collapsed to one tile the moment someone picked a blank we hold no photo for, which
    * reads as "this order is different" rather than "that product needs a photo".
+   *
+   * BUT THERE IS NO PAIR UNTIL A BLANK IS CHOSEN — and `art` alone was letting one through.
+   *
+   * The front card is "what we will make". Before a blank resolves we do not know that, and
+   * `blankOf` falls back to the LISTING photo, so a line with artwork and no blank drew the
+   * buyer's photo with the artwork on it, and tucked a second copy of that same photo behind
+   * it. Two tiles, one picture, and the treatment appeared on some rows of an order and not
+   * others depending only on whether artwork happened to be attached yet — which is exactly
+   * what it looked like: arbitrary. One tile until there are genuinely two things to compare.
    */
-  const showBoth = !!(listing && (art || blankMissing || (blank && listing !== blank))) && !listingFirst && size >= 56
+  const showBoth = !!(listing && blankChosen && (art || blankMissing || (blank && listing !== blank))) && !listingFirst && size >= 56
   /** Which card is in front. The print leads, because it is what the floor makes. */
   const [listingFront, setListingFront] = useState(false)
   /**
