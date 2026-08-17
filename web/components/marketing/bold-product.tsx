@@ -3,8 +3,8 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { TShirt, ArrowLeft, Check } from "@phosphor-icons/react"
-import { ACCENT, ACCENT_INK, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
+import { TShirt, ArrowLeft } from "@phosphor-icons/react"
+import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
 import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
@@ -326,10 +326,22 @@ export function BoldProduct({ product, shipping }: {
                     return (
                       <div key={m}>
                         <div className="text-sm font-bold">{m}</div>
-                        <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+                        {/**
+                          * PILLS, not a row of ticks.
+                          *
+                          * Six ✓ items on one line gave the section six small marks, six
+                          * gaps and no edges — a thin ragged strip that read as clutter
+                          * rather than as a set. Every OTHER list of facts on this page is
+                          * already a pill (see Spec: sizes, methods), so this was also the
+                          * one place inventing its own.
+                          *
+                          * The tick goes with them: a list titled "where we can print" is
+                          * affirmative by definition, so a ✓ on every item marks nothing.
+                          */}
+                        <ul className="mt-2.5 flex flex-wrap gap-1.5">
                           {spots.map((sp) => (
-                            <li key={sp} className="flex items-center gap-1.5 text-sm text-black/65">
-                              <Check size={13} weight="bold" className="shrink-0 text-black/35" />{sp}
+                            <li key={sp} className="rounded-full border border-black/[0.14] px-3 py-1 text-sm text-black/70">
+                              {sp}
                             </li>
                           ))}
                         </ul>
@@ -367,10 +379,17 @@ export function BoldProduct({ product, shipping }: {
           * attempt worse than the thing it replaced.
           */}
         {product.methods.length > 0 && (
-          <div className="relative left-1/2 mt-20 w-screen -translate-x-1/2" style={{ background: ACCENT }}>
+          /* -mb-20 cancels the page container's own pb-20. The band is the LAST thing on the
+             page, so that padding was 80px of cream hanging under the colour with nothing in
+             it — the plate should end where the page ends. */
+          <div className="relative left-1/2 mt-20 -mb-20 w-screen -translate-x-1/2" style={{ background: ACCENT }}>
             <div className="mx-auto max-w-6xl px-6 py-16">
               <Rise preset="cut">
-                <div className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: ACCENT_INK, opacity: 0.7 }}>
+                {/* ACID, not dimmed cream. The kit measures it at 5.07:1 on this plate and
+                    calls it "type rather than a glow" — this is the one ground it works on
+                    (1.12:1 on paper, where it disappears), so the plate is where the brand's
+                    second colour finally gets to appear. */}
+                <div className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: ACID }}>
                   What to send us · {product.methods.join(" / ")}
                 </div>
                 <h2 className="mt-2 font-display text-4xl font-black tracking-tight sm:text-5xl" style={{ color: ACCENT_INK }}>
@@ -380,7 +399,7 @@ export function BoldProduct({ product, shipping }: {
                   {FILE_GUIDES.filter((g) => g.methods.length === 0 || product.methods.some((m) => g.methods.some((k) => m.toUpperCase().includes(k)))).map((g, i) => (
                     <div key={g.label} className="mb-8 break-inside-avoid">
                       <dt className="flex items-baseline gap-2.5">
-                        <span className="font-mono text-xs font-bold tabular-nums" style={{ color: ACCENT_INK, opacity: 0.55 }}>
+                        <span className="font-mono text-xs font-bold tabular-nums" style={{ color: ACID }}>
                           {String(i + 1).padStart(2, "0")}
                         </span>
                         <span className="text-base font-black tracking-tight" style={{ color: ACCENT_INK }}>{g.label}</span>
