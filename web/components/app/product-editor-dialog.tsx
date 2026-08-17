@@ -210,7 +210,7 @@ export function ProductEditorDialog({
   const [status, setStatus] = useState("Active")
   /** Leads the public catalogue in the hand-picked row. Not a status: an Active product is
    *  ON the site, a featured one is at the TOP of it. */
-  const [featured, setFeatured] = useState(false)
+
   const [img, setImg] = useState("")
   const [err, setErr] = useState<string | null>(null)
   /** Highlight the well while a file is over it — without feedback a drop target is
@@ -327,7 +327,6 @@ export function ProductEditorDialog({
       }
       setSideMockups({ ...((p?.side_mockups ?? p?.sideMockups ?? {}) as Record<string, string>) })
       setStatus(p?.status ?? "Active")
-      setFeatured(p?.featured === true)
       setImg(p ? imageOf(p) : "")
       setColorInput("")
       setErr(null)
@@ -613,9 +612,6 @@ export function ProductEditorDialog({
       sku: cleanSku(sku) || cleanSku(nextSku ?? "") || undefined,
       supplierSku: supplierSku.trim() || undefined,
       type, method, status,
-      // Only ever sent as a real boolean, so a product that has never been featured does not
-      // gain the field on every save.
-      featured: featured || undefined,
       // Product cost = supplier COGS; Base cost = what the seller is charged. Save both as
       // undefined when blank so the server derives base = productCost + markup rather than
       // treating a blank as $0 (see server/pricing.js). `price` (any legacy retail figure)
@@ -838,27 +834,12 @@ export function ProductEditorDialog({
                   </select>
                 </label>
               </div>
-              {/* FEATURED IS NOT A STATUS. Active decides whether the public site shows it
-                  at all; this decides whether it LEADS — the hand-picked row at the top of
-                  the catalogue. Offered only on Active, because featuring something nobody
-                  can see is a setting with no effect, and a control that does nothing is
-                  worse than no control. */}
-              {status === "Active" && (
-                <label className="flex items-start gap-2 rounded-lg border border-border p-2.5">
-                  <input
-                    type="checkbox"
-                    checked={featured}
-                    onChange={(e) => setFeatured(e.target.checked)}
-                    className="mt-0.5 size-3.5 accent-primary"
-                  />
-                  <span className="text-xs">
-                    <span className="font-medium">Feature on the marketing site</span>
-                    <span className="block text-muted-foreground">
-                      Puts it in the hand-picked row at the top of the public catalogue, above the grid.
-                    </span>
-                  </span>
-                </label>
-              )}
+              {/* The "Feature on the marketing site" tick was here, gated on Active.
+                  It was a SECOND visibility switch beside a Status that already decides
+                  visibility: Active means the product is on the public site, Sellers only
+                  means sellers and the factory. Two controls for one decision, and the pair
+                  could disagree — a product could be Active and unfeatured, or carry a stale
+                  featured flag after being set back to Draft. */}
               <p className="-mt-1 text-xs text-muted-foreground">
                 {status === "Active"
                   ? "On the public marketing site, and orderable by sellers."
@@ -894,7 +875,11 @@ export function ProductEditorDialog({
                         className={"rounded-md border px-2 py-0.5 text-xs font-medium transition-colors " +
                           (on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground")}
                       >
-                        {on && <Check size={10} weight="bold" className="mr-1 inline" />}{m}
+                        {/* No tick. The pill lights up when it is on, which is the same
+                            information in the same place — a mark inside a control that has
+                            already changed colour is the second time it says so, and it
+                            shifts the label sideways as you toggle. */}
+                        {m}
                       </button>
                     )
                   })}

@@ -234,11 +234,15 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
    *  is searched, and the box has to exist before the day it is needed rather than after. */
   const [query, setQuery] = useState("")
   /**
-   * SORT ORDER. "Featured" is the catalogue's own order — hand-picked first, then whatever
-   * the server returned — and it is the default because it is the only one that carries a
-   * decision. Price and name are there for the two questions people re-sort by.
+   * SORT ORDER. "Newest" is the catalogue's own order — created_at desc, exactly as the
+   * server sent it — so it is a no-op rather than a sort, and the default for that reason.
+   * Price and name are the two questions people actually re-sort by.
+   *
+   * It replaced "Featured", which sorted on a flag set by a tick in the product editor. That
+   * tick is gone (Status already decides whether the public site shows a product), so the
+   * option would have sorted on something nothing could set.
    */
-  const [sort, setSort] = useState<"featured" | "price-asc" | "price-desc" | "name">("featured")
+  const [sort, setSort] = useState<"newest" | "price-asc" | "price-desc" | "name">("newest")
 
   /**
    * The filter controls, built from the WHOLE catalogue and not from what is currently
@@ -291,10 +295,10 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
         [p.name, p.brand, p.category].some((v) => String(v ?? "").toLowerCase().includes(q))
       )
     }
-    if (sort === "featured") {
-      // Hand-picked first, catalogue order within. Sorted on a COPY and on one key only, so
-      // everything unfeatured keeps exactly the order the server sent.
-      out = [...out].sort((a, b) => Number(!!b.featured) - Number(!!a.featured))
+    // "Newest" is the server's own order — created_at desc — so it needs no sort at all,
+    // which is also why it stays the default: the unsorted list IS the answer.
+    if (sort === "newest") {
+      /* the order the server sent */
     } else if (sort === "name") {
       out = [...out].sort((a, b) => a.name.localeCompare(b.name))
     } else {
@@ -304,14 +308,6 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
     return out
   }, [all, sel, query, sort])
 
-  /**
-   * THE HAND-PICKED SHELF.
-   *
-   * Someone chose these in the product editor and the page leads with them. Hidden the
-   * moment a filter, a search or a re-sort is on: a curated row is a starting point, and
-   * repeating four products above a filtered result is noise in front of the answer.
-   */
-  const picked = useMemo(() => all.filter((p) => p.featured).slice(0, 4), [all])
 
   /**
    * BROWSE BY KIND, before any filtering — the row every print-on-demand catalogue opens
@@ -440,19 +436,12 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
           reads: what do you make, where do I start, then let me narrow it. Four across at
           most: a curated row that scrolls stops being a recommendation and becomes a second
           catalogue. */}
-      {!failed && picked.length > 0 && (
-        <section className="mx-auto max-w-[88rem] px-6 pt-14">
-          <h2 className="text-[22px] font-bold tracking-tight">Starter essentials</h2>
-          <p className="mt-1 text-[15px] text-black/55">
-            Hand-picked blanks to start with — the ones we keep stocked and know print well.
-          </p>
-          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {picked.map((p, i) => (
-              <ProductCard key={p.slug} p={p} showCategory index={i} />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* THE HAND-PICKED SHELF is gone with the flag that filled it.
+          "Starter essentials" was `products.filter(featured).slice(0,4)`, and the only way
+          to set featured was a tick in the product editor beside a Status that already
+          decides whether the public site shows a product at all. With the tick removed this
+          row could only ever be empty, or — worse — hold whatever was ticked months ago and
+          never revisited. A curated row is worth having; one nothing can curate is not. */}
 
       <section className="mx-auto max-w-[88rem] px-6 py-16">
         {failed ? (
@@ -553,7 +542,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                 aria-label="Sort products"
                 className="h-10 rounded-full border border-black/[0.12] bg-white px-3 text-[14px] font-semibold outline-none focus:border-black/40"
               >
-                <option value="featured">Featured</option>
+                <option value="newest">Newest</option>
                 <option value="price-asc">Price: low to high</option>
                 <option value="price-desc">Price: high to low</option>
                 <option value="name">Name: A–Z</option>
