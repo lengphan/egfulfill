@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretRight } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
+import { InboundPanel } from "@/components/app/inbound-panel"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -281,7 +282,13 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       )}
 
       {tab === "consigned" ? (
-        <ConsignmentPanel />
+        /* Two things are inbound and neither was visible from this screen: stock we BOUGHT
+           and have not received (placed POs, Alibaba included), and stock a SELLER sent us
+           to hold. Both end with someone opening a carton at this desk. */
+        <div className="space-y-4">
+          <InboundPanel />
+          <ConsignmentPanel />
+        </div>
       ) : (
       <>
       <StatGrid>
