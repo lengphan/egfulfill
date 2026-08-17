@@ -835,9 +835,24 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
 
   const pick = (p: CatalogProduct) => {
     setPickedId(String(p.id ?? p.sku))
-    // Nothing pre-ticked once a product can have sixty variants: "select all" is one click
-    // away and a dialog that arrives with 66 rows armed is one mis-click from filing them.
-    setChosen(new Set())
+    /**
+     * EVERY VARIANT, TICKED. A product's whole colour × size run is what "add this product
+     * to inventory" means — the shelf should be able to say "none of that one" as a FACT,
+     * and it can only do that for a variant it has a row for. A blank row is silence; a row
+     * at 0 is an answer, and it is the answer the order board needs to stop reading a real
+     * garment as untracked.
+     *
+     * Ones already stocked stay out: re-adding them would rewrite a real count with a zero.
+     */
+    const base = String(p.sku || "").trim()
+    const szs = sizesOf(p)
+    const cls = colorsOf(p)
+    const next = new Set<string>()
+    for (const c of (cls.length ? cls : [""])) for (const sz of (szs.length ? szs : [""])) {
+      const k = variantSku(base, sz || null, c || null)
+      if (k && !existing.some((e) => e.toUpperCase() === k.toUpperCase())) next.add(k)
+    }
+    setChosen(next)
     setErr(null)
   }
 
