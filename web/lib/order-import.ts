@@ -382,7 +382,22 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
   return { records }
 }
 
-export type ImportItem = { name: string; sku: string; img: string; qty: number; unitPrice: number; color: string; size: string; printType: string; designUrl: string; blank: string; templateId: string; notes: string }
+export type ImportItem = {
+  name: string; sku: string; img: string; qty: number; unitPrice: number
+  color: string; size: string; printType: string; designUrl: string; blank: string
+  templateId: string; notes: string
+  /**
+   * Filled by applyTemplates, read by the order write — placement, and the other faces.
+   *
+   * They exist because `designUrl` is a string and a string cannot hold a position. The
+   * import used to stop at that string, so a templated line arrived with artwork centred by
+   * default on a design somebody had placed by hand. Absent on a row that named its own
+   * artwork: the sheet wins, and its artwork has no template placement to inherit.
+   */
+  templatePos?: TemplatePos | null
+  templateSides?: { side: string; artwork: string; pos: TemplatePos | null }[]
+  templateMachineFile?: { name: string; data: string } | null
+}
 export type ImportOrder = {
   orderNumber: string
   customer: { name: string; email: string }
@@ -486,7 +501,29 @@ export type ImportTemplate = {
   blankSku: string
   /** The composed preview, used as the line's artwork when the row names none. */
   composite: string
+  /**
+   * THE DESIGN AND WHERE IT SITS — the only two things a Template ID is for on a sheet.
+   *
+   * This carried `composite` alone: a flat picture of the finished thing, with no placement
+   * in it. So a row that named a template got an image and no idea where on the garment it
+   * belonged, and the floor saw artwork centred by default on a design somebody had
+   * positioned deliberately.
+   *
+   * Colour, size and method are NOT here on purpose. Those are variant choices the sheet
+   * makes per row, and a template that overwrote them would discard what somebody typed.
+   * The design maker's job is upload + blank + variants for publishing; the template's job
+   * here is the artwork and its position.
+   */
+  artwork: string
+  pos: TemplatePos | null
+  /** Every face the template placed artwork on, when it has more than one. */
+  sides: { side: string; artwork: string; pos: TemplatePos | null }[]
+  /** The stitch file saved with the template, so an embroidery line arrives ready. */
+  machineFile: { name: string; data: string } | null
 }
+
+/** Placement, as design-maker and the boards store it: percentages of the print area. */
+export type TemplatePos = { x?: number; y?: number; scale?: number; rot?: number }
 
 /** Lowercase, alphanumerics only — so `TPL-12`, `tpl 12`, `Tpl12` and `12` all meet. */
 const tkey = (s: string) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "")
@@ -551,10 +588,23 @@ export function applyTemplates(
       const t = idx.get(key)
       if (!t) { ambiguous.add(typed); return it }
       applied++
+      /**
+       * THE SHEET WINS, field by field.
+       *
+       * A template fills what the row left blank and never overwrites what somebody typed:
+       * a row that names its own artwork, or its own blank, meant that. The alternative —
+       * template wins — silently discards a typed value, and the way you find out is a
+       * wrong garment in a box.
+       */
       return {
         ...it,
         blank: it.blank || t.blankSku || "",
-        designUrl: it.designUrl || t.composite || "",
+        designUrl: it.designUrl || t.artwork || t.composite || "",
+        // Carried through to the order write, which turns them into a real design row per
+        // line. A `designUrl` string cannot hold placement, which is why placement was lost.
+        templatePos: it.designUrl ? null : t.pos,
+        templateSides: it.designUrl ? [] : t.sides,
+        templateMachineFile: t.machineFile,
       }
     }),
   }))

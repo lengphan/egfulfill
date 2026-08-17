@@ -13,6 +13,7 @@ import {
   groupToOrders,
   applyTemplates,
   type ImportTemplate,
+  type TemplatePos,
   CSV_COLUMNS,
   COLUMN_OPTIONS,
   GROUP_LABEL,
@@ -24,7 +25,7 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, formatSheetTemplate, getTemplates } from "@/lib/api"
+import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, formatSheetTemplate, getTemplates, postOrderDesign, uploadDesignFile, type DesignPos } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
 
@@ -185,13 +186,41 @@ export function ImportOrdersDialog({
     if (records.some((r) => String(r.template_id || "").trim())) {
       setTemplatesFailed(false)
       getTemplates()
-        .then((rows) => setTemplates((rows ?? []).map((t) => ({
-          id: String(t.id),
-          seq: t.seq ?? null,
-          name: t.name ?? null,
-          blankSku: String((t.data as { blankSku?: string } | null)?.blankSku ?? ""),
-          composite: t.composite ?? "",
-        }))))
+        .then((rows) => setTemplates((rows ?? []).map((t) => {
+          /**
+           * THE PIECES, NOT THE PICTURE.
+           *
+           * `composite` is a flat render of the finished design and was all a Template ID
+           * ever brought onto a line — so placement was lost every time, because a picture
+           * has no position in it. The layers are where the artwork and its position live,
+           * exactly as the design maker saved them.
+           *
+           * Two shapes, both read: a template saved before the layer stack has one artwork
+           * (`designUrl` + `pos`); one saved after has `images[]`. Bottom layer first — on
+           * every design made before the stack that is the only layer there is.
+           */
+          const l = (t.layers ?? {}) as {
+            images?: { src?: string; pos?: TemplatePos; side?: string }[]
+            designUrl?: string; pos?: TemplatePos
+            machineFile?: { name?: string; data?: string } | null
+          }
+          const first = Array.isArray(l.images) ? l.images.find((im) => im?.src) : null
+          const sides = (Array.isArray(l.images) ? l.images : [])
+            .filter((im) => im?.src && im.side)
+            .map((im) => ({ side: String(im.side), artwork: String(im.src), pos: im.pos ?? null }))
+          const mf = l.machineFile
+          return {
+            id: String(t.id),
+            seq: t.seq ?? null,
+            name: t.name ?? null,
+            blankSku: String((t.data as { blankSku?: string } | null)?.blankSku ?? ""),
+            composite: t.composite ?? "",
+            artwork: String(first?.src ?? l.designUrl ?? ""),
+            pos: first?.pos ?? l.pos ?? null,
+            sides,
+            machineFile: mf?.name && mf?.data ? { name: String(mf.name), data: String(mf.data) } : null,
+          }
+        })))
         // Not silent. A template that can't be looked up means the blank and the artwork
         // it promised won't be applied, and the import would otherwise look complete.
         .catch(() => { setTemplates([]); setTemplatesFailed(true) })
@@ -326,8 +355,11 @@ export function ImportOrdersDialog({
         // than something the importer added up — which is what lets the order page show it
         // as "Customer paid" instead of "not recorded". No Item Price column, no flag.
         if (total > 0) meta.retail_set = true
+        // Held rather than inlined: the design rows below are keyed on it, and trusting the
+        // response to echo an id back is a dependency this doesn't need — we minted it.
+        const newId = nextOrderId()
         const r = await createOrder({
-          id: nextOrderId(),
+          id: newId,
           seq: baseSeq + i,
           source: "manual",
           status: "new",
@@ -338,7 +370,50 @@ export function ImportOrdersDialog({
           items,
           meta: Object.keys(meta).length ? meta : undefined,
         })
-        if (!r.error) imported++
+        if (!r.error) {
+          imported++
+          /**
+           * THE DESIGN ROW, which is the only place a POSITION can live.
+           *
+           * `designSrc` on the line is a string, and the boards read placement from
+           * order_designs — so a templated line used to arrive with its artwork centred by
+           * default on a design somebody had positioned by hand. Written after the order
+           * exists, per line, and only for lines that actually took a template's artwork.
+           *
+           * Best-effort per line: a design that fails to attach must not undo an order that
+           * was created, and the line still carries designSrc, so nothing is lost silently
+           * except the placement it was going to inherit.
+           */
+          const orderId = newId || r.id || undefined
+          if (orderId) {
+            for (const it of o.items) {
+              const faces = (it.templateSides?.length
+                ? it.templateSides
+                : it.designUrl && (it.templatePos || it.templateId)
+                  ? [{ side: "front", artwork: it.designUrl, pos: it.templatePos ?? null }]
+                  : [])
+              for (const f of faces) {
+                if (!f.artwork) continue
+                await postOrderDesign(orderId, {
+                  sku: it.sku || it.name,
+                  side: f.side || "front",
+                  data: f.artwork,
+                  name: it.templateId ? `Template ${it.templateId}` : undefined,
+                  pos: (f.pos ?? undefined) as DesignPos | undefined,
+                }).catch(() => {})
+              }
+              // The stitch file the template carried, filed against the same line — an
+              // embroidery import that arrives without one is a job the floor cannot start.
+              if (it.templateMachineFile?.data) {
+                await uploadDesignFile({
+                  designId: `TPL-${it.templateId || "file"}-${(it.sku || it.name).replace(/[^a-z0-9]+/gi, "-").slice(0, 30)}`,
+                  orderId, sku: it.sku || it.name,
+                  name: it.templateMachineFile.name, data: it.templateMachineFile.data,
+                }).catch(() => {})
+              }
+            }
+          }
+        }
       }
       setDone({ imported })
       onImported?.(imported)
