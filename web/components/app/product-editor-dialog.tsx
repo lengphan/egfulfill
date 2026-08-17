@@ -17,7 +17,7 @@ import { descriptionToText, looksLikeHtml } from "@/lib/description"
 import { packagingHint } from "@/lib/dim-weight"
 import { cleanSku } from "@/lib/sku"
 import { variantSku, variantLabel, variantPairs } from "@/lib/variant-sku"
-import { framingStyle, FOCUS_MIN, FOCUS_MAX, ZOOM_MIN, ZOOM_MAX } from "@/lib/product-framing"
+import { framingStyle, renderedZoom, FOCUS_MIN, FOCUS_MAX, ZOOM_MIN, ZOOM_MAX } from "@/lib/product-framing"
 
 // Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
 // surcharges cannot drift apart again.
@@ -793,6 +793,16 @@ export function ProductEditorDialog({
                     className="h-1 flex-1 accent-primary" aria-label="Main image vertical position"
                   />
                 </label>
+                {/* SAID, BECAUSE IT IS NOT OBVIOUS. Moving a picture inside a fixed window
+                    means something leaves the window, so a pan zooms as far as it needs to
+                    keep the well full — otherwise the photo walks out of the frame and the
+                    empty box shows behind it, which is what "it gets cut off" was. The
+                    number is the zoom actually being rendered, not the one on the slider. */}
+                {renderedZoom({ imgZoom, imgFocusY }) > (imgZoom || 100) / 100 + 0.001 && (
+                  <p className="text-3xs leading-tight text-muted-foreground">
+                    Moving it zooms to {Math.round(renderedZoom({ imgZoom, imgFocusY }) * 100)}% so the frame stays full.
+                  </p>
+                )}
                 {((imgZoom || 100) !== 100 || (imgFocusY ?? 50) !== 50) && (
                   <button
                     type="button"
