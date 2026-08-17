@@ -276,9 +276,17 @@ app.post("/hooks/egful", express.raw({ type: "application/json" }), (req, res) =
 
         <Section id="errors" title="Errors">
           <p className="text-muted-foreground">
-            Errors return a JSON body with <Code>error</Code> and, where it helps you act, a
-            <Code>code</Code> and the offending fields.
+            Every error returns a JSON body with <Code>error</Code> in plain words and a{" "}
+            <Code>code</Code> to switch on. A validation failure also names the fields it is
+            missing under <Code>missing</Code>; an order we cannot price names the lines under{" "}
+            <Code>unpriced</Code>.
           </p>
+          <Block>{`{
+  "error": "An order needs a non-empty \"items\" array.",
+  "code": "invalid_request",
+  "mode": "live",
+  "missing": ["items"]
+}`}</Block>
           <Block>{`{
   "error": "Some lines have no catalogue match, so they cannot be priced or produced.",
   "code": "unpriceable_lines",

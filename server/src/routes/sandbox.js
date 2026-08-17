@@ -24,6 +24,11 @@ const genKey  = (mode) => (mode === 'live' ? LIVE_PREFIX : PREFIX) + crypto.rand
 const hashKey = (k) => crypto.createHash('sha256').update(k).digest('hex');
 const rid     = (p) => p + '_' + crypto.randomBytes(8).toString('hex');            // fake object id
 const nowISO  = () => new Date().toISOString();
+// Money is numeric(12,2) and node-pg hands numerics back as STRINGS, so every value that
+// leaves this file is parsed before it is published or added — concatenating two charges
+// instead of adding them is the classic way this goes wrong silently, and a price shipped
+// as a string breaks a partner's arithmetic rather than ours.
+const money = (v) => Math.round((parseFloat(v) || 0) * 100) / 100;
 
 let _ready = null;
 function ensure() {
@@ -85,7 +90,24 @@ function sandboxRates() {
   ];
 }
 
-const bad = (reply, msg, fields) => { reply.code(400); return { error: msg, mode: 'test', ...(fields ? { missing: fields } : {}) }; };
+/**
+ * A 400 a caller can act on.
+ *
+ * `mode` is a PARAMETER now. It was hardcoded to 'test', so a partner on a LIVE key who
+ * sent a malformed order was told `"mode": "test"` — the one field that says which world a
+ * call landed in, answering wrongly on the request that failed. Omitted when the caller
+ * doesn't know the mode yet (a rejected key has no mode), because absent beats false.
+ *
+ * `code` is here because the docs promise one on every error and validation 400s carried
+ * none: an integrator switching on `err.code` fell through to an unknown branch on the
+ * commonest failure there is. The offending fields stay under `missing`, which is what has
+ * always been sent — the docs now say so rather than naming a `fields` key that never
+ * existed.
+ */
+const bad = (reply, msg, fields, mode) => {
+  reply.code(400);
+  return { error: msg, code: 'invalid_request', ...(mode ? { mode } : {}), ...(fields ? { missing: fields } : {}) };
+};
 
 // ── Scopes ────────────────────────────────────────────────────────────────────
 // A key used to be all-or-nothing: a partner who only needed to push orders held one
@@ -414,7 +436,17 @@ export function sandboxRoutes(app, requireAuth) {
     const k = await requireKey(req, reply, { scope: 'products.read' }); if (k.error) return k;
     try {
       const r = await q('select id, sku, name, type, method, price, base_price from catalog_products order by name limit 200');
-      return { object: 'list', mode: k.mode, data: r.rows, count: r.rowCount };
+      /**
+       * MONEY AS NUMBERS, because that is what the documented sample shows.
+       *
+       * price and base_price are numeric(12,2) and node-pg hands numerics back as STRINGS,
+       * so this route was publishing `"base_price": "8.50"`. A partner doing
+       * `base_price * qty` gets NaN, and `total += base_price` silently concatenates —
+       * the exact trap the statement route already guards with money(), two hundred lines
+       * below, on the same kind of column.
+       */
+      const data = r.rows.map((row) => ({ ...row, price: money(row.price), base_price: money(row.base_price) }));
+      return { object: 'list', mode: k.mode, data, count: r.rowCount };
     } catch { return { object: 'list', mode: k.mode, data: [], count: 0 }; }
   });
 
@@ -422,8 +454,8 @@ export function sandboxRoutes(app, requireAuth) {
     const k = await requireKey(req, reply, { orderLimit: true, scope: 'orders.write' }); if (k.error) return k;
     const b = req.body || {};
     const items = Array.isArray(b.items) ? b.items : null;
-    if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items']);
-    if (!b.shipping_address) return bad(reply, 'An order needs a "shipping_address" object.', ['shipping_address']);
+    if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items'], k.mode);
+    if (!b.shipping_address) return bad(reply, 'An order needs a "shipping_address" object.', ['shipping_address'], k.mode);
     if (k.mode === 'live') {
       // Retry-safe. Returning the ORIGINAL order (200, not 409) is what makes this
       // usable: a client that retried a timeout gets the same answer it would have had,
@@ -558,10 +590,8 @@ export function sandboxRoutes(app, requireAuth) {
   // that lives in its own table can disagree with the ledger, and then two systems both
   // claim to know what is owed. The ledger is the single source; this presents it.
   //
-  // Money is numeric(12,2) and node-pg hands numerics back as STRINGS, so every value is
-  // parsed before arithmetic — concatenating two charges instead of adding them is the
-  // classic way this goes wrong silently.
-  const money = (v) => Math.round((parseFloat(v) || 0) * 100) / 100;
+  // (money() is at module scope — see the top of the file. It is used by the product list
+  // as well as by billing, and both must round the same way.)
 
   app.get('/api/v1/balance', async (req, reply) => {
     const k = await requireKey(req, reply, { scope: 'billing.read' }); if (k.error) return k;
@@ -581,7 +611,7 @@ export function sandboxRoutes(app, requireAuth) {
     const from = String(qy.from || new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10));
     const to = String(qy.to || now.toISOString().slice(0, 10));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-      return bad(reply, 'from and to must be YYYY-MM-DD dates.', ['from', 'to']);
+      return bad(reply, 'from and to must be YYYY-MM-DD dates.', ['from', 'to'], k.mode);
     }
     try {
       const acct = String(k.seller_id);
