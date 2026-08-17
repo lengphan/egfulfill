@@ -52,12 +52,12 @@ export function StatCard({
         {Icon && <Icon size={14} className="shrink-0 opacity-70" />}
         <span className="min-w-0 truncate">{label}</span>
       </div>
-      <div className="mt-2.5 text-[2.125rem] font-black leading-none tracking-tight tabular-nums">{value}</div>
+      <div className="mt-2.5 text-[1.75rem] font-black leading-none tracking-tight tabular-nums sm:text-[2.125rem]">{value}</div>
     </>
   )
 
   if (!onClick) {
-    return <Card className="relative gap-0 overflow-hidden p-6">{body}</Card>
+    return <Card className="relative gap-0 overflow-hidden p-4 sm:p-6">{body}</Card>
   }
   // A real <button>, not a div with onClick — keyboard and screen readers get it for free,
   // and Base UI has no asChild to lean on here.
@@ -67,7 +67,7 @@ export function StatCard({
         type="button"
         onClick={onClick}
         aria-pressed={active}
-        className="eg-tap w-full cursor-pointer p-6 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+        className="eg-tap w-full cursor-pointer p-4 text-left sm:p-6 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
       >
         {body}
       </button>
@@ -75,7 +75,14 @@ export function StatCard({
   )
 }
 
-/** Responsive 4-up grid for StatCards. */
+/**
+ * Responsive 4-up grid for StatCards.
+ *
+ * TWO across on a phone, not one. At `sm:grid-cols-2` the base case was a single column, so
+ * four tiles became four full-width blocks — roughly a thousand pixels to scroll past
+ * before reaching the table underneath, on every board in the app. A label and a number fit
+ * comfortably in half a phone; giving them the whole width bought nothing and cost the page.
+ */
 export function StatGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{children}</div>
+  return <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">{children}</div>
 }
