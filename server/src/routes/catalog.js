@@ -8,6 +8,7 @@ import { isStaff } from '../auth.js';
 import { quoteSpec, shipFeeOf, extraFeeOf, feeSettings, sellerBaseCostOf, priceByMethodOf } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
+import { variantSku, variantLabel, variantPairs, sizesOf, colorsOf } from '../variant-sku.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
 import { readAll as readSettings } from './factory_settings.js';
 
@@ -1820,6 +1821,16 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       return { error: 'Refusing to replace the catalog with an empty list. To remove products, delete them individually.' };
     }
     const keep = [];
+    /**
+     * WHICH PRODUCTS ARE NEW — read before the upsert, because after it everything exists.
+     *
+     * Only new ones get inventory rows (see below). A re-save of the whole list, which is
+     * what every edit posts, must not re-file anything.
+     */
+    const existingIds = new Set(
+      (await q('select id from catalog_products').catch(() => ({ rows: [] }))).rows.map((r) => String(r.id))
+    );
+    const freshlyAdded = [];
     // Snapshot the prices BEFORE the upsert, so a change can be reported as
     // before → after rather than just "something was edited".
     const actorOwnsPricing = PRICE_OWNERS.has(req.user && req.user.role);
@@ -1836,6 +1847,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const id = String(p.id != null ? p.id : '');
       if (!id) continue;
       keep.push(id);
+      if (!existingIds.has(id)) freshlyAdded.push(p);
       if (!actorOwnsPricing) {
         const was = before.get(id);
         if (was) {
@@ -1893,6 +1905,54 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         before: priceChanges.map((c) => ({ id: c.id, base: c.baseFrom, price: c.priceFrom })),
         after: priceChanges.map((c) => ({ id: c.id, base: c.baseTo, price: c.priceTo })) });
     }
-    return { ok: true, count: keep.length, priceChanges: priceChanges.length };
+    /**
+     * A NEW PRODUCT ARRIVES ON THE SHELF AS "NONE OF EACH", not as silence.
+     *
+     * A product syncs in with seven colourways and inventory held nothing for it, so every
+     * order line for it read "Not tracked" — which is not "we have none", it is "nobody has
+     * an opinion", and the two are opposite instructions: one says reorder, the other says
+     * go and look. A row at 0 is an answer; a missing row is a question.
+     *
+     * ONLY ON CREATION, and only for products with a sku of ours to key on. Re-saving the
+     * catalogue re-posts every product, so anything that ran per save would re-file the
+     * whole list on every edit.
+     *
+     * ON CONFLICT DO NOTHING — never an update. This must not be able to zero a count
+     * somebody typed or a scanner wrote; the worst it can do is nothing.
+     *
+     * FACTORY ONLY, like every other way stock comes into existence: holding a blank is not
+     * a decision to publish it.
+     *
+     * This is the PRODUCTS list, not the catalogue. Being in the lookbook is a statement
+     * about what we will sell to partners; being a product is what an order line resolves
+     * to, and that is the thing a shelf answers for.
+     */
+    let tracked = 0;
+    for (const p of freshlyAdded) {
+      const sku = String(p.sku || '').trim();
+      if (!sku) continue;
+      const pairs = variantPairs(sizesOf(p), colorsOf(p));
+      for (const v of pairs) {
+        const key = variantSku(sku, v.size, v.color);
+        if (!key) continue;
+        const r = await q(
+          // Base-schema columns only. `visibility` and `supplier` are added later, in
+          // inventory.js's own ensure(), and this route can run before it has — a missing
+          // column would throw into the catch and file nothing at all, silently. A null
+          // visibility already READS as factory-only (visOf), which is the safe default and
+          // the one every other creation path lands on.
+          `insert into inventory (sku, name, variant, in_stock, reserved, reorder_at, category)
+           values ($1,$2,$3,0,0,25,$4)
+           on conflict (sku) do nothing`,
+          [key, p.name || null, variantLabel(v.size, v.color) || null, p.type || null]
+        ).catch(() => ({ rowCount: 0 }));
+        tracked += r.rowCount || 0;
+      }
+    }
+    if (tracked) {
+      audit(req, 'inventory.auto_tracked', { entityType: 'inventory', entityId: 'auto',
+        after: { rows: tracked, products: freshlyAdded.length } });
+    }
+    return { ok: true, count: keep.length, priceChanges: priceChanges.length, tracked };
   });
 }
