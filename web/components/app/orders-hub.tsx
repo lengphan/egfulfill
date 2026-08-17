@@ -1747,7 +1747,7 @@ export function OrdersHub() {
               )
             )}
           </div>
-          <div className="divide-y divide-border" style={{ minWidth: gridMinPx }}>
+          <div className="divide-y divide-border" style={{ minWidth: rowMinPx }}>
             {paged.pageItems.map((o) => {
               const items = o.items ?? []
               const stage = orderStage(items)
@@ -1942,7 +1942,7 @@ export function OrdersHub() {
                       table has been a real table all along; this is the same idea, driven
                       from the same lib/order-columns.ts. */}
                   <div
-                    className={"mb-3 grid gap-x-3 " + (narrow ? "items-start gap-y-2" : "items-center gap-y-1")}
+                    className={"mb-3 grid gap-x-3 " + (narrow ? "w-full items-start gap-y-2" : "items-center gap-y-1")}
                     style={{ gridTemplateColumns: rowTmpl }}
                   >
                     {/* A box on EVERY row, disabled where it can't be used. Rendering it
@@ -1983,6 +1983,7 @@ export function OrdersHub() {
                     {/* Shipped orders keep the ⋯ menu (so admin can still Refund) — the old
                         "✓ Shipped" badge REPLACED the whole action cluster, hiding it. The
                         menu greys every stage except Refunded for a shipped order. */}
+                    <span className={narrow ? "col-span-2 flex flex-wrap items-center gap-1.5 pt-1" : "contents"}>
                     {(() => {
                       /**
                        * EVERY stage is listed; the ones this role can't use from here are
@@ -2317,6 +2318,7 @@ export function OrdersHub() {
                         </div>
                       )
                     })()}
+                    </span>
                   </div>
 
                   {/* Fulfill panel (warehouse/admin): buy a USPS-direct label, or record tracking manually */}
