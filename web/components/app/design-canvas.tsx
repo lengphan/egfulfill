@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, PaperPlaneTilt } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { designSrc } from "@/lib/order-image"
+import { VariantPicker } from "@/components/app/variant-picker"
 import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
@@ -1648,6 +1649,25 @@ export function DesignCanvasDialog({
             it was avoiding only ever appeared on an empty line, and a gap below the last
             control reads as nothing at all; a first step that starts halfway down does not. */}
         <div className="flex flex-col gap-4 lg:min-w-0 lg:self-start">
+        {/**
+          * THE BLANK, PICKED HERE.
+          *
+          * Placing artwork and choosing what it goes ON are one decision, and they were two
+          * screens: you opened this window, found the line had no blank, closed it, picked
+          * the blank in the order table, and opened it again. The mockup behind this rail is
+          * drawn FROM that choice, so the one place it obviously belongs is the one place it
+          * wasn't.
+          *
+          * The real VariantPicker, not a private dropdown — it owns the resolution rules, the
+          * post-submit refusal and the method list, and a second implementation would drift
+          * from the row that shows the same four values (CLAUDE.md §5).
+          */}
+        {catalog && catalog.length > 0 && (
+          <div className="rounded-lg border border-border p-2.5">
+            <div className="mb-1.5 text-sm font-medium">Product</div>
+            <VariantPicker orderId={orderId} item={item} catalog={catalog} onSaved={() => onSaved?.()} />
+          </div>
+        )}
         {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
             nearest in-stock cone; saved with the design so the floor loads the right threads.
             `order-last` rather than moving the block: it sits first in the markup for historical
@@ -1838,24 +1858,23 @@ export function DesignCanvasDialog({
             {/* ONE GREEN. This step hand-picked emerald-300/50 while step 2 below used the
                 success token, so two adjacent "done" states were two different colours — and
                 emerald is separately spoken for as the SHIPPED status. Both use success. */}
-            <div className={cn("rounded-lg border p-2.5", designUrl ? "border-success/40 bg-success/5" : "border-dashed border-border bg-muted/20")}>
-              <div className="flex items-start gap-2">
-                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold", designUrl ? "bg-success text-white" : "border border-border bg-background text-muted-foreground")}>
-                  {designUrl ? <Check size={12} weight="bold" /> : <span className="size-1.5 rounded-full bg-muted-foreground/50" />}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium">Your design</div>
-                  {/* Plain words, seller's point of view. "The artwork we print / embroider"
-                      described OUR job; a seller is deciding what goes on the product. */}
-                  <div className="text-2xs text-muted-foreground">
-                    {designUrl ? "Added — drag it on the preview to move it" : "The picture that goes on the product"}
-                    {designUrl && designNo != null && (
-                      <> · <span className="font-mono font-medium text-foreground">DSN-{designNo}</span></>
-                    )}
-                  </div>
-                </div>
+            {/**
+              * THE CARD IS THE STATE — no tick, no dot, no sentence.
+              *
+              * It carried a status circle AND a coloured border AND a line of prose saying
+              * the same thing three ways ("Added — drag it on the preview to move it", next
+              * to a green tick, inside a green card, above the artwork it is describing). The
+              * border already says done; the design number is the only fact the title cannot
+              * carry, so that is what stays beside it.
+              */}
+            <div className={cn("rounded-lg border px-2.5 py-2", designUrl ? "border-success/40 bg-success/5" : "border-dashed border-border bg-muted/20")}>
+              <div className="flex min-w-0 items-baseline gap-2">
+                <span className="text-sm font-medium">Your design</span>
+                {designUrl && designNo != null && (
+                  <span className="truncate font-mono text-2xs font-medium text-muted-foreground">DSN-{designNo}</span>
+                )}
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>{designUrl ? "Replace" : "Upload image"}</Button>
                 <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>Library</Button>
                 {/* Remove background is NOT here — it acts on the artwork, so it lives on
@@ -1875,51 +1894,30 @@ export function DesignCanvasDialog({
                 partner step beside it used success, so two "done" states were two colours.
                 The middle state is the brand tone, not green: it is under way, not finished. */}
             {isEmb && (
-            <div className={cn("rounded-lg border p-2.5",
+            <div className={cn("rounded-lg border px-2.5 py-2",
               hasMachineFile ? "border-success/40 bg-success/5"
               : sentToDesigner ? "border-primary/40 bg-primary/5"
               : "border-dashed border-border bg-muted/20")}>
-              <div className="flex items-start gap-2">
-                <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold",
-                  hasMachineFile ? "bg-success text-white"
-                  : sentToDesigner ? "bg-primary text-primary-foreground"
-                  : "border border-border bg-background text-muted-foreground")}>
-                  {hasMachineFile ? <Check size={12} weight="bold" />
-                    : sentToDesigner ? <PaperPlaneTilt size={11} weight="fill" />
-                    : <span className="size-1.5 rounded-full bg-muted-foreground/50" />}
+              {/**
+                * Same trim as the card above: the border carries the state, so the circle and
+                * the sentence explaining it both go. What is KEPT is what a title cannot say —
+                * the file's own name, and where the card sits once it is with a designer.
+                * Staff get the lane and who claimed it (that is how they chase it); a seller
+                * gets "with our team", because the lane names are our internal board.
+                */}
+              <div className="flex min-w-0 items-baseline gap-2">
+                <span className="shrink-0 text-sm font-medium">
+                  Embroidery file{!isStaff && <span className="font-normal text-muted-foreground"> (optional)</span>}
                 </span>
-                <div className="min-w-0 flex-1">
-                  {/* "Machine file" is our word for it. Every format this step accepts is an
-                      embroidery format (MACHINE_EXT_LIST), so naming it that is both plainer
-                      and more accurate. */}
-                  {/* Optional for a SELLER — we cut it for them — but not for staff, who
-                      cannot make the line without it. So the word only appears for the
-                      reader it is true for. */}
-                  <div className="text-sm font-medium">
-                    Embroidery file{!isStaff && <span className="font-normal text-muted-foreground"> (optional)</span>}
-                  </div>
-                  {/* This one line carries the whole state of the step, including "a
-                      designer has it" — which is why there is no longer a separate board
-                      strip underneath competing to say the same thing.
-                      Two audiences read it. Staff need the lane and who claimed it, because
-                      that is how they chase the card; a seller needs to know it is being
-                      handled and nothing more — the lane names are our internal board, and
-                      a designer's name is not theirs to be given. */}
-                  <div className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || undefined}>
-                    {hasMachineFile
-                      ? (latestMachine ? `${latestMachine.name} — ready to stitch` : "Added — ready to stitch")
-                      // The word SENT, first, because that is the fact someone is looking
-                      // for — "With a designer · Incoming" describes where it sits and never
-                      // says it left.
-                      : boardCard ? (isStaff
-                          ? `Sent to a designer · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
-                          : "Sent — our design team is preparing it")
-                      : designUrl ? "We make this for you — or attach your own"
-                      : "Only if you already have one (.emb, .pes, .dst…)"}
-                  </div>
-                </div>
+                <span className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || undefined}>
+                  {hasMachineFile ? (latestMachine?.name || "Added")
+                    : boardCard ? (isStaff
+                        ? `Sent · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
+                        : "Sent — with our team")
+                    : ""}
+                </span>
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <Button
                   variant="outline" size="sm"
                   disabled={filesLocked}
@@ -2185,14 +2183,10 @@ export function DesignCanvasDialog({
                     })}
                   </div>
 
-                  {!tier && (
-                    <p className="mt-2 text-2xs text-muted-foreground">
-                      {hasMachineFile
-                        ? "A machine file is already on this line, so they supplied it — we only check it."
-                        : "No machine file on this line, so we cut it from their artwork."}
-                      {" "}Suggested, not applied — nothing is charged until you pick one.
-                    </p>
-                  )}
+                  {/* The paragraph that explained the suggestion is gone. It restated what the
+                      chips already show (which tier is suggested, and that nothing is charged
+                      until one is picked) in three lines of prose above the controls it was
+                      describing. */}
                   {/* The quote's own state, in words. A "complex" chip alone can't tell
                       waiting-on-the-seller from already-paid from refused. */}
                   {quote === "pending" && <p className="mt-2 text-2xs text-amber-700">Waiting on the seller to accept — don&apos;t start work yet.</p>}
@@ -2202,7 +2196,12 @@ export function DesignCanvasDialog({
                   {/* The ALTERNATIVE to uploading, not a step after it. Offering both without
                       saying so is how a line ends up with a finished file AND an open card
                       nobody closes. */}
-                  {onSendToDesigner && (
+                  {/* NOT on an embroidered line: "Send to Board" is already in the Embroidery
+                      file card above, next to Attach file, where the choice between the two
+                      routes is actually made. Two buttons for one board, worded differently
+                      and thirty lines apart, is how a line gets a finished file AND an open
+                      card nobody closes. */}
+                  {onSendToDesigner && !isEmb && (
                     <div className="mt-3 border-t border-border pt-3">
                       <p className="mb-1.5 text-2xs text-muted-foreground">Don&apos;t have the file yet?</p>
                       {/* SAVE FIRST, then send — and only send if the save actually landed.
