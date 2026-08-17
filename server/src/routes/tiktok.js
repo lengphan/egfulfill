@@ -5,6 +5,7 @@
 // back to the callback registered in Partner Center as ?auth_code=<code>&state=… (NO app_key),
 // and we exchange the code at auth.tiktok-shops.com (app_key + app_secret required, NO signature).
 import crypto from 'node:crypto';
+import { descriptionHtml } from '../listing-description.js';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 import { clampDays, windowStartSec } from '../backfill.js';
@@ -224,18 +225,24 @@ function ttCleanText(s, max) {
     .trim()
     .slice(0, max);
 }
-// Description must be HTML (Create Product). We DON'T pass entities (TikTok rejects them),
-// so build plain <p>/<br> paragraphs from the cleaned text. Empty falls back to the title.
+/**
+ * TikTok's `description` — HTML, but with TikTok's own text rules applied first: no entities
+ * and no bare angle brackets (errors 12052931/932), so the cleaning happens HERE and the
+ * shared parser only ever sees safe text.
+ *
+ * The structure itself comes from listing-description.js, which every publish path now uses.
+ * Three channels each had their own version of this and each was wrong differently — Shopify
+ * put the raw string into body_html, this one split on blank lines a scraped description does
+ * not contain, and Etsy passed it straight through.
+ */
 function ttDescriptionHtml(text, fallback) {
   const clean = String(text || '')
     .replace(/&[a-z]+;|&#\d+;/gi, ' ')
     .replace(/[\x00-\x1f\x7f]/g, ' ')
     .replace(/<[^>]*>/g, ' ')                     // drop whole source HTML tags, not just <>
     .replace(/[<>]/g, ' ')                        // and any stray angle brackets
-    .replace(/&/g, ' and ');                      // no bare ampersands → no entities
-  const paras = clean.split(/\n{2,}/).map((p) => p.replace(/\n/g, '<br>').trim()).filter(Boolean);
-  const html = paras.length ? paras.map((p) => `<p>${p}</p>`).join('') : `<p>${ttCleanText(fallback, 2000)}</p>`;
-  return html.slice(0, 10000);
+    .replace(/&/g, ' and ');                      // no bare ampersands -> no entities
+  return descriptionHtml(clean, ttCleanText(fallback, 2000)).slice(0, 10000);
 }
 
 // Normalise the dialog's product into a TikTok Create Product body (v202309). `imageUris`

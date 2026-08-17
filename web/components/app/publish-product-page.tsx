@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
 import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle } from "@phosphor-icons/react"
+import { detectTrademarks } from "@/lib/trademarks"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -395,6 +396,28 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   const [retail, setRetail] = useState("")
   const [qty, setQty] = useState("999")
   const [tags, setTags] = useState<string[]>([])
+
+  /**
+   * BRAND NAMES IN THE COPY WE ARE ABOUT TO PUBLISH.
+   *
+   * SpyDeck already flags these on a COMPETITOR's listing, which is the half that costs
+   * nothing — the risk is on this screen, where a scraped title and description become OUR
+   * seller's listing. A competitor's "Disney Characters Halloween Embroidery Shirt" is one
+   * paste away from being published verbatim, and a marketplace takedown is per-listing
+   * until it is per-shop.
+   *
+   * A WARNING, NOT A BLOCK. Same rule the partner-disclosure notice follows: plenty of these
+   * are legitimate — a garment brand in a title we are entitled to use, a word that is only
+   * a trademark in another category — and a hard stop on a false positive is a feature
+   * nobody can ship around. It names the terms and where they are; the seller decides.
+   *
+   * Reads title, description AND tags together, because a term stripped from the title and
+   * left in the tags is still on the listing.
+   */
+  const tmHits = useMemo(
+    () => detectTrademarks([title, desc, tags.join(" ")].filter(Boolean).join(" \n ")),
+    [title, desc, tags],
+  )
   /**
    * Sent on every publish, fixed. Not a picker: the listing is created as a DRAFT, so the
    * seller answers this on Etsy's own form before anything goes live, and asking twice was
@@ -1527,6 +1550,22 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               {pickedDests.some((d) => outcomes[d.connection_id]) && (
                 <div className="divide-y divide-border/60 rounded-lg border border-border bg-muted/30 px-3 py-1">
                   {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} />)}
+                </div>
+              )}
+
+              {/* Named brands in the copy — see tmHits. Sits directly above the publish
+                  button because that is the last moment it can change anything. */}
+              {tmHits.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                  <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+                  <span>
+                    <strong>{tmHits.length === 1 ? "A brand name is" : `${tmHits.length} brand names are`}</strong>{" "}
+                    in this listing&apos;s text: {tmHits.slice(0, 8).join(", ")}
+                    {tmHits.length > 8 && ` +${tmHits.length - 8} more`}. Marketplaces remove listings that
+                    use a brand they don&apos;t license, and repeats put the shop itself at risk. Edit the
+                    title, description and tags above if you aren&apos;t entitled to use them — publishing is
+                    not blocked, because plenty of these are legitimate.
+                  </span>
                 </div>
               )}
 

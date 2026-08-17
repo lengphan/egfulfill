@@ -4,6 +4,7 @@
 // and we exchange for an OFFLINE access token (no expiry). connected_by = the caller, so a
 // seller connects their OWN store. Only *.myshopify.com is allowed (SSRF guard).
 import crypto from 'node:crypto';
+import { descriptionHtml } from '../listing-description.js';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 import { clampDays, windowStartSec } from '../backfill.js';
@@ -660,7 +661,10 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
 
     const product = {
       title,
-      body_html: String(b.description || ''),
+      // body_html is HTML. Handing it the raw string published a plain-text blob into an
+      // HTML field, which renders as one unbroken paragraph — the wall a seller sees in
+      // the Shopify editor. Same parser as the other channels.
+      body_html: descriptionHtml(b.description, b.title),
       status: 'draft',
       tags: (Array.isArray(b.tags) ? b.tags : []).map(String).filter(Boolean).join(', '),
       product_type: String(b.print_type || ''),

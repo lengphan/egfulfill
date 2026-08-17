@@ -2,6 +2,7 @@
 // Etsy v3 uses PKCE with the keystring as client_id; NO client secret is needed
 // for the token exchange. Access tokens last ~1h and are refreshed automatically.
 import { q } from '../db.js';
+import { descriptionText } from '../listing-description.js';
 import { recordUsage } from '../usage.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
@@ -1821,7 +1822,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       const form = new URLSearchParams({
         quantity: String(b.quantity || 999),
         title: title.slice(0, 140),
-        description: String(b.description || title),
+        // Etsy's description is PLAIN TEXT — markup is printed literally to the buyer —
+        // so this takes the text renderer, not the HTML one.
+        description: descriptionText(b.description, title),
         price: String(price),
         who_made: whoMade, when_made: 'made_to_order', type: 'physical', state: 'draft',
         taxonomy_id: String(taxId), shipping_profile_id: String(shipId)
