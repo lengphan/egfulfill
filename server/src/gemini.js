@@ -178,8 +178,11 @@ export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, mo
   const body = JSON.stringify({
     model,
     input: [{ type: 'text', text }],
-    // Capital K is required — '2k' is rejected.
-    response_format: { type: 'image', mime_type: 'image/png', aspect_ratio: ratio, image_size: size },
+    // Capital K is required — '2k' is rejected. And the mime must be JPEG: this surface
+    // rejects 'image/png' outright ("Supported values: 'image/jpeg'"), verified against the
+    // live API. Don't "improve" this back to PNG for transparency — it 400s, and the
+    // response is photographic anyway.
+    response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: ratio, image_size: size },
   });
   const headers = { 'content-type': 'application/json', 'x-goog-api-key': cfg.key };
 
