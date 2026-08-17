@@ -1,6 +1,6 @@
 "use client"
 
-import { Warning, Package, Truck } from "@phosphor-icons/react"
+import { Warning, Truck } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { warehouseEta, fmtEta } from "@/lib/warehouse-eta"
 
@@ -83,7 +83,6 @@ export function StockSplitWarning({
               {/* The one-box option, stated with its real consequence: fewer units. */}
               <Button size="sm" variant="outline" className="h-7"
                 onClick={() => onReduce(best.qty, best.abbr)}>
-                <Package size={12} weight="bold" />
                 Take {best.qty} from {best.abbr} only
                 {eta?.deliveryAt ? ` · ${fmtEta(eta.deliveryAt)}` : ""}
               </Button>

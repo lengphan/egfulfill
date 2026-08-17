@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch, Trash, CaretDown } from "@phosphor-icons/react"
+import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch, CaretDown } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1298,7 +1298,6 @@ export function ProductEditorDialog({
                       className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100"
                       title={dead.map((c) => `${prettyColorName(c)} — 0`).join("\n")}
                     >
-                      <Trash size={12} weight="bold" />
                       Remove {dead.length} out of stock
                     </button>
                   )

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CircleNotch, Plus, Trash, ArrowSquareOut, FloppyDisk, UploadSimple, Warning, Image as ImageIcon } from "@phosphor-icons/react"
+import { CircleNotch, Plus, Trash, ArrowSquareOut, UploadSimple, Warning, Image as ImageIcon } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -253,7 +253,7 @@ export function SiteContentPanel() {
                   <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                     {uploading ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} />}Replace
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={removeBanner} disabled={uploading || saving}><Trash size={13} />Remove</Button>
+                  <Button variant="ghost" size="sm" onClick={removeBanner} disabled={uploading || saving}>Remove</Button>
                 </div>
               </div>
             ) : (
@@ -418,7 +418,7 @@ export function SiteContentPanel() {
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={resetToDefaults}>Reset to defaults</Button>
           <Button size="sm" onClick={() => save()} disabled={saving}>
-            {saving ? <CircleNotch size={14} className="animate-spin" /> : <FloppyDisk size={14} />}Save
+            {saving ? <CircleNotch size={14} className="animate-spin" /> : null}Save
           </Button>
         </div>
       </div>

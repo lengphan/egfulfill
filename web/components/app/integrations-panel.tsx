@@ -510,7 +510,7 @@ export function IntegrationsPanel() {
                       title={`Make a live ${active.name} call`}
                       className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:underline disabled:opacity-50"
                     >
-                      {tests[active.key]?.running ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />} Test connection
+                      {tests[active.key]?.running ? <CircleNotch size={12} className="animate-spin" /> : null} Test connection
                     </button>
                   )}
                   <button
@@ -519,7 +519,7 @@ export function IntegrationsPanel() {
                     title={`Refresh ${active.name}`}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
                   >
-                    <ArrowsClockwise size={12} weight="bold" className={activeRes.level === "checking" ? "animate-spin" : ""} /> Recheck
+                    Recheck
                   </button>
                 </span>
               </div>

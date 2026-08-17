@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { FilmSlate, CircleNotch, Warning, Sparkle } from "@phosphor-icons/react"
+import { CircleNotch, Warning, Sparkle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getDeskImageConfig, getDeskVideoConfig, type DeskImageConfig, type DeskVideoConfig } from "@/lib/api"
 
@@ -292,7 +292,7 @@ export function AnimateImageButton({ imageName, onArm }: {
       type="button" onClick={arm} aria-label="Animate this image"
       className="absolute right-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-md bg-background/85 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur-sm transition-colors hover:bg-background"
     >
-      {busy ? <CircleNotch size={12} className="animate-spin" /> : <FilmSlate size={12} weight="duotone" />}
+      {busy ? <CircleNotch size={12} className="animate-spin" /> : null}
       Animate
     </button>
   )

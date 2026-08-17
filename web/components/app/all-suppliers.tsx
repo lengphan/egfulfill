@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { MagnifyingGlass, UploadSimple, ArrowsClockwise, CircleNotch } from "@phosphor-icons/react"
+import { MagnifyingGlass, UploadSimple, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -511,7 +511,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
                 S&S catalogue pull, which is the only sync a person has any reason to force. */}
             <Button size="sm" variant="outline" onClick={onSyncAll} disabled={importing || refreshing}
                     title="Force a full S&S catalogue pull now. SanMar refreshes nightly on the server; Otto is a file import.">
-              <ArrowsClockwise size={14} weight="bold" className={refreshing ? "animate-spin" : ""} /> Refresh all styles
+              Refresh all styles
             </Button>
           </>
         )}

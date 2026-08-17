@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, ChatText, Check, Trash, Handshake } from "@phosphor-icons/react"
+import { CircleNotch, ChatText, Trash, Handshake } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSupplierMessages, addSupplierMessage, deleteSupplierMessage, saveSourcing,
@@ -139,7 +139,7 @@ export function SupplierTerms({ row, onSaved }: { row: SourcingRow; onSaved?: ()
             {saving ? <CircleNotch size={13} className="animate-spin" /> : null} Save
           </Button>
           <Button size="sm" onClick={() => void save(true)} disabled={saving}>
-            <Check size={13} weight="bold" /> Save + mark confirmed today
+            Save + mark confirmed today
           </Button>
         </div>
         {/* An age, not just a date. "Confirmed 12 Mar" reads as settled; "148 days ago"

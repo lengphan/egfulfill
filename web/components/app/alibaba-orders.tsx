@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, CaretRight, Package, ChatCircleDots, ArrowSquareOut, Flask, Warning, CheckCircle } from "@phosphor-icons/react"
+import { CircleNotch, CaretRight, Package, ArrowSquareOut, Warning, CheckCircle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { SampleOrderDialog, chatUrl, orderUrl, usd, when } from "@/components/app/sample-orders"
@@ -179,7 +179,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                         {loaded?.sellerEid && (
                           <a href={chatUrl(loaded.sellerEid) ?? "#"} target="_blank" rel="noopener noreferrer"
                              title={`Message ${loaded.sellerName ?? "this supplier"} on Alibaba`}>
-                            <Button size="sm" variant="outline"><ChatCircleDots size={13} weight="bold" /> Chat</Button>
+                            <Button size="sm" variant="outline">Chat</Button>
                           </a>
                         )}
                         <a href={orderUrl(o.tradeId) ?? "#"} target="_blank" rel="noopener noreferrer"
@@ -188,7 +188,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                         </a>
                         <Button size="sm" variant="outline" onClick={() => setSampling(o.tradeId)}
                                 title="Record this as a sourcing sample and book its cost to the factory wallet">
-                          <Flask size={13} weight="bold" /> Record as sample
+                          Record as sample
                         </Button>
                         {/* Bringing it into stock needs the LINES, and those arrive with the
                             detail — so like Chat, this appears once the row is open rather
@@ -201,7 +201,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                         ) : loaded && (
                           <Button size="sm" variant="outline" onClick={() => setReceiving(loaded)}
                                   title="Create a purchase order from this, so the goods can be received into inventory">
-                            <Package size={13} weight="bold" /> Into stock
+                            Into stock
                           </Button>
                         )}
                       </div>

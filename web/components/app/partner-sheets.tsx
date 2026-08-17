@@ -1,9 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import {
-  CircleNotch, Warning, UploadSimple, DownloadSimple, Trash, FloppyDisk, Plus, X,
-} from "@phosphor-icons/react"
+import { CircleNotch, Warning, UploadSimple, DownloadSimple, FloppyDisk, Plus, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -230,7 +228,7 @@ export function PartnerSheets() {
                 actually being aimed at. */}
             <Button size="sm" variant="ghost" onClick={() => remove(current)} disabled={busy}
               className="ml-auto text-muted-foreground hover:text-destructive">
-              <Trash size={14} weight="bold" /> Delete
+              Delete
             </Button>
           </div>
 

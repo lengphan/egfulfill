@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Plus, Trash, PaperPlaneTilt, CircleNotch, Copy, Check, Warning, ClockCounterClockwise, CheckCircle } from "@phosphor-icons/react"
+import { Plus, Trash, CircleNotch, Copy, Check, Warning, ClockCounterClockwise, CheckCircle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -180,7 +180,7 @@ export function WebhooksPanel() {
                     <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground">#{w.id}</span>
                     <span className="min-w-0 flex-1 truncate font-mono text-xs">{w.url}</span>
                     <Button size="sm" variant="outline" onClick={() => fire(w.id)} disabled={busy === `test:${w.id}`}>
-                      {busy === `test:${w.id}` ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Send test
+                      {busy === `test:${w.id}` ? <CircleNotch size={13} className="animate-spin" /> : null} Send test
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => openLog(w.id)} title="Delivery history">
                       <ClockCounterClockwise size={13} weight="bold" />

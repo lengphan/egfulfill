@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, Package } from "@phosphor-icons/react"
+import { Package } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getCatalogProducts, getDesignFees, type CatalogProduct, type DesignFees } from "@/lib/api"
@@ -112,7 +112,7 @@ export default function ProductDetailPage() {
         </span>
         <div className="font-medium">Product not found</div>
         <Button variant="outline" size="sm" onClick={() => router.push("/products")}>
-          <ArrowLeft size={14} weight="bold" /> Back to products
+          Back to products
         </Button>
       </div>
     )
@@ -132,7 +132,7 @@ export default function ProductDetailPage() {
   return (
     <div className="space-y-5">
       <Button variant="ghost" size="sm" onClick={() => router.push("/products")} className="text-muted-foreground">
-        <ArrowLeft size={16} weight="bold" /> Products
+        Products
       </Button>
 
       {/* Fill the page container (eg-content, 1600px) like every other page — the old

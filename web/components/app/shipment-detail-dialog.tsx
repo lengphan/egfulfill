@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowSquareOut, ArrowUUpLeft, CircleNotch, DownloadSimple, LinkBreak, Receipt, FilePdf, Printer, Warning } from "@phosphor-icons/react"
+import { ArrowSquareOut, ArrowUUpLeft, CircleNotch, DownloadSimple, LinkBreak, Receipt, FilePdf, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { useEffect, useRef, useState } from "react"
@@ -531,7 +531,7 @@ export function ShipmentDetailDialog({
               </p>
               <div className="flex items-center gap-1">
                 <Button size="sm" variant="outline" onClick={() => void detach()} disabled={detaching} className="bg-card">
-                  {detaching ? <CircleNotch size={13} className="animate-spin" /> : <LinkBreak size={13} weight="bold" />}
+                  {detaching ? <CircleNotch size={13} className="animate-spin" /> : null}
                   Yes, unlink it
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setConfirmDetach(false)} disabled={detaching}>
@@ -569,7 +569,7 @@ export function ShipmentDetailDialog({
                 disabled={voiding === s.id}
                 title="Refund the postage with the carrier. This cannot be undone."
               >
-                {voiding === s.id ? <CircleNotch size={13} className="animate-spin" /> : <Receipt size={13} />}
+                {voiding === s.id ? <CircleNotch size={13} className="animate-spin" /> : null}
                 Refund postage
               </Button>
             )}
@@ -583,7 +583,6 @@ export function ShipmentDetailDialog({
                 disabled={detaching || confirmDetach}
                 title="Take this tracking off the order so a correct label can be bought. The postage is NOT refunded, and this can be undone."
               >
-                <LinkBreak size={13} />
                 Wrong order?
               </Button>
             )}
@@ -611,7 +610,7 @@ export function ShipmentDetailDialog({
                   Download
                 </a>
                 <Button size="sm" onClick={printLabel} disabled={!labelSrc}>
-                  <Printer size={13} weight="bold" /> Print
+                  Print
                 </Button>
               </div>
             )}

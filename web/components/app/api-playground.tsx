@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Play, Key, Copy, Check, CircleNotch, Warning, BookOpen, CaretRight, Eye, EyeSlash } from "@phosphor-icons/react"
+import { Key, Copy, Check, CircleNotch, Warning, BookOpen, CaretRight, Eye, EyeSlash } from "@phosphor-icons/react"
 import { tabsListVariants, tabsTriggerVariants } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { SectionCard } from "@/components/app/section-card"
@@ -296,7 +296,7 @@ export function ApiPlayground() {
               )}
 
               <Button onClick={send} disabled={sending || !apiKey.trim()}>
-                {sending ? <CircleNotch size={15} className="animate-spin" /> : <Play size={15} weight="fill" />} Send request
+                {sending ? <CircleNotch size={15} className="animate-spin" /> : null} Send request
               </Button>
               {!apiKey.trim() && <span className="ml-2 text-xs text-muted-foreground">Add a test key above to send.</span>}
             </div>

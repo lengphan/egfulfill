@@ -5,7 +5,7 @@ import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf, platformOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch } from "@phosphor-icons/react"
+import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, getOrderDesignCards, cardForLine, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
@@ -300,7 +300,7 @@ export default function OrderDetailPage() {
         <div className="text-sm text-muted-foreground">It may have been removed, or the link is stale.</div>
         {/* Role-aware: staff belong on their production board, not the seller list. */}
         <Button variant="outline" size="sm" onClick={() => router.push(ordersHomeFor(getUser()?.role))}>
-          <ArrowLeft size={14} weight="bold" /> Back to orders
+          Back to orders
         </Button>
       </div>
     )
@@ -427,7 +427,7 @@ export default function OrderDetailPage() {
           to the Total it was duplicating. */}
       <div>
         <Button variant="ghost" size="sm" onClick={() => router.push("/orders")} className="-ml-2 mb-1 h-7 text-muted-foreground">
-          <ArrowLeft size={16} weight="bold" /> Orders
+          Orders
         </Button>
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">

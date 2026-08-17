@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, Warning, CheckCircle, Truck, MapPin } from "@phosphor-icons/react"
+import { CircleNotch, Warning, CheckCircle, MapPin } from "@phosphor-icons/react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
@@ -424,7 +424,7 @@ export function SupplierOrderingDialog({
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>Close</Button>
           <Button size="sm" onClick={save} disabled={busy || !opts}>
-            {busy ? <CircleNotch size={13} className="animate-spin" /> : <Truck size={13} weight="bold" />} Save
+            {busy ? <CircleNotch size={13} className="animate-spin" /> : null} Save
           </Button>
         </DialogFooter>
       </DialogContent>

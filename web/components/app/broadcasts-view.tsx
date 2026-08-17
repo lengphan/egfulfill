@@ -650,7 +650,7 @@ export function BroadcastsView() {
                             <Button size="sm" variant="ghost" onClick={() => remove(b)} aria-label="Delete"><Trash size={14} /></Button>
                             {canSend && (
                               <Button size="sm" disabled={!mailOk && mailsOf(b)} onClick={() => startSend(b)}>
-                                <PaperPlaneTilt size={14} />Send
+                                Send
                               </Button>
                             )}
                           </div>

@@ -492,7 +492,7 @@ export function ImportOrdersDialog({
                     <>
                       <div className="rounded-xl border border-border bg-muted/30 p-4">
                         <Button onClick={makeSheetCopy}>
-                          <Table size={15} weight="bold" /> Make a copy in Google Sheets
+                          Make a copy in Google Sheets
                         </Button>
                         <p className="mt-2 text-xs text-muted-foreground">
                           Opens your own copy in your Drive — every column already in place, required

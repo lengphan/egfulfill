@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, Warning, CheckCircle, Plus, Minus } from "@phosphor-icons/react"
+import { CircleNotch, Warning, CheckCircle, Plus } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -125,7 +125,7 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
                   className={"flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors " +
                     (dir === -1 ? "border-rose-300 bg-rose-50 text-rose-700" : "border-border text-muted-foreground hover:bg-accent")}
                 >
-                  <Minus size={14} weight="bold" /> Money out
+                  Money out
                 </button>
                 <button
                   type="button" onClick={() => { setDir(1); setConfirming(false) }}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Plus, ArrowLineDown, DownloadSimple } from "@phosphor-icons/react"
+import { Plus, DownloadSimple } from "@phosphor-icons/react"
 import { TopUpDialog } from "@/components/app/topup-dialog"
 import { PayoutDialog } from "@/components/app/payout-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -86,7 +86,7 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
                   className="h-8 w-20 rounded-lg border border-border bg-card px-2 text-right text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               </label>
-              <Button size="sm" variant="outline" onClick={() => review(t, "reject")} disabled={busy === t.id} className="text-red-600 hover:text-red-700"><XCircle size={14} weight="bold" /> Reject</Button>
+              <Button size="sm" variant="outline" onClick={() => review(t, "reject")} disabled={busy === t.id} className="text-red-600 hover:text-red-700">Reject</Button>
               <Button size="sm" onClick={() => review(t, "confirm")} disabled={busy === t.id}>{busy === t.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Confirm &amp; credit</>}</Button>
             </div>
           </div>
@@ -136,7 +136,7 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => act(p, "reject")} disabled={busy === p.id} className="text-red-600 hover:text-red-700"><XCircle size={14} weight="bold" /> Reject</Button>
+                <Button size="sm" variant="outline" onClick={() => act(p, "reject")} disabled={busy === p.id} className="text-red-600 hover:text-red-700">Reject</Button>
                 <Button size="sm" onClick={() => act(p, "pay")} disabled={busy === p.id}>{busy === p.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Mark paid</>}</Button>
               </div>
             </div>
@@ -476,7 +476,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             "Manage Linked Accounts" is gone: those details now live in that dialog. */}
         {!isFactoryWallet && (
           <Button variant="outline" onClick={() => setPayoutOpen(true)}>
-            <ArrowLineDown size={16} /> Withdraw
+            Withdraw
           </Button>
         )}
         <Button onClick={() => setTopUpOpen(true)}>

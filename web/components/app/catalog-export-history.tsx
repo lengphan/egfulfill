@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, ArrowCounterClockwise, Archive } from "@phosphor-icons/react"
+import { CircleNotch, Archive } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getCatalogExports, type CatalogExport } from "@/lib/api"
 
@@ -68,7 +68,7 @@ export function CatalogExportHistory({ onOpen }: { onOpen: (id: string) => void 
                   <td className="px-2 py-2 text-xs tabular-nums text-muted-foreground">{e.styleCount}</td>
                   <td className="px-2 py-2 text-right">
                     <Button size="sm" variant="outline" onClick={() => onOpen(e.id)}>
-                      <ArrowCounterClockwise size={13} weight="bold" /> Reopen
+                      Reopen
                     </Button>
                   </td>
                 </tr>

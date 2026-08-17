@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, CheckCircle, Warning, UploadSimple, X, MagnifyingGlassPlus } from "@phosphor-icons/react"
+import { CircleNotch, CheckCircle, Warning, UploadSimple, X } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -149,7 +149,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={info.qr} alt="Your bank QR code" className="size-40 rounded-lg border border-border bg-white object-contain" />
                           <span className="absolute inset-0 flex items-center justify-center gap-1 bg-black/0 text-2xs font-medium text-transparent transition group-hover:bg-black/45 group-hover:text-white">
-                            <MagnifyingGlassPlus size={15} weight="bold" /> Enlarge
+                            Enlarge
                           </span>
                         </button>
                         <Button variant="outline" size="sm" onClick={() => set("qr", "")}><X size={14} /> Remove</Button>

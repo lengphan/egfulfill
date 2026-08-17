@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CircleNotch, ShoppingCart, Plus } from "@phosphor-icons/react"
+import { CircleNotch, Plus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { getSsStyle, getOttoStyle, getSanmarCatalogStyle } from "@/lib/api"
@@ -467,14 +467,14 @@ export function SupplierDetailDialog({
                     className="h-9 w-16 rounded-lg border border-border bg-card px-2.5 text-sm tabular-nums"
                   />
                   <Button size="sm" className="h-9" onClick={() => onAddToCart({ colour, size, qty })}>
-                    <ShoppingCart size={14} weight="bold" /> Add to cart
+                    Add to cart
                   </Button>
                 </div>
               )}
               <div className="ml-auto flex flex-wrap items-center gap-2">
               {onOrder && (
                 <Button size="sm" variant="outline" className="h-9" onClick={onOrder}>
-                  <ShoppingCart size={14} weight="bold" /> Order
+                  Order
                 </Button>
               )}
               {onAddToCatalog && (

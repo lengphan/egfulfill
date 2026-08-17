@@ -60,7 +60,7 @@ export function ShopAnalyzer() {
         <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground"><Storefront size={24} weight="duotone" /></span>
         <div className="font-medium">No Etsy shop connected</div>
         <p className="max-w-sm text-sm text-muted-foreground">Connect your Etsy shop and we&apos;ll analyze your listings, pricing and tags, then tell you what to fix first.</p>
-        <Link href="/stores"><Button size="sm" className="mt-1"><Storefront size={14} weight="bold" /> Connect a shop</Button></Link>
+        <Link href="/stores"><Button size="sm" className="mt-1">Connect a shop</Button></Link>
       </div>
     )
   }

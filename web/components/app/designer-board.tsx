@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { PenNib, X, CircleNotch, Storefront, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash, DotsSixVertical } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Storefront, Needle, CurrencyDollar, CheckCircle, CheckSquare, Square, LinkSimple, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash, DotsSixVertical } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -915,7 +915,7 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
       {canEdit && (
         <div className="flex justify-end">
           <div className="relative">
-            <Button variant="outline" size="sm" onClick={() => setMenuOpen((o) => !o)}><Columns size={14} weight="bold" /> Columns</Button>
+            <Button variant="outline" size="sm" onClick={() => setMenuOpen((o) => !o)}>Columns</Button>
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
@@ -1187,14 +1187,14 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         <div className="flex flex-wrap gap-2">
           {!card.order_id && (
             <Button size="sm" variant="outline" onClick={onAssign}>
-              <LinkSimple size={14} weight="bold" /> Assign to an order
+              Assign to an order
             </Button>
           )}
           {/* EMB-check cards are already digitised — Pink Design DIGITISES raw art, so it's
               not an option here. They only get a factory check before stitching. */}
           {canPush && !card.vendor && !isEmbCard(card) && (
             <Button size="sm" variant={showPush ? "secondary" : "outline"} onClick={() => setShowPush((v) => !v)}>
-              <PaperPlaneTilt size={14} weight="bold" /> Send to Pink Design
+              Send to Pink Design
             </Button>
           )}
         </div>
@@ -1391,8 +1391,8 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               )}
               {col === "review" && (
                 <>
-                  <Button size="sm" onClick={() => move("approved")}><CheckCircle size={14} weight="bold" /> Accept</Button>
-                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" disabled={busy} onClick={requestFix}><ArrowClockwise size={14} weight="bold" /> Request changes</Button>
+                  <Button size="sm" onClick={() => move("approved")}>Accept</Button>
+                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" disabled={busy} onClick={requestFix}>Request changes</Button>
                 </>
               )}
               {col === "fix" && (
@@ -1409,15 +1409,15 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               {/* Sending out lives on the ORDER's item row, not here: the decision is made
                   while looking at the line and its artwork, and a designer opening a card to
                   claim it is not the person deciding to outsource it. */}
-              {col === "incoming" && <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}><Hand size={14} weight="bold" /> Claim</Button>}
-              {col === "inprogress" && <Button size="sm" onClick={() => move("review")}><ArrowRight size={14} weight="bold" /> Send for review</Button>}
+              {col === "incoming" && <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}>Claim</Button>}
+              {col === "inprogress" && <Button size="sm" onClick={() => move("review")}>Send for review</Button>}
               {col === "review" && (
                 <>
-                  <Button size="sm" onClick={() => move("approved")}><CheckCircle size={14} weight="bold" /> Approve</Button>
-                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => move("fix")}><ArrowClockwise size={14} weight="bold" /> Fix</Button>
+                  <Button size="sm" onClick={() => move("approved")}>Approve</Button>
+                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => move("fix")}>Fix</Button>
                 </>
               )}
-              {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}><ArrowClockwise size={14} weight="bold" /> Back to work</Button>}
+              {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}>Back to work</Button>}
               {col === "approved" && (
                 card.credited
                   ? <span className="inline-flex items-center gap-1 text-sm font-medium text-success"><CheckCircle size={15} weight="fill" /> Credited {money(amt(card.payment))}</span>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { Printer, Minus, Plus, X } from "@phosphor-icons/react"
+import { Minus, Plus, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Barcode } from "@/components/app/barcode"
 import { QrCode } from "@/components/app/qr-code"
@@ -176,7 +176,7 @@ export function LabelSheet({
               {STOCKS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </label>
-          <Button className="w-full" onClick={() => window.print()} disabled={!sheet.length}><Printer size={14} weight="bold" /> Print</Button>
+          <Button className="w-full" onClick={() => window.print()} disabled={!sheet.length}>Print</Button>
         </div>
       </div>
 

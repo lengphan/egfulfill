@@ -285,7 +285,7 @@ export function AlibabaReceiveDialog({
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
           <Button size="sm" onClick={importIt} disabled={busy || !usable.length}>
-            {busy ? <CircleNotch size={14} className="animate-spin" /> : <Package size={13} weight="bold" />}
+            {busy ? <CircleNotch size={14} className="animate-spin" /> : null}
             Create {poNum}
           </Button>
         </DialogFooter>

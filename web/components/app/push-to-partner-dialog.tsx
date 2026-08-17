@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CircleNotch, PaperPlaneTilt, Trash, UploadSimple, Warning, CheckCircle } from "@phosphor-icons/react"
+import { CircleNotch, Trash, UploadSimple, Warning, CheckCircle } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -370,7 +370,7 @@ function PushToPartnerPanel({
       <div className="flex items-center justify-end gap-2 pt-1">
         {onCancel && <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>Cancel</Button>}
         <Button size="sm" onClick={send} disabled={busy || uploading || notReady || noArtwork}>
-          {busy ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />}
+          {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
           Send to Pink Design
         </Button>
       </div>

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { SupplierFlag } from "@/components/app/supplier-flag"
 import { clickableProps } from "@/lib/a11y"
-import { Heart, Plus, CheckCircle, CircleNotch, ShoppingCart, ArrowsClockwise } from "@phosphor-icons/react"
+import { Heart, Plus, CheckCircle, CircleNotch, ArrowsClockwise } from "@phosphor-icons/react"
 import { swatchBg } from "@/lib/color-swatch"
 import { prettyColorName } from "@/lib/color-name"
 import { cn } from "@/lib/utils"
@@ -306,7 +306,7 @@ export function SupplierProductCard({
           {onQuickOrder && (
             <button onClick={onQuickOrder} title="Order this — quantities and prices per size"
               className={cn(CARD_ACTION_SECONDARY, "w-full")}>
-              <ShoppingCart size={13} weight="bold" /> Order
+              Order
             </button>
           )}
           <button onClick={onAdd} disabled={added || adding}

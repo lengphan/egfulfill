@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, Check, X, Package, Warning, ChatCircleDots, ArrowSquareOut, DownloadSimple } from "@phosphor-icons/react"
+import { CircleNotch, X, Package, Warning, ChatCircleDots, ArrowSquareOut, DownloadSimple } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -291,7 +291,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
                         <>
                           <button onClick={() => act(s, "received")} disabled={busy === s.id} title="Mark arrived"
                                   className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50">
-                            <Check size={13} weight="bold" /> Arrived
+                            Arrived
                           </button>
                           <button onClick={() => act(s, "cancel")} disabled={busy === s.id} title="Cancel and credit the cost back"
                                   className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:bg-accent hover:text-destructive disabled:opacity-50">

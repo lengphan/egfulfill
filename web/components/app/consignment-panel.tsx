@@ -221,7 +221,7 @@ export function ConsignmentPanel() {
                 <div className="mt-3 flex items-center justify-end gap-2">
                   <span className="text-xs text-muted-foreground">Blank bin = we pick one for you</span>
                   <Button size="sm" onClick={() => receive(s)} disabled={busy === s.id}>
-                    {busy === s.id ? <CircleNotch size={14} className="animate-spin" /> : <Barcode size={14} weight="bold" />}
+                    {busy === s.id ? <CircleNotch size={14} className="animate-spin" /> : null}
                     Receive &amp; shelve
                   </Button>
                 </div>

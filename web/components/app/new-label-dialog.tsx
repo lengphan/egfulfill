@@ -416,7 +416,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   const msg = printPackingSlips([{ id: order.id, num: order.num, items: order.items, address: order.to } as never])
                   if (msg) setErr(msg)
                 }}>
-                  <Package size={14} weight="bold" /> Packing slip
+                  Packing slip
                 </Button>
               )}
               {result.labelUrl && (

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { CircleNotch, Calculator, Warning } from "@phosphor-icons/react"
+import { CircleNotch, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -269,7 +269,7 @@ export function RateCalculatorView() {
           )}
 
           <Button onClick={run} disabled={busy} className="w-full">
-            {busy ? <CircleNotch size={15} className="animate-spin" /> : <Calculator size={15} weight="bold" />} Get rates
+            {busy ? <CircleNotch size={15} className="animate-spin" /> : null} Get rates
           </Button>
           {err && <p className="text-xs text-destructive">{err}</p>}
         </SectionCard>

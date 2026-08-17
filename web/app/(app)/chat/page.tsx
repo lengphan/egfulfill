@@ -893,7 +893,7 @@ export default function ChatPage() {
           <div className="flex items-center justify-center gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
             <span>Not what you needed?</span>
             <button onClick={escalate} className="inline-flex items-center gap-1 font-medium text-foreground hover:underline">
-              <Headset size={14} /> Talk to a human
+              Talk to a human
             </button>
           </div>
         )}
@@ -938,7 +938,7 @@ export default function ChatPage() {
         <div className="flex items-center gap-2 border-t border-border p-3">
           {isInbox && (
             <Button variant="outline" size="sm" className="h-10 shrink-0 gap-1.5" onClick={draftWithAi} disabled={drafting}>
-              {drafting ? <CircleNotch size={14} className="animate-spin" /> : <Sparkle size={14} />}
+              {drafting ? <CircleNotch size={14} className="animate-spin" /> : null}
               Draft with AI
             </Button>
           )}

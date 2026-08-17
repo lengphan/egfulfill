@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, TrayArrowDown, CaretRight, Check, Warning } from "@phosphor-icons/react"
+import { CircleNotch, CaretRight, Check, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -150,7 +150,7 @@ export function InboundPanel() {
                     </span>
                   </button>
                   <Button size="sm" onClick={() => receive(po)} disabled={busy === po.num}>
-                    {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />} Receive into stock
+                    {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : null} Receive into stock
                   </Button>
                 </div>
                 {isOpen && (

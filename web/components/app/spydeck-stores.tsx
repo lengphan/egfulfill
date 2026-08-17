@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { MagnifyingGlass, Heart, Storefront, Star, ArrowLeft, ArrowSquareOut, CircleNotch, Package } from "@phosphor-icons/react"
+import { MagnifyingGlass, Heart, Storefront, Star, ArrowSquareOut, CircleNotch, Package } from "@phosphor-icons/react"
 import {
   searchSpydeckShops, getSpydeckShop, getSpydeckShopListings, getSpydeckSavedShops, saveSpydeckShop, unsaveSpydeckShop,
   getSpydeckShopsByCategory, getEtsyCategories,
@@ -239,7 +239,7 @@ export function StoresTab(h: Handlers) {
       <div>
         <div className="flex flex-wrap items-center gap-3 px-5 pt-4">
           <button type="button" onClick={() => { setOpen(null); setCatalog(null) }} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent">
-            <ArrowLeft size={14} weight="bold" /> Back
+            Back
           </button>
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">{open.shop_name}</span>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Plus, Trash, FloppyDisk } from "@phosphor-icons/react"
+import { Plus, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
@@ -131,7 +131,7 @@ export function VolumeTiersPanel() {
       title="Volume tiers"
       actions={
         <Button size="sm" onClick={save} disabled={busy}>
-          <FloppyDisk size={14} weight="bold" /> Save ladder
+          Save ladder
         </Button>
       }
     >

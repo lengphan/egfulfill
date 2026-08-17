@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, Warning, FilePdf, Barcode, CheckCircle } from "@phosphor-icons/react"
+import { CircleNotch, Warning, Barcode, CheckCircle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -105,7 +105,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
                 {m.pdf ? (
                   <Button size="sm" variant="outline"
                     onClick={() => window.open(m.pdf as string, "_blank", "noopener,noreferrer")}>
-                    <FilePdf size={14} weight="bold" /> Print
+                    Print
                   </Button>
                 ) : (
                   // Honest about the async gap rather than showing a dead button: USPS has

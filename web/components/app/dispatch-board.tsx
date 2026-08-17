@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, UploadSimple, X, XCircle, Clock, FilePdf, Barcode, CaretDown, CaretRight, Package, Tag, type Icon } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, UploadSimple, X, XCircle, Clock, FilePdf, Barcode, CaretDown, CaretRight, Package, type Icon } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -882,7 +882,7 @@ export function DispatchBoard() {
             {/* Label + slip in one click — the two documents that leave with the parcel. */}
             <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={labelAndSlip}
               title="Open the shipping label(s) and print the packing slip(s) together">
-              <Tag size={14} weight="bold" /> Label &amp; Slip
+              Label &amp; Slip
             </Button>
 
             {/* PULL BACK / undo — grouped: take orders off the board, or cancel the batch at
@@ -1259,7 +1259,7 @@ export function DispatchBoard() {
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLabelFor(o) }}
                       className="eg-tap inline-flex w-fit items-center gap-1 rounded-lg border border-primary/40 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
                     >
-                      <Tag size={12} weight="bold" /> Create label
+                      Create label
                     </button>
                   )}
                   <span className="flex justify-end gap-1">

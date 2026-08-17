@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Columns, DotsSixVertical, Eye, EyeSlash, ArrowCounterClockwise } from "@phosphor-icons/react"
+import { Columns, DotsSixVertical, Eye, EyeSlash } from "@phosphor-icons/react"
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ORDER_COLS, DEFAULT_ORDER_COLS, reorderCols, type OrderColId } from "@/lib/order-columns"
@@ -37,7 +37,7 @@ export function ColumnsMenu({
         <div className="flex items-center justify-between px-1.5 pb-1.5 pt-0.5">
           <span className="text-xs font-semibold text-muted-foreground">Columns</span>
           <button onClick={reset} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            <ArrowCounterClockwise size={11} weight="bold" /> Reset
+            Reset
           </button>
         </div>
         {order.map((id, i) => {

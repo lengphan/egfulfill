@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, CircleNotch, Check } from "@phosphor-icons/react"
+import { Bell, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Pagination } from "@/components/app/pagination"
@@ -100,7 +100,7 @@ export function NotificationsView() {
           </button>
           {unread > 0 && (
             <Button size="sm" variant="outline" onClick={readAll} disabled={busy}>
-              <Check size={13} weight="bold" /> Mark all read ({unread})
+              Mark all read ({unread})
             </Button>
           )}
         </div>

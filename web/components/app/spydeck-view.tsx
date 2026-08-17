@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
+import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, CheckCircle, Storefront, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -1268,7 +1268,7 @@ export function SpyDeckView() {
               </div>
               {canFilter && (
                 <Button variant="outline" onClick={() => setShowFilters((s) => !s)} className={showFilters ? "border-primary text-primary" : ""}>
-                  <SlidersHorizontal size={15} weight="bold" /> Filters
+                  Filters
                 </Button>
               )}
               <Button onClick={() => { setView("search"); run() }} disabled={loading || (!query.trim() && !hasFilter)}>
@@ -1364,14 +1364,14 @@ export function SpyDeckView() {
                   className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:opacity-50"
                   title="Reshuffle the feed for a fresh set of ideas — free and instant"
                 >
-                  {refreshing ? <CircleNotch size={14} className="animate-spin" /> : <Shuffle size={14} weight="bold" />} More ideas
+                  {refreshing ? <CircleNotch size={14} className="animate-spin" /> : null} More ideas
                 </button>
                 <button
                   type="button" onClick={freshScan} disabled={refreshing || freshScanning}
                   className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
                   title="Pull a brand-new batch of niches from Etsy (rate-limited)"
                 >
-                  {freshScanning ? <CircleNotch size={14} className="animate-spin" /> : <ArrowsClockwise size={14} weight="bold" />} Fresh scan
+                  {freshScanning ? <CircleNotch size={14} className="animate-spin" /> : null} Fresh scan
                 </button>
                 {refreshMsg && <span className="text-xs text-muted-foreground">{refreshMsg}</span>}
               </div>

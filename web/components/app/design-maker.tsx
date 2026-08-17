@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, CircleNotch, Export, FloppyDisk, Stack } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
@@ -591,7 +591,7 @@ export function DesignMaker() {
           <div className="space-y-1.5">
             <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Add</div>
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={addText}>
-              <TextT size={15} weight="bold" /> Add text
+              Add text
             </Button>
           </div>
 
@@ -611,7 +611,7 @@ export function DesignMaker() {
                   <input type="checkbox" checked={!!selText.bold} onChange={(e) => updateText(selText.id, { bold: e.target.checked })} /> Bold
                 </label>
               </div>
-              <Button variant="outline" size="sm" onClick={() => removeText(selText.id)} className="text-red-600 hover:text-red-700"><Trash size={14} weight="bold" /> Delete text</Button>
+              <Button variant="outline" size="sm" onClick={() => removeText(selText.id)} className="text-red-600 hover:text-red-700">Delete text</Button>
             </div>
           ) : images.length > 0 || texts.length > 0 ? (
             <div className="space-y-3 border-t border-border pt-3">
@@ -691,7 +691,7 @@ export function DesignMaker() {
               }}
               disabled={!designUrl && texts.length === 0}
             >
-              <Export size={15} weight="bold" /> Publish product
+              Publish product
             </Button>
             {pubErr && <p className="text-xs text-destructive">{pubErr}</p>}
           </div>

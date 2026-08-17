@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Barcode as BarcodeIcon, Camera, X, ArrowUp, ArrowDown, ArrowCounterClockwise, CircleNotch, Warning, CheckCircle } from "@phosphor-icons/react"
+import { Barcode as BarcodeIcon, X, ArrowUp, ArrowDown, ArrowCounterClockwise, CircleNotch, Warning, CheckCircle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -230,7 +230,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
       <SectionCard
         title={readOnly ? "Stock levels — view only" : isIn ? "Scanning IN — adds to stock" : "Scanning OUT — removes from stock"}
         actions={hasCam ? (
-          <Button size="sm" variant="outline" onClick={() => setCamOpen(true)}><Camera size={14} weight="bold" /> Camera</Button>
+          <Button size="sm" variant="outline" onClick={() => setCamOpen(true)}>Camera</Button>
         ) : undefined}
       >
         <div className="space-y-3 p-5">

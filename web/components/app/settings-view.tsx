@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useContext, createContext, isValidEle
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, X, DownloadSimple, Database, ArrowSquareOut, CaretRight } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, MagnifyingGlass, DotsThree, X, DownloadSimple, Database, ArrowSquareOut, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -288,7 +288,7 @@ function ProfilePanel() {
         <label className="flex max-w-md cursor-pointer items-center justify-between gap-4 rounded-xl border border-border p-3">
           <span className="flex items-center gap-2.5">
             <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              {sound ? <SpeakerHigh size={15} weight="fill" /> : <SpeakerSlash size={15} weight="fill" />}
+              {sound ? <SpeakerHigh size={15} weight="fill" /> : null}
             </span>
             <span>
               <span className="block text-sm font-medium">Notification sound</span>
@@ -333,7 +333,7 @@ function ProfilePanel() {
           <Button onClick={save} disabled={!dirty || saving}>
             {saving ? "Saving…" : "Save changes"}
           </Button>
-          {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
+          {saved && <span className="inline-flex items-center gap-1 text-sm text-success">Saved</span>}
         </div>
       </div>
     </SectionCard>
@@ -512,7 +512,7 @@ function ApiKeysPanel() {
                   className="text-muted-foreground hover:text-red-600"
                   onClick={() => onRevoke(k.id)}
                 >
-                  <Trash size={14} weight="bold" /> Revoke
+                  Revoke
                 </Button>
               )}
             </div>
@@ -786,7 +786,7 @@ function TeamPanel() {
                   className="shrink-0 text-muted-foreground hover:text-red-600"
                   onClick={() => setRemoving(m)}
                 >
-                  <Trash size={14} weight="bold" /> Remove
+                  Remove
                 </Button>
               </div>
             </div>

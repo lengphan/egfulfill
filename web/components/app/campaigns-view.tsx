@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Megaphone, CircleNotch, Warning, Plus, Play, Pause, ArrowSquareOut, Gear } from "@phosphor-icons/react"
+import { Megaphone, CircleNotch, Warning, Plus, Play, Pause, ArrowSquareOut } from "@phosphor-icons/react"
 import Link from "next/link"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -93,7 +93,7 @@ export function CampaignsView() {
               <li>· <b className="text-foreground">Google Ads</b> — needs a client id/secret <i>and</i> a developer token from a Google Ads Manager (MCC) account.</li>
             </ul>
             {role === "admin" ? (
-              <Link href="/settings"><Button size="sm" variant="outline"><Gear size={14} weight="bold" /> Add keys in Settings › Integrations</Button></Link>
+              <Link href="/settings"><Button size="sm" variant="outline">Add keys in Settings › Integrations</Button></Link>
             ) : (
               <p className="text-xs text-muted-foreground">An admin can add these in Settings › Integrations.</p>
             )}

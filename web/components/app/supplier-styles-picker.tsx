@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, Warning, MagnifyingGlass, Percent, CaretLeft, CaretRight } from "@phosphor-icons/react"
+import { CircleNotch, Warning, MagnifyingGlass, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProductThumb } from "@/components/app/product-thumb"
@@ -129,7 +129,7 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
           {/* Applies to the ticked styles ON THIS PAGE — which are, by definition, the
               ones in the catalogue. No second selection to keep in sync with the first. */}
           <Button size="sm" variant="outline" onClick={markup} disabled={busy}>
-            <Percent size={14} weight="bold" /> Price these {rows.filter((r) => r.picked).length}
+            Price these {rows.filter((r) => r.picked).length}
           </Button>
         </div>
       )}

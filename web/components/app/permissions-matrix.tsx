@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Check, FloppyDisk, CircleNotch, LockSimple } from "@phosphor-icons/react"
+import { Check, CircleNotch, LockSimple } from "@phosphor-icons/react"
 import {
   visSurfaces, effectiveHidden, refreshNavVisibility, setNavVisibilityCache,
   VIS_ROLES, VIS_ROLE_LABEL, type VisRole,
@@ -113,7 +113,7 @@ export function PermissionsMatrix() {
               type="button" onClick={save} disabled={saving}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors disabled:opacity-50"
             >
-              {saving ? <CircleNotch size={16} className="animate-spin" /> : <FloppyDisk size={16} weight="bold" />} Save
+              {saving ? <CircleNotch size={16} className="animate-spin" /> : null} Save
             </button>
             {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
           </div>

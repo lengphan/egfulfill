@@ -235,7 +235,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
           </div>
         ) : (
           <button onClick={() => setShowBulk(true)} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5">
-            <Sparkle size={14} weight="fill" /> Top up more for a better rate <CaretDown size={13} weight="bold" />
+            Top up more for a better rate <CaretDown size={13} weight="bold" />
           </button>
         )
       )}

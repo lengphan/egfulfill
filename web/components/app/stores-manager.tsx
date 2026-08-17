@@ -1,15 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import {
-  ArrowsClockwise,
-  Trash,
-  Plus,
-  CheckCircle,
-  Storefront,
-  Warning,
-  Prohibit,
-} from "@phosphor-icons/react"
+import { ArrowsClockwise, Trash, Plus, CheckCircle, Storefront, Warning, Prohibit } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

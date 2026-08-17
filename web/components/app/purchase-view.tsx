@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { cartChanged } from "@/lib/cart-events"
-import { ShoppingCart, CircleNotch, TrayArrowDown, CheckCircle, Trash, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise } from "@phosphor-icons/react"
+import { ShoppingCart, CircleNotch, CheckCircle, Trash, CaretRight, ArrowClockwise } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -1291,24 +1291,24 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
                         : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
                     <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
-                      <ArrowClockwise size={13} weight="bold" /> Reorder
+                      Reorder
                     </Button>
                     {/* Only where it makes sense: an order already settled is IN history. */}
                     {(po.status === "draft" || po.status === "placed") && (
                       <Button size="sm" variant="outline" onClick={() => archive([po])} disabled={busy === "archive"}
                               title="Clear it off the board — the supplier is not contacted">
-                        <ArrowUUpLeft size={13} weight="bold" /> To history
+                        To history
                       </Button>
                     )}
                     {po.status === "received" && (
                       <Button size="sm" variant="outline" onClick={() => setReturning(po)} disabled={busy === po.num}>
-                        <ArrowUUpLeft size={13} weight="bold" /> Return
+                        Return
                       </Button>
                     )}
                     {po.status === "placed" && (
                       <>
                         <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={busy === po.num}>
-                          {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />} Receive into stock
+                          {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : null} Receive into stock
                         </Button>
                         {(() => {
                           const mins = minutesSincePlaced(po)
@@ -1866,7 +1866,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
               // like this. Same confirm, same "the supplier is not contacted".
               actions={placed.length > 1 ? (
                 <Button size="sm" variant="outline" onClick={() => archive(placed)} disabled={busy === "archive"}>
-                  {busy === "archive" ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
+                  {busy === "archive" ? <CircleNotch size={13} className="animate-spin" /> : null}
                   Move all {placed.length} to history
                 </Button>
               ) : undefined}

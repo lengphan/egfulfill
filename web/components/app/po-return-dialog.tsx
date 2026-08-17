@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CircleNotch, ArrowUUpLeft, Warning } from "@phosphor-icons/react"
+import { CircleNotch, Warning } from "@phosphor-icons/react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
@@ -188,7 +188,7 @@ export function PoReturnDialog({
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button size="sm" onClick={submit} disabled={busy || !picked.length}>
-            {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
+            {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
             Return {picked.length || ""} line{picked.length === 1 ? "" : "s"}{expected > 0 ? ` · ${usd(expected)} expected` : ""}
           </Button>
         </DialogFooter>

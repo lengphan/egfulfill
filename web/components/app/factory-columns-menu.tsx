@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Columns, DotsSixVertical, ArrowCounterClockwise, Check } from "@phosphor-icons/react"
+import { Columns, DotsSixVertical, Check } from "@phosphor-icons/react"
 
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { useLabelT } from "@/lib/i18n"
@@ -73,7 +73,7 @@ export function FactoryColumnsMenu({ order, hidden, onOrder, onHidden, className
             onClick={reset}
             className="eg-tap inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            <ArrowCounterClockwise size={11} weight="bold" /> Reset
+            Reset
           </button>
         </div>
         <p className="mb-1.5 px-1 text-2xs leading-relaxed text-muted-foreground">Drag to reorder · click to show or hide.</p>

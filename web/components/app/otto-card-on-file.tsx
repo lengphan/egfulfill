@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CreditCard, Lock, Warning, CheckCircle } from "@phosphor-icons/react"
+import { CreditCard, Warning, CheckCircle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -148,7 +148,7 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
 
           <div className="flex items-center gap-3">
             <Button size="sm" onClick={commit} disabled={touched && errs.length > 0}>
-              <CreditCard size={13} weight="bold" /> Save card
+              Save card
             </Button>
             {saved && (
               <button onClick={() => { setEditing(false); setTouched(false); setName(""); setNumber(""); setCvv(""); setExp("") }}

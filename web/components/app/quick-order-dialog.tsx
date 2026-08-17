@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { cartChanged } from "@/lib/cart-events"
-import { CircleNotch, ShoppingCart, Warning } from "@phosphor-icons/react"
+import { CircleNotch, Warning } from "@phosphor-icons/react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
@@ -189,7 +189,7 @@ export function QuickOrderDialog({
           </span>
           <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button size="sm" onClick={submit} disabled={busy || !picked.length}>
-            {busy ? <CircleNotch size={13} className="animate-spin" /> : <ShoppingCart size={13} weight="bold" />}
+            {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
             Add to order list
           </Button>
         </DialogFooter>

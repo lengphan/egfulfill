@@ -203,7 +203,7 @@ export function ReceiveScanDialog({
           </span>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={saving}>Close</Button>
           <Button size="sm" onClick={receive} disabled={!box || saving || !units}>
-            {saving ? <CircleNotch size={13} className="animate-spin" /> : <CheckCircle size={13} weight="bold" />}
+            {saving ? <CircleNotch size={13} className="animate-spin" /> : null}
             Add to stock
           </Button>
         </DialogFooter>

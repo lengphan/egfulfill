@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, Check, Warning, ArrowSquareOut } from "@phosphor-icons/react"
+import { CircleNotch, Warning, ArrowSquareOut } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSupplierOptions, setFactorySettings, type SupplierOptions } from "@/lib/api"
@@ -207,7 +207,7 @@ export function SupplierOrderingSettings() {
 
       <div className="flex items-center gap-3 border-t border-border pt-4">
         <Button onClick={save} disabled={busy}>
-          {busy ? <CircleNotch size={15} className="animate-spin" /> : <Check size={15} weight="bold" />} Save defaults
+          {busy ? <CircleNotch size={15} className="animate-spin" /> : null} Save defaults
         </Button>
         {saved && <span className="text-sm text-success">Saved — purchases will use these.</span>}
         {err && <span className="text-sm text-destructive">{err}</span>}

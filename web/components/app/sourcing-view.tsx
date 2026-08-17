@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, Binoculars, X, Package, CaretRight } from "@phosphor-icons/react"
+import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, X, Package, CaretRight } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Loading } from "@/components/app/loading"
 import { AlibabaStatus } from "@/components/app/alibaba-status"
@@ -328,7 +328,7 @@ export function SourcingView() {
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={openPicker} disabled={!!draft}>
-            <Binoculars size={14} weight="bold" /> From SpyDeck
+            From SpyDeck
           </Button>
           <Button size="sm" onClick={() => setDraft({ ...EMPTY })} disabled={!!draft}>
             <Plus size={14} weight="bold" /> Add source

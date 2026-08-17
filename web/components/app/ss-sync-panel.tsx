@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, ArrowsClockwise, Stop, Warning } from "@phosphor-icons/react"
+import { CircleNotch, Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getSsSyncStatus, startSsSyncAll, stopSsSyncAll, type SsSyncStatus } from "@/lib/api"
 
@@ -72,7 +72,7 @@ export function SsSyncPanel() {
     return (
       <>
         <Button size="sm" variant="outline" onClick={() => start(false)} disabled={busy}>
-          {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowsClockwise size={13} weight="bold" />}
+          {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
           Sync all styles
         </Button>
       </>
@@ -116,12 +116,12 @@ export function SsSyncPanel() {
 
       {st.running ? (
         <Button size="sm" variant="outline" onClick={stop} disabled={busy}>
-          <Stop size={13} weight="bold" /> Stop
+          Stop
         </Button>
       ) : (
         <>
           <Button size="sm" onClick={() => start(false)} disabled={busy}>
-            {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowsClockwise size={13} weight="bold" />}
+            {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
             Sync all styles
           </Button>
           {/* Refresh re-fetches styles already held — prices and stock move, so an

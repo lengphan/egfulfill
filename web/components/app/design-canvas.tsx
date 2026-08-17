@@ -1783,7 +1783,7 @@ export function DesignCanvasDialog({
                   title="Put the background back"
                   className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur transition-colors hover:bg-accent"
                 >
-                  <ArrowCounterClockwise size={12} weight="bold" /> Undo
+                  Undo
                 </button>
               )}
               {bg.msg && (

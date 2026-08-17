@@ -188,7 +188,7 @@ export function CardEntryDialog({
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button size="sm" onClick={submit} disabled={touched && errs.length > 0}>
-            <CreditCard size={13} weight="bold" /> Pay &amp; place order
+            Pay &amp; place order
           </Button>
         </DialogFooter>
       </DialogContent>

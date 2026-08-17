@@ -163,7 +163,6 @@ export function ForwardSetup() {
                   onClick={openProvider}
                   className="eg-tap mb-3 inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
-                  <EnvelopeSimple size={14} weight="bold" />
                   Copy address &amp; open {active.label} settings
                 </button>
               )}

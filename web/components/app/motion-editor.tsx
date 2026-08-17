@@ -15,7 +15,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
-import { ArrowClockwise, Warning } from "@phosphor-icons/react"
+import { Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   DEFAULT_MOTION, LIMITS, PRESET_NAMES, clampField, entrance,
@@ -191,7 +191,7 @@ export function MotionEditor({ value, onChange }: {
 
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => setReplay((n) => n + 1)}>
-              <ArrowClockwise size={14} weight="bold" /> Replay
+              Replay
             </Button>
             <Button
               size="sm" variant="ghost" disabled={isDefault}

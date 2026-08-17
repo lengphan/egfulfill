@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent } from "react"
 // NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
-import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown, DotsSixVertical, TShirt } from "@phosphor-icons/react"
+import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown, TShirt } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
 import {
   getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
@@ -398,7 +398,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
               ) : (
                 <>
                   <button onClick={() => run(false)} disabled={busy || areaOver} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
-                    {status === "previewing" ? <CircleNotch size={14} className="animate-spin" /> : <Eye size={14} />} Preview
+                    {status === "previewing" ? <CircleNotch size={14} className="animate-spin" /> : null} Preview
                   </button>
                   <button onClick={() => run(true)} disabled={busy || areaOver} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
                     {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : null} Generate file
@@ -946,10 +946,8 @@ function CreateTab() {
                     className={"transition-colors " + (dragId === l.id ? "opacity-40" : dragId ? "hover:bg-primary/5" : "")}
                   >
                     <div className="flex items-center gap-2 px-3 py-2 text-sm">
-                      <DotsSixVertical size={15} weight="bold" className="shrink-0 cursor-grab text-muted-foreground/50" />
                       {isImg(l) ? (
                         <>
-                          <ImageSquare size={15} className="shrink-0 text-muted-foreground" />
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={l.thumb} alt="" className="size-6 shrink-0 rounded border border-border object-contain" />
                           <span className="min-w-0 flex-1 truncate">{l.name}</span>
@@ -982,10 +980,10 @@ function CreateTab() {
             = the .emb (stitches only, for the embroidery machine); PNG = the rendered image. */}
         <div className="flex gap-2">
           <button onClick={() => void generateAnd("emb")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-            {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : <Needle size={14} weight="bold" />} EMB
+            {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : null} EMB
           </button>
           <button onClick={() => void generateAnd("png")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
-            <ImageSquare size={14} weight="bold" /> PNG
+            PNG
           </button>
         </div>
         {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}

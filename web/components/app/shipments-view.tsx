@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { MagnifyingGlass, CircleNotch, Package, DownloadSimple, Plus, Truck } from "@phosphor-icons/react"
+import { MagnifyingGlass, CircleNotch, Package, DownloadSimple, Plus } from "@phosphor-icons/react"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { ShipmentDetailDialog } from "@/components/app/shipment-detail-dialog"
 import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
@@ -282,7 +282,7 @@ export function ShipmentsView() {
             <DownloadSimple size={14} weight="bold" /> Export CSV
           </Button>
           <Button size="sm" variant="outline" onClick={() => setRateCheckOpen(true)}>
-            <Truck size={14} weight="bold" /> Rate check
+            Rate check
           </Button>
           {canVoid && (
             <Button size="sm" onClick={() => setNewLabelOpen(true)}>

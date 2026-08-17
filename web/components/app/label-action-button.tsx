@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Truck, DownloadSimple, Plus, ArrowCounterClockwise, CaretDown, CircleNotch } from "@phosphor-icons/react"
+import { DownloadSimple, Plus, ArrowCounterClockwise, CaretDown, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { voidLabel, type OrderRow } from "@/lib/api"
@@ -52,7 +52,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
   if (!hasLabel) {
     return (
       <Button variant="outline" size="sm" onClick={onOpenLabel}>
-        <Truck size={14} weight="bold" /> Create label
+        Create label
       </Button>
     )
   }

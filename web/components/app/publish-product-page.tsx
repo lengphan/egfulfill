@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
-import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle, Sparkle, ArrowCounterClockwise } from "@phosphor-icons/react"
+import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle, Sparkle } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -1442,7 +1442,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 {aiPrev && !aiBusy && (
                   <Button size="sm" variant="ghost" onClick={() => { setTitle(aiPrev.title); setDesc(aiPrev.description); setAiPrev(null) }}
                     title="Put back the title and description as they were before the last rewrite">
-                    <ArrowCounterClockwise size={14} weight="bold" /> Undo
+                    Undo
                   </Button>
                 )}
                 <span className="text-2xs text-muted-foreground">
