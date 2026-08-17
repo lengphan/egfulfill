@@ -216,6 +216,38 @@ function unitCostOf(row, item, fees, sides = 1) {
 }
 
 /**
+ * WHAT ONE COSTS BY TECHNIQUE — base + that method's surcharge, or null.
+ *
+ * The lookbook quoted ONE unit price per style, which is the base plus whatever surcharge the
+ * product's first method happens to carry. A blank offered in both DTG and embroidery has two
+ * real prices and they are not close: stitches cost more than ink, which is the whole reason
+ * method_emb exists. Quoting one of them and calling it "unit" understates half the sheet.
+ *
+ * NULL when the product does not offer that technique — the caller prints N/A. A price for a
+ * method we cannot run is worse than a gap: it is a number a partner can order against.
+ *
+ * Exported so the catalogue does not re-derive it. methodAddOn already handles a product's own
+ * override (methodPrices) before falling back to the platform rate, and a second copy of that
+ * ladder is how the sheet and the invoice come to disagree.
+ */
+export function priceByMethodOf(row, fees, methods) {
+  const base = sellerBaseCostOf(row, fees);
+  if (base == null) return { print: null, embroidery: null };
+  const list = (Array.isArray(methods) ? methods : []).map((m) => String(m || '').toUpperCase());
+  const has = (re) => list.some((m) => re.test(m));
+  const d = (row && row.data) || {};
+  // "Printing" is any ink technique the product lists — DTG first, because it is the default
+  // and the cheapest, and a style offering both DTG and DTF is quoted at the one it will
+  // actually be run on.
+  const printTech = has(/DTG|DIRECT/) ? 'DTG' : has(/DTF/) ? 'DTF' : has(/SCR|SCREEN/) ? 'SCR'
+    : has(/SUBLIM|\bDYE\b/) ? 'SUB' : has(/VINYL|HTV|VNL/) ? 'VNL' : null;
+  return {
+    print: printTech ? money(base + methodAddOn(d, printTech, fees)) : null,
+    embroidery: has(/EMB/) ? money(base + methodAddOn(d, 'EMB', fees)) : null,
+  };
+}
+
+/**
  * THE SELLER'S BASE COST FOR A WHOLE PRODUCT — the highest one across its sizes.
  *
  * Exported because the CATALOGUE needs it and must not re-derive it. The lookbook is a price

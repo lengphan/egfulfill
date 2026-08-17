@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto';
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
-import { quoteSpec, shipFeeOf, extraFeeOf, feeSettings, sellerBaseCostOf } from '../pricing.js';
+import { quoteSpec, shipFeeOf, extraFeeOf, feeSettings, sellerBaseCostOf, priceByMethodOf } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
@@ -1240,6 +1240,20 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
           const n = Number(d.price ?? d.basePrice ?? d.base_price ?? row.base_price);
           return Number.isFinite(n) && n > 0 ? n : null;
         })(),
+        /**
+         * ONE PRICE PER TECHNIQUE, because a blank that takes both has two.
+         *
+         * The sheet quoted a single "unit" figure — the base plus whatever surcharge the
+         * product's first listed method happens to carry — so a garment offered in DTG and
+         * embroidery was quoted at one of them and the other half of the sheet was wrong.
+         * Stitches cost more than ink; that is the whole reason method_emb exists.
+         *
+         * NULL for a technique the product does not offer, which the table prints as N/A. A
+         * price for a method we cannot run is worse than a gap: it is a number a partner can
+         * place an order against.
+         */
+        priceByMethod: priceByMethodOf({ data: d, base_price: row.base_price }, fees,
+          Array.isArray(d.methods) ? d.methods : (d.method ? [d.method] : [])),
         sizes: Array.isArray(d.sizes) ? d.sizes
           : (Array.isArray(d.sizePrices) ? d.sizePrices.map((t) => t && t.size).filter(Boolean) : []),
         // Supplier colourways when we can match the style — they carry a real photo AND an

@@ -774,9 +774,6 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             const ROWS_PER_PAGE = 22
             const pages: LookbookStyle[][] = []
             for (let i = 0; i < rows.length; i += ROWS_PER_PAGE) pages.push(rows.slice(i, i + ROWS_PER_PAGE))
-            // Every fee we could not read, so the note under the table can say whether the
-            // dashes mean "free" (they never do) or "we could not price it".
-            const unpriced = rows.filter((r) => r.ship == null || sheetPrice(r) == null).length
             return pages.map((page, pi) => (
               <section
                 key={`prices-${pi}`}
@@ -800,7 +797,12 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       <th className="pb-2 pr-3 font-semibold uppercase tracking-wider text-neutral-500">Sku</th>
                       {/* "Base" was wrong: it printed catalog_price, the trade rate. This is the number
                           a reader orders at, whichever of the two it resolves to. */}
-                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Unit</th>
+                      {/* ONE COLUMN PER TECHNIQUE. "Unit" was the base plus whichever
+                          surcharge the product's first listed method carried, so a blank
+                          offered in both was quoted at one of them and the sheet was wrong
+                          about the other. Stitches cost more than ink. */}
+                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Printing</th>
+                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Embroidery</th>
                       <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">First item<br />shipping</th>
                       <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Additional item<br />shipping</th>
                     </tr>
@@ -816,8 +818,26 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                         {/* A DASH, NEVER A ZERO. An unpriced style on a price list that
                             printed $0.00 would be quoting a wholesale buyer a free garment,
                             and it is the one mistake here nobody could walk back. */}
+                        {/* N/A, NOT A DASH, for a technique this blank does not take. The two
+                            mean different things on a price list: a dash is "we have not
+                            priced it, ask us"; N/A is "we cannot run it", and quoting a
+                            number there would be an order we could not fulfil.
+                            Falls back to the sheet price when a SAVED export predates the
+                            per-method figures — an older document keeps quoting what it
+                            always did rather than going blank. */}
                         <td className="py-1.5 pl-3 text-right tabular-nums">
-                          {sheetPrice(st) == null ? <span className="text-neutral-400">—</span> : money(sheetPrice(st))}
+                          {st.priceByMethod
+                            ? (st.priceByMethod.print == null
+                                ? <span className="text-neutral-400">N/A</span>
+                                : money(st.priceByMethod.print))
+                            : (sheetPrice(st) == null ? <span className="text-neutral-400">—</span> : money(sheetPrice(st)))}
+                        </td>
+                        <td className="py-1.5 pl-3 text-right tabular-nums">
+                          {st.priceByMethod
+                            ? (st.priceByMethod.embroidery == null
+                                ? <span className="text-neutral-400">N/A</span>
+                                : money(st.priceByMethod.embroidery))
+                            : <span className="text-neutral-400">—</span>}
                         </td>
                         <td className="py-1.5 pl-3 text-right tabular-nums">
                           {st.ship == null ? <span className="text-neutral-400">—</span> : money(st.ship)}
@@ -831,11 +851,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 </table>
 
                 <div className="mt-auto pt-6">
-                  <p className="text-[9px] leading-relaxed text-neutral-500">
-                    One parcel is charged the first-item rate once, plus the each-extra rate for
-                    every other unit in it. Base cost is the garment before decoration.
-                    {unpriced > 0 && ` A dash means we haven't priced that line yet — it is not zero; ask us and we'll quote it. (${unpriced} of ${rows.length}.)`}
-                  </p>
+                  {/* The explanatory paragraph is gone. It restated the two shipping column
+                      headings in a sentence directly under them, and defined "base cost" —
+                      a term the table no longer uses. */}
                   <footer className="mt-3 flex items-center justify-between border-t border-neutral-200 pt-3 text-[9px] text-neutral-400">
                     <span className="font-title text-sm font-semibold tracking-tight text-neutral-700">{brand.title}</span>
                     <span>{new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>

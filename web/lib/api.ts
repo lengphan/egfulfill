@@ -773,6 +773,10 @@ export type LookbookStyle = {
    *  job is to be ordered from. Its own field, never coalesced server-side: the two mean
    *  different things to different readers, and the template decides which to show. */
   sellerPrice?: number | null
+  /** One price per TECHNIQUE — base + that method's surcharge. null means the product does
+   *  not offer it, which the table prints as N/A rather than as a dash: "we don't run this"
+   *  and "we haven't priced it" are different answers. Optional: a saved export predates it. */
+  priceByMethod?: { print: number | null; embroidery: number | null }
 }
 export function getLookbook() {
   return api<{ styles: LookbookStyle[] }>(`/api/catalog/lookbook`)
