@@ -544,24 +544,28 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
     const big = arr.filter((f) => f.size > 50 * 1024 * 1024)
     if (big.length) setErr(`${big.map((f) => f.name).join(", ")} — over the 50 MB limit.`)
     const ok = arr.filter((f) => (MACHINE_RE.test(f.name) || isImg(f)) && f.size <= 50 * 1024 * 1024)
-    setStaged((prev) => {
-      const fresh = ok.filter((f) => !prev.some((s) => s.name === f.name))
-      const room = Math.max(0, MAX_STAGED - prev.length)
-      if (fresh.length > room) {
-        // Named, not silently truncated: a queue that quietly drops half a selection is a
-        // queue you believe you attached.
-        setErr(`Too many files at once — ${MAX_STAGED} is the limit, so ${fresh.length - room} ${fresh.length - room === 1 ? "was" : "were"} left out. Attach these, then drop the rest.`)
-      }
-      return [
-      ...prev,
-      ...fresh.slice(0, room)
-        .map((f) => {
-          const image = isImg(f)
-          const allowed = image ? items : items.filter((it) => isEmbroidery(it.print_type))
-          return { file: f, name: f.name, target: allowed.length ? matchLine(f.name, allowed) : ALL, image }
-        }),
-      ]
+    /**
+     * DECIDED HERE, not inside the updater.
+     *
+     * The cap and its message lived inside setStaged's updater, which React runs during
+     * render and twice under StrictMode — so calling setErr from in there is a side effect
+     * in a function that must be pure, and it throws. `staged` is in scope, so the updater
+     * was buying nothing.
+     */
+    const fresh = ok.filter((f) => !staged.some((x) => x.name === f.name))
+    const room = Math.max(0, MAX_STAGED - staged.length)
+    const dropped = fresh.length - Math.min(fresh.length, room)
+    if (dropped > 0) {
+      // Named, not silently truncated: a queue that quietly drops half a selection is a
+      // queue you believe you attached.
+      setErr(`Too many files at once — ${MAX_STAGED} is the limit, so ${dropped} ${dropped === 1 ? "was" : "were"} left out. Attach these, then drop the rest.`)
+    }
+    const rows = fresh.slice(0, room).map((f) => {
+      const image = isImg(f)
+      const allowed = image ? items : items.filter((it) => isEmbroidery(it.print_type))
+      return { file: f, name: f.name, target: allowed.length ? matchLine(f.name, allowed) : ALL, image }
     })
+    if (rows.length) setStaged((prev) => [...prev, ...rows])
   }
 
   const readDataUrl = (f: File) => new Promise<string>((res, rej) => {

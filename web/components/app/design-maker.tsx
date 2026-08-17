@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, CircleNotch, Export, FloppyDisk, Stack, MagnifyingGlass } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, CircleNotch, Export, FloppyDisk, Stack } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
@@ -194,24 +194,36 @@ export function DesignMaker() {
   const MAX_LAYERS = 10
   const [images, setImages] = useState<ImageLayer[]>([])
   const nextLayerId = useRef(1)
+  /**
+   * EVERYTHING DECIDED BEFORE ANY STATE IS SET.
+   *
+   * This built the new layers INSIDE the setImages updater and called setMsg/setSelected from
+   * in there. An updater must be pure — React runs it during render, and twice in StrictMode —
+   * so setting other state from inside it throws, which is why dropping an image crashed the
+   * page to "This page couldn't load".
+   *
+   * `images` is already in scope, so there is nothing the updater form was buying: the room
+   * left, the ids and the offsets are all computed here, and the three setters are then
+   * ordinary calls in an event handler, which is exactly where they belong.
+   */
   const addImages = (srcs: { src: string; name?: string | null }[]) => {
     if (!srcs.length) return
-    setImages((prev) => {
-      const room = Math.max(0, MAX_LAYERS - prev.length)
-      if (srcs.length > room) {
-        setMsg({ tone: "err", text: `A design can hold ${MAX_LAYERS} layers — ${srcs.length - room} ${srcs.length - room === 1 ? "was" : "were"} left out.` })
-      }
-      const added = srcs.slice(0, room).map((f, i) => ({
-        id: `img-${nextLayerId.current++}`,
-        src: f.src,
-        name: f.name ?? null,
-        // Each new layer lands slightly below the last so a second drop is visible rather
-        // than hidden exactly behind the first.
-        pos: { ...DEFAULT_POS, y: Math.min(80, DEFAULT_POS.y + (prev.length + i) * 4) },
-      }))
-      if (added.length) setSelected(added[added.length - 1].id)
-      return [...prev, ...added]
-    })
+    const room = Math.max(0, MAX_LAYERS - images.length)
+    const added = srcs.slice(0, room).map((f, i) => ({
+      id: `img-${nextLayerId.current++}`,
+      src: f.src,
+      name: f.name ?? null,
+      // Each new layer lands slightly below the last so a second drop is visible rather
+      // than hidden exactly behind the first.
+      pos: { ...DEFAULT_POS, y: Math.min(80, DEFAULT_POS.y + (images.length + i) * 4) },
+    }))
+    const dropped = srcs.length - added.length
+    if (dropped > 0) {
+      setMsg({ tone: "err", text: `A design can hold ${MAX_LAYERS} layers — ${dropped} ${dropped === 1 ? "was" : "were"} left out.` })
+    }
+    if (!added.length) return
+    setImages((prev) => [...prev, ...added])
+    setSelected(added[added.length - 1].id)
   }
   const updateImage = (id: string, patch: Partial<Pos>) =>
     setImages((prev) => prev.map((im) => (im.id === id ? { ...im, pos: { ...im.pos, ...patch } } : im)))
@@ -484,20 +496,19 @@ export function DesignMaker() {
                   <>
                     <div className="mt-1 flex items-baseline justify-between">
                       <div className="text-3xs font-medium text-muted-foreground">From your orders</div>
+                      {/* ONE way in, not two. "All 74" up here and "Browse order art" below
+                          the grid opened the same dialog, ten pixels of thumbnails apart —
+                          two controls for one action, and neither said which orders. The
+                          link carries it, named for what it opens. */}
                       {orderUploads.length > RAIL_LIMIT && (
                         <button type="button" onClick={() => setBrowse("orders")} className="text-3xs font-medium text-primary hover:underline">
-                          All {orderUploads.length}
+                          Browse All Orders
                         </button>
                       )}
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                       {orderUploads.slice(0, RAIL_LIMIT).map((im, i) => <ImageThumb key={im.url + i} url={im.url} src={canvasReadableSrc(im.url)} name={im.name} badge={shortRef(im.orderRef)} title={[im.orderRef, im.name].filter(Boolean).join(" · ")} onPlace={() => placeImage(im.url)} />)}
                     </div>
-                    {orderUploads.length > RAIL_LIMIT && (
-                      <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setBrowse("orders")}>
-                        <MagnifyingGlass size={15} weight="bold" /> Browse order art
-                      </Button>
-                    )}
                   </>
                 )}
               </>
