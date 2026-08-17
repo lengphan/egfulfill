@@ -6,6 +6,8 @@ import { X, Printer, CircleNotch, PencilSimple, Image as ImageIcon, ArrowCounter
 import { Button } from "@/components/ui/button"
 import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, saveLookbookStyle, type LookbookStyle } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
+import { getUser } from "@/lib/auth"
+import { LookbookBrandingDialog } from "@/components/app/lookbook-branding-dialog"
 
 /**
  * THE PRICE THE SHEET PRINTS — the trade rate, or what a seller pays when there isn't one.
@@ -231,6 +233,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
    */
   const [editing, setEditing] = useState(false)
   const [savingRef, setSavingRef] = useState<string | null>(null)
+  const [brandOpen, setBrandOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setIsAdmin((getUser()?.role || "") === "admin"), 0); return () => clearTimeout(t) }, [])
   const [editErr, setEditErr] = useState<string | null>(null)
   const canEdit = !exportId
   const fileFor = useRef<LookbookStyle | null>(null)
@@ -311,6 +316,11 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
     await patch(st, { image: dataUrl }, { image: dataUrl })
   }
   const pickFile = (st: LookbookStyle) => { fileFor.current = st; fileInput.current?.click() }
+  /* Repaints the sheet from what was just saved rather than refetching — the reason for
+     editing the cover next to the cover. */
+  const brandingDialog = (
+    <LookbookBrandingDialog open={brandOpen} onOpenChange={setBrandOpen} brand={brand} onSaved={setBrand} />
+  )
 
   // Nothing to portal into until the effect has run — and on the server there is no document.
   if (!host) return null
@@ -336,6 +346,16 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
           {/* Editing changes THIS DOCUMENT. Said on the button rather than in a help panel,
               because the reasonable assumption is the opposite — that typing a new name here
               renames the product. */}
+          {/* Branding sits beside Edit because it is the same kind of act — changing THIS
+              document — and it was three screens away in Settings › Platform, where the only
+              way to judge a cover colour was to set it, come back, and look. Admin only:
+              setFactorySettings is admin-only server-side, so anyone else would meet a 403
+              after typing. */}
+          {isAdmin && (
+            <Button size="sm" variant="outline" onClick={() => setBrandOpen(true)} disabled={!rows?.length}>
+              Branding
+            </Button>
+          )}
           {canEdit && (
             <Button
               size="sm" variant={editing ? "default" : "outline"}
@@ -372,6 +392,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
         ref={fileInput} type="file" accept="image/*" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0] ?? null; e.target.value = ""; onFile(f) }}
       />
+      {/* Outside .print-area, or the dialog's own chrome would land in the PDF. */}
+      {brandingDialog}
 
       <div className="print-area mx-auto">
         {rows === null ? (

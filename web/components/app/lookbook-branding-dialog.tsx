@@ -1,0 +1,134 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { getFactorySettings, setFactorySettings } from "@/lib/api"
+
+export type LookbookBrand = { title: string; tagline: string; accent: string; contact: string }
+
+/**
+ * THE COVER, EDITED WHERE THE COVER IS.
+ *
+ * These four fields lived in Settings › Platform, three screens from the document they
+ * describe — so setting a cover colour meant leaving the catalogue, typing a hex, coming back
+ * and looking. They are not platform policy like a postage band; they are this document's
+ * masthead, and the only way to judge them is against the page.
+ *
+ * It writes through setFactorySettings, which is admin-only server-side, so the button that
+ * opens this is gated to admin as well: a warehouse user who can print a catalogue would
+ * otherwise meet a 403 after typing.
+ *
+ * `onSaved` hands the values straight back, so the sheet behind repaints without a refetch —
+ * the whole point of editing here rather than there.
+ */
+export function LookbookBrandingDialog({
+  open, onOpenChange, brand, onSaved,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  brand: LookbookBrand
+  onSaved: (b: LookbookBrand) => void
+}) {
+  const [title, setTitle] = useState(brand.title)
+  const [tagline, setTagline] = useState(brand.tagline)
+  const [accent, setAccent] = useState(brand.accent)
+  const [contact, setContact] = useState(brand.contact)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  // Re-seeded on OPEN, not on mount: the dialog stays mounted between opens, so a value
+  // saved and then reopened would otherwise show what was typed the first time.
+  // Deferred, per this codebase's react-hooks/set-state-in-effect rule: a straight setState
+  // in an effect body cascades a render before paint, and every app page defers the same way.
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(() => {
+      setTitle(brand.title); setTagline(brand.tagline); setAccent(brand.accent); setContact(brand.contact)
+      setErr(null)
+    }, 0)
+    return () => clearTimeout(t)
+  }, [open, brand])
+
+  const save = async () => {
+    setBusy(true); setErr(null)
+    try {
+      /**
+       * READ, THEN WRITE THE WHOLE OBJECT.
+       *
+       * setFactorySettings replaces what it is sent, and this dialog knows four of the
+       * platform's several dozen fields. Posting only these would blank every fee and band on
+       * the way past. So the current settings are read and the four are laid over them —
+       * expensive-looking and correct, where the cheap version silently deletes the price
+       * list.
+       */
+      const cur = (await getFactorySettings()) as Record<string, unknown>
+      const r = await setFactorySettings({
+        ...cur,
+        lookbook_title: title.trim(),
+        lookbook_tagline: tagline.trim(),
+        lookbook_accent: accent.trim(),
+        lookbook_contact: contact,
+      } as Parameters<typeof setFactorySettings>[0])
+      if ((r as { error?: string })?.error) throw new Error((r as { error?: string }).error!)
+      onSaved({ title: title.trim() || "EGFUL", tagline: tagline.trim(), accent: accent.trim(), contact })
+      onOpenChange(false)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't save the branding.")
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader><DialogTitle>Lookbook branding</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Name on the cover</span>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="EGFUL" className="h-9" />
+            <span className="block text-2xs text-muted-foreground">Also the wordmark in each page footer.</span>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Cover tagline</span>
+            <Input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="Print-on-demand, made to order" className="h-9" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Accent colour</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={/^#[0-9a-f]{6}$/i.test(accent) ? accent : "#6633FF"}
+                onChange={(e) => setAccent(e.target.value)}
+                aria-label="Lookbook accent colour"
+                className="h-9 w-12 cursor-pointer rounded-md border border-input bg-transparent p-1"
+              />
+              <Input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder="#6633FF" className="h-9 flex-1 font-mono" />
+            </div>
+            {/* Stated rather than discovered at the printer: the covers reverse cream type out
+                of this colour, so a light value makes the title vanish. */}
+            <span className="block text-2xs text-muted-foreground">
+              Prints full-bleed on the covers with the title reversed out — keep it dark.
+            </span>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Back-cover contact</span>
+            <textarea
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              rows={2}
+              placeholder={"orders@egful.store\negful.store"}
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+            />
+            <span className="block text-2xs text-muted-foreground">Left blank, the block is omitted rather than printed empty.</span>
+          </label>
+          {err && <p className="text-sm text-destructive">{err}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => void save()} disabled={busy}>{busy ? "Saving…" : "Save branding"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

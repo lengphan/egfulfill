@@ -1098,10 +1098,6 @@ function PlatformPanel() {
   const [pinkTypeOptions, setPinkTypeOptions] = useState<{ value: string; label: string }[]>([])
   const [orderLimitDefault, setOrderLimitDefault] = useState("")
   const [capacityNotice, setCapacityNotice] = useState("")
-  const [lookbookTitle, setLookbookTitle] = useState("")
-  const [lookbookTagline, setLookbookTagline] = useState("")
-  const [lookbookAccent, setLookbookAccent] = useState("")
-  const [lookbookContact, setLookbookContact] = useState("")
   const [capacityMode, setCapacityMode] = useState(false)
   const [factoryDailyLimit, setFactoryDailyLimit] = useState("")
   const [shipExtra, setShipExtra] = useState("")
@@ -1164,10 +1160,6 @@ function PlatformPanel() {
       setPinkProductType(r.pink_product_type != null ? String(r.pink_product_type) : "")
       setOrderLimitDefault(r.order_limit_default != null ? String(r.order_limit_default) : "")
       setCapacityNotice(r.capacity_notice != null ? String(r.capacity_notice) : "")
-      setLookbookTitle(r.lookbook_title != null ? String(r.lookbook_title) : "")
-      setLookbookTagline(r.lookbook_tagline != null ? String(r.lookbook_tagline) : "")
-      setLookbookAccent(r.lookbook_accent != null ? String(r.lookbook_accent) : "")
-      setLookbookContact(r.lookbook_contact != null ? String(r.lookbook_contact) : "")
       setCapacityMode(!!Number(r.capacity_mode || 0))
       setFactoryDailyLimit(r.factory_daily_limit != null ? String(r.factory_daily_limit) : "")
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
@@ -1249,10 +1241,12 @@ function PlatformPanel() {
         pink_product_type: pinkProductType,
         order_limit_default: orderLimitDefault === "" ? undefined : Number(orderLimitDefault),
         capacity_notice: capacityNotice,
-        lookbook_title: lookbookTitle,
-        lookbook_tagline: lookbookTagline,
-        lookbook_accent: lookbookAccent,
-        lookbook_contact: lookbookContact,
+        /* NOT SENT ANY MORE. The four cover fields are edited on the catalogue page now,
+           and this panel had no control for them — but it still POSTED the values it had
+           loaded, so saving any unrelated platform setting would quietly overwrite a cover
+           edited since this screen was opened. The server treats a missing key as unchanged
+           (factory_settings.js: `if (b[k] === undefined) continue`), so leaving them out is
+           the correct way to have one writer. */
         capacity_mode: capacityMode ? 1 : 0,
         factory_daily_limit: factoryDailyLimit === "" ? undefined : Number(factoryDailyLimit),
         ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
@@ -1602,58 +1596,11 @@ function PlatformPanel() {
         </label>
       </Fold>
 
-      {/* The printed catalogue goes to BUYERS, so its cover is the one surface here that
-          someone outside the company reads. Editable without a deploy: a trade show, a
-          private-label buyer or a seasonal cover should not need one. Every field falls
-          back to the house brand when blank, so an untouched install still prints a
-          finished document rather than an empty template. */}
-      <Fold title="Lookbook branding" hint="the printed catalogue's cover">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">Name on the cover</span>
-            <Input value={lookbookTitle} onChange={(e) => setLookbookTitle(e.target.value)}
-                   placeholder="EGFUL" className="h-9" />
-            <span className="block text-2xs text-muted-foreground">Also the wordmark in each page footer.</span>
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">Accent colour</span>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={/^#[0-9a-f]{6}$/i.test(lookbookAccent) ? lookbookAccent : "#6633FF"}
-                onChange={(e) => setLookbookAccent(e.target.value)}
-                aria-label="Lookbook accent colour"
-                className="h-9 w-12 cursor-pointer rounded-md border border-input bg-transparent p-1"
-              />
-              <Input value={lookbookAccent} onChange={(e) => setLookbookAccent(e.target.value)}
-                     placeholder="#6633FF" className="h-9 flex-1 font-mono" />
-            </div>
-            {/* Stated, not left to be discovered at the printer. The covers reverse cream
-                type out of this colour, so a light value makes the title vanish. */}
-            <span className="block text-2xs text-muted-foreground">
-              Prints full-bleed on the covers with the title reversed out — keep it dark.
-            </span>
-          </label>
-        </div>
-        <label className="mt-3 block space-y-1">
-          <span className="text-sm font-medium">Cover tagline</span>
-          <Input value={lookbookTagline} onChange={(e) => setLookbookTagline(e.target.value)}
-                 placeholder="Print-on-demand, made to order" className="h-9" />
-        </label>
-        <label className="mt-3 block space-y-1">
-          <span className="text-sm font-medium">Back-cover contact</span>
-          <textarea
-            value={lookbookContact}
-            onChange={(e) => setLookbookContact(e.target.value)}
-            rows={2}
-            placeholder={"orders@egful.store\negful.store"}
-            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-          />
-          <span className="block text-2xs text-muted-foreground">
-            Left blank, the block is omitted rather than printed empty.
-          </span>
-        </label>
-      </Fold>
+      {/* LOOKBOOK BRANDING MOVED to the catalogue page, behind a Branding button beside
+          Edit. These four fields describe one document's cover, and they were three screens
+          from it — the only way to judge an accent colour is against the page it prints on,
+          which meant setting a hex here, navigating back, and looking. They are not platform
+          policy like a postage band. (components/app/lookbook-branding-dialog.tsx) */}
 
       <Fold title="Embroidery threads" hint="the cones you actually stock" status={`${threads.length} cones`}>
 
