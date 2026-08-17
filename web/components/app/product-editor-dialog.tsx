@@ -10,7 +10,7 @@ import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { getFactorySettings, getInventory, saveVariantStock, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
 import { shipBandKey } from "@/lib/ship-band"
-import { swatchHex, swatchBg } from "@/lib/color-swatch"
+import { swatchHex } from "@/lib/color-swatch"
 import { extractDominant, hexToRgb, rgbToOklab } from "@/lib/thread-match"
 import { normalizeMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
@@ -519,8 +519,18 @@ export function ProductEditorDialog({
   // product cost, else the product-level one. Shipping is a flat fee. A blank field is left
   // alone, so you can bulk-set just one column.
   const applyBulk = () => {
-    const b = bulkBase.trim(), sh = bulkShip.trim()
-    if (b === "" && sh === "") return
+    const b = bulkBase.trim(), sh = bulkShip.trim(), st = bulkStock.trim()
+    if (b === "" && sh === "" && st === "") return
+    // Stock too, now that it is a column of this table. An "apply to all" that skipped one
+    // of the three fields beside it would mean something different depending on which one
+    // you typed in.
+    if (st !== "" && ourSku) {
+      setStock((p) => {
+        const n = { ...p }
+        for (const sz of sizes) n[variantSku(ourSku, sz, null).toUpperCase()] = st
+        return n
+      })
+    }
     const amt = Number(b) || 0
     setTiers((prev) => {
       const nextT: Record<string, Tier> = { ...prev }
@@ -549,6 +559,11 @@ export function ProductEditorDialog({
    * Only rows whose sku starts with this product's — the inventory table is the whole
    * factory, and pulling it all into the grid would put another product's counts in these
    * cells the moment two skus shared a prefix.
+   *
+   * Keyed PER SIZE (`EG-1001-L`), because stock is a column of the size table now. Rows
+   * written under the older per-size-AND-colour skus (`EG-1001-L-BLK`) are a different key
+   * and would read as an empty shelf, so they are summed into their size on the way in.
+   * They are not deleted — they are still real rows on the Inventory page.
    */
   useEffect(() => {
     if (!open || !ourSku) return
@@ -557,11 +572,20 @@ export function ProductEditorDialog({
       getInventory().then((rows) => {
         if (!live) return
         const mine: Record<string, string> = {}
-        const want = new Set(variantPairs(sizes, colors).map((v) => variantSku(ourSku, v.size, v.color)))
+        const sizeKeyOf = (sz: string) => variantSku(ourSku, sz, null).toUpperCase()
+        const bySize = new Set(sizes.map(sizeKeyOf))
+        const legacy = new Map<string, string>()
+        for (const v of variantPairs(sizes, colors)) legacy.set(variantSku(ourSku, v.size, v.color).toUpperCase(), v.size)
+        const sums: Record<string, number> = {}
         for (const r of rows ?? []) {
           const key = String(r.sku || "").toUpperCase()
-          if (want.has(key) && r.in_stock != null) mine[key] = String(r.in_stock)
+          if (r.in_stock == null) continue
+          if (bySize.has(key)) { mine[key] = String(r.in_stock); continue }
+          const sz = legacy.get(key)
+          if (sz) sums[sizeKeyOf(sz)] = (sums[sizeKeyOf(sz)] ?? 0) + Number(r.in_stock)
         }
+        // A real size-level row wins; the sum only fills a size that has none.
+        for (const [k, n] of Object.entries(sums)) if (mine[k] === undefined) mine[k] = String(n)
         setStock(mine); setLoadedStock(mine)
       }).catch(() => {})
     }, 0)
@@ -570,20 +594,6 @@ export function ProductEditorDialog({
     // edits. A variant added after opening simply starts blank, which is correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ourSku])
-
-  /** Put the bulk number in every cell, or in one colourway's row. */
-  const fillStock = (color?: string) => {
-    const v = bulkStock.trim()
-    if (v === "") return
-    setStock((m) => {
-      const next = { ...m }
-      for (const pair of variantPairs(sizes, color ? [color] : colors)) {
-        const key = variantSku(ourSku, pair.size, pair.color)
-        if (key) next[key] = v
-      }
-      return next
-    })
-  }
 
   const save = () => {
     if (!name.trim()) { setErr("Give the product a name."); return }
@@ -685,11 +695,14 @@ export function ProductEditorDialog({
     const moved = Object.entries(stock).filter(([k, v]) => (loadedStock[k] ?? "") !== v)
     if (moved.length) {
       void saveVariantStock(moved.map(([sku, v]) => {
-        const pair = variantPairs(sizes, colors).find((p) => variantSku(ourSku, p.size, p.color) === sku)
+        // PER SIZE, so the label is the size alone. A "M · Black" label on a row that
+        // counts every colour would attribute a number to a variant it doesn't describe,
+        // on the page the floor scans against.
+        const sz = sizes.find((x) => variantSku(ourSku, x, null).toUpperCase() === sku)
         return {
           sku,
           name: name.trim() || undefined,
-          variant: pair ? variantLabel(pair.size, pair.color) : undefined,
+          variant: sz ? variantLabel(sz, null) : undefined,
           // "" is CLEARED, not zero — the row is left untracked rather than written as empty
           // stock. Skipped server-side for the same reason.
           in_stock: v.trim() === "" ? null : Number(v),
@@ -968,11 +981,19 @@ export function ProductEditorDialog({
                     <span className="text-xs text-muted-foreground">· shipping</span>
                     <Input value={bulkShip} onChange={(e) => setBulkShip(e.target.value.replace(/[^0-9.]/g, ""))}
                       placeholder="$ flat" className="h-8 w-20 text-xs" inputMode="decimal" aria-label="Bulk shipping fee" />
-                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim()}>Apply to all</Button>
+                    <span className="text-xs text-muted-foreground">· stock</span>
+                    <Input value={bulkStock} onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
+                      placeholder="units" className="h-8 w-20 text-xs" inputMode="numeric" aria-label="Bulk stock" disabled={!ourSku}
+                      title={ourSku ? undefined : "Give the product a SKU — stock is held against it"} />
+                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim() && !bulkStock.trim()}>Apply to all</Button>
                   </div>
                 )}
-                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
-                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span><span className="text-right">Margin</span><span />
+                {/* STOCK IS A COLUMN HERE. It was a size × colour grid of its own below —
+                    the only place in this form asking for a second dimension, to answer a
+                    question ("how many 3XL?") this row is already asking. Held per SIZE now,
+                    so the sku is EG-1001-L rather than EG-1001-L-BLK. */}
+                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_5rem_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
+                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span><span>Stock</span><span className="text-right">Margin</span><span />
                 </div>
                 <div className="mt-1 space-y-1.5">
                   {sizes.map((s) => {
@@ -983,7 +1004,7 @@ export function ProductEditorDialog({
                     const patch = (k: keyof Tier, v: string) =>
                       setTiers((p) => ({ ...p, [s]: { ...{ price: "", shipping: "", cost: "" }, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
                     return (
-                    <div key={s} className="grid grid-cols-[3rem_1fr_1fr_1fr_4.5rem_1.5rem] items-center gap-2">
+                    <div key={s} className="grid grid-cols-[3rem_1fr_1fr_1fr_5rem_4.5rem_1.5rem] items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground">{s}</span>
                       <Input
                         value={t?.cost ?? ""}
@@ -1016,6 +1037,21 @@ export function ProductEditorDialog({
                         placeholder={shipping.trim() !== "" ? Number(shipping).toFixed(2) : (bandFee != null ? Number(bandFee).toFixed(2) : "—")}
                         title={shipping.trim() !== "" ? "Using the product-level shipping fee above" : (bandFee != null ? "Platform default for this weight band" : undefined)}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Shipping fee for size ${s}`}
+                      />
+                      {/* EMPTY IS NOT ZERO: blank leaves the size untracked and the boards
+                          read it as unknown; 0 says the shelf is empty and reads as out.
+                          stock-status.ts has always drawn that line. */}
+                      <Input
+                        value={ourSku ? (stock[variantSku(ourSku, s, null).toUpperCase()] ?? "") : ""}
+                        onChange={(e) => {
+                          const k = variantSku(ourSku, s, null).toUpperCase()
+                          const v = e.target.value.replace(/[^0-9]/g, "")
+                          setStock((p) => ({ ...p, [k]: v }))
+                        }}
+                        disabled={!ourSku}
+                        placeholder={ourSku ? "—" : "sku"}
+                        title={ourSku ? `Held against ${variantSku(ourSku, s, null)}` : "Give the product a SKU — stock is held against it"}
+                        className="h-8 text-xs" inputMode="numeric" aria-label={`Stock for size ${s}`}
                       />
                       {/* Margin for THIS size = its Base cost − its Product cost (what we
                           charge the seller minus what the blank costs us). Base is this
@@ -1082,113 +1118,11 @@ export function ProductEditorDialog({
               </div>
           </div>
 
-          {/**
-            * STOCK, PER VARIANT — its own card, deliberately not a column in the table above.
-            *
-            * Sizes & pricing is MONEY, and money is per size: a 3XL costs more to buy and to
-            * ship, and colour changes neither. Stock is the opposite — it is the shelf, and a
-            * shelf is per size AND colour. Putting a stock column in that table would have
-            * been one number covering 17 colours, which is the very thing that made "do we
-            * have it?" unanswerable: `inventory` is keyed by sku, and until now an order line
-            * resolved to the PRODUCT's sku, so one Gildan 5000 had a single count across 8
-            * sizes and 62 colours.
-            *
-            * A GRID, NOT A LIST OF 496 FIELDS. Colours down, sizes across, so a row is a
-            * colourway and a column is a size — the two ways anyone actually asks the
-            * question ("how many black?", "are we out of 3XL?").
-            *
-            * EMPTY IS NOT ZERO, and the grid must keep them apart: blank means we don't track
-            * that variant and the boards read it as "unknown"; 0 means the shelf is empty and
-            * reads as "out". stock-status.ts has always drawn that line — this is the first
-            * screen that can express it.
-            */}
-          {ourSku && colors.length > 0 && sizes.length > 0 && (
-            <div className="rounded-xl border border-border p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-medium">
-                  Stock
-                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                    {sizes.length} size{sizes.length === 1 ? "" : "s"} × {colors.length} colour{colors.length === 1 ? "" : "s"}
-                  </span>
-                </span>
-                {/* The pricing card's "Apply to all", in the same words and the same place,
-                    because it is the same gesture on the same shape of table. */}
-                <div className="flex items-center gap-1.5 text-xs">
-                  <Input
-                    value={bulkStock}
-                    onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
-                    placeholder="units" inputMode="numeric"
-                    className="h-7 w-20 text-center text-xs"
-                    aria-label="Units to apply"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fillStock()}
-                    disabled={bulkStock.trim() === ""}
-                    className="rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
-                  >
-                    Apply to all
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full border-separate border-spacing-0 text-xs">
-                  <thead>
-                    <tr>
-                      <th className="sticky left-0 z-10 bg-card pb-1.5 pr-2 text-left font-medium text-muted-foreground">Colour</th>
-                      {sizes.map((s) => (
-                        <th key={s} className="px-1 pb-1.5 text-center font-medium text-muted-foreground">{s}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {colors.map((c) => (
-                      <tr key={c}>
-                        <th className="sticky left-0 z-10 max-w-[9rem] truncate bg-card py-0.5 pr-2 text-left font-normal" title={prettyColorName(c)}>
-                          <span className="flex items-center gap-1.5">
-                            <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: swatchBg(c) ?? "#c7c4bd" }} />
-                            <span className="truncate">{prettyColorName(c)}</span>
-                            {/* One colourway at a time — the common case is a delivery of
-                                one colour in every size, which "apply to all" would spread
-                                across the whole product. */}
-                            <button
-                              type="button"
-                              onClick={() => fillStock(c)}
-                              disabled={bulkStock.trim() === ""}
-                              title={`Put ${bulkStock || "…"} in every size of ${prettyColorName(c)}`}
-                              className="ml-auto shrink-0 rounded px-1 text-2xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-0"
-                            >
-                              fill
-                            </button>
-                          </span>
-                        </th>
-                        {sizes.map((s) => {
-                          const key = variantSku(ourSku, s, c)
-                          return (
-                            <td key={s} className="px-1 py-0.5">
-                              <Input
-                                value={stock[key] ?? ""}
-                                onChange={(e) => setStock((m) => ({ ...m, [key]: e.target.value.replace(/[^0-9]/g, "") }))}
-                                placeholder="—" inputMode="numeric"
-                                className="h-7 w-14 text-center text-xs"
-                                aria-label={`Stock for ${prettyColorName(c)} ${s}`}
-                                title={key}
-                              />
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Blank means we don&apos;t track that variant — different from 0, which says the shelf is
-                empty. Each cell is stocked against its own sku ({variantSku(ourSku, sizes[0], colors[0])}).
-              </p>
-            </div>
-          )}
+          {/* THE SIZE × COLOUR STOCK GRID WAS HERE. Stock is a column of the size table
+              above now: it asked "how many 3XL in black" on a form whose every other row is
+              per size, and it was the only place in the dialog demanding a second dimension.
+              Rows written under the old per-colour skus are summed into their size when the
+              dialog reads them, and are never rewritten or deleted — they stay on Inventory. */}
 
           {/* Shipping physicals + dim-weight guard. Carriers bill the greater of actual and
               dimensional weight (L×W×H÷166); keep the box under the ceiling so you're always

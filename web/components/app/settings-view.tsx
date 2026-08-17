@@ -847,6 +847,28 @@ function TeamPanel() {
 
 // ─────────────────────────── Page ───────────────────────────
 // ─────────────────────────── Platform (warehouse/admin) ───────────────────────────
+
+/**
+ * Visible, but not editable — for a role that may read a setting and may not write it.
+ *
+ * SAYS SO, rather than looking live and dropping the edit. PUT /api/factory/settings is
+ * admin+warehouse; an operator's Save reaches the cone list alone. Before this, the shipping
+ * and surcharge boxes typed and accepted and flashed "Saved", and nothing had been written —
+ * the one failure the honesty rule is about, because a wrong postage rate is indistinguishable
+ * from a saved one until an invoice is short.
+ */
+function ReadOnlyFor({ on, children }: { on: boolean; children: React.ReactNode }) {
+  if (!on) return <>{children}</>
+  return (
+    <>
+      <p className="mb-3 rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
+        Read-only for operators — these are the numbers your jobs are quoted on. Admin or
+        warehouse changes them.
+      </p>
+      <fieldset disabled className="min-w-0 opacity-70">{children}</fieldset>
+    </>
+  )
+}
 function MoneyField({ label, hint, value, onChange }: { label: string; hint?: string; value: string; onChange: (v: string) => void }) {
   // Translated HERE rather than at ~30 call sites. The value stays a number and the $ stays
   // a $ — only the caption moves.
@@ -1116,7 +1138,19 @@ function PlatformPanel() {
   const [vqrSmall, setVqrSmall] = useState("")
   const [vqrBulk, setVqrBulk] = useState("")
   const isAdminUser = (getUser()?.role || "") === "admin"
-  const setTier = (i: number, k: "usd" | "rate", v: string) => setVqrTiers((ts) => ts.map((t, j) => (j === i ? { ...t, [k]: v.replace(/[^0-9]/g, "") } : t)))
+  /**
+   * AN OPERATOR SEES FOUR SECTIONS, not nine.
+   *
+   * The tab was opened to operators for one reason — the thread stock is theirs to keep
+   * accurate — and it arrived carrying the ship-from address, payout limits, partner rates,
+   * the peak-season switch and the card Shippo bills. Those are the warehouse's and the
+   * owner's, and an operator's zone ends at scan.
+   *
+   * What stays is what they work in: the cones, the design surfaces, and the two numbers a
+   * job is quoted on (shipping + surcharge). Everything else is admin/warehouse.
+   */
+  const isOperator = (getUser()?.role || "") === "operator"
+  const setTier =(i: number, k: "usd" | "rate", v: string) => setVqrTiers((ts) => ts.map((t, j) => (j === i ? { ...t, [k]: v.replace(/[^0-9]/g, "") } : t)))
   const addTier = () => setVqrTiers((ts) => [...ts, { usd: "", rate: "" }])
   const removeTier = (i: number) => setVqrTiers((ts) => ts.filter((_, j) => j !== i))
   const [saving, setSaving] = useState(false)
@@ -1311,6 +1345,7 @@ function PlatformPanel() {
         </div>
       </div>
       <FoldGroup>
+      {!isOperator && (
       <Fold title="Warehouse ship-from address" hint="the sender on every label" status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
 
         <p className="mb-3 text-xs text-muted-foreground">
@@ -1357,12 +1392,14 @@ function PlatformPanel() {
           </span>
         </label>
       </Fold>
+      )}
 
       {/* A SEPARATE return address. Once the sender name is the seller's shop, the sender
           block can no longer double as "send it back to us under our own name" — so this is
           its own address, with its own name, sent to the carrier as address_return
           (Shippo) / return_address (EasyPost). Left blank, the carrier falls back to the
           sender, which is what happened before this field existed. */}
+      {!isOperator && (
       <Fold title="Return address" hint="where undeliverable parcels come back to" status={returnAddr.street ? "set" : "using ship-from"}>
         <p className="mb-3 text-xs text-muted-foreground">
           Only needed if returns come back to a <b>different address</b> than the one you ship
@@ -1391,6 +1428,8 @@ function PlatformPanel() {
           </div>
         )}
       </Fold>
+      )}
+      {!isOperator && (
       <Fold title="Fees" hint="design charges, payout, file price, default shipping">
         {/* MONEY OUT first, then money in, and the direction is written into every hint.
             These sat together unlabelled when the payout was called "design fee", which is
@@ -1498,10 +1537,12 @@ function PlatformPanel() {
           />
         </FeeGroup>
       </Fold>
+      )}
 
       {/* Product types. The default mockup is the labour-saver: set one 2D outline per
           category and every product in it inherits a blank for the Design Maker, instead
           of an upload per product. A product's own mockup still wins. */}
+      {!isOperator && (
       <Fold title="Partner rates" hint="what outside partners cost us, per job" status={Number(expediteCost) > 0 || Number(designPartnerCost) > 0 ? "set" : "unset — nothing booked"}>
 
         <p className="mb-3 text-xs text-muted-foreground">
@@ -1550,7 +1591,9 @@ function PlatformPanel() {
           )}
         </div>
       </Fold>
+      )}
 
+      {!isOperator && (
       <Fold title="Peak-season capacity" hint="per-seller order limits + the delay notice" status={capacityMode ? "on" : "off"}>
         {/* Master switch — off = no header counters, no notice, limits ignored. */}
         <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
@@ -1595,6 +1638,7 @@ function PlatformPanel() {
           <span className="block text-2xs text-muted-foreground">Leave blank to use the default wording.</span>
         </label>
       </Fold>
+      )}
 
       {/* LOOKBOOK BRANDING MOVED to the catalogue page, behind a Branding button beside
           Edit. These four fields describe one document's cover, and they were three screens
@@ -1705,6 +1749,7 @@ function PlatformPanel() {
       </Fold>
 
       <Fold title="Positions / Design Surfaces" hint="sides + positioning outlines per category" status={`${types.length} types`}>
+        <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           Sides and outlines are set once per category and inherited by every product in it —
@@ -1827,6 +1872,7 @@ function PlatformPanel() {
             </Button>
           </div>
         </div>
+        </ReadOnlyFor>
       </Fold>
 
       {/* Ship-from. A label with no origin is rejected by the carrier, so this is the
@@ -1838,9 +1884,11 @@ function PlatformPanel() {
           here would be invented. What is worth knowing before a label fails at the counter is
           which card is active and when it expires — the card itself is changed in Shippo's
           own dashboard, which is where card details belong. */}
+      {!isOperator && (
       <Fold title="Postage card" hint="the card Shippo charges each label to">
         <ShippoBillingPanel />
       </Fold>
+      )}
 
       {/* THE WHOLE PARCEL CHARGE, IN ONE PLACE.
           A seller pays for one parcel: the first item at its garment's rate, then a smaller
@@ -1850,6 +1898,7 @@ function PlatformPanel() {
           bands first and one of them always matches, so that field was edited and saved and
           changed no invoice. It is gone, and what remains is the two figures that bill. */}
       <Fold title="Shipping" hint="what a seller pays to send one parcel">
+        <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           The first item is charged at its garment&rsquo;s rate below; every other unit in the
@@ -1870,6 +1919,7 @@ function PlatformPanel() {
             value={shipExtra} onChange={setShipExtra}
           />
         </div>
+        </ReadOnlyFor>
       </Fold>
 
       {/* Surcharges on top of the blank's base cost. Named for what the section IS rather
@@ -1877,6 +1927,7 @@ function PlatformPanel() {
           belongs here too, and "Print method surcharge" would have read as the wrong home
           for it. */}
       <Fold title="Surcharge" hint="added per unit on top of the base cost">
+        <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">Added to the base cost per unit. A product can override this for its own methods.</p>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -1895,6 +1946,7 @@ function PlatformPanel() {
             value={bands.method_side ?? ""} onChange={(v) => setBand("method_side", v)}
           />
         </div>
+        </ReadOnlyFor>
       </Fold>
       </FoldGroup>
       {/* Save stays OUTSIDE the search filter and always visible: a filtered page still
