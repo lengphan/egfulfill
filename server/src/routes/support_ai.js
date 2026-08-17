@@ -497,8 +497,27 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     return { ok: true, keySet: !!cfg.key, last4: cfg.key ? cfg.key.slice(-4) : null, masked: maskKey(cfg.key, true), fromEnv: cfg.fromEnv, model: cfg.model };
   });
 
-  // ── The seller-facing auto-reply ─────────────────────────────────────────────
+  /**
+   * THE SELLER-FACING AUTO-REPLY — OFF.
+   *
+   * A product decision, not a technical one: nobody who writes to support wants to talk to
+   * a machine first, and everything below this line — the handoff suppression, the "don't
+   * talk over the queue" rule, the escalation-flag bookkeeping — exists to manage a bot
+   * that should not have been in the conversation at all.
+   *
+   * AI still helps US: POST /api/support/ai-draft (staff-only) drafts a reply for a person
+   * to read, edit and send. That is the version where a model's mistake is caught by the
+   * human whose name goes on the answer.
+   *
+   * The route stays and answers `{ ok:true, disabled:true }` — the shape callers already
+   * handle for "no key configured" — so any client still calling it degrades to silence
+   * rather than an error, and the whole implementation below stays readable for whoever
+   * revisits this decision.
+   */
+  const SELLER_AUTO_REPLY = false;
+
   app.post('/api/support/ai-reply', { preHandler: requireAuth }, async (req, reply) => {
+    if (!SELLER_AUTO_REPLY) return { ok: true, disabled: true, reason: 'seller-auto-reply-off' };
     const { key, model } = await aiConfig();
     if (!key) { req.log?.warn?.('support-ai: no AI key configured (Settings › Integrations)'); return { ok: false, disabled: true }; }
     const sellerId = req.user.sub;

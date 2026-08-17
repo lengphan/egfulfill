@@ -36,7 +36,6 @@ q(`create table if not exists public_support (
      updated_at timestamptz default now()
    )`).catch(() => {});
 
-const MAX_PER_CONVO = 30;
 const MAX_MSG_CHARS = 2000;
 const DAILY_CEILING = 500;          // whole-site AI replies per day
 
@@ -163,7 +162,6 @@ export function publicSupportRoutes(app) {
      * stored like any other and the escalated branch below carries it to the rail, which
      * never calls the model again.
      */
-    const overLength = history.length >= MAX_PER_CONVO;
 
     const name = clean(b.name, 80);
     const email = clean(b.email, 160);
@@ -198,23 +196,14 @@ export function publicSupportRoutes(app) {
      * the daily ceiling or a model outage: a conversation a person is handling does not
      * depend on the machine that stopped handling it.
      */
-    if (row && (row.escalated || overLength)) {
-      // Over-length and not yet handed over: do it now, and say WHY in the note staff read,
-      // so the rail shows a reason rather than an unexplained arrival.
-      if (!row.escalated) {
-        await handToPerson({ ...row, messages }, {
-          reason: `${finalName || finalEmail || 'A website visitor'} has been talking a while — taking over from here. Reply below; they'll get it at ${finalEmail || 'no address given'}.`,
-        }).catch(() => {});
-      }
+    if (row && row.escalated) {
       await q(
         `insert into order_messages (order_id, sender_id, sender_role, body, meta)
          values ($1, null, 'seller', $2, $3)`,
         [`support-web-${id}`, text,
          JSON.stringify({ web: true, name: finalName, email: finalEmail })]
       ).catch(() => {});
-      return { conversationId: id, messages, escalated: true, reply: null,
-               notice: row.escalated ? null : 'A person is picking this up — keep typing, they can see it.',
-               withPerson: true };
+      return { conversationId: id, messages, escalated: true, reply: null, withPerson: true };
     }
 
     // The question is now stored. Ask who they are BEFORE spending anything on a reply.
@@ -222,51 +211,31 @@ export function publicSupportRoutes(app) {
       return { conversationId: id, needsIdentity: true, messages };
     }
 
-    // A whole-site ceiling, so the worst day is bounded rather than open-ended.
-    const today = (await q(
-      `select count(*)::int as n from public_support
-        where updated_at > now() - interval '1 day'`
-    ).then((r) => r.rows[0]?.n || 0).catch(() => 0));
-    if (today > DAILY_CEILING) {
-      // IT SAID A PERSON WOULD FOLLOW UP AND TOLD NOBODY. The message sat in
-      // public_support, which staff never read — so on the busiest day of the year, the day
-      // this branch exists for, every enquiry was quietly dropped while promising a reply.
-      await handToPerson({ ...(row || {}), id, name: finalName, email: finalEmail, messages }, {
-        reason: `Instant replies are at capacity — ${finalName || finalEmail || 'a website visitor'} is waiting on a person. They'll get it at ${finalEmail || 'no address given'}.`,
-      }).catch(() => {});
-      return { conversationId: id, messages, reply: null, escalated: true, withPerson: true,
-               notice: 'We\'re at capacity on instant replies — a person has this and will reply here.' };
-    }
-
-    let answer = null;
-    try {
-      answer = await aiComplete({
-        system: SYSTEM,
-        messages: messages.slice(-12).map((m) => ({
-          role: m.role === 'assistant' ? 'assistant' : 'user',
-          content: String(m.text || ''),
-        })),
-        maxTokens: 500,
-      });
-    } catch { answer = null; }
-
-    // A failed model call is NOT an empty answer. Say a person will pick it up rather than
-    // leaving a visitor talking to a box that stopped responding.
-    if (!answer) {
-      // Same as the ceiling above: the promise of a person has to actually put it in front
-      // of one, or a model outage is a silent hole where the enquiries go.
-      await handToPerson({ ...(row || {}), id, name: finalName, email: finalEmail, messages }, {
-        reason: `The assistant couldn't answer this one — ${finalName || finalEmail || 'a website visitor'} is waiting. They'll get your reply at ${finalEmail || 'no address given'}.`,
-      }).catch(() => {});
-      return { conversationId: id, messages, reply: null, escalated: true, withPerson: true,
-               notice: 'I couldn\'t answer that one — a person has it and will reply here.' };
-    }
-
-    const shaped = deMarkdown(answer);
-    const withReply = [...messages, { role: 'assistant', text: shaped, at: new Date().toISOString() }];
-    await q('update public_support set messages=$2::jsonb, updated_at=now() where id=$1',
-      [id, JSON.stringify(withReply)]).catch(() => {});
-    return { conversationId: id, messages: withReply, reply: shaped };
+    /**
+     * NO MODEL ON THIS ENDPOINT. A PERSON ANSWERS.
+     *
+     * The bot used to reply here, which is why this route carried a whole-site daily
+     * ceiling, a 30-turn cap per conversation and two "a person will follow up" fallbacks:
+     * every one of those existed to bound what an unauthenticated stranger could spend.
+     *
+     * AI helps US draft a reply now (POST /api/support/ai-draft, staff-only) and never
+     * speaks to a visitor. So the spend is zero however long the conversation runs, and the
+     * guardrails that existed to cap it are gone with the thing they were capping — a cap
+     * that can only ever refuse a customer, protecting a cost that no longer exists, is
+     * worse than no cap.
+     *
+     * What remains is the per-IP rate limit at the top, which is about flooding rather than
+     * spend, and therefore still earns its keep.
+     */
+    await handToPerson({ ...(row || {}), id, name: finalName, email: finalEmail, messages }, {
+      reason: `${finalName || finalEmail || 'A website visitor'} started a chat on the website. Reply here — they see it in the widget, and it also reaches ${finalEmail || 'no address given'}.`,
+    }).catch(() => {});
+    await q(
+      `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+       values ($1, null, 'seller', $2, $3)`,
+      [`support-web-${id}`, text, JSON.stringify({ web: true, name: finalName, email: finalEmail })]
+    ).catch(() => {});
+    return { conversationId: id, messages, reply: null, escalated: true, withPerson: true };
   });
 
   /**
@@ -306,12 +275,31 @@ export function publicSupportRoutes(app) {
         order by created_at asc limit 100`, [`support-web-${id}`]
     ).then((r) => r.rows).catch(() => []);
 
-    const messages = [
-      ...(Array.isArray(row.messages) ? row.messages : []),
-      // 'staff' rather than 'assistant': the widget says who is talking, and "a person
-      // replied" is the whole point of having escalated.
-      ...staff.map((m) => ({ role: 'staff', text: String(m.body || ''), at: m.created_at })),
+    /**
+     * MERGED BY TIME, not concatenated.
+     *
+     * This was `[...theirs, ...staff]`, which put every visitor message first and every
+     * reply after — so a conversation that actually went question, answer, question, answer
+     * was shown as one block from each side, in an order nobody spoke in. Two people
+     * alternating is the ONE thing a chat transcript has to preserve.
+     *
+     * Sorted on the timestamp each row already carries, with the original position as the
+     * tiebreak: rows written before `at` existed have no time, and keeping their relative
+     * order is better than scattering them through the thread on a parsed zero.
+     *
+     * 'staff' rather than 'assistant': the widget says who is talking, and "a person
+     * replied" is the whole point of having escalated.
+     */
+    const stamped = [
+      ...(Array.isArray(row.messages) ? row.messages : []).map((m, i) => ({ m, i, t: Date.parse(m.at || '') || 0 })),
+      ...staff.map((m, i) => ({
+        m: { role: 'staff', text: String(m.body || ''), at: m.created_at },
+        i: 100000 + i,
+        t: Date.parse(m.created_at) || 0,
+      })),
     ];
+    stamped.sort((a, b) => (a.t - b.t) || (a.i - b.i));
+    const messages = stamped.map((x) => x.m);
     return { conversationId: id, escalated: !!row.escalated, messages };
   });
 
