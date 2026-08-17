@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretRight } from "@phosphor-icons/react"
+import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretDown } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { InboundPanel } from "@/components/app/inbound-panel"
@@ -353,7 +353,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2.5">
+                    <th className="py-2.5 pl-3 pr-1">
                       <input
                         type="checkbox"
                         aria-label="Select all on this page"
@@ -438,7 +438,7 @@ type Group = { key: string; name: string; product: CatalogProduct | null; image:
 /** The photo, or the letter — never an empty tile, and never a stock photo of something
  *  else. A blank square with an initial says "no picture"; a placeholder garment would say
  *  "this is the garment", which is a lie the picker acts on. */
-function Thumb({ src, name, size = 48 }: { src: string; name: string; size?: number }) {
+function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: number }) {
   return src ? (
     <span className="block shrink-0 overflow-hidden rounded-md border border-border bg-muted/40" style={{ width: size, height: size }}>
       <Image src={src} alt="" width={size * 2} height={size * 2} unoptimized className="size-full object-cover" />
@@ -485,20 +485,32 @@ function ProductGroup({
 }) {
   const row = (it: InventoryItem, indented: boolean) => (
     <tr key={it.sku} className={"border-t border-border " + (sel.has(it.sku) ? "bg-primary/[0.04]" : "") + (indented ? " bg-muted/30" : "")}>
-      <td className="px-3 py-2">
-        <input
-          type="checkbox"
-          aria-label={`Select ${it.sku}`}
-          checked={sel.has(it.sku)}
-          onChange={(e) => {
-            const next = new Set(sel)
-            if (e.target.checked) next.add(it.sku); else next.delete(it.sku)
-            setSel(next)
-          }}
-        />
+      {/* THE DISCLOSURE LIVES BESIDE THE CHECKBOX, in its own column, on every row —
+          expandable or not. It used to sit inside the Item cell, so a grouped product's
+          photo started 20px right of a single product's and the thumbnails never lined up.
+          A column of pictures that is not a column is harder to scan than no pictures. */}
+      <td className="py-2 pl-3 pr-1">
+        <div className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            aria-label={`Select ${it.sku}`}
+            checked={sel.has(it.sku)}
+            onChange={(e) => {
+              const next = new Set(sel)
+              if (e.target.checked) next.add(it.sku); else next.delete(it.sku)
+              setSel(next)
+            }}
+          />
+          <span className="size-5 shrink-0" aria-hidden />
+        </div>
       </td>
       <td className="px-4 py-2">
-        <div className={"flex w-[21rem] items-center gap-2 " + (indented ? "pl-11" : "")}>
+        {/* THE CARET GETS ITS OWN COLUMN, on every row, expandable or not. It used to sit
+            inside the flex only where there was something to expand, so a grouped product's
+            photo started 20px right of a single product's and the thumbnails never lined
+            up — a column of pictures that is not a column is harder to scan than no
+            pictures at all. */}
+        <div className={"flex w-[23rem] items-center gap-2.5 " + (indented ? "pl-[4.25rem]" : "")}>
           {!indented && <Thumb src={group.image} name={group.name} />}
           <div className="min-w-0">
             {/* TWO LINES, then ellipsis. One line at 220px cut "OTTO CAP OTTO FLEX Fitte…"
@@ -534,7 +546,7 @@ function ProductGroup({
           type="button"
           onClick={() => onZoom(it.sku)}
           title={`Show a scannable code for ${it.sku}`}
-          className="block w-[150px] break-all text-left font-mono text-xs font-medium underline-offset-2 hover:underline"
+          className="block w-[12rem] break-all text-left font-mono text-xs font-medium underline-offset-2 hover:underline"
         >
           {it.sku}
         </button>
@@ -602,12 +614,25 @@ function ProductGroup({
   return (
     <>
       <tr className={"border-t border-border " + (selected ? "bg-primary/[0.04]" : "")}>
-        <td className="px-3 py-2">
-          <input type="checkbox" aria-label={`Select all ${group.rows.length} variants of ${group.name}`} checked={selected} onChange={(e) => onSelect(e.target.checked)} />
+        <td className="py-2 pl-3 pr-1">
+          <div className="flex items-center gap-1">
+            <input type="checkbox" aria-label={`Select all ${group.rows.length} variants of ${group.name}`} checked={selected} onChange={(e) => onSelect(e.target.checked)} />
+            {/* Points DOWN at what it will reveal and flips up when it is open — the two
+                states are the same glyph rotated, so the row never changes width. */}
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={open}
+              aria-label={`${open ? "Hide" : "Show"} the ${group.rows.length} variants of ${group.name}`}
+              className={"grid size-5 shrink-0 place-items-center rounded transition-colors hover:bg-accent "
+                + (open ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              <CaretDown size={12} weight="bold" className={"transition-transform " + (open ? "rotate-180" : "")} />
+            </button>
+          </div>
         </td>
         <td className="px-4 py-2">
-          <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-[21rem] items-center gap-2 text-left">
-            <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
+          <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-[23rem] items-center gap-2.5 text-left">
             <Thumb src={group.image} name={group.name} />
             <span className="min-w-0">
               <span className="line-clamp-2 font-medium leading-tight" title={group.name}>{group.name}</span>
