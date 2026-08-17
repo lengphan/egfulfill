@@ -431,14 +431,14 @@ type Group = { key: string; name: string; product: CatalogProduct | null; image:
 /** The photo, or the letter — never an empty tile, and never a stock photo of something
  *  else. A blank square with an initial says "no picture"; a placeholder garment would say
  *  "this is the garment", which is a lie the picker acts on. */
-function Thumb({ src, name, size = 34 }: { src: string; name: string; size?: number }) {
+function Thumb({ src, name, size = 48 }: { src: string; name: string; size?: number }) {
   return src ? (
     <span className="block shrink-0 overflow-hidden rounded-md border border-border bg-muted/40" style={{ width: size, height: size }}>
       <Image src={src} alt="" width={size * 2} height={size * 2} unoptimized className="size-full object-cover" />
     </span>
   ) : (
     <span
-      className="grid shrink-0 place-items-center rounded-md border border-border bg-muted/40 text-xs font-semibold text-muted-foreground"
+      className="grid shrink-0 place-items-center rounded-md border border-border bg-muted/40 text-sm font-semibold text-muted-foreground"
       style={{ width: size, height: size }}
       aria-hidden
     >
@@ -868,7 +868,7 @@ function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog }: { open:
                         onClick={() => pick(p)}
                         className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent"
                       >
-                        <Thumb src={imageFor(p, null)} name={p.name ?? "?"} size={30} />
+                        <Thumb src={imageFor(p, null)} name={p.name ?? "?"} size={34} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">{p.name || "Untitled"}</span>
                           <span className="block truncate font-mono text-xs text-muted-foreground">{p.sku}</span>
@@ -881,7 +881,7 @@ function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog }: { open:
               ) : (
                 <>
                   <div className="flex items-center gap-2.5 rounded-lg border border-border p-2.5">
-                    <Thumb src={imageFor(picked, null)} name={picked.name ?? "?"} size={38} />
+                    <Thumb src={imageFor(picked, null)} name={picked.name ?? "?"} size={44} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{picked.name}</div>
                       <div className="truncate font-mono text-xs text-muted-foreground">{picked.sku}</div>
