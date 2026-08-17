@@ -13,10 +13,9 @@ import { CatalogPrint } from "@/components/app/catalog-print"
 import { ProductThumb } from "@/components/app/product-thumb"
 import { SupplierStylesPicker } from "@/components/app/supplier-styles-picker"
 import { CatalogExportHistory } from "@/components/app/catalog-export-history"
-import { CatalogSummaryBar } from "@/components/app/catalog-summary-bar"
 import { PartnerSheets } from "@/components/app/partner-sheets"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { colorsOf, swatchHex } from "@/components/app/products-catalog"
+import { colorsOf } from "@/components/app/products-catalog"
 import { sizesOf } from "@/lib/variant-resolve"
 
 const money = (n: number | string | null | undefined) =>
@@ -46,9 +45,6 @@ export function CatalogView() {
   // Which saved catalogue to reopen. Separate from printOpen because the two show
   // different documents — one live, one as it was sent.
   const [reopenId, setReopenId] = useState<string | null>(null)
-  // Bumped whenever something is published, priced or removed, so the bar can't drift from
-  // the tables under it.
-  const [summaryTick, setSummaryTick] = useState(0)
   // Controlled, because the search box now sits on the tab bar and must only appear for
   // the tab it filters.
   const [tab, setTab] = useState("mine")
@@ -82,7 +78,7 @@ export function CatalogView() {
     try {
       const r = await setCatalogSelection([id], include)
       if (r.error) throw new Error(r.error)
-      setSummaryTick((t) => t + 1); load()
+      load()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
@@ -102,7 +98,7 @@ export function CatalogView() {
       setNote(skipped
         ? `Priced ${r.priced ?? 0}. ${skipped} skipped — no base cost on record, so there was nothing to mark up: ${r.skippedNoCost!.slice(0, 4).join(", ")}${skipped > 4 ? "…" : ""}`
         : `Priced ${r.priced ?? 0} at base + ${n}%.`)
-      setSummaryTick((t) => t + 1); load()
+      load()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
@@ -141,11 +137,6 @@ export function CatalogView() {
         </div>
       }
     >
-      {/* WHAT IS IN THE CATALOGUE, always on screen.
-          Publishing is persistent — closing the lookbook unpublishes nothing — but nothing
-          said so, so the only way to know was to open the preview and count. That is how
-          you add two, close the window, add a third, and find three. */}
-      <CatalogSummaryBar refresh={summaryTick} />
       <Tabs value={tab} onValueChange={(v) => setTab(v as string)}>
         {/* Search rides the tab bar rather than owning a row under it — it filters ONE
             tab's table, so it belongs beside the tab it acts on, and it's hidden on the
@@ -174,7 +165,7 @@ export function CatalogView() {
             </div>
           )}
         </div>
-        <TabsContent value="supplier"><SupplierStylesPicker onChanged={() => setSummaryTick((t) => t + 1)} /></TabsContent>
+        <TabsContent value="supplier"><SupplierStylesPicker onChanged={load} /></TabsContent>
         <TabsContent value="partners"><PartnerSheets /></TabsContent>
         <TabsContent value="history"><CatalogExportHistory onOpen={setReopenId} /></TabsContent>
         <TabsContent value="mine">
@@ -288,23 +279,16 @@ export function CatalogView() {
                             {/* Colourways as their own supplier photos where we have them.
                                 Capped at eight with a count — a 40-colour style would
                                 otherwise make one row taller than the rest of the table. */}
-                            {colorsOf(p).length > 0 && (
-                              <div className="mt-1 flex items-center gap-1">
-                                {colorsOf(p).slice(0, 8).map((c) => {
-                                  const ci = (p as unknown as { colorImages?: Record<string, string> }).colorImages?.[c]
-                                  return ci
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    ? <img key={c} src={ci} alt={c} title={c} className="size-4 rounded-full border border-border object-cover" />
-                                    : <span key={c} title={c} className="size-3.5 rounded-full border border-border" style={{ background: swatchHex(c) }} />
-                                })}
-                                {colorsOf(p).length > 8 && (
-                                  <span className="text-3xs text-muted-foreground">+{colorsOf(p).length - 8}</span>
-                                )}
-                              </div>
-                            )}
-                            {sizesOf(p).length > 0 && (
+                            {/* COUNTS, NOT CHIPS — the same line the supplier styles tab
+                                uses, and for the same reason: a 40-colour style owned the
+                                row with a wall of dots that answered nothing you ask on this
+                                screen, which is what to publish and what to charge. The
+                                colours themselves are on the product page and in the printed
+                                catalogue, where they are the point. */}
+                            {(colorsOf(p).length > 0 || sizesOf(p).length > 0) && (
                               <div className="mt-1 truncate text-3xs text-muted-foreground">
-                                {sizesOf(p).join(" · ")}
+                                {colorsOf(p).length} colour{colorsOf(p).length === 1 ? "" : "s"} · {sizesOf(p).length} size{sizesOf(p).length === 1 ? "" : "s"}
+                                {sizesOf(p).length > 0 && <> · {sizesOf(p).slice(0, 8).join(" ")}{sizesOf(p).length > 8 ? "…" : ""}</>}
                               </div>
                             )}
                           </div>
