@@ -99,6 +99,45 @@ export function publicSupportRoutes(app) {
    * message IS stored, so the client can show the form knowing the question is already safe.
    * Answering before that point is what would make this free to abuse.
    */
+  /**
+   * PUT THE CONVERSATION IN FRONT OF A PERSON, and mark it as theirs.
+   *
+   * Extracted so the LENGTH CAP can use it too. That cap used to refuse the message —
+   * "this conversation has gone on a while, let us pick it up by email" — which threw away
+   * what the visitor had just typed, in a widget still showing them an input, and pointed
+   * them at a medium they had chosen not to use. A long conversation is not an abuse to be
+   * stopped; it is one that has outgrown the bot, which is what a person is for.
+   *
+   * Idempotent on the channel: the transcript is copied once, so an automatic handover
+   * followed by someone pressing the button cannot duplicate it.
+   */
+  async function handToPerson(row, opts = {}) {
+    const id = row.id;
+    await q('update public_support set escalated=true, updated_at=now() where id=$1', [id]).catch(() => {});
+    const channel = `support-web-${id}`;
+    const already = await q('select 1 from order_messages where order_id=$1 limit 1', [channel])
+      .then((r) => r.rowCount > 0).catch(() => false);
+    if (!already) {
+      const who = row.name || row.email || 'Website visitor';
+      for (const m of (Array.isArray(row.messages) ? row.messages : [])) {
+        await q(
+          `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+           values ($1, null, $2, $3, $4)`,
+          [channel, m.role === 'assistant' ? 'assistant' : 'seller', String(m.text || ''),
+           JSON.stringify({ web: true, name: row.name || null, email: row.email || null })]
+        ).catch(() => {});
+      }
+      await q(
+        `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+         values ($1, null, 'assistant', $2, $3)`,
+        [channel, opts.reason || `${who} asked to speak to a person. Reply here — they'll get it at ${row.email || 'no address given'}.`,
+         JSON.stringify({ web: true, escalated: true, name: row.name || null, email: row.email || null })]
+      ).catch(() => {});
+    }
+
+    return channel;
+  }
+
   app.post('/api/public/support', async (req, reply) => {
     const b = req.body || {};
     const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim() || 'unknown';
@@ -116,10 +155,15 @@ export function publicSupportRoutes(app) {
 
     const row = (await q('select * from public_support where id=$1', [id])).rows[0] || null;
     const history = Array.isArray(row?.messages) ? row.messages : [];
-    if (history.length >= MAX_PER_CONVO) {
-      reply.code(429);
-      return { error: 'This conversation has gone on a while — let us pick it up by email.', conversationId: id, needsHuman: true };
-    }
+    /**
+     * A LONG CONVERSATION IS HANDED OVER, NEVER REFUSED.
+     *
+     * The cap exists to bound MODEL SPEND, and the way to stop spending on a conversation
+     * is to give it to a person — not to stop listening to it. Past the cap the message is
+     * stored like any other and the escalated branch below carries it to the rail, which
+     * never calls the model again.
+     */
+    const overLength = history.length >= MAX_PER_CONVO;
 
     const name = clean(b.name, 80);
     const email = clean(b.email, 160);
@@ -154,7 +198,14 @@ export function publicSupportRoutes(app) {
      * the daily ceiling or a model outage: a conversation a person is handling does not
      * depend on the machine that stopped handling it.
      */
-    if (row && row.escalated) {
+    if (row && (row.escalated || overLength)) {
+      // Over-length and not yet handed over: do it now, and say WHY in the note staff read,
+      // so the rail shows a reason rather than an unexplained arrival.
+      if (!row.escalated) {
+        await handToPerson({ ...row, messages }, {
+          reason: `${finalName || finalEmail || 'A website visitor'} has been talking a while — taking over from here. Reply below; they'll get it at ${finalEmail || 'no address given'}.`,
+        }).catch(() => {});
+      }
       await q(
         `insert into order_messages (order_id, sender_id, sender_role, body, meta)
          values ($1, null, 'seller', $2, $3)`,
@@ -162,7 +213,8 @@ export function publicSupportRoutes(app) {
          JSON.stringify({ web: true, name: finalName, email: finalEmail })]
       ).catch(() => {});
       return { conversationId: id, messages, escalated: true, reply: null,
-               notice: null, withPerson: true };
+               notice: row.escalated ? null : 'A person is picking this up — keep typing, they can see it.',
+               withPerson: true };
     }
 
     // The question is now stored. Ask who they are BEFORE spending anything on a reply.
@@ -176,8 +228,14 @@ export function publicSupportRoutes(app) {
         where updated_at > now() - interval '1 day'`
     ).then((r) => r.rows[0]?.n || 0).catch(() => 0));
     if (today > DAILY_CEILING) {
-      return { conversationId: id, messages, reply: null, needsHuman: true,
-               notice: 'We\'re at capacity on instant replies right now — a person will follow up by email.' };
+      // IT SAID A PERSON WOULD FOLLOW UP AND TOLD NOBODY. The message sat in
+      // public_support, which staff never read — so on the busiest day of the year, the day
+      // this branch exists for, every enquiry was quietly dropped while promising a reply.
+      await handToPerson({ ...(row || {}), id, name: finalName, email: finalEmail, messages }, {
+        reason: `Instant replies are at capacity — ${finalName || finalEmail || 'a website visitor'} is waiting on a person. They'll get it at ${finalEmail || 'no address given'}.`,
+      }).catch(() => {});
+      return { conversationId: id, messages, reply: null, escalated: true, withPerson: true,
+               notice: 'We\'re at capacity on instant replies — a person has this and will reply here.' };
     }
 
     let answer = null;
@@ -195,8 +253,13 @@ export function publicSupportRoutes(app) {
     // A failed model call is NOT an empty answer. Say a person will pick it up rather than
     // leaving a visitor talking to a box that stopped responding.
     if (!answer) {
-      return { conversationId: id, messages, reply: null, needsHuman: true,
-               notice: 'I couldn\'t answer that one — a person will follow up by email.' };
+      // Same as the ceiling above: the promise of a person has to actually put it in front
+      // of one, or a model outage is a silent hole where the enquiries go.
+      await handToPerson({ ...(row || {}), id, name: finalName, email: finalEmail, messages }, {
+        reason: `The assistant couldn't answer this one — ${finalName || finalEmail || 'a website visitor'} is waiting. They'll get your reply at ${finalEmail || 'no address given'}.`,
+      }).catch(() => {});
+      return { conversationId: id, messages, reply: null, escalated: true, withPerson: true,
+               notice: 'I couldn\'t answer that one — a person has it and will reply here.' };
     }
 
     const shaped = deMarkdown(answer);
@@ -283,26 +346,7 @@ export function publicSupportRoutes(app) {
      * `escalated` on the meta of the last row is what sorts it to the top of the rail as
      * an unanswered request for a human — the same flag a seller's own escalation sets.
      */
-    const channel = `support-web-${id}`;
-    const already = await q('select 1 from order_messages where order_id=$1 limit 1', [channel])
-      .then((r) => r.rowCount > 0).catch(() => false);
-    if (!already) {
-      const who = row.name || row.email || 'Website visitor';
-      for (const m of (Array.isArray(row.messages) ? row.messages : [])) {
-        await q(
-          `insert into order_messages (order_id, sender_id, sender_role, body, meta)
-           values ($1, null, $2, $3, $4)`,
-          [channel, m.role === 'assistant' ? 'assistant' : 'seller', String(m.text || ''),
-           JSON.stringify({ web: true, name: row.name || null, email: row.email || null })]
-        ).catch(() => {});
-      }
-      await q(
-        `insert into order_messages (order_id, sender_id, sender_role, body, meta)
-         values ($1, null, 'assistant', $2, $3)`,
-        [channel, `${who} asked to speak to a person. Reply here — they'll get it at ${row.email || 'no address given'}.`,
-         JSON.stringify({ web: true, escalated: true, name: row.name || null, email: row.email || null })]
-      ).catch(() => {});
-    }
+    await handToPerson(row);
 
     const lines = (Array.isArray(row.messages) ? row.messages : [])
       .map((m) => `${m.role === 'assistant' ? 'EGFUL' : (row.name || 'You')}: ${m.text}`).join('\n\n');
