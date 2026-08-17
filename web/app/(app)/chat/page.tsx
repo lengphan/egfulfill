@@ -8,7 +8,7 @@ import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportTh
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
-import { GenerateButton, type FrameChoice } from "@/components/app/generate-menu"
+import { GenerateButton, AnimateImageButton } from "@/components/app/generate-menu"
 import { UserAvatar } from "@/components/app/user-avatar"
 
 const nowMs = () => Date.now()
@@ -86,23 +86,6 @@ export default function ChatPage() {
   const [drafting, setDrafting] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatEntry[] | null>(null)
-  /* Stills in this thread that a video can start from. Deliberately ANY image here, not
-     only generated ones — a product photo someone dropped in is just as good a first frame,
-     and often better, because it's the real garment. The server takes the bare asset name
-     rather than a URL, so parse it out here; anything not served from our own asset route
-     is skipped, since the server couldn't read it back anyway. */
-  const animatableFrames = useMemo<FrameChoice[]>(() => {
-    const out: FrameChoice[] = []
-    for (const m of [...(messages ?? [])].reverse()) {
-      const att = m.attachment as ChatAttachment | undefined
-      if (!att?.url || !att.mime?.startsWith("image/")) continue
-      const name = att.url.split("/api/support/asset/")[1]
-      if (!name || out.some((f) => f.name === name)) continue
-      out.push({ name, url: att.url, label: att.name || "image" })
-      if (out.length >= 8) break
-    }
-    return out
-  }, [messages])
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
@@ -449,7 +432,12 @@ export default function ChatPage() {
           else if (r.empty) setAiNote(r.reason ? `Nothing to answer yet — ${r.reason}.` : "Nothing to answer yet.")
           else setAiNote(null)
         } catch {
-          setAiNote("Assistant is unavailable right now — a teammate will follow up here.")
+          // "A teammate will follow up" is true of a SELLER's thread, which has a queue
+          // behind it. My EG has no one behind it but the model, so the same sentence there
+          // promises an admin a person who is never coming.
+          setAiNote(isStaffUser
+            ? "The assistant didn't answer that one — try again in a moment."
+            : "Assistant is unavailable right now — a teammate will follow up here.")
         } finally {
           setAiTyping(false)
           setStreaming("")
@@ -729,11 +717,26 @@ export default function ChatPage() {
                           const att = m.attachment as ChatAttachment | undefined
                           if (!att?.url) return null
                           const isImg = (att.mime || "").startsWith("image/")
+                          // The server animates by bare asset NAME, so only an image we
+                          // stored for this chat can be one — anything else has no name to give.
+                          const assetName = isImg ? att.url.split("/api/support/asset/")[1] : undefined
+                          const canAnimate = !!assetName && isStaffUser && activeId === supportId
                           return (
-                            <a href={att.url} target="_blank" rel="noreferrer" className={"block " + (m.text ? "mt-1.5" : "")}>
+                            <a href={att.url} target="_blank" rel="noreferrer" className={"relative block " + (m.text ? "mt-1.5" : "")}>
                               {isImg ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={att.url} alt={att.name || "attachment"} className="max-h-60 max-w-full rounded-lg border border-border object-contain" />
+                                <>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={att.url} alt={att.name || "attachment"} className="max-h-60 max-w-full rounded-lg border border-border object-contain" />
+                                  {canAnimate && (
+                                    <AnimateImageButton
+                                      imageName={assetName}
+                                      onStarted={({ usd, seconds }) => {
+                                        setAiNote(`Animating that still — a ${seconds}s clip (~$${usd.toFixed(2)}) lands here in a minute or two.`)
+                                        setTimeout(() => setAiNote(null), 12000)
+                                      }}
+                                    />
+                                  )}
+                                </>
                               ) : (
                                 <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/40 px-2 py-1 text-xs font-medium underline-offset-2 hover:underline">
                                   <FileText size={14} weight="duotone" />{att.name || "file"}
@@ -824,7 +827,6 @@ export default function ChatPage() {
           {isStaffUser && activeId === supportId && (
             <GenerateButton
               disabled={signedOut || !activeId}
-              frames={animatableFrames}
               // The server already posted it into this thread — just pull the thread again
               // so it lands as a normal message rather than a second, client-only bubble.
               onImage={() => { void load() }}

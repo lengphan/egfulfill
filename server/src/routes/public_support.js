@@ -19,7 +19,7 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { limited } from '../ratelimit.js';
-import { aiComplete } from './support_ai.js';
+import { supportAvailability } from './support_ai.js';
 import { sendMail } from '../mailer.js';
 import { notify } from './notifications.js';
 
@@ -240,7 +240,8 @@ export function publicSupportRoutes(app) {
         [`support-web-${id}`, text,
          JSON.stringify({ web: true, name: finalName, email: finalEmail })]
       ).catch(() => {});
-      return { conversationId: id, messages: await fullThread(id, messages), escalated: true, reply: null, withPerson: true };
+      return { conversationId: id, messages: await fullThread(id, messages), escalated: true, reply: null,
+               withPerson: true, office: await supportAvailability().catch(() => null) };
     }
 
     // The question is now stored. Ask who they are BEFORE spending anything on a reply.
@@ -272,7 +273,20 @@ export function publicSupportRoutes(app) {
        values ($1, null, 'seller', $2, $3)`,
       [`support-web-${id}`, text, JSON.stringify({ web: true, name: finalName, email: finalEmail })]
     ).catch(() => {});
-    return { conversationId: id, messages: await fullThread(id, messages), reply: null, escalated: true, withPerson: true };
+    /**
+     * SAY WHETHER ANYONE IS ACTUALLY AROUND.
+     *
+     * The widget used to show "thinking…" while a model composed — feedback that a reply
+     * was seconds away. A person answers now, and a spinner would be a lie about that: it
+     * says "wait here" when the honest answer might be "we're closed until tomorrow at 9".
+     *
+     * The office hours are already configured by staff and already drive the seller chat's
+     * queue note (supportAvailability). Publishing open/hoursLabel/resumesLabel says nothing
+     * private — it is the same thing a contact page prints — and it lets the bubble tell a
+     * visitor what will happen instead of animating at them.
+     */
+    return { conversationId: id, messages: await fullThread(id, messages), reply: null, escalated: true,
+             withPerson: true, office: await supportAvailability().catch(() => null) };
   });
 
   /**

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { ChatCircleDots, X, PaperPlaneRight, CircleNotch } from "@phosphor-icons/react"
+import { ChatCircleDots, X, PaperPlaneRight } from "@phosphor-icons/react"
 import { ACCENT } from "@/components/marketing/bold-kit"
 
 type Msg = { role: string; text: string; at?: string }
@@ -65,6 +65,9 @@ export function SupportBubble() {
   const [done, setDone] = useState(false)
   /** Someone asked for a person before there was a conversation to hand over — see escalate. */
   const [pendingEscalate, setPendingEscalate] = useState(false)
+  /** When the team is around, from the server (staff configure the hours). Null until a
+   *  send answers — the widget never claims availability it hasn't been told. */
+  const [office, setOffice] = useState<{ open?: boolean; hoursLabel?: string; resumesLabel?: string } | null>(null)
   /** A person is on this conversation. Set by the handover and by every read, so it survives
    *  a reload — and it is what takes the "talk to support" offer away once it is answered. */
   const [withPerson, setWithPerson] = useState(false)
@@ -168,6 +171,7 @@ export function SupportBubble() {
       // the visitor should see rather than a silent dead input.
       if (d.error) setNotice(d.error)
       if (d.escalated || d.withPerson) setWithPerson(true)
+      if (d.office) setOffice(d.office)
       return d.conversationId ?? convo
     } catch {
       setNotice("We couldn't reach support just now — please try again shortly.")
@@ -331,7 +335,25 @@ export function SupportBubble() {
           </div>
           )
         })}
-        {busy && <div className="mt-3 flex items-center gap-2 text-xs text-black/45"><CircleNotch size={13} className="animate-spin" /> thinking…</div>}
+        {/**
+          * WHAT HAPPENS NEXT, instead of a spinner.
+          *
+          * "thinking…" was the bot composing, and there is no bot — a spinner would say
+          * "wait here, seconds away" when the honest answer might be "we're closed until
+          * tomorrow at 9". So the last thing in the thread, once the visitor has spoken and
+          * nobody has answered yet, is a plain sentence about when someone will.
+          *
+          * The hours are the ones staff configure and the seller chat already quotes; the
+          * widget only ever repeats what the server told it, so it cannot promise
+          * availability it hasn't been given.
+          */}
+        {msgs.length > 0 && msgs[msgs.length - 1].role === "user" && !done && (
+          <p className="mt-3 text-xs leading-relaxed text-black/45">
+            {office && office.open === false
+              ? `Sent. The team is out of office right now${office.resumesLabel ? ` — back ${office.resumesLabel}` : ""}. Your message is with them; they'll reply right here${email ? `, and email ${email}` : ""}.`
+              : `Sent. A person will reply right here${office?.hoursLabel ? ` — usually within ${office.hoursLabel}` : ""}${email ? `, and you'll get it at ${email} if you close this` : ""}.`}
+          </p>
+        )}
         {notice && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">{notice}</p>}
         {done && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">Passed to a person — we&apos;ll reply to {email || "your email"}.</p>}
       </div>
