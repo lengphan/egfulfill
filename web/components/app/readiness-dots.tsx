@@ -31,6 +31,29 @@ import { useLabelT } from "@/lib/i18n"
 
 type State = "todo" | "doing" | "done"
 
+/**
+ * THE THREE TONES, in one place.
+ *
+ * The Stock chip in orders-hub carries the fourth pill of this same set and had its own
+ * copy of these strings, so "the same colour" was a thing two files agreed on by hand.
+ * §5: import, don't re-implement.
+ *
+ * The dark step is not decoration. `amber-100` is #FEF3C7 — a near-white block, and on the
+ * dark board it was the brightest thing on the screen by a wide margin: a row of them read
+ * as warning lamps rather than as "in progress", which is the exact misreading the fixed
+ * three-tag shape exists to prevent. Dark mode is its own steps against its own surface
+ * (§4), so the tint drops to a wash of amber and the LETTERING carries the hue instead —
+ * amber-300 on that wash measures 9.4:1, where the light pair reads 8.9:1 on paper. Same
+ * legibility, no glare.
+ */
+export const CHIP_TONE = {
+  done: "bg-primary/10 text-primary hover:bg-primary/15",
+  doing:
+    "bg-amber-100 text-amber-800 hover:bg-amber-200/70 " +
+    "dark:bg-amber-400/15 dark:text-amber-300 dark:hover:bg-amber-400/25",
+  todo: "bg-muted text-muted-foreground/70 hover:bg-muted/80",
+} as const
+
 /** A file reachable from a tag. `href` opens directly; `designId` goes through the API so
  *  the paywall and the seller/staff checks still apply. */
 export type TagFile = { key: string; name: string; note?: string; href?: string; designId?: string }
@@ -49,12 +72,7 @@ function Tag({ id, label, state, title, orderId, status, files }: {
   // Amber is used here deliberately despite meaning "problem" elsewhere in the app. In
   // THIS column it isn't an alarm — the tags are a progress track, and a middle state is
   // exactly what amber reads as anywhere else it appears on a timeline.
-  const cls =
-    state === "done"
-      ? "bg-primary/10 text-primary hover:bg-primary/15"
-      : state === "doing"
-        ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
-        : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
+  const cls = CHIP_TONE[state]
   const tl = useLabelT()
   const [rows, setRows] = useState<AuditRow[] | null>(null)
 

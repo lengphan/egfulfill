@@ -81,7 +81,13 @@ function MiniStat({
   return (
     <div className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm">
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-primary">
+        {/* The glyph goes LIME on dark. "Large fills only, never text" is a rule about the
+            light theme, where the accent measures 1.19:1 on white and disappears; on the
+            dark card the same colour is 16.56:1 and is what globals.css already uses for the
+            selected nav item. Five tiles across the top of the page is where the accent
+            earns its keep — it was violet-on-violet-wash here, which is a tint, not a
+            colour. */}
+        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-primary dark:bg-brand/15 dark:text-brand">
           <Icon size={16} weight="bold" />
         </span>
         <div className="min-w-0">
@@ -418,7 +424,23 @@ export function StaffDashboard() {
               {gmvBars.length > 0 && (
                 <div className="mt-auto flex h-28 items-end gap-1" aria-hidden>
                   {gmvBars.map((h, i) => (
-                    <span key={i} className="flex-1 rounded-t-md bg-brand/30" style={{ height: `${Math.max(3, h * 100)}%` }} />
+                    <span
+                      key={i}
+                      /* LIME, at a strength you can actually see it at.
+                       *
+                       * --brand swaps by mode (violet on paper, lime on the dark surface —
+                       * globals.css), and 30% of the lime over a near-black card lands on a
+                       * dull olive: the one large piece of colour on the page read as a
+                       * washed-out grey-green rather than as the house accent. The gauge
+                       * beside it already draws at full strength, so the two halves of the
+                       * same row disagreed about what colour this app is.
+                       *
+                       * Only the dark step moves. On paper 30% violet is a bar you read the
+                       * shape of, and taking it up would make the chart shout over the
+                       * figures it exists to support. */
+                      className="flex-1 rounded-t-md bg-brand/30 dark:bg-brand/70"
+                      style={{ height: `${Math.max(3, h * 100)}%` }}
+                    />
                   ))}
                 </div>
               )}

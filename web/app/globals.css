@@ -265,8 +265,14 @@
    * the room, which is what a "you are here" marker is for. */
     --sidebar: oklch(0.148 0.020 285);
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.5305 0.2723 283.5);
-    --sidebar-primary-foreground: oklch(0.9320 0.1290 125.0);
+    /* THE SWAP THE COMMENT ABOVE ALREADY DESCRIBED. These two carried the LIGHT arrangement
+     * verbatim — violet block, acid label — so the paragraph promising "the acid block with
+     * ink on it" sat directly on top of values doing the opposite, and dark mode's one
+     * reserved use of lime never appeared. The nav was violet on violet-tinted panel on
+     * violet-tinted canvas, which is why the dark app reads as having no accent at all.
+     * Ink on this lime is 16.56:1; the violet block it replaces was 4.9:1 against the panel. */
+    --sidebar-primary: oklch(0.9320 0.1290 125.0);
+    --sidebar-primary-foreground: oklch(0.175 0.008 277);
     --sidebar-accent: oklch(0.222 0.026 285);
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(0.370 0.030 285);
