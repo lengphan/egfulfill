@@ -53,6 +53,7 @@ import {
   type ThreadColor,
   ALL_SIDES,
   setFactorySettings,
+  setThreadPalette,
   getPinkStatus,
   getUsers,
   updateUserAdmin,
@@ -1214,6 +1215,25 @@ function PlatformPanel() {
   const save = async () => {
     setSaving(true); setErr(null); setSaved(false)
     try {
+      /**
+       * THE FLOOR SAVES THE CONES, AND ONLY THE CONES.
+       *
+       * setFactorySettings is admin-only on the server because it carries the base markup,
+       * the shipping bands and every design fee — so an operator pressing Save here used to
+       * get a flat 403 and no thread change, even though the cone list is the one setting
+       * they are the authority on: it is what is physically on the rack.
+       *
+       * So a non-admin takes the palette's own endpoint and stops. Everything else on this
+       * screen is disabled for them anyway; attempting the whole payload would only turn a
+       * successful thread edit into a refusal.
+       */
+      if (!isAdminUser) {
+        const tr = await setThreadPalette(threads)
+        if (tr.error) throw new Error(tr.error)
+        setActivePalette(tr.thread_palette ?? threads)
+        setSaved(true); setTimeout(() => setSaved(false), 2000)
+        return
+      }
       const r = await setFactorySettings({
         designer_payout: designFee === "" ? undefined : Number(designFee),
         design_fee_standard: designStd === "" ? undefined : Number(designStd),
@@ -1263,7 +1283,7 @@ function PlatformPanel() {
       setActivePalette(r.thread_palette ?? threads)
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't save — warehouse/admin only.")
+      setErr(e instanceof Error ? e.message : "Couldn't save those settings.")
     } finally { setSaving(false) }
   }
 
@@ -3174,7 +3194,18 @@ export function SettingsView() {
     const id = setTimeout(() => {
       const u = getUser()
       setIsAdmin(u?.role === "admin")
-      setCanPlatform(u?.role === "admin" || u?.role === "warehouse")
+      /**
+       * OPERATOR TOO, for the cone list.
+       *
+       * The tab was admin+warehouse, so an operator could not reach the one setting they are
+       * the authority on: the embroidery threads are an inventory of what is on the rack, and
+       * the person at the machine is who knows a cone ran out.
+       *
+       * Everything else in here stays admin-only — the fields are disabled and the server
+       * refuses them anyway (PUT /api/factory/settings is requireAdmin). What an operator can
+       * actually change is the palette, through its own endpoint.
+       */
+      setCanPlatform(u?.role === "admin" || u?.role === "warehouse" || u?.role === "operator")
       // A plan is a seller subscription; staff roles don't have one.
       setIsSeller(!u?.role || u.role === "seller")
       setCanUseKeys(!u?.role || u.role === "seller" || u.role === "admin")

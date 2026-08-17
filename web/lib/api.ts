@@ -2343,11 +2343,25 @@ export type ThreadColor = { code: string; name: string; hex: string }
 
 /**
  * The cone stock. Readable by ANY signed-in user — the seller-side Design Maker
- * thread-matches too, and codes/names/colours carry no cost information. Writing goes
- * through setFactorySettings, which the server gates to warehouse/admin.
+ * thread-matches too, and codes/names/colours carry no cost information.
  */
 export function getThreadPalette() {
   return api<ThreadColor[]>(`/api/thread_palette`)
+}
+/**
+ * Save the cone list — the ONE factory setting the floor may change.
+ *
+ * Its own endpoint rather than setFactorySettings, which is admin-only because it also
+ * carries the base markup, the shipping bands and every design fee. The palette is not
+ * policy: it is an inventory of what is physically on the rack, and the people at the
+ * machines are the ones who know a cone ran out. The server gates it to operator, warehouse
+ * and admin, and it writes exactly one settings key — no request shape can reach a fee
+ * through it.
+ */
+export function setThreadPalette(thread_palette: ThreadColor[]) {
+  return api<{ ok?: boolean; thread_palette?: ThreadColor[]; error?: string }>(`/api/thread_palette`, {
+    method: "PUT", body: JSON.stringify({ thread_palette }),
+  })
 }
 /** A managed product type and the 2D mockup that represents the whole category. */
 export const ALL_SIDES = ["front", "back", "left", "right", "sleeve", "hood", "inside", "wrap"] as const

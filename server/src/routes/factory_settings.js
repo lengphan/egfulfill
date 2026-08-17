@@ -4,6 +4,7 @@
 // (dropped the dev-only bits: storage/clear-cache/reset-demo, production capacity).
 
 import { q } from '../db.js';
+import { audit } from '../audit.js';
 
 // Per-category flat shipping and per-method surcharges. Admin-editable so pricing policy
 // is a settings change, not a deploy. `emb_price` is NOT the embroidery surcharge — it's
@@ -394,6 +395,42 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
   app.get('/api/thread_palette', { preHandler: requireAuth }, async () => {
     await ensure();
     return readThreadPalette();
+  });
+
+  /**
+   * THE CONES, WRITABLE BY THE PEOPLE WHO CAN SEE THE SHELF.
+   *
+   * This lived only inside PUT /api/factory/settings, which is requireAdmin — and rightly
+   * so: that endpoint also carries the base markup, the shipping bands and every design fee.
+   * Widening it to let an operator fix a thread colour would hand them the price list, which
+   * is the opposite of "an operator's zone ends at scan".
+   *
+   * So the palette gets its own door. It is the one factory setting that is not policy: it is
+   * an inventory of what is physically on the rack, and the people at the machines are the
+   * ones who know a cone ran out or a new one arrived. Leaving it admin-only meant the
+   * matcher kept proposing colours nobody stocks until somebody senior had a spare minute.
+   *
+   * NO MONEY REACHES THIS ROUTE. It writes exactly one settings key and reads no others, so
+   * there is no shape of request that can change a fee through it.
+   *
+   * Designer is deliberately NOT included: they consume the palette to match artwork, and a
+   * list of what the factory stocks is not theirs to edit.
+   */
+  app.put('/api/thread_palette', { preHandler: requireAuth }, async (req, reply) => {
+    const role = req.user && req.user.role;
+    if (!['admin', 'warehouse', 'operator'].includes(role)) {
+      reply.code(403);
+      return { error: 'Only the factory floor and admins can change the cone list.' };
+    }
+    const palette = normalizeThreadPalette((req.body || {}).thread_palette);
+    // null from the normaliser means "not a palette", never "an empty one" — writing an
+    // empty list would blank the matcher's whole input on a malformed request.
+    if (!palette) { reply.code(400); return { error: 'Send thread_palette as a list of { code, name, hex }.' }; }
+    await ensure();
+    await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()',
+      [THREAD_PALETTE_KEY, JSON.stringify(palette)]);
+    audit(req, 'settings.thread_palette', { entityType: 'settings', entityId: THREAD_PALETTE_KEY, after: { cones: palette.length } });
+    return { ok: true, thread_palette: await readThreadPalette() };
   });
 
   // Just the DESIGN fees a seller is actually charged (standard / complex / check) — no
