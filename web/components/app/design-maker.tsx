@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack, MagnifyingGlass, Eraser, ArrowCounterClockwise } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, CircleNotch, Export, FloppyDisk, Stack, MagnifyingGlass } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } from "@/components/app/design-canvas"
+import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
@@ -32,40 +32,53 @@ const mockupOf = (p: CatalogProduct) =>
 
 // Composite the artwork + text layers onto a transparent square canvas → PNG data URL.
 // (Only data-URL sources are drawn, so the canvas never taints.)
-function composeDesign(designUrl: string, pos: Pos, texts: TextLayer[], size = 900): Promise<string> {
+/**
+ * FLATTEN THE STACK — every image layer, then every text, in that order.
+ *
+ * Took one artwork and drew it; the lab holds a list now, so it draws them back-to-front and
+ * awaits each in turn. Sequential rather than Promise.all on purpose: layer order IS the
+ * z-order, and racing the loads would composite them in whatever order the network returned.
+ *
+ * Text stays on top of every image. A caption under a logo is not a thing anyone has asked
+ * for, and one predictable rule beats a per-layer z-index nobody sets.
+ */
+function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
-    const c = document.createElement("canvas"); c.width = size; c.height = size
-    const ctx = c.getContext("2d")
-    if (!ctx) { resolve(designUrl); return }
-    const drawTexts = () => {
-      for (const t of texts) {
-        const px = (t.size / 100) * size
-        ctx.save()
-        ctx.translate((t.x / 100) * size, (t.y / 100) * size)
-        ctx.rotate((t.r * Math.PI) / 180)
-        ctx.font = `${t.bold ? 800 : 600} ${px}px Inter, system-ui, sans-serif`
-        ctx.fillStyle = t.color
-        ctx.textAlign = "center"; ctx.textBaseline = "middle"
-        ctx.fillText(t.text || "", 0, 0)
-        ctx.restore()
-      }
-      try { resolve(c.toDataURL("image/png")) } catch { resolve(designUrl) }
-    }
-    if (!designUrl) { drawTexts(); return }
     const img = new Image()
-    img.onload = () => {
-      const w = (pos.w / 100) * size
-      const h = w * ((img.naturalHeight || 1) / (img.naturalWidth || 1))
-      ctx.save()
-      ctx.translate((pos.x / 100) * size, (pos.y / 100) * size)
-      ctx.rotate((pos.r * Math.PI) / 180)
-      ctx.drawImage(img, -w / 2, -h / 2, w, h)
-      ctx.restore()
-      drawTexts()
-    }
-    img.onerror = () => drawTexts()
-    img.src = designUrl
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)   // a broken layer is skipped, never fatal to the flatten
+    img.src = src
   })
+}
+
+async function composeDesign(images: ImageLayer[], texts: TextLayer[], size = 900): Promise<string> {
+  const c = document.createElement("canvas"); c.width = size; c.height = size
+  const ctx = c.getContext("2d")
+  const first = images[0]?.src ?? ""
+  if (!ctx) return first
+  for (const layer of images) {
+    const img = await loadImage(layer.src)
+    if (!img) continue
+    const w = (layer.pos.w / 100) * size
+    const h = w * ((img.naturalHeight || 1) / (img.naturalWidth || 1))
+    ctx.save()
+    ctx.translate((layer.pos.x / 100) * size, (layer.pos.y / 100) * size)
+    ctx.rotate((layer.pos.r * Math.PI) / 180)
+    ctx.drawImage(img, -w / 2, -h / 2, w, h)
+    ctx.restore()
+  }
+  for (const t of texts) {
+    const px = (t.size / 100) * size
+    ctx.save()
+    ctx.translate((t.x / 100) * size, (t.y / 100) * size)
+    ctx.rotate((t.r * Math.PI) / 180)
+    ctx.font = `${t.bold ? 800 : 600} ${px}px Inter, system-ui, sans-serif`
+    ctx.fillStyle = t.color
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"
+    ctx.fillText(t.text || "", 0, 0)
+    ctx.restore()
+  }
+  try { return c.toDataURL("image/png") } catch { return first }
 }
 
 const rid = () => "t" + Math.random().toString(36).slice(2, 8)
@@ -171,7 +184,50 @@ export function DesignMaker() {
   // re-renders). Held so re-saving UPDATES the same template rather than piling up
   // duplicates, and set to the source id when a template is reopened.
   const templateId = useRef<string | null>(null)
-  const [designUrl, setDesignUrl] = useState("")
+  /**
+   * THE STACK. The lab held one artwork; a print is often several — a logo, a name, a badge —
+   * and doing that meant flattening them in another tool first.
+   *
+   * Capped at MAX_LAYERS, the same number the server refuses past (templates.js). The cap is
+   * about the editor as much as the storage: a layer list you cannot read is not a layer list.
+   */
+  const MAX_LAYERS = 10
+  const [images, setImages] = useState<ImageLayer[]>([])
+  const nextLayerId = useRef(1)
+  const addImages = (srcs: { src: string; name?: string | null }[]) => {
+    if (!srcs.length) return
+    setImages((prev) => {
+      const room = Math.max(0, MAX_LAYERS - prev.length)
+      if (srcs.length > room) {
+        setMsg({ tone: "err", text: `A design can hold ${MAX_LAYERS} layers — ${srcs.length - room} ${srcs.length - room === 1 ? "was" : "were"} left out.` })
+      }
+      const added = srcs.slice(0, room).map((f, i) => ({
+        id: `img-${nextLayerId.current++}`,
+        src: f.src,
+        name: f.name ?? null,
+        // Each new layer lands slightly below the last so a second drop is visible rather
+        // than hidden exactly behind the first.
+        pos: { ...DEFAULT_POS, y: Math.min(80, DEFAULT_POS.y + (prev.length + i) * 4) },
+      }))
+      if (added.length) setSelected(added[added.length - 1].id)
+      return [...prev, ...added]
+    })
+  }
+  const updateImage = (id: string, patch: Partial<Pos>) =>
+    setImages((prev) => prev.map((im) => (im.id === id ? { ...im, pos: { ...im.pos, ...patch } } : im)))
+  const dropLayer = (id: string) =>
+    setImages((prev) => prev.filter((im) => im.id !== id))
+  /** The selected image layer, when the selection is one. */
+  const selImage = images.find((im) => im.id === selected) ?? null
+  /**
+   * BACKWARD COMPATIBILITY, in one place. Publish and the template's own `designUrl` field
+   * both predate the stack and mean "the artwork": that is the bottom layer, which on every
+   * design made before this is the only layer.
+   */
+  const designUrl = images[0]?.src ?? ""
+  const setDesignUrl = (v: string) =>
+    setImages((prev) => (v ? (prev.length ? prev.map((im, i) => (i === 0 ? { ...im, src: v } : im))
+      : [{ id: `img-${nextLayerId.current++}`, src: v, name: null, pos: { ...DEFAULT_POS } }]) : prev.slice(1)))
   const [pos, setPos] = useState<Pos>(DEFAULT_POS)
   const [texts, setTexts] = useState<TextLayer[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -182,7 +238,17 @@ export function DesignMaker() {
   // state rather than two booleans: they are the same dialog and can never both be open.
   const [browse, setBrowse] = useState<null | "uploads" | "orders">(null)
   // Background removal — the same hook the mini designer uses, so the two can't drift.
-  const bg = useBackgroundRemoval(designUrl, setDesignUrl)
+  /**
+   * THE ERASER ACTS ON THE SELECTED LAYER.
+   *
+   * It was bound to `designUrl`, which is now the BOTTOM of the stack — so pressing Remove
+   * background with the third layer selected would have quietly rubbed out the first one's
+   * backdrop and left the layer you were looking at untouched.
+   */
+  const bg = useBackgroundRemoval(
+    selImage?.src ?? "",
+    (v) => setImages((prev) => prev.map((im) => (im.id === selImage?.id ? { ...im, src: v } : im))),
+  )
   // Only the failure needs state now: publishing navigates away, so there is nothing
   // "open" to track — but a draft too large to stash has to be said, not swallowed.
   const [pubErr, setPubErr] = useState("")
@@ -231,11 +297,19 @@ export function DesignMaker() {
         .then((rows) => {
           const t = (rows ?? []).find((x) => String(x.id) === templateParam)
           if (!t) return
-          const l = (t.layers ?? {}) as { designUrl?: string; pos?: Pos; texts?: TextLayer[] }
+          const l = (t.layers ?? {}) as { images?: ImageLayer[]; designUrl?: string; pos?: Pos; texts?: TextLayer[] }
           const d = (t.data ?? {}) as { blank?: string | null; printArea?: { w?: number; h?: number } }
           templateId.current = String(t.id)
           if (t.name) setName(t.name)
-          if (l.designUrl) setDesignUrl(l.designUrl)
+          // A template saved BEFORE the stack has one artwork and a position; one saved
+          // after has the list. Reading images first means a new template never falls back
+          // to its own compatibility fields and loses its upper layers.
+          if (Array.isArray(l.images) && l.images.length) {
+            setImages(l.images)
+            nextLayerId.current = l.images.length + 1
+          } else if (l.designUrl) {
+            setImages([{ id: `img-${nextLayerId.current++}`, src: l.designUrl, name: null, pos: l.pos ?? { ...DEFAULT_POS } }])
+          }
           if (l.pos) setPos(l.pos)
           if (Array.isArray(l.texts)) setTexts(l.texts)
           if (d.printArea?.w) setPaW(String(d.printArea.w))
@@ -257,22 +331,37 @@ export function DesignMaker() {
   useEffect(() => {
     const t = setTimeout(refreshImages, 0)
     return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   // Place a library image on the canvas. Remote URLs (R2, marketplace) go through the img
   // proxy so the composed canvas stays SAME-ORIGIN and can export (a tainted canvas throws
   // on toDataURL). A data: url (a fresh local upload) is already same-origin.
-  const placeImage = (url: string) => {
-    setDesignUrl(url.startsWith("data:") ? url : canvasReadableSrc(url))
-    setPos(DEFAULT_POS); setSelected("image")
+  const placeImage = (url: string, name?: string | null) => {
+    // ADDS a layer. It used to overwrite the artwork, so picking a second library image
+    // silently discarded the first — which on a design you had already placed is a loss, not
+    // a replacement. Removing a layer is one click on its strip.
+    addImages([{ src: url.startsWith("data:") ? url : canvasReadableSrc(url), name: name ?? null }])
   }
   // Upload → place it now AND keep it in "Your uploads" so it's reusable next time.
-  const onUploadImage = (file: File | undefined) => {
-    readImageFile(file, (dataUrl) => {
-      setDesignUrl(dataUrl); setPos(DEFAULT_POS); setSelected("image")
-      uploadSellerImage(dataUrl, file?.name).then((r) => { if (r.image) refreshImages() }).catch(() => {})
-    }, (m) => setMsg({ tone: "err", text: m }))
+  /**
+   * SEVERAL FILES, each becoming its own layer.
+   *
+   * Took `files?.[0]` and dropped the rest on the floor — silently, so selecting four images
+   * looked like three of them had failed. Read in parallel and added in the order they were
+   * given, which is the order somebody picked them in.
+   */
+  const onUploadImages = (files: FileList | File[] | null | undefined) => {
+    const arr = Array.from(files ?? [])
+    if (!arr.length) return
+    Promise.all(arr.map((f) => new Promise<{ src: string; name?: string | null } | null>((res) => {
+      readImageFile(f, (dataUrl) => {
+        // Kept in "Your uploads" too, so it is reusable next time — best-effort, exactly as
+        // before: failing to stash a copy must never cost the layer that was just placed.
+        uploadSellerImage(dataUrl, f.name).then((r) => { if (r.image) refreshImages() }).catch(() => {})
+        res({ src: dataUrl, name: f.name })
+      }, (m) => { setMsg({ tone: "err", text: m }); res(null) })
+    }))).then((out) => addImages(out.filter((x): x is { src: string; name?: string | null } => !!x)))
   }
   const removeImage = (id: string) => {
     setSellerImages((prev) => prev.filter((im) => im.id !== id))
@@ -288,7 +377,6 @@ export function DesignMaker() {
   const removeText = (id: string) => { setTexts((prev) => prev.filter((t) => t.id !== id)); setSelected(null) }
   const selText = texts.find((t) => t.id === selected)
 
-  const clearArtwork = () => { setDesignUrl(""); setSelected(null) }
 
   // What the browse dialog shows. Buyer art needs the proxy to DISPLAY (Etsy blocks
   // hotlinking) but the raw url to PLACE — same split the rail thumbnails make.
@@ -303,7 +391,7 @@ export function DesignMaker() {
     if (!designUrl && texts.length === 0) { setMsg({ tone: "err", text: "Add artwork or text first." }); return }
     setSaving(true); setMsg(null)
     try {
-      const composed = await composeDesign(designUrl, pos, texts, 640)
+      const composed = await composeDesign(images, texts, 640)
       // `layers` is what makes this REOPENABLE — the library stores a flattened image,
       // a template stores the pieces plus which blank they were placed on.
       templateId.current ??= `TPL-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -312,7 +400,10 @@ export function DesignMaker() {
         name: name.trim() || "Untitled template",
         composite: composed,
         data: { blank: product?.name ?? null, blankSku: product?.sku ?? null, printArea: { w: Number(paW), h: Number(paH) } },
-        layers: { designUrl, pos, texts },
+        // BOTH shapes. `images` is the truth; `designUrl`/`pos` are the bottom layer, kept
+        // so a template saved today still opens in anything that reads the old fields —
+        // including this file's own loader, and the publish prefill below.
+        layers: { images, texts, designUrl, pos: images[0]?.pos ?? pos },
       })
       if (r.error) throw new Error(r.error)
       setMsg({ tone: "ok", text: "Saved as a template." })
@@ -325,7 +416,7 @@ export function DesignMaker() {
     if (!designUrl && texts.length === 0) { setMsg({ tone: "err", text: "Add artwork or text first." }); return }
     setSaving(true); setMsg(null)
     try {
-      const composed = await composeDesign(designUrl, pos, texts, 640)
+      const composed = await composeDesign(images, texts, 640)
       const r = await saveDesignLibrary({ name: name.trim() || "Untitled design", data: composed, thumb: composed })
       if (r.error) throw new Error(r.error)
       setMsg({ tone: "ok", text: "Saved to your library." })
@@ -365,7 +456,7 @@ export function DesignMaker() {
               <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Images</div>
               <label className="flex cursor-pointer items-center gap-1 text-2xs font-medium text-primary hover:underline">
                 <UploadSimple size={12} weight="bold" /> Upload
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => onUploadImage(e.target.files?.[0])} />
+                <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onUploadImages(e.target.files); e.target.value = "" }} />
               </label>
             </div>
             {imagesLoading ? (
@@ -413,18 +504,10 @@ export function DesignMaker() {
             )}
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setLibOpen(true)}>Saved designs</Button>
           </div>
-          <div className="space-y-1.5">
-            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Layers</div>
-            {designUrl && (
-              <button onClick={() => setSelected("image")} className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === "image" ? "bg-primary/10 text-primary" : "hover:bg-accent")}><ImageIcon size={14} weight="duotone" /> Artwork</button>
-            )}
-            {texts.map((t) => (
-              <button key={t.id} onClick={() => setSelected(t.id)} className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === t.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
-                <TextT size={14} /> <span className="truncate">{t.text || "Text"}</span>
-              </button>
-            ))}
-            {!designUrl && texts.length === 0 && <div className="px-2 text-xs text-muted-foreground">Add artwork or text to start.</div>}
-          </div>
+          {/* The layer list used to be here AND the selected layer's controls were on the
+              right, so working on one layer meant crossing the canvas: pick on the left, edit
+              on the right, look in the middle. One list, on the right, with the controls it
+              belongs to. */}
         </aside>
 
         {/* Center: canvas */}
@@ -457,14 +540,24 @@ export function DesignMaker() {
               onDragLeave={() => setDragOver(false)}
               onDrop={(e) => {
                 e.preventDefault(); setDragOver(false)
-                readImageFile(e.dataTransfer.files?.[0], (u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }, (m) => setMsg({ tone: "err", text: m }))
+                onUploadImages(e.dataTransfer.files)
               }}
               className={"relative w-full max-w-[min(100%,calc(100svh-12rem))] rounded-xl transition-shadow " + (dragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "")}
             >
               <DesignStage
                 className="w-full"
-                mockup={faceUrl || mockup} designUrl={designUrl} pos={pos} setPos={setPos}
-                onRemove={() => setDesignUrl("")} texts={texts} updateText={updateText}
+                mockup={faceUrl || mockup}
+                // The stack, not a single artwork. `designUrl`/`pos` are left unset here on
+                // purpose: passing both would draw the bottom layer twice.
+                images={images} updateImage={updateImage}
+                texts={texts} updateText={updateText}
+                // Acts on the SELECTED layer, and sits on the strip above it rather than in a
+                // panel across the window — it changes the picture, so it belongs where the
+                // picture is.
+                onRemove={selImage ? () => dropLayer(selImage.id) : undefined}
+                onEraseBg={selImage ? bg.run : undefined}
+                eraseBusy={bg.busy}
+                onUndoErase={selImage && bg.canUndo ? bg.undo : undefined}
                 selected={selected} onSelect={setSelected}
                 printZone={printZoneOf(product, side, { w: Number(paW) || BASE_PRINT_IN.w, h: Number(paH) || BASE_PRINT_IN.h })}
                 printLabel={`${Number(paW) || BASE_PRINT_IN.w}" x ${Number(paH) || BASE_PRINT_IN.h}" print area`}
@@ -509,34 +602,49 @@ export function DesignMaker() {
               </div>
               <Button variant="outline" size="sm" onClick={() => removeText(selText.id)} className="text-red-600 hover:text-red-700"><Trash size={14} weight="bold" /> Delete text</Button>
             </div>
-          ) : designUrl ? (
+          ) : images.length > 0 || texts.length > 0 ? (
             <div className="space-y-3 border-t border-border pt-3">
-              <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Artwork</div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={designUrl} alt="" className="eg-checker h-24 w-full rounded-md border border-border object-contain" />
-              <div className="space-y-1.5">
-                <label className="flex items-center justify-between gap-2 text-sm">
-                  <span className="text-muted-foreground">Tolerance</span>
+              {/**
+                * LAYERS — the list AND the thing you do to a layer, in one place.
+                *
+                * The list was on the left of the canvas and the controls on the right, so
+                * working on one layer meant crossing the picture twice: pick on the left, edit
+                * on the right, look in the middle.
+                *
+                * Reversed, so the TOP of the list is the top of the stack. A layer list that
+                * runs bottom-up matches the array and nothing else anybody has ever used.
+                */}
+              <div className="flex items-baseline justify-between gap-2">
+                <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Layers</div>
+                <span className="text-2xs tabular-nums text-muted-foreground">{images.length + texts.length} / {MAX_LAYERS}</span>
+              </div>
+              <div className="space-y-1">
+                {[...images].reverse().map((im) => (
+                  <button key={im.id} onClick={() => setSelected(im.id)}
+                    className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === im.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={im.src} alt="" className="eg-checker size-7 shrink-0 rounded border border-border object-contain" />
+                    <span className="truncate">{im.name || "Image"}</span>
+                  </button>
+                ))}
+                {texts.map((t) => (
+                  <button key={t.id} onClick={() => setSelected(t.id)}
+                    className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === t.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
+                    <TextT size={14} className="shrink-0" /> <span className="truncate">{t.text || "Text"}</span>
+                  </button>
+                ))}
+              </div>
+              {/* The background tools moved ONTO the layer — see the strip above the image.
+                  Only the tolerance stays here: it is a setting for that tool, not an action,
+                  and a slider in a floating strip is a thing you knock while dragging. */}
+              {selImage && (
+                <label className="flex items-center justify-between gap-2 border-t border-border pt-3 text-sm">
+                  <span className="text-muted-foreground">Erase tolerance</span>
                   <input type="range" min={4} max={40} value={bg.tolerance} onChange={(e) => bg.changeTolerance(Number(e.target.value))} className="flex-1" aria-label="Background removal tolerance" />
                   <span className="w-6 text-right text-xs tabular-nums text-muted-foreground">{bg.tolerance}</span>
                 </label>
-                <Button variant="outline" size="sm" className="w-full justify-start" onClick={bg.run} disabled={bg.busy}>
-                  {bg.busy ? <CircleNotch size={15} className="animate-spin" /> : <Eraser size={15} weight="bold" />}
-                  {bg.busy ? "Working…" : "Remove background"}
-                </Button>
-                {bg.canUndo && (
-                  <Button variant="ghost" size="sm" className="w-full justify-start" onClick={bg.undo}>
-                    <ArrowCounterClockwise size={15} weight="bold" /> Undo removal
-                  </Button>
-                )}
-                {/* Said out loud, because "nothing happened" and "this image has no flat
-                    backdrop to remove" look identical otherwise. */}
-                {bg.msg && <p className="text-2xs text-muted-foreground">{bg.msg}</p>}
-                <p className="text-2xs text-muted-foreground">
-                  Clears the backdrop connected to the edges — no AI, nothing leaves your browser.
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={clearArtwork} className="text-red-600 hover:text-red-700"><Trash size={14} weight="bold" /> Remove artwork</Button>
+              )}
+              {bg.msg && <p className="text-2xs text-muted-foreground">{bg.msg}</p>}
             </div>
           ) : (
             <div className="border-t border-border pt-3 text-sm text-muted-foreground">Place artwork from the left, or add text above, then select a layer to edit it.</div>
@@ -553,7 +661,7 @@ export function DesignMaker() {
             <Button
               className="w-full"
               onClick={async () => {
-                const composed = await composeDesign(designUrl, pos, texts, 1200)
+                const composed = await composeDesign(images, texts, 1200)
                 // images[] is the composite the BUYER sees; designUrl is the artwork the
                 // FACTORY needs. Sending only the composite is why published listings
                 // produced orders with nothing to digitise.

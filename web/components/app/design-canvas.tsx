@@ -25,6 +25,19 @@ import { Eyedropper } from "@phosphor-icons/react"
 export type Pos = { x: number; y: number; w: number; r: number }
 export type TextLayer = { id: string; text: string; x: number; y: number; size: number; r: number; color: string; bold?: boolean }
 export const DEFAULT_POS: Pos = { x: 50, y: 50, w: 45, r: 0 }
+
+/**
+ * ONE PICTURE ON THE STAGE, when there is more than one.
+ *
+ * The stage has always drawn a single `designUrl`. The Design Lab needs several — a logo and
+ * a name and a badge are three layers of one print — so it takes a LIST instead, and each
+ * entry carries its own placement exactly as a text layer does.
+ *
+ * `designUrl` is untouched and still the path the mini designer uses: an order line holds one
+ * artwork per face, and giving it a list to hold one item would be a worse model, not a more
+ * general one.
+ */
+export type ImageLayer = { id: string; src: string; pos: Pos; name?: string | null }
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
 /**
@@ -75,20 +88,31 @@ function ThreadSelect({ value, options, onChange }: {
 // Reusable place/size/rotate surface — used by the order customizer, the studio, and the
 // full maker. Renders a mockup + a draggable image layer + optional draggable text layers.
 export function DesignStage({
-  mockup, designUrl, pos, setPos, onRemove, onCopy, copyLabel, className,
-  texts, updateText, selected, onSelect, picking, onPickColor,
+  mockup, designUrl = "", pos = DEFAULT_POS, setPos, onRemove, onCopy, copyLabel, className,
+  texts, updateText, images, updateImage, onEraseBg, eraseBusy, onUndoErase, selected, onSelect, picking, onPickColor,
   printZone, printLabel, emptyHint,
 }: {
   mockup?: string
-  designUrl: string
-  pos: Pos
-  setPos: (fn: (p: Pos) => Pos) => void
+  /** The single artwork. Optional because a caller driving `images` has no single one —
+   *  requiring it forced a placeholder that the stage would then draw beneath the stack. */
+  designUrl?: string
+  pos?: Pos
+  setPos?: (fn: (p: Pos) => Pos) => void
   onRemove?: () => void
   /** Offered in the action strip when a caller has somewhere to copy TO — the design maker
    *  and the studio have no second face, so they simply don't pass it and the button is not
    *  drawn. A control that does nothing is worse than one that isn't there. */
   onCopy?: () => void
   copyLabel?: string
+  /** Several image layers, drawn back-to-front in array order. Ignored when absent, which is
+   *  every caller that places exactly one artwork. */
+  images?: ImageLayer[]
+  updateImage?: (id: string, patch: Partial<Pos>) => void
+  /** Background removal, offered ON the layer rather than in a panel across the window — it
+   *  changes the picture, so it belongs where the picture is. Absent ⇒ no button. */
+  onEraseBg?: () => void
+  eraseBusy?: boolean
+  onUndoErase?: () => void
   className?: string
   texts?: TextLayer[]
   updateText?: (id: string, patch: Partial<TextLayer>) => void
@@ -291,11 +315,14 @@ export function DesignStage({
     e.preventDefault(); e.stopPropagation()
     select(target)
     const rect = stageRef.current.getBoundingClientRect()
-    const isText = target !== "image"
+    // THREE kinds of layer now: the single artwork ("image"), a text, or one of several
+    // image layers. Resolved once, here, so everything below reads the same three numbers.
+    const imgLayer = images?.find((i) => i.id === target)
+    const isText = target !== "image" && !imgLayer
     const layer = isText ? texts?.find((t) => t.id === target) : null
-    const startX = isText ? (layer?.x ?? 50) : pos.x
-    const startY = isText ? (layer?.y ?? 50) : pos.y
-    const startR = isText ? (layer?.r ?? 0) : pos.r
+    const startX = imgLayer ? imgLayer.pos.x : isText ? (layer?.x ?? 50) : pos.x
+    const startY = imgLayer ? imgLayer.pos.y : isText ? (layer?.y ?? 50) : pos.y
+    const startR = imgLayer ? imgLayer.pos.r : isText ? (layer?.r ?? 0) : pos.r
     const px = e.clientX, py = e.clientY
     const cx = rect.left + (startX / 100) * rect.width
     const cy = rect.top + (startY / 100) * rect.height
@@ -314,8 +341,9 @@ export function DesignStage({
     const halfY = ((layerEl?.offsetHeight ?? 0) / 2 / rect.height) * 100
     const startSize = isText ? (layer?.size ?? 8) : pos.w
     function apply(patch: { x?: number; y?: number; w?: number; size?: number; r?: number }) {
-      if (isText && layer) updateText?.(target, { x: patch.x, y: patch.y, size: patch.w ?? patch.size, r: patch.r } as Partial<TextLayer>)
-      else setPos((p) => ({ ...p, ...(patch.x != null ? { x: patch.x } : {}), ...(patch.y != null ? { y: patch.y } : {}), ...(patch.w != null ? { w: patch.w } : {}), ...(patch.r != null ? { r: patch.r } : {}) }))
+      if (imgLayer) updateImage?.(target, { ...(patch.x != null ? { x: patch.x } : {}), ...(patch.y != null ? { y: patch.y } : {}), ...(patch.w != null ? { w: patch.w } : {}), ...(patch.r != null ? { r: patch.r } : {}) })
+      else if (isText && layer) updateText?.(target, { x: patch.x, y: patch.y, size: patch.w ?? patch.size, r: patch.r } as Partial<TextLayer>)
+      else setPos?.((p) => ({ ...p, ...(patch.x != null ? { x: patch.x } : {}), ...(patch.y != null ? { y: patch.y } : {}), ...(patch.w != null ? { w: patch.w } : {}), ...(patch.r != null ? { r: patch.r } : {}) }))
     }
     function move(ev: PointerEvent) {
       if (mode === "move") {
@@ -351,7 +379,7 @@ export function DesignStage({
         // maxW, not a flat 100: the ceiling is whatever keeps the artwork's own height
         // inside the bed, so dragging a grip stops at the edge instead of past it.
         const next = startSize * Math.max(scale, 0)
-        apply(isText ? { size: clamp(next, 2, 40) } : { w: clamp(next, 8, maxW) })
+        apply(isText ? { size: clamp(next, 2, 40) } : { w: clamp(next, 8, imgLayer ? 100 : maxW) })
       } else {
         const ang = (Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180) / Math.PI + 90
         apply({ r: Math.round(ang) })
@@ -429,8 +457,20 @@ export function DesignStage({
         >
           {locked ? <Lock size={14} weight="fill" /> : <LockOpen size={14} weight="bold" />}
         </button>
+        {onEraseBg && (
+          <button type="button" onClick={onEraseBg} disabled={eraseBusy}
+            title="Remove the background — clears the backdrop connected to the edges, in your browser"
+            aria-label="Remove background" className={stripBtn}>
+            {eraseBusy ? <CircleNotch size={14} className="animate-spin" /> : <Eraser size={14} weight="bold" />}
+          </button>
+        )}
+        {onUndoErase && (
+          <button type="button" onClick={onUndoErase} title="Put the background back" aria-label="Undo background removal" className={stripBtn}>
+            <ArrowCounterClockwise size={14} weight="bold" />
+          </button>
+        )}
         {onRemove && (
-          <button type="button" onClick={onRemove} title="Remove this artwork" aria-label="Remove this artwork" className={stripBtn + " hover:bg-destructive hover:text-destructive-foreground"}>
+          <button type="button" onClick={onRemove} title="Remove this layer" aria-label="Remove this layer" className={stripBtn + " hover:bg-destructive hover:text-destructive-foreground"}>
             <Trash size={14} weight="bold" />
           </button>
         )}
@@ -494,6 +534,28 @@ export function DesignStage({
           )}
         </div>
       )}
+
+      {/**
+        * SEVERAL IMAGE LAYERS, in array order — first is furthest back, which is the order a
+        * layer list reads top-down when reversed. Each is its own draggable, lockable,
+        * selectable thing, exactly like a text layer; nothing here is special-cased for
+        * "the artwork" because with a list there is no such single thing.
+        */}
+      {(images ?? []).map((im) => (
+        <div
+          key={im.id}
+          onPointerDown={picking ? undefined
+            : lockedIds[im.id]
+              ? (e) => { e.stopPropagation(); select(im.id) }
+              : startDrag(im.id, "move")}
+          style={{ left: `${im.pos.x}%`, top: `${im.pos.y}%`, width: `${im.pos.w}%`, transform: `translate(-50%,-50%) rotate(${im.pos.r}deg)` }}
+          className={"absolute touch-none " + (picking ? "cursor-crosshair" : lockedIds[im.id] ? "cursor-default" : "cursor-move")}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={canvasReadableSrc(im.src)} alt="" className="pointer-events-none block w-full select-none" draggable={false} />
+          {!picking && sel === im.id && handles(im.id)}
+        </div>
+      ))}
 
       {designUrl && imgBroken && (
         /* An image that cannot be fetched renders as nothing here, so say so. Silence was
