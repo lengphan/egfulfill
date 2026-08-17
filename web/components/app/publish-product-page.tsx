@@ -14,6 +14,7 @@ import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
 import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getPublishDestinations, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord, type PublishDestination, recordSpydeckUpload, keepListingPhoto} from "@/lib/api"
 import { readPublishDraft, clearPublishDraft, type PublishDraft, type PublishPrefill } from "@/lib/publish-draft"
+import { getUser } from "@/lib/auth"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -299,37 +300,46 @@ const OUTCOME_MARK = {
   fail: { Icon: XCircle, cls: "text-destructive", weight: "fill" as const },
 }
 
-function OutcomeLine({ dest, outcome }: { dest: PublishDestination; outcome?: Outcome }) {
+function OutcomeLine({ dest, outcome, sameForAll }: { dest: PublishDestination; outcome?: Outcome; sameForAll?: boolean }) {
   if (!outcome) return null
   const mark = outcome.state === "ok" ? OUTCOME_MARK.ok
     : outcome.state === "dry" ? OUTCOME_MARK.dry
     : outcome.state === "fail" ? OUTCOME_MARK.fail
     : null
+  /**
+   * THREE COLUMNS, and only one of them can wrap.
+   *
+   * It had five — mark, shop, platform, outcome, link — each sized independently, so on a
+   * real run three of them truncated at once ("CustomBabe…", "Draft product crea…") and no
+   * two rows lined up. Five ragged columns of abbreviated text is not a summary.
+   *
+   * `sameForAll` is the outcome text hoisted to a single line under the heading when every
+   * shop reports the same thing, which is the usual run: three rows all saying "Draft listing
+   * created" is one fact printed three times. A row only carries its own words when it
+   * DIFFERS — a dry run or a refusal among successes — which is precisely when you want them.
+   */
   return (
-    <div className="grid grid-cols-[0.9rem_minmax(4rem,1fr)_auto] items-center gap-x-2 gap-y-0.5 py-1 text-xs sm:grid-cols-[0.9rem_minmax(5rem,1fr)_6.5rem_minmax(6rem,1.3fr)_auto]">
-      <span className="flex items-center justify-center">
+    <div className="grid grid-cols-[0.9rem_minmax(0,1fr)_auto] items-baseline gap-x-3 py-1.5 text-xs">
+      <span className="flex translate-y-px items-center justify-center">
         {mark
           ? <mark.Icon size={13} weight={mark.weight} className={mark.cls} />
           : <CircleNotch size={12} className="animate-spin text-muted-foreground" />}
       </span>
-      <span className="truncate font-medium" title={dest.shop_name ?? undefined}>{dest.shop_name}</span>
-      {/* The platform is its own column on desktop; on a narrow screen it joins the outcome
-          line beneath, because a 6.5rem column of "TikTok Shop" is what forces the wrap. */}
-      <span className="hidden truncate text-muted-foreground sm:block">{dest.platform_label}</span>
-      <span
-        className={"col-span-2 col-start-2 truncate sm:col-span-1 sm:col-start-4 " + (mark ? mark.cls : "text-muted-foreground")}
-        title={[dest.platform_label, outcome.text, outcome.note].filter(Boolean).join(" — ")}
-      >
-        <span className="text-muted-foreground sm:hidden">{dest.platform_label} · </span>
-        {outcome.text}
-        {outcome.note && <span className="text-muted-foreground"> {outcome.note}</span>}
-      </span>
-      {/* Right-hand column, so every link on the panel starts at the same x — a column of
-          "View" is scannable in a way one trailing per sentence is not. */}
-      <span className="col-start-3 row-start-1 justify-self-end sm:col-start-5">
-        {outcome.url && (
-          <a href={outcome.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">View →</a>
+      <span className="min-w-0 truncate" title={[dest.shop_name, dest.platform_label].filter(Boolean).join(" · ")}>
+        <span className="font-medium">{dest.shop_name}</span>
+        <span className="text-muted-foreground"> · {dest.platform_label}</span>
+        {/* Its own outcome only when it is not the one on the line above the list. */}
+        {!sameForAll && (
+          <span className={mark ? mark.cls : "text-muted-foreground"}> · {outcome.text}{outcome.note ? ` ${outcome.note}` : ""}</span>
         )}
+      </span>
+      {/* Last column, so every link starts at the same x — a column of "View" is scannable
+          in a way one trailing each sentence is not. Reserved even when a shop has no link,
+          or the rows either side of it shift. */}
+      <span className="justify-self-end">
+        {outcome.url
+          ? <a href={outcome.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">View →</a>
+          : <span className="text-muted-foreground/50">—</span>}
       </span>
     </div>
   )
@@ -661,6 +671,25 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * you can see but that silently doesn't ship is the most misleading of the three options.
    */
   const referencePhotos = useMemo(() => (prefill?.referenceImages ?? []).filter(Boolean), [prefill])
+
+  /**
+   * WHO THE WATERMARK IS FOR.
+   *
+   * It exists to stop a SELLER mistaking a competitor's photo for one of their own and
+   * publishing it — the shortest path there is a shot that looks like an asset in a picker.
+   * Staff are not making that mistake from this screen: the factory looks at these to judge
+   * a print, a placement, a garment colour, and a diagonal band of type across the middle is
+   * exactly over the part being judged.
+   *
+   * The FACT does not come off with the mark. The tile keeps its dashed border, the count
+   * line above the grid still reads "N reference photos shown, none published", and the
+   * lightbox is still titled "the competitor's own shot, not published with your listing".
+   * What changes is only whether it is written across the photograph.
+   *
+   * Defaults to the seller's view when the role is unknown, so a failed session read leaves
+   * the mark ON rather than off — the safe direction for a guard rail.
+   */
+  const staffViewer = (getUser()?.role || "seller") !== "seller"
 
   // Which reference photo the lightbox is showing, or null for closed. A thumbnail this
   // small is not enough to judge a competitor's shot by, which is the entire reason these
@@ -1085,15 +1114,27 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
           three shops and a lie about the fourth. Any failure keeps the form on screen so
           it can be fixed without retyping the listing. */}
         {draft == null ? null : allDone && !busy ? (
-          <div className="mx-auto flex max-w-lg flex-col items-center gap-3 rounded-2xl border border-border bg-card py-10 text-center">
-            <div className="font-semibold text-success">
+          <div className="mx-auto flex max-w-md flex-col items-center gap-2.5 rounded-2xl border border-border bg-card py-8 text-center">
+            <div className="text-sm font-semibold text-success">
               {pickedDests.every((d) => outcomes[d.connection_id]?.state === "ok")
                 ? PUBLISH_OK
                 : "Finished — with one shop that sent nothing"}
             </div>
-            <div className="w-full max-w-md divide-y divide-border/60 px-6 text-left">
-              {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} />)}
-            </div>
+            {/* Said ONCE when every shop said the same thing, which is the usual run. Three
+                rows each reading "Draft listing created" is one fact printed three times, and
+                it was the widest column on the panel. */}
+            {(() => {
+              const texts = pickedDests.map((d) => outcomes[d.connection_id]?.text).filter(Boolean)
+              const same = texts.length === pickedDests.length && new Set(texts).size === 1
+              return (
+                <>
+                  {same && <div className="-mt-1 text-xs text-muted-foreground">{texts[0]}</div>}
+                  <div className="w-full max-w-sm divide-y divide-border/60 px-6 text-left">
+                    {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} sameForAll={same} />)}
+                  </div>
+                </>
+              )
+            })()}
             <Button onClick={leave}>{returnLabel}</Button>
           </div>
         ) : (
@@ -1177,7 +1218,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={src} alt="" className="size-full object-cover" />
-                      <ReferenceWatermark />
+                      {!staffViewer && <ReferenceWatermark />}
                       <span className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover:opacity-100">
                         <MagnifyingGlassPlus size={16} weight="bold" className="text-white drop-shadow" />
                       </span>
@@ -1544,7 +1585,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={zoomSrc} alt="" className="max-h-[72dvh] w-auto max-w-full object-contain" />
-                <ReferenceWatermark big />
+                {!staffViewer && <ReferenceWatermark big />}
               </>
             )}
           </div>
