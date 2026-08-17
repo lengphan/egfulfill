@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { X, Printer, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, type LookbookStyle } from "@/lib/api"
@@ -69,6 +70,23 @@ const hexOr = (v: unknown, fallback: string) =>
  * file. The label sheet prints the same way, so the print CSS already exists.
  */
 export function CatalogPrint({ onClose, exportId }: { onClose: () => void; exportId?: string }) {
+  /**
+   * PORTALLED TO <body>, WHICH IS THE ONLY REASON THIS PRINTS.
+   *
+   * globals.css removes everything that is not the sheet with
+   *   body > *:not(.eg-print-root) { display: none }
+   * and that selector needs the print root to be a DIRECT CHILD of body. Rendered inline
+   * this overlay sits deep in the React tree, so the rule matched the app root instead —
+   * the div that CONTAINS the lookbook — and hid the entire document. The preview looked
+   * perfect on screen and printed a blank page, which is exactly what was reported.
+   *
+   * label-sheet.tsx has always portalled for this reason and has always printed. Same fix,
+   * same pattern, and its comment already spells out why display:none is the only thing that
+   * works here: visibility keeps the app's full height, so one sheet prints across four
+   * mostly-blank pages.
+   */
+  const [host, setHost] = useState<HTMLElement | null>(null)
+  useEffect(() => { const id = setTimeout(() => setHost(document.body), 0); return () => clearTimeout(id) }, [])
   const [rows, setRows] = useState<LookbookStyle[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
@@ -114,7 +132,10 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
     } catch (e) { setErr((e as Error).message) }
   }
 
-  return (
+  // Nothing to portal into until the effect has run — and on the server there is no document.
+  if (!host) return null
+
+  return createPortal(
     // eg-print-root is load-bearing: globals.css prints with
     // `body > *:not(.eg-print-root) { display: none }`, so an overlay without it is hidden
     // and the printer emits a blank sheet.
@@ -558,6 +579,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
           .eg-print-root { background: #fff !important; }
         }
       `}</style>
-    </div>
+    </div>,
+    host,
   )
 }
