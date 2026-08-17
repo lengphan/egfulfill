@@ -216,6 +216,40 @@ function unitCostOf(row, item, fees, sides = 1) {
 }
 
 /**
+ * THE SELLER'S BASE COST FOR A WHOLE PRODUCT — the highest one across its sizes.
+ *
+ * Exported because the CATALOGUE needs it and must not re-derive it. The lookbook is a price
+ * list that goes to partners, and it was being built on `productCost` — what we PAY S&S. A 5%
+ * markup over that printed $2.27 beside a blank we buy at $2.16, so anyone holding the sheet
+ * could divide by 1.05 and read our supplier invoice. That is §2.9 broken by arithmetic
+ * rather than by a field name.
+ *
+ * Built on costPartsOf, so it is the same ladder a seller is actually charged on — supplier
+ * cost only ever reaches it THROUGH base_markup, which puts the invoice two markups away from
+ * anything printed instead of one. A product synced from a supplier is covered by that on its
+ * own: it arrives carrying productCost and nothing else, and this turns it into a base before
+ * any catalogue price can be derived.
+ *
+ * THE HIGHEST SIZE WINS, for the same reason the old supplier-cost version did: one catalogue
+ * price stands for every size, and taking the cheapest would list the largest sizes below
+ * what they cost to make.
+ *
+ * null when nothing in the ladder answers — the caller's cue to print nothing, never to fall
+ * back to a number that is really a cost.
+ */
+export function sellerBaseCostOf(row, fees) {
+  const d = (row && row.data) || {};
+  const sizes = Array.isArray(d.sizePrices) ? d.sizePrices.map((t) => t && t.size).filter(Boolean) : [];
+  const candidates = sizes.length ? sizes : [null];
+  let best = null;
+  for (const size of candidates) {
+    const { base } = costPartsOf(row, { size }, fees);
+    if (base != null && (best == null || base > best)) best = base;
+  }
+  return best;
+}
+
+/**
  * WHAT THE BLANK COSTS US — the supplier's price, not the seller's.
  *
  * Same ladder as unitCostOf's cost branches and no other: the size's own cost first, then

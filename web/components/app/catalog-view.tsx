@@ -100,8 +100,8 @@ export function CatalogView() {
       // a blank where a price should be, and nobody knows which ones until they look.
       const skipped = r.skippedNoCost?.length ?? 0
       setNote(skipped
-        ? `Priced ${r.priced ?? 0}. ${skipped} skipped — no supplier cost on record, so there was nothing to mark up: ${r.skippedNoCost!.slice(0, 4).join(", ")}${skipped > 4 ? "…" : ""}`
-        : `Priced ${r.priced ?? 0} at cost + ${n}%.`)
+        ? `Priced ${r.priced ?? 0}. ${skipped} skipped — no base cost on record, so there was nothing to mark up: ${r.skippedNoCost!.slice(0, 4).join(", ")}${skipped > 4 ? "…" : ""}`
+        : `Priced ${r.priced ?? 0} at base + ${n}%.`)
       setSummaryTick((t) => t + 1); load()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
@@ -183,7 +183,7 @@ export function CatalogView() {
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
             {/* No publish/remove buttons: the tick already is that decision, and two ways
                 to express one thing is how they drifted apart. This bar only prices. */}
-            <span className="text-xs text-muted-foreground">Cost +</span>
+            <span className="text-xs text-muted-foreground">Base +</span>
             <Input value={pct} onChange={(e) => setPct(e.target.value.replace(/[^\d.]/g, ""))}
               className="h-8 w-16 text-center text-xs tabular-nums" inputMode="decimal" aria-label="Markup percent" />
             <Button size="sm" variant="outline" onClick={markup} disabled={busy}>

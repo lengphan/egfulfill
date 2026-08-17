@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto';
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
-import { quoteSpec, shipFeeOf, extraFeeOf, feeSettings } from '../pricing.js';
+import { quoteSpec, shipFeeOf, extraFeeOf, feeSettings, sellerBaseCostOf } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
@@ -849,17 +849,47 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     // Inserts as well as updates, for the same reason as above: applying a markup to a
     // selection is the act of putting those styles in the catalogue. Requiring a separate
     // publish first made the obvious gesture do nothing.
+    /**
+     * BASE_MARKUP FIRST, THEN YOURS — the invoice is never one division away.
+     *
+     * ss_products.price is what we PAY S&S (customerPrice/piecePrice). This multiplied it by
+     * the markup and wrote the result as the catalogue price, so a lookbook handed to a
+     * partner carried our supplier cost × 1.05 — divide by 1.05 and you have our invoice.
+     * That is §2.9 broken by arithmetic, and it is the path a style PICKED DIRECTLY FROM A
+     * SUPPLIER takes, which is exactly the case that matters here.
+     *
+     * base_markup is the same number pricing.js adds to a supplier cost to get the base a
+     * SELLER is charged (costPartsOf, step 4), so this is one ladder rather than two: the
+     * partner price is our base plus whatever margin is being applied today, and the supplier
+     * figure sits two markups back instead of one.
+     *
+     * A zero base_markup collapses the two and is worth knowing about — see the note the
+     * caller gets back.
+     */
+    const fees0 = await feeSettings().catch(() => ({}));
+    const baseMarkup = Number(fees0.base_markup) || 0;
     const r = await q(
       `insert into catalog_picks (source, ref, catalog_price)
-       select $1, c.style_id, round((c.cost * (1 + $3::numeric / 100))::numeric, 2)
+       select $1, c.style_id, round(((c.cost + $4::numeric) * (1 + $3::numeric / 100))::numeric, 2)
          from (select style_id, max(price) as cost from ss_products
                 where style_id = any($2::text[]) and price is not null
                 group by style_id) c
         where c.cost > 0
        on conflict (source, ref) do update set catalog_price = excluded.catalog_price`,
-      [source, refs, pct]).catch(() => ({ rowCount: 0 }));
-    audit(req, 'catalog.pick.markup', { entityType: 'catalog', entityId: 'picks', after: { markupPct: pct, priced: r.rowCount } });
-    return { ok: true, priced: r.rowCount, skippedNoCost: refs.length - r.rowCount };
+      [source, refs, pct, baseMarkup]).catch(() => ({ rowCount: 0 }));
+    audit(req, 'catalog.pick.markup', { entityType: 'catalog', entityId: 'picks', after: { markupPct: pct, baseMarkup, priced: r.rowCount } });
+    return {
+      ok: true, priced: r.rowCount, skippedNoCost: refs.length - r.rowCount,
+      /**
+       * SAID OUT LOUD when the guardrail is thin. With base_markup at 0 the catalogue price
+       * IS the supplier cost plus only the percent typed here, so a small percent leaves the
+       * invoice one division away on a sheet that goes to partners. The caller is told rather
+       * than blocked: publishing a lookbook is not the moment to argue about settings, and a
+       * seller-facing lookbook at base + 0% is a legitimate thing to want.
+       */
+      baseMarkup,
+      thinMargin: baseMarkup === 0,
+    };
   });
 
   /**
