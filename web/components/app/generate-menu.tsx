@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { ImageSquare, FilmSlate, CircleNotch, Warning, Sparkle } from "@phosphor-icons/react"
+import { FilmSlate, CircleNotch, Warning, Sparkle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getDeskImageConfig, getDeskVideoConfig, type DeskImageConfig, type DeskVideoConfig } from "@/lib/api"
 
@@ -62,10 +62,6 @@ export function GenerateButton({ disabled, armed, onArm }: {
   const effImgSize = imgSpec ? (imgSpec.sizes.includes(imgSize) ? imgSize : imgSpec.defaultSize) : imgSize
   const effVidRes = vidSpec ? (vidSpec.resolutions.includes(vidRes) ? vidRes : vidSpec.defaultResolution) : vidRes
 
-  const usd = isVideo
-    ? (vidSpec ? (vidSpec.usdPerSec[effVidRes] ?? 0) * secs : 0)
-    : (imgSpec ? (imgSpec.usd[effImgSize] ?? 0) : 0)
-
   const cfg = isVideo ? vid : img
   const ratios = isVideo ? (vid?.ratios ?? []) : (img?.ratios ?? [])
   const hints = isVideo ? (vid?.ratioHints ?? {}) : (img?.ratioHints ?? {})
@@ -82,6 +78,13 @@ export function GenerateButton({ disabled, armed, onArm }: {
       setImg(i); setVid(v)
       setImgModel(i.model); setImgSize(i.models.find((m) => m.id === i.model)?.defaultSize || "1K")
       setVidModel(v.model); setVidRes(v.models.find((m) => m.id === v.model)?.defaultResolution || "1080p")
+      const iM = i.models.find((m) => m.id === i.model)
+      if (i.enabled && iM) {
+        onArm({
+          mode: "image", model: i.model, ratio: "1:1", size: iM.defaultSize,
+          usd: iM.usd[iM.defaultSize] ?? 0, label: `Image · ${iM.defaultSize} · 1:1`,
+        })
+      }
     } catch (e) {
       // Keep the REAL reason (a 403, a 502, a network failure) — "couldn't load" alone sends
       // the reader looking in entirely the wrong place.
@@ -89,19 +92,35 @@ export function GenerateButton({ disabled, armed, onArm }: {
     } finally {
       setLoading(false)
     }
-  }, [open, img, vid, loading])
+  }, [open, img, vid, loading, onArm])
 
-  const arm = () => {
-    onArm(isVideo
+  /*
+   * Build the armed settings from current state, with overrides for the value being changed
+   * right now (state setters are async, so reading them back here would arm the PREVIOUS
+   * choice — the bug that makes a picker feel one step behind).
+   */
+  const armWith = (o: Partial<{ mode: Mode; imgModel: string; imgSize: string; imgRatio: string; vidModel: string; vidRes: string; vidRatio: string; secs: number }> = {}) => {
+    const m = o.mode ?? mode
+    const video = m === "video"
+    const iM = o.imgModel ?? imgModel, vM = o.vidModel ?? vidModel
+    const iSpec = img?.models.find((x) => x.id === iM) || null
+    const vSpec = vid?.models.find((x) => x.id === vM) || null
+    const iSize = iSpec ? (iSpec.sizes.includes(o.imgSize ?? imgSize) ? (o.imgSize ?? imgSize) : iSpec.defaultSize) : (o.imgSize ?? imgSize)
+    const vRes = vSpec ? (vSpec.resolutions.includes(o.vidRes ?? vidRes) ? (o.vidRes ?? vidRes) : vSpec.defaultResolution) : (o.vidRes ?? vidRes)
+    const sc = o.secs ?? secs
+    const iRatio = o.imgRatio ?? imgRatio, vRatio = o.vidRatio ?? vidRatio
+
+    onArm(video
       ? {
-        mode: "video", model: vidModel, ratio: vidRatio, resolution: effVidRes, seconds: secs, usd,
-        label: `Video · ${effVidRes} · ${secs}s`,
+        mode: "video", model: vM, ratio: vRatio, resolution: vRes, seconds: sc,
+        usd: (vSpec?.usdPerSec[vRes] ?? 0) * sc,
+        label: `Video · ${vRes} · ${sc}s`,
       }
       : {
-        mode: "image", model: imgModel, ratio: imgRatio, size: effImgSize, usd,
-        label: `Image · ${effImgSize} · ${imgRatio}`,
+        mode: "image", model: iM, ratio: iRatio, size: iSize,
+        usd: iSpec?.usd[iSize] ?? 0,
+        label: `Image · ${iSize} · ${iRatio}`,
       })
-    setOpen(false)
   }
 
   const selectCls = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
@@ -151,7 +170,7 @@ export function GenerateButton({ disabled, armed, onArm }: {
               <div className="space-y-2.5">
                 <div>
                   <div className="mb-1 text-2xs text-muted-foreground">What are we making?</div>
-                  <select value={mode} onChange={(e) => { setMode(e.target.value as Mode); setErr(null) }} className={selectCls}>
+                  <select value={mode} onChange={(e) => { const m = e.target.value as Mode; setMode(m); setErr(null); armWith({ mode: m }) }} className={selectCls}>
                     <option value="image">Image</option>
                     <option value="video">Video</option>
                   </select>
@@ -164,7 +183,9 @@ export function GenerateButton({ disabled, armed, onArm }: {
                       onChange={(e) => {
                         const id = e.target.value; setVidModel(id)
                         const m = vid?.models.find((x) => x.id === id)
-                        if (m && !m.resolutions.includes(vidRes)) setVidRes(m.defaultResolution)
+                        const r = m && !m.resolutions.includes(vidRes) ? m.defaultResolution : vidRes
+                        if (m && r !== vidRes) setVidRes(r)
+                        armWith({ vidModel: id, vidRes: r })
                       }}>
                       {vid?.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                     </select>
@@ -173,7 +194,9 @@ export function GenerateButton({ disabled, armed, onArm }: {
                       onChange={(e) => {
                         const id = e.target.value; setImgModel(id)
                         const m = img?.models.find((x) => x.id === id)
-                        if (m && !m.sizes.includes(imgSize)) setImgSize(m.defaultSize)
+                        const sz = m && !m.sizes.includes(imgSize) ? m.defaultSize : imgSize
+                        if (m && sz !== imgSize) setImgSize(sz)
+                        armWith({ imgModel: id, imgSize: sz })
                       }}>
                       {img?.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                     </select>
@@ -187,18 +210,21 @@ export function GenerateButton({ disabled, armed, onArm }: {
                   <div>
                     <div className="mb-1 text-2xs text-muted-foreground">Shape</div>
                     <select value={isVideo ? vidRatio : imgRatio} className={selectCls}
-                      onChange={(e) => (isVideo ? setVidRatio(e.target.value) : setImgRatio(e.target.value))}>
+                      onChange={(e) => {
+                        const v = e.target.value
+                        if (isVideo) { setVidRatio(v); armWith({ vidRatio: v }) } else { setImgRatio(v); armWith({ imgRatio: v }) }
+                      }}>
                       {ratios.map((r) => <option key={r} value={r}>{hints[r] ? `${r} — ${hints[r]}` : r}</option>)}
                     </select>
                   </div>
                   <div>
                     <div className="mb-1 text-2xs text-muted-foreground">{isVideo ? "Quality" : "Size"}</div>
                     {isVideo ? (
-                      <select value={effVidRes} onChange={(e) => setVidRes(e.target.value)} className={selectCls}>
+                      <select value={effVidRes} onChange={(e) => { setVidRes(e.target.value); armWith({ vidRes: e.target.value }) }} className={selectCls}>
                         {(vidSpec?.resolutions || []).map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
                     ) : (
-                      <select value={effImgSize} onChange={(e) => setImgSize(e.target.value)} className={selectCls}>
+                      <select value={effImgSize} onChange={(e) => { setImgSize(e.target.value); armWith({ imgSize: e.target.value }) }} className={selectCls}>
                         {(imgSpec?.sizes || []).map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     )}
@@ -206,7 +232,7 @@ export function GenerateButton({ disabled, armed, onArm }: {
                   {isVideo && (
                     <div>
                       <div className="mb-1 text-2xs text-muted-foreground">Length</div>
-                      <select value={secs} onChange={(e) => setSecs(Number(e.target.value))} className={selectCls}>
+                      <select value={secs} onChange={(e) => { setSecs(Number(e.target.value)); armWith({ secs: Number(e.target.value) }) }} className={selectCls}>
                         {(vid?.durations || [8]).map((d) => <option key={d} value={d}>{d}s</option>)}
                       </select>
                     </div>
@@ -215,12 +241,9 @@ export function GenerateButton({ disabled, armed, onArm }: {
 
                 {/* Arms the composer; it does not spend anything yet. The price rides onto the
                     pill so it stays visible while you type, not only at the moment of choosing. */}
-                <Button className="h-9 w-full gap-1.5" onClick={arm}>
-                  {isVideo ? <FilmSlate size={14} /> : <ImageSquare size={14} />}
-                  Use {isVideo ? "Video" : "Image"} · ~${usd.toFixed(usd < 1 ? 3 : 2)}
-                </Button>
+                <Button variant="outline" className="h-9 w-full" onClick={() => setOpen(false)}>Done</Button>
                 <p className="text-2xs text-muted-foreground">
-                  Then type in the message box and press Enter — it goes to the model instead of the chat.
+                  Already armed — type in the message box and press Enter. The Send button now says Generate.
                 </p>
               </div>
             )}
