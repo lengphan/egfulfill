@@ -257,9 +257,16 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
    * reading "More" would imply a choice the catalogue can't offer.
    */
   const facets = useMemo<Facet[]>(() => {
+    /**
+     * NO TYPE ROW. Two kinds across thirteen products is not a filter — picking one of two
+     * is the same gesture as reading the page, and it was the last of three places the same
+     * fact was being presented (tiles, section headings, chips). The facet stays in the
+     * table below so it returns the day the catalogue has kinds worth choosing between;
+     * what is removed is the row, not the data.
+     */
     const spec: [FacetKey, string, boolean][] = [
       ["size", "Size", false], ["color", "Colour", true],
-      ["method", "Print", false], ["category", "Type", false],
+      ["method", "Print", false],
     ]
     return spec.flatMap(([key, label, swatch]) => {
       const seen = new Set<string>()
@@ -318,38 +325,6 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
   const picked = useMemo(() => (all.filter((p) => p.featured).slice(0, 4)), [all])
 
 
-  /**
-   * BROWSE BY KIND, before any filtering — the row every print-on-demand catalogue opens
-   * with, and the thing this page had no equivalent of.
-   *
-   * The filter rail answers "narrow this down"; it does not answer "what do you make?",
-   * which is the question a first-time visitor arrives with. A rail of chips is also a
-   * control you have to read before the products start, so the page opened on its own
-   * furniture and a long scroll of unlabelled cards.
-   *
-   * BUILT FROM THE CATALOGUE, never a hardcoded list of kinds we wish we sold: a tile
-   * exists because products in it exist, it carries one of their real photographs, and it
-   * says how many there are. A category we stop stocking disappears on its own.
-   *
-   * Clicking one IS the category filter — the same `sel` the rail writes, so the two can
-   * never disagree about what is selected, and a tile shows as active when it is on.
-   */
-  const kinds = useMemo(() => {
-    const by = new Map<string, { name: string; count: number; image: string | null }>()
-    for (const p of all) {
-      const name = p.category?.trim()
-      if (!name) continue
-      const cur = by.get(name) ?? { name, count: 0, image: null }
-      cur.count++
-      if (!cur.image && p.image) cur.image = p.image
-      by.set(name, cur)
-    }
-    // Two is the floor, for the same reason the facets have one: a single tile is not a
-    // choice. Biggest first — the kind we make most of is the one worth leading with.
-    const out = [...by.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    return out.length >= 2 ? out : []
-  }, [all])
-
   const activeCount = (Object.keys(sel) as FacetKey[]).reduce((n, k) => n + sel[k].length, 0)
   const toggle = (key: FacetKey, value: string) =>
     setSel((s) => ({
@@ -357,21 +332,19 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
       [key]: s[key].includes(value) ? s[key].filter((v) => v !== value) : [...s[key], value],
     }))
 
-  // Group by category so a long list reads as a catalogue rather than a wall. Anything
-  // without one collects under "More" instead of being dropped.
-  const groups = new Map<string, PublicProduct[]>()
-  for (const p of list) {
-    const k = p.category?.trim() || "More"
-    groups.set(k, [...(groups.get(k) ?? []), p])
-  }
-  // GROUPING HAS TO EARN ITS KEEP. Each heading is display-sized, so a category holding one
-  // product produced a giant title above a single card with three empty cells beside it —
-  // four of those in a row made a young catalogue look broken rather than small. Below the
-  // threshold everything renders as one dense grid, which reads as deliberate at four
-  // products and still scales, because the headings return the moment there is enough to
-  // sort. Category is not lost: it stays on the card.
-  const grouped = list.length >= 8 && [...groups.values()].filter((g) => g.length > 1).length >= 2
-  const sections: [string, PublicProduct[]][] = grouped ? [...groups.entries()] : [["", list]]
+  /**
+   * ONE GRID, NO CATEGORY SECTIONS.
+   *
+   * The page grouped by category, tiled the categories above the filters, and labelled each
+   * card with its own — three presentations of one fact on a catalogue holding two kinds.
+   * At 13 products across Apparel and Headwear that is furniture, not navigation: a heading
+   * over ten cards and a heading over three, with a browse row above repeating both.
+   *
+   * The FILTER is where a kind belongs when there are few of them, and it is still there
+   * under Type. Grouping earns its keep again at the width a real catalogue has — the
+   * threshold it used to carry (two groups of more than one) is exactly that judgement, and
+   * removing the sections rather than the data is what keeps it cheap to bring back.
+   */
 
   return (
     <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
@@ -386,71 +359,6 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
           legibility. The hero above keeps the narrower measure every other marketing page
           uses, because that IS read. Widening both would have made the headline worse to
           make the grid better. */}
-      {/* THE BROWSE ROW. Above the filters and above the grid, because it answers the
-          question that comes first. Scrolls sideways on a phone rather than wrapping to
-          three ragged rows — a category strip is read across, like the shelf it stands
-          for. */}
-      {/* pt-2, not pt-14. PlateHero already ends in pb-20, so a generous top padding here
-          was stacking onto it: 136px of nothing between the headline and the first thing
-          you can click, on a page whose whole job is to show products. */}
-      {!failed && kinds.length > 0 && (
-        <section className="mx-auto max-w-[88rem] px-6 pt-2">
-          <h2 className="text-[22px] font-bold tracking-tight">What we print on</h2>
-          <p className="mt-1 text-[15px] text-black/55">
-            {all.length} product{all.length === 1 ? "" : "s"} you can order today. Pick a kind to narrow the list.
-          </p>
-          <div className="-mx-6 mt-6 flex snap-x gap-4 overflow-x-auto px-6 pb-2 sm:mx-0 sm:px-0">
-            {kinds.map((k) => {
-              const on = sel.category.includes(k.name)
-              return (
-                <button
-                  key={k.name}
-                  type="button"
-                  onClick={() => toggle("category", k.name)}
-                  aria-pressed={on}
-                  className={
-                    "group w-32 shrink-0 snap-start overflow-hidden rounded-xl border bg-white text-left transition-colors sm:w-36 " +
-                    (on ? "border-[#0B0B0C]" : "border-black/[0.09] hover:border-black/40")
-                  }
-                >
-                  {/* 5:4, not square, and 128px wide. At two categories a row of big square
-                      tiles is more furniture than choice — it read as the page's main content
-                      rather than as a way into it. */}
-                  <div className="relative aspect-[5/4] overflow-hidden" style={{ background: ACCENT }}>
-                    {k.image ? (
-                      <Image
-                        src={k.image}
-                        alt=""
-                        fill
-                        unoptimized
-                        sizes="144px"
-                        className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                      />
-                    ) : (
-                      <div className="flex size-full items-center justify-center text-[#FAF8F3]/45">
-                        <TShirt size={32} weight="duotone" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="px-3 py-2.5">
-                    <div className="text-[14px] font-bold tracking-tight">{k.name}</div>
-                    {/* The count is the point of a tile over a chip: it says how deep the
-                        shelf is before you open it. */}
-                    <div className="text-[12px] text-black/55">
-                      {k.count} product{k.count === 1 ? "" : "s"}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* THE SHELF SOMEBODY CHOSE. Above the filters, below the kinds — the order a person
-          reads: what do you make, where do I start, then let me narrow it. Four across at
-          most: a curated row that scrolls stops being a recommendation and becomes a second
-          catalogue. */}
       {/* Drawn from PUBLISHED products only, which is what keeps it from going stale: a
           product ticked months ago and since set back to Draft is not on this page at all,
           so it cannot be in this row either. Empty until someone ticks something, and the
@@ -601,27 +509,11 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                 </button>
               </div>
             ) : (
-              sections.map(([cat, items], gi) => (
-            <div key={cat || "all"} className={gi ? "mt-16" : ""}>
-              {/* A SECTION LABEL, not a page headline. This carried the marketing display
-                  size (clamp up to 3.6rem — 58px here), so "Apparel" was set larger than
-                  "What we can make." reads at the top of the page and dwarfed the products
-                  underneath it. Matched to the other headings on this page instead, so the
-                  page has one rhythm and the loudest thing on it is the grid. */}
-              {cat && <h2 className="text-[22px] font-bold tracking-tight">{cat}</h2>}
-              {/* Four across on a wide desktop, not three. A catalogue is scanned rather than
-                  read, and three 355px cards on a 1,400px screen made a browsing page feel
-                  like a landing page — you saw six products before scrolling.
-                  The fourth column waits for xl BECAUSE OF THE RAIL: it appears at lg and
-                  takes 16rem out of the row, so four columns at a 1024px window would be
-                  165px cards. Three there, four once there is width to pay for it. */}
-              <div className={(cat ? "mt-4" : "") + " grid gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"}>
-                {items.map((p, i) => (
-                  <ProductCard key={p.slug} p={p} showCategory={!grouped} index={i} />
+              <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                {list.map((p, i) => (
+                  <ProductCard key={p.slug} p={p} showCategory={false} index={i} />
                 ))}
               </div>
-            </div>
-              ))
             )}
             </div>
           </div>
