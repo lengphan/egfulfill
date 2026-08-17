@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, PencilSimple, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
+import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront, Shuffle, ArrowsClockwise, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -331,11 +331,11 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
               title="Reopen the publish window with this listing's blank, variants, artwork and photos"
               className={cn(CARD_ACTION_PRIMARY, "flex-1")}
             >
-              <PencilSimple size={13} weight="bold" /> Edit listing
+              Edit listing
             </button>
           ) : l.our_url ? (
             <a href={l.our_url} target="_blank" rel="noopener noreferrer" className={cn(CARD_ACTION_PRIMARY, "flex-1")}>
-              <Storefront size={13} weight="bold" /> Open listing
+              Open listing
             </a>
           ) : (
             <span className={cn(CARD_ACTION_SECONDARY, "flex-1 cursor-default opacity-60")} title="No listing URL was returned when this was published.">
@@ -568,7 +568,15 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
                 ? cn(CARD_ACTION_SECONDARY, "flex-1 border-emerald-600/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400")
                 : cn(CARD_ACTION_PRIMARY, "flex-1")}
             >
-              {uploaded ? <><CheckCircle size={13} weight="fill" /> Uploaded</> : <><Storefront size={13} weight="bold" /> Make product</>}
+              {/* LETTERING ONLY. A card is already a photograph with a price, a shop name and
+                  a keyword row on it; a glyph on the button was one more thing competing in
+                  the busiest part of the tile, and it said nothing the word beside it didn't.
+                  Same for every other card action here.
+                  "Create product", not "Add to store": the click opens the publish form with
+                  this listing prefilled, and nothing reaches a shop until that form is
+                  submitted. A button that names a finished action it doesn't perform is the
+                  reason people press it twice. */}
+              {uploaded ? "Uploaded" : "Create product"}
             </button>
             {/* Sourcing is admin-only server-side, so the button only exists for an admin —
                 anyone else would be clicking a control that always 403s. */}
@@ -711,7 +719,7 @@ export function SpyDeckView() {
   }, [])
   const [saved, setSaved] = useState<SavedListing[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
-  // "Make product" → Etsy draft. Track which listings have been uploaded (this session).
+  // "Create product" → Etsy draft. Track which listings have been uploaded (this session).
   const [makeListing, setMakeListing] = useState<EtsyListing | null>(null)
   // description + images are NOT in the grid payload — they'd be ~5x the response for
   // data no card shows. Fetched here for the one listing being turned into a product,
@@ -856,7 +864,7 @@ export function SpyDeckView() {
         source: l,
         returnTo: "/spydeck",
         returnLabel: "Back to SpyDeck",
-        title: "Make product",
+        title: "Create product",
       })
       setMakeListing(null)
       if (!draftId) { setPublishErr("Couldn't open the publish page — that listing's photos are too large for the browser to hand over."); return }
@@ -993,7 +1001,7 @@ export function SpyDeckView() {
   }, [entitled])
 
   // Same for what's already been turned into a draft. Without this the Uploaded tab was
-  // empty on every refresh and each card offered "Make product" again for something
+  // empty on every refresh and each card offered "Create product" again for something
   // already published — duplicate drafts in the shop.
   /**
    * STAFF SEE EVERYONE'S. A factory running several people through one set of shops has to
@@ -1382,7 +1390,7 @@ export function SpyDeckView() {
                 <Storefront size={24} weight="duotone" />
               </span>
               <div className="font-medium">Nothing uploaded yet</div>
-              <div className="max-w-xs text-sm text-muted-foreground">Hit &ldquo;Make product&rdquo; on any card to publish it as an Etsy draft — it&apos;ll show here.</div>
+              <div className="max-w-xs text-sm text-muted-foreground">Hit &ldquo;Create product&rdquo; on any card to publish it as an Etsy draft — it&apos;ll show here.</div>
             </div>
           ) : (
             <>

@@ -98,7 +98,7 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => onOpen(s)} className={cn(CARD_ACTION_PRIMARY, "flex-1")}>
-            <Storefront size={13} weight="bold" /> Go To Store
+            Go to store
           </button>
           {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className={cn(CARD_ACTION_ICON, "text-muted-foreground hover:text-foreground")} title="Open on Etsy"><ArrowSquareOut size={15} /></a>}
         </div>
