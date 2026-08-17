@@ -359,6 +359,28 @@ export default function ChatPage() {
     return () => { clearTimeout(t); clearInterval(iv) }
   }, [activeId, load])
 
+  /**
+   * THE RAIL ITSELF HAS TO REFRESH, or the badge is a number from whenever the page opened.
+   *
+   * The thread list was fetched exactly once, on mount. So a conversation that arrived while
+   * you were reading another one never appeared, the order never re-sorted, and the unread
+   * count could only ever change by reloading the page — which is most of the reason the
+   * badge looked stuck. The open thread polls every 5s; the list is cheaper to be wrong
+   * about and noisier to re-render, so it goes at 20.
+   *
+   * Staff only: a seller has no inbox to poll.
+   */
+  const refreshRail = useCallback(() => {
+    if (!isStaffUser || isDesigner) return
+    getSupportThreads().then((rows) => { if (rows) setInbox(rows) }).catch(() => {})
+  }, [isStaffUser, isDesigner])
+
+  useEffect(() => {
+    if (!isStaffUser || isDesigner) return
+    const iv = setInterval(refreshRail, 20000)
+    return () => clearInterval(iv)
+  }, [isStaffUser, isDesigner, refreshRail])
+
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
@@ -442,6 +464,23 @@ export default function ChatPage() {
     try {
       await postOrderMessage(activeId, text, { clientId, by: myName, role: myRole, attachment: att })
       await load()
+      /**
+       * ANSWERED — so the badge goes now, not at the next poll.
+       *
+       * The count is what is waiting on US, and the reply that just landed is the thing
+       * that settles it. The server works this out too, but it is read on a 20-second
+       * timer, and typing an answer while the number sits there unchanged is exactly the
+       * "it's still there" this was meant to fix. Cleared locally first, then reconciled —
+       * if the seller writes again a second later, the next refresh puts a 1 back, which
+       * is correct rather than a flicker.
+       *
+       * Only for a reply into SOMEONE ELSE's thread. On your own My EG thread you are the
+       * asker, and there is no badge to clear.
+       */
+      if (myRole === "staff") {
+        setInbox((prev) => prev.map((t) => (t.order_id === activeId ? { ...t, unanswered: 0 } : t)))
+        refreshRail()
+      }
       // Only the Support thread gets an AI reply; order threads are seller↔factory.
       if (isSupport) {
         setAiTyping(true)
