@@ -8,7 +8,8 @@ import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportTh
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
-import { ImageGenButton } from "@/components/app/image-gen"
+import { GenerateButton, type FrameChoice } from "@/components/app/generate-menu"
+import { UserAvatar } from "@/components/app/user-avatar"
 
 const nowMs = () => Date.now()
 const fmtTime = (ts?: number) => {
@@ -29,7 +30,14 @@ const SUGGESTIONS = [
 // orders are open. Per-order talk now rides inside a channel as an order_ref chip; it
 // used to spawn a room per order (plus a second `design-<id>` room), which buried the
 // real conversations under dozens of empty ones.
-type Convo = { id: string; kind: "support" | "staff" | "inbox" | "announce"; title: string; sub: string; escalated?: boolean }
+type Convo = {
+  id: string; kind: "support" | "staff" | "inbox" | "announce"; title: string; sub: string
+  escalated?: boolean
+  /** Messages in the thread — the badge on the row. */
+  count?: number
+  /** The person's own avatar, when the row is a person. */
+  avatar?: { name?: string | null; avatar_emoji?: string | null; avatar_color?: string | null } | null
+}
 const STAFF_CHANNEL = "staff-general"
 const ANNOUNCE_CHANNEL = "announce"
 
@@ -78,6 +86,23 @@ export default function ChatPage() {
   const [drafting, setDrafting] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatEntry[] | null>(null)
+  /* Stills in this thread that a video can start from. Deliberately ANY image here, not
+     only generated ones — a product photo someone dropped in is just as good a first frame,
+     and often better, because it's the real garment. The server takes the bare asset name
+     rather than a URL, so parse it out here; anything not served from our own asset route
+     is skipped, since the server couldn't read it back anyway. */
+  const animatableFrames = useMemo<FrameChoice[]>(() => {
+    const out: FrameChoice[] = []
+    for (const m of [...(messages ?? [])].reverse()) {
+      const att = m.attachment as ChatAttachment | undefined
+      if (!att?.url || !att.mime?.startsWith("image/")) continue
+      const name = att.url.split("/api/support/asset/")[1]
+      if (!name || out.some((f) => f.name === name)) continue
+      out.push({ name, url: att.url, label: att.name || "image" })
+      if (out.length >= 8) break
+    }
+    return out
+  }, [messages])
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
@@ -139,13 +164,25 @@ export default function ChatPage() {
     if (supportId) list.push({ id: supportId, kind: "support", title: isStaffUser ? "My EG" : "EGFUL Support", sub: isStaffUser ? "Your AI assistant" : "Assistant + team" })
     // Admin writes, everyone else reads. Designers aren't part of seller-facing comms.
     if (!isDesigner) list.push({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: isAdmin ? "Broadcast to all sellers" : "From EGFUL" })
-    // Threads with an unanswered "talk to a human" sort above the rest — an explicit
-    // request for help shouldn't be buried under newer small talk.
-    if (isStaffUser) for (const t of [...inbox].sort((a, b) => Number(!!b.escalated) - Number(!!a.escalated))) {
+    /**
+     * NEWEST MESSAGE FIRST, under the pinned channels.
+     *
+     * Escalated threads were floated to the top, on the argument that an explicit request
+     * for a human should not be buried. In an inbox someone is WORKING, it buries the thing
+     * they are actually mid-sentence with: a reply arrives, the row does not move, and the
+     * conversation you were in sits below two older ones that carry a flag. The flag is
+     * still on the row and still legible — "Needs a human" — which is what makes it
+     * findable without also making it the sort.
+     *
+     * The server already returns `last_at desc`; this sorts explicitly rather than relying
+     * on it, so the rail cannot quietly change meaning if that query is ever reordered.
+     */
+    if (isStaffUser) for (const t of [...inbox].sort((a, b) => (b.last_at || 0) - (a.last_at || 0))) {
       if (t.order_id === supportId) continue // don't list my own thread twice
       list.push({
         id: t.order_id, kind: "inbox", title: t.seller_name || t.seller_id,
-        sub: t.last ? t.last.slice(0, 40) : "Support request", escalated: !!t.escalated,
+        sub: t.last ? t.last.slice(0, 40) : "Support request", escalated: !!t.escalated, count: t.n,
+        avatar: { name: t.seller_name, avatar_emoji: t.avatar_emoji, avatar_color: t.avatar_color },
       })
     }
     // Channels opened from the directory that have no messages yet, so they don't
@@ -489,15 +526,41 @@ export default function ChatPage() {
                 onClick={() => setActiveId(c.id)}
                 className={"flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-accent " + (c.id === activeId ? "bg-accent" : "")}
               >
-                <span className={"flex size-9 shrink-0 items-center justify-center rounded-full " + (c.kind === "support" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                  {convoIcon(c.kind)}
-                </span>
+                {/* THE PERSON, not a parcel. Every row drew the same glyph, so an inbox of
+                    eight conversations looked like eight copies of one thing and the only way
+                    to find the one you were mid-sentence with was to read names. The pinned
+                    channels (Announcements, Factory, My EG) keep their icons — those are
+                    places, not people. A website visitor has no account, so UserAvatar falls
+                    back to their initial rather than inventing a face. */}
+                {c.avatar ? (
+                  <UserAvatar
+                    user={{
+                      name: c.avatar.name ?? undefined,
+                      avatar_emoji: c.avatar.avatar_emoji ?? null,
+                      avatar_color: c.avatar.avatar_color ?? null,
+                    }}
+                    size={36}
+                    className="shrink-0"
+                  />
+                ) : (
+                  <span className={"flex size-9 shrink-0 items-center justify-center rounded-full " + (c.kind === "support" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                    {convoIcon(c.kind)}
+                  </span>
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span className="truncate text-sm font-semibold">{c.title}</span>
-                    {c.escalated && (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-3xs font-bold uppercase tracking-wide text-amber-700">
-                        Needs a human
+                    {/* HOW MUCH IS IN IT, not a flag about it.
+                        "Needs a human" is gone: it was a second ordering signal competing
+                        with the sort, and once the newest conversation is at the top the
+                        flag says nothing the position doesn't — an unanswered request IS
+                        the most recent message. Amber is also a reserved floor status
+                        (warning / on hold), which a chat row has no business borrowing.
+                        The count is what a rail row can usefully carry: how long this
+                        conversation is before you open it. */}
+                    {!!c.count && (
+                      <span className="ml-auto shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-3xs font-semibold tabular-nums text-muted-foreground">
+                        {c.count > 99 ? "99+" : c.count}
                       </span>
                     )}
                   </span>
@@ -747,15 +810,23 @@ export default function ChatPage() {
               Draft with AI
             </Button>
           )}
-          {/* Generate an image — STAFF ONLY, and only in the staffer's own "My EG" channel.
-              Each render bills Google, so it is not offered on a seller thread, a factory
-              room or an inbox conversation; the server enforces the same two rules. */}
+          {/* Generate an image or video — STAFF ONLY, and only in the staffer's own "My EG"
+              channel. Each generation bills Google, so it is not offered on a seller thread,
+              a factory room or an inbox conversation; the server enforces the same two rules. */}
           {isStaffUser && activeId === supportId && (
-            <ImageGenButton
+            <GenerateButton
               disabled={signedOut || !activeId}
+              frames={animatableFrames}
               // The server already posted it into this thread — just pull the thread again
               // so it lands as a normal message rather than a second, client-only bubble.
-              onGenerated={() => { void load() }}
+              onImage={() => { void load() }}
+              // A clip is NOT here yet. Say when it will be and what it cost, because the
+              // thread will look unchanged for the next couple of minutes and silence there
+              // is indistinguishable from a failure.
+              onVideoStarted={({ usd, seconds }) => {
+                setAiNote(`Making a ${seconds}s clip (~$${usd.toFixed(2)}) — it lands in this chat in a minute or two.`)
+                setTimeout(() => setAiNote(null), 12000)
+              }}
             />
           )}
           {/* Attach a file (images downsized before upload) */}

@@ -2756,6 +2756,14 @@ export function ordersRoutes(app, requireAuth) {
                (select coalesce(nullif(ps.name,''), ps.email) from public_support ps
                  where 'support-web-' || ps.id = m.order_id)
              ) as seller_name,
+             -- THE FACE THAT GOES WITH THE NAME. The rail drew the same parcel glyph on every
+             -- row, so eight conversations looked like eight copies of one thing and finding
+             -- the person you were mid-sentence with meant reading names. The account already
+             -- carries an avatar (Settings › Profile) and every other surface shows it.
+             -- Null for a website visitor: no user row, so the rail falls back to their
+             -- initial rather than inventing a face for someone who has no account.
+             (select u.avatar_emoji from users u where u.id::text = replace(m.order_id, 'support-', '')) as avatar_emoji,
+             (select u.avatar_color from users u where u.id::text = replace(m.order_id, 'support-', '')) as avatar_color,
              -- Open escalation = the seller asked for a human and no HUMAN has replied since.
              -- That's what sorts a thread to the top of the inbox. The AI assistant and its
              -- auto-acknowledgments (both role 'assistant') deliberately do NOT clear it —
@@ -2775,6 +2783,8 @@ export function ordersRoutes(app, requireAuth) {
       order_id: x.order_id,
       seller_id: String(x.order_id).replace('support-', ''),
       seller_name: x.seller_name || null,
+      avatar_emoji: x.avatar_emoji || null,
+      avatar_color: x.avatar_color || null,
       last: x.last_body || '',
       last_at: x.last_at ? new Date(x.last_at).getTime() : 0,
       n: x.n,

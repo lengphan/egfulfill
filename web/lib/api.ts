@@ -2397,9 +2397,47 @@ export function generateDeskImage(body: { prompt: string; aspectRatio?: string; 
     `/api/desk/image`, { method: "POST", body: JSON.stringify(body) })
 }
 
+// ── Video generation (Veo 3.1), same staff-only gate and channel as images ────
+// A clip takes 1–3 minutes, so POST only STARTS a job and returns; the finished video is
+// posted into the thread by the server and arrives the way an AI reply does.
+export type VideoGenModel = {
+  id: string; label: string; note: string
+  resolutions: string[]; defaultResolution: string
+  /** Per-SECOND USD, keyed by resolution — multiply by duration for the clip cost. */
+  usdPerSec: Record<string, number>
+}
+export type DeskVideoConfig = {
+  enabled: boolean; keySet: boolean; storageReady: boolean
+  model: string; models: VideoGenModel[]
+  ratios: string[]; ratioHints: Record<string, string>; durations: number[]
+}
+export function getDeskVideoConfig() {
+  return api<DeskVideoConfig>(`/api/desk/video/config`)
+}
+/** `imageName` is the bare asset filename of an already-generated still — passing it turns
+ *  this into image-to-video, so the clip starts from that exact frame. */
+export function generateDeskVideo(body: {
+  prompt: string; aspectRatio?: string; resolution?: string
+  durationSeconds?: number; model?: string; imageName?: string
+}) {
+  return api<{ ok?: boolean; started?: boolean; jobId?: string; usd?: number; seconds?: number; model?: string; resolution?: string; disabled?: boolean; error?: string }>(
+    `/api/desk/video`, { method: "POST", body: JSON.stringify(body) })
+}
+export function getDeskVideoJob(id: string) {
+  return api<{ id: string; status: string; error?: string | null; seconds?: number; model?: string; resolution?: string }>(
+    `/api/desk/video/${encodeURIComponent(id)}`)
+}
+
 // Staff support inbox: every seller support thread + an AI-drafted reply (not posted).
 // `escalated` = the seller asked for a human and no staffer has replied since.
-export type SupportThread = { order_id: string; seller_id: string; seller_name: string | null; last: string; last_at: number; n: number; escalated?: boolean }
+export type SupportThread = {
+  order_id: string; seller_id: string; seller_name: string | null
+  last: string; last_at: number; n: number; escalated?: boolean
+  /** The account's own avatar, so the rail shows the person rather than a generic glyph.
+   *  Null for a website visitor — they have no account, and a made-up face is worse than
+   *  their initial. */
+  avatar_emoji?: string | null; avatar_color?: string | null
+}
 export function getSupportThreads() {
   return api<SupportThread[]>(`/api/support/threads`)
 }
