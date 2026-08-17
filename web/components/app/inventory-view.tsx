@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, Barcode as BarcodeIcon } from "@phosphor-icons/react"
+import Image from "next/image"
+import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretRight } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -12,12 +13,39 @@ import { Barcode } from "@/components/app/barcode"
 import { ScanQr } from "@/components/app/scan-code"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, type InventoryItem, type ScanRow, type SkuVisibility } from "@/lib/api"
+import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, getCatalogProducts, type CatalogProduct, type InventoryItem, type OrderItem, type ScanRow, type SkuVisibility } from "@/lib/api"
 import { getToken } from "@/lib/auth"
+import { resolveProduct, sizesOf } from "@/lib/variant-resolve"
+import { variantSku, variantLabel } from "@/lib/variant-sku"
+import { prettyColorName } from "@/lib/color-name"
 import { PageTitle } from "@/components/app/page-title"
 import { TabLabel } from "@/components/app/tab-label"
 
 const num = (v: unknown) => Number(v) || 0
+
+/**
+ * THE PICTURE OF THE THING ON THE SHELF.
+ *
+ * An inventory row is a sku and a number, which is enough to audit and not enough to pick:
+ * "Adidas Ultimate365 Polo" and "Otto Cap Digital Camo 6-Panel" are the same amount of grey
+ * text, and the person reading this table is holding a garment. The catalogue already has
+ * the photo — the row just never asked for it.
+ *
+ * Colour-specific when we can: a row whose variant names a colourway gets THAT colourway's
+ * photo, because a black tee and a white tee are the difference the picker is checking.
+ */
+const imageFor = (p: CatalogProduct | null, variant?: string | null): string => {
+  if (!p) return ""
+  const ci = p.colorImages ?? {}
+  const v = (variant || "").toLowerCase()
+  if (v) {
+    for (const [c, url] of Object.entries(ci)) {
+      if (!c || !url) continue
+      if (v.includes(c.toLowerCase()) || v.includes(prettyColorName(c).toLowerCase())) return url
+    }
+  }
+  return p.img || p.image || p.hero || p.images?.[0] || Object.values(ci).find(Boolean) || ""
+}
 
 /**
  * How far a SKU may travel. A row written before the column existed reads back undefined,
@@ -60,12 +88,26 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
   const [zoomSku, setZoomSku] = useState<string | null>(null)
   const [copies, setCopies] = useState<Record<string, number>>({})
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** The catalogue, for the row photo and for "Add from catalogue". Read once; a product's
+   *  picture doesn't change while a stock count is being typed. */
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([])
+  /** Which product groups are expanded. Collapsed by default — the point of grouping is a
+   *  table of PRODUCTS, and a page that opens with every variant showing is the flat list
+   *  again with extra indentation. */
+  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set())
 
   const load = useCallback(() => {
     if (!getToken()) { setItems([]); return }
     getInventory().then((r) => setItems(r ?? [])).catch(() => setItems([]))
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (!getToken()) return
+      getCatalogProducts().then((r) => setCatalog(r ?? [])).catch(() => {})
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
 
   // Edits are optimistic locally, then flushed as PER-FIELD PATCHes (debounced).
   // Never save the whole array: that would re-send this page's snapshot of every
@@ -104,10 +146,17 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
     pending.current.delete(sku)
     deleteInventoryItem(sku).catch(() => load())
   }
-  const add = (it: InventoryItem) => {
-    setItems((prev) => [it, ...(prev ?? []).filter((x) => x.sku !== it.sku)])
+  /** One row or a product's whole size run — the catalogue path adds several at once, and
+   *  they go in as individual POSTs so a failure loses one row rather than the batch. */
+  const add = (batch: InventoryItem[]) => {
+    const skus = new Set(batch.map((b) => b.sku))
+    setItems((prev) => [...batch, ...(prev ?? []).filter((x) => !skus.has(x.sku))])
     setAddOpen(false)
-    addInventoryItem(it).catch(() => load())
+    Promise.all(batch.map((it) => addInventoryItem(it).catch(() => null))).then((r) => {
+      // Re-read if any POST failed, rather than leaving the table showing a row the
+      // server never took.
+      if (r.some((x) => x === null)) load()
+    })
   }
 
   const cats = useMemo(() => Array.from(new Set((items ?? []).map((i) => i.category).filter(Boolean))).sort() as string[], [items])
@@ -126,7 +175,41 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
     return { total: list.length, low: list.filter(isLow).length, out: list.filter(isOut).length, reserved: list.reduce((s, i) => s + num(i.reserved), 0) }
   }, [items])
 
-  const paged = usePaged(filtered, 25)
+  /**
+   * ONE ROW PER PRODUCT, variants underneath it.
+   *
+   * Stock is held per variant, so the table was one row per sku — 8 sizes of one tee read
+   * as 8 unrelated products, and "do we have this polo?" meant reading eight rows and adding
+   * them up. Grouped, the answer is the row: the total is the product's, and the caret opens
+   * the sizes when the question is which one.
+   *
+   * Grouped by the CATALOGUE PRODUCT the sku resolves to, not by a prefix of the string —
+   * `resolveProduct` is the same matcher an order line uses, so a row groups with the
+   * product it will actually be picked for. Unresolved rows fall back to their name, and
+   * anything left is its own group of one, which renders exactly as it always did.
+   */
+  const groups = useMemo(() => {
+    const out: { key: string; name: string; product: CatalogProduct | null; image: string; rows: InventoryItem[] }[] = []
+    const by = new Map<string, number>()
+    for (const it of filtered) {
+      const p = catalog.length ? resolveProduct({ sku: it.sku } as OrderItem, catalog) : null
+      const key = p ? "p:" + String(p.id ?? p.sku ?? p.name) : it.name?.trim() ? "n:" + it.name.trim().toLowerCase() : "s:" + it.sku
+      const at = by.get(key)
+      if (at === undefined) {
+        by.set(key, out.length)
+        out.push({ key, name: p?.name || it.name || it.sku, product: p, image: imageFor(p, it.variant), rows: [it] })
+      } else {
+        out[at].rows.push(it)
+      }
+    }
+    return out
+  }, [filtered, catalog])
+
+  const paged = usePaged(groups, 25)
+  /** Every sku on the page, open or not — what "select all" and the supplier resolver mean
+   *  by "this page". A collapsed group still selects its variants: the checkbox is on the
+   *  product, and the labels are printed per variant. */
+  const pageSkus = useMemo(() => paged.pageItems.flatMap((g) => g.rows.map((r) => r.sku)), [paged.pageItems])
 
   /**
    * WHO SELLS THIS, AND CAN WE STILL GET IT.
@@ -144,8 +227,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
    * flagged, and removing it stays a decision someone makes per row.
    */
   useEffect(() => {
-    const skus = paged.pageItems.map((i) => i.sku).filter(Boolean)
-    const missing = skus.filter((k) => meta[k] === undefined)
+    const missing = pageSkus.filter(Boolean).filter((k) => meta[k] === undefined)
     if (!missing.length) return
     let alive = true
     const t = setTimeout(() => {
@@ -162,7 +244,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
     }, 0)
     return () => { alive = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paged.pageItems])
+  }, [pageSkus])
 
   return (
     <div className="space-y-4">
@@ -268,18 +350,20 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                       <input
                         type="checkbox"
                         aria-label="Select all on this page"
-                        checked={paged.pageItems.length > 0 && paged.pageItems.every((i) => sel.has(i.sku))}
+                        checked={pageSkus.length > 0 && pageSkus.every((k) => sel.has(k))}
                         onChange={(e) => {
                           const next = new Set(sel)
                           // Only this page — ticking a header shouldn't silently select
-                          // hundreds of rows the user can't see.
-                          paged.pageItems.forEach((i) => (e.target.checked ? next.add(i.sku) : next.delete(i.sku)))
+                          // hundreds of rows the user can't see. Every VARIANT on the page,
+                          // including the ones inside collapsed groups: the group is a way
+                          // of reading the table, not a subset of what it holds.
+                          pageSkus.forEach((k) => (e.target.checked ? next.add(k) : next.delete(k)))
                           setSel(next)
                         }}
                       />
                     </th>
-                    <th className="px-4 py-2.5 font-medium">SKU</th>
                     <th className="px-4 py-2.5 font-medium">Item</th>
+                    <th className="px-4 py-2.5 font-medium">SKU</th>
                     <th className="px-2 py-2.5 text-center font-medium">Labels</th>
                     <th className="px-4 py-2.5 text-center font-medium">In stock</th>
                     <th className="px-4 py-2.5 text-center font-medium">Reserved</th>
@@ -291,108 +375,33 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.pageItems.map((it) => (
-                    <tr key={it.sku} className={"border-t border-border " + (sel.has(it.sku) ? "bg-primary/[0.04]" : "")}>
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${it.sku}`}
-                          checked={sel.has(it.sku)}
-                          onChange={(e) => {
-                            const next = new Set(sel)
-                            if (e.target.checked) next.add(it.sku); else next.delete(it.sku)
-                            setSel(next)
-                          }}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        {/* SKU as TEXT, with the code one tap away.
-                            The inline barcode was a 22px-tall thumbnail — unreadable by any
-                            scanner, which is worse than showing none: it looks scannable, so
-                            people aim a phone at it and conclude the scanner is broken. It
-                            also cost the column ~24px of height on every row for a picture
-                            nobody could use.
-                            The SKU itself is the thing people read off this table; the code
-                            is for the one moment someone wants to scan, and that now opens
-                            at a size that actually decodes. */}
-                        <div className="flex w-[150px] items-center gap-1.5">
-                          <span className="min-w-0 flex-1 break-all font-mono text-xs font-medium">{it.sku}</span>
-                          <button
-                            type="button"
-                            onClick={() => setZoomSku(it.sku)}
-                            title={`Show a scannable code for ${it.sku}`}
-                            aria-label={`Show a scannable code for ${it.sku}`}
-                            className="eg-tap shrink-0 rounded-md border border-border p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                          >
-                            <BarcodeIcon size={14} weight="bold" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="max-w-[220px] truncate font-medium">{it.name || "—"}</div>
-                        {/* Variant first — it is what tells two rows of one style apart.
-                            Then who sells it: typed if someone typed it, else resolved from
-                            the supplier catalogues by sku, so the next restock does not
-                            start with a search. */}
-                        {(it.variant || meta[it.sku]?.variant) && (
-                          <div className="max-w-[220px] truncate text-xs text-muted-foreground">{it.variant || meta[it.sku]?.variant}</div>
-                        )}
-                        {(it.supplier || meta[it.sku]?.supplier) && (
-                          <div className="max-w-[220px] truncate text-2xs text-muted-foreground">{it.supplier || meta[it.sku]?.supplier}</div>
-                        )}
-                        {/* Only once we have ASKED and been told nothing — `meta[sku]` is
-                            undefined while unresolved, and an empty object once answered. */}
-                        {meta[it.sku] !== undefined && !meta[it.sku]?.supplier && !it.supplier && (
-                          <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-medium text-amber-700">
-                            Not in any supplier catalogue
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        {/* How many stickers for THIS variant. Only meaningful once it's
-                            ticked, so it's disabled until then. */}
-                        <Input
-                          value={String(copies[it.sku] ?? 1)}
-                          onChange={(e) => setCopies({ ...copies, [it.sku]: Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1) })}
-                          disabled={!sel.has(it.sku)}
-                          inputMode="numeric"
-                          aria-label={`Label copies for ${it.sku}`}
-                          className="mx-auto h-8 w-14 text-center"
-                        />
-                      </td>
-                      <td className="px-2 py-2 text-center"><Input value={String(num(it.in_stock))} onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
-                      <td className="px-2 py-2 text-center"><Input value={String(num(it.reserved))} onChange={(e) => edit(it.sku, "reserved", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
-                      <td className="px-4 py-2 text-center font-semibold tabular-nums">{avail(it)}</td>
-                      <td className="px-2 py-2 text-center"><Input value={String(it.reorder_at ?? 25)} onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
-                      <td className="px-4 py-2">
-                        {/* nowrap: the visibility column narrowed this one enough that
-                            "In stock" wrapped onto two lines and the row grew a step. */}
-                        {isOut(it) ? <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Out</span>
-                          : isLow(it) ? <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Low</span>
-                            : <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
-                      </td>
-                      <td className="px-4 py-2">
-                        <select
-                          value={visOf(it)}
-                          onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
-                          aria-label={`Visibility for ${it.sku}`}
-                          className={"eg-select h-7 rounded-full border-0 py-0 pl-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (VIS.find((v) => v.id === visOf(it))?.pill ?? "")}
-                        >
-                          {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => setHistSku(it.sku)} title="Scan history" className="text-muted-foreground hover:text-foreground"><ClockCounterClockwise size={15} /></button>
-                          <button onClick={() => remove(it.sku)} title="Remove" className="text-muted-foreground hover:text-red-600"><Trash size={15} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {paged.pageItems.map((g) => {
+                    const one = g.rows.length === 1
+                    const isOpen = openKeys.has(g.key)
+                    const allSel = g.rows.every((r) => sel.has(r.sku))
+                    return (
+                      <ProductGroup
+                        key={g.key}
+                        group={g}
+                        open={isOpen}
+                        onToggle={() => setOpenKeys((p) => { const n = new Set(p); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n })}
+                        selected={allSel}
+                        onSelect={(on) => {
+                          const next = new Set(sel)
+                          for (const r of g.rows) { if (on) next.add(r.sku); else next.delete(r.sku) }
+                          setSel(next)
+                        }}
+                        single={one}
+                        meta={meta}
+                        sel={sel} setSel={setSel} copies={copies} setCopies={setCopies}
+                        edit={edit} setVisibility={setVisibility} remove={remove} onHistory={setHistSku} onZoom={setZoomSku}
+                      />
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
-            <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage} total={paged.total} start={paged.start} onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[25, 50, 100]} />
+            <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage} total={paged.total} start={paged.start} onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[25, 50, 100]} noun="products" />
           </>
         )}
       </SectionCard>
@@ -400,7 +409,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       </>
       )}
 
-      <AddItemDialog open={addOpen} onOpenChange={setAddOpen} onAdd={add} existing={(items ?? []).map((i) => i.sku)} />
+      <AddItemDialog open={addOpen} onOpenChange={setAddOpen} onAdd={add} existing={(items ?? []).map((i) => i.sku)} catalog={catalog} />
       <ScanHistoryDialog sku={histSku} onClose={() => setHistSku(null)} />
 
       {/* Selected variants only — or the whole filtered list if nothing is ticked,
@@ -414,6 +423,201 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       />
       <BarcodeZoom sku={zoomSku} onClose={() => setZoomSku(null)} />
     </div>
+  )
+}
+
+type Group = { key: string; name: string; product: CatalogProduct | null; image: string; rows: InventoryItem[] }
+
+/** The photo, or the letter — never an empty tile, and never a stock photo of something
+ *  else. A blank square with an initial says "no picture"; a placeholder garment would say
+ *  "this is the garment", which is a lie the picker acts on. */
+function Thumb({ src, name, size = 34 }: { src: string; name: string; size?: number }) {
+  return src ? (
+    <span className="block shrink-0 overflow-hidden rounded-md border border-border bg-muted/40" style={{ width: size, height: size }}>
+      <Image src={src} alt="" width={size * 2} height={size * 2} unoptimized className="size-full object-cover" />
+    </span>
+  ) : (
+    <span
+      className="grid shrink-0 place-items-center rounded-md border border-border bg-muted/40 text-xs font-semibold text-muted-foreground"
+      style={{ width: size, height: size }}
+      aria-hidden
+    >
+      {(name || "?").trim().charAt(0).toUpperCase()}
+    </span>
+  )
+}
+
+/**
+ * A product and its variants — one <tbody> row when there is one variant, a summary row
+ * plus an openable list when there are several.
+ *
+ * THE SUMMARY ROW DOES NOT TAKE EDITS. Its numbers are sums across sizes, and there is no
+ * honest answer to "set in stock to 40" on a row that stands for eight skus — it would have
+ * to pick one, or spread, and either is a number nobody typed. Editing lives on the variant,
+ * which is where the count is actually held.
+ */
+function ProductGroup({
+  group, open, onToggle, selected, onSelect, single, meta, sel, setSel, copies, setCopies, edit, setVisibility, remove, onHistory, onZoom,
+}: {
+  group: Group
+  open: boolean
+  onToggle: () => void
+  selected: boolean
+  onSelect: (on: boolean) => void
+  single: boolean
+  meta: Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>
+  sel: Set<string>
+  setSel: (s: Set<string>) => void
+  copies: Record<string, number>
+  setCopies: (c: Record<string, number>) => void
+  edit: (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) => void
+  setVisibility: (sku: string, v: SkuVisibility) => void
+  remove: (sku: string) => void
+  onHistory: (sku: string) => void
+  onZoom: (sku: string) => void
+}) {
+  const row = (it: InventoryItem, indented: boolean) => (
+    <tr key={it.sku} className={"border-t border-border " + (sel.has(it.sku) ? "bg-primary/[0.04]" : "") + (indented ? " bg-muted/30" : "")}>
+      <td className="px-3 py-2">
+        <input
+          type="checkbox"
+          aria-label={`Select ${it.sku}`}
+          checked={sel.has(it.sku)}
+          onChange={(e) => {
+            const next = new Set(sel)
+            if (e.target.checked) next.add(it.sku); else next.delete(it.sku)
+            setSel(next)
+          }}
+        />
+      </td>
+      <td className="px-4 py-2">
+        <div className={"flex items-center gap-2 " + (indented ? "pl-11" : "")}>
+          {!indented && <Thumb src={group.image} name={group.name} />}
+          <div className="min-w-0">
+            <div className="max-w-[220px] truncate font-medium">{indented ? (it.variant || meta[it.sku]?.variant || it.sku) : (it.name || group.name || "—")}</div>
+            {/* Variant first — it is what tells two rows of one style apart. Then who sells
+                it: typed if someone typed it, else resolved from the supplier catalogues by
+                sku, so the next restock does not start with a search. */}
+            {!indented && (it.variant || meta[it.sku]?.variant) && (
+              <div className="max-w-[220px] truncate text-xs text-muted-foreground">{it.variant || meta[it.sku]?.variant}</div>
+            )}
+            {(it.supplier || meta[it.sku]?.supplier) && (
+              <div className="max-w-[220px] truncate text-2xs text-muted-foreground">{it.supplier || meta[it.sku]?.supplier}</div>
+            )}
+            {/* Only once we have ASKED and been told nothing — `meta[sku]` is undefined
+                while unresolved, and an empty object once answered. */}
+            {meta[it.sku] !== undefined && !meta[it.sku]?.supplier && !it.supplier && (
+              <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-medium text-amber-700">
+                Not in any supplier catalogue
+              </div>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-2">
+        {/* SKU as TEXT. The inline barcode was a 22px thumbnail no scanner could read, and
+            the icon beside it spent a column on a dialog nobody opened twice — the SKU
+            itself opens it, for the one moment someone wants to scan off the screen. */}
+        <button
+          type="button"
+          onClick={() => onZoom(it.sku)}
+          title={`Show a scannable code for ${it.sku}`}
+          className="block w-[150px] break-all text-left font-mono text-xs font-medium underline-offset-2 hover:underline"
+        >
+          {it.sku}
+        </button>
+      </td>
+      <td className="px-2 py-2 text-center">
+        {/* How many stickers for THIS variant. Only meaningful once it's ticked, so it's
+            disabled until then. */}
+        <Input
+          value={String(copies[it.sku] ?? 1)}
+          onChange={(e) => setCopies({ ...copies, [it.sku]: Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1) })}
+          disabled={!sel.has(it.sku)}
+          inputMode="numeric"
+          aria-label={`Label copies for ${it.sku}`}
+          className="mx-auto h-8 w-14 text-center"
+        />
+      </td>
+      <td className="px-2 py-2 text-center"><Input value={String(num(it.in_stock))} onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
+      <td className="px-2 py-2 text-center"><Input value={String(num(it.reserved))} onChange={(e) => edit(it.sku, "reserved", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
+      <td className="px-4 py-2 text-center font-semibold tabular-nums">{avail(it)}</td>
+      <td className="px-2 py-2 text-center"><Input value={String(it.reorder_at ?? 25)} onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
+      <td className="px-4 py-2">
+        {/* nowrap: the visibility column narrowed this one enough that "In stock" wrapped
+            onto two lines and the row grew a step. */}
+        {isOut(it) ? <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Out</span>
+          : isLow(it) ? <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Low</span>
+            : <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
+      </td>
+      <td className="px-4 py-2">
+        <select
+          value={visOf(it)}
+          onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
+          aria-label={`Visibility for ${it.sku}`}
+          className={"eg-select h-7 rounded-full border-0 py-0 pl-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (VIS.find((v) => v.id === visOf(it))?.pill ?? "")}
+        >
+          {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+        </select>
+      </td>
+      <td className="px-4 py-2">
+        <div className="flex items-center justify-end gap-1">
+          <button onClick={() => onHistory(it.sku)} title="Scan history" className="text-muted-foreground hover:text-foreground"><ClockCounterClockwise size={15} /></button>
+          <button onClick={() => remove(it.sku)} title="Remove" className="text-muted-foreground hover:text-red-600"><Trash size={15} /></button>
+        </div>
+      </td>
+    </tr>
+  )
+
+  if (single) return row(group.rows[0], false)
+
+  const stock = group.rows.reduce((n, r) => n + num(r.in_stock), 0)
+  const reserved = group.rows.reduce((n, r) => n + num(r.reserved), 0)
+  const out = group.rows.filter(isOut).length
+  const low = group.rows.filter(isLow).length
+
+  return (
+    <>
+      <tr className={"border-t border-border " + (selected ? "bg-primary/[0.04]" : "")}>
+        <td className="px-3 py-2">
+          <input type="checkbox" aria-label={`Select all ${group.rows.length} variants of ${group.name}`} checked={selected} onChange={(e) => onSelect(e.target.checked)} />
+        </td>
+        <td className="px-4 py-2">
+          <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-2 text-left">
+            <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
+            <Thumb src={group.image} name={group.name} />
+            <span className="min-w-0">
+              <span className="block max-w-[220px] truncate font-medium">{group.name}</span>
+              <span className="block text-xs text-muted-foreground">{group.rows.length} variants</span>
+            </span>
+          </button>
+        </td>
+        <td className="px-4 py-2 text-xs text-muted-foreground">
+          {/* NOT one of the variants' skus. Printing the first would read as the product's
+              own code and get scanned as one. */}
+          <span className="font-mono">{group.rows.length} SKUs</span>
+        </td>
+        <td className="px-2 py-2" />
+        <td className="px-2 py-2 text-center font-semibold tabular-nums">{stock}</td>
+        <td className="px-2 py-2 text-center tabular-nums">{reserved}</td>
+        <td className="px-4 py-2 text-center font-semibold tabular-nums">{stock - reserved}</td>
+        <td className="px-2 py-2" />
+        <td className="px-4 py-2">
+          {out === group.rows.length ? <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">All out</span>
+            : out || low ? <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{out ? `${out} out` : `${low} low`}</span>
+              : <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
+        </td>
+        <td className="px-4 py-2 text-xs text-muted-foreground">
+          {/* One word only when the variants agree. Showing the first row's setting as if it
+              were the product's is how a public sku hides behind a "Factory only" label. */}
+          {group.rows.every((r) => visOf(r) === visOf(group.rows[0]))
+            ? (VIS.find((v) => v.id === visOf(group.rows[0]))?.label ?? "")
+            : "Mixed"}
+        </td>
+        <td className="px-4 py-2" />
+      </tr>
+      {open && group.rows.map((it) => row(it, true))}
+    </>
   )
 }
 
@@ -524,7 +728,21 @@ function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () =
   )
 }
 
-function AddItemDialog({ open, onOpenChange, onAdd, existing }: { open: boolean; onOpenChange: (v: boolean) => void; onAdd: (it: InventoryItem) => void; existing: string[] }) {
+/**
+ * ADD A ROW, OR ADD A PRODUCT'S WHOLE SIZE RUN.
+ *
+ * Typing a sku by hand is how every row got here, and it is the step that gets them wrong:
+ * the sku has to match what an order line resolves to, and nothing on the form said what
+ * that was. Picking the product instead derives it — `variantSku`, the same function the
+ * product editor writes stock with — so a size run added here and one stocked on the product
+ * card are the SAME rows rather than two spellings of them.
+ *
+ * PER SIZE, not per size × colour, because that is what the product editor now holds. Two
+ * screens writing two different key shapes for one shelf is the split that made "do we have
+ * it?" unanswerable in the first place.
+ */
+function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog }: { open: boolean; onOpenChange: (v: boolean) => void; onAdd: (items: InventoryItem[]) => void; existing: string[]; catalog: CatalogProduct[] }) {
+  const [mode, setMode] = useState<"catalog" | "manual">("catalog")
   const [sku, setSku] = useState("")
   const [name, setName] = useState("")
   const [variant, setVariant] = useState("")
@@ -536,30 +754,188 @@ function AddItemDialog({ open, onOpenChange, onAdd, existing }: { open: boolean;
   // dialog should not be the place that quietly differs from receiving.
   const [visibility, setVisibility] = useState<SkuVisibility>("factory")
   const [err, setErr] = useState<string | null>(null)
+  // Catalogue path
+  const [q, setQ] = useState("")
+  const [pickedId, setPickedId] = useState<string | null>(null)
+  const [chosen, setChosen] = useState<Set<string>>(new Set())
 
-  useEffect(() => { if (open) { const id = setTimeout(() => { setSku(""); setName(""); setVariant(""); setStock(""); setReorder("25"); setCategory(""); setSupplier(""); setVisibility("factory"); setErr(null) }, 0); return () => clearTimeout(id) } }, [open])
+  useEffect(() => {
+    if (!open) return
+    const id = setTimeout(() => {
+      setMode(catalog.length ? "catalog" : "manual")
+      setSku(""); setName(""); setVariant(""); setStock(""); setReorder("25"); setCategory(""); setSupplier(""); setVisibility("factory"); setErr(null)
+      setQ(""); setPickedId(null); setChosen(new Set())
+    }, 0)
+    return () => clearTimeout(id)
+  }, [open, catalog.length])
 
-  const save = () => {
+  const withSku = useMemo(() => catalog.filter((p) => String(p.sku || "").trim()), [catalog])
+  const matches = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    const list = t ? withSku.filter((p) => `${p.name ?? ""} ${p.sku ?? ""}`.toLowerCase().includes(t)) : withSku
+    return list.slice(0, 40)
+  }, [withSku, q])
+  const picked = useMemo(() => withSku.find((p) => String(p.id ?? p.sku) === pickedId) ?? null, [withSku, pickedId])
+  const pickedSizes = useMemo(() => (picked ? sizesOf(picked) : []), [picked])
+
+  /** What each ticked size will be filed as, and whether that row is already on the shelf. */
+  const rows = useMemo(() => {
+    if (!picked) return []
+    const base = String(picked.sku || "").trim()
+    const list = pickedSizes.length ? pickedSizes : [""]
+    return list.map((sz) => {
+      const k = variantSku(base, sz || null, null)
+      return { size: sz, sku: k, exists: existing.some((e) => e.toUpperCase() === k.toUpperCase()) }
+    })
+  }, [picked, pickedSizes, existing])
+
+  const pick = (p: CatalogProduct) => {
+    setPickedId(String(p.id ?? p.sku))
+    // Every size that is not already stocked. Re-adding an existing row would only rewrite
+    // its count with a zero, so the ones we hold start unticked.
+    const base = String(p.sku || "").trim()
+    const szs = sizesOf(p)
+    const next = new Set<string>()
+    for (const sz of (szs.length ? szs : [""])) {
+      const k = variantSku(base, sz || null, null)
+      if (!existing.some((e) => e.toUpperCase() === k.toUpperCase())) next.add(sz)
+    }
+    setChosen(next)
+    setErr(null)
+  }
+
+  const saveManual = () => {
     const s = sku.trim()
     if (!s) { setErr("A SKU is required."); return }
     if (existing.includes(s)) { setErr("That SKU already exists."); return }
-    onAdd({ sku: s, name: name.trim() || undefined, variant: variant.trim() || undefined, in_stock: Number(stock) || 0, reorder_at: Number(reorder) || 25, category: category.trim() || undefined, supplier: supplier.trim() || undefined, visibility })
+    onAdd([{ sku: s, name: name.trim() || undefined, variant: variant.trim() || undefined, in_stock: Number(stock) || 0, reorder_at: Number(reorder) || 25, category: category.trim() || undefined, supplier: supplier.trim() || undefined, visibility }])
+  }
+
+  const saveCatalog = () => {
+    if (!picked) { setErr("Pick a product first."); return }
+    const take = rows.filter((r) => chosen.has(r.size) && !r.exists)
+    if (!take.length) { setErr("Nothing to add — every ticked size is already on the shelf."); return }
+    onAdd(take.map((r) => ({
+      sku: r.sku,
+      name: picked.name || undefined,
+      variant: r.size ? variantLabel(r.size, null) : undefined,
+      in_stock: Number(stock) || 0,
+      reorder_at: Number(reorder) || 25,
+      category: picked.type || category.trim() || undefined,
+      // The supplier is NOT copied from the product. It is a factory-only field on the
+      // catalogue side, and an inventory row is read on screens a seller can reach.
+      visibility,
+    })))
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader><DialogTitle>Add inventory item</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">SKU</span><Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="G2000-BLK-L" className="h-9 font-mono" /></label>
-          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gildan Ultra Cotton Tee" className="h-9" /></label>
-          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Variant</span><Input value={variant} onChange={(e) => setVariant(e.target.value)} placeholder="Black · L" className="h-9" /></label>
+          {catalog.length > 0 && (
+            <div className="flex w-fit rounded-full border border-border p-0.5">
+              {([{ id: "catalog", label: "From catalogue" }, { id: "manual", label: "By hand" }] as const).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => { setMode(t.id); setErr(null) }}
+                  className={"eg-tap rounded-full px-3 py-1 text-xs font-medium transition-colors " + (mode === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {mode === "catalog" ? (
+            <>
+              {!picked ? (
+                <>
+                  <div className="relative">
+                    <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the catalogue…" className="h-9 pl-9" autoFocus />
+                  </div>
+                  <div className="max-h-72 divide-y divide-border overflow-auto rounded-lg border border-border">
+                    {matches.length === 0 ? (
+                      <div className="px-3 py-8 text-center text-sm text-muted-foreground">
+                        {withSku.length === 0 ? "No catalogue product has a SKU yet — stock is held against it, so add one on the product first." : "No product matches."}
+                      </div>
+                    ) : matches.map((p) => (
+                      <button
+                        key={String(p.id ?? p.sku)}
+                        type="button"
+                        onClick={() => pick(p)}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent"
+                      >
+                        <Thumb src={imageFor(p, null)} name={p.name ?? "?"} size={30} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{p.name || "Untitled"}</span>
+                          <span className="block truncate font-mono text-xs text-muted-foreground">{p.sku}</span>
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{sizesOf(p).length || 1} size{sizesOf(p).length === 1 ? "" : "s"}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2.5 rounded-lg border border-border p-2.5">
+                    <Thumb src={imageFor(picked, null)} name={picked.name ?? "?"} size={38} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{picked.name}</div>
+                      <div className="truncate font-mono text-xs text-muted-foreground">{picked.sku}</div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => { setPickedId(null); setChosen(new Set()) }}>Change</Button>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Sizes to stock</span>
+                      <button
+                        type="button"
+                        className="font-medium text-primary hover:underline"
+                        onClick={() => setChosen(chosen.size === rows.filter((r) => !r.exists).length ? new Set() : new Set(rows.filter((r) => !r.exists).map((r) => r.size)))}
+                      >
+                        {chosen.size ? "Clear" : "Select all"}
+                      </button>
+                    </div>
+                    <div className="max-h-48 divide-y divide-border overflow-auto rounded-lg border border-border">
+                      {rows.map((r) => (
+                        <label key={r.size || "one"} className={"flex items-center gap-2 px-3 py-1.5 text-sm " + (r.exists ? "opacity-50" : "cursor-pointer")}>
+                          <input
+                            type="checkbox"
+                            checked={chosen.has(r.size)}
+                            disabled={r.exists}
+                            onChange={(e) => setChosen((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.size); else n.delete(r.size); return n })}
+                            className="size-3.5 accent-[var(--primary)]"
+                          />
+                          <span className="w-16 shrink-0 font-medium">{r.size || "One size"}</span>
+                          <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{r.sku}</span>
+                          {r.exists && <span className="shrink-0 text-2xs text-muted-foreground">already stocked</span>}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">SKU</span><Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="G2000-BLK-L" className="h-9 font-mono" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gildan Ultra Cotton Tee" className="h-9" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Variant</span><Input value={variant} onChange={(e) => setVariant(e.target.value)} placeholder="Black · L" className="h-9" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Supplier</span><Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="S&S Activewear / Otto Cap" className="h-9" /></label>
+            </>
+          )}
+
           <div className="grid grid-cols-3 gap-2">
             <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">In stock</span><Input value={stock} onChange={(e) => setStock(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" inputMode="numeric" className="h-9" /></label>
             <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Reorder at</span><Input value={reorder} onChange={(e) => setReorder(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" className="h-9" /></label>
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Category</span><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Apparel" className="h-9" /></label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Category</span>
+              <Input value={mode === "catalog" ? (picked?.type ?? "") : category} onChange={(e) => setCategory(e.target.value)} disabled={mode === "catalog"} placeholder="Apparel" className="h-9" />
+            </label>
           </div>
-          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Supplier</span><Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="S&S Activewear / Otto Cap" className="h-9" /></label>
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Visibility</span>
             <select
@@ -575,11 +951,17 @@ function AddItemDialog({ open, onOpenChange, onAdd, existing }: { open: boolean;
                   : "Cleared for unauthenticated surfaces too. Nothing reads that yet — this records the decision."}
             </span>
           </label>
-          {sku.trim() && <div className="flex justify-center rounded-lg border border-border bg-muted/30 py-2"><Barcode value={sku.trim()} height={40} /></div>}
+          {mode === "manual" && sku.trim() && <div className="flex justify-center rounded-lg border border-border bg-muted/30 py-2"><Barcode value={sku.trim()} height={40} /></div>}
           {err && <div className="text-sm text-destructive">{err}</div>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={save}>Add item</Button>
+            {mode === "catalog" ? (
+              <Button onClick={saveCatalog} disabled={!picked || chosen.size === 0}>
+                Add {chosen.size || ""} item{chosen.size === 1 ? "" : "s"}
+              </Button>
+            ) : (
+              <Button onClick={saveManual}>Add item</Button>
+            )}
           </div>
         </div>
       </DialogContent>

@@ -63,6 +63,15 @@ export function LabelSheet({
    * incompatible label formats in one bin. Defaulted, visible, overridable.
    */
   const [codeType, setCodeType] = useState<"barcode" | "qr">("barcode")
+  /**
+   * WHAT THE STICKER CARRIES: the code, the number, or both.
+   *
+   * Both is right for a bin label — the gun reads the code, a person reads the number when
+   * the gun won't. But a 2×1 that has to hold a long style name is tight, and a code-only
+   * sticker frees the height; a number-only one is what goes on something a scanner never
+   * sees. One choice, made once, applied to the whole sheet.
+   */
+  const [content, setContent] = useState<"both" | "code" | "sku">("both")
   useEffect(() => {
     // Coarse pointer = finger. Resolved after mount because matchMedia doesn't exist
     // during prerender and would render a different tree on server than client.
@@ -110,6 +119,18 @@ export function LabelSheet({
               code — so the wrong choice here produces a bin of labels nothing can scan,
               and that is not a discovery to make at the scanner. */}
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Print
+            <select
+              value={content}
+              onChange={(e) => setContent(e.target.value as "both" | "code" | "sku")}
+              className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              <option value="both">Code + SKU</option>
+              <option value="code">Code only</option>
+              <option value="sku">SKU only</option>
+            </select>
+          </label>
+          <label className={"flex items-center gap-1.5 text-xs text-muted-foreground " + (content === "sku" ? "hidden" : "")}>
             Code
             <select
               value={codeType}
@@ -162,7 +183,13 @@ export function LabelSheet({
                 {l.variant && <div className="line-clamp-1 w-full text-[7px] leading-tight text-muted-foreground">{prettyVariant(l.variant)}</div>}
                 {/* fit → scales to the label. A long SKU otherwise renders ~450px wide
                     and spills across the card, printing a clipped, unscannable code. */}
-                {codeType === "qr" ? (
+                {content === "sku" ? (
+                  // No code at all: the number becomes the label, at a size someone reads
+                  // across a shelf rather than the 8px caption it is under a barcode.
+                  <div className="flex w-full flex-1 items-center justify-center">
+                    <span className="w-full break-all px-1 text-center font-mono text-[13px] font-semibold leading-tight tracking-tight">{l.sku}</span>
+                  </div>
+                ) : codeType === "qr" ? (
                   // Square, and centred in whatever slice the sticker allows. A QR has no
                   // useful non-square rendering — stretching one stops it decoding.
                   <div className={oneUp ? "flex min-h-0 w-full flex-1 items-center justify-center" : "mx-auto w-full max-w-[7rem]"}>
@@ -174,12 +201,14 @@ export function LabelSheet({
                     <Barcode value={l.sku} height={40} displayValue={false} fit stretch className="block size-full" />
                   </div>
                 ) : (
-                  <Barcode value={l.sku} height={46} fit className="mx-auto block w-full max-w-full" />
+                  // JsBarcode stamps the number inside the svg on this path, so "code only"
+                  // has to turn it off here rather than by hiding a caption.
+                  <Barcode value={l.sku} height={46} displayValue={content === "both"} fit className="mx-auto block w-full max-w-full" />
                 )}
                 {/* On thermal stock the SKU is drawn HERE, not by JsBarcode: its text is
                     stamped inside the svg and scales down with it, so on a 2×1 the code
                     was legible and the number underneath was clipped mid-digit. */}
-                {oneUp && (
+                {oneUp && content === "both" && (
                   <div className="w-full truncate font-mono text-[8px] leading-none tracking-tight">{l.sku}</div>
                 )}
               </div>

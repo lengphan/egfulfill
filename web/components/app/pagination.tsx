@@ -22,7 +22,7 @@ export function usePaged<T>(items: T[], initialPerPage = 24) {
 }
 
 export function Pagination({
-  page, pageCount, perPage, total, start, onPage, onPerPage, perPageOptions = [24, 48, 96], className,
+  page, pageCount, perPage, total, start, onPage, onPerPage, perPageOptions = [24, 48, 96], className, noun,
 }: {
   page: number
   pageCount: number
@@ -33,13 +33,16 @@ export function Pagination({
   onPerPage: (n: number) => void
   perPageOptions?: number[]
   className?: string
+  /** What is being counted, when it isn't the obvious thing. The inventory table pages over
+   *  PRODUCTS while its stat card counts SKUs, and "of 3" beside "SKUs 5" reads as a bug. */
+  noun?: string
 }) {
   if (total === 0) return null
   const from = start + 1
   const to = Math.min(start + perPage, total)
   return (
     <div className={"flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm " + (className ?? "")}>
-      <span className="text-muted-foreground">Showing {from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()}</span>
+      <span className="text-muted-foreground">Showing {from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()}{noun ? ` ${noun}` : ""}</span>
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-1.5 text-muted-foreground">
           <span className="hidden sm:inline">Per page</span>
