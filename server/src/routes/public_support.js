@@ -180,6 +180,52 @@ export function publicSupportRoutes(app) {
   });
 
   /**
+   * READ THE CONVERSATION BACK — including what a PERSON has since replied.
+   *
+   * There was no read path at all. Escalating copies the transcript into order_messages
+   * under `support-web-<id>`, staff answer it from the Conversations rail, and the visitor's
+   * widget had no way to learn that: it said "we'll reply to your email" and then sat there
+   * while the answer went somewhere they could not see. On a page that invites a question,
+   * that is the reply never arriving.
+   *
+   * THE ID IS THE CAPABILITY. Conversation ids are 96 bits from crypto.randomBytes and are
+   * minted server-side precisely so a caller cannot name someone else's (see the note where
+   * one is generated). This route adds no new exposure: anyone holding the id can already
+   * grow the conversation through POST, which returns its messages.
+   *
+   * STAFF REPLIES ARE THE ONES WITH AN AUTHOR. The escalation copies the visitor's own
+   * history in with `sender_id = null`; a human answering types with their id attached. That
+   * is the discriminator, so the copied transcript cannot come back as a stream of duplicate
+   * "replies". Names are not published — a visitor gets "EGFUL", not which of us it was.
+   */
+  app.get('/api/public/support/:id', async (req, reply) => {
+    const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim() || 'unknown';
+    // Polled by an open widget, so the ceiling is generous where the POST's is not — this
+    // one costs a query, not a model call.
+    const stop = limited(reply, `pubsup-read:${ip}`, 120, 10 * 60 * 1000);
+    if (stop) return stop;
+
+    const id = String(req.params.id || '').trim();
+    if (!/^ps_[a-f0-9]{24}$/.test(id)) { reply.code(404); return { error: 'Conversation not found' }; }
+    const row = (await q('select id, messages, escalated from public_support where id=$1', [id])).rows[0];
+    if (!row) { reply.code(404); return { error: 'Conversation not found' }; }
+
+    const staff = await q(
+      `select body, created_at from order_messages
+        where order_id = $1 and sender_id is not null
+        order by created_at asc limit 100`, [`support-web-${id}`]
+    ).then((r) => r.rows).catch(() => []);
+
+    const messages = [
+      ...(Array.isArray(row.messages) ? row.messages : []),
+      // 'staff' rather than 'assistant': the widget says who is talking, and "a person
+      // replied" is the whole point of having escalated.
+      ...staff.map((m) => ({ role: 'staff', text: String(m.body || ''), at: m.created_at })),
+    ];
+    return { conversationId: id, escalated: !!row.escalated, messages };
+  });
+
+  /**
    * Hand the conversation to a person.
    *
    * Emails the visitor a copy so the thread survives them closing the tab — which is the

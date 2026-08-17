@@ -75,6 +75,38 @@ export function SupportBubble() {
   }, [])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }) }, [msgs, needIdentity])
 
+  /**
+   * WATCH FOR A PERSON'S REPLY.
+   *
+   * Escalating hands the thread to the Conversations rail, where someone answers it — and
+   * until now the widget had no way to learn that. It said "we'll reply to your email" and
+   * then sat still while the answer went somewhere the visitor could not see.
+   *
+   * Polling, not a socket: this is an unauthenticated page and the event stream is
+   * token-authed, so a socket here would mean a second, public channel to secure for a
+   * message that arrives once. Every 8s, and ONLY while the panel is open with a
+   * conversation — a closed bubble costs nothing, which is what makes the interval cheap
+   * enough to be this simple.
+   *
+   * The server's copy REPLACES the local thread, so a reply cannot be duplicated by a poll
+   * that overlaps a send. The canned answers are the exception and are re-appended below.
+   */
+  useEffect(() => {
+    if (!open || !convo) return
+    let live = true
+    const read = async () => {
+      try {
+        const r = await fetch(`/api/public/support/${encodeURIComponent(convo)}`)
+        if (!r.ok) return
+        const d = await r.json()
+        if (live && Array.isArray(d.messages)) setMsgs(d.messages)
+      } catch { /* a failed poll is not worth a notice — the next one is 8s away */ }
+    }
+    const t = setInterval(read, 8000)
+    const first = setTimeout(read, 500)
+    return () => { live = false; clearInterval(t); clearTimeout(first) }
+  }, [open, convo])
+
   /** Returns the conversation id, so a caller that created one can act on it immediately —
    *  `convo` is state and is not set yet on the line after this resolves. */
   const send = async (text: string): Promise<string | null> => {
@@ -185,11 +217,17 @@ export function SupportBubble() {
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {/* THE FIRST THING SAID IS A GREETING, in the same bubble a reply would arrive in —
+            so the panel opens as a conversation someone has started rather than as a form
+            with instructions above it. The old grey paragraph explained the widget; this
+            asks the question the widget exists for. */}
         {msgs.length === 0 && (
-          <p className="text-sm leading-relaxed text-black/55">
-            Ask us anything about products, pricing or how fulfilment works. A person can pick
-            it up if you&apos;d rather.
-          </p>
+          <div>
+            <span className="inline-block max-w-[85%] rounded-2xl bg-black/[0.05] px-3 py-2 text-sm leading-relaxed text-[#0B0B0C]">
+              Hi — how can we help? Ask us anything about products, pricing or how fulfilment
+              works, and a person can pick it up whenever you&apos;d rather have one.
+            </span>
+          </div>
         )}
         {/* MOST ASKED, in the bubble. Shown while the thread is short — they are a way IN,
             and a row of suggested questions under a conversation that is already going is
@@ -209,11 +247,20 @@ export function SupportBubble() {
           </div>
         )}
         {msgs.map((m, i) => (
-          <div key={i} className={m.role === "assistant" ? "" : "flex justify-end"}>
+          <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
             {/* whitespace-pre-wrap, or the line breaks the server just put between numbered
                 steps collapse back into one run-on sentence in the bubble. */}
+            {/* A PERSON'S REPLY SAYS SO. It arrives in the same column as the assistant's,
+                and a visitor who asked for a human needs to be able to tell that they got
+                one — otherwise the escalation looks unanswered while its answer is on
+                screen. */}
+            {m.role === "staff" && (
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">EGFUL support</span>
+            )}
             <span className={"inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed " +
-              (m.role === "assistant" ? "bg-black/[0.05] text-[#0B0B0C]" : "bg-[#0B0B0C] text-[#D4F897]")}>
+              (m.role === "user" ? "bg-[#0B0B0C] text-[#D4F897]"
+                : m.role === "staff" ? "border border-black/10 bg-white text-[#0B0B0C]"
+                : "bg-black/[0.05] text-[#0B0B0C]")}>
               {m.text}
               {/* The page that answers it properly. On the canned replies only — a model
                   answer has no fixed destination, and inventing one would send people to a
