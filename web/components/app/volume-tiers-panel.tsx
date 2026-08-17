@@ -84,16 +84,6 @@ export function VolumeTiersPanel() {
       }
     >
       <div className="space-y-4 px-5 pb-5">
-        {/* The "this changes no charge" notice that used to sit here is gone because it
-            stopped being true: quoteOrder reads this ladder now. What replaces it is not
-            reassurance but the one fact an admin needs before typing — a saved rung is
-            money on the next order, and it applies from the next charge, not retroactively
-            to orders already paid for. */}
-        <p className="text-sm text-muted-foreground">
-          A saved ladder prices the next order. Sellers earn a rate from what they ship in a
-          month and spend it the month after, so editing these changes what future orders
-          cost — never what an already-charged order was billed.
-        </p>
 
         <div className="space-y-2">
           {rows.length === 0 && (

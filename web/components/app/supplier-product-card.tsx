@@ -136,7 +136,21 @@ export function SupplierProductCard({
           keyboard behaviour via the shared helper. */}
       <div
         {...(onOpenDetail ? clickableProps(onOpenDetail, `Open ${data.title ?? "this blank"}`) : {})}
-        className={"relative aspect-[4/5] shrink-0 overflow-hidden bg-white " + (onOpenDetail ? "cursor-zoom-in" : "")}
+        /**
+         * A SHORTER BED, AND THE PRODUCT INSET IN IT.
+         *
+         * 4:5 made every tile 1.25× as tall as it is wide, so a grid of caps ran off the
+         * screen vertically for no gain — a cap is a wide object and was being given a
+         * portrait frame. Square is the shortest bed that still fits the portrait garment
+         * shots without cropping, which is the constraint the notes below spent two attempts
+         * arriving at: change the bed for everyone, never crop for one supplier.
+         *
+         * The p-[7%] is the "zoom out": contain fitted the product edge to edge, so a cap
+         * touched the sides of its own tile and read as cropped even though nothing was cut.
+         * The inset is on the IMAGE, not the well, so the white bed still reaches the card's
+         * border and the tile keeps its shape.
+         */
+        className={"relative aspect-square shrink-0 overflow-hidden bg-white " + (onOpenDetail ? "cursor-zoom-in" : "")}
       >
         {img ? (
           // absolute inset-0 is load-bearing. As an in-flow child, `size-full` means
@@ -171,7 +185,7 @@ export function SupplierProductCard({
           // conclusion this file reached the first time: fix the tile for every supplier,
           // never crop for one.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt="" loading="lazy" className="absolute inset-0 size-full object-contain" />
+          <img src={img} alt="" loading="lazy" className="absolute inset-0 size-full object-contain p-[7%]" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50">No image</div>
         )}

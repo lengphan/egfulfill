@@ -246,7 +246,27 @@ export function BoldProduct({ product, shipping }: {
                 </div>
               </div>
             )}
-            {product.sizes.length > 0 && <Spec label="Sizes" items={product.sizes} />}
+            {product.sizes.length > 0 && (
+              <>
+                <Spec label="Sizes" items={product.sizes} />
+                {/**
+                  * THE SIZE CHART, WHERE SIZES ARE.
+                  *
+                  * It was a full section under the fold, and on most of the catalogue it held
+                  * one line — only some manufacturers publish a measurement feed, so the
+                  * common state was a heading, a sentence, and nothing. A heading that size
+                  * over an apology is a section announcing its own emptiness.
+                  *
+                  * As a link next to the sizes it is where the question is asked, and it
+                  * costs one line whether or not there is a table behind it.
+                  */}
+                <p className="mt-3 text-sm">
+                  {specNames.length > 0
+                    ? <a href="#size-chart" className="font-semibold text-black/70 underline underline-offset-4">Size chart &amp; measurements</a>
+                    : <a href="mailto:orders@egful.store" className="font-semibold text-black/70 underline underline-offset-4">Ask us for measurements</a>}
+                </p>
+              </>
+            )}
 
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Pill href="/signup" tone="ink">Start free</Pill>
@@ -270,17 +290,17 @@ export function BoldProduct({ product, shipping }: {
              A two-column grid holding a single item is just a half-width page, which is
              what made this section look broken rather than short. */
           <div className="mt-16 max-w-3xl space-y-12">
+            {/* ONLY WHEN THERE IS A CHART. It used to render either way, so most products got
+                a 24px heading over one line of apology — a section whose whole content was
+                the news that it had none. The link beside the sizes covers that case now, and
+                this is the anchor it points at. */}
+            {specNames.length > 0 && (
             <Rise preset="cut">
-                <h2 className="font-display text-2xl font-black tracking-tight">Size chart</h2>
-                {/* One line, not a paragraph. Only some manufacturers publish a measurement
-                    feed, so the no-chart case is the state MOST of the catalogue is in — it
-                    should read as a normal answer, not as an apology for a missing section. */}
+                <h2 id="size-chart" className="scroll-mt-24 font-display text-2xl font-black tracking-tight">Size chart</h2>
                 <p className="mt-1.5 text-sm text-black/50">
-                  {specNames.length > 0
-                    ? "Garment measurements from the manufacturer, in inches."
-                    : <a href="mailto:orders@egful.store" className="font-semibold text-black/70 underline underline-offset-4">Contact support for detailed measurements</a>}
+                  Garment measurements from the manufacturer, in inches.
                 </p>
-                {specNames.length > 0 && (<>
+                {(<>
                 {/* PIVOTED, not read off named fields: the supplier returns one row per
                     (size, measurement) and the measurements differ per garment — a polo has
                     a chest width, a cap has a bill length. Assuming columns is how a chart
@@ -309,6 +329,7 @@ export function BoldProduct({ product, shipping }: {
                 </div>
                 </>)}
             </Rise>
+            )}
 
             {product.methods.length > 0 && (
               <Rise preset="cut" index={1}>
