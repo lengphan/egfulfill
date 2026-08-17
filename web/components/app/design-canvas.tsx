@@ -1665,7 +1665,10 @@ export function DesignCanvasDialog({
         {catalog && catalog.length > 0 && (
           <div className="rounded-lg border border-border p-2.5">
             <div className="mb-1.5 text-sm font-medium">Product</div>
-            <VariantPicker orderId={orderId} item={item} catalog={catalog} onSaved={() => onSaved?.()} />
+            {/* dense: the rail is a fixed 380px column, and the picker's four-across layout
+                turns on at the `sm` VIEWPORT — which is true here and wrong here, so Size and
+                Method came out as "S.." and "E...". Two per row fits. */}
+            <VariantPicker dense orderId={orderId} item={item} catalog={catalog} onSaved={() => onSaved?.()} />
           </div>
         )}
         {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
@@ -1675,7 +1678,19 @@ export function DesignCanvasDialog({
             seller to "upload artwork to match threads" before showing them the upload button,
             and it competed with the two things they must actually do. Last is where a derived
             read-out belongs. */}
-        {isEmb && (
+        {/**
+          * ONLY ONCE THERE IS SOMETHING TO SHOW.
+          *
+          * The card used to open on every embroidered line and, with no artwork yet, hold a
+          * title over "Add your image above and we'll pick the thread colours for it" — an
+          * instruction, in the panel that exists to REPORT a result, sitting under the two
+          * controls that already say what to do.
+          *
+          * Hiding it is honest here rather than evasive: this is a DERIVED read-out, and a
+          * derivation with no input has nothing to be wrong about. The moment artwork lands
+          * the card appears with the colours in it, which is the answer it was promising.
+          */}
+        {isEmb && designUrl && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <div className="min-w-0">
@@ -1686,12 +1701,9 @@ export function DesignCanvasDialog({
                 <div className="text-xs font-medium text-foreground">
                   Thread colours {regions?.length ? `· ${regions.length}` : ""}
                 </div>
-                {/* Says what the seller is looking at and what it is FOR, in their words.
-                    "Thread match · 2 cones" was a factory read-out: a cone is a spool on our
-                    machine, not something they bought. */}
-                <div className="text-3xs text-muted-foreground">
-                  We embroider your design in these colours — change any that look wrong.
-                </div>
+                {/* The sentence under the title is gone: a list of thread colours beside the
+                    parts of the design they belong to already says what it is, and it said so
+                    on every render including the ones where there was nothing to describe. */}
               </div>
               {designUrl && (
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -1730,9 +1742,7 @@ export function DesignCanvasDialog({
                 not describe the cones actually on the floor, so it cried wolf about colours we
                 stock. The colour is added and shown; the human picks a different one if it is
                 wrong. */}
-            {!designUrl ? (
-              <div className="text-xs text-muted-foreground/70">Add your image above and we&apos;ll pick the thread colours for it.</div>
-            ) : regions === null ? (
+            {regions === null ? (
               <div className="rounded-md border border-border bg-card px-3 py-4 text-center text-xs text-muted-foreground">Reading the colours in your image…</div>
             ) : regions.length === 0 ? (
               <div className="rounded-md border border-border bg-card px-3 py-4 text-center text-xs text-muted-foreground">

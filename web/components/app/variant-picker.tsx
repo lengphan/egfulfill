@@ -19,12 +19,21 @@ const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 // blank pre-filled with nothing to do. The chosen Blank drives the Colour/Size/Method
 // options. Persisted per line (postItemSetup); the parent reloads so the quote updates.
 export function VariantPicker({
-  orderId, item, catalog, onSaved,
+  orderId, item, catalog, onSaved, dense,
 }: {
   orderId: string
   item: OrderItem
   catalog: CatalogProduct[]
   onSaved: () => void
+  /**
+   * Two per row at EVERY width.
+   *
+   * The four-track layout below turns on at `sm`, which is a VIEWPORT question — and the
+   * designer's rail is a fixed 380px column on a wide screen, so all four tracks were laid
+   * out inside it and Size and Method truncated to "S.." and "E...". The breakpoint cannot
+   * see the container; the caller can.
+   */
+  dense?: boolean
 }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -139,7 +148,7 @@ export function VariantPicker({
           like "Heather Grey", while Size is "S"/"2XL" and Method is "DTG"/"EMB" — three or
           four characters. Giving those two an equal share left them mostly empty and starved
           the blank name, which is the one that gets truncated. */}
-      <div className="grid grid-cols-2 gap-x-2 gap-y-2.5 sm:grid-cols-[1.7fr_1.25fr_0.7fr_0.85fr]">
+      <div className={"grid grid-cols-2 gap-x-2 gap-y-2.5" + (dense ? "" : " sm:grid-cols-[1.7fr_1.25fr_0.7fr_0.85fr]")}>
         {/* Blank — the load-bearing pick; nothing else can price without it, so it's the
             only field that flags itself when empty. */}
         {/* No custom placeholder: the field names itself now, and "Blank" beside the
