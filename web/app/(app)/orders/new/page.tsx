@@ -108,6 +108,25 @@ export default function NewOrderPage() {
     [lines]
   )
 
+  /**
+   * WHAT THE BUYER PAID, TYPED — when the lines do not add up to it.
+   *
+   * The card printed Σ(sold-for × qty) and nothing else, so an order taken over the phone
+   * for a round £120 could only be recorded by reverse-engineering per-unit prices that
+   * were never quoted, and a discount, a bundle or a deposit had nowhere to go at all.
+   *
+   * Blank means "use the lines", which is the old behaviour exactly. Typed WINS, and the
+   * card says which of the two it is showing — one number labelled two ways is the fault
+   * this card was rewritten to fix, and it would return the moment a typed total sat
+   * silently on top of a different sum.
+   *
+   * Never mandatory: an order whose sale price nobody recorded is a real order, and "not
+   * recorded" is a truthful thing for it to say.
+   */
+  const [paidTyped, setPaidTyped] = useState("")
+  const paidValue = paidTyped.trim() === "" ? pricing.subtotal : Number(paidTyped) || 0
+  const paidIsTyped = paidTyped.trim() !== ""
+
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)))
   const addLine = () => setLines((prev) => [...prev, emptyLine()])
@@ -205,8 +224,8 @@ export default function NewOrderPage() {
         // otherwise whatever the create form happened to add up; see the note on `revenue`
         // in orders/[id]). Left unflagged when no price was typed, so "nothing recorded"
         // stays distinguishable from "sold for $0".
-        total: pricing.subtotal,
-        meta: pricing.subtotal > 0 ? { retail_set: true } : undefined,
+        total: paidValue,
+        meta: paidValue > 0 ? { retail_set: true } : undefined,
         items,
       })
       if (r.error) throw new Error(r.error)
@@ -426,18 +445,30 @@ export default function NewOrderPage() {
             submit, computed from the blank, the size and the technique. So the card states
             the sale, and says where the other number comes from. */}
         <div className="space-y-1.5 border-t border-border px-5 py-4">
-          <div className="flex items-center justify-between border-border font-semibold">
+          <div className="flex flex-wrap items-center justify-between gap-3 font-semibold">
             <span>Customer paid</span>
-            <span className="text-lg tabular-nums">
-              {pricing.subtotal > 0
-                ? usd(pricing.subtotal)
-                : <span className="text-base font-normal italic text-muted-foreground">not recorded</span>}
+            <span className="flex items-center gap-2">
+              {/* The sum of the lines is the PLACEHOLDER, so leaving this alone keeps the
+                  old behaviour and typing in it is visibly an override rather than a
+                  correction of something. "not recorded" when there is nothing either way. */}
+              <span className="text-sm font-normal text-muted-foreground">$</span>
+              <Input
+                value={paidTyped}
+                onChange={(e) => setPaidTyped(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder={pricing.subtotal > 0 ? pricing.subtotal.toFixed(2) : "not recorded"}
+                inputMode="decimal"
+                aria-label="What the customer paid for this order"
+                className="h-9 w-32 text-right text-base tabular-nums"
+              />
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            What the buyer paid you, for your own records. What WE charge to make this is quoted
-            on the order once it&apos;s created — the blank, its size and the print method.
-          </p>
+          {paidIsTyped && pricing.subtotal > 0 && Math.abs(paidValue - pricing.subtotal) >= 0.01 && (
+            // SAID OUT LOUD, because the two numbers disagree and only one is being saved.
+            // Silence here is how a discount becomes a bug report.
+            <p className="text-xs text-muted-foreground">
+              The lines add up to {usd(pricing.subtotal)}; {usd(paidValue)} is recorded.
+            </p>
+          )}
         </div>
       </SectionCard>
 
