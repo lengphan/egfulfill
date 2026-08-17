@@ -68,12 +68,35 @@ export type OrderStock = {
  * "" when nothing resolves — an unstocked or not-yet-assigned line, which reads as the grey
  * "unknown" state, not "out".
  */
+/**
+ * The keys a line's stock could be held under, most specific first.
+ *
+ * THREE, not two, because the product editor writes PER SIZE now (`EG-1001-L`) while stock
+ * entered before that is per size AND colour (`EG-1001-L-BLK`), and older products are one
+ * row for the whole style (`EG-1001`). A ladder that skipped the middle rung read a shelf
+ * that had just been counted as untracked, and an order whose blanks were on hand showed no
+ * answer at all — which also meant "add short blanks to a PO" skipped it, because only a
+ * line with a known count can be called short.
+ *
+ * The map decides which rung applies; nothing is migrated for this to be safe.
+ */
+function stockKeys(productSku: string, size?: string | null, color?: string | null): string[] {
+  const out: string[] = []
+  const withColor = variantSku(productSku, size, color)
+  const sizeOnly = variantSku(productSku, size, null)
+  if (withColor) out.push(withColor)
+  if (sizeOnly && sizeOnly !== withColor) out.push(sizeOnly)
+  return out
+}
+
 export function stockSkuOf(item: OrderItem, catalog: CatalogProduct[], stock?: Record<string, number>): string {
   const product = resolveProduct(item, catalog)
   const base = stripMethod(String(product?.sku || item.blank || "")).toUpperCase()
   if (!base) return ""
-  const variant = variantSku(product?.sku || "", item.size, item.color)
-  if (variant && (!stock || Object.prototype.hasOwnProperty.call(stock, variant))) return variant
+  const keys = stockKeys(product?.sku || "", item.size, item.color)
+  // No map to consult (a caller that only wants the key it WOULD read) → the most specific.
+  if (!stock) return keys[0] || base
+  for (const k of keys) if (Object.prototype.hasOwnProperty.call(stock, k)) return k
   return base
 }
 
@@ -110,8 +133,7 @@ export function orderStock(items: OrderItem[], catalog: CatalogProduct[], stock:
      * variant nobody has counted falls back to the product row rather than reporting a
      * confident zero for a shelf that was never split.
      */
-    const variant = variantSku(product?.sku || "", it.size, it.color)
-    const sku = variant && Object.prototype.hasOwnProperty.call(stock, variant) ? variant : base
+    const sku = stockKeys(product?.sku || "", it.size, it.color).find((k) => Object.prototype.hasOwnProperty.call(stock, k)) ?? base
     const have = sku && Object.prototype.hasOwnProperty.call(stock, sku) ? stock[sku] : null
     // Which link broke, in the order the chain runs. A product that resolved but carries no
     // sku is the interesting one: it looks set up from every other screen, and is the exact

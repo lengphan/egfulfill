@@ -498,18 +498,24 @@ function ProductGroup({
         />
       </td>
       <td className="px-4 py-2">
-        <div className={"flex items-center gap-2 " + (indented ? "pl-11" : "")}>
+        <div className={"flex w-[21rem] items-center gap-2 " + (indented ? "pl-11" : "")}>
           {!indented && <Thumb src={group.image} name={group.name} />}
           <div className="min-w-0">
-            <div className="max-w-[220px] truncate font-medium">{indented ? (it.variant || meta[it.sku]?.variant || it.sku) : (it.name || group.name || "—")}</div>
+            {/* TWO LINES, then ellipsis. One line at 220px cut "OTTO CAP OTTO FLEX Fitte…"
+                off before the part that tells it from the next Otto cap; letting it run
+                free would hand one column the whole row. Two lines is enough for a real
+                product name and still a bounded row height. */}
+            <div className="line-clamp-2 font-medium leading-tight" title={indented ? undefined : (it.name || group.name || undefined)}>
+              {indented ? (it.variant || meta[it.sku]?.variant || it.sku) : (it.name || group.name || "—")}
+            </div>
             {/* Variant first — it is what tells two rows of one style apart. Then who sells
                 it: typed if someone typed it, else resolved from the supplier catalogues by
                 sku, so the next restock does not start with a search. */}
             {!indented && (it.variant || meta[it.sku]?.variant) && (
-              <div className="max-w-[220px] truncate text-xs text-muted-foreground">{it.variant || meta[it.sku]?.variant}</div>
+              <div className="truncate text-xs text-muted-foreground">{it.variant || meta[it.sku]?.variant}</div>
             )}
             {(it.supplier || meta[it.sku]?.supplier) && (
-              <div className="max-w-[220px] truncate text-2xs text-muted-foreground">{it.supplier || meta[it.sku]?.supplier}</div>
+              <div className="truncate text-2xs text-muted-foreground">{it.supplier || meta[it.sku]?.supplier}</div>
             )}
             {/* NO "not in any supplier catalogue" BADGE. It landed on nearly every row —
                 anything we stock that isn't a live S&S/Otto sku, which is most of what a
@@ -589,11 +595,11 @@ function ProductGroup({
           <input type="checkbox" aria-label={`Select all ${group.rows.length} variants of ${group.name}`} checked={selected} onChange={(e) => onSelect(e.target.checked)} />
         </td>
         <td className="px-4 py-2">
-          <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-2 text-left">
+          <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-[21rem] items-center gap-2 text-left">
             <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
             <Thumb src={group.image} name={group.name} />
             <span className="min-w-0">
-              <span className="block max-w-[220px] truncate font-medium">{group.name}</span>
+              <span className="line-clamp-2 font-medium leading-tight" title={group.name}>{group.name}</span>
               <span className="block text-xs text-muted-foreground">{group.rows.length} variants</span>
             </span>
           </button>
