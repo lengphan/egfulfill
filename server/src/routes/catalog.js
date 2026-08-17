@@ -1152,7 +1152,18 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     // whose price lives only in the column — the import writes both, but the column is what
     // sellerBaseCostOf bills from — still printed a dash on the sheet.
     const mineRows = (await q(
-      `select data, catalog_price, base_price from catalog_products where in_catalog = true order by created_at desc`
+      /*
+       * `id` IS THE ROW'S IDENTITY and has to be selected.
+       *
+       * The ref handed to the client was String(data.id ?? data.sku), read out of the JSON
+       * blob — while the price edit does `update catalog_products set catalog_price where
+       * id = $ref`. On any product whose data carries no `id` (an import, an older row) the
+       * ref fell back to the SKU, matched no row, and the edit answered 404 — while the name
+       * and image edits beside it saved fine, because those key on source:ref in their own
+       * table and do not care what the ref is. Hence "the price doesn't save" on some styles
+       * and not others, with everything else on the page working.
+       */
+      `select id, data, catalog_price, base_price from catalog_products where in_catalog = true order by created_at desc`
     ).catch(() => ({ rows: [] }))).rows;
 
     /**
@@ -1215,7 +1226,14 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const ci = (d.colorImages && typeof d.colorImages === 'object') ? d.colorImages : {};
       const sid = styleIdOf(d.sku);
       const supplierColours = supplierArt.get('c:' + sid);
-      const ref = String(d.id ?? d.sku ?? '');
+      // The COLUMN first: it is what every write keys on.
+      const ref = String(row.id ?? d.id ?? d.sku ?? '');
+      /*
+       * An override saved under the OLD ref still applies. Edits made before this fix are
+       * keyed by whatever the ref was then, and dropping somebody's renamed page or replaced
+       * photo while fixing a different bug is not a fix.
+       */
+      const legacyRef = String(d.id ?? d.sku ?? '');
       return withOverride({
         ref, source: 'mine', name: d.name || '', sku: d.sku || '',
         description: d.description || '', brand: notSupplier(d.brand),
@@ -1268,7 +1286,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         // Our own products carry no supplier spec chart unless their sku resolves to a
         // style; filled below for the ones that do.
         specs: [],
-      }, overrides.get('mine:' + ref));
+      }, overrides.get('mine:' + ref) || (legacyRef && legacyRef !== ref ? overrides.get('mine:' + legacyRef) : undefined));
     });
 
     // Picked supplier styles — colourways rolled up from their sku rows. One row per
