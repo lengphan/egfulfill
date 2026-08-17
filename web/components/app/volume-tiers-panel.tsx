@@ -92,56 +92,73 @@ export function VolumeTiersPanel() {
     >
       <div className="space-y-4 px-5 pb-5">
 
-        <div className="space-y-2">
-          {rows.length === 0 && (
+        {/**
+          * A TABLE, not a sentence made of inputs.
+          *
+          * The row read "[Tier 1] [100] units or more → [3] % off 🗑" — three pill fields of
+          * three different widths with prose between them, so nothing lined up down the
+          * column and the eye had to re-parse each line to compare two rungs. A ladder is
+          * read VERTICALLY: the question is always "what happens at 300 that did not at 100".
+          *
+          * Fixed grid tracks and a header row answer that. The units and the percent are
+          * right-aligned and tabular so the digits stack; the arrow and the words "units or
+          * more" become column headings, said once instead of once per rung.
+          */}
+        <div className="space-y-1.5">
+          {rows.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
               No tiers. An empty ladder means the programme is off and every seller earns 0%.
             </div>
-          )}
-          {rows.map((t, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2">
-              {/**
-                * THE RUNG'S NAME, and why it is first.
-                *
-                * Every display called this "Tier 2" from its POSITION in the ladder — which
-                * renumbers itself the moment a rung is inserted below it, so the tier an
-                * admin told a seller they were on silently became a different label. A name
-                * survives an edit, and it is what a programme is actually called.
-                *
-                * Optional: blank falls back to the position, which is what every ladder saved
-                * before now uses, so nothing has to be filled in to keep working.
-                */}
-              <Input
-                value={t.name ?? ""}
-                onChange={(e) => setCell(i, "name", e.target.value)}
-                placeholder={`Tier ${i + 1}`}
-                aria-label={`Name for tier ${i + 1}`}
-                className="h-8 w-32"
-              />
-              <Input
-                value={Number.isFinite(t.minUnits) ? String(t.minUnits) : ""}
-                onChange={(e) => setCell(i, "minUnits", e.target.value.replace(/[^\d]/g, ""))}
-                placeholder="units"
-                inputMode="numeric"
-                aria-label={`Minimum units for tier ${i + 1}`}
-                className="h-8 w-28 text-right tabular-nums"
-              />
-              <span className="text-sm text-muted-foreground">units or more →</span>
-              <Input
-                value={Number.isFinite(t.pct) ? String(t.pct) : ""}
-                onChange={(e) => setCell(i, "pct", e.target.value.replace(/[^\d.]/g, ""))}
-                placeholder="%"
-                inputMode="decimal"
-                aria-label={`Discount percent for tier ${i + 1}`}
-                className="h-8 w-20 text-right tabular-nums"
-              />
-              <span className="text-sm text-muted-foreground">% off</span>
-              <Button size="icon-sm" variant="ghost" aria-label={`Remove tier ${i + 1}`}
-                onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
-                <Trash size={14} />
-              </Button>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-border">
+              <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_2.25rem] items-center gap-x-3 border-b border-border bg-muted/40 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <span>Name</span>
+                <span className="text-right">From (units)</span>
+                <span className="text-right">Discount</span>
+                <span />
+              </div>
+              <div className="divide-y divide-border">
+                {rows.map((t, i) => (
+                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_2.25rem] items-center gap-x-3 px-3 py-2">
+                    {/* Optional. Blank shows the position as a placeholder, which is what the
+                        rung is called until somebody names it — and what every ladder saved
+                        before names existed will keep showing. */}
+                    <Input
+                      value={t.name ?? ""}
+                      onChange={(e) => setCell(i, "name", e.target.value)}
+                      placeholder={`Tier ${i + 1}`}
+                      aria-label={`Name for tier ${i + 1}`}
+                      className="h-8 border-transparent bg-transparent px-2 font-medium shadow-none focus-visible:border-border focus-visible:bg-card"
+                    />
+                    <Input
+                      value={Number.isFinite(t.minUnits) ? String(t.minUnits) : ""}
+                      onChange={(e) => setCell(i, "minUnits", e.target.value.replace(/[^\d]/g, ""))}
+                      placeholder="0"
+                      inputMode="numeric"
+                      aria-label={`Minimum units for tier ${i + 1}`}
+                      className="h-8 px-2 text-right tabular-nums"
+                    />
+                    <div className="flex items-center justify-end gap-1">
+                      <Input
+                        value={Number.isFinite(t.pct) ? String(t.pct) : ""}
+                        onChange={(e) => setCell(i, "pct", e.target.value.replace(/[^\d.]/g, ""))}
+                        placeholder="0"
+                        inputMode="decimal"
+                        aria-label={`Discount percent for tier ${i + 1}`}
+                        className="h-8 w-14 px-2 text-right tabular-nums"
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <Button size="icon-sm" variant="ghost" aria-label={`Remove tier ${i + 1}`}
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
+                      <Trash size={14} />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
           <Button size="sm" variant="outline" onClick={() => setRows((r) => [...r, { minUnits: NaN, pct: NaN, name: "" }])}>
             <Plus size={14} weight="bold" /> Add tier
           </Button>

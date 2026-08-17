@@ -462,6 +462,25 @@ export type AdminUser = {
   orders_today?: number
   /** Orders in the trailing 14 days — the "busiest first" sort key. */
   orders_14d?: number
+  /**
+   * WHAT THIS ACCOUNT HAS ACTUALLY MOVED, in UNITS — the row's detail panel.
+   *
+   * Units, not orders: `orders_total` already counts orders, and a seller with four orders
+   * of fifty pieces is not the seller with fifty orders of four. `items_waiting` excludes
+   * cancelled and refunded, so a dead order can't make an idle account look busy, and
+   * `units_last_month` is the figure the volume ladder reads (last month earns, this month
+   * spends) — it says WHY a seller is on the rung they are on.
+   *
+   * OPTIONAL, and undefined is not zero: a server that predates these sends nothing, and a
+   * panel that printed 0 would report "shipped nothing" for an account it simply cannot
+   * measure. The panel prints a dash for undefined.
+   */
+  items_shipped?: number
+  items_waiting?: number
+  units_last_month?: number
+  /** The team's members by address — `team_size` counts them, this names them. email is the
+   *  only identity team_members is guaranteed to hold. */
+  team_emails?: string[] | null
 }
 /** The current seller's capacity status — information only, never blocks a submit. `mode` is
  *  the master switch; `over` is true only once today's count has reached the limit. limit:0
@@ -3640,6 +3659,17 @@ export function grantTrial(body: { userId: string; plan?: string; days?: number 
 }
 
 /** One rung of the volume ladder: ship `minUnits` in a month, earn `pct` the next. */
+/** The subscription price list. Admin-editable; the server keeps the constants as defaults. */
+export type PlanPrices = { plans: Record<string, number>; spydeck_addon: number }
+export function getPlanPrices() {
+  return api<PlanPrices>(`/api/billing/prices`)
+}
+export function savePlanPrices(body: PlanPrices) {
+  return api<PlanPrices & { ok?: boolean; error?: string }>(`/api/billing/prices`, {
+    method: "PUT", body: JSON.stringify(body),
+  })
+}
+
 export type VolumeTier = {
   minUnits: number
   pct: number

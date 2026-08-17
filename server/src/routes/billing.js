@@ -15,9 +15,46 @@ import { notify } from './notifications.js';
 // SERVER-side prices. The client has its own copy in lib/plans.ts for display, but the
 // amount charged must never come from the caller — that's the hole that made the old
 // upgrade button free.
-const PLAN_PRICES = { starter: 0, pro: 29, enterprise: 99 };
-const SPYDECK_ADDON_PRICE = 9;
-const PLANS = Object.keys(PLAN_PRICES);
+/**
+ * THE PRICE LIST — defaults here, overridable in Settings, read at CALL TIME.
+ *
+ * These were constants, so changing what a plan costs meant a deploy. They are now the
+ * FALLBACK: readPrices() overlays whatever an admin has saved.
+ *
+ * Read per charge rather than cached at module load, for the reason the integration keys
+ * carry the same note (CLAUDE.md §3): a value snapshotted at boot means a price saved in the
+ * UI does not apply until the next restart, which looks like the setting doing nothing.
+ *
+ * CHANGING A PRICE IS NOT RETROACTIVE, and cannot be: runRenewals is idempotent per
+ * (user, month) through the ledger's own (account, type, ref) uniqueness, so a month already
+ * charged stays charged at the figure it was charged at. A new price meets the next renewal.
+ */
+const PLAN_PRICE_DEFAULTS = { starter: 0, pro: 29, enterprise: 99 };
+const SPYDECK_ADDON_DEFAULT = 9;
+const PLANS = Object.keys(PLAN_PRICE_DEFAULTS);
+const PLAN_PRICES_KEY = 'plan_prices';
+
+/**
+ * Saved prices over the defaults. A missing, malformed or negative figure falls back rather
+ * than throwing — a bad row in settings must not stop every seller being billed, and 0 is a
+ * legitimate price (starter) so it cannot be used as the "unset" signal.
+ */
+async function readPrices() {
+  const out = { plans: { ...PLAN_PRICE_DEFAULTS }, spydeck_addon: SPYDECK_ADDON_DEFAULT };
+  try {
+    const row = (await q('select value from settings where key=$1', [PLAN_PRICES_KEY])).rows[0];
+    const v = row && row.value;
+    if (v && typeof v === 'object') {
+      for (const p of PLANS) {
+        const n = Number(v.plans && v.plans[p]);
+        if (Number.isFinite(n) && n >= 0) out.plans[p] = Math.round(n * 100) / 100;
+      }
+      const a = Number(v.spydeck_addon);
+      if (Number.isFinite(a) && a >= 0) out.spydeck_addon = Math.round(a * 100) / 100;
+    }
+  } catch { /* table not ready, or a malformed row — the defaults are the answer */ }
+  return out;
+}
 
 // Where subscription revenue lands — the same house account order charges credit.
 const HOUSE = 'factory';
@@ -41,6 +78,9 @@ const GRACE_DAYS = 7;
  * keeps their plan through the grace window; only after that do they drop to Starter.
  */
 export async function runRenewals() {
+  // ONE read for the whole run: every seller in this pass is billed off the same price list,
+  // and re-reading settings per row would let a mid-run edit bill two sellers differently.
+  const PRICES = await readPrices();
   const due = await q(
     `select id, plan, spydeck_addon, plan_past_due_since, plan_auto_renew, plan_trial_ends_at from users
       where plan_renews_at is not null
@@ -82,7 +122,7 @@ export async function runRenewals() {
         body: 'Your paid plan has ended as scheduled. You can upgrade again any time.', href: '/settings' });
       continue;
     }
-    const monthly = (PLAN_PRICES[u.plan] || 0) + (u.spydeck_addon === true ? SPYDECK_ADDON_PRICE : 0);
+    const monthly = (PRICES.plans[u.plan] || 0) + (u.spydeck_addon === true ? PRICES.spydeck_addon : 0);
     if (monthly <= 0) {
       await q('update users set plan_renews_at=null where id=$1', [u.id]).catch(() => {});
       continue;
@@ -190,7 +230,7 @@ export function billingRoutes(app, requireAuth, requireAdmin) {
       on_trial: !!(u.plan_trial_ends_at && new Date(u.plan_trial_ends_at).getTime() > Date.now()),
       trial_used: !!u.plan_trial_used_at,
       balance: await balanceOf(req.user.sub),
-      prices: { plans: PLAN_PRICES, spydeck_addon: SPYDECK_ADDON_PRICE },
+      prices: await readPrices(),
     };
   });
 
@@ -208,6 +248,42 @@ export function billingRoutes(app, requireAuth, requireAdmin) {
    *
    * body: { userId, plan?, days? }
    */
+  /**
+   * THE PRICE LIST, editable — the subscription packages.
+   *
+   * They were constants, so changing what Pro costs was a deploy. Admin only: this is what
+   * every seller is billed monthly, and it is the single highest-leverage number in the app.
+   *
+   * NOT RETROACTIVE, and it cannot be — runRenewals is idempotent per (user, month) through
+   * the ledger's own (account, type, ref) uniqueness, so a month already charged stays
+   * charged at the figure it was charged at. A new price meets the next renewal. That is
+   * worth knowing before typing, so it is said on the screen too.
+   *
+   * Starter is allowed to be 0 and only 0 is special-cased nowhere: a plan priced at 0 simply
+   * never renews (runRenewals skips monthly <= 0), which is exactly what a free tier is.
+   */
+  app.get('/api/billing/prices', { preHandler: requireAdmin }, async () => readPrices());
+
+  app.put('/api/billing/prices', { preHandler: requireAdmin }, async (req, reply) => {
+    const b = req.body || {};
+    const plans = {};
+    for (const p of PLANS) {
+      const n = Number(b.plans && b.plans[p]);
+      // Every plan must arrive as a real, non-negative number. Silently keeping the old value
+      // for a field somebody cleared would show them a price they did not save.
+      if (!Number.isFinite(n) || n < 0) { reply.code(400); return { error: `${p} needs a price of 0 or more.` }; }
+      plans[p] = Math.round(n * 100) / 100;
+    }
+    const addon = Number(b.spydeck_addon);
+    if (!Number.isFinite(addon) || addon < 0) { reply.code(400); return { error: 'The SpyDeck add-on needs a price of 0 or more.' }; }
+    const value = { plans, spydeck_addon: Math.round(addon * 100) / 100 };
+    await q(`insert into settings (key, value, updated_at) values ($1, $2::jsonb, now())
+             on conflict (key) do update set value = excluded.value, updated_at = now()`,
+      [PLAN_PRICES_KEY, JSON.stringify(value)]);
+    audit(req, 'settings.plan_prices', { entityType: 'settings', entityId: PLAN_PRICES_KEY, after: value });
+    return { ok: true, ...(await readPrices()) };
+  });
+
   app.post('/api/billing/trial', { preHandler: requireAdmin }, async (req, reply) => {
     const b = req.body || {};
     const userId = String(b.userId || '');
@@ -277,8 +353,13 @@ export function billingRoutes(app, requireAuth, requireAdmin) {
     // the industry-standard deferred downgrade; applying it immediately would strip access
     // that's already been paid for. Mechanically it's exactly "auto-renew off": the plan
     // runs out the paid month, then runRenewals lapses it to Starter.
-    const curMonthly = (PLAN_PRICES[curPlan] || 0) + (curAddon ? SPYDECK_ADDON_PRICE : 0);
-    const tgtMonthly = (PLAN_PRICES[plan] || 0) + (addon ? SPYDECK_ADDON_PRICE : 0);
+    // Read ONCE for this request, so the comparison, the proration and the charge below
+    // cannot be computed against three different price lists if one is saved mid-request.
+    const PRICES = await readPrices();
+    const P = PRICES.plans;
+    const ADDON = PRICES.spydeck_addon;
+    const curMonthly = (P[curPlan] || 0) + (curAddon ? ADDON : 0);
+    const tgtMonthly = (P[plan] || 0) + (addon ? ADDON : 0);
     if (tgtMonthly < curMonthly && activePeriod) {
       await q('update users set plan_auto_renew=false where id=$1', [req.user.sub]);
       audit(req, 'billing.subscribe', {
@@ -298,9 +379,9 @@ export function billingRoutes(app, requireAuth, requireAdmin) {
     // period has already been paid for — not merely the tier in use. So Pro → Starter →
     // Pro inside one paid month is free the second time: that month's Pro is bought.
     // Upgrading past what's paid for still charges the difference.
-    const baseline = PLAN_PRICES[paidPlan] >= PLAN_PRICES[curPlan] ? paidPlan : curPlan;
-    const planCharge = PLAN_PRICES[plan] > PLAN_PRICES[baseline] ? PLAN_PRICES[plan] - PLAN_PRICES[baseline] : 0;
-    const addonCharge = addon && !(curAddon || paidAddon) ? SPYDECK_ADDON_PRICE : 0;
+    const baseline = P[paidPlan] >= P[curPlan] ? paidPlan : curPlan;
+    const planCharge = P[plan] > P[baseline] ? P[plan] - P[baseline] : 0;
+    const addonCharge = addon && !(curAddon || paidAddon) ? ADDON : 0;
     const amount = planCharge + addonCharge;
 
     const method = String(b.method || 'wallet');
@@ -341,7 +422,7 @@ export function billingRoutes(app, requireAuth, requireAdmin) {
       : (plan === 'starter' && !addon ? null : monthFromNow());
     // What this period covers is the HIGH-WATER mark: dropping to Starter for a week
     // doesn't refund the month, so coming back to Pro within it is already paid for.
-    const nextPaidPlan = PLAN_PRICES[plan] >= PLAN_PRICES[paidPlan] ? plan : paidPlan;
+    const nextPaidPlan = P[plan] >= P[paidPlan] ? plan : paidPlan;
     const nextPaidAddon = addon || paidAddon;
     // Paying for a plan re-arms renewal and clears any past-due state — otherwise someone
     // who had lapsed would pay and then silently lapse again next month.

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useContext, createContext, isValidEle
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, X, DownloadSimple, Database, ArrowSquareOut } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, X, DownloadSimple, Database, ArrowSquareOut, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -26,6 +26,8 @@ import { VolumeBoard } from "@/components/app/volume-board"
 import { SiteContentPanel } from "@/components/app/site-content-panel"
 import { SupplierOrderingSettings } from "@/components/app/supplier-ordering-settings"
 import { getUser, updateUser } from "@/lib/auth"
+import { VolumeTiersPanel } from "@/components/app/volume-tiers-panel"
+import { PlanPackagesPanel } from "@/components/app/plan-packages-panel"
 import { UserAvatar, AVATAR_COLORS, AVATAR_EMOJIS } from "@/components/app/user-avatar"
 import {
   getApiKeys,
@@ -2040,6 +2042,83 @@ function LimitCell({
   )
 }
 
+/**
+ * WHAT AN ACCOUNT HAS ACTUALLY MOVED — the row's detail panel.
+ *
+ * /api/users has computed these three aggregates per account for months and nothing read
+ * them, so the list paid for the query on every load and showed none of it: the directory
+ * could say when a seller last ordered and never what they had shipped.
+ *
+ * UNITS, because the columns already carry orders. Four orders of fifty pieces and fifty
+ * orders of four are the same account by the order count and nothing alike on the floor.
+ *
+ * A DASH IS NOT A ZERO. These fields are optional — a server that predates them sends
+ * nothing — and printing 0 for "we cannot measure this" would report an account as having
+ * shipped nothing when it may have shipped thousands. Undefined prints a dash and says why
+ * underneath; a real 0 prints 0.
+ */
+function UserStat({ label, value, hint }: { label: string; value?: number; hint?: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-lg font-medium tabular-nums">
+        {value == null ? <span className="text-muted-foreground/50">—</span> : value.toLocaleString("en-US")}
+      </div>
+      {hint && <div className="text-[11px] leading-tight text-muted-foreground">{hint}</div>}
+    </div>
+  )
+}
+
+function UserDetail({ u, isSeller, hasOrders }: { u: AdminUser; isSeller: boolean; hasOrders: boolean }) {
+  // Every volume figure here counts orders whose seller_id IS this account. A warehouse or
+  // designer account works on other people's orders and owns none, so four zeros would be a
+  // true number answering a question nobody asked — say that instead.
+  const ownsOrders = isSeller || hasOrders
+  const measured = u.items_shipped != null || u.items_waiting != null || u.units_last_month != null
+  return (
+    <div className="col-span-full mt-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+      {ownsOrders ? (
+        <>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+            <UserStat label="Units shipped" value={u.items_shipped} hint="lifetime" />
+            <UserStat label="Units waiting" value={u.items_waiting} hint="excludes cancelled" />
+            {/* The number the volume ladder reads — last month earns, this month spends — so
+                a rung can be checked here rather than taken on faith. */}
+            <UserStat label="Units last month" value={u.units_last_month} hint="sets this month's tier" />
+            <UserStat label="Orders" value={u.orders_total} hint={u.last_order_at ? `last ${fmtDate(u.last_order_at)}` : "none yet"} />
+          </div>
+          {!measured && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Unit figures aren&apos;t coming back from the server — a dash here means unread, not zero.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          A {u.role} account works on other people&apos;s orders and owns none of its own, so it has no
+          volume of its own to show.
+        </p>
+      )}
+
+      {/* WHO IS ON THE TEAM, not just how many. The badge in the row counts them; this is the
+          only place the directory names them, and email is the one identity team_members
+          always holds — a member who hasn't accepted yet has no user row to join to. */}
+      {(u.team_emails?.length ?? 0) > 0 && (
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="text-xs text-muted-foreground">
+            Team · {u.team_emails!.length} active {u.team_emails!.length === 1 ? "member" : "members"}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {u.team_emails!.map((e) => (
+              <span key={e} className="rounded bg-card px-1.5 py-0.5 text-xs text-foreground">{e}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function UsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -2066,6 +2145,10 @@ function UsersPanel() {
   const [adjAmt, setAdjAmt] = useState("")
   const [adjNote, setAdjNote] = useState("")
   const [adjErr, setAdjErr] = useState<string | null>(null)
+  // Which row has its detail panel open. ONE at a time: this is a directory you scan, and a
+  // list where every row can be left expanded stops being one. Keyed by id rather than a
+  // per-row flag so re-sorting or filtering can't strand an open panel on a hidden row.
+  const [openId, setOpenId] = useState<string | null>(null)
 
   const loadUsers = useCallback(() => { getUsers().then((r) => { setUsers(r ?? []); setLoaded(true) }).catch(() => setLoaded(true)) }, [])
   useEffect(() => { const id = setTimeout(loadUsers, 0); return () => clearTimeout(id) }, [loadUsers])
@@ -2345,11 +2428,25 @@ function UsersPanel() {
                     (u.active === false ? "opacity-55" : "")
                   }
                 >
-                  {/* Account — avatar + identity + badges, all in the flexible column. */}
-                  <div className={"flex min-w-0 items-center gap-3 " + (child ? "border-l-2 border-primary/30 pl-3" : "")}>
+                  {/* Account — avatar + identity + badges, all in the flexible column.
+                      IT IS ALSO THE DISCLOSURE. A button rather than a click handler on the
+                      row: the row holds two selects and a menu, and a row-wide handler would
+                      fire on every one of them. Identity is the safe half to make clickable,
+                      and it is the half you were already aiming at. */}
+                  <button
+                    type="button"
+                    onClick={() => setOpenId((v) => (v === String(u.id) ? null : String(u.id)))}
+                    aria-expanded={openId === String(u.id)}
+                    aria-label={`Details for ${displayName}`}
+                    className={"flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (child ? "border-l-2 border-primary/30 pl-3" : "")}
+                  >
                     <UserAvatar user={{ name: displayName, avatar_emoji: u.avatar_emoji, avatar_color: u.avatar_color }} size={child ? 30 : 38} className={child ? "rounded-lg" : "rounded-xl"} />
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
+                        <CaretRight
+                          size={12} weight="bold" aria-hidden
+                          className={"shrink-0 text-muted-foreground transition-transform " + (openId === String(u.id) ? "rotate-90" : "")}
+                        />
                         <span className={child ? "truncate text-sm" : "truncate text-sm font-medium"}>{displayName}</span>
                         {!child && (u.team_size ?? 0) > 0 && (
                           <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">Leads {u.team_size}</span>
@@ -2371,7 +2468,7 @@ function UsersPanel() {
                         {u.store_name && u.store_name !== displayName && <span className="opacity-70"> · {u.store_name}</span>}
                       </div>
                     </div>
-                  </div>
+                  </button>
 
                   {/* Joined — context, not a control, so it stays quiet. */}
                   <span className="hidden truncate text-sm text-muted-foreground lg:block">{fmtDate(u.created_at)}</span>
@@ -2466,6 +2563,12 @@ function UsersPanel() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+
+                  {/* THE DETAIL PANEL — inside the row, spanning every column.
+                      A sibling of the row would take the list's own divider between the two,
+                      so one account would read as two records. col-span-full keeps a person
+                      to one bordered block, which is what they are. */}
+                  {openId === String(u.id) && <UserDetail u={u} isSeller={isSeller} hasOrders={hasOwnOrders(u)} />}
                 </div>
               )})
             )}
@@ -3233,6 +3336,11 @@ export function SettingsView() {
             credentials (admin-only, below). One tab so keys live in one place. */}
         {canUseKeys && <TabsTrigger value="keys"><TabLabel>API keys</TabLabel></TabsTrigger>}
         {canPlatform && <TabsTrigger value="platform"><TabLabel>Platform</TabLabel></TabsTrigger>}
+        {/* Its own tab rather than a section of Platform. It is settings and belongs with the
+            settings — but it is not the same KIND as a postage band: a band is a cost we pass
+            on, these two decide what a seller pays US. Admin only, because operators reach
+            Platform now for the cone list and this is not theirs. */}
+        {isAdmin && <TabsTrigger value="plans"><TabLabel>Plans</TabLabel></TabsTrigger>}
         {/* ADMIN ONLY. Warehouse keeps Platform, Suppliers and Usage — this one writes
             users.password_hash, which is account takeover in one call. */}
         {isAdmin && <TabsTrigger value="users"><TabLabel>Users</TabLabel></TabsTrigger>}
@@ -3281,6 +3389,16 @@ export function SettingsView() {
               theirs to touch — a second reason it does not belong here. */}
           <div className="space-y-4">
             <PlatformPanel />
+          </div>
+        </TabsContent>
+      )}
+      {isAdmin && (
+        <TabsContent value="plans">
+          <div className="space-y-4">
+            {/* Packages first: a rung is a discount OFF a plan price, so the number being
+                discounted should already be on screen above it. */}
+            <PlanPackagesPanel />
+            <VolumeTiersPanel />
           </div>
         </TabsContent>
       )}
