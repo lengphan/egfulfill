@@ -2396,7 +2396,54 @@ export function OrdersHub() {
                             <OrderedVariant
                               item={it}
                               className="sm:pr-[15rem]"
-                              after={<LineStock item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} />}
+                              after={
+                                <>
+                                  <LineStock item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} />
+                                  {(() => {
+                                    /**
+                                     * THREADS ONLY ONCE A BLANK IS CHOSEN.
+                                     *
+                                     * The pill showed on a line with nothing picked: the lookup fell
+                                     * through to the LISTING sku, matched a thread row saved against it,
+                                     * and claimed a cone map for a garment nobody had selected. A thread
+                                     * match is part of the make-spec — it cannot precede the thing being
+                                     * made.
+                                     *
+                                     * The GATE is "is a blank chosen", the LOOKUP is unchanged. Those are
+                                     * two different questions and conflating them was the trap here:
+                                     * order_threads rows are keyed by the line's own sku (LA6,
+                                     * LA10-POCKET in the live data), not by the blank's, so requiring the
+                                     * resolved product's sku as the key would have hidden every real match
+                                     * instead of the wrong ones.
+                                     *
+                                     * Beside Qty rather than under the pickers, with the stock pill: how
+                                     * many we need, how many we hold, what it is stitched in — one line of
+                                     * facts about the line, read together.
+                                     */
+                                    const product = resolveProduct(it, catalog)
+                                    const blankChosen = !!product || !!String(it.blank || "").trim()
+                                    if (!blankChosen) return null
+                                    const key = String(product?.sku || it.blank || it.sku || "").toUpperCase()
+                                    const cones = (threads[o.id] ?? []).find((t) => String(t.sku).toUpperCase() === key)?.threads ?? []
+                                    if (!cones.length) return null
+                                    return (
+                                      <ThreadBreakdown artwork={artworkFor(o, it)}>
+                                        <span
+                                          className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground hover:bg-muted/80"
+                                          title={`${cones.length} thread colour${cones.length === 1 ? "" : "s"} matched — click for the cone map`}
+                                        >
+                                          <span className="flex items-center -space-x-0.5">
+                                            {cones.slice(0, 8).map((c) => (
+                                              <span key={c.code} className="size-2.5 rounded-full border border-black/10" style={{ background: c.hex }} />
+                                            ))}
+                                          </span>
+                                          {cones.length} thread{cones.length === 1 ? "" : "s"}
+                                        </span>
+                                      </ThreadBreakdown>
+                                    )
+                                  })()}
+                                </>
+                              }
                             />
                             {/* Factory-owned marketplace orders arrive with no blank chosen;
                                 artwork review (canDesign) picks it here while the order is
@@ -2442,37 +2489,28 @@ export function OrdersHub() {
                                 is picked. */}
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 empty:mt-0">
                               {(() => {
-                                const skuU = String(resolveProduct(it, catalog)?.sku || it.blank || it.sku || "").toUpperCase()
-                                const cones = (threads[o.id] ?? []).find((t) => String(t.sku).toUpperCase() === skuU)?.threads ?? []
+                                // The thread pill moved up beside Qty (see OrderedVariant's
+                                // `after`). What is left here is the machine file — and it is
+                                // keyed on the RESOLVED blank for the same reason: falling back
+                                // to the listing sku attributed a file to a line whose garment
+                                // nobody had picked.
+                                // Same rule as the thread pill above: gated on a chosen blank,
+                                // looked up on the key the rows were actually written with.
+                                const product = resolveProduct(it, catalog)
+                                if (!product && !String(it.blank || "").trim()) return null
+                                const skuU = String(product?.sku || it.blank || it.sku || "").toUpperCase()
                                 const file = (dfiles[o.id] ?? []).find((f) => String(f.sku ?? "").toUpperCase() === skuU)
-                                if (!cones.length && !file) return null
-                                // One uniform pill language for the line's make-spec, matching
-                                // the Label/Scan/Design + Stock pills above: same rounded-md
-                                // px-2 py-0.5 shape, tinted by meaning. The thread + file pills
-                                // are neutral info, not status.
-                                const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium"
+                                if (!file) return null
+                                // The same pill language as the Label/Scan/Design and Stock
+                                // pills: rounded-md, px-2 py-0.5, neutral because a file id is
+                                // information rather than status.
                                 return (
-                                  <>
-                                    {cones.length > 0 && (
-                                      // Mini-swatches + count in a neutral pill; click opens the
-                                      // map of which cone covers which part of the artwork.
-                                      <ThreadBreakdown artwork={artworkFor(o, it)}>
-                                        <span className={pill + " bg-muted text-muted-foreground hover:bg-muted/80"} title={`${cones.length} thread colour${cones.length === 1 ? "" : "s"} matched — click for the cone map`}>
-                                          <span className="flex items-center -space-x-0.5">
-                                            {cones.slice(0, 8).map((c) => (
-                                              <span key={c.code} className="size-2.5 rounded-full border border-black/10" style={{ background: c.hex }} />
-                                            ))}
-                                          </span>
-                                          {cones.length} thread{cones.length === 1 ? "" : "s"}
-                                        </span>
-                                      </ThreadBreakdown>
-                                    )}
-                                    {file && (
-                                      <span className={pill + " bg-muted font-mono text-muted-foreground"} title={`Machine file ${file.name ?? ""} · ${file.designId}`}>
-                                        <FileArrowDown size={10} weight="bold" /> {file.designId}
-                                      </span>
-                                    )}
-                                  </>
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-2xs font-medium text-muted-foreground"
+                                    title={`Machine file ${file.name ?? ""} · ${file.designId}`}
+                                  >
+                                    <FileArrowDown size={10} weight="bold" /> {file.designId}
+                                  </span>
                                 )
                               })()}
                             </div>
