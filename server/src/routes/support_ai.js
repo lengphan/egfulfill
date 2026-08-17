@@ -833,7 +833,9 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       // showed up as a dead spinner with nothing said, which is how the assistant's other
       // no-op paths became undiagnosable.
       req.log?.warn?.({ err: String(e), detail: e.detail }, 'desk-image generation failed');
-      return { ok: false, disabled: !!e.disabled, error: e.message || 'Image generation failed' };
+      // `overloaded` = this MODEL is out of capacity, not the account or the request. The
+      // client offers a switch to a less contended model rather than just "try later".
+      return { ok: false, disabled: !!e.disabled, overloaded: !!e.overloaded, error: e.message || 'Image generation failed' };
     }
 
     // Store PRIVATE and hand back a same-origin proxy URL, exactly like a chat upload:

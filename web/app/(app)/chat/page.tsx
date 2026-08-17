@@ -33,7 +33,8 @@ const SUGGESTIONS = [
 type Convo = {
   id: string; kind: "support" | "staff" | "inbox" | "announce"; title: string; sub: string
   escalated?: boolean
-  /** Messages in the thread — the badge on the row. */
+  /** Incoming messages since our last reply — the unread badge. Zero once answered, which
+   *  is how every other messenger behaves: the badge is a to-do, not a size. */
   count?: number
   /** The person's own avatar, when the row is a person. */
   avatar?: { name?: string | null; avatar_emoji?: string | null; avatar_color?: string | null } | null
@@ -164,7 +165,7 @@ export default function ChatPage() {
       if (t.order_id === supportId) continue // don't list my own thread twice
       list.push({
         id: t.order_id, kind: "inbox", title: t.seller_name || t.seller_id,
-        sub: t.last ? t.last.slice(0, 40) : "Support request", escalated: !!t.escalated, count: t.n,
+        sub: t.last ? t.last.slice(0, 40) : "Support request", escalated: !!t.escalated, count: t.unanswered ?? 0,
         avatar: { name: t.seller_name, avatar_emoji: t.avatar_emoji, avatar_color: t.avatar_color },
       })
     }
@@ -564,7 +565,10 @@ export default function ChatPage() {
                     --primary, which is what fills buttons here; the reserved status colours
                     (amber hold, red alert) stay out of a row that is only saying "there are
                     twelve messages in this". min-w keeps it circular at one digit and lets
-                    it grow for "99+" instead of clipping. */}
+                    it grow for "99+" instead of clipping.
+                    It counts what is UNANSWERED, not how long the thread is: reply and it
+                    clears on the next load, ignore it and it stays — a to-do, the way every
+                    other messenger reads. */}
                 {!!c.count && (
                   <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-3xs font-bold tabular-nums text-primary-foreground">
                     {c.count > 99 ? "99+" : c.count}
@@ -741,6 +745,8 @@ export default function ChatPage() {
                                   {canAnimate && (
                                     <AnimateImageButton
                                       imageName={assetName}
+                                      prompt={input}
+                                      onConsumePrompt={() => setInput("")}
                                       onStarted={({ usd, seconds }) => {
                                         setAiNote(`Animating that still — a ${seconds}s clip (~$${usd.toFixed(2)}) lands here in a minute or two.`)
                                         setTimeout(() => setAiNote(null), 12000)
@@ -838,6 +844,10 @@ export default function ChatPage() {
           {isStaffUser && activeId === supportId && (
             <GenerateButton
               disabled={signedOut || !activeId}
+              // The panel holds settings only; the words come from the composer, so there
+              // is one box to type in rather than a second one hidden inside a popover.
+              prompt={input}
+              onConsumePrompt={() => setInput("")}
               // The server already posted it into this thread — just pull the thread again
               // so it lands as a normal message rather than a second, client-only bubble.
               onImage={() => { void load() }}

@@ -2399,7 +2399,7 @@ export function getDeskImageConfig() {
 /** Generates, stores, and posts the image into the caller's own assistant thread.
  *  Returns `ok:false` with a reason rather than throwing, same as the other AI calls. */
 export function generateDeskImage(body: { prompt: string; aspectRatio?: string; imageSize?: string; model?: string }) {
-  return api<{ ok?: boolean; attachment?: ChatAttachment; model?: string; size?: string; aspectRatio?: string; usd?: number; disabled?: boolean; error?: string }>(
+  return api<{ ok?: boolean; attachment?: ChatAttachment; model?: string; size?: string; aspectRatio?: string; usd?: number; disabled?: boolean; overloaded?: boolean; error?: string }>(
     `/api/desk/image`, { method: "POST", body: JSON.stringify(body) })
 }
 
@@ -2439,6 +2439,9 @@ export function getDeskVideoJob(id: string) {
 export type SupportThread = {
   order_id: string; seller_id: string; seller_name: string | null
   last: string; last_at: number; n: number; escalated?: boolean
+  /** Incoming messages since our last HUMAN reply — the unread badge. Answered threads
+   *  report 0, which is what makes the badge mean "needs you" rather than "is long". */
+  unanswered?: number
   /** The account's own avatar, so the rail shows the person rather than a generic glyph.
    *  Null for a website visitor — they have no account, and a made-up face is worse than
    *  their initial. */

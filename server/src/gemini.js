@@ -200,8 +200,12 @@ export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, mo
      * for an extra 2.4s before reading the same message.
      */
     const permanent = /limit:\s*0|free_tier|billing/i.test(detail);
+    // A capacity spike on a specific model ("high demand") is not a per-key rate limit and
+    // does not clear in 800ms, so it gets a longer back-off than the generic transient case.
+    // Still bounded, and still under ~5s total, because a request is being held open.
+    const overloaded = /high demand|overloaded|UNAVAILABLE/i.test(detail) || r.status === 503;
     if (!permanent && (r.status === 429 || r.status === 503 || r.status === 500) && attempt < 2) {
-      await sleep(800 * (attempt + 1));
+      await sleep((overloaded ? 1500 : 800) * (attempt + 1));
       continue;
     }
     break;
@@ -224,7 +228,15 @@ export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, mo
       e.status = 402; e.detail = detail; throw e;
     }
     const e = new Error(reason ? `Image AI: ${reason}` : `Image service error (HTTP ${r.status})`);
-    e.status = 502; e.detail = detail; throw e;
+    e.status = 502; e.detail = detail;
+    /*
+     * Google is out of capacity ON THIS MODEL. That is worth telling apart from a real
+     * failure, because there is something better to do than "try again later": the other
+     * models are separate pools, and Nano Banana 2 is both cheaper and far less contended.
+     * The caller passes this through so the UI can offer that switch in one press.
+     */
+    if (/high demand|overloaded|UNAVAILABLE/i.test(detail) || r.status === 503) e.overloaded = true;
+    throw e;
   }
 
   const data = await r.json();

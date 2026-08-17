@@ -2808,7 +2808,33 @@ export function ordersRoutes(app, requireAuth) {
                  and e.created_at > coalesce((select max(s.created_at) from order_messages s
                                                where s.order_id = m.order_id
                                                  and s.sender_role not in ('seller', 'assistant')), '-infinity'::timestamptz)
-             )::int as open_escalations
+             )::int as open_escalations,
+             /**
+              * WHAT IS STILL WAITING ON US — the number the rail badges.
+              *
+              * It badged the TOTAL, so a conversation someone had answered an hour ago still
+              * showed "36" and the rail gave no way to tell a finished thread from one with
+              * a question sitting in it. A count that never goes down is decoration.
+              *
+              * So: incoming messages since the last time a HUMAN ON OUR SIDE replied.
+              *
+              * "Our side" is the ROLE, not the presence of an author. A signed-in seller
+              * writes with their own sender_id, so an author-based test is true of both
+              * halves of a seller thread — measured against the live rail it reported every
+              * conversation as answered, including ones with an open request for a human
+              * sitting in them. The escalation subquery above already had this right:
+              * anything not 'seller' and not 'assistant' is us.
+              *
+              * Answer it and the badge goes to zero on the next load; say nothing and it
+              * stays.
+              */
+             (select count(*) from order_messages a
+               where a.order_id = m.order_id
+                 and a.sender_role = 'seller'
+                 and a.created_at > coalesce((select max(h.created_at) from order_messages h
+                                               where h.order_id = m.order_id
+                                                 and h.sender_role not in ('seller', 'assistant')), '-infinity'::timestamptz)
+             )::int as unanswered
         from order_messages m
        where m.order_id like 'support-%'
        group by m.order_id
@@ -2822,6 +2848,8 @@ export function ordersRoutes(app, requireAuth) {
       last: x.last_body || '',
       last_at: x.last_at ? new Date(x.last_at).getTime() : 0,
       n: x.n,
+      /** Incoming since our last human reply — what the rail badges. */
+      unanswered: x.unanswered,
       escalated: x.open_escalations > 0,
     }));
   });

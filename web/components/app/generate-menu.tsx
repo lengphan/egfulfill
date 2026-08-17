@@ -1,9 +1,8 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useState } from "react"
 import { ImageSquare, FilmSlate, CircleNotch, Warning, Sparkle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   getDeskImageConfig, generateDeskImage, getDeskVideoConfig, generateDeskVideo,
   type DeskImageConfig, type DeskVideoConfig, type ChatAttachment,
@@ -20,8 +19,12 @@ type Mode = "image" | "video"
  * price of the CURRENT selection is always on the button before it's pressed. Config is
  * fetched on OPEN, an event, never from an effect watching state the fetch would rewrite.
  */
-export function GenerateButton({ disabled, onImage, onVideoStarted }: {
+export function GenerateButton({ disabled, prompt, onConsumePrompt, onImage, onVideoStarted }: {
   disabled?: boolean
+  /** What's typed in the chat composer — this panel holds settings only. */
+  prompt: string
+  /** Clear the composer once the text has been spent on a generation. */
+  onConsumePrompt: () => void
   onImage: (att: ChatAttachment) => void
   onVideoStarted: (info: { jobId: string; usd: number; seconds: number }) => void
 }) {
@@ -31,7 +34,6 @@ export function GenerateButton({ disabled, onImage, onVideoStarted }: {
   const [vid, setVid] = useState<DeskVideoConfig | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const [prompt, setPrompt] = useState("")
   const [imgModel, setImgModel] = useState("")
   const [imgSize, setImgSize] = useState("")
   const [imgRatio, setImgRatio] = useState("1:1")
@@ -42,7 +44,8 @@ export function GenerateButton({ disabled, onImage, onVideoStarted }: {
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const promptRef = useRef<HTMLInputElement>(null)
+  // Set when Google reports THIS model is out of capacity — drives the one-press fallback.
+  const [overloaded, setOverloaded] = useState(false)
 
   const isVideo = mode === "video"
   const imgSpec = img?.models.find((m) => m.id === imgModel) || null
@@ -70,7 +73,6 @@ export function GenerateButton({ disabled, onImage, onVideoStarted }: {
       setImg(i); setVid(v)
       setImgModel(i.model); setImgSize(i.models.find((m) => m.id === i.model)?.defaultSize || "1K")
       setVidModel(v.model); setVidRes(v.models.find((m) => m.id === v.model)?.defaultResolution || "1080p")
-      setTimeout(() => promptRef.current?.focus(), 0)
     } catch (e) {
       // Keep the REAL reason (a 403, a 502, a network failure) — "couldn't load" alone
       // sent the last person who hit this looking in entirely the wrong place.
@@ -83,11 +85,15 @@ export function GenerateButton({ disabled, onImage, onVideoStarted }: {
   const run = async () => {
     const text = prompt.trim()
     if (!text || busy) return
-    setBusy(true); setErr(null)
+    setBusy(true); setErr(null); setOverloaded(false)
     try {
       if (mode === "image") {
         const r = await generateDeskImage({ prompt: text, aspectRatio: imgRatio, imageSize: effImgSize, model: imgModel })
-        if (!r.ok || !r.attachment) { setErr(r.error || (r.disabled ? "Image generation is off — an admin can add the Google AI key in Settings › Integrations." : "That didn't work.")); return }
+        if (!r.ok || !r.attachment) {
+          setErr(r.error || (r.disabled ? "Image generation is off — an admin can add the Google AI key in Settings › Integrations." : "That didn't work."))
+          setOverloaded(!!r.overloaded)
+          return
+        }
         onImage(r.attachment)
       } else {
         const r = await generateDeskVideo({
@@ -97,7 +103,7 @@ export function GenerateButton({ disabled, onImage, onVideoStarted }: {
         if (!r.ok || !r.jobId) { setErr(r.error || (r.disabled ? "Video generation is off — an admin can add the Google AI key in Settings › Integrations." : "That didn't work.")); return }
         onVideoStarted({ jobId: r.jobId, usd: r.usd ?? usd, seconds: r.seconds ?? secs })
       }
-      setPrompt(""); setOpen(false)
+      onConsumePrompt(); setOpen(false)
     } catch (e) {
       setErr(e instanceof Error ? e.message : "That didn't work.")
     } finally {
@@ -161,15 +167,6 @@ export function GenerateButton({ disabled, onImage, onVideoStarted }: {
                 </div>
 
 
-                <Input
-                  ref={promptRef} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run() } }}
-                  placeholder={isVideo
-                    ? "A folded tee on warm oak, camera drifting past…"
-                    : "A folded heather-grey tee on warm oak, soft daylight…"}
-                  className="h-9 text-sm" disabled={busy}
-                />
-
                 <div>
                   <div className="mb-1 text-2xs text-muted-foreground">Model</div>
                   {isVideo ? (
@@ -226,7 +223,31 @@ export function GenerateButton({ disabled, onImage, onVideoStarted }: {
                   )}
                 </div>
 
+                {!prompt.trim() && (
+                  <p className="text-2xs text-muted-foreground">Type what you want in the message box below, then press Generate.</p>
+                )}
                 {err && <p className="text-xs text-destructive">{err}</p>}
+                {/* Google is out of capacity on THIS model, which is a different thing from a
+                    broken request — and the other models are separate pools. Offer the switch
+                    rather than leaving "try again later" as the only instruction. Nano Banana 2
+                    is both cheaper and far less contended. */}
+                {overloaded && !isVideo && (() => {
+                  const alt = img?.models.find((m) => m.id !== imgModel && /flash-image$/.test(m.id))
+                    || img?.models.find((m) => m.id !== imgModel)
+                  if (!alt) return null
+                  return (
+                    <Button
+                      size="sm" variant="outline" className="h-8 w-full text-xs"
+                      onClick={() => {
+                        setImgModel(alt.id)
+                        if (!alt.sizes.includes(imgSize)) setImgSize(alt.defaultSize)
+                        setErr(null); setOverloaded(false)
+                      }}
+                    >
+                      Use {alt.label.split(" — ")[0]} instead (${(alt.usd[alt.defaultSize] ?? 0).toFixed(3)})
+                    </Button>
+                  )
+                })()}
                 {isVideo && (
                   // Set the expectation before the spend, not after: this is the one action
                   // here that does not come back in the same breath you asked.
@@ -257,21 +278,22 @@ export function GenerateButton({ disabled, onImage, onVideoStarted }: {
  * The server takes the bare asset NAME, never a URL, so it can only ever read back an object
  * we already stored for this chat.
  */
-export function AnimateImageButton({ imageName, onStarted }: {
+export function AnimateImageButton({ imageName, prompt, onConsumePrompt, onStarted }: {
   imageName: string
+  /** Also the composer's text — one box to type in, wherever the panel was opened from. */
+  prompt: string
+  onConsumePrompt: () => void
   onStarted: (info: { jobId: string; usd: number; seconds: number }) => void
 }) {
   const [open, setOpen] = useState(false)
   const [cfg, setCfg] = useState<DeskVideoConfig | null>(null)
   const [loading, setLoading] = useState(false)
-  const [prompt, setPrompt] = useState("")
   const [model, setModel] = useState("")
   const [res, setRes] = useState("")
   const [ratio, setRatio] = useState("9:16")
   const [secs, setSecs] = useState(8)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const promptRef = useRef<HTMLInputElement>(null)
 
   const spec = cfg?.models.find((m) => m.id === model) || null
   const effRes = spec ? (spec.resolutions.includes(res) ? res : spec.defaultResolution) : res
@@ -289,7 +311,6 @@ export function AnimateImageButton({ imageName, onStarted }: {
       const c = await getDeskVideoConfig()
       setCfg(c); setModel(c.model)
       setRes(c.models.find((m) => m.id === c.model)?.defaultResolution || "1080p")
-      setTimeout(() => promptRef.current?.focus(), 0)
     } catch (e2) {
       setErr(e2 instanceof Error ? `Couldn't load the video settings — ${e2.message}` : "Couldn't load the video settings.")
     } finally {
@@ -305,7 +326,7 @@ export function AnimateImageButton({ imageName, onStarted }: {
       const r = await generateDeskVideo({ prompt: text, aspectRatio: ratio, resolution: effRes, durationSeconds: secs, model, imageName })
       if (!r.ok || !r.jobId) { setErr(r.error || "That didn't work."); return }
       onStarted({ jobId: r.jobId, usd: r.usd ?? usd, seconds: r.seconds ?? secs })
-      setPrompt(""); setOpen(false)
+      onConsumePrompt(); setOpen(false)
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : "That didn't work.")
     } finally {
@@ -349,13 +370,9 @@ export function AnimateImageButton({ imageName, onStarted }: {
 
             {cfg?.enabled && (
               <div className="space-y-2">
-                <Input
-                  ref={promptRef} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run() } }}
-                  placeholder="Slow push-in, light moving across the fabric…"
-                  className="h-8 text-xs" disabled={busy}
-                />
-                <select value={model} disabled={busy} className={selectCls}
+                {!prompt.trim() && (
+                  <p className="text-2xs text-muted-foreground">Describe the motion in the message box below, then press Animate.</p>
+                )}                <select value={model} disabled={busy} className={selectCls}
                   onChange={(e) => {
                     const id = e.target.value; setModel(id)
                     const m = cfg.models.find((x) => x.id === id)
