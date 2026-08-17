@@ -790,6 +790,10 @@ export type CatalogProduct = {
    *  base_price, which is what an order actually charges. */
   inCatalog?: boolean
   catalogPrice?: number | null
+  /** Hand-picked for the front of the public catalogue. Published by name in the public
+   *  shape; distinct from inCatalog (the trade lookbook) and from status (who may see it
+   *  at all) — this one only decides whether it LEADS. */
+  featured?: boolean
   /** OURS — "EG-1001". Inventory is keyed on it, an order line resolves to it, and publish
    *  writes it onto the seller's listing, where the seller reads it as their product SKU. */
   sku?: string
@@ -954,6 +958,13 @@ export type PublicProduct = {
   brand: string | null
   /** What a SELLER pays us. Never our cost. */
   price: number
+  /** The cheapest orderable size. Equals `price` on a product with one price. */
+  priceFrom?: number
+  /** True when sizes are priced differently — the page says "from" only then, because a
+   *  single-price product dressed as a range is the other half of getting this wrong. */
+  priceVaries?: boolean
+  /** Hand-picked for the front of the catalogue, set in the product editor. */
+  featured?: boolean
   /** What THIS product ships for as the first item in a parcel — its own fee if it carries
    *  one, otherwise its garment band. Resolved by the same function that bills the order. */
   ship: number | null

@@ -323,6 +323,28 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
      * is dropped below — so two perfectly good products were invisible with nothing said.
      */
     const price = Number(d.price ?? d.basePrice ?? d.base_price ?? row.base_price);
+    /**
+     * THE LOWEST PRICE ANYONE CAN ACTUALLY PAY, and whether it is the only one.
+     *
+     * One figure was published for a product whose price moves by size — a 5XL costs more
+     * to buy and to ship than an S — so the page quoted the base against a tee you cannot
+     * order in every size at that number. Every catalogue in this trade says "from" for
+     * exactly this reason.
+     *
+     * `priceFrom` is the cheapest priced SIZE when the product has per-size tiers, else the
+     * base. `priceVaries` is what lets the page say "from" ONLY when it is true: a product
+     * with one price must not be dressed up as a range, which is the other half of being
+     * honest about it.
+     *
+     * Tier prices only — a tier with no price of its own inherits the base and cannot make
+     * the range wider than it is.
+     */
+    const tierPrices = (Array.isArray(d.sizePrices) ? d.sizePrices : [])
+      .map((t) => Number(t && t.price))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    const withBase = Number.isFinite(price) && price > 0 ? [...tierPrices, price] : tierPrices;
+    const priceFrom = withBase.length ? Math.min(...withBase) : price;
+    const priceVaries = withBase.length > 1 && Math.max(...withBase) > Math.min(...withBase);
     const colorImages = d.colorImages && typeof d.colorImages === 'object' ? d.colorImages : {};
     const colors = Object.keys(colorImages)
       .filter((name) => typeof name === 'string' && name.trim())
@@ -373,6 +395,19 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       brand: SUPPLIER_NAMES.has(String(d.brand || '').trim().toLowerCase())
         ? null : publicText(d.brand, 60),
       price,
+      /** The cheapest orderable size, and whether there is more than one price. The page
+       *  says "from" only when priceVaries — see the note where these are computed. */
+      priceFrom,
+      priceVaries,
+      /**
+       * HAND-PICKED FOR THE FRONT OF THE CATALOGUE.
+       *
+       * A boolean set in the product editor, published by NAME like everything else here.
+       * The marketing page had no way to lead with anything: 13 products in one grid, in
+       * whatever order the catalogue happened to hold, with nothing to say where to start.
+       * A shelf someone chose is the whole difference between a catalogue and a list.
+       */
+      featured: d.featured === true,
       /**
        * WHAT THIS ONE SHIPS FOR — not a platform average.
        *

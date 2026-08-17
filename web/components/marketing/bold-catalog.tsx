@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { TShirt } from "@phosphor-icons/react"
+import { TShirt, MagnifyingGlass } from "@phosphor-icons/react"
 import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import type { PublicProduct } from "@/lib/api"
 import { framingStyle } from "@/lib/product-framing"
@@ -133,6 +133,96 @@ function SwatchDot({ name, on, onClick }: { name: string; on: boolean; onClick: 
    and nowhere else: there it is one number for the thing you are looking at, where here it
    was a four-row price list for categories, printed under a page whose whole job is to show
    what we make. */
+
+/**
+ * ONE PRODUCT CARD.
+ *
+ * Lifted out of the grid so it can hold state: hovering a colour chip swaps the photo to
+ * that colourway. The chips were already there and were decoration — a row of dots that
+ * says "six colours" without letting you see one is the shop equivalent of a locked
+ * cabinet, and every catalogue in this trade swaps on hover.
+ *
+ * Module scope, like the other two: `react-hooks/static-components` forbids declaring a
+ * component inside a render, and a card redefined on every keystroke of the search box
+ * would remount — losing the hover it exists to hold.
+ *
+ * Hover only, no click. The card is a LINK, and a button inside an anchor is invalid
+ * markup; a chip that navigated on click would also fight the card's own job. The detail
+ * page is where a colourway is chosen — this is where it is glanced at.
+ */
+function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategory: boolean; index: number }) {
+  const [hovered, setHovered] = useState<string | null>(null)
+  // The hovered colourway's photo, or the product's own. Falls back the moment a colour has
+  // no picture of its own, so a chip can never blank the card.
+  const src = hovered || p.image
+  const from = p.priceVaries ? (p.priceFrom ?? p.price) : p.price
+  return (
+    <Rise preset="bloom" index={Math.min(index, 6)}
+          className="group overflow-hidden rounded-2xl border border-black/[0.09] bg-white transition-colors hover:border-black/30">
+      <Link href={`/catalog/${p.slug}`} className="block">
+        <div className="relative aspect-square overflow-hidden" style={{ background: ACCENT }}>
+          {src ? (
+            <div className="absolute inset-0" style={framingStyle(p)}>
+              <Image
+                src={src}
+                alt={p.name}
+                fill
+                unoptimized
+                sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw"
+                className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              />
+            </div>
+          ) : (
+            <div className="flex size-full items-center justify-center text-[#FAF8F3]/45">
+              <TShirt size={40} weight="duotone" />
+            </div>
+          )}
+        </div>
+        <div className="p-4">
+          {showCategory && p.category && (
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">{p.category}</div>
+          )}
+          <div className="line-clamp-2 text-[15px] font-semibold leading-snug">{p.name}</div>
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            {/* "FROM" ONLY WHEN IT IS TRUE. A 5XL costs more to buy and to ship than an S, so
+                one figure was quoting a price you cannot always order at — and a product with
+                a single price must not be dressed up as a range either. The server says which
+                it is (priceVaries); this only reads it. */}
+            <span className="text-lg font-black tabular-nums">
+              {p.priceVaries && <span className="mr-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-black/45">from</span>}
+              {usd(from)}
+            </span>
+            {sizeRangeLabel(p.sizes) && (
+              <span className="shrink-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-black/45">
+                {sizeRangeLabel(p.sizes)}
+              </span>
+            )}
+          </div>
+          {p.colors.length > 0 && (
+            <div className="mt-3 flex items-center gap-1.5" onMouseLeave={() => setHovered(null)}>
+              {p.colors.slice(0, 5).map((c) => (
+                <span
+                  key={c.name}
+                  title={c.name}
+                  onMouseEnter={() => setHovered(c.image)}
+                  className={
+                    "size-4 rounded-full border bg-center transition-transform " +
+                    (hovered && hovered === c.image ? "scale-125 border-black/60" : "border-black/15")
+                  }
+                  style={chipStyle(c)}
+                />
+              ))}
+              {p.colors.length > 5 && (
+                <span className="text-[12px] font-medium text-black/45">+{p.colors.length - 5}</span>
+              )}
+            </div>
+          )}
+        </div>
+      </Link>
+    </Rise>
+  )
+}
+
 export function BoldCatalog({ products }: { products: PublicProduct[] | null }) {
   // null = the catalogue could not be READ; [] = it is genuinely empty. The house rule is
   // that those two must never look the same, so the caller distinguishes them and this
@@ -140,6 +230,15 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
   const failed = products === null
   const all = useMemo(() => products ?? [], [products])
   const [sel, setSel] = useState<Selection>(NO_SELECTION)
+  /** Free text over name, brand and category. A catalogue this size is scanned; one at 50
+   *  is searched, and the box has to exist before the day it is needed rather than after. */
+  const [query, setQuery] = useState("")
+  /**
+   * SORT ORDER. "Featured" is the catalogue's own order — hand-picked first, then whatever
+   * the server returned — and it is the default because it is the only one that carries a
+   * decision. Price and name are there for the two questions people re-sort by.
+   */
+  const [sort, setSort] = useState<"featured" | "price-asc" | "price-desc" | "name">("featured")
 
   /**
    * The filter controls, built from the WHOLE catalogue and not from what is currently
@@ -174,14 +273,45 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
    *  return fewer products than the first did. */
   const list = useMemo(() => {
     const active = (Object.keys(sel) as FacetKey[]).filter((k) => sel[k].length)
-    if (!active.length) return all
-    return all.filter((p) =>
-      active.every((k) => {
-        const has = new Set(FACET_VALUES[k](p))
-        return sel[k].some((v) => has.has(v))
-      })
-    )
-  }, [all, sel])
+    const q = query.trim().toLowerCase()
+    let out = all
+    if (active.length) {
+      out = out.filter((p) =>
+        active.every((k) => {
+          const has = new Set(FACET_VALUES[k](p))
+          return sel[k].some((v) => has.has(v))
+        })
+      )
+    }
+    // NAME, BRAND, CATEGORY — the three things someone types. Not the description: matching
+    // a word buried in supplier prose returns products whose relevance nobody can see, and a
+    // result you cannot explain reads as a broken search.
+    if (q) {
+      out = out.filter((p) =>
+        [p.name, p.brand, p.category].some((v) => String(v ?? "").toLowerCase().includes(q))
+      )
+    }
+    if (sort === "featured") {
+      // Hand-picked first, catalogue order within. Sorted on a COPY and on one key only, so
+      // everything unfeatured keeps exactly the order the server sent.
+      out = [...out].sort((a, b) => Number(!!b.featured) - Number(!!a.featured))
+    } else if (sort === "name") {
+      out = [...out].sort((a, b) => a.name.localeCompare(b.name))
+    } else {
+      const at = (p: PublicProduct) => (p.priceVaries ? (p.priceFrom ?? p.price) : p.price)
+      out = [...out].sort((a, b) => (sort === "price-asc" ? at(a) - at(b) : at(b) - at(a)))
+    }
+    return out
+  }, [all, sel, query, sort])
+
+  /**
+   * THE HAND-PICKED SHELF.
+   *
+   * Someone chose these in the product editor and the page leads with them. Hidden the
+   * moment a filter, a search or a re-sort is on: a curated row is a starting point, and
+   * repeating four products above a filtered result is noise in front of the answer.
+   */
+  const picked = useMemo(() => all.filter((p) => p.featured).slice(0, 4), [all])
 
   /**
    * BROWSE BY KIND, before any filtering — the row every print-on-demand catalogue opens
@@ -306,6 +436,24 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
         </section>
       )}
 
+      {/* THE SHELF SOMEBODY CHOSE. Above the filters, below the kinds — the order a person
+          reads: what do you make, where do I start, then let me narrow it. Four across at
+          most: a curated row that scrolls stops being a recommendation and becomes a second
+          catalogue. */}
+      {!failed && picked.length > 0 && (
+        <section className="mx-auto max-w-[88rem] px-6 pt-14">
+          <h2 className="text-[22px] font-bold tracking-tight">Starter essentials</h2>
+          <p className="mt-1 text-[15px] text-black/55">
+            Hand-picked blanks to start with — the ones we keep stocked and know print well.
+          </p>
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {picked.map((p, i) => (
+              <ProductCard key={p.slug} p={p} showCategory index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="mx-auto max-w-[88rem] px-6 py-16">
         {failed ? (
           <Rise className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
@@ -344,7 +492,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                   {activeCount > 0 && (
                     <button
                       type="button"
-                      onClick={() => setSel(NO_SELECTION)}
+                      onClick={() => { setSel(NO_SELECTION); setQuery("") }}
                       className="text-[12px] font-semibold underline underline-offset-4 text-black/55 hover:text-[#0B0B0C]"
                     >
                       Clear
@@ -384,21 +532,55 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                 item's max-content and push the whole page sideways. Same failure the product
                 page's thumbnail rail caused. */}
             <div className="min-w-0 flex-1">
+            {/* SEARCH AND SORT SIT WITH THE RESULTS, not in the rail. The rail answers
+                "which kind"; these two act on what came back, and a person reaches for them
+                while looking at the grid. Both are plain controls on purpose — a catalogue
+                is not the place to invent a select. */}
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <label className="relative min-w-0 flex-1 sm:max-w-xs">
+                <MagnifyingGlass size={15} weight="bold" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-black/40" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search products"
+                  aria-label="Search products"
+                  className="h-10 w-full rounded-full border border-black/[0.12] bg-white pl-9 pr-3 text-[14px] outline-none placeholder:text-black/35 focus:border-black/40"
+                />
+              </label>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as typeof sort)}
+                aria-label="Sort products"
+                className="h-10 rounded-full border border-black/[0.12] bg-white px-3 text-[14px] font-semibold outline-none focus:border-black/40"
+              >
+                <option value="featured">Featured</option>
+                <option value="price-asc">Price: low to high</option>
+                <option value="price-desc">Price: high to low</option>
+                <option value="name">Name: A–Z</option>
+              </select>
+              {/* Always present, not only when filtered: "13 products" is the scale of the
+                  catalogue, and it is the first thing a buyer sizing us up wants. */}
+              <span className="ml-auto text-[13px] font-semibold text-black/55">
+                {list.length === all.length
+                  ? `${all.length} product${all.length === 1 ? "" : "s"}`
+                  : `${list.length} of ${all.length}`}
+              </span>
+            </div>
             {list.length === 0 ? (
               /* A filter that matched nothing is NOT an empty catalogue, and must not borrow
                  its words — the products are still there and one click brings them back. */
               <div className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
-                <h2 className="text-xl font-bold tracking-tight">Nothing matches those filters</h2>
+                <h2 className="text-xl font-bold tracking-tight">Nothing matches that</h2>
                 <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-black/55">
                   All {all.length} products are still here — no combination of what you picked
-                  appears on one of them.
+                  or typed appears on one of them.
                 </p>
                 <button
                   type="button"
-                  onClick={() => setSel(NO_SELECTION)}
+                  onClick={() => { setSel(NO_SELECTION); setQuery("") }}
                   className="mt-5 text-[15px] font-semibold underline underline-offset-4"
                 >
-                  Clear filters
+                  Clear filters and search
                 </button>
               </div>
             ) : (
@@ -413,80 +595,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                   165px cards. Three there, four once there is width to pay for it. */}
               <div className={(cat ? "mt-8" : "") + " grid gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"}>
                 {items.map((p, i) => (
-                  /* Keyed by SLUG, not name. The server already disambiguated duplicate names
-                     with an index suffix, so the slug is the unique one — two products sharing
-                     a name collided on this key and React reconciled them as one card. */
-                  <Rise key={p.slug} preset="bloom" index={Math.min(i, 6)}
-                        className="group overflow-hidden rounded-2xl border border-black/[0.09] bg-white transition-colors hover:border-black/30">
-                  <Link href={`/catalog/${p.slug}`} className="block">
-                    {/* Square well, so a mixed catalogue (tees, mugs, caps) lines up. The
-                        placeholder is the accent rather than a grey box — a product without a
-                        photo should look unfinished, not broken. */}
-                    <div className="relative aspect-square overflow-hidden" style={{ background: ACCENT }}>
-                      {p.image ? (
-                        /* The crop set in the product editor, on a WRAPPER rather than on the
-                           image: the hover lift is a class-based transform and an inline one
-                           would win against it, killing the lift on every framed product.
-                           Same arrangement the staff grid uses. */
-                        <div className="absolute inset-0" style={framingStyle(p)}>
-                          <Image
-                            src={p.image}
-                            alt={p.name}
-                            fill
-                            unoptimized
-                            sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw"
-                            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex size-full items-center justify-center text-[#FAF8F3]/45">
-                          <TShirt size={40} weight="duotone" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      {/* When the page ISN'T split into category sections, the category
-                          moves onto the card — so a single grid still tells you what each
-                          thing is, and nothing is lost by dropping the headings. */}
-                      {!grouped && p.category && (
-                        <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">{p.category}</div>
-                      )}
-                      <div className="line-clamp-2 text-[15px] font-semibold leading-snug">{p.name}</div>
-                      {/* THE RANGE, beside the price — "does this come in my size" answered in
-                          four characters. Eight size chips is what the product page is for; in
-                          a grid it is the fact you are scanning past. */}
-                      <div className="mt-2 flex items-baseline justify-between gap-2">
-                        <span className="text-lg font-black tabular-nums">{usd(p.price)}</span>
-                        {sizeRangeLabel(p.sizes) && (
-                          <span className="shrink-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-black/45">
-                            {sizeRangeLabel(p.sizes)}
-                          </span>
-                        )}
-                      </div>
-                      {/* Colour chips. The count alone ("6 colourways") is a fact you have to
-                          imagine; the swatches are the thing a buyer actually shops by, and
-                          they were only on the detail page. Capped at five so a 30-colour
-                          style doesn't turn the card into a palette, with the remainder
-                          stated rather than silently dropped. See chipStyle for how a name
-                          becomes a colour. */}
-                      {p.colors.length > 0 && (
-                        <div className="mt-3 flex items-center gap-1.5">
-                          {p.colors.slice(0, 5).map((c) => (
-                            <span
-                              key={c.name}
-                              title={c.name}
-                              className="size-4 rounded-full border border-black/15 bg-center"
-                              style={chipStyle(c)}
-                            />
-                          ))}
-                          {p.colors.length > 5 && (
-                            <span className="text-[12px] font-medium text-black/45">+{p.colors.length - 5}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                  </Rise>
+                  <ProductCard key={p.slug} p={p} showCategory={!grouped} index={i} />
                 ))}
               </div>
             </div>
