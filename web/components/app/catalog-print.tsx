@@ -908,10 +908,13 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                               <span className="px-1 text-center text-[7px] leading-tight text-neutral-400">{c.name}</span>
                             )}
                           </div>
-                          {/* SKU then colour, the way a buyer reads it back to you when
-                              they order — the name alone is not orderable. */}
-                          {c.sku && <div className="mt-1.5 w-full truncate text-center font-mono text-[7px] text-neutral-500">{c.sku}</div>}
-                          <div className="w-full truncate text-center text-[8px] font-medium leading-tight text-neutral-700">{c.name}</div>
+                          {/* THE NAME, AT A SIZE SOMEONE READS. The sku sat above it in 7px
+                              mono and the name under it in 8px — two lines of caption per
+                              swatch, both below the size type stops being legible in print,
+                              for a page whose whole job is "which colour do you want".
+                              The code is on the price list and in the export, where a buyer
+                              orders from; the swatch is where they choose. */}
+                          <div className="mt-2 w-full text-center text-[11px] font-medium leading-tight text-neutral-800">{c.name}</div>
                         </div>
                       ))}
                     </div>
