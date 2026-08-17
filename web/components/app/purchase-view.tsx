@@ -1830,29 +1830,16 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                     <dd className="tabular-nums">{usd(toOrderTotal)}</dd>
                   </div>
 
-                  {/* THE HONEST LINE. A number here would be a guess; the supplier decides
-                      it when the order is created, and on small orders it dwarfs the goods
-                      — $17.41 of freight on a $1.50 cap. */}
-                  <div className="space-y-1 rounded-lg bg-muted/40 p-2.5">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-xs font-medium">Shipping</span>
-                      <span className="text-xs text-muted-foreground">added when you place</span>
-                    </div>
-                    <p className="text-2xs text-muted-foreground">
-                      No supplier here quotes freight before the order exists — it arrives in their
-                      confirmation and lands on the card.
-                    </p>
-                    {toOrderGroups.map((g) => {
-                      const seen = lastFreightBySupplier[(g.supplier || "").trim()]
-                      if (!seen) return null
-                      return (
-                        <p key={g.key} className="text-2xs text-muted-foreground">
-                          <span className="font-medium text-foreground">{g.supplier}</span> last charged{" "}
-                          <span className="font-medium text-foreground tabular-nums">{usd(seen.freight)}</span>
-                          {seen.goods > 0 ? ` on ${usd(seen.goods)} of goods` : ""}.
-                        </p>
-                      )
-                    })}
+                  {/* ONE LINE, like every other line in this column. The panel is a column of
+                      figures and this was three paragraphs of prose in the middle of it.
+                      A DASH, NOT "FREE" and not a number: no supplier here quotes freight
+                      before the order exists, so we do not have the figure — and "Free" is the
+                      one word that would be a lie about a cost that regularly dwarfs the goods.
+                      The note under the total already says freight is added at placement, so
+                      nothing true was lost with the paragraphs. */}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-xs font-medium">Shipping</dt>
+                    <dd className="text-xs tabular-nums text-muted-foreground">—</dd>
                   </div>
 
                   <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2 text-base font-semibold">

@@ -657,7 +657,12 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               <div className={"grid min-h-0 flex-1 items-stretch gap-8 " + (twoUp ? "grid-cols-[92mm_minmax(0,1fr)]" : "grid-cols-1")}>
                 {/* LEFT — the product itself, big. Omitted entirely when there is neither. */}
                 {twoUp && (
-                <div className="flex flex-col">
+                /* min-h-0 + overflow-hidden: the sheet is a fixed 210mm now, so a column that
+                   does not bound itself does not make the page longer — it runs THROUGH the
+                   footer and out of the bottom, which is what a supplier description written
+                   as one 12-line paragraph did. Bounded here, the page clips at its own edge
+                   and the footer stays where it belongs. */
+                <div className="flex min-h-0 flex-col overflow-hidden">
                   {/* No fixed aspect: the hero takes the room the copy doesn't. On a style
                       with no description that is most of the column, which is exactly the
                       gap that made the page look unfinished. */}
@@ -710,6 +715,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     </button>
                   ) : null}
 
+                  <div className="min-h-0 flex-1 overflow-hidden">
                   <Editable
                     editing={editing} value={st.description} multiline
                     placeholder="Add a description"
@@ -728,7 +734,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                           {descriptionLines(st.description).slice(0, 8).map((line, i) => (
                             <li key={i} className="flex items-start gap-1.5">
                               <span className="mt-[0.6em] size-[3px] shrink-0 rounded-full bg-neutral-400" />
-                              <span>{line}</span>
+                              <span className="line-clamp-4">{line}</span>
                             </li>
                           ))}
                         </ul>
@@ -738,6 +744,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       // is the thing a buyer would otherwise have to ask for.
                       : null}
                   </Editable>
+                  </div>
 
                   {/* The size run and the chart sit UNDER THE HERO, in the left column.
                       swatches. On the left they left the bottom-right of every sheet
