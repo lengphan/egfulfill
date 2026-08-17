@@ -117,6 +117,20 @@ export function OrdersList() {
   // The mini designer, opened from an item row — same surface the factory boards use, so
   // a seller edits artwork where the item is rather than navigating to the order first.
   const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
+  /**
+   * THE LINE AS IT IS NOW. `editing` is a snapshot taken on click, and the design window now
+   * carries the variant picker — so picking a blank inside it saved, refreshed the board, and
+   * then re-rendered the picker from the same stale object, which reads as a control that
+   * does nothing. Re-found by line identity against the live orders.
+   */
+  const editingLive = useMemo(() => {
+    if (!editing) return null
+    const o = (orders ?? []).find((x) => x.id === editing.order.id) ?? editing.order
+    const key = editing.item.line_id ?? editing.item.sku
+    const it = (o.items ?? []).find((x) => (x.line_id ?? x.sku) === key) ?? editing.item
+    return { order: o, item: it }
+  }, [editing, orders])
+
   const reloadDesigns = useCallback((oid: string) => {
     getOrderDesigns(oid).then((r) => {
       const list = Array.isArray(r) ? r : (r?.designs ?? [])
@@ -461,7 +475,7 @@ export function OrdersList() {
           open
           onOpenChange={(v) => { if (!v) setEditing(null) }}
           orderId={editing.order.id}
-          item={editing.item}
+          item={editingLive?.item ?? editing.item}
           initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
           initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}
           catalog={catalog}

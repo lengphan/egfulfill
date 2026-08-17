@@ -418,6 +418,20 @@ export function OrdersHub() {
 
   // The line whose artwork is open in the editor. Operator/admin only — warehouse verifies.
   const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
+  /**
+   * THE LINE AS IT IS NOW. `editing` is a snapshot taken on click, and the design window now
+   * carries the variant picker — so picking a blank inside it saved, refreshed the board, and
+   * then re-rendered the picker from the same stale object, which reads as a control that
+   * does nothing. Re-found by line identity against the live orders.
+   */
+  const editingLive = useMemo(() => {
+    if (!editing) return null
+    const o = (orders ?? []).find((x) => x.id === editing.order.id) ?? editing.order
+    const key = editing.item.line_id ?? editing.item.sku
+    const it = (o.items ?? []).find((x) => (x.line_id ?? x.sku) === key) ?? editing.item
+    return { order: o, item: it }
+  }, [editing, orders])
+
   // A push that would duplicate work already done. Held until a human decides, because
   // the alternative — silently reusing, or silently re-digitising — is wrong either way.
   const [reuse, setReuse] = useState<{ order: OrderRow; item: OrderItem; exact: ReuseMatch[]; similar: ReuseMatch[] } | null>(null)
@@ -2779,7 +2793,7 @@ export function OrdersHub() {
               open
               onOpenChange={(v) => { if (!v) setEditing(null) }}
               orderId={editing.order.id}
-              item={editing.item}
+              item={editingLive?.item ?? editing.item}
               initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
               initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}
               catalog={catalog}

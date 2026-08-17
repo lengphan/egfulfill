@@ -307,6 +307,24 @@ export default function OrderDetailPage() {
   }
 
   const items = order.items ?? []
+  /**
+   * THE LINE AS IT IS NOW, not as it was when the window opened.
+   *
+   * `customize` is a SNAPSHOT taken on click. Harmless while the dialog only placed artwork —
+   * but it now carries the variant picker, and picking a blank inside it saved to the server,
+   * refreshed the order, and then re-rendered the picker from the same stale object. The
+   * field snapped back to "Blank · Required" and the strip read as broken; it had worked
+   * every time.
+   *
+   * Re-found in `items` by line identity, so the dialog sees what the order sees. Falls back
+   * to the snapshot for the instant between the click and the next fetch. Deliberately NOT a
+   * useMemo: `items` is only available after this component's early returns, and a hook here
+   * would run conditionally.
+   */
+  const customizeKey = customize ? (customize.line_id ?? customize.sku) : null
+  const customizeLive = customize
+    ? (items.find((it) => (it.line_id ?? it.sku) === customizeKey) ?? customize)
+    : null
   // Variants are editable only before submit — after that the cost is frozen and the
   // server rejects changes. new/draft/"" = not yet submitted.
   const preSubmit = ["", "new", "draft"].includes(String(order.factory_status || ""))
@@ -1014,7 +1032,7 @@ export default function OrderDetailPage() {
           open={!!customize}
           onOpenChange={(v) => !v && setCustomize(null)}
           orderId={id}
-          item={customize}
+          item={customizeLive ?? customize}
           initialDesign={designSrc(designForLine(designs, customize)?.data)}
           initialPos={designForLine(designs, customize)?.pos}
           // OPPOSITE SIDES OF THE SAME MOMENT. Before submit the order is the seller's
@@ -1024,7 +1042,7 @@ export default function OrderDetailPage() {
           filesLocked={isStaff ? preSubmit : !preSubmit}
           siblings={items.filter((it) => (it.line_id ?? it.sku) !== (customize.line_id ?? customize.sku))}
           designs={designs}
-          onSaved={() => { reloadDesigns(); setQuoteNonce((n) => n + 1) }}
+          onSaved={() => { reloadDesigns(); reloadOne(); setQuoteNonce((n) => n + 1) }}
           /* What a SECOND printed face adds per unit, so the side pills can say so before
              anyone commits to one. From the quote, which is the same settings the charge
              reads — a number typed here would be a second opinion about the price. */
