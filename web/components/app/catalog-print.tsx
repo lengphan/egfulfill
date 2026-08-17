@@ -662,7 +662,12 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   the two-up grid printed an empty half-page beside the swatches — a hole in
                   the middle of the sheet, which reads worse than a shorter page. The colours
                   and the charts take the full width instead. */}
-              <div className={"grid min-h-0 flex-1 items-stretch gap-8 " + (twoUp ? "grid-cols-[92mm_minmax(0,1fr)]" : "grid-cols-1")}>
+              {/* grid-rows AND overflow-hidden, both load-bearing. A grid ROW sizes to its
+                  content by default, so `min-h-0` on the grid BOX did nothing to stop the row
+                  growing past it — the column kept drawing and painted straight over the
+                  footer, which is exactly what it was still doing after the last fix.
+                  minmax(0,1fr) caps the row at the box; overflow-hidden clips what is left. */}
+              <div className={"grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] items-stretch gap-8 overflow-hidden " + (twoUp ? "grid-cols-[92mm_minmax(0,1fr)]" : "grid-cols-1")}>
                 {/* LEFT — the product itself, big. Omitted entirely when there is neither. */}
                 {twoUp && (
                 /* min-h-0 + overflow-hidden: the sheet is a fixed 210mm now, so a column that
