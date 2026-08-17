@@ -8,7 +8,7 @@ import { isStaff } from '../auth.js';
 import { quoteSpec, shipFeeOf, extraFeeOf, feeSettings, sellerBaseCostOf, priceByMethodOf } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
-import { variantSku, variantLabel, variantPairs, sizesOf, colorsOf } from '../variant-sku.js';
+import { variantSku, variantLabel, variantPairs, productSizes, productColors } from '../variant-sku.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
 import { readAll as readSettings } from './factory_settings.js';
 
@@ -1931,7 +1931,11 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     for (const p of freshlyAdded) {
       const sku = String(p.sku || '').trim();
       if (!sku) continue;
-      const pairs = variantPairs(sizesOf(p), colorsOf(p));
+      // THE PRODUCT'S OWN VARIANTS, as the editor saved them — never the supplier's full
+      // run. We keep seven of a style's sixty colourways; the other fifty-three are not
+      // ours to hold, and a row for one would read as "we have none of that" about a
+      // garment nobody chose to sell.
+      const pairs = variantPairs(productSizes(p), productColors(p));
       for (const v of pairs) {
         const key = variantSku(sku, v.size, v.color);
         if (!key) continue;

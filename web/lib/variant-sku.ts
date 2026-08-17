@@ -62,3 +62,30 @@ export function variantPairs(sizes: string[], colors: string[]): { size: string;
   }
   return out
 }
+
+/**
+ * THE VARIANTS A PRODUCT WAS CREATED WITH — not everything its supplier offers.
+ *
+ * A style arrives with sixty colourways and we keep seven. The seven are what the editor
+ * saved, and they are the only ones a shelf should hold rows for: a row for one of the other
+ * fifty-three reads as "we have none of that" about a garment nobody chose to sell.
+ *
+ * Mirrors what product-editor-dialog LOADS, exactly — sizes from `sizes`, colours from the
+ * keys of `colorImages` with `mainColor` as a FALLBACK when there are none, never a union.
+ *
+ * Deliberately NOT sizesOf/colorsOf from variant-resolve.ts. Those union in sizePrices sizes
+ * and mainColor, which is right for an order line's picker (it must keep offering whatever
+ * the line already holds) and wrong here, where a leftover price tier or a mainColor left
+ * pointing at a removed colourway would file a variant the product does not offer.
+ *
+ * server/src/variant-sku.js mirrors this — change both.
+ */
+export function productSizes(p: { sizes?: string[] | null } | null | undefined): string[] {
+  return (p?.sizes ?? []).filter(Boolean).map(String)
+}
+
+export function productColors(p: { colorImages?: Record<string, string> | null; mainColor?: string | null } | null | undefined): string[] {
+  const keys = Object.keys(p?.colorImages ?? {}).filter(Boolean)
+  if (keys.length) return keys
+  return p?.mainColor ? [String(p.mainColor)] : []
+}

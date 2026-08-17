@@ -16,8 +16,8 @@ import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, getCatalogProducts, type CatalogProduct, type InventoryItem, type OrderItem, type ScanRow, type SkuVisibility } from "@/lib/api"
 import { getToken } from "@/lib/auth"
-import { resolveProduct, sizesOf, colorsOf } from "@/lib/variant-resolve"
-import { variantSku, variantLabel } from "@/lib/variant-sku"
+import { resolveProduct } from "@/lib/variant-resolve"
+import { variantSku, variantLabel, productSizes, productColors } from "@/lib/variant-sku"
 import { prettyColorName } from "@/lib/color-name"
 import { PageTitle } from "@/components/app/page-title"
 import { TabLabel } from "@/components/app/tab-label"
@@ -809,8 +809,8 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
     return list.slice(0, 40)
   }, [withSku, q])
   const picked = useMemo(() => withSku.find((p) => String(p.id ?? p.sku) === pickedId) ?? null, [withSku, pickedId])
-  const pickedSizes = useMemo(() => (picked ? sizesOf(picked) : []), [picked])
-  const pickedColors = useMemo(() => (picked ? colorsOf(picked) : []), [picked])
+  const pickedSizes = useMemo(() => (picked ? productSizes(picked) : []), [picked])
+  const pickedColors = useMemo(() => (picked ? productColors(picked) : []), [picked])
 
   /**
    * ONE ROW PER VARIANT — colour AND size, because that is what the shelf holds and what an
@@ -845,8 +845,10 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
      * Ones already stocked stay out: re-adding them would rewrite a real count with a zero.
      */
     const base = String(p.sku || "").trim()
-    const szs = sizesOf(p)
-    const cls = colorsOf(p)
+    // The product's OWN variants, as the editor saved them — the supplier's full run is
+    // not what we hold.
+    const szs = productSizes(p)
+    const cls = productColors(p)
     const next = new Set<string>()
     for (const c of (cls.length ? cls : [""])) for (const sz of (szs.length ? szs : [""])) {
       const k = variantSku(base, sz || null, c || null)
@@ -925,7 +927,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                           <span className="block truncate text-sm font-medium">{p.name || "Untitled"}</span>
                           <span className="block truncate font-mono text-xs text-muted-foreground">{p.sku}</span>
                         </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">{sizesOf(p).length || 1} size{sizesOf(p).length === 1 ? "" : "s"}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{productColors(p).length || 1} × {productSizes(p).length || 1}</span>
                       </button>
                     ))}
                   </div>

@@ -32,22 +32,34 @@ export function variantLabel(size, color) {
   return [String(size ?? '').trim(), String(color ?? '').trim()].filter(Boolean).join(' · ');
 }
 
-/** Sizes a product offers. Mirrors sizesOf in web/lib/variant-resolve.ts: the list plus any
- *  size that only appears as a price tier. */
-export function sizesOf(d) {
-  const out = new Set();
-  for (const s of (Array.isArray(d?.sizes) ? d.sizes : [])) if (s) out.add(String(s));
-  for (const t of (Array.isArray(d?.sizePrices) ? d.sizePrices : [])) if (t && t.size) out.add(String(t.size));
-  return [...out];
+/**
+ * THE VARIANTS THE PRODUCT WAS CREATED WITH — not everything the supplier offers.
+ *
+ * A style arrives from S&S or Otto with sixty colourways and we keep seven; the seven are
+ * what the editor saved, and they are the only ones a shelf should have rows for. Filing the
+ * supplier's whole run would put fifty-three garments on the inventory page that nobody has
+ * ever decided to sell, and each one would read as a real "we have none of that".
+ *
+ * So these mirror what web/components/app/product-editor-dialog.tsx LOADS, exactly:
+ *   sizes  = p.sizes
+ *   colours = keys of colorImages, or [mainColor] as a FALLBACK when there are none
+ *
+ * Deliberately NOT sizesOf/colorsOf from web/lib/variant-resolve.ts. Those UNION in
+ * sizePrices sizes and mainColor, which is right where they are used — an order line's
+ * picker must keep offering whatever that line already holds — and wrong here, where a
+ * leftover price tier or a mainColor pointing at a colourway somebody removed would file a
+ * row for a variant the product does not offer.
+ */
+export function productSizes(d) {
+  const out = [];
+  for (const s of (Array.isArray(d?.sizes) ? d.sizes : [])) if (s) out.push(String(s));
+  return out;
 }
 
-/** Colourways a product offers. Mirrors colorsOf: the keys it was set up with, plus its main
- *  colour — a product with one colourway carries it there and nowhere else. */
-export function colorsOf(d) {
-  const out = new Set();
-  if (d?.mainColor) out.add(String(d.mainColor));
-  for (const c of Object.keys(d?.colorImages || {})) if (c) out.add(String(c));
-  return [...out];
+export function productColors(d) {
+  const keys = Object.keys(d?.colorImages || {}).filter(Boolean);
+  if (keys.length) return keys.map(String);
+  return d?.mainColor ? [String(d.mainColor)] : [];
 }
 
 /** Every (size, colour) a product offers, sizes outer — the order the editor renders. */
