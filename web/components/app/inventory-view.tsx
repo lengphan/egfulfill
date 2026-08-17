@@ -74,7 +74,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
    *  the filter reads it, and the filter is computed before that effect is defined. */
   const [meta, setMeta] = useState<Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>>({})
   const [saving, setSaving] = useState(false)
-  // When the Inventory shell drives the pool (its single Our stock · Seller stock · Scan
+  // When the Inventory shell drives the pool (its single Our stock · Incoming stock · Scan
   // nav), follow it and hide the in-view toggle; standalone, keep our own.
   const [ownTab, setOwnTab] = useState<"own" | "consigned">("own")
   const tab = pool ?? ownTab
@@ -268,7 +268,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           second stacked pill row. */}
       {!pool && (
         <div className="flex w-fit rounded-full border border-border p-0.5">
-          {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Seller stock" }] as const).map((t) => (
+          {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Incoming stock" }] as const).map((t) => (
             <button
               key={t.id}
               onClick={() => setOwnTab(t.id)}
@@ -504,13 +504,12 @@ function ProductGroup({
             {(it.supplier || meta[it.sku]?.supplier) && (
               <div className="max-w-[220px] truncate text-2xs text-muted-foreground">{it.supplier || meta[it.sku]?.supplier}</div>
             )}
-            {/* Only once we have ASKED and been told nothing — `meta[sku]` is undefined
-                while unresolved, and an empty object once answered. */}
-            {meta[it.sku] !== undefined && !meta[it.sku]?.supplier && !it.supplier && (
-              <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-medium text-amber-700">
-                Not in any supplier catalogue
-              </div>
-            )}
+            {/* NO "not in any supplier catalogue" BADGE. It landed on nearly every row —
+                anything we stock that isn't a live S&S/Otto sku, which is most of what a
+                factory holds — so it read as a warning about the table rather than about a
+                row, and it pushed every line onto two. The same answer is still one click
+                away and deliberate: the "No longer stocked" filter above lists exactly these
+                rows when that is the question being asked. */}
           </div>
         </div>
       </td>

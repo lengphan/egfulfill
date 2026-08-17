@@ -99,8 +99,18 @@ export function LabelSheet({
   })
 
   return createPortal(
-    <div className="eg-print-root fixed inset-0 z-50 overflow-auto bg-background">
-      <div className="no-print sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-3">
+    /**
+     * A PREVIEW WINDOW, not a page takeover.
+     *
+     * This filled the whole screen to show six stickers: one label per line down the left
+     * edge with the rest of a 27-inch monitor blank, which reads as a broken page rather
+     * than a preview. Bounded and centred, the labels tile, and what is on screen is the
+     * sheet — the print CSS still flattens this back to plain page content (see globals.css,
+     * .eg-print-card / .eg-print-body), so what prints is unchanged.
+     */
+    <div className="eg-print-root fixed inset-0 z-50 grid place-items-center overflow-auto bg-black/45 p-4 backdrop-blur-sm">
+      <div className="eg-print-card flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      <div className="no-print flex flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-3">
         <span className="font-medium">{sheet.length} {title}</span>
         <span className="text-xs text-muted-foreground">{labels.length} variant{labels.length === 1 ? "" : "s"}</span>
 
@@ -113,7 +123,7 @@ export function LabelSheet({
           </span>
         </label>
 
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
           {/* Which code, said out loud. A gun cannot read a QR and a phone fights a 1D
               code — so the wrong choice here produces a bin of labels nothing can scan,
@@ -155,6 +165,7 @@ export function LabelSheet({
         </div>
       </div>
 
+      <div className="eg-print-body min-h-0 flex-1 overflow-auto bg-muted/30">
       {sheet.length === 0 ? (
         <div className="py-20 text-center text-sm text-muted-foreground">Nothing selected to print.</div>
       ) : (
@@ -163,7 +174,7 @@ export function LabelSheet({
               thinks the page is. Injected rather than hardcoded so the preview and the
               print use one source of truth. */}
           <style>{`@media print { @page { size: ${spec.w}in ${spec.h}in; margin: 0; } }`}</style>
-          <div className={oneUp ? "print-area flex flex-col items-center gap-4 p-4" : "print-area grid grid-cols-3 gap-3 p-4 sm:grid-cols-4"}>
+          <div className={oneUp ? "print-area flex flex-wrap items-start justify-center gap-4 p-4" : "print-area grid grid-cols-3 gap-3 p-4 sm:grid-cols-4"}>
             {sheet.map(({ key, l }) => (
               <div
                 key={key}
@@ -216,6 +227,8 @@ export function LabelSheet({
           </div>
         </>
       )}
+      </div>
+      </div>
     </div>,
     host
   )

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { cartChanged } from "@/lib/cart-events"
-import { ShoppingCart, CircleNotch, Truck, CheckCircle, Trash, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise } from "@phosphor-icons/react"
+import { ShoppingCart, CircleNotch, TrayArrowDown, CheckCircle, Trash, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -1289,7 +1289,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                     {po.status === "placed" && (
                       <>
                         <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={busy === po.num}>
-                          {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <Truck size={13} weight="bold" />} Receive into stock
+                          {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />} Receive into stock
                         </Button>
                         {(() => {
                           const mins = minutesSincePlaced(po)

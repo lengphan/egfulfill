@@ -436,7 +436,15 @@ export default function ChatPage() {
           // why "it doesn't work" was undiagnosable. The server now sends a human reason.
           else if (r.ok && r.skipped) { await load(); setAiNote(r.reason ? `Nothing to answer yet — ${r.reason}.` : "Nothing new to answer yet.") }
           else if (r.ok && r.escalated) { if (r.office) setOffice(r.office); await load(); setAiNote(queueNote(r.office ?? office)) }
-          else if (r.disabled) setAiNote("The assistant is off — an admin can add the AI key in Settings → Integrations. A teammate will follow up.")
+          // `unavailable` = the server couldn't READ its settings (a database blip during a
+          // deploy). Distinct from "no key", which is a thing an admin can act on.
+          else if (r.unavailable) setAiNote(r.error || "The assistant is briefly unavailable. Try again in a moment.")
+          // Three different things used to share this one sentence, and two of them sent the
+          // reader to Settings to fix a key that was never the problem. `reason` says which.
+          else if (r.disabled) setAiNote(
+            r.reason === "seller-auto-reply-off"
+              ? "Automatic replies are off here — a teammate will answer you directly."
+              : "The assistant is off — an admin can add the AI key in Settings → Integrations. A teammate will follow up.")
           else if (r.error) setAiNote(`Assistant couldn't reply (${r.error}). A teammate will follow up.`)
           else if (r.empty) setAiNote(r.reason ? `Nothing to answer yet — ${r.reason}.` : "Nothing to answer yet.")
           else setAiNote(null)

@@ -13,8 +13,12 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { egBroadcast } from '../events.js';
-import { putObject, storageEnabled } from '../storage.js';
+import { putObject, getObject, storageEnabled } from '../storage.js';
 import { generateImage, imageConfig, priceUsd, IMAGE_MODELS, ASPECT_RATIOS, RATIO_HINTS } from '../gemini.js';
+import {
+  startVideo, checkVideo, fetchVideo, meterVideo, videoConfig, usdFor,
+  VIDEO_MODELS, VIDEO_RATIOS, VIDEO_RATIO_HINTS, VIDEO_DURATIONS,
+} from '../veo.js';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
@@ -137,6 +141,100 @@ async function runSupportNudges() {
 }
 
 let _settingsReady = null;
+/*
+ * Video jobs. Created idempotently at route load like the other late-added tables — see
+ * CLAUDE.md: schema.sql only runs on a FIRST database init, so an existing deployment
+ * would never get this.
+ *
+ * A row exists because a Veo clip outlives its HTTP request. It is also what stops a job
+ * being lost to a container restart: the sweeper picks up anything still pending, so a
+ * deploy mid-generation costs a delay rather than the money already spent at Google.
+ */
+let _videoJobsReady = null;
+function ensureVideoJobs() {
+  if (_videoJobsReady) return _videoJobsReady;
+  _videoJobsReady = q(`create table if not exists video_jobs (
+      id text primary key,
+      thread_id text not null,
+      user_id uuid,
+      operation text not null,
+      model text, resolution text, aspect text,
+      seconds integer, prompt text,
+      from_image boolean not null default false,
+      status text not null default 'pending',
+      error text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`)
+    .then(() => q(`create index if not exists video_jobs_pending on video_jobs (status, created_at)`))
+    .catch((e) => { _videoJobsReady = null; throw e; });
+  return _videoJobsReady;
+}
+
+// How long a clip may take before we stop asking. Veo lands in one to three minutes; twelve
+// is generous. A job past this is ABANDONED with a reason rather than polled forever — an
+// unbounded waiter against a paid API is the shape that costs real money.
+const VIDEO_MAX_MIN = 12;
+
+async function finishVideoJob(job, uri) {
+  const vid = await fetchVideo(uri);
+  const ext = /webm/.test(vid.mime) ? 'webm' : 'mp4';
+  const name = `vid-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+  await putObject(`chat/${name}`, vid.buffer, vid.mime, 'private');
+  const base = (process.env.PUBLIC_API_ORIGIN || 'https://egful.store').replace(/\/+$/, '');
+  const attachment = { url: `${base}/api/support/asset/${name}`, name: String(job.prompt || 'video').slice(0, 80), mime: vid.mime, size: vid.buffer.length };
+  const meta = {
+    by: 'EGFUL Assistant', ai: true, video: true, ts: Date.now(),
+    model: job.model, resolution: job.resolution, seconds: job.seconds,
+    usd: usdFor(job.model, job.resolution, job.seconds), fromImage: !!job.from_image,
+  };
+  await q(
+    `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
+     values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) where client_id is not null do nothing`,
+    [job.thread_id, null, 'assistant', job.prompt || '', attachment, JSON.stringify(meta), job.id]);
+  meterVideo(job.model, job.resolution, job.seconds, true);
+  egBroadcast({ type: 'order-message' });
+}
+
+/** Say why, in the thread. A clip that silently never arrives is the worst outcome here. */
+async function failVideoJob(job, why) {
+  await q(`update video_jobs set status='failed', error=$2, updated_at=now() where id=$1`, [job.id, String(why).slice(0, 400)]);
+  meterVideo(job.model, job.resolution, job.seconds, false);
+  await q(
+    `insert into order_messages (order_id, sender_id, sender_role, body, meta, client_id)
+     values ($1,$2,$3,$4,$5,$6) on conflict (client_id) where client_id is not null do nothing`,
+    [job.thread_id, null, 'assistant', `The video didn't finish — ${why}`,
+     JSON.stringify({ by: 'EGFUL Assistant', ai: true, system: true, ts: Date.now() }), job.id + '-err']);
+  egBroadcast({ type: 'order-message' });
+}
+
+async function sweepVideoJobs() {
+  let rows;
+  try {
+    await ensureVideoJobs();
+    rows = await q(`select * from video_jobs where status='pending' order by created_at asc limit 10`);
+  } catch { return; }
+  for (const job of rows.rows) {
+    const ageMin = (Date.now() - new Date(job.created_at).getTime()) / 60000;
+    try {
+      const st = await checkVideo(job.operation);
+      if (!st.done) {
+        if (ageMin > VIDEO_MAX_MIN) await failVideoJob(job, `it was still not ready after ${VIDEO_MAX_MIN} minutes, so we stopped waiting.`);
+        continue;
+      }
+      if (st.error) { await failVideoJob(job, st.error); continue; }
+      await finishVideoJob(job, st.uri);
+      await q(`update video_jobs set status='done', updated_at=now() where id=$1`, [job.id]);
+    } catch (e) {
+      // A transient poll failure must not burn the job — only age it out. But a terminal
+      // one (billing, a rejected prompt) has a status and should stop now rather than
+      // re-ask for twelve minutes.
+      if (e && (e.status === 402 || e.status === 400)) { await failVideoJob(job, e.message).catch(() => {}); continue; }
+      if (ageMin > VIDEO_MAX_MIN) await failVideoJob(job, 'we lost contact with the video service.').catch(() => {});
+    }
+  }
+}
+
 function ensureSettings() {
   if (_settingsReady) return _settingsReady;
   // value is JSONB, matching schema.sql. It said `text` here, which disagreed with the
@@ -153,6 +251,16 @@ function ensureSettings() {
 // Resolve the effective AI config: DB settings first, then env, then defaults.
 async function aiConfig() {
   let key = '', model = '';
+  /*
+   * DID THE READ FAIL, OR IS THERE GENUINELY NO KEY? These are opposite problems and this
+   * function used to report both as "no key". ANTHROPIC_API_KEY is not forwarded in
+   * docker-compose.yml, so the env fallback below is always empty in production — meaning a
+   * momentary database failure resolved to no key at all, and the UI told the operator "the
+   * assistant is off, an admin can add the AI key", pointing them at a setting that was
+   * fine. It happens exactly during `docker compose up -d --build`, when the API is up
+   * before the database is ready, so it lands right when someone is watching a deploy.
+   */
+  let unavailable = false;
   try {
     await ensureSettings();
     const r = await q("select key, value from settings where key in ('support_ai_key','support_ai_model')");
@@ -161,7 +269,7 @@ async function aiConfig() {
       if (row.key === 'support_ai_key') key = String(row.value ?? '').trim();
       if (row.key === 'support_ai_model') model = String(row.value ?? '').trim();
     }
-  } catch { /* settings unavailable → env fallback */ }
+  } catch { unavailable = true; /* settings unreadable → env fallback, and SAY SO */ }
   key = key || (process.env.ANTHROPIC_API_KEY || '').trim();
   model = model || (process.env.SUPPORT_AI_MODEL || '').trim() || DEFAULT_MODEL;
   const fromEnv = !!(process.env.ANTHROPIC_API_KEY || '').trim();
@@ -185,7 +293,7 @@ async function aiConfig() {
   const known = AI_MODELS.some((m) => m.id === model);
   const pinnedByEnv = model === (process.env.SUPPORT_AI_MODEL || '').trim();
   if (!known && !pinnedByEnv) { staleModel = model; model = DEFAULT_MODEL; }
-  return { key, model, fromEnv, staleModel };
+  return { key, model, fromEnv, staleModel, unavailable };
 }
 
 // Seller-friendly status label from the factory status (mirrors the front-end SELLER_STATUS:
@@ -309,7 +417,8 @@ async function postAnthropic(key, body) {
  * instead of reporting a generic failure.
  */
 export async function aiComplete({ system, messages, maxTokens = 900 }) {
-  const { key, model } = await aiConfig();
+  const cfg = await aiConfig();
+    const { key, model } = cfg;
   if (!key) { const e = new Error('The assistant is off — an admin can add the AI key in Settings › Integrations.'); e.disabled = true; e.status = 503; throw e; }
   return postAnthropic(key, JSON.stringify({ model, max_tokens: maxTokens, system, messages }));
 }
@@ -358,6 +467,14 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   if (!globalThis.__egSupportNudge) {
     globalThis.__egSupportNudge = setInterval(() => { runSupportNudges().catch(() => {}); }, 15 * 60 * 1000);
     if (globalThis.__egSupportNudge.unref) globalThis.__egSupportNudge.unref();
+  }
+  // Same single-instance pattern for the video sweeper: a globalThis guard so a hot reload
+  // can't stack pollers against a paid API, unref so it never holds the process open, and a
+  // delayed first run to pick up anything left pending by a restart.
+  if (!globalThis.__egVideoSweep) {
+    globalThis.__egVideoSweep = setInterval(() => { sweepVideoJobs().catch(() => {}); }, 20 * 1000);
+    if (globalThis.__egVideoSweep.unref) globalThis.__egVideoSweep.unref();
+    setTimeout(() => { sweepVideoJobs().catch(() => {}); }, 30 * 1000).unref?.();
     setTimeout(() => { runSupportNudges().catch(() => {}); }, 45 * 1000).unref?.();
   }
 
@@ -400,8 +517,11 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
 
   // ── Staff: DRAFT a reply for a seller's support thread (does NOT post it) ─────
   app.post('/api/support/ai-draft', { preHandler: requireStaff }, async (req, reply) => {
-    const { key, model } = await aiConfig();
-    if (!key) return { ok: false, disabled: true };
+    const cfg = await aiConfig();
+    const { key, model } = cfg;
+    if (!key) return cfg.unavailable
+      ? { ok: false, unavailable: true, error: 'The assistant is briefly unavailable — the server could not read its settings. Try again in a moment.' }
+      : { ok: false, disabled: true };
     const threadId = String((req.body && req.body.threadId) || '');
     if (threadId.indexOf('support-') !== 0) { reply.code(400); return { error: 'threadId must be a support-* thread' }; }
     const sellerId = threadId.slice('support-'.length);
@@ -517,15 +637,35 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   const SELLER_AUTO_REPLY = false;
 
   app.post('/api/support/ai-reply', { preHandler: requireAuth }, async (req, reply) => {
-    if (!SELLER_AUTO_REPLY) return { ok: true, disabled: true, reason: 'seller-auto-reply-off' };
-    const { key, model } = await aiConfig();
-    if (!key) { req.log?.warn?.('support-ai: no AI key configured (Settings › Integrations)'); return { ok: false, disabled: true }; }
+    /*
+     * The switch above is about SELLERS — nobody writing to support wants a machine first.
+     * A staffer's own "My EG" runs through this same route and is not that: there is no
+     * seller in it, no human queue behind it, and it is the personal assistant they use to
+     * work. Gating it here turned that off too, and because the client renders `disabled`
+     * as "an admin can add the AI key in Settings", it read as a broken credential — so the
+     * one place to look was the one place that was already correct.
+     *
+     * The same carve-out is already made further down for handoff suppression, and for the
+     * same reason; this just applies it one step earlier.
+     */
+    const isStaffOwn = String(req.user.role || 'seller') !== 'seller';
+    if (!SELLER_AUTO_REPLY && !isStaffOwn) return { ok: true, disabled: true, reason: 'seller-auto-reply-off' };
+    const cfg = await aiConfig();
+    const { key, model } = cfg;
+    if (!key) {
+      // `unavailable` = the settings read itself failed (database still coming up during a
+      // deploy, most often). Reporting that as "add a key" sends an operator to a screen
+      // where everything is already correct.
+      if (cfg.unavailable) { req.log?.warn?.('support-ai: settings unreadable — reporting as temporary'); return { ok: false, unavailable: true, error: 'The assistant is briefly unavailable — the server could not read its settings. Try again in a moment.' }; }
+      req.log?.warn?.('support-ai: no AI key configured (Settings › Integrations)');
+      return { ok: false, disabled: true };
+    }
     const sellerId = req.user.sub;
     const threadId = 'support-' + sellerId;
     // A staffer's own "My EG" is a PERSONAL AI thread — there is no human queue behind it,
     // so the handoff suppression below (which goes silent until a teammate replies) must
     // never gate it, or one stray escalated flag would mute their assistant permanently.
-    const isStaffOwn = String(req.user.role || 'seller') !== 'seller';
+    // (`isStaffOwn` is decided at the top of the route now, for the auto-reply switch.)
 
     // HUMAN HANDOFF: once a seller asks for a human, the AI stays OUT until a real teammate
     // replies. Two reasons — it must not talk over the queue, and its own reply (role
@@ -601,8 +741,11 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   // ── Private Workbench: personal AI over the user's OWN notes + chat ────────────
   // Reads only desk-<caller's own id>, so one user can never reach another's Workbench.
   app.post('/api/desk/ai-reply', { preHandler: requireAuth }, async (req, reply) => {
-    const { key, model } = await aiConfig();
-    if (!key) return { ok: false, disabled: true };
+    const cfg = await aiConfig();
+    const { key, model } = cfg;
+    if (!key) return cfg.unavailable
+      ? { ok: false, unavailable: true, error: 'The assistant is briefly unavailable — the server could not read its settings. Try again in a moment.' }
+      : { ok: false, disabled: true };
     const threadId = 'desk-' + req.user.sub;
     // Pinned notes (meta.note) become durable context; everything else is recent chat.
     const noteRows = await q(
@@ -717,6 +860,85 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     egBroadcast({ type: 'order-message' });
 
     return { ok: true, attachment, model: img.model, size: img.size, aspectRatio: img.aspectRatio, usd: img.usd };
+  });
+
+  // ── Video generation (Veo), same gate and same channel as images ─────────────
+  //
+  // A clip takes one to three minutes, which no HTTP request should be held open for —
+  // through Caddy, Vercel or a phone on mobile data, that connection dies long before the
+  // video does. So POST only STARTS a job; a bounded sweeper below posts the finished clip
+  // into the thread, which the chat page is already polling. Same arrival as an AI reply.
+
+  app.get('/api/desk/video/config', { preHandler: requireStaff }, async () => {
+    const cfg = await videoConfig();
+    return {
+      enabled: !!cfg.key && storageEnabled(),
+      keySet: !!cfg.key,
+      storageReady: storageEnabled(),
+      model: cfg.model,
+      models: VIDEO_MODELS,
+      ratios: VIDEO_RATIOS,
+      ratioHints: VIDEO_RATIO_HINTS,
+      durations: VIDEO_DURATIONS,
+    };
+  });
+
+  app.post('/api/desk/video', { preHandler: requireStaff }, async (req, reply) => {
+    if (!storageEnabled()) { reply.code(503); return { error: 'File storage is not configured, so a generated video could not be kept.' }; }
+    const b = req.body || {};
+    const prompt = String(b.prompt || '').trim();
+    if (!prompt) { reply.code(400); return { error: 'Describe the video you want.' }; }
+    if (prompt.length > 4000) { reply.code(400); return { error: 'That prompt is too long (max 4000 characters).' }; }
+
+    // ANIMATE AN EXISTING STILL. The client passes the bare asset filename, never a URL —
+    // a URL parameter here would be a fetcher pointed at anything the server can reach.
+    // Same hard bare-name check the asset route uses, so it can only read chat/<name>.
+    let image = null;
+    if (b.imageName) {
+      const name = String(b.imageName);
+      if (!/^[A-Za-z0-9._-]+$/.test(name)) { reply.code(400); return { error: 'bad image reference' }; }
+      try {
+        const obj = await getObject(`chat/${name}`);
+        if (!obj) { reply.code(404); return { error: "That image is no longer stored, so it can't be animated." }; }
+        image = { buffer: obj.body, mime: obj.contentType || 'image/jpeg' };
+      } catch {
+        reply.code(502); return { error: "Couldn't read that image back to animate it." };
+      }
+    }
+
+    const threadId = 'support-' + req.user.sub;
+    let job;
+    try {
+      job = await startVideo({
+        prompt, aspectRatio: b.aspectRatio, resolution: b.resolution,
+        durationSeconds: b.durationSeconds, model: b.model, image,
+      });
+    } catch (e) {
+      req.log?.warn?.({ err: String(e), detail: e.detail }, 'desk-video start failed');
+      return { ok: false, disabled: !!e.disabled, error: e.message || 'Video generation failed to start' };
+    }
+
+    const id = 'vid-' + crypto.randomBytes(8).toString('hex');
+    await ensureVideoJobs();
+    await q(
+      `insert into video_jobs (id, thread_id, user_id, operation, model, resolution, aspect, seconds, prompt, from_image, status)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending')`,
+      [id, threadId, req.user.sub, job.operation, job.model, job.resolution, job.aspectRatio, job.seconds, prompt, !!image]);
+
+    // Kick the sweeper rather than waiting a full interval for the first check.
+    setTimeout(() => { sweepVideoJobs().catch(() => {}); }, 12_000).unref?.();
+    return { ok: true, started: true, jobId: id, usd: job.usd, seconds: job.seconds, model: job.model, resolution: job.resolution };
+  });
+
+  // Has my clip landed yet? The thread itself carries the result; this is only so the
+  // composer can keep a spinner honest instead of guessing how long to show one.
+  app.get('/api/desk/video/:id', { preHandler: requireStaff }, async (req, reply) => {
+    await ensureVideoJobs();
+    const r = await q(
+      `select id, status, error, seconds, model, resolution, created_at from video_jobs where id=$1 and user_id=$2`,
+      [String(req.params.id || ''), req.user.sub]);
+    if (!r.rows.length) { reply.code(404); return { error: 'not found' }; }
+    return r.rows[0];
   });
 
   // ── Admin config for the image key (Settings › Integrations), mirroring ai-config ──

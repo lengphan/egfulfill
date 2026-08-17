@@ -2353,11 +2353,13 @@ export function setSupportHoursConfig(config: SupportHoursConfig) {
   return api<{ ok?: boolean; config?: SupportHoursConfig; availability?: SupportAvailability; error?: string }>(
     `/api/support/hours-config`, { method: "PUT", body: JSON.stringify(config) })
 }
+/** `reason` distinguishes a policy switch from a missing key; `unavailable` means the
+ *  server couldn't read its settings at all, which is temporary rather than actionable. */
 export function requestAiReply() {
   // `escalated: true` means the thread has an OPEN human handoff — the assistant deliberately
   // stays quiet until a teammate replies, so there's no `reply`. `office` says whether the
   // team is in hours, so the client can show the right "in queue" vs "we're offline" copy.
-  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; empty?: boolean; reason?: string; escalated?: boolean; office?: SupportAvailability; error?: string }>(`/api/support/ai-reply`, {
+  return api<{ ok?: boolean; reply?: string; disabled?: boolean; unavailable?: boolean; skipped?: boolean; empty?: boolean; reason?: string; escalated?: boolean; office?: SupportAvailability; error?: string }>(`/api/support/ai-reply`, {
     method: "POST",
     body: "{}",
   })

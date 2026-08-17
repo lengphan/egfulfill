@@ -52,7 +52,7 @@ export function InventorySection() {
         </div>
       </div>
       <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Seller stock" }, { id: "scan", label: "Scan" }] as const).map((t) => (
+        {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Incoming stock" }, { id: "scan", label: "Scan" }] as const).map((t) => (
           <button
             key={t.id}
             onClick={() => pick(t.id)}

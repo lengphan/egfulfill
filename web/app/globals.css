@@ -365,8 +365,13 @@
   html, body { height: auto !important; background: #fff !important; }
   /* Remove everything that isn't the sheet — space and all. */
   body > *:not(.eg-print-root) { display: none !important; }
-  /* Let the sheet flow as normal page content instead of a fixed overlay. */
-  .eg-print-root { position: static !important; overflow: visible !important; background: #fff !important; }
+  /* Let the sheet flow as normal page content instead of a fixed overlay. On screen the
+     sheet is a bounded, centred preview window; printing has to undo every part of that —
+     the backdrop, the card's height cap and its scroll container — or the printer is handed
+     a 900px-tall box with a scrollbar in it and prints one page of the first few labels. */
+  .eg-print-root { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; padding: 0 !important; backdrop-filter: none !important; }
+  .eg-print-card { max-width: none !important; max-height: none !important; overflow: visible !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; display: block !important; background: #fff !important; }
+  .eg-print-body { max-height: none !important; overflow: visible !important; background: #fff !important; }
   .print-area { position: static !important; margin: 0; padding: 0; }
   .no-print { display: none !important; }
   /* Never split a label across a page break. */
