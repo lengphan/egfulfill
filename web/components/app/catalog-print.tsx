@@ -343,9 +343,6 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                             </div>
                           ))}
                         </div>
-                        <div className="mt-1.5 text-[9px] text-neutral-400">
-                          {st.colors.length} colourway{st.colors.length === 1 ? "" : "s"} · {st.sizes.length} size{st.sizes.length === 1 ? "" : "s"} available
-                        </div>
                       </div>
                     )}
 
@@ -451,8 +448,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       <th className="pb-2 pr-3 font-semibold uppercase tracking-wider text-neutral-500">Style</th>
                       <th className="pb-2 pr-3 font-semibold uppercase tracking-wider text-neutral-500">Sku</th>
                       <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Base</th>
-                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Ship<br />1st item</th>
-                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Ship<br />each extra</th>
+                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">First item<br />shipping</th>
+                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Additional item<br />shipping</th>
                     </tr>
                   </thead>
                   <tbody>
