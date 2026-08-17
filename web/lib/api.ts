@@ -748,6 +748,13 @@ export function priceCatalogPicks(body: { refs?: string[]; markupPct?: number; r
  *  cannot be laid out. */
 export type LookbookStyle = {
   ref: string; name: string; sku: string; description: string; brand: string
+  /** Which list this page came from — our own catalogue products, or a picked S&S style.
+   *  It decides where an edit is written, so it travels with the style rather than being
+   *  re-derived from the shape of the ref. OPTIONAL: a saved export predates it. */
+  source?: "mine" | "ss"
+  /** True when this page's copy or photo has been overridden for the lookbook. Shown, and
+   *  revertible — a document you can't tell you've altered is one you can't check. */
+  edited?: boolean
   image: string; price: number | null; sizes: string[]
   colors: { name: string; sku: string; image: string }[]
   /** Garment measurements from S&S, as generic name/value pairs per size — their /specs
@@ -769,6 +776,27 @@ export type LookbookStyle = {
 }
 export function getLookbook() {
   return api<{ styles: LookbookStyle[] }>(`/api/catalog/lookbook`)
+}
+/**
+ * Edit one page of the lookbook.
+ *
+ * `name` / `description` / `image` are the SHEET's copy — stored against the style for this
+ * document and applied over whatever the source says, so retitling a page never renames the
+ * product a seller buys or writes into the supplier's own data. `price` is different: it goes
+ * to the catalogue price that already exists, the one the Catalogue page and the markup button
+ * write, because a second price is how a document ends up disagreeing with the screen.
+ *
+ * `null` clears a field back to the source. `{ reset: true }` puts the whole page back.
+ * An image must be an uploaded file (a data: URL) — see the route.
+ */
+export function saveLookbookStyle(
+  source: "mine" | "ss", ref: string,
+  body: { name?: string | null; description?: string | null; image?: string | null; price?: number | null; reset?: boolean },
+) {
+  return api<{ ok?: boolean; error?: string; catalogPrice?: number | null }>(
+    `/api/catalog/lookbook/${source}/${encodeURIComponent(ref)}`,
+    { method: "PATCH", body: JSON.stringify(body) },
+  )
 }
 
 /** A saved catalogue — what was in it and at what prices, on the day it was sent. */
@@ -922,6 +950,26 @@ export function setAiConfig(body: { key?: string; model?: string; clearKey?: boo
 // or omit to test the currently-saved key. Returns the real error if it fails.
 export function testAiKey(key?: string) {
   return api<{ ok?: boolean; model?: string; status?: number; error?: string }>(`/api/admin/ai-test`, { method: "POST", body: JSON.stringify(key ? { key } : {}) })
+}
+
+// Image AI config (admin) — the Google key behind staff image generation. Separate
+// credential and separate provider from the Claude assistant above, so it gets its own
+// card rather than sharing one and implying a single key covers both.
+// Omit rather than intersect: `AiConfig["models"]` is AiModel[], and `A & B` would resolve
+// `models` to AiModel[] & ImageGenModel[] — property access then picks AiModel and the
+// price fields vanish. Same key, different element type, so it has to be replaced.
+export type ImageAiConfig = Omit<AiConfig, "models"> & { models?: ImageGenModel[]; staleModel?: string | null; storageReady?: boolean }
+export function getImageAiConfig() {
+  return api<ImageAiConfig>(`/api/admin/image-ai-config`)
+}
+export function setImageAiConfig(body: { key?: string; model?: string; clearKey?: boolean }) {
+  return api<ImageAiConfig>(`/api/admin/image-ai-config`, { method: "PUT", body: JSON.stringify(body) })
+}
+/** Live-test the Google key. Unlike the Claude test there is no free ping on an image
+ *  endpoint, so this RENDERS one image on the cheapest model — it costs about $0.034. */
+export function testImageAiKey(key?: string) {
+  return api<{ ok?: boolean; model?: string; bytes?: number; mime?: string; usd?: number; costNote?: string; error?: string }>(
+    `/api/admin/image-ai-test`, { method: "POST", body: JSON.stringify(key ? { key } : {}) })
 }
 
 // Google Sheets import — server reads the sheet and returns a 2D row array,
@@ -3664,8 +3712,13 @@ export type PlanPrices = { plans: Record<string, number>; spydeck_addon: number 
 export function getPlanPrices() {
   return api<PlanPrices>(`/api/billing/prices`)
 }
-export function savePlanPrices(body: PlanPrices) {
-  return api<PlanPrices & { ok?: boolean; error?: string }>(`/api/billing/prices`, {
+/**
+ * `confirm` is the second press on a price CUT. The server answers 409 with `drops` — the
+ * changes named one by one — until it arrives, so the guard holds for a stray API call and
+ * not only for this dialog.
+ */
+export function savePlanPrices(body: PlanPrices & { confirm?: boolean }) {
+  return api<PlanPrices & { ok?: boolean; error?: string; drops?: string[]; needsConfirm?: boolean }>(`/api/billing/prices`, {
     method: "PUT", body: JSON.stringify(body),
   })
 }

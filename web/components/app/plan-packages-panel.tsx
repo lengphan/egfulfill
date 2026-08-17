@@ -6,6 +6,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getPlanPrices, savePlanPrices, type PlanPrices } from "@/lib/api"
+import { useConfirm } from "@/components/app/confirm-dialog"
 
 /**
  * SUBSCRIPTION PACKAGES — what each plan costs per month.
@@ -37,13 +38,36 @@ export function PlanPackagesPanel() {
   const [draft, setDraft] = useState<Record<string, string>>({})
   const shown = (k: string, v: number) => draft[k] ?? String(v)
 
+  const confirm = useConfirm()
+
+  /**
+   * A CUT IS CONFIRMED, AND THE SERVER DECIDES WHICH ONES.
+   *
+   * The 409 comes back naming each change — "pro $29 → free" — so the question asked here is
+   * about something specific. "Are you sure?" answers itself; a list of the prices about to
+   * fall does not.
+   *
+   * The rule is not duplicated in the browser on purpose: two copies of "what counts as a
+   * sharp cut" drift, and the one that matters is the one the endpoint enforces.
+   */
   const save = async () => {
     if (!prices) return
     setBusy(true); setErr(null); setSaved(false)
     try {
       const plans: Record<string, number> = {}
       for (const [k, v] of Object.entries(prices.plans)) plans[k] = Number(shown(`plan:${k}`, v))
-      const r = await savePlanPrices({ plans, spydeck_addon: Number(shown("addon", prices.spydeck_addon)) })
+      const addonPrice = Number(shown("addon", prices.spydeck_addon))
+      let r = await savePlanPrices({ plans, spydeck_addon: addonPrice })
+      if (r.needsConfirm) {
+        const ok = await confirm({
+          title: "Save this price cut?",
+          body: `${(r.drops ?? []).join("\n")}\n\nExisting charges are unaffected — this applies from each seller's next renewal. A plan at $0 stops renewing altogether.`,
+          confirmLabel: "Save prices",
+          destructive: true,
+        })
+        if (!ok) { setBusy(false); return }
+        r = await savePlanPrices({ plans, spydeck_addon: addonPrice, confirm: true })
+      }
       if (r.error) throw new Error(r.error)
       setPrices({ plans: r.plans, spydeck_addon: r.spydeck_addon })
       setDraft({})

@@ -277,6 +277,44 @@ export function billingRoutes(app, requireAuth, requireAdmin) {
     const addon = Number(b.spydeck_addon);
     if (!Number.isFinite(addon) || addon < 0) { reply.code(400); return { error: 'The SpyDeck add-on needs a price of 0 or more.' }; }
     const value = { plans, spydeck_addon: Math.round(addon * 100) / 100 };
+
+    /**
+     * A PRICE CUT HAS TO BE MEANT.
+     *
+     * Setting a paid plan to 0 is a legal thing to want and an easy thing to do by accident —
+     * clear a field, tab away, save. Nothing then looks wrong: the row saves, the screen shows
+     * $0, every renewal pass runs green, and the only symptom is that subscription revenue
+     * quietly stops. Measured on a scratch database: with every plan at 0, a pass charged
+     * nobody and cleared every renewal date, silently.
+     *
+     * So a DROP needs saying twice. The guard is on the server rather than only in the dialog
+     * because a confirm in the browser is a suggestion — this is the thing that actually holds,
+     * for a stray API call as much as for a slip of the keyboard.
+     *
+     * Only downwards, and only sharply: raising a price, or trimming one by a few percent, is
+     * ordinary work and must not need a ceremony. Zeroing a paid plan always asks, whatever
+     * the percentage, because that is the case with no floor under it.
+     */
+    const prev = await readPrices();
+    const drops = [];
+    for (const p of PLANS) {
+      const was = prev.plans[p], now = plans[p];
+      if (was > 0 && now === 0) drops.push(`${p} $${was} → free`);
+      else if (was > 0 && now < was * 0.5) drops.push(`${p} $${was} → $${now}`);
+    }
+    if (prev.spydeck_addon > 0 && value.spydeck_addon === 0) drops.push(`SpyDeck add-on $${prev.spydeck_addon} → free`);
+    else if (prev.spydeck_addon > 0 && value.spydeck_addon < prev.spydeck_addon * 0.5) drops.push(`SpyDeck add-on $${prev.spydeck_addon} → $${value.spydeck_addon}`);
+
+    if (drops.length && b.confirm !== true) {
+      reply.code(409);
+      return {
+        error: 'This cuts a price by more than half, or makes a paid plan free. Confirm to save.',
+        // NAMED, so the confirmation is about something specific rather than a general warning
+        // — "are you sure" answers itself, "pro $29 → free" does not.
+        drops,
+        needsConfirm: true,
+      };
+    }
     await q(`insert into settings (key, value, updated_at) values ($1, $2::jsonb, now())
              on conflict (key) do update set value = excluded.value, updated_at = now()`,
       [PLAN_PRICES_KEY, JSON.stringify(value)]);
