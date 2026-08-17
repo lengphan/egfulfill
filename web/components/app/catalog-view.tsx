@@ -300,7 +300,13 @@ export function CatalogView() {
                           onChange={(e) => setDraft((d) => ({ ...d, [id]: e.target.value.replace(/[^\d.]/g, "") }))}
                           onBlur={() => savePrice(id)}
                           onKeyDown={(e) => { if (e.key === "Enter") savePrice(id) }}
-                          placeholder="not set"
+                          /* "0.00", not "not set". It is a PRICE field, and the shape of a
+                             price is what tells you what to type in it — the words were
+                             wider than the column and read as a status rather than a hint.
+                             Still a placeholder, so an unpriced row stays genuinely empty
+                             and cannot be mistaken for one priced at zero: the "needs a
+                             price to show publicly" badge on the row is what says it. */
+                          placeholder="0.00"
                           inputMode="decimal"
                           aria-label={`Catalogue price for ${p.name || id}`}
                           className="h-8 w-24 text-right text-xs tabular-nums"
