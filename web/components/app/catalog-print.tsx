@@ -7,6 +7,24 @@ import { Button } from "@/components/ui/button"
 import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, type LookbookStyle } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
 
+/**
+ * THE PRICE THE SHEET PRINTS — the trade rate, or what a seller pays when there isn't one.
+ *
+ * `price` is catalog_price, set per product on the Catalogue page (by hand or by the markup
+ * button). Plenty of styles have never had one, and those printed a dash on a document whose
+ * entire purpose is to be ordered from — the reader cannot tell "ask us" from "we forgot".
+ *
+ * So it always resolves to a number when we have one at all. The trade rate wins wherever it
+ * exists, including after a markup run, so adjusting prices on the Catalogue page still
+ * decides what a partner is quoted; the seller rate only fills the gaps.
+ *
+ * Null only when NEITHER exists, which is a real answer and still prints a dash.
+ */
+const sheetPrice = (st: LookbookStyle): number | null =>
+  (st.price != null && st.price > 0) ? st.price
+    : (st.sellerPrice != null && st.sellerPrice > 0) ? st.sellerPrice
+      : null
+
 const money = (n: number | null | undefined) =>
   n == null ? "" : `$${(Number(n) || 0).toFixed(2)}`
 
@@ -240,12 +258,12 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     {st.brand && <span>· {st.brand}</span>}
                   </div>
                 </div>
-                {st.price != null && (
+                {sheetPrice(st) != null && (
                   /* The price is the thing a buyer came for, so it is the one filled block
                      on the page — ink on lime, 16.6:1, and impossible to miss. */
                   <div className="shrink-0 rounded-xl px-4 py-2.5 text-right"
                        style={{ background: HOUSE.lime, color: HOUSE.ink }}>
-                    <div className="font-title text-4xl font-bold leading-none tabular-nums">{money(st.price)}</div>
+                    <div className="font-title text-4xl font-bold leading-none tabular-nums">{money(sheetPrice(st))}</div>
                     <div className="mt-0.5 text-[9px] font-bold uppercase tracking-widest opacity-70">per unit</div>
                   </div>
                 )}
@@ -445,7 +463,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             for (let i = 0; i < rows.length; i += ROWS_PER_PAGE) pages.push(rows.slice(i, i + ROWS_PER_PAGE))
             // Every fee we could not read, so the note under the table can say whether the
             // dashes mean "free" (they never do) or "we could not price it".
-            const unpriced = rows.filter((r) => r.ship == null).length
+            const unpriced = rows.filter((r) => r.ship == null || sheetPrice(r) == null).length
             return pages.map((page, pi) => (
               <section
                 key={`prices-${pi}`}
@@ -467,7 +485,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     <tr className="border-b border-neutral-300 text-left align-bottom">
                       <th className="pb-2 pr-3 font-semibold uppercase tracking-wider text-neutral-500">Style</th>
                       <th className="pb-2 pr-3 font-semibold uppercase tracking-wider text-neutral-500">Sku</th>
-                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Base</th>
+                      {/* "Base" was wrong: it printed catalog_price, the trade rate. This is the number
+                          a reader orders at, whichever of the two it resolves to. */}
+                      <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Unit</th>
                       <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">First item<br />shipping</th>
                       <th className="pb-2 pl-3 text-right font-semibold uppercase tracking-wider text-neutral-500">Additional item<br />shipping</th>
                     </tr>
@@ -484,7 +504,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                             printed $0.00 would be quoting a wholesale buyer a free garment,
                             and it is the one mistake here nobody could walk back. */}
                         <td className="py-1.5 pl-3 text-right tabular-nums">
-                          {st.price == null ? <span className="text-neutral-400">—</span> : money(st.price)}
+                          {sheetPrice(st) == null ? <span className="text-neutral-400">—</span> : money(sheetPrice(st))}
                         </td>
                         <td className="py-1.5 pl-3 text-right tabular-nums">
                           {st.ship == null ? <span className="text-neutral-400">—</span> : money(st.ship)}

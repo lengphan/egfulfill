@@ -742,6 +742,11 @@ export type LookbookStyle = {
    *  no fees, and null means "we don't know", never "free". The table prints a dash. */
   ship?: number | null
   shipExtra?: number | null
+  /** What a SELLER pays us to make one. `price` is catalog_price — the trade rate quoted to
+   *  partners — and a style nobody has priced for the trade printed a dash on a page whose
+   *  job is to be ordered from. Its own field, never coalesced server-side: the two mean
+   *  different things to different readers, and the template decides which to show. */
+  sellerPrice?: number | null
 }
 export function getLookbook() {
   return api<{ styles: LookbookStyle[] }>(`/api/catalog/lookbook`)

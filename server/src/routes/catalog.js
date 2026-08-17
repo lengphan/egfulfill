@@ -1086,8 +1086,12 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
   app.get('/api/catalog/lookbook', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
 
+    // base_price is selected because the seller price below coalesces onto it LAST, exactly
+    // as publicShape does. Reading `data` alone left that final term undefined, so a product
+    // whose price lives only in the column — the import writes both, but the column is what
+    // sellerBaseCostOf bills from — still printed a dash on the sheet.
     const mineRows = (await q(
-      `select data, catalog_price from catalog_products where in_catalog = true order by created_at desc`
+      `select data, catalog_price, base_price from catalog_products where in_catalog = true order by created_at desc`
     ).catch(() => ({ rows: [] }))).rows;
 
     /**
@@ -1155,6 +1159,25 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         description: d.description || '', brand: notSupplier(d.brand),
         image: supplierArt.get(sid) || d.image || d.img || '',
         price: row.catalog_price == null ? null : Number(row.catalog_price),
+        /**
+         * WHAT A SELLER PAYS, so a style with no trade price is still quoted.
+         *
+         * `price` is catalog_price — the rate quoted to partners — and a product nobody has
+         * priced for the trade printed a dash on a page whose whole job is to be ordered
+         * from. This is the OTHER number, the one pricing.js charges a seller, sent so the
+         * sheet can fall back to it rather than to nothing.
+         *
+         * Kept as its OWN field rather than coalesced into `price`, because the two mean
+         * different things to different readers and a document that silently swaps them is
+         * how a partner ends up quoted a seller rate. The template decides which to show.
+         *
+         * Same coalesce publicShape uses, so the lookbook and the public site cannot
+         * disagree about what a seller pays.
+         */
+        sellerPrice: (() => {
+          const n = Number(d.price ?? d.basePrice ?? d.base_price ?? row.base_price);
+          return Number.isFinite(n) && n > 0 ? n : null;
+        })(),
         sizes: Array.isArray(d.sizes) ? d.sizes
           : (Array.isArray(d.sizePrices) ? d.sizePrices.map((t) => t && t.size).filter(Boolean) : []),
         // Supplier colourways when we can match the style — they carry a real photo AND an
@@ -1227,6 +1250,9 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       description: descs.get(p.ref) || '', brand: notSupplier(p.brand),
       image: ssImgUrl(p.image),
       price: p.catalog_price == null ? null : Number(p.catalog_price),
+      // A picked supplier style has no catalog_products row, so there is no seller price for
+      // it — null, not 0, because "we have not priced this" is not "it is free".
+      sellerPrice: null,
       sizes: p.sizes || [],
       colors: coloursByStyle.get(p.ref) || [],
       specs: specsByStyle.get(p.ref) || [],
