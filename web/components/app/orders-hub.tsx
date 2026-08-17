@@ -2894,12 +2894,24 @@ export function OrdersHub() {
           .map((it) => {
             const blank = resolveProduct(it, catalog)
             const stockSku = blank?.sku || it.blank || ""
-            return { it, stockSku }
+            return { it, blank, stockSku }
           })
           .filter(({ stockSku }) => !!stockSku)
-          .map(({ it, stockSku }) => ({
+          .map(({ it, blank, stockSku }) => ({
             sku: stockSku,
-            name: it.name || stockSku,
+            /**
+             * THE BLANK'S NAME, not the listing's.
+             *
+             * `it.name` is the marketplace title — "Custom Apron with Embroidered Name, Heavy
+             * Duty Cotton Canvas Apron with…" — which is what the buyer bought, not what the
+             * picker takes off a shelf. On a 2×1 sticker it truncates to nothing useful and it
+             * names a thing the warehouse does not stock. The code beneath it is already the
+             * BLANK's sku, so the words above it were describing something else entirely.
+             *
+             * Falls back to the stock sku, never to the listing title: an unnamed blank is
+             * still a blank, and a marketplace title on a stock label is the actual mistake.
+             */
+            name: blank?.name || stockSku,
             variant: variantOf(it),
             copies: Number(it.qty) || 1,
           }))}
