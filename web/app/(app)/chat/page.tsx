@@ -554,14 +554,22 @@ export default function ChatPage() {
                         (warning / on hold), which a chat row has no business borrowing.
                         The count is what a rail row can usefully carry: how long this
                         conversation is before you open it. */}
-                    {!!c.count && (
-                      <span className="ml-auto shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-3xs font-semibold tabular-nums text-muted-foreground">
-                        {c.count > 99 ? "99+" : c.count}
-                      </span>
-                    )}
                   </span>
                   <span className="block truncate text-xs text-muted-foreground">{c.sub}</span>
                 </span>
+                {/* A COUNT BADGE, the shape every messenger uses: a filled circle at the end
+                    of the row, vertically centred, read at a glance without being read as
+                    text. It was a grey pill beside the name, which sat in the title's line
+                    and competed with it for the same left-to-right reading.
+                    --primary, which is what fills buttons here; the reserved status colours
+                    (amber hold, red alert) stay out of a row that is only saying "there are
+                    twelve messages in this". min-w keeps it circular at one digit and lets
+                    it grow for "99+" instead of clipping. */}
+                {!!c.count && (
+                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-3xs font-bold tabular-nums text-primary-foreground">
+                    {c.count > 99 ? "99+" : c.count}
+                  </span>
+                )}
               </button>
             ))
           )}
@@ -721,8 +729,11 @@ export default function ChatPage() {
                           // stored for this chat can be one — anything else has no name to give.
                           const assetName = isImg ? att.url.split("/api/support/asset/")[1] : undefined
                           const canAnimate = !!assetName && isStaffUser && activeId === supportId
+                          // w-fit, not a bare block: the overlay anchors to this link, and a
+                          // full-width block put "Animate" at the BUBBLE's right edge,
+                          // floating in space beside the picture instead of on it.
                           return (
-                            <a href={att.url} target="_blank" rel="noreferrer" className={"relative block " + (m.text ? "mt-1.5" : "")}>
+                            <a href={att.url} target="_blank" rel="noreferrer" className={"relative block w-fit " + (m.text ? "mt-1.5" : "")}>
                               {isImg ? (
                                 <>
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
