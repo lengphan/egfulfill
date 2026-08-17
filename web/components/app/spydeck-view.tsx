@@ -1134,10 +1134,28 @@ export function SpyDeckView() {
     } finally { setFreshScanning(false) }
   }
 
-  // Stats reflect whatever's on screen — search results, or the trending feed when
-  // no search has run yet — so the cards fill in without a search.
+  /**
+   * Stats reflect whatever's on screen — search results, or the trending feed when no
+   * search has run yet — so the cards fill in without a search.
+   *
+   * READ FROM THE SAME LIST THE PAGER COUNTS. This built its own list from the raw state
+   * while the grid paged over the FILTERED one, so the two could disagree about how many
+   * results there are — the card read "100" beside a pager saying "Page 13 / 17", which at
+   * 24 a page is about 400. Whichever number was right, a page cannot state two totals and
+   * be believed about either.
+   *
+   * It is also the honest number now that a search walks four pages: the count is every
+   * result we hold, not the first page of them.
+   *
+   * NO EXTRA ETSY CALLS. Counting is arithmetic over an array that is already in memory —
+   * and the grid still renders ONE PAGE at a time, so raising the total does not raise how
+   * many images load. Per page stays per page; only the denominator got honest.
+   */
   const stats = useMemo(() => {
-    const list = (view === "saved" ? saved : view === "trending" || results === null ? (trending?.products ?? []) : results) ?? []
+    const list = (view === "saved" ? saved
+      : view === "uploaded" ? uploaded
+        : view === "trending" || results === null ? trendingList
+          : resultsList) ?? []
     const prices = list.map((l) => l.price).filter((p): p is number => p != null && p > 0).sort((a, b) => a - b)
     const median = prices.length ? prices[Math.floor((prices.length - 1) / 2)] : 0
     const views = list.map((l) => l.views).filter((v): v is number => v != null)
@@ -1149,7 +1167,7 @@ export function SpyDeckView() {
       shops: shops.size,
       topViews: views.length ? Math.max(...views) : 0,
     }
-  }, [view, results, trending, saved])
+  }, [view, results, trendingList, resultsList, saved, uploaded])
 
   // Cloud: aggregate the actual tags across search results (real niche keywords);
   // before any search, fall back to the curated trending niches.
