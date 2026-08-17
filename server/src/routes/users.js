@@ -81,7 +81,45 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
              (select count(*)::int from team_members t2 where t2.owner_id = u.id::text and t2.status = 'active') as team_size,
              -- Wallet balance, so an admin can see who's out of funds without opening
              -- each account. One aggregate over the ledger rather than a request per row.
-             (select coalesce(sum(w.delta), 0)::float from wallet_ledger w where w.account = u.id::text) as balance
+             (select coalesce(sum(w.delta), 0)::float from wallet_ledger w where w.account = u.id::text) as balance,
+             /*
+              * WHAT THEY HAVE ACTUALLY MOVED, for the row's detail panel.
+              *
+              * UNITS, not orders: orders_total already counts orders, and a seller with four
+              * orders of fifty pieces is not the same seller as one with fifty orders of
+              * four. The two answer different questions, so the panel shows both.
+              *
+              * WAITING excludes cancelled and refunded on the same reasoning volume.js uses:
+              * an order somebody killed is not work in front of us, and counting it makes an
+              * idle account look busy.
+              *
+              * Computed in the LIST rather than behind a per-row fetch: two aggregates over
+              * one seller's own orders, on a bounded staff-and-sellers table, against a
+              * spinner every time somebody opens a row.
+              */
+             (select coalesce(sum(i1.qty), 0)::int
+                from orders os join order_items i1 on i1.order_id = os.id
+               where os.seller_id = u.id and os.shipped_at is not null) as items_shipped,
+             (select coalesce(sum(i2.qty), 0)::int
+                from orders ow join order_items i2 on i2.order_id = ow.id
+               where ow.seller_id = u.id and ow.shipped_at is null
+                 and lower(coalesce(ow.factory_status, '')) not in ('cancelled', 'refunded')
+                 and lower(coalesce(ow.status, '')) not in ('cancelled', 'refunded')) as items_waiting,
+             /* UNITS SHIPPED LAST MONTH — the number the volume ladder actually reads
+              * (volume.js: last month earns, this month spends). Shown so an admin can see
+              * WHY a seller is on the rung they are on, rather than only that they are. */
+             (select coalesce(sum(i3.qty), 0)::int
+                from orders om join order_items i3 on i3.order_id = om.id
+               where om.seller_id = u.id and om.shipped_at is not null
+                 and to_char(om.shipped_at at time zone 'UTC', 'YYYY-MM')
+                     = to_char((now() at time zone 'UTC') - interval '1 month', 'YYYY-MM')
+                 and lower(coalesce(om.factory_status, '')) not in ('cancelled', 'refunded')
+                 and lower(coalesce(om.status, '')) not in ('cancelled', 'refunded')) as units_last_month,
+             /* The members themselves, not just how many. email is the only identity this
+              * table is guaranteed to hold — user_id is filled on acceptance, name never. */
+             (select array_agg(t3.email order by t3.email)
+                from team_members t3
+               where t3.owner_id = u.id::text and t3.status = 'active') as team_emails
         from users u
         left join team_members tm on lower(tm.email) = lower(u.email) and tm.status = 'active'
         left join users o on o.id::text = tm.owner_id

@@ -62,7 +62,23 @@ export function normalizeTiers(raw) {
   if (!Array.isArray(raw)) return [];
   const seen = new Set();
   return raw
-    .map((t) => ({ minUnits: Math.floor(Number(t && t.minUnits)), pct: Number(t && t.pct) }))
+    /*
+     * NAME IS CARRIED THROUGH, and it is the only optional field here.
+     *
+     * A rung was {minUnits, pct} and everything displayed it as "Tier 2" from its position —
+     * which renumbers itself the moment a rung is inserted below it, so the thing an admin
+     * told a seller they were on silently became a different label. A name is stable across
+     * edits and is what a programme is actually called ("Gold", "Partner rate").
+     *
+     * Trimmed and capped rather than validated: it is a label, and the only harm a long one
+     * does is to a table cell. Empty stays empty so the display can fall back to the position,
+     * which is what every existing ladder has.
+     */
+    .map((t) => ({
+      minUnits: Math.floor(Number(t && t.minUnits)),
+      pct: Number(t && t.pct),
+      name: String((t && t.name) || '').trim().slice(0, 40) || null,
+    }))
     .filter((t) => Number.isFinite(t.minUnits) && t.minUnits > 0)
     .filter((t) => Number.isFinite(t.pct) && t.pct > 0 && t.pct <= 100)
     .sort((a, b) => a.minUnits - b.minUnits)
@@ -87,6 +103,9 @@ export function tierFor(units, tiers) {
   return {
     units: n,
     pct: current ? current.pct : 0,
+    // The rung's own label when it has one. Callers fall back to `index` ("Tier 2"), which
+    // is what every ladder saved before names existed will use.
+    name: current ? current.name : null,
     index,
     minUnits: current ? current.minUnits : 0,
     next,

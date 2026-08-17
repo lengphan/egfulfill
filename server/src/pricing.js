@@ -493,10 +493,47 @@ export async function quoteOrder(orderId) {
 // by freezeQuote and then discounted AGAIN by the next quote that read it back — the
 // compounding kind of bug that is invisible until someone reconciles a month. Lines carry
 // the list price, the rate is stored once on the order, and the discount is derived.
+/**
+ * ONE RATE OUT OF HOWEVER MANY GO IN — and the rule is a decision, not an accident.
+ *
+ * There is exactly ONE discount in the charge path today: the volume tier. A subscription
+ * discount does not exist (pricing.js never reads `plan`; entitlements.js gates FEATURES),
+ * so nothing stacks and nothing can. This exists so that stays true by construction when a
+ * second rate is added, rather than by whoever writes it remembering to check.
+ *
+ * BEST-OF IS THE DEFAULT, and deliberately not the sum. 15% + 10% is 25% off goods that
+ * were priced with one discount in mind, and the failure is silent: every order still books,
+ * every total still looks plausible, and the margin is gone a month before anyone reconciles
+ * it. Best-of cannot produce a rate nobody chose, and it is the rule a seller can predict —
+ * "you get your best rate" is explainable at a support desk in one sentence.
+ *
+ * `mode` is a setting the moment there is a second input worth combining. It is NOT exposed
+ * on the Settings screen yet, on purpose: a switch that governs a combination which cannot
+ * occur is a control that does nothing, which this file has been burned by before — see the
+ * flat first-item shipping fee at the top, editable for months and never once used to price
+ * an order. When a plan or seasonal rate lands, pass it here and turn the switch on.
+ *
+ * Seasonal rates are exactly the case this shape is for: a peak-season rate is another
+ * percentage arriving from somewhere else, and it must not silently add to what a seller
+ * already earned by shipping.
+ */
+export function effectiveDiscountPct(parts, mode = 'best') {
+  const vals = (Array.isArray(parts) ? parts : [parts])
+    .map((p) => Number(p) || 0)
+    .filter((p) => p > 0);
+  if (!vals.length) return 0;
+  const raw = mode === 'stack' ? vals.reduce((a, b) => a + b, 0) : Math.max(...vals);
+  // Clamped whichever mode is in force: stacking three rates must not be able to reach a
+  // total that turns an order into a credit.
+  return Math.min(100, Math.max(0, raw));
+}
+
 export function computeTotals(lines, fees, volumePct = 0) {
   const subtotal = money(lines.reduce((s, l) => s + l.unitCost * l.qty, 0));
   const units = lines.reduce((s, l) => s + l.qty, 0);
-  const pct = Math.min(100, Math.max(0, Number(volumePct) || 0));
+  // Through the combiner even with one input, so the single-rate path and the eventual
+  // multi-rate path are the same code and the clamp lives in one place.
+  const pct = effectiveDiscountPct([volumePct]);
   const volumeDiscount = money(subtotal * (pct / 100));
   if (!units) return { subtotal, shipping: 0, units: 0, volumePct: pct, volumeDiscount: 0, total: subtotal };
   /**
