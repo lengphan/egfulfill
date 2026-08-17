@@ -296,6 +296,26 @@ async function aiConfig() {
   return { key, model, fromEnv, staleModel, unavailable };
 }
 
+/**
+ * Strip emoji from a generated reply.
+ *
+ * The prompts ask for none, but an instruction is a request rather than a guarantee, and one
+ * "Chào bạn! 👋" is all it takes for the assistant to read as a chatbot. Applies ONLY to text
+ * the model produced — a seller's own emoji in their message is theirs and stays.
+ *
+ * Extended_Pictographic covers the pictographs; the range and joiners beside it catch skin
+ * tones, variation selectors and ZWJ sequences, which would otherwise leave orphaned marks
+ * behind when the base character is removed.
+ */
+function stripEmoji(text) {
+  return String(text || '')
+    .replace(/[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}\uFE0F\u200D]+/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')        // the gap the emoji left behind
+    .replace(/ +([,.!?;:])/g, '$1')     // "hello !" once the emoji between them is gone
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // Seller-friendly status label from the factory status (mirrors the front-end SELLER_STATUS:
 // Draft -> Pending -> In Process -> Fulfilled, plus On Hold / Cancelled / Refunded).
 function sellerStatus(o) {
@@ -316,6 +336,7 @@ const SYSTEM = `You are the EGFUL support assistant. EGFUL is a print-on-demand 
 Rules:
 - Reply in the SAME language the seller wrote in. Our sellers write in English or Vietnamese: answer Vietnamese messages in natural Vietnamese, English messages in English. If a message mixes both or is ambiguous, mirror the seller's most recent message. Status labels in ACCOUNT DATA are English — translate them to match your reply.
 - Be concise, warm, and practical. 1–3 short paragraphs, no filler.
+- NO EMOJI. Not in greetings, not as decoration, not to soften a message. Warmth comes from the words.
 - Use ONLY the ACCOUNT DATA provided for anything about a specific order, status, tracking, or balance. Never invent order numbers, tracking codes, dates, or amounts.
 - If the answer needs info you don't have, say you've flagged it for a human teammate who will follow up here.
 - Be SPECIFIC about orders — the ACCOUNT DATA includes each recent order's items, placed date, status and tracking. When answering, name the actual item(s) and cite the status, the placed date, and the tracking when present, rather than giving a generic reply. If the seller doesn't say which order, use the most recent (or briefly list them if it's ambiguous).
@@ -456,6 +477,7 @@ const DESK_SYSTEM = `You are Workbench, a private personal assistant for one EGF
 Rules:
 - Reply in the same language the user writes in (English or Vietnamese).
 - Be concise and practical. Use markdown (**bold**, lists) when it helps.
+- NO EMOJI, anywhere, for any reason.
 - When SAVED NOTES are provided, treat them as facts the user asked you to remember, and cite them when relevant ("from your notes, …").
 - You don't have live order, wallet, or shipping data here — if they need that, point them to EGFUL Support or the relevant board.
 - Never claim to have taken actions in the system.`;
@@ -538,7 +560,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     try {
       const draft = await generateReply(key, model, sellerId, messages);
       if (!draft) return { ok: false, empty: true };
-      return { ok: true, draft };
+      return { ok: true, draft: stripEmoji(draft) };
     } catch (e) {
       // Return 200 with the reason so the UI can show it (a failed AI call isn't an API error).
       req.log?.warn?.({ err: String(e), detail: e.detail }, 'support-ai draft failed');
@@ -720,7 +742,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
 
     let text = '';
     try {
-      text = await generateReply(key, model, sellerId, messages, isStaffOwn);
+      text = stripEmoji(await generateReply(key, model, sellerId, messages, isStaffOwn));
     } catch (e) {
       // Return 200 with the reason (not a 5xx) so the client shows WHY instead of throwing.
       req.log?.warn?.({ err: String(e), detail: e.detail }, 'support-ai request failed');
@@ -776,7 +798,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       : '\n\n(No saved notes yet.)');
     let text = '';
     try {
-      text = await postAnthropic(key, JSON.stringify({ model, max_tokens: 700, system, messages }));
+      text = stripEmoji(await postAnthropic(key, JSON.stringify({ model, max_tokens: 700, system, messages })));
     } catch (e) {
       req.log?.warn?.({ err: String(e), detail: e.detail }, 'desk-ai request failed');
       return { ok: false, error: e.message || 'AI service unavailable' };
