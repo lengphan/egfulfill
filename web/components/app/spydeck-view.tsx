@@ -584,6 +584,27 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
  *
  * The server clamps both independently, so these are a request, not a guarantee.
  */
+/**
+ * SORTS ETSY CANNOT DO, done here.
+ *
+ * Etsy ranks by relevance, date and price. None of those answer the question this tool
+ * exists for — "which of these is actually SELLING" — so with 400 results the depth just
+ * moved the problem: you no longer run out of listings, you drown in them.
+ *
+ * These two re-rank what has already been fetched, using the same estimate the cards print
+ * (estFor: favourites x 3.5 over listing age). No extra Etsy call, and switching to one is
+ * instant because the data is already here.
+ *
+ * THEY RANK THE FETCHED SET, NOT ETSY. Four pages of relevance is the pool being sorted, so
+ * this is "the best sellers among the most relevant 400", which is a real answer to a real
+ * question — but it is NOT "the best sellers on Etsy", and the label says Est. because the
+ * numbers are a model, not reported figures.
+ */
+const CLIENT_SORTS: Record<string, (l: EtsyListing) => number> = {
+  best: (l) => estFor(l).sold24,
+  revenue: (l) => estFor(l).revenue,
+}
+
 const PAGE_SIZE = 100
 const EXTRA_PAGES = 3
 
@@ -913,7 +934,13 @@ export function SpyDeckView() {
   // Paging for every grid. Hooks can't be conditional, so all four are declared up
   // front; only the active tab's is rendered.
   const trendingList = useMemo(() => applyClientFilters(trending?.products ?? []), [applyClientFilters, trending])
-  const resultsList = useMemo(() => applyClientFilters(results ?? []), [applyClientFilters, results])
+  const resultsList = useMemo(() => {
+    const list = applyClientFilters(results ?? [])
+    const key = CLIENT_SORTS[sortSel]
+    // Copy before sorting — `applyClientFilters` returns the state array itself when no
+    // filter is set, and sorting in place mutates state React believes it still owns.
+    return key ? [...list].sort((a, b) => key(b) - key(a)) : list
+  }, [applyClientFilters, results, sortSel])
   const trendingPaged = usePaged(trendingList, 24)
   const resultsPaged = usePaged(resultsList, 24)
   const savedPaged = usePaged(saved, 24)
@@ -1009,6 +1036,10 @@ export function SpyDeckView() {
     try {
       const sortMap: Record<string, { sort?: string; sortOrder?: string }> = {
         relevance: {}, newest: { sort: "created" }, price_asc: { sort: "price", sortOrder: "asc" }, price_desc: { sort: "price", sortOrder: "desc" },
+        // The performance sorts fetch by relevance and re-rank locally — asking Etsy for
+        // "price ascending" and then sorting by sales would rank the cheap end of the
+        // catalogue, not the market.
+        best: {}, revenue: {},
       }
       const shape = {
         limit: PAGE_SIZE,
@@ -1213,6 +1244,9 @@ export function SpyDeckView() {
                 <FilterField label="Sort by">
                   <select value={sortSel} onChange={(e) => setSortSel(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                     <option value="relevance">Relevance</option>
+                    {/* Ranked from what has been fetched, not from Etsy — see CLIENT_SORTS. */}
+                    <option value="best">Est. best sellers</option>
+                    <option value="revenue">Est. revenue</option>
                     <option value="newest">Newest</option>
                     <option value="price_asc">Price: low → high</option>
                     <option value="price_desc">Price: high → low</option>
