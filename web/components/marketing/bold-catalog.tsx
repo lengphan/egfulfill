@@ -5,8 +5,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { TShirt } from "@phosphor-icons/react"
 import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
-import { ShippingFees } from "@/components/shipping-fees"
-import type { ShipBands } from "@/lib/api"
 import type { PublicProduct } from "@/lib/api"
 import { framingStyle } from "@/lib/product-framing"
 import { swatchBg, colorFamily, COLOR_FAMILIES } from "@/lib/color-swatch"
@@ -84,40 +82,58 @@ const NO_SELECTION: Selection = { size: [], color: [], method: [], category: [] 
 
 /** One filter chip. Defined at module scope — `react-hooks/static-components` forbids
  *  declaring a component inside a render, and a chip redefined every keystroke remounts. */
-function Chip({ label, on, swatch, onClick }: {
-  label: string; on: boolean; swatch?: string | null; onClick: () => void
-}) {
+function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={on}
       className={
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold transition-colors " +
+        "rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-colors " +
         (on
           ? "border-[#0B0B0C] bg-[#0B0B0C] text-[#FAF8F3]"
           : "border-black/[0.14] text-black/70 hover:border-black/40 hover:text-[#0B0B0C]")
       }
     >
-      {swatch && (
-        <span
-          aria-hidden
-          className={"size-3 rounded-full border " + (on ? "border-white/40" : "border-black/20")}
-          style={{ background: swatch }}
-        />
-      )}
       {label}
     </button>
   )
 }
 
-export function BoldCatalog({ products, shipping }: {
-  products: PublicProduct[] | null
-  /** What a seller pays to send a parcel — first unit, then each extra in the same box.
-   *  Shown once for the whole grid rather than on every card: it is one platform fee, and
-   *  repeating it 24 times would read as a per-product charge. */
-  shipping?: { bands: ShipBands; extra: number } | null
-}) {
+/**
+ * Colour is a DOT, not a labelled chip.
+ *
+ * Twelve chips reading "Black · Grey · White · Cream · Brown · Red …" is the row that made
+ * the bar look cluttered — it is the widest facet by a distance, and the only one whose
+ * label duplicates something the eye can already read off the swatch. Twelve dots fit two
+ * rows of a 13rem rail; twelve labelled chips need seven.
+ *
+ * The name is not lost, it moves: `aria-label` carries it for a screen reader and `title`
+ * for a pointer, so nothing here is colour-as-the-only-channel — the selected state is a
+ * ring and an offset, not a hue.
+ */
+function SwatchDot({ name, on, onClick }: { name: string; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={name}
+      title={name}
+      className={
+        "size-6 rounded-full border border-black/20 transition-shadow " +
+        (on ? "ring-2 ring-[#0B0B0C] ring-offset-2 ring-offset-[#F2F1EC]" : "hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[#F2F1EC]")
+      }
+      style={{ background: swatchBg(name) ?? NEUTRAL_CHIP }}
+    />
+  )
+}
+
+/* The parcel-fee band table used to sit under this grid. It lives on the PRODUCT page now
+   and nowhere else: there it is one number for the thing you are looking at, where here it
+   was a four-row price list for categories, printed under a page whose whole job is to show
+   what we make. */
+export function BoldCatalog({ products }: { products: PublicProduct[] | null }) {
   // null = the catalogue could not be READ; [] = it is genuinely empty. The house rule is
   // that those two must never look the same, so the caller distinguishes them and this
   // renders each honestly.
@@ -198,7 +214,12 @@ export function BoldCatalog({ products, shipping }: {
         sub="Live from our catalogue — every product here is one you can order today, at the price shown."
       />
 
-      <section className="mx-auto max-w-6xl px-6 py-16">
+      {/* WIDER THAN THE PROSE PAGES, on purpose. A catalogue is scanned, not read: nothing
+          in the grid runs left-to-right, so width buys products per row rather than costing
+          legibility. The hero above keeps the narrower measure every other marketing page
+          uses, because that IS read. Widening both would have made the headline worse to
+          make the grid better. */}
+      <section className="mx-auto max-w-[88rem] px-6 py-16">
         {failed ? (
           <Rise className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
             <h2 className="text-xl font-bold tracking-tight">We couldn&apos;t load the catalogue</h2>
@@ -215,48 +236,67 @@ export function BoldCatalog({ products, shipping }: {
             </p>
           </Rise>
         ) : (
-          <>
+          /* A RAIL DOWN THE EDGE, not a bar across the top.
+             Stacked in one column each facet gets its own line and its own heading, so three
+             groups read as three questions — across the top they ran together into one band
+             of forty chips that had to be parsed before the products could be. It also stops
+             the controls pushing the first row of products off the fold, which is the actual
+             cost of a horizontal filter: the page opens on its own furniture.
+             Below lg it goes back to a block above the grid, because a 13rem rail beside a
+             phone-width grid leaves neither enough room. */
+          <div className="lg:flex lg:items-start lg:gap-12">
             {/* NO Rise on the controls. Everything else on these pages enters on scroll, but a
                 filter that fades in is a filter that is briefly unclickable, and one whose
                 entrance doesn't fire is a page that looks like it has no filters at all. */}
             {facets.length > 0 && (
-              <div className="mb-10 border-b border-black/[0.09] pb-8">
+              <aside className="mb-10 border-b border-black/[0.09] pb-8 lg:sticky lg:top-24 lg:mb-0 lg:w-52 lg:shrink-0 lg:border-b-0 lg:pb-0">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-black/40">Filter</span>
+                  {/* Only ever shown when there is something TO clear — a permanent Clear
+                      button on an unfiltered page is a control that does nothing. */}
+                  {activeCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSel(NO_SELECTION)}
+                      className="text-[12px] font-semibold underline underline-offset-4 text-black/55 hover:text-[#0B0B0C]"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
                 {facets.map((f) => (
-                  <div key={f.key} className="mb-3 flex flex-wrap items-center gap-2 last:mb-0">
-                    <span className="w-14 shrink-0 text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">
+                  <div key={f.key} className="mt-6">
+                    <div className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">
                       {f.label}
-                    </span>
-                    {f.options.map((o) => (
-                      <Chip
-                        key={o}
-                        label={o}
-                        on={sel[f.key].includes(o)}
-                        swatch={f.swatch ? swatchBg(o) : null}
-                        onClick={() => toggle(f.key, o)}
-                      />
-                    ))}
+                    </div>
+                    <div className={f.swatch ? "flex flex-wrap gap-2.5" : "flex flex-wrap gap-1.5"}>
+                      {f.options.map((o) =>
+                        f.swatch ? (
+                          <SwatchDot key={o} name={o} on={sel[f.key].includes(o)} onClick={() => toggle(f.key, o)} />
+                        ) : (
+                          <Chip key={o} label={o} on={sel[f.key].includes(o)} onClick={() => toggle(f.key, o)} />
+                        )
+                      )}
+                    </div>
                   </div>
                 ))}
+
                 {/* The count is the honest part: with filters on, say what was set aside as
                     well as what is showing, so a short grid reads as a narrow filter rather
                     than a small catalogue. */}
                 {activeCount > 0 && (
-                  <div className="mt-5 flex items-center gap-3 text-[13px] text-black/55">
-                    <span className="font-semibold text-[#0B0B0C]">
-                      {list.length} of {all.length} products
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSel(NO_SELECTION)}
-                      className="font-semibold underline underline-offset-4 hover:text-[#0B0B0C]"
-                    >
-                      Clear filters
-                    </button>
+                  <div className="mt-7 border-t border-black/[0.09] pt-4 text-[13px] font-semibold">
+                    {list.length} of {all.length} products
                   </div>
                 )}
-              </div>
+              </aside>
             )}
 
+            {/* min-w-0: a grid track inside a flex row will otherwise size to its widest
+                item's max-content and push the whole page sideways. Same failure the product
+                page's thumbnail rail caused. */}
+            <div className="min-w-0 flex-1">
             {list.length === 0 ? (
               /* A filter that matched nothing is NOT an empty catalogue, and must not borrow
                  its words — the products are still there and one click brings them back. */
@@ -278,12 +318,13 @@ export function BoldCatalog({ products, shipping }: {
               sections.map(([cat, items], gi) => (
             <div key={cat || "all"} className={gi ? "mt-16" : ""}>
               {cat && <h2 className="font-display font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>{cat}</h2>}
-              {/* Four across on a desktop, not three. A catalogue is scanned rather than read,
-                  and three 355px cards on a 1,400px screen made a browsing page feel like a
-                  landing page — you saw six products before scrolling. Four lands each card at
-                  ~261px, which still holds a two-line name, a price and five swatches; the
-                  ladder gains a step at md so the jump from two to four isn't taken in one go. */}
-              <div className={(cat ? "mt-8" : "") + " grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}>
+              {/* Four across on a wide desktop, not three. A catalogue is scanned rather than
+                  read, and three 355px cards on a 1,400px screen made a browsing page feel
+                  like a landing page — you saw six products before scrolling.
+                  The fourth column waits for xl BECAUSE OF THE RAIL: it appears at lg and
+                  takes 16rem out of the row, so four columns at a 1024px window would be
+                  165px cards. Three there, four once there is width to pay for it. */}
+              <div className={(cat ? "mt-8" : "") + " grid gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"}>
                 {items.map((p, i) => (
                   /* Keyed by SLUG, not name. The server already disambiguated duplicate names
                      with an index suffix, so the slug is the unique one — two products sharing
@@ -364,21 +405,11 @@ export function BoldCatalog({ products, shipping }: {
             </div>
               ))
             )}
-          </>
+            </div>
+          </div>
         )}
       </section>
 
-      {/* THE PARCEL, once, under the grid. Every price above is a garment; this is what
-          it costs to send one, and leaving it to the checkout is how a quoted price stops
-          matching a bill. Once for the page, not on every card — it is one platform fee,
-          and 24 copies of it would read as a per-product charge. */}
-      {shipping && (
-        <section className="px-6 pb-14">
-          <div className="mx-auto max-w-5xl">
-            <ShippingFees bands={shipping.bands} extra={shipping.extra} tone="marketing" className="max-w-md" />
-          </div>
-        </section>
-      )}
 
       <section className="px-6 pb-16">
         <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
