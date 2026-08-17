@@ -31,27 +31,26 @@ const HOUSE = {
 }
 
 /**
- * THE PLATE EVERY PRODUCT PHOTO SITS ON.
+ * THE WELL EVERY PRODUCT PHOTO SITS IN — WHITE, WITH A HAIRLINE BORDER.
  *
- * Supplier photography is a garment cut out on WHITE. On a white sheet that means a shirt
- * with no edges — the picture and the page are the same colour, so a cap floats in the
- * middle of nothing and the swatch grid reads as text with gaps. The wells were
- * `bg-neutral-50` (#FAFAFA), which is white for any practical purpose and did nothing.
+ * This was a warm grey, to give a cut-out-on-white garment an edge on a white sheet. It
+ * solved that and created a worse one: the photos ARE white, and object-contain letterboxes
+ * them, so every cell rendered a white rectangle floating inside a grey box. On the hero
+ * that reads as a mistake — a picture pasted onto the wrong background — and no amount of
+ * choosing a nicer grey fixes it, because the artefact is the seam between two backgrounds,
+ * not the shade of either.
  *
- * A grey plate is the whole fix, and it is the cheap one: the alternative is cutting the
- * background out of every supplier image, which is per-image work we would redo on every
- * sync. One panel behind the picture gives the product its edge back and costs nothing.
+ * So the well is white and the EDGE comes from a rule around it, which is the same answer
+ * the app's product tiles use. One background, no seam, and the garment still has a
+ * boundary.
  *
- * #EDECE9 is warm rather than a neutral grey, so it belongs to the same paper as the rest
- * of the document instead of reading as a screenshot dropped onto it. Light enough to print
- * without eating toner across twenty pages, dark enough that a white garment has a border.
- * The covers already force print-color-adjust: exact, so it survives Chrome's
- * drop-the-backgrounds default.
+ * Kept as a token because the curation list imports it: the screen you choose from should
+ * look like the document you are choosing for.
  */
-/* Exported because the curation list shows the SAME supplier photographs while you pick
-   what goes in the book. Two plates defined separately would drift, and the screen you
-   choose from should look like the document you are choosing for. */
-export const PLATE = "#EDECE9"
+export const PLATE = "#FFFFFF"
+/** The rule that replaces the tint. Light enough to frame a photo without competing with
+ *  it, dark enough to survive a laser printer. */
+export const PLATE_EDGE = "#E2E0DB"
 /** Only a real hex survives — a half-typed value in settings must not paint the cover. */
 const hexOr = (v: unknown, fallback: string) =>
   typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim() : fallback
@@ -244,8 +243,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       corners, and min-h raised from 80mm: on a style with no description
                       this column is the page, and the hero was sitting small in the middle
                       of it. */}
-                  <div className="flex min-h-[120mm] flex-1 w-full items-center justify-center overflow-hidden rounded-lg p-4"
-                       style={{ background: PLATE }}>
+                  <div className="flex min-h-[120mm] flex-1 w-full items-center justify-center overflow-hidden rounded-lg border p-4"
+                       style={{ background: PLATE, borderColor: PLATE_EDGE }}>
                     {st.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={st.image} alt={st.name} className="size-full object-contain" />
@@ -299,8 +298,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                               than 3:4 for the same reason: the letterboxing above and below
                               was padding, not picture. Twelve rather than twenty because the
                               bigger cells cost rows — the remainder is still stated below. */}
-                          <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded p-1"
-                               style={{ background: PLATE }}>
+                          <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded border p-1"
+                               style={{ background: PLATE, borderColor: PLATE_EDGE }}>
                             {c.image ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={c.image} alt={c.name} className="size-full object-contain" />
