@@ -264,11 +264,12 @@ export function BoldProduct({ product, shipping }: {
             checking a file spec has already decided they're interested, and squeezing a
             multi-column table into the right rail would make both harder to read. */}
         {(
-          /* Two columns ONLY when there are two things to put in them. Most products have
-             no supplier size chart — S&S is the only feed that provides one — so a fixed
-             two-column grid left the guidelines stranded in the left half with a dead right
-             half beside them, which is what made the section look broken rather than short. */
-          <div className={"mt-16 grid gap-12 " + (product.methods.length > 0 ? "lg:grid-cols-2" : "max-w-2xl")}>
+          /* ONE column, because there is one thing left in it. Most products have no
+             supplier size chart — S&S is the only feed that provides one — and the artwork
+             guidelines that used to sit beside it are now their own full-width band below.
+             A two-column grid holding a single item is just a half-width page, which is
+             what made this section look broken rather than short. */
+          <div className="mt-16 max-w-3xl">
             <Rise preset="cut">
                 <h2 className="font-display text-2xl font-black tracking-tight">Size chart</h2>
                 {/* One line, not a paragraph. Only some manufacturers publish a measurement
@@ -339,27 +340,45 @@ export function BoldProduct({ product, shipping }: {
               </Rise>
             )}
 
-            {product.methods.length > 0 && (
-              <Rise preset="cut" index={2}>
-                <h2 className="font-display text-2xl font-black tracking-tight">Artwork guidelines</h2>
-                <p className="mt-1.5 text-sm text-black/50">
-                  What to send us for {product.methods.join(" / ")}.
-                </p>
-                <dl className="mt-5 divide-y divide-black/[0.09] border-y border-black/[0.09]">
-                  {FILE_GUIDES.filter((g) => g.methods.length === 0 || product.methods.some((m) => g.methods.some((k) => m.toUpperCase().includes(k)))).map((g) => (
-                    <div key={g.label} className="flex gap-6 py-3.5">
-                      <dt className="w-36 shrink-0 text-sm font-bold">{g.label}</dt>
-                      <dd className="min-w-0 text-sm leading-relaxed text-black/65">{g.body}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <p className="mt-4 text-sm leading-relaxed text-black/50">
-                  Not sure? Send what you have — we check every file before it goes on a machine,
-                  and we&apos;ll tell you if something won&apos;t hold up.
-                </p>
-              </Rise>
-            )}
           </div>
+        )}
+
+        {/**
+          * FULL WIDTH, and laid out ACROSS it rather than stretched.
+          *
+          * This sat in the two-column grid beside the size chart, so four short facts were
+          * squeezed into half a page while the other half stood empty — and simply widening
+          * the old label/body list would have run each answer to a 100-character line, which
+          * is worse than cramped.
+          *
+          * So the rows become CARDS across the page: each keeps a readable measure, the
+          * whole band uses the width, and the four things you have to know are visible at
+          * once instead of as a list you scan down.
+          */}
+        {product.methods.length > 0 && (
+          <Rise preset="cut" index={2}>
+            <div className="mt-16 border-t border-black/[0.09] pt-10">
+              <h2 className="font-display text-2xl font-black tracking-tight">Artwork guidelines</h2>
+              <p className="mt-1.5 text-sm text-black/50">
+                What to send us for {product.methods.join(" / ")}.
+              </p>
+              <dl className="mt-7 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+                {FILE_GUIDES.filter((g) => g.methods.length === 0 || product.methods.some((m) => g.methods.some((k) => m.toUpperCase().includes(k)))).map((g) => (
+                  <div key={g.label}>
+                    {/* The label sits ON the rule, the way a spec sheet heads a column —
+                        the old 9rem label gutter was most of the width on a narrow column
+                        and none of it here. */}
+                    <dt className="border-t-2 border-[#0B0B0C] pt-2.5 text-sm font-black tracking-tight">{g.label}</dt>
+                    <dd className="mt-2 text-sm leading-relaxed text-black/65">{g.body}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-8 max-w-2xl text-sm leading-relaxed text-black/50">
+                Not sure? Send what you have — we check every file before it goes on a machine,
+                and we&apos;ll tell you if something won&apos;t hold up.
+              </p>
+            </div>
+          </Rise>
         )}
 
       </div>
