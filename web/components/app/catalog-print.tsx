@@ -127,17 +127,19 @@ const HOUSE = {
  * choosing a nicer grey fixes it, because the artefact is the seam between two backgrounds,
  * not the shade of either.
  *
- * So the well is white and the EDGE comes from a rule around it, which is the same answer
- * the app's product tiles use. One background, no seam, and the garment still has a
- * boundary.
+ * So the well is white — and, since the second attempt, with no rule around it either. The
+ * tint made a seam; the rule that replaced it made a box, drawn on every style, so the eye
+ * met the frame before the garment. A cut-out shot on a white page needs neither: the product
+ * is the only thing on the sheet with a shape.
+ *
+ * The trade, named because it is real: a white or pale garment has no boundary of its own
+ * now. If that ever reads as floating, the answer is a soft shadow under the PRODUCT, not a
+ * line around the box.
  *
  * Kept as a token because the curation list imports it: the screen you choose from should
  * look like the document you are choosing for.
  */
 export const PLATE = "#FFFFFF"
-/** The rule that replaces the tint. Light enough to frame a photo without competing with
- *  it, dark enough to survive a laser printer. */
-export const PLATE_EDGE = "#E2E0DB"
 /** Only a real hex survives — a half-typed value in settings must not paint the cover. */
 const hexOr = (v: unknown, fallback: string) =>
   typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim() : fallback
@@ -540,8 +542,17 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       plate is drawn only when there is something to put in it; the copy takes
                       the column otherwise, and in edit mode the space offers to fix it. */}
                   {hero ? (
-                    <div className="group relative flex min-h-[120mm] w-full flex-1 items-center justify-center overflow-hidden rounded-lg border p-4"
-                         style={{ background: PLATE, borderColor: PLATE_EDGE }}>
+                    /* NO RULE. The grey plate went first because it made a seam rather than
+                       an edge; the rule that replaced it is the same mark one step quieter —
+                       a box drawn around a cut-out photo on a white page, on every style, so
+                       the eye reads the frame before the garment. The page is white and the
+                       shot is white, and that is the point: the product is the only thing on
+                       the sheet with a shape.
+                       The trade is real and worth naming — a white or pale garment now has no
+                       boundary of its own. If that reads as floating, the answer is a soft
+                       shadow under the product, not a line around the box. */
+                    <div className="group relative flex min-h-[120mm] w-full flex-1 items-center justify-center overflow-hidden rounded-lg p-4"
+                         style={{ background: PLATE }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={hero} alt={st.name} className="size-full object-contain" />
                       {editing && (
@@ -632,8 +643,11 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                               than 3:4 for the same reason: the letterboxing above and below
                               was padding, not picture. Twelve rather than twenty because the
                               bigger cells cost rows — the remainder is still stated below. */}
-                          <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded border p-1"
-                               style={{ background: PLATE, borderColor: PLATE_EDGE }}>
+                          {/* Same reasoning as the hero: no rule around a cut-out on white.
+                              Twelve of these in a grid made twelve boxes, which read as a
+                              table of frames rather than a set of colourways. */}
+                          <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded p-1"
+                               style={{ background: PLATE }}>
                             {c.image ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={c.image} alt={c.name} className="size-full object-contain" />
