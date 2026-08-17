@@ -994,8 +994,19 @@ export default function ChatPage() {
               className="h-10 w-full"
             />
           </div>
-          <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !activeId || readOnly || (!input.trim() && !(pendingAtt && !gen)) || sending}>
-            <PaperPlaneTilt size={16} weight="fill" />
+          {/* ARMED: the send button BECOMES the generate button. Same position, same key —
+              but it must not still look like "post a message" when pressing it spends money,
+              so it takes the mode's icon, says Generate, and carries the price. */}
+          <Button
+            size={gen ? "sm" : "icon"}
+            className={gen ? "h-10 shrink-0 gap-1.5 px-3" : "size-10"}
+            onClick={send}
+            disabled={signedOut || !activeId || readOnly || (!input.trim() && !(pendingAtt && !gen)) || sending}
+          >
+            {sending && gen ? <CircleNotch size={16} className="animate-spin" />
+              : gen ? (gen.mode === "image" ? <ImageSquare size={16} weight="fill" /> : <FilmSlate size={16} weight="fill" />)
+              : <PaperPlaneTilt size={16} weight="fill" />}
+            {gen && <span className="text-xs font-medium">Generate · ~${gen.usd.toFixed(gen.usd < 1 ? 3 : 2)}</span>}
           </Button>
         </div>
       </div>
