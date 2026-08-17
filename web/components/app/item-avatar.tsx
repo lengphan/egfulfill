@@ -9,7 +9,7 @@ import { designSrc } from "@/lib/order-image"
 import { designForLine } from "@/lib/api"
 import type { CatalogProduct, DesignPos, OrderDesign, OrderItem } from "@/lib/api"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { swatchBg, swatchHex } from "@/lib/color-swatch"
+import { swatchBg } from "@/lib/color-swatch"
 import { prettyColorName } from "@/lib/color-name"
 
 /**
@@ -68,15 +68,6 @@ export type ItemAvatarProps = {
   className?: string
 }
 
-/** Is this fill dark enough that ink-coloured dashes disappear on it? Perceived luminance,
- *  the same rule the user chips use (user-avatar.tsx). Null (an unrecognised colour name)
- *  is not dark: that tile keeps the neutral background. */
-const isDarkHex = (hex?: string | null) => {
-  if (!hex || hex.length !== 7) return false
-  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16)
-  return (r * 299 + g * 587 + b * 114) / 1000 <= 150
-}
-
 /**
  * The blank the artwork sits on — and whether it is REALLY the blank.
  *
@@ -131,18 +122,18 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   const { url: blank, missing: blankMissing, chosen: blankChosen } = blankOf(item, catalog)
   const listing = item.img || ""
   /**
-   * NO BLANK PICKED — and the tile must not paper over it with the listing photo.
+   * NO BLANK PICKED IS NOT AN ERROR STATE — it is where every marketplace line starts.
    *
-   * `blankOf` falls back to `item.img` so a manual order never renders an empty square, and
-   * that fallback reaches all the way here: clearing the Blank field put the BUYER'S photo
-   * in the print position, which made unpicking a blank look like progress. It is the same
-   * stand-in as a chosen-but-pictureless blank, with its own caption.
+   * This briefly rendered a dashed "No blank picked" stand-in instead of the listing photo,
+   * on the reasoning that the front card must never show the buyer's picture. Wrong trade:
+   * before anything is picked there is no second card to be confused with, the listing IS
+   * the only thing known about the line, and a queue of dashed squares tells the person
+   * choosing a blank nothing about what they are choosing FOR.
    *
-   * NOT on `listingFirst` callers. Those are the dense row strips, where showing the buyer's
-   * photo is the whole point and is stated as such — a board of dashed squares would be a
-   * worse answer to a different question.
+   * So: nothing picked → the listing photo, alone. Picked → the pair, blank in front and
+   * the listing tucked behind it. Picked but pictureless → the pair with a dashed colour
+   * stand-in in front, which is the one case where the front card would otherwise be a lie.
    */
-  const blankUnpicked = !blankChosen && !listingFirst
   // Only worth offering the swap when the two views actually differ.
   const canSwap = !!(art && listing && listing !== blank)
   /**
@@ -219,7 +210,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         className={"relative block shrink-0 overflow-hidden rounded-md bg-muted " + (bare ? "" : "border border-border ") + (className ?? "")}
         style={{ width: size, height: size }}
       >
-        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} blankUnpicked={blankUnpicked} color={item.color} />
+        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} color={item.color} />
       </span>
     )
   }
@@ -246,7 +237,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             + (showBoth && !listingFront ? " z-20 border-2 border-background shadow-md" : " z-0")}
           style={{ left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
         >
-          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} blankUnpicked={blankUnpicked} color={item.color} />
+          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} color={item.color} />
           {/* Affordance only where there's something to do — and only on hover, so the
               row stays quiet until you're actually pointing at it. */}
           <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-md bg-black/45 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 sm:flex">
@@ -331,7 +322,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
                   the same "one click away" the row strips already rely on. With artwork the
                   stand-in stays, because a design floating on the buyer's photo is the
                   misleading composite this whole component avoids. */}
-              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} blankMissing={blankMissing} blankUnpicked={blankUnpicked && !!art} color={item.color} fit="contain" />
+              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} blankMissing={blankMissing} color={item.color} fit="contain" />
             </div>
             {canSwap && (
               <button
@@ -362,7 +353,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
  * so the same numbers hold at 44px in a row and at full size in the preview — one model,
  * no per-surface maths.
  */
-function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissing, blankUnpicked, color }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string; fit?: "cover" | "contain"; blankMissing?: boolean; blankUnpicked?: boolean; color?: string | null }) {
+function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissing, color }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string; fit?: "cover" | "contain"; blankMissing?: boolean; color?: string | null }) {
   /**
    * NO PHOTO, BUT WE DO KNOW THE COLOUR — so stand in with the colour.
    *
@@ -394,31 +385,37 @@ function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissi
    * Both states get the same stand-in, because they are the same sentence: we cannot show
    * you the garment. They differ only in the caption.
    */
-  const noBlank = (blankMissing || blankUnpicked) && !showListing
+  const noBlank = blankMissing && !showListing
   const swatch = noBlank ? swatchBg(color || "") : null
-  // THE DASHES HAVE TO SURVIVE THE FILL. Ink at 25% is invisible on Black — the exact tile
-  // where a solid square is most likely to be mistaken for a photograph of a black apron.
-  // Same perceived-luminance rule the user chips use (user-avatar.tsx).
-  const onDark = swatch ? isDarkHex(swatchHex(color || "")) : false
   if (noBlank) {
-    const why = blankUnpicked ? "No blank picked" : "No blank photo"
+    const why = "No blank photo"
     return (
       <span
-        className={"relative grid size-full place-items-center overflow-hidden rounded-[inherit] border border-dashed bg-muted/60 text-center text-muted-foreground "
-          + (onDark ? "border-white/50" : "border-foreground/25")}
+        className="relative grid size-full place-items-center overflow-hidden rounded-[inherit] bg-muted/60 text-center text-muted-foreground"
         style={swatch ? { background: swatch } : undefined}
         title={color ? `${prettyColorName(color)} — ${why.toLowerCase()}` : why}
       >
-        {art ? <ArtLayer art={art} pos={pos} /> : swatch ? (
-          // The colour IS the message; a caption over it would only obscure the thing it
-          // describes. The name is in the tooltip, and the dashes carry "stand-in".
-          null
-        ) : (
-          <span className="grid place-items-center gap-1 p-1">
-            <Package size={15} />
-            <span className="text-[9px] font-medium leading-tight">{color ? prettyColorName(color) : why}</span>
-          </span>
-        )}
+        {art && <ArtLayer art={art} pos={pos} />}
+        {/**
+          * A CAPTION, NOT A DASHED BORDER.
+          *
+          * This wore a dashed edge to say "stand-in, not a photograph". It sat one pixel
+          * inside the tile's own solid border, so every stand-in had TWO edges doing one
+          * job — and on the pair's front card, a third: the white ring that separates it
+          * from the listing behind. Three lines around a coloured square.
+          *
+          * The words do the work instead, on the same translucent strip the product editor
+          * puts "{type} default" on, so the marking is one this app already uses. It reads
+          * at a glance, it survives any fill (the strip is the page's own background, not
+          * ink on cloth), and it says WHICH of the two states this is — which a dashed
+          * border never could.
+          *
+          * The icon is gone with it: a parcel glyph over a caption that already says the
+          * whole sentence was decoration in the smallest space on screen.
+          */}
+        <span className="absolute inset-x-0 bottom-0 truncate bg-background/85 px-1 py-0.5 text-[9px] font-medium leading-tight text-foreground/70">
+          {why}
+        </span>
       </span>
     )
   }
