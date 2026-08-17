@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { Printer, Minus, Plus } from "@phosphor-icons/react"
+import { Printer, Minus, Plus, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Barcode } from "@/components/app/barcode"
 import { QrCode } from "@/components/app/qr-code"
@@ -110,11 +110,27 @@ export function LabelSheet({
      */
     <div className="eg-print-root fixed inset-0 z-50 grid place-items-center overflow-auto bg-black/45 p-4 backdrop-blur-sm">
       <div className="eg-print-card flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-      <div className="no-print flex flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-3">
+      {/* THE HEADER SAYS WHAT THIS IS AND HOW TO LEAVE. Close was a button in the middle of a
+          wrapping row of selects, which is where nobody looks for it — an X in the corner is
+          where every window in the app puts it. */}
+      <div className="no-print flex items-center gap-3 border-b border-border bg-card px-4 py-3">
         <span className="font-medium">{sheet.length} {title}</span>
         <span className="text-xs text-muted-foreground">{labels.length} variant{labels.length === 1 ? "" : "s"}</span>
+        <button
+          type="button" onClick={onClose} aria-label="Close"
+          className="ml-auto grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <X size={16} weight="bold" />
+        </button>
+      </div>
 
-        <label className="ml-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+      {/* PREVIEW LEFT, CONTROLS RIGHT. They were a wrapping toolbar above the labels — six
+          controls of six widths reflowing as the window changed, with Print at one end and
+          Close in the middle. A rail keeps them stacked, labelled and in the same place every
+          time, and gives the sheet the whole width to be looked at. */}
+      <div className="flex min-h-0 flex-1">
+      <div className="no-print order-2 w-60 shrink-0 space-y-4 overflow-auto border-l border-border bg-card p-4">
+        <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
           Copies of each
           <span className="flex items-center gap-1">
             <Button size="sm" variant="outline" className="size-7 p-0" onClick={() => setMultiplier((m) => Math.max(1, m - 1))} aria-label="Fewer copies"><Minus size={12} weight="bold" /></Button>
@@ -123,49 +139,48 @@ export function LabelSheet({
           </span>
         </label>
 
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
+        <div className="space-y-4">
           {/* Which code, said out loud. A gun cannot read a QR and a phone fights a 1D
               code — so the wrong choice here produces a bin of labels nothing can scan,
               and that is not a discovery to make at the scanner. */}
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
             Print
             <select
               value={content}
               onChange={(e) => setContent(e.target.value as "both" | "code" | "sku")}
-              className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="eg-select h-9 w-full rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               <option value="both">Code + SKU</option>
               <option value="code">Code only</option>
               <option value="sku">SKU only</option>
             </select>
           </label>
-          <label className={"flex items-center gap-1.5 text-xs text-muted-foreground " + (content === "sku" ? "hidden" : "")}>
+          <label className={"flex flex-col gap-1.5 text-xs text-muted-foreground " + (content === "sku" ? "hidden" : "")}>
             Code
             <select
               value={codeType}
               onChange={(e) => setCodeType(e.target.value as "barcode" | "qr")}
-              className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="eg-select h-9 w-full rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               <option value="barcode">Barcode — scanner guns</option>
               <option value="qr">QR — phone cameras</option>
             </select>
           </label>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
             Label stock
             <select
               value={stock}
               onChange={(e) => setStock(e.target.value as StockId)}
-              className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="eg-select h-9 w-full rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               {STOCKS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </label>
-          <Button size="sm" onClick={() => window.print()} disabled={!sheet.length}><Printer size={14} weight="bold" /> Print</Button>
+          <Button className="w-full" onClick={() => window.print()} disabled={!sheet.length}><Printer size={14} weight="bold" /> Print</Button>
         </div>
       </div>
 
-      <div className="eg-print-body min-h-0 flex-1 overflow-auto bg-muted/30">
+      <div className="eg-print-body order-1 min-h-0 flex-1 overflow-auto bg-muted/30">
       {sheet.length === 0 ? (
         <div className="py-20 text-center text-sm text-muted-foreground">Nothing selected to print.</div>
       ) : (
@@ -174,7 +189,12 @@ export function LabelSheet({
               thinks the page is. Injected rather than hardcoded so the preview and the
               print use one source of truth. */}
           <style>{`@media print { @page { size: ${spec.w}in ${spec.h}in; margin: 0; } }`}</style>
-          <div className={oneUp ? "print-area flex flex-wrap items-start justify-center gap-4 p-4" : "print-area grid grid-cols-3 gap-3 p-4 sm:grid-cols-4"}>
+          {/* The PREVIEW is enlarged, the print is not: `zoom` inside a screen-only query,
+              so the sticker still leaves the printer at its true physical size — which is
+              already right. One per row, because six thumbnails tiled across a card is a
+              contact sheet, and the question here is "can I read this label". */}
+          <style>{`@media screen { .eg-label-preview { zoom: 1.9 } }`}</style>
+          <div className={"eg-label-preview " + (oneUp ? "print-area flex flex-col items-center gap-4 p-4" : "print-area flex flex-col items-center gap-3 p-4")}>
             {sheet.map(({ key, l }) => (
               <div
                 key={key}
@@ -227,6 +247,7 @@ export function LabelSheet({
           </div>
         </>
       )}
+      </div>
       </div>
       </div>
     </div>,
