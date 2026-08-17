@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, Warning, DownloadSimple, MagnifyingGlass, Percent, FilePdf } from "@phosphor-icons/react"
+import { CircleNotch, Warning, DownloadSimple, MagnifyingGlass, Percent } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
@@ -106,6 +106,26 @@ export function CatalogView() {
   }
 
 
+  /** Publish or unpublish everything the current filter shows, in ONE call — the endpoint
+   *  already takes a list, and forty round trips is forty chances to half-finish. */
+  const shownIds = shown.map(idOf).filter(Boolean)
+  const allShown = shownIds.length > 0 && shown.every((p) => p.inCatalog)
+  const someShown = shown.some((p) => p.inCatalog)
+  const toggleAllShown = async (include: boolean) => {
+    if (!shownIds.length) return
+    setErr(null); setNote(null); setBusy(true)
+    const before = rows
+    setRows((prev) => (prev ?? []).map((p) => (shownIds.includes(idOf(p)) ? { ...p, inCatalog: include } : p)))
+    try {
+      const r = await setCatalogSelection(shownIds, include)
+      if (r.error) throw new Error(r.error)
+    } catch (e) {
+      // Put every row back: a half-applied bulk tick is worse than one that did not happen.
+      setRows(before)
+      setErr((e as Error).message)
+    } finally { setBusy(false) }
+  }
+
   const markup = async () => {
     const inCat = (rows ?? []).filter((p) => p.inCatalog)
     if (!inCat.length) return
@@ -149,7 +169,7 @@ export function CatalogView() {
               lookbook is not importable. */}
           <Button size="sm" onClick={() => setPrintOpen(true)}
             title="A printable catalogue with images — save it as PDF">
-            <FilePdf size={14} weight="bold" /> Create lookbook
+            Create lookbook
           </Button>
           <a href={catalogExportUrl()} download>
             <Button size="sm" variant="outline" disabled={!published}
@@ -234,7 +254,22 @@ export function CatalogView() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="w-8 px-2 py-2" />
+                  {/* SELECT ALL — every row the current search shows, not every row in the
+                      catalogue, because the visible set is the one somebody just narrowed to
+                      and a tick that reaches past it is a bulk action nobody aimed.
+                      Indeterminate while some are in: a box that reads "off" over a mixed
+                      column is the only state that would lie about what one click does. */}
+                  <th className="w-8 px-2 py-2">
+                    <input
+                      type="checkbox"
+                      ref={(el) => { if (el) el.indeterminate = someShown && !allShown }}
+                      checked={allShown}
+                      disabled={busy || shown.length === 0}
+                      aria-label={allShown ? "Remove all shown products from the catalogue" : "Add all shown products to the catalogue"}
+                      title={allShown ? "Remove all shown from the catalogue" : "Add all shown to the catalogue"}
+                      onChange={(e) => void toggleAllShown(e.target.checked)}
+                    />
+                  </th>
                   <th className="px-2 py-2 font-medium">Product</th>
                   <th className="px-2 py-2 font-medium">Catalogue price</th>
                   {/* Labelled as what it is, and not editable here. The two prices sitting
