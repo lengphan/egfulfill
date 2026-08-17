@@ -258,9 +258,17 @@ async function accountContext(sellerId) {
 function toMessages(rows) {
   const out = [];
   for (const m of rows) {
-    const text = String(m.body || '').trim();
+    let text = String(m.body || '').trim();
     if (!text) continue;
     const role = (m.sender_role === 'seller') ? 'user' : 'assistant';
+    /*
+     * A GENERATED IMAGE is stored as an assistant row whose body is the PROMPT — that is
+     * what the thread should show under the picture. But fed to the text model raw, the
+     * prompt reads as something the assistant itself said ("A folded heather-grey tee on
+     * warm oak…"), which is both false and confusing: the model then answers as though it
+     * had been describing a tee. Label it instead, so the transcript says what happened.
+     */
+    if (m.meta && m.meta.image) text = `(generated an image: ${text})`;
     const last = out[out.length - 1];
     if (last && last.role === role) last.content += '\n' + text;
     else out.push({ role, content: text });
@@ -306,9 +314,28 @@ export async function aiComplete({ system, messages, maxTokens = 900 }) {
   return postAnthropic(key, JSON.stringify({ model, max_tokens: maxTokens, system, messages }));
 }
 
-async function generateReply(key, model, sellerId, messages) {
+/*
+ * A staffer's own "My EG" runs through this same seller-facing prompt, which says nothing
+ * about pictures — so when a staffer asked for one the model improvised a denial and sent
+ * them to DALL-E, Midjourney or Canva, with our own image button sitting inches away in the
+ * same composer. An assistant that denies a capability the screen is offering is worse than
+ * one that stays quiet, so the staff case gets told what is actually on their screen.
+ *
+ * Sellers must NOT get this block: image generation is staff-only, and telling a seller
+ * about a button they don't have is the same failure pointing the other way.
+ */
+const STAFF_EXTRA = `
+
+THIS THREAD IS A STAFF MEMBER'S OWN WORKSPACE — not a seller's support thread.
+- Image generation IS available to them here. There is a picture button in the message box (left of the paperclip) that renders product images and posts them into this thread.
+- So never say you can't do images, and never point them at DALL-E, Midjourney or Canva. If they ask for a picture, tell them to use that button — and help by writing the prompt they should paste, plus which shape to pick (1:1 for an Etsy/Shopify listing, 4:5 Instagram, 9:16 Reels).
+- A good prompt names the subject, the fabric or material, the surface it sits on, and the light. Keep lettering out of it unless they ask — text is the hardest thing for it to render.
+- They are staff, so internal detail is fine; the seller-facing caution about naming suppliers still applies to anything they might publish.`;
+
+async function generateReply(key, model, sellerId, messages, isStaffOwn = false) {
   const ctx = await accountContext(sellerId);
-  const body = JSON.stringify({ model, max_tokens: 600, system: SYSTEM + '\n\nACCOUNT DATA (for this seller only):\n' + ctx, messages });
+  const system = SYSTEM + (isStaffOwn ? STAFF_EXTRA : '') + '\n\nACCOUNT DATA (for this seller only):\n' + ctx;
+  const body = JSON.stringify({ model, max_tokens: 600, system, messages });
   return postAnthropic(key, body);
 }
 
@@ -381,8 +408,8 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // NEWEST 20, re-ordered oldest-first for the model. `order by created_at asc limit 20`
     // takes the OLDEST 20 — see the note on the auto-reply query below.
     const hist = await q(
-      `select sender_role, body from (
-         select sender_role, body, created_at, id from order_messages
+      `select sender_role, body, meta from (
+         select sender_role, body, meta, created_at, id from order_messages
           where order_id=$1
           order by created_at desc, id desc limit 20
        ) t order by t.created_at asc, t.id asc`, [threadId]);
@@ -515,8 +542,8 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // nothing said why. Order desc to take the recent window, then restore chronological
     // order, because toMessages() builds the transcript in sequence.
     const hist = await q(
-      `select sender_role, body from (
-         select sender_role, body, created_at, id from order_messages
+      `select sender_role, body, meta from (
+         select sender_role, body, meta, created_at, id from order_messages
           where order_id=$1
             and not coalesce((meta->>'internal')::boolean, false)
           order by created_at desc, id desc limit 20
@@ -534,7 +561,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
 
     let text = '';
     try {
-      text = await generateReply(key, model, sellerId, messages);
+      text = await generateReply(key, model, sellerId, messages, isStaffOwn);
     } catch (e) {
       // Return 200 with the reason (not a 5xx) so the client shows WHY instead of throwing.
       req.log?.warn?.({ err: String(e), detail: e.detail }, 'support-ai request failed');
@@ -566,8 +593,8 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
           order by created_at desc, id desc limit 50
        ) t order by t.created_at asc, t.id asc`, [threadId]);
     const hist = await q(
-      `select sender_role, body from (
-         select sender_role, body, created_at, id from order_messages
+      `select sender_role, body, meta from (
+         select sender_role, body, meta, created_at, id from order_messages
           where order_id=$1 and not coalesce((meta->>'note')::boolean, false)
           order by created_at desc, id desc limit 20
        ) t order by t.created_at asc, t.id asc`, [threadId]);
