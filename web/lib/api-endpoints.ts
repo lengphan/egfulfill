@@ -64,13 +64,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     { "line": 1, "sku": "16468", "quantity": 2, "size": "L",
       "unit_price": 8.50, "line_total": 17.00 }
   ],
+  "shipping_address": { "name": "Ava Brodeur", "street1": "43 Calumet Rd",
+    "city": "Fairhaven", "state": "MA", "zip": "02719", "country": "US" },
   "totals": { "items": 17.00, "currency": "USD" },
   "created": "2026-07-21T16:04:11.882Z"
 }`,
     method: "POST",
     path: "/api/v1/orders",
     title: "Create order",
-    description: "Create a fulfillment order. Needs an items array and a shipping_address. A test key validates and prices identically to live but produces nothing; a live key puts it in the factory queue. Every product_id must exist in GET /api/v1/products — we refuse an order we cannot price rather than inventing a number.",
+    description: "Create a fulfillment order. Needs an items array and a shipping_address. A test key validates and prices identically to live but produces nothing; a live key puts it in the factory queue. Every product_id must exist in GET /api/v1/products — we refuse an order we cannot price rather than inventing a number. `totals` covers the LINE ITEMS only: postage is quoted when the order goes to production, not when it is created, so it is not part of this response in either mode. Send the same `external_id` twice and you get the first order back with `idempotent: true` rather than a duplicate.",
     body: JSON.stringify(
       {
         external_id: "my-store-1001",
@@ -102,7 +104,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     method: "GET",
     path: "/api/v1/orders/:id",
     title: "Retrieve order",
-    description: "Looks up an order by id (any well-formed id resolves in the sandbox).",
+    description: "Looks up an order by id. A test key resolves ANY well-formed id to a simulated order with the same fields live returns — `total` comes back null there, because the id matches no real order. A cancelled order also carries `reason`, `rejected_by` and `rejected_at`, so a refusal is readable here even if the webhook never arrived.",
     param: { name: "id", placeholder: "ord_test123" },
   },
   // Label buying and rate shopping USED to be listed here. They were removed rather than

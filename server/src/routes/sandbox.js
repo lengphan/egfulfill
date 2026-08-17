@@ -478,14 +478,27 @@ export function sandboxRoutes(app, requireAuth) {
     // a real order.received was to put an actual order through the factory. Stripe's
     // test mode delivers webhooks for exactly this reason; the flag is what keeps it
     // honest, not silence.
+    /**
+     * THE SAME SHAPE AS LIVE, AND THE SAME NUMBERS.
+     *
+     * Test used to add `shipping: 4.63` and a `total` built from it. Neither exists on the
+     * live response: postage is not known when an order is CREATED — it is quoted when the
+     * order is submitted to production — so live reports the line items and nothing else.
+     *
+     * That made the sandbox lie twice. A partner reading `totals.total` in test got
+     * `undefined` the moment they flipped to a live key, which is precisely the failure
+     * this sandbox exists to prevent ("build against test, change one key"). And 4.63 was a
+     * hardcoded sample rate, i.e. an invented figure about money — the same thing the
+     * shipping routes below return 501 rather than fake.
+     */
     emitWebhook(k.seller_id, 'order.received', {
       test: true, id: testId, status: 'received', items: priced,
       shipping_address: b.shipping_address ?? null,
-      total: +(itemsTotal + 4.63).toFixed(2),
+      total: itemsTotal,
       _note: 'Simulated order — nothing was created in the factory.',
     });
     return { object: 'order', mode: 'test', id: testId, status: 'received', items: priced,
-      shipping_address: b.shipping_address, totals: { items: itemsTotal, shipping: 4.63, total: +(itemsTotal + 4.63).toFixed(2), currency: 'USD' },
+      shipping_address: b.shipping_address, totals: { items: itemsTotal, currency: 'USD' },
       created: nowISO(), _note: 'Simulated — nothing was created in the factory, but order.received WAS delivered to your webhooks (test:true). Prices and validation match live exactly; send a live key (egk_live_…) to create a real order.' };
   });
 
@@ -627,8 +640,19 @@ export function sandboxRoutes(app, requireAuth) {
           ...(rej ? { reason: rej.reason || null, rejected_by: rej.by || 'factory', rejected_at: rej.at || null } : {}) };
       } catch (e) { reply.code(500); return { error: String((e && e.message) || e), mode: 'live' }; }
     }
+    /**
+     * EVERY FIELD LIVE HAS, so a parser written against the sandbox does not meet an
+     * undefined on its first real order. `total` and `created` were simply missing here —
+     * both are documented, both are on the live response, and a client reading
+     * `order.total.toFixed(2)` threw the moment the key changed.
+     *
+     * `total` is NULL rather than a plausible number: this id resolves to nothing, so
+     * there is no money to report, and a made-up figure is worse than an admitted absence
+     * (the same rule that keeps the shipping routes at 501).
+     */
     return { object: 'order', mode: 'test', id: req.params.id, status: 'in_production',
-      tracking: { carrier: 'USPS', code: null, url: null }, _note: 'Simulated lookup.' };
+      tracking: { carrier: 'USPS', code: null, url: null }, total: null, created: nowISO(),
+      _note: 'Simulated lookup — this id resolves to no real order, so total is null.' };
   });
 
   // ── Shipping (v1) ──────────────────────────────────────────────────────────
