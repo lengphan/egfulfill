@@ -1064,14 +1064,23 @@ export function ProductEditorDialog({
                           disabled={!ourSku}
                           onClick={() => setStockOpen((p) => (p === s ? null : s))}
                           title={ourSku ? `Stock per colourway for ${s}` : "Give the product a SKU — stock is held against it"}
-                          className="h-8 rounded-md border border-border px-2 text-xs tabular-nums transition-colors hover:border-primary disabled:opacity-50"
+                          className="flex h-8 w-full items-center justify-between gap-1 rounded-md border border-border px-2 text-xs transition-colors hover:border-primary disabled:opacity-50"
                         >
-                          {(() => {
-                            const keys = [variantSku(ourSku, s, null).toUpperCase(), ...colors.map((c) => variantSku(ourSku, s, c).toUpperCase())]
-                            const vals = keys.map((k) => stock[k]).filter((v) => v !== undefined && v !== "")
-                            return vals.length ? vals.reduce((n, v) => n + (Number(v) || 0), 0) : "—"
-                          })()}
-                          <CaretDown size={9} weight="bold" className={"ml-1 inline transition-transform " + (stockOpen === s ? "rotate-180" : "")} />
+                          {/* BLANK WHEN NOTHING IS TRACKED, not a dash. Every other cell in
+                              this row is empty until it has a value, and an em-dash here
+                              read as a THIRD state beside 0 and blank — the one distinction
+                              this column exists to keep. The caret is the affordance; the
+                              number does not have to say anything to earn it. */}
+                          <span className="tabular-nums">
+                            {(() => {
+                              const keys = [variantSku(ourSku, s, null).toUpperCase(), ...colors.map((c) => variantSku(ourSku, s, c).toUpperCase())]
+                              const vals = keys.map((k) => stock[k]).filter((v) => v !== undefined && v !== "")
+                              return vals.length ? vals.reduce((n, v) => n + (Number(v) || 0), 0) : ""
+                            })()}
+                          </span>
+                          {/* Right-aligned and muted, so it reads as the row's disclosure
+                              rather than a glyph stuck to the digit. */}
+                          <CaretDown size={10} className={"shrink-0 text-muted-foreground transition-transform " + (stockOpen === s ? "rotate-180" : "")} />
                         </button>
                       ) : (
                         <Input
@@ -1082,7 +1091,7 @@ export function ProductEditorDialog({
                             setStock((p) => ({ ...p, [k]: v }))
                           }}
                           disabled={!ourSku}
-                          placeholder={ourSku ? "—" : "sku"}
+                          placeholder={ourSku ? "" : "sku"}
                           title={ourSku ? `Held against ${variantSku(ourSku, s, colors[0] ?? null)}` : "Give the product a SKU — stock is held against it"}
                           className="h-8 text-xs" inputMode="numeric" aria-label={`Stock for size ${s}`}
                         />
@@ -1135,19 +1144,23 @@ export function ProductEditorDialog({
                           <span>Stock · {s}</span>
                           <span className="font-mono">{variantSku(ourSku, s, colors[0])}</span>
                         </div>
-                        <div className="grid gap-1 sm:grid-cols-2">
+                        {/* WRAPPED PAIRS, not a grid. A grid across the whole table width
+                            put hundreds of pixels between a colour and the box it belongs
+                            to, so the eye had to travel the row to find out which colour it
+                            was typing into. Each pair is now only as wide as its own name. */}
+                        <div className="flex flex-wrap gap-x-5 gap-y-1.5">
                           {(stock[variantSku(ourSku, s, null).toUpperCase()] !== undefined
                             ? [null, ...colors] : colors).map((c) => {
                             const k = variantSku(ourSku, s, c).toUpperCase()
                             return (
-                              <label key={c ?? "any"} className="flex items-center gap-2 text-xs">
-                                <span className="min-w-0 flex-1 truncate" title={c ? prettyColorName(c) : "Held for this size without a colourway"}>
+                              <label key={c ?? "any"} className="flex items-center gap-1.5 text-xs">
+                                <span className="max-w-[9rem] truncate" title={c ? prettyColorName(c) : "Held for this size without a colourway"}>
                                   {c ? prettyColorName(c) : "Any colour"}
                                 </span>
                                 <Input
                                   value={stock[k] ?? ""}
                                   onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); setStock((p) => ({ ...p, [k]: v })) }}
-                                  placeholder="—" inputMode="numeric"
+                                  placeholder="" inputMode="numeric"
                                   className="h-7 w-14 shrink-0 text-center text-xs"
                                   aria-label={`Stock for ${c ? prettyColorName(c) : "any colour"} ${s}`}
                                   title={variantSku(ourSku, s, c)}
