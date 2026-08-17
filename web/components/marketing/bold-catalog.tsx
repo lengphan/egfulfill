@@ -308,6 +308,15 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
     return out
   }, [all, sel, query, sort])
 
+  /**
+   * THE HAND-PICKED SHELF — the four products someone chose to lead with.
+   *
+   * Hidden the moment a filter, a search or a re-sort is on: a curated row is a starting
+   * point, and repeating four products in front of a narrowed result is noise where the
+   * answer should be.
+   */
+  const picked = useMemo(() => (all.filter((p) => p.featured).slice(0, 4)), [all])
+
 
   /**
    * BROWSE BY KIND, before any filtering — the row every print-on-demand catalogue opens
@@ -381,8 +390,11 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
           question that comes first. Scrolls sideways on a phone rather than wrapping to
           three ragged rows — a category strip is read across, like the shelf it stands
           for. */}
+      {/* pt-2, not pt-14. PlateHero already ends in pb-20, so a generous top padding here
+          was stacking onto it: 136px of nothing between the headline and the first thing
+          you can click, on a page whose whole job is to show products. */}
       {!failed && kinds.length > 0 && (
-        <section className="mx-auto max-w-[88rem] px-6 pt-14">
+        <section className="mx-auto max-w-[88rem] px-6 pt-2">
           <h2 className="text-[22px] font-bold tracking-tight">What we print on</h2>
           <p className="mt-1 text-[15px] text-black/55">
             {all.length} product{all.length === 1 ? "" : "s"} you can order today. Pick a kind to narrow the list.
@@ -397,18 +409,21 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                   onClick={() => toggle("category", k.name)}
                   aria-pressed={on}
                   className={
-                    "group w-40 shrink-0 snap-start overflow-hidden rounded-2xl border bg-white text-left transition-colors sm:w-44 " +
+                    "group w-32 shrink-0 snap-start overflow-hidden rounded-xl border bg-white text-left transition-colors sm:w-36 " +
                     (on ? "border-[#0B0B0C]" : "border-black/[0.09] hover:border-black/40")
                   }
                 >
-                  <div className="relative aspect-square overflow-hidden" style={{ background: ACCENT }}>
+                  {/* 5:4, not square, and 128px wide. At two categories a row of big square
+                      tiles is more furniture than choice — it read as the page's main content
+                      rather than as a way into it. */}
+                  <div className="relative aspect-[5/4] overflow-hidden" style={{ background: ACCENT }}>
                     {k.image ? (
                       <Image
                         src={k.image}
                         alt=""
                         fill
                         unoptimized
-                        sizes="176px"
+                        sizes="144px"
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                       />
                     ) : (
@@ -417,11 +432,11 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                       </div>
                     )}
                   </div>
-                  <div className="px-3.5 py-3">
-                    <div className="text-[15px] font-bold tracking-tight">{k.name}</div>
+                  <div className="px-3 py-2.5">
+                    <div className="text-[14px] font-bold tracking-tight">{k.name}</div>
                     {/* The count is the point of a tile over a chip: it says how deep the
                         shelf is before you open it. */}
-                    <div className="mt-0.5 text-[13px] text-black/55">
+                    <div className="text-[12px] text-black/55">
                       {k.count} product{k.count === 1 ? "" : "s"}
                     </div>
                   </div>
@@ -436,14 +451,27 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
           reads: what do you make, where do I start, then let me narrow it. Four across at
           most: a curated row that scrolls stops being a recommendation and becomes a second
           catalogue. */}
-      {/* THE HAND-PICKED SHELF is gone with the flag that filled it.
-          "Starter essentials" was `products.filter(featured).slice(0,4)`, and the only way
-          to set featured was a tick in the product editor beside a Status that already
-          decides whether the public site shows a product at all. With the tick removed this
-          row could only ever be empty, or — worse — hold whatever was ticked months ago and
-          never revisited. A curated row is worth having; one nothing can curate is not. */}
+      {/* Drawn from PUBLISHED products only, which is what keeps it from going stale: a
+          product ticked months ago and since set back to Draft is not on this page at all,
+          so it cannot be in this row either. Empty until someone ticks something, and the
+          row simply doesn't render then. */}
+      {!failed && picked.length > 0 && (
+        <section className="mx-auto max-w-[88rem] px-6 pt-10">
+          <h2 className="text-[22px] font-bold tracking-tight">Starter essentials</h2>
+          <p className="mt-1 text-[15px] text-black/55">
+            Hand-picked blanks to start with — the ones we keep stocked and know print well.
+          </p>
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {picked.map((p, i) => (
+              <ProductCard key={p.slug} p={p} showCategory index={i} />
+            ))}
+          </div>
+        </section>
+      )}
 
-      <section className="mx-auto max-w-[88rem] px-6 py-16">
+      {/* pt-8: the browse row and the shelf above already separate this from the hero, and
+          64px more put the first product below the fold on a laptop. */}
+      <section className="mx-auto max-w-[88rem] px-6 pb-16 pt-8">
         {failed ? (
           <Rise className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
             <h2 className="text-xl font-bold tracking-tight">We couldn&apos;t load the catalogue</h2>
@@ -575,14 +603,19 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
             ) : (
               sections.map(([cat, items], gi) => (
             <div key={cat || "all"} className={gi ? "mt-16" : ""}>
-              {cat && <h2 className="font-display font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>{cat}</h2>}
+              {/* A SECTION LABEL, not a page headline. This carried the marketing display
+                  size (clamp up to 3.6rem — 58px here), so "Apparel" was set larger than
+                  "What we can make." reads at the top of the page and dwarfed the products
+                  underneath it. Matched to the other headings on this page instead, so the
+                  page has one rhythm and the loudest thing on it is the grid. */}
+              {cat && <h2 className="text-[22px] font-bold tracking-tight">{cat}</h2>}
               {/* Four across on a wide desktop, not three. A catalogue is scanned rather than
                   read, and three 355px cards on a 1,400px screen made a browsing page feel
                   like a landing page — you saw six products before scrolling.
                   The fourth column waits for xl BECAUSE OF THE RAIL: it appears at lg and
                   takes 16rem out of the row, so four columns at a 1024px window would be
                   165px cards. Three there, four once there is width to pay for it. */}
-              <div className={(cat ? "mt-8" : "") + " grid gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"}>
+              <div className={(cat ? "mt-4" : "") + " grid gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"}>
                 {items.map((p, i) => (
                   <ProductCard key={p.slug} p={p} showCategory={!grouped} index={i} />
                 ))}
