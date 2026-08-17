@@ -847,7 +847,15 @@ export default function ChatPage() {
               // The panel holds settings only; the words come from the composer, so there
               // is one box to type in rather than a second one hidden inside a popover.
               prompt={input}
-              onConsumePrompt={() => setInput("")}
+              // A photo staged with the paperclip becomes a REFERENCE for the image. It is
+              // already uploaded and stored, so all the server needs is its asset name —
+              // which is also why only our own attachments can be used.
+              referenceNames={
+                pendingAtt?.url && pendingAtt.mime?.startsWith("image/")
+                  ? [pendingAtt.url.split("/api/support/asset/")[1]].filter(Boolean)
+                  : []
+              }
+              onConsumePrompt={() => { setInput(""); setPendingAtt(null) }}
               // The server already posted it into this thread — just pull the thread again
               // so it lands as a normal message rather than a second, client-only bubble.
               onImage={() => { void load() }}

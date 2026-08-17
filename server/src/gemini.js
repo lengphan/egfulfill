@@ -34,6 +34,7 @@ export const IMAGE_MODELS = [
     sizes: ['1K', '2K', '4K'],
     defaultSize: '2K',
     usd: { '1K': 0.134, '2K': 0.134, '4K': 0.24 },
+    maxRefs: 6,
   },
   {
     id: 'gemini-3.1-flash-image',
@@ -42,6 +43,7 @@ export const IMAGE_MODELS = [
     sizes: ['0.5K', '1K', '2K', '4K'],
     defaultSize: '1K',
     usd: { '0.5K': 0.045, '1K': 0.067, '2K': 0.101, '4K': 0.151 },
+    maxRefs: 14,
   },
   {
     id: 'gemini-3.1-flash-lite-image',
@@ -50,6 +52,7 @@ export const IMAGE_MODELS = [
     sizes: ['1K'],
     defaultSize: '1K',
     usd: { '1K': 0.0336 },
+    maxRefs: 14,
   },
 ];
 
@@ -158,7 +161,7 @@ export const _test = { extractImage, refusalReason, modelById };
  * Throws with .status set, and with .disabled = true when no key is configured, so a
  * caller can say "an admin hasn't switched this on" instead of reporting a broken API.
  */
-export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, model: modelOverride } = {}) {
+export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, model: modelOverride, images = [] } = {}) {
   const cfg = await imageConfig();
   const model = modelById(modelOverride) ? modelOverride : cfg.model;
   const spec = modelById(model);
@@ -175,9 +178,22 @@ export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, mo
   // with a message no operator would understand. Fall back to the model's own default.
   const size = spec.sizes.includes(imageSize) ? imageSize : spec.defaultSize;
 
+  /*
+   * REFERENCE PHOTOS. Text goes FIRST — the docs are explicit that the prompt should
+   * precede the images it refers to — then one item per picture. With none of these the
+   * request is plain text-to-image, which is what it always was.
+   *
+   * Capacity is per model (Pro takes fewer than Flash), and going over is a 400 whose
+   * message would not help anyone, so the list is trimmed here instead.
+   */
+  const refs = (Array.isArray(images) ? images : [])
+    .filter((im) => im && im.buffer && im.buffer.length)
+    .slice(0, spec.maxRefs || 6)
+    .map((im) => ({ type: 'image', mime_type: im.mime || 'image/jpeg', data: im.buffer.toString('base64') }));
+
   const body = JSON.stringify({
     model,
-    input: [{ type: 'text', text }],
+    input: [{ type: 'text', text }, ...refs],
     // Capital K is required — '2k' is rejected. And the mime must be JPEG: this surface
     // rejects 'image/png' outright ("Supported values: 'image/jpeg'"), verified against the
     // live API. Don't "improve" this back to PNG for transparency — it 400s, and the
@@ -253,6 +269,6 @@ export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, mo
   return {
     buffer: Buffer.from(hit.b64, 'base64'),
     mime: hit.mime,
-    model, size, aspectRatio: ratio, usd,
+    model, size, aspectRatio: ratio, usd, refsUsed: refs.length,
   };
 }

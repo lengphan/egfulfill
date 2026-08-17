@@ -825,9 +825,27 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // The caller's OWN assistant channel — same thread "My EG" already reads.
     const threadId = 'support-' + req.user.sub;
 
+    /*
+     * REFERENCE PHOTOS. Bare asset NAMES, never URLs — a URL here would be a fetcher aimed
+     * at anything the server can reach, and these are read straight off our own storage.
+     * Same hard bare-name check the asset route uses, so nothing outside chat/ is readable.
+     *
+     * A missing one is skipped rather than fatal: a reference that has aged out of storage
+     * should not throw away a prompt the person already typed.
+     */
+    const refs = [];
+    for (const raw of (Array.isArray(b.imageNames) ? b.imageNames : []).slice(0, 14)) {
+      const name = String(raw || '');
+      if (!/^[A-Za-z0-9._-]+$/.test(name)) continue;
+      try {
+        const obj = await getObject(`chat/${name}`);
+        if (obj && obj.body && obj.body.length) refs.push({ buffer: obj.body, mime: obj.contentType || 'image/jpeg' });
+      } catch { /* unreadable reference — carry on without it */ }
+    }
+
     let img;
     try {
-      img = await generateImage({ prompt, aspectRatio: b.aspectRatio, imageSize: b.imageSize, model: b.model });
+      img = await generateImage({ prompt, aspectRatio: b.aspectRatio, imageSize: b.imageSize, model: b.model, images: refs });
     } catch (e) {
       // 200 with a reason, not a 5xx — the chat client renders `error`, and a throw here
       // showed up as a dead spinner with nothing said, which is how the assistant's other
@@ -854,14 +872,14 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     const attachment = { url: `${base}/api/support/asset/${name}`, name: prompt.slice(0, 80), mime: img.mime, size: img.buffer.length };
 
     const clientId = 'img-' + crypto.randomBytes(8).toString('hex');
-    const meta = { by: 'EGFUL Assistant', ai: true, image: true, ts: Date.now(), model: img.model, size: img.size, aspect: img.aspectRatio, usd: img.usd };
+    const meta = { by: 'EGFUL Assistant', ai: true, image: true, ts: Date.now(), model: img.model, size: img.size, aspect: img.aspectRatio, usd: img.usd, refs: img.refsUsed || 0 };
     await q(
       `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
        values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) where client_id is not null do nothing`,
       [threadId, null, 'assistant', prompt, attachment, JSON.stringify(meta), clientId]);
     egBroadcast({ type: 'order-message' });
 
-    return { ok: true, attachment, model: img.model, size: img.size, aspectRatio: img.aspectRatio, usd: img.usd };
+    return { ok: true, attachment, model: img.model, size: img.size, aspectRatio: img.aspectRatio, usd: img.usd, refsUsed: img.refsUsed || 0 };
   });
 
   // ── Video generation (Veo), same gate and same channel as images ─────────────

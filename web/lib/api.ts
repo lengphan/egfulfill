@@ -2385,6 +2385,8 @@ export type ImageGenModel = {
   sizes: string[]; defaultSize: string
   /** Per-image USD at the standard tier, keyed by size. */
   usd: Record<string, number>
+  /** How many reference photos this model accepts (Pro takes fewer than Flash). */
+  maxRefs?: number
 }
 export type DeskImageConfig = {
   enabled: boolean
@@ -2398,8 +2400,12 @@ export function getDeskImageConfig() {
 }
 /** Generates, stores, and posts the image into the caller's own assistant thread.
  *  Returns `ok:false` with a reason rather than throwing, same as the other AI calls. */
-export function generateDeskImage(body: { prompt: string; aspectRatio?: string; imageSize?: string; model?: string }) {
-  return api<{ ok?: boolean; attachment?: ChatAttachment; model?: string; size?: string; aspectRatio?: string; usd?: number; disabled?: boolean; overloaded?: boolean; error?: string }>(
+export function generateDeskImage(body: {
+  prompt: string; aspectRatio?: string; imageSize?: string; model?: string
+  /** Bare asset filenames of reference photos already stored for this chat. */
+  imageNames?: string[]
+}) {
+  return api<{ ok?: boolean; attachment?: ChatAttachment; model?: string; size?: string; aspectRatio?: string; usd?: number; refsUsed?: number; disabled?: boolean; overloaded?: boolean; error?: string }>(
     `/api/desk/image`, { method: "POST", body: JSON.stringify(body) })
 }
 

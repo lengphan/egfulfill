@@ -19,10 +19,12 @@ type Mode = "image" | "video"
  * price of the CURRENT selection is always on the button before it's pressed. Config is
  * fetched on OPEN, an event, never from an effect watching state the fetch would rewrite.
  */
-export function GenerateButton({ disabled, prompt, onConsumePrompt, onImage, onVideoStarted }: {
+export function GenerateButton({ disabled, prompt, referenceNames, onConsumePrompt, onImage, onVideoStarted }: {
   disabled?: boolean
   /** What's typed in the chat composer — this panel holds settings only. */
   prompt: string
+  /** Photos staged in the composer, used as references for an image. */
+  referenceNames?: string[]
   /** Clear the composer once the text has been spent on a generation. */
   onConsumePrompt: () => void
   onImage: (att: ChatAttachment) => void
@@ -88,7 +90,10 @@ export function GenerateButton({ disabled, prompt, onConsumePrompt, onImage, onV
     setBusy(true); setErr(null); setOverloaded(false)
     try {
       if (mode === "image") {
-        const r = await generateDeskImage({ prompt: text, aspectRatio: imgRatio, imageSize: effImgSize, model: imgModel })
+        const r = await generateDeskImage({
+          prompt: text, aspectRatio: imgRatio, imageSize: effImgSize, model: imgModel,
+          imageNames: referenceNames?.length ? referenceNames : undefined,
+        })
         if (!r.ok || !r.attachment) {
           setErr(r.error || (r.disabled ? "Image generation is off — an admin can add the Google AI key in Settings › Integrations." : "That didn't work."))
           setOverloaded(!!r.overloaded)
@@ -225,6 +230,19 @@ export function GenerateButton({ disabled, prompt, onConsumePrompt, onImage, onV
 
                 {!prompt.trim() && (
                   <p className="text-2xs text-muted-foreground">Type what you want in the message box below, then press Generate.</p>
+                )}
+                {/* Say the photos are being USED. A staged attachment that silently did or
+                    didn't reach the model is the difference between "add cats to this" working
+                    and coming back as an unrelated picture. */}
+                {!isVideo && !!referenceNames?.length && (
+                  <p className="text-2xs text-muted-foreground">
+                    Using {referenceNames.length} attached photo{referenceNames.length > 1 ? "s" : ""} as reference.
+                    {imgSpec?.maxRefs && referenceNames.length > imgSpec.maxRefs
+                      ? ` This model takes ${imgSpec.maxRefs} — the rest are ignored.` : ""}
+                  </p>
+                )}
+                {isVideo && !!referenceNames?.length && (
+                  <p className="text-2xs text-muted-foreground">Video ignores attached photos — use Animate on a picture instead.</p>
                 )}
                 {err && <p className="text-xs text-destructive">{err}</p>}
                 {/* Google is out of capacity on THIS model, which is a different thing from a
