@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { CircleNotch, Warning, Sparkle } from "@phosphor-icons/react"
+import { CircleNotch, Warning, Sparkle, ImageSquare, FilmSlate, CaretDown } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getDeskImageConfig, getDeskVideoConfig, type DeskImageConfig, type DeskVideoConfig } from "@/lib/api"
 
@@ -28,8 +28,10 @@ export type GenSettings = {
   imageUrl?: string
   /** Cost of one generation with these settings, shown on the pill before anything runs. */
   usd: number
-  /** Short human label for the pill. */
+  /** Short human label. */
   label: string
+  /** The compact form for the trigger chip — just the settings, no noun: "2K · 1:1". */
+  short: string
 }
 
 type Mode = "image" | "video"
@@ -85,7 +87,7 @@ export function GenerateButton({ disabled, armed, onArm }: {
       if (i.enabled && iM) {
         onArm({
           mode: "image", model: i.model, ratio: "1:1", size: iM.defaultSize,
-          usd: iM.usd[iM.defaultSize] ?? 0, label: `Image · ${iM.defaultSize} · 1:1`,
+          usd: iM.usd[iM.defaultSize] ?? 0, label: `Image · ${iM.defaultSize} · 1:1`, short: `${iM.defaultSize} · 1:1`,
         })
       }
     } catch (e) {
@@ -117,12 +119,12 @@ export function GenerateButton({ disabled, armed, onArm }: {
       ? {
         mode: "video", model: vM, ratio: vRatio, resolution: vRes, seconds: sc,
         usd: (vSpec?.usdPerSec[vRes] ?? 0) * sc,
-        label: `Video · ${vRes} · ${sc}s`,
+        label: `Video · ${vRes} · ${sc}s`, short: `${vRes} · ${vRatio} · ${sc}s`,
       }
       : {
         mode: "image", model: iM, ratio: iRatio, size: iSize,
         usd: iSpec?.usd[iSize] ?? 0,
-        label: `Image · ${iSize} · ${iRatio}`,
+        label: `Image · ${iSize} · ${iRatio}`, short: `${iSize} · ${iRatio}`,
       })
   }
 
@@ -130,12 +132,25 @@ export function GenerateButton({ disabled, armed, onArm }: {
 
   return (
     <div className="relative shrink-0">
-      <Button
-        variant={armed ? "default" : "ghost"} size="icon" className="size-10"
-        onClick={openMenu} disabled={disabled} aria-label="Choose what to generate"
-      >
-        <Sparkle size={18} weight={armed ? "fill" : "regular"} />
-      </Button>
+      {armed ? (
+        <Button
+          variant="secondary" size="sm"
+          className="h-9 shrink-0 gap-1.5 rounded-full pl-2.5 pr-2 text-xs font-medium"
+          onClick={openMenu} disabled={disabled}
+          aria-label={`Generating ${armed.mode}: ${armed.short}. Change settings`}
+        >
+          {armed.mode === "image" ? <ImageSquare size={13} weight="fill" /> : <FilmSlate size={13} weight="fill" />}
+          <span className="tabular-nums">{armed.short}</span>
+          <CaretDown size={11} weight="bold" className="opacity-60" />
+        </Button>
+      ) : (
+        <Button
+          variant="ghost" size="icon" className="size-9"
+          onClick={openMenu} disabled={disabled} aria-label="Choose what to generate"
+        >
+          <Sparkle size={18} />
+        </Button>
+      )}
 
       {open && (
         <>
@@ -289,13 +304,25 @@ export function AnimateImageButton({ imageName, imageUrl, onArm }: {
     setBusy(true)
     try {
       const c = await getDeskVideoConfig()
-      const m = c.models.find((x) => x.id === c.model) || c.models[0]
-      if (!m) return
-      const res = m.defaultResolution
+      /*
+       * CHEAPEST settings, not the configured default. Animating is the exploratory move —
+       * you already have the picture and you're finding out whether it moves well — so it
+       * should not open on the $0.96 option. The floor here is Lite/720p at the shortest
+       * length, about 20c. Everything is still one click away in the panel.
+       *
+       * Derived rather than hardcoded: the catalogue owns the prices, and a hardcoded
+       * "veo-lite" would quietly become wrong the day a cheaper tier appears.
+       */
+      const priced = c.models
+        .flatMap((m) => m.resolutions.map((res) => ({ m, res, rate: m.usdPerSec[res] ?? Infinity })))
+        .sort((a, b) => a.rate - b.rate)
+      const pick = priced[0]
+      if (!pick) return
+      const secs = Math.min(...(c.durations?.length ? c.durations : [8]))
       onArm({
-        mode: "video", model: m.id, ratio: "9:16", resolution: res, seconds: 8,
-        imageName, imageUrl, usd: (m.usdPerSec[res] ?? 0) * 8,
-        label: `Animate · ${res} · 8s`,
+        mode: "video", model: pick.m.id, ratio: "9:16", resolution: pick.res, seconds: secs,
+        imageName, imageUrl, usd: pick.rate * secs,
+        label: `Animate · ${pick.res} · ${secs}s`, short: `Animate · ${pick.res} · ${secs}s`,
       })
     } catch { /* the pill is the feedback; a failed arm simply doesn't arm */ } finally {
       setBusy(false)

@@ -857,6 +857,7 @@ export default function ChatPage() {
                           const att = m.attachment as ChatAttachment | undefined
                           if (!att?.url) return null
                           const isImg = (att.mime || "").startsWith("image/")
+                          const isVid = (att.mime || "").startsWith("video/")
                           // The server animates by bare asset NAME, so only an image we
                           // stored for this chat can be one — anything else has no name to give.
                           const assetName = isImg ? att.url.split("/api/support/asset/")[1] : undefined
@@ -864,12 +865,35 @@ export default function ChatPage() {
                           // w-fit, not a bare block: the overlay anchors to this link, and a
                           // full-width block put "Animate" at the BUBBLE's right edge,
                           // floating in space beside the picture instead of on it.
+                          /*
+                           * A CLIP PLAYS HERE. It arrived as a file chip — an icon and a
+                           * filename — which is a poor way to hand someone a video they just
+                           * paid for and have to judge before using.
+                           *
+                           * Not wrapped in the link the other attachments use: the controls
+                           * are clickable, and every press of play or scrub would have
+                           * navigated the tab away to the raw file instead.
+                           */
+                          if (isVid) {
+                            return (
+                              <div className={"w-fit " + (m.text ? "mt-1.5" : "")}>
+                                <video
+                                  src={att.url} controls playsInline preload="metadata"
+                                  className="max-h-[30rem] w-full max-w-[26rem] rounded-lg border border-border bg-black"
+                                />
+                                <a href={att.url} target="_blank" rel="noreferrer"
+                                   className="mt-1 inline-block text-2xs text-muted-foreground underline-offset-2 hover:underline">
+                                  Open full size
+                                </a>
+                              </div>
+                            )
+                          }
                           return (
                             <a href={att.url} target="_blank" rel="noreferrer" className={"relative block w-fit " + (m.text ? "mt-1.5" : "")}>
                               {isImg ? (
                                 <>
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={att.url} alt={att.name || "attachment"} className="max-h-60 max-w-full rounded-lg border border-border object-contain" />
+                                  <img src={att.url} alt={att.name || "attachment"} className="max-h-[30rem] max-w-full rounded-lg border border-border object-contain" />
                                   {canAnimate && (
                                     <AnimateImageButton imageName={assetName} imageUrl={att.url} onArm={setGen} />
                                   )}
