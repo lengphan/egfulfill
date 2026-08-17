@@ -295,13 +295,16 @@ export function SupportBubble() {
           * the label repeated more often than anyone said anything, and a run read as one
           * block of chrome rather than as somebody talking.
           *
-          * A run now gets ONE caption and closes up (mt-1 inside, mt-3 between turns), which
-          * is what every chat client does and why a conversation reads as turns.
+          * A run gets ONE caption. The SPACING stays the same for every message though —
+          * closing the gap inside a run was the wrong half of that idea: three bubbles a
+          * few pixels apart read as one message that grew, which is precisely the "appended
+          * to the previous bubble" this was meant to fix. Each thing said is one bubble with
+          * air around it; only the repeated label goes.
           */}
         {msgs.map((m, i) => {
           const startsRun = i === 0 || msgs[i - 1].role !== m.role
           return (
-          <div key={i} className={(m.role === "user" ? "flex flex-col items-end " : "") + (startsRun ? "mt-3 first:mt-0" : "mt-1")}>
+          <div key={i} className={(m.role === "user" ? "flex flex-col items-end " : "") + "mt-3 first:mt-0"}>
             {/* whitespace-pre-wrap, or the line breaks the server just put between numbered
                 steps collapse back into one run-on sentence in the bubble. */}
             {/* A PERSON'S REPLY SAYS SO — once per run. It arrives in the same column as the
