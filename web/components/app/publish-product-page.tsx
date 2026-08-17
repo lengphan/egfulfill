@@ -885,13 +885,13 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
             : "Live TikTok publishing is switched off on the server.",
         }
       }
-      onPublished?.(undefined, images[0], {
+      onPublished?.(undefined, recordCover(null), {
         platform: "tiktok",
         // TikTok's own id for the draft. It was dropped, which is how this destination came
         // to write an upload record with no listing id at all — and, before the coalesce on
         // the server, to erase whatever Etsy had put there.
         listing_id: r.product_id ?? undefined,
-        title: title.trim(), price: basePrice, image: images[0],
+        title: title.trim(), price: basePrice, image: recordCover(null),
         state: "draft",
         blank_sku: blank?.sku ?? undefined, blank_name: blank?.name ?? undefined,
         print_type: method || undefined,
@@ -929,7 +929,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         design_id: prefill?.designId, design_data: prefill?.designUrl, design_pos: prefill?.designPos,
       })
       if (r.error) throw new Error(r.error)
-      onPublished?.(r.url, r.primary_image || images[0], {
+      onPublished?.(r.url, recordCover(r.primary_image), {
         platform: "shopify",
         title: title.trim(), price: basePrice, image: r.primary_image || images[0],
         state: r.state || "draft",
@@ -1015,7 +1015,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       // Etsy's hosted url for the cover, falling back to what we sent. The fallback is only
       // reached when the photo upload failed, in which case there IS no published image and
       // showing the source we tried is the honest thing.
-      const cover = r.primary_image || images[0]
+      const cover = recordCover(r.primary_image)
       onPublished?.(r.url, cover, {
         platform: "etsy",
         listing_id: r.listing_id != null ? String(r.listing_id) : undefined,
@@ -1100,6 +1100,23 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    */
   const coverThumbRef = useRef<string | null>(null)
   const keptImagesRef = useRef<string[] | null>(null)
+  /**
+   * THE PICTURE THE RECORD KEEPS — never the raw data: URL.
+   *
+   * spydeck_uploads drops data: URLs on purpose (persistableImage — a base64 blob per photo
+   * per listing is what it exists to prevent), so passing `images[0]` straight in means the
+   * row is stored with NO image whenever the photo came off the seller's machine, which is
+   * every design made in the lab. Etsy never showed it because Etsy hands back a hosted
+   * `primary_image`; TikTok hands back none, so its cards published fine and then rendered
+   * as an empty box while the listing sat on the marketplace with the photo on it.
+   *
+   * keepPhotos() has already uploaded these and holds OUR urls, so the order is: the
+   * marketplace's own hosted image, then the copy we stored, then the raw source — which is
+   * only reached when both failed, and is honest about showing what we tried.
+   */
+  const recordCover = (hosted?: string | null) =>
+    hosted || keptImagesRef.current?.[0] || images[0]
+
   const keepPhotos = async () => {
     if (keptImagesRef.current) return keptImagesRef.current
     coverThumbRef.current = images[0] ? await thumbnail(images[0]).catch(() => images[0]) : null
