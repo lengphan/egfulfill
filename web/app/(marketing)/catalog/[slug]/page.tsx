@@ -10,6 +10,27 @@ import { getPublicProduct, ApiError } from "@/lib/api"
 export const revalidate = 300
 
 /**
+ * PRE-RENDER THE PUBLISHED PRODUCTS.
+ *
+ * Without this every slug was built ON DEMAND the first time anybody opened it — so the first
+ * visitor to each product waited for Vercel to call the API and render before the browser
+ * received anything at all, which is a navigation that appears to do nothing for a beat. With
+ * it, the common case is a static page that ships immediately; `revalidate` keeps it current
+ * and anything published after the build still renders on demand exactly as before.
+ *
+ * A build-time failure returns NO params rather than throwing: the pages simply fall back to
+ * on-demand, which is today's behaviour. A catalogue fetch is not a reason to fail a deploy.
+ */
+export async function generateStaticParams() {
+  try {
+    const { products } = await getPublicProducts()
+    return (products ?? []).map((p) => ({ slug: p.slug })).filter((p) => !!p.slug)
+  } catch {
+    return []
+  }
+}
+
+/**
  * Three outcomes, kept apart on purpose.
  *
  *   found        render it
@@ -43,7 +64,20 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const { product, failed } = await read(slug)
+  /**
+   * BOTH READS AT ONCE.
+   *
+   * These ran one after the other — the product, and only once it had landed, the shipping
+   * figure — so rendering cost two serial round trips from Vercel to the API before any HTML
+   * was sent. They do not depend on each other, so the second was pure waiting.
+   *
+   * The shipping read keeps its own catch: a failure there must cost the price table, never
+   * the product page.
+   */
+  const [{ product, failed }, shippingRead] = await Promise.all([
+    read(slug),
+    getPublicProducts().then((r) => r.shipping ?? null).catch(() => null),
+  ])
 
   if (failed || !product) {
     return (
@@ -61,9 +95,6 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     )
   }
 
-  // The parcel travels with the price. Read from the same public route the grid uses, and
-  // a failure here must not take the product page down — it simply shows no table.
-  let shipping: { extra: number } | null = null
-  try { shipping = (await getPublicProducts()).shipping ?? null } catch { shipping = null }
-  return <BoldProduct product={product} shipping={shipping} />
+  // The parcel travels with the price, from the same public route the grid uses.
+  return <BoldProduct product={product} shipping={shippingRead} />
 }

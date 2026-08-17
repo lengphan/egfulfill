@@ -975,6 +975,24 @@ export type PublicProduct = {
  *  named fields. Never use this inside the app: it deliberately omits the blank SKU, cost,
  *  margin and supplier that the authenticated catalog carries. Colourways and sizes ARE
  *  published — they describe the finished product a buyer picks from. */
+/**
+ * THE ONLY TWO CALLS THAT MAY BE CACHED, and the reason they may.
+ *
+ * `api()` sends no cache hint, so under Next 15+ every fetch is uncached — and an uncached
+ * fetch during a render makes the whole route DYNAMIC, which silently overrode
+ * `revalidate = 300` on the marketing product page and rebuilt it from scratch on every
+ * first visit. generateStaticParams could not help while that was true.
+ *
+ * These two are safe to cache and nothing else here is: they are UNAUTHENTICATED and
+ * PUBLIC — no Bearer token, no per-user shape, the same bytes for every reader. Caching an
+ * authenticated call would risk handing one account's response to another, which is why this
+ * is opted into per call rather than defaulted in api().
+ *
+ * 300s matches the pages' own revalidate, so publishing reaches the marketing site on the
+ * same schedule either way.
+ */
+const PUBLIC_CACHE = { next: { revalidate: 300 } } as RequestInit
+
 export function getPublicProducts() {
   /** `shipping.extra` is each ADDITIONAL unit in the same box. The first unit's fee is on
    *  each product (`ship`), because it depends on the garment — a cap and a hoodie never
@@ -982,13 +1000,13 @@ export function getPublicProducts() {
    *  bands ride along for the grid, where no single product is on screen.
    *  Published beside the prices because a garment price on its own is the half of the
    *  answer that flatters us. */
-  return api<{ products: PublicProduct[]; shipping?: { bands: ShipBands; extra: number } }>(`/api/public/products`)
+  return api<{ products: PublicProduct[]; shipping?: { bands: ShipBands; extra: number } }>(`/api/public/products`, PUBLIC_CACHE)
 }
 /** One published product by slug, for the marketing detail page. 404s for anything not
  *  published — deliberately without distinguishing "unpublished" from "does not exist", so
  *  the route can't be used to probe for unreleased products. */
 export function getPublicProduct(slug: string) {
-  return api<{ product: PublicProduct }>(`/api/public/products/${encodeURIComponent(slug)}`)
+  return api<{ product: PublicProduct }>(`/api/public/products/${encodeURIComponent(slug)}`, PUBLIC_CACHE)
 }
 
 export function getCatalogProducts() {
