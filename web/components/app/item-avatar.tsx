@@ -9,6 +9,8 @@ import { designSrc } from "@/lib/order-image"
 import { designForLine } from "@/lib/api"
 import type { CatalogProduct, DesignPos, OrderDesign, OrderItem } from "@/lib/api"
 import { OrderedVariant } from "@/components/app/ordered-variant"
+import { swatchBg, swatchHex } from "@/lib/color-swatch"
+import { prettyColorName } from "@/lib/color-name"
 
 /**
  * The ONE item avatar, shared by the seller order list, the order detail, and all three
@@ -64,6 +66,15 @@ export type ItemAvatarProps = {
    *  where the tile IS a control, still look like one. */
   bare?: boolean
   className?: string
+}
+
+/** Is this fill dark enough that ink-coloured dashes disappear on it? Perceived luminance,
+ *  the same rule the user chips use (user-avatar.tsx). Null (an unrecognised colour name)
+ *  is not dark: that tile keeps the neutral background. */
+const isDarkHex = (hex?: string | null) => {
+  if (!hex || hex.length !== 7) return false
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16)
+  return (r * 299 + g * 587 + b * 114) / 1000 <= 150
 }
 
 /**
@@ -195,7 +206,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         className={"relative block shrink-0 overflow-hidden rounded-md bg-muted " + (bare ? "" : "border border-border ") + (className ?? "")}
         style={{ width: size, height: size }}
       >
-        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} />
+        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} color={item.color} />
       </span>
     )
   }
@@ -222,7 +233,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             + (showBoth && !listingFront ? " z-20 border-2 border-background shadow-md" : " z-0")}
           style={{ left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
         >
-          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} />
+          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} color={item.color} />
           {/* Affordance only where there's something to do — and only on hover, so the
               row stays quiet until you're actually pointing at it. */}
           <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-md bg-black/45 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 sm:flex">
@@ -301,7 +312,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           </DialogHeader>
           <div className="space-y-3 px-1 pb-1">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted">
-              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} blankMissing={blankMissing} fit="contain" />
+              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} blankMissing={blankMissing} color={item.color} fit="contain" />
             </div>
             {canSwap && (
               <button
@@ -332,21 +343,50 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
  * so the same numbers hold at 44px in a row and at full size in the preview — one model,
  * no per-surface maths.
  */
-function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissing }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string; fit?: "cover" | "contain"; blankMissing?: boolean }) {
+function Composite({ blank, art, pos, listing, showListing, alt, fit, blankMissing, color }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string; fit?: "cover" | "contain"; blankMissing?: boolean; color?: string | null }) {
   /**
-   * SAY IT, rather than borrow the listing photo.
+   * NO PHOTO, BUT WE DO KNOW THE COLOUR — so stand in with the colour.
    *
-   * When the chosen blank has no imagery, `blank` falls back to the buyer's listing photo —
-   * and this component's whole premise is that it shows what gets MADE, never the listing.
-   * A rack of aprons sitting in the print position, captioned as the thing to produce, is
-   * worse than an empty tile: it is confidently wrong. So when a blank IS chosen and simply
-   * has no picture, the card says so and the pair keeps both halves.
+   * `blank` falls back to the buyer's LISTING photo when the chosen blank has no imagery,
+   * and this component's premise is that it shows what gets MADE, never the listing. A rack
+   * of aprons in the print position, captioned as the thing to produce, is confidently
+   * wrong — worse than an empty tile.
+   *
+   * The tile said "No blank photo" instead, which was honest and useless: it threw away the
+   * one thing we DO know about the garment. A field of the chosen colour is a real fact
+   * about what gets made, and artwork can sit on it the way it will sit on the cloth.
+   *
+   * DASHED, ALWAYS. The border is what keeps it from being read as a photograph — a solid
+   * black square and a photo of a black apron are the same pixels, and only one of them is
+   * evidence. Dashed says stand-in, everywhere else in this app as well.
+   *
+   * An unrecognised colour name gets no fill (swatchBg returns null — "Caviar" is not in the
+   * table). It keeps the neutral tile and prints the NAME, because painting a guess is the
+   * one thing worse than not painting.
    */
-  if (blankMissing && !art && !showListing) {
+  const swatch = blankMissing && !showListing ? swatchBg(color || "") : null
+  // THE DASHES HAVE TO SURVIVE THE FILL. Ink at 25% is invisible on Black — the exact tile
+  // where a solid square is most likely to be mistaken for a photograph of a black apron.
+  // Same perceived-luminance rule the user chips use (user-avatar.tsx).
+  const onDark = swatch ? isDarkHex(swatchHex(color || "")) : false
+  if (blankMissing && !showListing) {
     return (
-      <span className="grid size-full place-items-center gap-1 bg-muted/60 p-1 text-center text-muted-foreground">
-        <Package size={15} />
-        <span className="text-[9px] font-medium leading-tight">No blank photo</span>
+      <span
+        className={"relative grid size-full place-items-center overflow-hidden rounded-[inherit] border border-dashed bg-muted/60 text-center text-muted-foreground "
+          + (onDark ? "border-white/50" : "border-foreground/25")}
+        style={swatch ? { background: swatch } : undefined}
+        title={color ? `${prettyColorName(color)} — no photo of this blank` : "No photo of this blank"}
+      >
+        {art ? <ArtLayer art={art} pos={pos} /> : swatch ? (
+          // The colour IS the message; a caption over it would only obscure the thing it
+          // describes. The name is in the tooltip, and the dashes carry "stand-in".
+          null
+        ) : (
+          <span className="grid place-items-center gap-1 p-1">
+            <Package size={15} />
+            <span className="text-[9px] font-medium leading-tight">{color ? prettyColorName(color) : "No blank photo"}</span>
+          </span>
+        )}
       </span>
     )
   }
