@@ -149,7 +149,7 @@ export default function ProductDetailPage() {
                  moment you opened the product — the same photo, cropped two ways, one click
                  apart. Only the hero: the thumbnail strip is an index of what is available
                  and wants the whole picture in each tile. */
-              <Image src={gallery[active] ?? gallery[0]} alt={product.name ?? "Product"} fill unoptimized className="object-cover" style={framingStyle(product)} />
+              <Image src={gallery[active] ?? gallery[0]} alt={product.name ?? "Product"} fill unoptimized className="object-contain" style={framingStyle(product)} />
             ) : (
               <div className="flex size-full items-center justify-center bg-gradient-to-br from-violet-100 to-indigo-50 text-violet-500">
                 <span className="font-title text-6xl font-semibold">

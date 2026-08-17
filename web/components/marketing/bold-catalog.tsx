@@ -163,7 +163,7 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
                 fill
                 unoptimized
                 sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw"
-                className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                className="object-contain transition-transform duration-300 group-hover:scale-[1.03]"
               />
             </div>
           ) : (

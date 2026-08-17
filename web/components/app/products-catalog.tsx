@@ -355,7 +355,7 @@ export function ProductsCatalog() {
                         alt={p.name ?? "Product"}
                         fill
                         unoptimized
-                        className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                        className="object-contain transition-transform duration-300 group-hover:scale-[1.04]"
                       />
                     </div>
                   ) : (

@@ -739,22 +739,27 @@ export function ProductEditorDialog({
                 purely where it's uploaded and how it's shown. */}
             <div className="shrink-0 space-y-1.5">
             <div
-              className="relative flex size-28 items-center justify-center overflow-hidden rounded-xl border border-border bg-white"
+              className="relative flex size-44 items-center justify-center overflow-hidden rounded-xl border border-border bg-white"
               title={img ? "The main image, chosen in Images below" : "No image yet — add one in Images below"}
             >
               {img ? (
                 /**
                  * FRAMED THE WAY THE CARD WILL FRAME IT.
                  *
-                 * object-contain here and object-cover on the card meant this preview could
-                 * never show the problem it exists to solve. Same fit, same zoom, same focal
-                 * point — so what you set is what the grid shows.
+                 * Same FIT, same zoom, same focal point as the grid, or this preview cannot
+                 * show the thing it exists to show. That fit is object-CONTAIN everywhere now:
+                 * a square well cropped a third off a 4:3 cap and a third off a 2:3 portrait,
+                 * so the sourcing tile showed a whole cap and the product's own avatar showed
+                 * a slice of one — the same photograph, two answers, which is what made no
+                 * sense. The supplier tile settled this first (supplier-product-card: "CONTAIN,
+                 * always"); the product surfaces just never followed. The white the picture
+                 * sits in is the same white it was shot on, so nothing letterboxes visibly.
                  */
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={img}
                   alt=""
-                  className="size-full object-cover"
+                  className="size-full object-contain"
                   // The SAME function every other surface frames with (lib/product-framing),
                   // so "what you set is what the grid shows" stays true of the product page
                   // and the public catalogue too — which it was not.

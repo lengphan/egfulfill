@@ -156,7 +156,7 @@ export function BoldProduct({ product, shipping }: {
                     unoptimized
                     priority
                     sizes="(max-width:1024px) 100vw, 60vw"
-                    className="object-cover"
+                    className="object-contain"
                     /* The crop set in the product editor. The public pages were the last
                        surface still ignoring it, so a product framed for the app arrived
                        here uncropped — see lib/product-framing. */
