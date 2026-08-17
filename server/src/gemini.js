@@ -191,8 +191,16 @@ export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, mo
     r = await fetch(API_URL, { method: 'POST', headers, body });
     if (r.ok) break;
     detail = await r.text().catch(() => '');
-    // 429 rate limit / 503 overloaded / 500 are transient; 4xx auth or quota are not.
-    if ((r.status === 429 || r.status === 503 || r.status === 500) && attempt < 2) {
+    /*
+     * 429 covers two opposite things. A real rate limit is transient and worth a backoff.
+     * But a key with no billing attached ALSO 429s — "limit: 0" on a free_tier metric,
+     * because the image models have no free tier at all — and that is a permanent account
+     * state. Google even sends "Please retry in 18.3s" with it, which is misleading: zero
+     * does not become one after a wait. Retrying it just makes the user stare at a spinner
+     * for an extra 2.4s before reading the same message.
+     */
+    const permanent = /limit:\s*0|free_tier|billing/i.test(detail);
+    if (!permanent && (r.status === 429 || r.status === 503 || r.status === 500) && attempt < 2) {
       await sleep(800 * (attempt + 1));
       continue;
     }
@@ -208,6 +216,13 @@ export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, mo
     meter(false);
     let reason = '';
     try { const j = JSON.parse(detail); reason = (j && j.error && (j.error.message || j.error.status)) || ''; } catch { /* non-JSON */ }
+    // Google's quota text is ~500 characters of metric names and two doc links, and the
+    // ONE actionable fact — the project has no billing — is never stated outright. Say it,
+    // and keep the original underneath rather than swallowing it.
+    if (/limit:\s*0|free_tier/i.test(detail)) {
+      const e = new Error('Image AI: this Google key has no billing enabled, and the image models have no free tier (the quota is literally 0). Link a billing account to the key\'s Google Cloud project, then try again — the same key will work.');
+      e.status = 402; e.detail = detail; throw e;
+    }
     const e = new Error(reason ? `Image AI: ${reason}` : `Image service error (HTTP ${r.status})`);
     e.status = 502; e.detail = detail; throw e;
   }
