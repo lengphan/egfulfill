@@ -130,11 +130,27 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
   };
 
   const publicImage = (d) => {
-    const cands = [d.img, d.image, d.hero, Array.isArray(d.images) ? d.images[0] : null,
-      d.colorImages && typeof d.colorImages === 'object' ? Object.values(d.colorImages)[0] : null];
+    /**
+     * A PRINT OUTLINE IS NOT A PRODUCT PHOTO.
+     *
+     * `side_mockups` holds line drawings of a blank — positioning aids for the Design
+     * Maker. One product's main image IS its outline, so the public catalogue was showing
+     * a wireframe cap between two photographs, which reads as a broken image rather than
+     * as a product. The app's own gallery has excluded them since it was written
+     * (galleryOf in app/(app)/products/[id]); the public page never learned the rule.
+     *
+     * Excluded by VALUE, not by field: the same url can sit in `img` and in `side_mockups`,
+     * and it is the second membership that says what it is.
+     */
+    const outlines = new Set(Object.values({ ...(d.side_mockups || {}), ...(d.sideMockups || {}) }).filter(Boolean));
+    const cands = [d.img, d.image, d.hero, ...(Array.isArray(d.images) ? d.images : []),
+      ...(d.colorImages && typeof d.colorImages === 'object' ? Object.values(d.colorImages) : [])];
     for (const c of cands) {
-      if (renderable(c)) return c;
+      if (renderable(c) && !outlines.has(c)) return c;
     }
+    // Everything we hold for this product is an outline. Better the drawing than an empty
+    // tile — but only after every real photograph has been ruled out.
+    for (const c of cands) if (renderable(c)) return c;
     return null;
   };
 
@@ -328,7 +344,22 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       // so the title and the URL can never disagree about what this product is called.
       name: publicName(d.name),
       image: publicImage(d) ? `/api/public/products/${slug}/img` : null,
-      category: typeof d.category === 'string' ? d.category : null,
+      /**
+       * THE CATEGORY IS `type` — the field that is actually filled in.
+       *
+       * This read `d.category`, which NOTHING writes: the product editor sets `type`
+       * (Apparel · Headwear · Bags · Drinkware · Accessories · Other) and there has never
+       * been a category input anywhere. So every one of the 19 published products came out
+       * with `category: null`, the catalogue page grouped them all under "More", and its
+       * grouping threshold (two groups of more than one) was never met — which is why the
+       * public catalogue has no sections, no headings and no way to browse by kind.
+       *
+       * `category` is still read FIRST so a future explicit field wins over the type, and
+       * neither is invented: null stays null and the page keeps its ungrouped layout.
+       */
+      category: typeof d.category === 'string' && d.category.trim()
+        ? d.category.trim()
+        : (typeof d.type === 'string' && d.type.trim() ? d.type.trim() : null),
       // Real prose from the supplier feed, already synced and never published. Capped and
       // tag-stripped: S&S descriptions arrive as messy HTML, and a public page should not
       // be rendering markup we did not author.
@@ -1392,7 +1423,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     if (!ids.length || !isFinite(pct)) { reply.code(400); return { error: 'Send either {id, price} or {ids, markupPct}.' }; }
     if (pct < 0) { reply.code(400); return { error: 'A negative markup would price below cost — set the price explicitly if that is intended.' }; }
 
-    const rows = await q('select id, data from catalog_products where id = any($1::text[])', [ids])
+    const rows = await q('select id, data, base_price from catalog_products where id = any($1::text[])', [ids])
       .then((r) => r.rows).catch(() => []);
     let priced = 0;
     const noCost = [];
@@ -1409,20 +1440,32 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
      * below their own cost. Rounding a little margin onto the small sizes is the
      * survivable direction of that error.
      */
-    const costOf = (d) => {
-      const tiers = Array.isArray(d.sizePrices) ? d.sizePrices : [];
-      const tierCosts = tiers.map((t) => Number(t && t.cost)).filter((n) => isFinite(n) && n > 0);
-      if (tierCosts.length) return Math.max(...tierCosts);
-      const flat = Number(d.productCost ?? d.product_cost);
-      return isFinite(flat) && flat > 0 ? flat : null;
-    };
+    /**
+     * OVER OUR BASE COST, NOT OVER THE SUPPLIER'S INVOICE.
+     *
+     * This read sizePrices[].cost and productCost — the price we PAY S&S — and multiplied it
+     * by the markup. So "cost + 5%" printed $2.27 in a partner-facing lookbook beside a blank
+     * we buy at $2.16, and anyone holding the sheet could divide by 1.05 and read our supplier
+     * cost. §2.9 broken by arithmetic rather than by a field name. It also meant 5% was not a
+     * 5% margin on anything a seller pays — two very different numbers wearing one label.
+     *
+     * sellerBaseCostOf is the SAME ladder pricing.js charges a seller on, imported rather than
+     * copied (§5). Supplier cost still reaches it, but only through base_markup — which puts
+     * the invoice two markups away from the printed page instead of one, and covers products
+     * synced from a supplier automatically: they arrive with productCost alone, and the ladder
+     * turns that into a base before anything can be derived from it.
+     */
+    const fees = await feeSettings().catch(() => ({}));
+    const costOf = (d, row) => sellerBaseCostOf({ data: d, base_price: row && row.base_price }, fees);
 
     for (const row of rows) {
       const d = row.data || {};
-      const cost = costOf(d);
+      const cost = costOf(d, row);
       // A product with no recorded cost anywhere cannot be marked up, and guessing one
       // would put a made-up number in front of a buyer. Reported back, not skipped in
       // silence.
+      // No base cost anywhere means nothing to mark up — and falling back to what we PAY
+      // would put our supplier price on a partner's sheet, which is the whole bug above.
       if (cost == null) { noCost.push(row.id); continue; }
       const price = Math.round(cost * (1 + pct / 100) * 100) / 100;
       await q('update catalog_products set catalog_price=$2 where id=$1', [row.id, price]).catch(() => {});

@@ -183,6 +183,38 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
     )
   }, [all, sel])
 
+  /**
+   * BROWSE BY KIND, before any filtering — the row every print-on-demand catalogue opens
+   * with, and the thing this page had no equivalent of.
+   *
+   * The filter rail answers "narrow this down"; it does not answer "what do you make?",
+   * which is the question a first-time visitor arrives with. A rail of chips is also a
+   * control you have to read before the products start, so the page opened on its own
+   * furniture and a long scroll of unlabelled cards.
+   *
+   * BUILT FROM THE CATALOGUE, never a hardcoded list of kinds we wish we sold: a tile
+   * exists because products in it exist, it carries one of their real photographs, and it
+   * says how many there are. A category we stop stocking disappears on its own.
+   *
+   * Clicking one IS the category filter — the same `sel` the rail writes, so the two can
+   * never disagree about what is selected, and a tile shows as active when it is on.
+   */
+  const kinds = useMemo(() => {
+    const by = new Map<string, { name: string; count: number; image: string | null }>()
+    for (const p of all) {
+      const name = p.category?.trim()
+      if (!name) continue
+      const cur = by.get(name) ?? { name, count: 0, image: null }
+      cur.count++
+      if (!cur.image && p.image) cur.image = p.image
+      by.set(name, cur)
+    }
+    // Two is the floor, for the same reason the facets have one: a single tile is not a
+    // choice. Biggest first — the kind we make most of is the one worth leading with.
+    const out = [...by.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    return out.length >= 2 ? out : []
+  }, [all])
+
   const activeCount = (Object.keys(sel) as FacetKey[]).reduce((n, k) => n + sel[k].length, 0)
   const toggle = (key: FacetKey, value: string) =>
     setSel((s) => ({
@@ -219,6 +251,61 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
           legibility. The hero above keeps the narrower measure every other marketing page
           uses, because that IS read. Widening both would have made the headline worse to
           make the grid better. */}
+      {/* THE BROWSE ROW. Above the filters and above the grid, because it answers the
+          question that comes first. Scrolls sideways on a phone rather than wrapping to
+          three ragged rows — a category strip is read across, like the shelf it stands
+          for. */}
+      {!failed && kinds.length > 0 && (
+        <section className="mx-auto max-w-[88rem] px-6 pt-14">
+          <h2 className="text-[22px] font-bold tracking-tight">What we print on</h2>
+          <p className="mt-1 text-[15px] text-black/55">
+            {all.length} product{all.length === 1 ? "" : "s"} you can order today. Pick a kind to narrow the list.
+          </p>
+          <div className="-mx-6 mt-6 flex snap-x gap-4 overflow-x-auto px-6 pb-2 sm:mx-0 sm:px-0">
+            {kinds.map((k) => {
+              const on = sel.category.includes(k.name)
+              return (
+                <button
+                  key={k.name}
+                  type="button"
+                  onClick={() => toggle("category", k.name)}
+                  aria-pressed={on}
+                  className={
+                    "group w-40 shrink-0 snap-start overflow-hidden rounded-2xl border bg-white text-left transition-colors sm:w-44 " +
+                    (on ? "border-[#0B0B0C]" : "border-black/[0.09] hover:border-black/40")
+                  }
+                >
+                  <div className="relative aspect-square overflow-hidden" style={{ background: ACCENT }}>
+                    {k.image ? (
+                      <Image
+                        src={k.image}
+                        alt=""
+                        fill
+                        unoptimized
+                        sizes="176px"
+                        className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center text-[#FAF8F3]/45">
+                        <TShirt size={32} weight="duotone" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="px-3.5 py-3">
+                    <div className="text-[15px] font-bold tracking-tight">{k.name}</div>
+                    {/* The count is the point of a tile over a chip: it says how deep the
+                        shelf is before you open it. */}
+                    <div className="mt-0.5 text-[13px] text-black/55">
+                      {k.count} product{k.count === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       <section className="mx-auto max-w-[88rem] px-6 py-16">
         {failed ? (
           <Rise className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
