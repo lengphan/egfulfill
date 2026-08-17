@@ -4,6 +4,7 @@ import { Geist_Mono, Inter, Playfair_Display } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { LanguageProvider } from "@/lib/i18n"
+import { SITE_URL } from "@/lib/site-url"
 import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
@@ -43,6 +44,9 @@ const fontMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
+  // Makes every relative canonical/OG URL resolve against the app's own host rather than
+  // localhost. Without it Next warns at build and social cards point nowhere.
+  metadataBase: new URL(SITE_URL),
   title: { default: "EGFUL", template: "%s · EGFUL" },
   // Search Console URL-prefix property for app.egful.store. The DNS method can't be used:
   // app.egful.store is a CNAME to Vercel, so a TXT record at that name is never resolvable.
