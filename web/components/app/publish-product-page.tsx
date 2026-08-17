@@ -319,13 +319,17 @@ function OutcomeLine({ dest, outcome, sameForAll }: { dest: PublishDestination; 
    * shop reports the same thing, which is the usual run: three rows all saying "Draft listing
    * created" is one fact printed three times. A row only carries its own words when it
    * DIFFERS — a dry run or a refusal among successes — which is precisely when you want them.
+   *
+   * text-sm, not text-xs, and a bigger mark: this is the LAST thing the dialog says — the
+   * confirmation you read before closing it — and it was set smaller than the form fields
+   * above it.
    */
   return (
-    <div className="grid grid-cols-[0.9rem_minmax(0,1fr)_auto] items-baseline gap-x-3 py-1.5 text-xs">
+    <div className="grid grid-cols-[1.1rem_minmax(0,1fr)_auto] items-baseline gap-x-3 py-2 text-sm">
       <span className="flex translate-y-px items-center justify-center">
         {mark
-          ? <mark.Icon size={13} weight={mark.weight} className={mark.cls} />
-          : <CircleNotch size={12} className="animate-spin text-muted-foreground" />}
+          ? <mark.Icon size={16} weight={mark.weight} className={mark.cls} />
+          : <CircleNotch size={14} className="animate-spin text-muted-foreground" />}
       </span>
       <span className="min-w-0 truncate" title={[dest.shop_name, dest.platform_label].filter(Boolean).join(" · ")}>
         <span className="font-medium">{dest.shop_name}</span>
@@ -1196,7 +1200,12 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               const same = texts.length === pickedDests.length && new Set(texts).size === 1
               return (
                 <>
-                  {same && <div className="-mt-1 text-xs text-muted-foreground">{texts[0]}</div>}
+                  {/* "Draft listing created" is gone. The tick already says it — a green
+                      check beside a shop name is not ambiguous about what happened, and
+                      spelling it out underneath was the same fact a third time (the heading
+                      above says it too). Only a row that DIFFERS still carries words, which
+                      is the case where you actually need them: a dry run, or a refusal among
+                      successes. */}
                   <div className="w-full max-w-sm divide-y divide-border/60 px-6 text-left">
                     {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} sameForAll={same} />)}
                   </div>
