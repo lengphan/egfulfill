@@ -14,7 +14,7 @@
 //     Ordering against it would under-order every time. What matters is in_stock
 //     minus everything already promised to unshipped orders.
 import { q } from './db.js';
-import { catalogIndex, resolveStockSku } from './pricing.js';
+import { catalogIndex, resolveStockSku, matchProduct } from './pricing.js';
 import { variantSku } from './variant-sku.js';
 
 const AUTO_PO = (supplier) => 'PO-AUTO-' + String(supplier || 'UNASSIGNED').toUpperCase().replace(/[^A-Z0-9]+/g, '-').slice(0, 24);
@@ -138,13 +138,33 @@ export async function autoReplenish(orderId) {
 
   const need = new Map();          // stock key -> total units
   const byVariant = new Map();     // stock key -> Map(variant -> units)
-  const keyOf = new Map();         // stock key -> the product sku it belongs to (for reporting)
+  /**
+   * WHAT THIS LINE IS, for the person who has to buy it.
+   *
+   * A parked row carried a sku and nothing else, so the cart showed "EG-1009-2XL-BLACK"
+   * over an empty tile — a string to look up, next to hand-picked lines that show the
+   * garment. The name and the colourway's own photo are already in the catalogue row this
+   * line resolved through; they just were not being carried across.
+   *
+   * The COLOUR's image where there is one: on a cart that is mostly caps and tees, the
+   * thing that tells two rows apart is which colourway, and that is the shot for it.
+   */
+  const shownAs = new Map();       // stock key -> { name, image }
   for (const r of lines) {
     const sku = stockKeyOf(idx, r, known);
     if (!sku) continue;
     const qty = Number(r.qty) || 1;
     need.set(sku, (need.get(sku) || 0) + qty);
-    keyOf.set(sku, blankOf(idx, r));
+    if (!shownAs.has(sku)) {
+      const row = matchProduct(idx, r);
+      const d = (row && row.data) || {};
+      const ci = d.colorImages || {};
+      const colour = String(r.color || '').trim();
+      const exact = colour && Object.keys(ci).find((k) => k.toLowerCase() === colour.toLowerCase());
+      const image = (exact && ci[exact]) || d.img || d.image || d.hero
+        || (Array.isArray(d.images) ? d.images.find(Boolean) : '') || Object.values(ci).find(Boolean) || '';
+      shownAs.set(sku, { name: d.name || row?.name || '', image: image || '' });
+    }
     if (!byVariant.has(sku)) byVariant.set(sku, new Map());
     const v = byVariant.get(sku);
     const key = variantOf(r);
@@ -266,8 +286,15 @@ export async function autoReplenish(orderId) {
         if (seen.some((x) => String(x.order) === String(orderId))) continue;   // idempotent
         hit.qty = (Number(hit.qty) || 0) + it.qty;
         hit.sources = [...seen, src];
+        // Fill in what an older parked row is missing, never overwrite what it has: a line
+        // somebody renamed or re-imaged in the cart keeps their version.
+        const shown = shownAs.get(it.sku) || {};
+        if (!hit.name && shown.name) hit.name = shown.name;
+        if (!hit.image && shown.image) hit.image = shown.image;
       } else {
-        list.push({ sku: it.sku, variant: it.variant || '', qty: it.qty, price: 0, supplier,
+        const shown = shownAs.get(it.sku) || {};
+        list.push({ sku: it.sku, name: shown.name || undefined, image: shown.image || undefined,
+                    variant: it.variant || '', qty: it.qty, price: 0, supplier,
                     auto: true, sources: [src], savedAt: new Date().toISOString() });
       }
       ordered.push({ sku: it.sku, variant: it.variant || '', qty: it.qty, supplier,

@@ -83,7 +83,10 @@ export async function catalogIndex() {
 // (1) is what makes a marketplace order priceable once its variants are chosen; (2) is
 // what makes a listing published FROM our catalog price itself with no picking at all,
 // because its variant SKU is already ours.
-function matchProduct(idx, item) {
+/** Exported so replenishment can put the product's NAME and its colourway PHOTO on a parked
+ *  line. A cart row that reads "EG-1009-2XL-BLACK" with an empty tile is a sku, not a thing
+ *  somebody can recognise before spending money on it. */
+export function matchProduct(idx, item) {
   const blank = String(item.blank || '').trim();
   if (blank) {
     const want = blank.toLowerCase();

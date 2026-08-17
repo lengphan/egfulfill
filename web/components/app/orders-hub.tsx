@@ -79,7 +79,6 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
   onTrack?: (sku: string) => void
 }) {
   if (!show) return null
-  const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium"
   /**
    * THE KEY THE SHELF IS ACTUALLY UNDER — stockSkuOf, not a private re-derivation.
    *
@@ -120,7 +119,7 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onTrack(blankSku) }}
-        className={pill + " border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"}
+        className="font-medium text-primary underline decoration-dotted underline-offset-2 hover:no-underline"
         title={`${blankSku} has no inventory row yet — click to add it`}
       >
         Add to inventory
@@ -149,22 +148,32 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
    *   Stock: 40    purple  enough
    */
   const none = have <= 0
+  /**
+   * A DETAIL, IN THE SAME SHAPE AS THE DETAILS BESIDE IT.
+   *
+   * This was a tinted pill sitting on a line that reads "Listing SKU: LA10-POCKET · Qty 1" —
+   * a badge among labels, which made a number you glance at look like a status you have to
+   * act on. It is "Stock: 0" now, label and value exactly like Qty, and only the VALUE
+   * carries the colour: red at nothing, amber when there is some but not enough, plain when
+   * the shelf covers the line. The tone is the alarm; the format is the row's.
+   */
   return (
     <span
-      // Same tones as the Stock chip that summarises these lines, dark step included — the
-      // per-line detail and the row pill are one statement seen at two zoom levels.
-      className={pill + " " + (none
-        ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
-        : enough
-          ? "bg-primary/10 text-primary"
-          : "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300")}
       title={none
         ? `None of ${blankSku} on the shelf — this line needs ${need}${poNum ? ` — on PO ${poNum}` : ""}`
         : enough
           ? `${have} of ${blankSku} on the shelf — this line needs ${need}`
           : `Only ${have} of ${blankSku} in stock, this line needs ${need}${poNum ? ` — on PO ${poNum}` : ""}`}
     >
-      {none ? "0" : `Stock: ${have}`}{poNum ? ` · ${poNum}` : ""}
+      <span className="font-medium text-foreground/70">Stock:</span>{" "}
+      <span className={none
+        ? "font-semibold text-red-600 dark:text-red-400"
+        : enough
+          ? "text-foreground"
+          : "font-semibold text-amber-700 dark:text-amber-400"}>
+        {have}
+      </span>
+      {poNum ? <span className="text-muted-foreground"> · {poNum}</span> : null}
     </span>
   )
 }
