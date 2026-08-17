@@ -9,7 +9,8 @@ import {
   getCatalogProducts, setCatalogSelection, setCatalogPrice, applyCatalogMarkup,
   catalogExportUrl, type CatalogProduct,
 } from "@/lib/api"
-import { CatalogPrint, PLATE } from "@/components/app/catalog-print"
+import { CatalogPrint } from "@/components/app/catalog-print"
+import { ProductThumb } from "@/components/app/product-thumb"
 import { SupplierStylesPicker } from "@/components/app/supplier-styles-picker"
 import { CatalogExportHistory } from "@/components/app/catalog-export-history"
 import { CatalogSummaryBar } from "@/components/app/catalog-summary-bar"
@@ -260,18 +261,15 @@ export function CatalogView() {
                           {/* 56px was smaller than the row of colour chips beside it, on the
                               screen where you decide which products go in a printed catalogue
                               — a choice made by eye, from a thumbnail too small to see the
-                              garment in. 96px, on the same warm plate the lookbook uses,
-                              because these are the same cut-out-on-white supplier photos and
-                              a white shirt on a white tile has no edges. */}
-                          <div className="size-24 shrink-0 overflow-hidden rounded-lg border border-border p-1"
-                               style={{ background: PLATE }}>
-                            {imageOf(p) ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={imageOf(p)} alt="" className="size-full object-contain" />
-                            ) : (
-                              <div className="flex size-full items-center justify-center text-3xs text-muted-foreground">no image</div>
-                            )}
-                          </div>
+                              garment in. 96px now.
+                              WHITE, not the lookbook's plate. These are cut-out-on-white
+                              photos, so a white tile lets the garment sit on the card with no
+                              visible box around it — and the edge this needs is already there
+                              in the border. The printed lookbook keeps its grey precisely
+                              because those wells have no border, so white there would leave a
+                              white shirt with nothing to define it. Same photographs, two
+                              surfaces, and the plate is only load-bearing on one. */}
+                          <ProductThumb src={imageOf(p)} alt={p.name || id} />
                           <div className="min-w-0">
                             <div className="max-w-[20rem] truncate font-medium">{p.name || id}</div>
                             <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">

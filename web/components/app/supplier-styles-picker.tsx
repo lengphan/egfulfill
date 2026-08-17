@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning, MagnifyingGlass, Percent, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ProductThumb } from "@/components/app/product-thumb"
 import { getSupplierStyles, setCatalogPicks, priceCatalogPicks, type SupplierStyle } from "@/lib/api"
 
 const money = (n: number | string | null | undefined) =>
@@ -182,14 +183,7 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
                     </td>
                     <td className="px-2 py-2">
                       <div className="flex items-start gap-3">
-                        <div className="size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
-                          {st.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={st.image} alt="" className="size-full object-contain" />
-                          ) : (
-                            <div className="flex size-full items-center justify-center text-3xs text-muted-foreground">no image</div>
-                          )}
-                        </div>
+                        <ProductThumb src={st.image} alt={st.name || st.ref} />
                         <div className="min-w-0">
                           <div className="max-w-[22rem] truncate font-medium">{st.name || st.ref}</div>
                           <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
