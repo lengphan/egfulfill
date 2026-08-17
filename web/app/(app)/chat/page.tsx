@@ -8,6 +8,7 @@ import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportTh
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
+import { ImageGenButton } from "@/components/app/image-gen"
 
 const nowMs = () => Date.now()
 const fmtTime = (ts?: number) => {
@@ -745,6 +746,17 @@ export default function ChatPage() {
               {drafting ? <CircleNotch size={14} className="animate-spin" /> : <Sparkle size={14} />}
               Draft with AI
             </Button>
+          )}
+          {/* Generate an image — STAFF ONLY, and only in the staffer's own "My EG" channel.
+              Each render bills Google, so it is not offered on a seller thread, a factory
+              room or an inbox conversation; the server enforces the same two rules. */}
+          {isStaffUser && activeId === supportId && (
+            <ImageGenButton
+              disabled={signedOut || !activeId}
+              // The server already posted it into this thread — just pull the thread again
+              // so it lands as a normal message rather than a second, client-only bubble.
+              onGenerated={() => { void load() }}
+            />
           )}
           {/* Attach a file (images downsized before upload) */}
           <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />

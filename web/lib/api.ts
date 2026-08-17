@@ -2299,6 +2299,33 @@ export function deskAiReply() {
     body: "{}",
   })
 }
+// ── Image generation (Nano Banana), STAFF ONLY, in the staffer's own "My EG" channel ──
+// Every render is real money at Google, so this is deliberately not a seller-facing
+// feature: the server gates it with requireStaff and always posts into the CALLER'S own
+// thread — there is no thread parameter to point somewhere else.
+export type ImageGenModel = {
+  id: string; label: string; note: string
+  sizes: string[]; defaultSize: string
+  /** Per-image USD at the standard tier, keyed by size. */
+  usd: Record<string, number>
+}
+export type DeskImageConfig = {
+  enabled: boolean
+  /** Told apart so the UI can name WHICH half is missing rather than "unavailable". */
+  keySet: boolean; storageReady: boolean
+  model: string; models: ImageGenModel[]
+  ratios: string[]; ratioHints: Record<string, string>
+}
+export function getDeskImageConfig() {
+  return api<DeskImageConfig>(`/api/desk/image/config`)
+}
+/** Generates, stores, and posts the image into the caller's own assistant thread.
+ *  Returns `ok:false` with a reason rather than throwing, same as the other AI calls. */
+export function generateDeskImage(body: { prompt: string; aspectRatio?: string; imageSize?: string; model?: string }) {
+  return api<{ ok?: boolean; attachment?: ChatAttachment; model?: string; size?: string; aspectRatio?: string; usd?: number; disabled?: boolean; error?: string }>(
+    `/api/desk/image`, { method: "POST", body: JSON.stringify(body) })
+}
+
 // Staff support inbox: every seller support thread + an AI-drafted reply (not posted).
 // `escalated` = the seller asked for a human and no staffer has replied since.
 export type SupportThread = { order_id: string; seller_id: string; seller_name: string | null; last: string; last_at: number; n: number; escalated?: boolean }

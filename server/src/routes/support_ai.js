@@ -12,6 +12,9 @@
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
+import { egBroadcast } from '../events.js';
+import { putObject, storageEnabled } from '../storage.js';
+import { generateImage, imageConfig, priceUsd, IMAGE_MODELS, ASPECT_RATIOS, RATIO_HINTS } from '../gemini.js';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
@@ -597,5 +600,129 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
        values ($1,$2,$3,$4,$5,$6) on conflict (client_id) where client_id is not null do nothing`,
       [threadId, null, 'assistant', text, JSON.stringify(meta), clientId]);
     return { ok: true, reply: text };
+  });
+
+  // ── Image generation, STAFF ONLY, in the staffer's own "My EG" assistant channel ──
+  //
+  // Factory-only on purpose. Every render is real money at Google (~7–13c), so this is not
+  // a seller-facing feature that could be looped by anyone with an account — it is a tool on
+  // the factory's own desk, gated by requireStaff and hard-scoped to the CALLER'S OWN thread.
+  //
+  // The thread id is derived from the JWT and never accepted from the body: there is no
+  // parameter here that could aim a billable call at somebody else's channel.
+
+  // What the composer needs to draw its picker — and whether the feature is on at all.
+  app.get('/api/desk/image/config', { preHandler: requireStaff }, async () => {
+    const cfg = await imageConfig();
+    return {
+      enabled: !!cfg.key && storageEnabled(),
+      // Told apart so the UI can say WHICH half is missing rather than "unavailable".
+      keySet: !!cfg.key,
+      storageReady: storageEnabled(),
+      model: cfg.model,
+      models: IMAGE_MODELS,
+      ratios: ASPECT_RATIOS,
+      ratioHints: RATIO_HINTS,
+    };
+  });
+
+  app.post('/api/desk/image', { preHandler: requireStaff }, async (req, reply) => {
+    if (!storageEnabled()) { reply.code(503); return { error: 'File storage is not configured, so a generated image could not be kept.' }; }
+    const b = req.body || {};
+    const prompt = String(b.prompt || '').trim();
+    if (!prompt) { reply.code(400); return { error: 'Describe the image you want.' }; }
+    if (prompt.length > 4000) { reply.code(400); return { error: 'That prompt is too long (max 4000 characters).' }; }
+
+    // The caller's OWN assistant channel — same thread "My EG" already reads.
+    const threadId = 'support-' + req.user.sub;
+
+    let img;
+    try {
+      img = await generateImage({ prompt, aspectRatio: b.aspectRatio, imageSize: b.imageSize, model: b.model });
+    } catch (e) {
+      // 200 with a reason, not a 5xx — the chat client renders `error`, and a throw here
+      // showed up as a dead spinner with nothing said, which is how the assistant's other
+      // no-op paths became undiagnosable.
+      req.log?.warn?.({ err: String(e), detail: e.detail }, 'desk-image generation failed');
+      return { ok: false, disabled: !!e.disabled, error: e.message || 'Image generation failed' };
+    }
+
+    // Store PRIVATE and hand back a same-origin proxy URL, exactly like a chat upload:
+    // it loads in an <img> without a public bucket, and it is only reachable via the
+    // unguessable key it is posted into the thread with.
+    const ext = img.mime === 'image/jpeg' ? 'jpg' : img.mime === 'image/webp' ? 'webp' : 'png';
+    const name = `img-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+    try {
+      await putObject(`chat/${name}`, img.buffer, img.mime, 'private');
+    } catch (e) {
+      req.log?.error?.({ err: String(e) }, 'desk-image storage failed');
+      // The money was already spent at Google — say so plainly rather than implying a retry is free.
+      return { ok: false, error: 'The image was generated but could not be saved: ' + ((e && e.message) || 'storage error') };
+    }
+    const base = (process.env.PUBLIC_API_ORIGIN || 'https://egful.store').replace(/\/+$/, '');
+    const attachment = { url: `${base}/api/support/asset/${name}`, name: prompt.slice(0, 80), mime: img.mime, size: img.buffer.length };
+
+    const clientId = 'img-' + crypto.randomBytes(8).toString('hex');
+    const meta = { by: 'EGFUL Assistant', ai: true, image: true, ts: Date.now(), model: img.model, size: img.size, aspect: img.aspectRatio, usd: img.usd };
+    await q(
+      `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
+       values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) where client_id is not null do nothing`,
+      [threadId, null, 'assistant', prompt, attachment, JSON.stringify(meta), clientId]);
+    egBroadcast({ type: 'order-message' });
+
+    return { ok: true, attachment, model: img.model, size: img.size, aspectRatio: img.aspectRatio, usd: img.usd };
+  });
+
+  // ── Admin config for the image key (Settings › Integrations), mirroring ai-config ──
+  app.get('/api/admin/image-ai-config', { preHandler: requireStaff }, async (req) => {
+    const cfg = await imageConfig();
+    return {
+      keySet: !!cfg.key,
+      last4: cfg.key ? cfg.key.slice(-4) : null,
+      masked: maskKey(cfg.key, req.user?.role === 'admin'),
+      fromEnv: cfg.fromEnv,
+      model: cfg.model,
+      staleModel: cfg.staleModel || null,
+      models: IMAGE_MODELS,
+      storageReady: storageEnabled(),
+    };
+  });
+
+  app.put('/api/admin/image-ai-config', { preHandler: requireStaff }, async (req, reply) => {
+    if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only' }; }
+    const b = req.body || {};
+    await ensureSettings();
+    if (b.clearKey) {
+      await q("delete from settings where key='image_ai_key'");
+    } else if (typeof b.key === 'string' && b.key.trim()) {
+      await q("insert into settings (key,value,updated_at) values ('image_ai_key', to_jsonb($1::text), now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [b.key.trim()]);
+    }
+    if (typeof b.model === 'string' && b.model.trim()) {
+      if (!IMAGE_MODELS.some((m) => m.id === b.model.trim())) { reply.code(400); return { error: 'Unknown model' }; }
+      await q("insert into settings (key,value,updated_at) values ('image_ai_model', to_jsonb($1::text), now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [b.model.trim()]);
+    }
+    const cfg = await imageConfig();
+    return { ok: true, keySet: !!cfg.key, last4: cfg.key ? cfg.key.slice(-4) : null, masked: maskKey(cfg.key, true), fromEnv: cfg.fromEnv, model: cfg.model };
+  });
+
+  // Verify a key BEFORE saving it — one real 1K render on the cheapest model, so the test
+  // costs ~3c rather than a Pro-tier 13c. There is no free ping on an image endpoint.
+  app.post('/api/admin/image-ai-test', { preHandler: requireStaff }, async (req) => {
+    const typed = (req.body && typeof req.body.key === 'string') ? req.body.key.trim() : '';
+    const cfg = await imageConfig();
+    if (!typed && !cfg.key) return { ok: false, error: 'No API key to test — paste one or save it first.' };
+    // A typed key isn't saved yet, so put it on the env for the duration of this one call.
+    const prev = process.env.GEMINI_API_KEY;
+    if (typed) process.env.GEMINI_API_KEY = typed;
+    try {
+      const probe = 'gemini-3.1-flash-lite-image';
+      const img = await generateImage({ prompt: 'A plain grey cotton t-shirt on a white background, product photo.', aspectRatio: '1:1', imageSize: '1K', model: probe });
+      return { ok: true, model: img.model, bytes: img.buffer.length, mime: img.mime, usd: img.usd, costNote: `This test cost about $${priceUsd(probe, '1K').toFixed(4)}.` };
+    } catch (e) {
+      return { ok: false, error: (e && e.message) || 'Request failed' };
+    } finally {
+      // Restore exactly — including the "was unset" case, which assigning '' would not.
+      if (typed) { if (prev === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = prev; }
+    }
   });
 }
