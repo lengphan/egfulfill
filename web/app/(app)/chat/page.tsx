@@ -765,19 +765,19 @@ export default function ChatPage() {
         )}
 
         {/* messages */}
+        {/* The drop overlay must sit OUTSIDE the scrolling element: as a child it is
+            positioned against the scroll CONTENT, so it slides away the moment the thread is
+            scrolled. This wrapper doesn't scroll, so the overlay stays over what you can see.
+            Drag handlers live here too, covering the whole reading area rather than the strip
+            of it that happens to be in view. */}
         <div
-          ref={scrollRef}
-          className={"relative min-h-0 flex-1 space-y-3 overflow-y-auto p-5 " + (dragging ? "ring-2 ring-inset ring-primary/50" : "")}
+          className="relative min-h-0 flex-1"
           onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; if (e.dataTransfer.types?.includes("Files")) setDragging(true) }}
           onDragOver={(e) => e.preventDefault()}
           onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
           onDrop={onDrop}
         >
-          {dragging && (
-            <div className="pointer-events-none sticky top-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/50 bg-primary/5 py-6 text-sm font-medium text-primary">
-              Drop to attach{gen ? " as a reference" : ""}
-            </div>
-          )}
+          <div ref={scrollRef} className="h-full space-y-3 overflow-y-auto p-5">
           {signedOut ? (
             <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Sign in to chat.</div>
           ) : messages === null ? (
@@ -937,6 +937,25 @@ export default function ChatPage() {
                 </div>
               )}
             </>
+          )}
+          </div>
+
+          {/* Opaque, not tinted. A translucent wash over live messages read as a glitch —
+              the thread was still legible underneath and the dashed box looked like it had
+              landed on top of a conversation. Covering it outright makes the target the only
+              thing on screen, which is the whole job of a drop zone.
+              pointer-events-none on purpose: the overlay must not generate its own
+              dragenter/dragleave, or the depth counter it depends on never returns to zero. */}
+          {dragging && (
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-background p-6">
+              <div className="flex w-full max-w-sm flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/40 px-8 py-12 text-center">
+                <Paperclip size={24} weight="duotone" className="text-primary" />
+                <span className="text-sm font-medium text-foreground">Drop to attach</span>
+                <span className="text-xs text-muted-foreground">
+                  {gen?.mode === "image" ? "It goes in as a reference for the image" : "Image or PDF, up to 25MB"}
+                </span>
+              </div>
+            </div>
           )}
         </div>
 
