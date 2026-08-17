@@ -29,6 +29,16 @@ const MAP: Record<string, string> = {
   sapphire: "#0f52ba", heliconia: "#e0218a", "jade dome": "#00a170", tangerine: "#f28500",
   blackberry: "#4d2d52", "prairie dust": "#c6b79b", "dark chocolate": "#3f2a1d",
   petrol: "#3e6b77",
+  // Comfort Colors' garment-dyed names, which is what a Comfort Colors order line actually
+  // says. None of them were here, so a run of six colourways came back six identical
+  // neutrals — the chips looked deleted rather than unrecognised.
+  //
+  // "blue jean" is listed in its own right even though the substring pass would find "blue":
+  // it is DENIM, and a bright royal-blue dot beside the word is a wrong chip, which this map
+  // treats as worse than no chip at all.
+  espresso: "#4b3621", pepper: "#4a4a48", moss: "#8a8b5c", watermelon: "#f2637f",
+  dusk: "#7a8ba3", "blue jean": "#3b5b7c", "true navy": "#1e293b", butter: "#f3e2a9",
+  yam: "#d98f4e", brick: "#8f3b32", seafoam: "#93e0c6", "light green": "#a8d5a2",
 }
 
 const ABBR: Record<string, string> = {

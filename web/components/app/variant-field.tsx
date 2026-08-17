@@ -2,6 +2,7 @@
 
 import { Check, CaretDown } from "@phosphor-icons/react"
 import { prettyColorName } from "@/lib/color-name"
+import { swatchBg, NEUTRAL_CHIP } from "@/lib/color-swatch"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,16 +12,24 @@ import {
 import { cn } from "@/lib/utils"
 import { useLabelT } from "@/lib/i18n"
 
-// Common garment colour names → a hex dot. Unknown names fall back to neutral; the dot
-// is a hint next to the label, never the only way to tell colours apart.
-const SWATCH: Record<string, string> = {
-  black: "#191918", white: "#f4f2ef", navy: "#25314d", "sport grey": "#b7b7b3", grey: "#9ca3af",
-  gray: "#9ca3af", heather: "#b9b6b0", sand: "#d8cbb4", natural: "#e8e0cf", maroon: "#6d2233",
-  red: "#c0392b", royal: "#2f4bf0", blue: "#3457d5", green: "#3f7d4e", forest: "#2f5540",
-  pink: "#e59bb4", khaki: "#c3b091", gold: "#d4a017", purple: "#6d4aec", "camo green": "#4b5320",
-  charcoal: "#36454f", cream: "#fffdd0", olive: "#708238", tan: "#d2b48c",
-}
-const swatchHex = (name: string) => SWATCH[name.toLowerCase().trim()] ?? "#c7c4bd"
+/**
+ * THE COLOUR DOT — resolved by lib/color-swatch, like every other swatch in the app.
+ *
+ * This file used to carry its own 24-name map with an exact-match lookup, so anything a
+ * supplier actually calls a colour landed on the neutral: Ivory, Rose Quartz, Blue Jean,
+ * Espresso, Dusk, Pepper — a whole Comfort Colors run — came out as six identical grey dots,
+ * which reads as the chips having been removed rather than as six unknown names.
+ *
+ * The shared resolver knows ~100 names, expands supplier abbreviations, strips the numeric
+ * prefixes they ship ("016 - White"), matches longest-substring so "Rose Quartz" finds rose
+ * and "Blue Jean" finds blue, and splits a two-tone name ("Black/ Stone") into a gradient.
+ * It is the same function the catalogue grid, the product page and the public site frame
+ * their chips with — §5: import, don't re-implement.
+ *
+ * NEUTRAL_CHIP is still the answer for a name that places nowhere. A wrong colour chip is
+ * worse than a plain one.
+ */
+const swatchHex = (name: string) => swatchBg(name) ?? NEUTRAL_CHIP
 
 /**
  * One variant control (Blank / Colour / Size / Method).
