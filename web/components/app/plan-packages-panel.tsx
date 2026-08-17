@@ -85,12 +85,12 @@ export function PlanPackagesPanel() {
         ) : (
           <>
             <div className="overflow-hidden rounded-lg border border-border">
-              <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-x-3 border-b border-border bg-muted/40 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-x-3 border-b border-border bg-muted/40 px-3 py-2.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <span>Plan</span><span className="text-right">Per month</span>
               </div>
               <div className="divide-y divide-border">
                 {Object.entries(prices.plans).map(([name, v]) => (
-                  <div key={name} className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-x-3 px-3 py-2">
+                  <div key={name} className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-x-3 px-3 py-2.5">
                     <span className="text-sm font-medium capitalize">{name}</span>
                     <div className="flex items-center justify-end gap-1">
                       <span className="text-sm text-muted-foreground">$</span>
@@ -104,7 +104,7 @@ export function PlanPackagesPanel() {
                     </div>
                   </div>
                 ))}
-                <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-x-3 px-3 py-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-x-3 px-3 py-2.5">
                   <span className="text-sm font-medium">SpyDeck add-on</span>
                   <div className="flex items-center justify-end gap-1">
                     <span className="text-sm text-muted-foreground">$</span>

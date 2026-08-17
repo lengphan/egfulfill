@@ -111,7 +111,7 @@ export function VolumeTiersPanel() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg border border-border">
-              <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_2.25rem] items-center gap-x-3 border-b border-border bg-muted/40 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_2.25rem] items-center gap-x-3 border-b border-border bg-muted/40 px-3 py-2.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <span>Name</span>
                 <span className="text-right">From (units)</span>
                 <span className="text-right">Discount</span>
@@ -119,7 +119,7 @@ export function VolumeTiersPanel() {
               </div>
               <div className="divide-y divide-border">
                 {rows.map((t, i) => (
-                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_2.25rem] items-center gap-x-3 px-3 py-2">
+                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_2.25rem] items-center gap-x-3 px-3 py-2.5">
                     {/* Optional. Blank shows the position as a placeholder, which is what the
                         rung is called until somebody names it — and what every ladder saved
                         before names existed will keep showing. */}

@@ -3326,8 +3326,40 @@ export function SettingsView() {
   const showTeam = isSeller || hasInvites
 
   return (
-    <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-      <TabsList>
+    /**
+      * A LEFT RAIL, not a strip across the top.
+      *
+      * Thirteen tabs wrapped to two rows and pushed every panel down the page — a band of
+      * chrome taller than most of the panels under it, on a screen where each one holds a
+      * handful of fields. A vertical list costs a fixed column instead, and reads as a
+      * contents page: the sections are legible at a glance and the one you are on does not
+      * move when a tab is added.
+      *
+      * BELOW lg it collapses back to the horizontal strip, which is the right shape on a
+      * phone — a 13-item rail there would be the whole screen before any setting.
+      *
+      * `sticky` on the rail, so the list stays put while a long panel (Users, Activity)
+      * scrolls beside it. self-start, or the rail stretches to the panel's height and the
+      * sticky has nothing to do.
+      */
+    <Tabs
+      value={tab}
+      onValueChange={setTab}
+      className="gap-4 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0"
+    >
+      {/* The rail is styled HERE rather than by the primitive's `orientation`, which is a
+          prop and therefore cannot be responsive — group-data-vertical would never fire on a
+          list that has to be a strip on a phone and a column on a laptop. Targeting the
+          children keeps it to this one screen and leaves the shared Tabs untouched. */}
+      <TabsList
+        className={
+          "mb-4 w-full max-w-full flex-row overflow-x-auto " +
+          "lg:sticky lg:top-4 lg:mb-0 lg:h-auto lg:flex-col lg:items-stretch lg:gap-0.5 lg:overflow-visible " +
+          "lg:rounded-2xl lg:border lg:border-border lg:bg-card lg:p-2 " +
+          // Each trigger becomes a full-width, left-aligned row with its own height.
+          "lg:[&>button]:h-auto lg:[&>button]:w-full lg:[&>button]:flex-none lg:[&>button]:justify-start lg:[&>button]:px-3 lg:[&>button]:py-1.5"
+        }
+      >
         <TabsTrigger value="profile"><TabLabel>Profile</TabLabel></TabsTrigger>
         {/* API keys are for building AGAINST the platform — a seller integrating their
             own systems, or an admin. An operator works the floor and has nothing to
@@ -3368,6 +3400,10 @@ export function SettingsView() {
         {isSeller && <TabsTrigger value="plan"><TabLabel>Plan</TabLabel></TabsTrigger>}
       </TabsList>
 
+      {/* One column for every panel, so a tab change swaps the contents rather than the
+          page's shape. min-w-0 because the tables inside scroll horizontally and would
+          otherwise widen the grid track instead of scrolling. */}
+      <div className="min-w-0 space-y-4">
       <TabsContent value="profile">
         <ProfilePanel />
       </TabsContent>
@@ -3464,6 +3500,7 @@ export function SettingsView() {
           </div>
         </TabsContent>
       )}
+      </div>
     </Tabs>
   )
 }
