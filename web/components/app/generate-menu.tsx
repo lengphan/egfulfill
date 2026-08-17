@@ -152,8 +152,11 @@ export function GenerateButton({ disabled, onImage, onVideoStarted }: {
                 <div>
                   <div className="mb-1 text-2xs text-muted-foreground">What are we making?</div>
                   <select value={mode} onChange={(e) => { setMode(e.target.value as Mode); setErr(null) }} disabled={busy} className={selectCls}>
-                    <option value="image">Image — a still</option>
-                    <option value="video">Video — from a description</option>
+                    {/* Just the two words. The trailing glosses ("— a still", "— from a
+                        description") explained what an image and a video are, which the
+                        reader already knew, and made a two-item list look like a decision. */}
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
                   </select>
                 </div>
 
