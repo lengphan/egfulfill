@@ -229,8 +229,6 @@ export function DesignMaker() {
     setImages((prev) => prev.map((im) => (im.id === id ? { ...im, pos: { ...im.pos, ...patch } } : im)))
   const dropLayer = (id: string) =>
     setImages((prev) => prev.filter((im) => im.id !== id))
-  /** The selected image layer, when the selection is one. */
-  const selImage = images.find((im) => im.id === selected) ?? null
   /**
    * BACKWARD COMPATIBILITY, in one place. Publish and the template's own `designUrl` field
    * both predate the stack and mean "the artwork": that is the bottom layer, which on every
@@ -243,6 +241,15 @@ export function DesignMaker() {
   const [pos, setPos] = useState<Pos>(DEFAULT_POS)
   const [texts, setTexts] = useState<TextLayer[]>([])
   const [selected, setSelected] = useState<string | null>(null)
+  /** The selected image layer, when the selection is one.
+   *
+   *  DECLARED AFTER `selected`, and that is the whole fix: it was reading a `const` twelve
+   *  lines above the one that defines it. A let/const is in its temporal dead zone until
+   *  its own line runs, so this threw "Cannot access 'selected' before initialization" on
+   *  every render — the Design Lab and the mini designer both showed "This page couldn't
+   *  load", whatever you opened them for. Hoisting is a `var`/`function` behaviour, and
+   *  neither of those is in this file. */
+  const selImage = images.find((im) => im.id === selected) ?? null
   const [name, setName] = useState("")
   const [pickerOpen, setPickerOpen] = useState(false)
   const [libOpen, setLibOpen] = useState(false)
