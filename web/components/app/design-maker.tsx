@@ -9,7 +9,7 @@ import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
-import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, type CatalogProduct, type SellerImage, type OrderUpload } from "@/lib/api"
+import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, type CatalogProduct, type SellerImage, type OrderUpload, type ProductTemplate } from "@/lib/api"
 import { canvasReadableSrc } from "@/lib/thread-match"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
@@ -307,38 +307,52 @@ export function DesignMaker() {
   const catalogFor = (sku: string): CatalogProduct | null =>
     catalogRef.current.find((x) => String(x.sku ?? "") === sku) ?? null
 
-  // Reopening a template restores the PIECES (artwork, position, text, blank, print
-  // area) — that's the whole point of a template over a library image, which is flat.
+  /**
+   * Put a template's PIECES on the canvas — artwork, position, text, blank, print area.
+   * That is the whole point of a template over a library image, which is flat.
+   *
+   * ONE implementation, two ways in: the ?template= link from the Templates page, and
+   * picking one in the library dialog. They were about to be two copies of the same
+   * twenty lines, and the copy that drifts is the one that stops restoring `pos` — which
+   * puts the artwork back centred and looks like the template never saved it.
+   */
+  const applyTemplate = (t: ProductTemplate) => {
+    const l = (t.layers ?? {}) as { images?: ImageLayer[]; designUrl?: string; pos?: Pos; texts?: TextLayer[] }
+    const d = (t.data ?? {}) as { blank?: string | null; printArea?: { w?: number; h?: number } }
+    templateId.current = String(t.id)
+    if (t.name) setName(t.name)
+    // A template saved BEFORE the stack has one artwork and a position; one saved
+    // after has the list. Reading images first means a new template never falls back
+    // to its own compatibility fields and loses its upper layers.
+    if (Array.isArray(l.images) && l.images.length) {
+      setImages(l.images)
+      nextLayerId.current = l.images.length + 1
+    } else if (l.designUrl) {
+      setImages([{ id: `img-${nextLayerId.current++}`, src: l.designUrl, name: null, pos: l.pos ?? { ...DEFAULT_POS } }])
+    }
+    if (l.pos) setPos(l.pos)
+    if (Array.isArray(l.texts)) setTexts(l.texts)
+    if (d.printArea?.w) setPaW(String(d.printArea.w))
+    if (d.printArea?.h) setPaH(String(d.printArea.h))
+    const p = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
+    if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front") }
+  }
+
   useEffect(() => {
     if (!templateParam) return
     const id = setTimeout(() => {
       getTemplates()
         .then((rows) => {
           const t = (rows ?? []).find((x) => String(x.id) === templateParam)
-          if (!t) return
-          const l = (t.layers ?? {}) as { images?: ImageLayer[]; designUrl?: string; pos?: Pos; texts?: TextLayer[] }
-          const d = (t.data ?? {}) as { blank?: string | null; printArea?: { w?: number; h?: number } }
-          templateId.current = String(t.id)
-          if (t.name) setName(t.name)
-          // A template saved BEFORE the stack has one artwork and a position; one saved
-          // after has the list. Reading images first means a new template never falls back
-          // to its own compatibility fields and loses its upper layers.
-          if (Array.isArray(l.images) && l.images.length) {
-            setImages(l.images)
-            nextLayerId.current = l.images.length + 1
-          } else if (l.designUrl) {
-            setImages([{ id: `img-${nextLayerId.current++}`, src: l.designUrl, name: null, pos: l.pos ?? { ...DEFAULT_POS } }])
-          }
-          if (l.pos) setPos(l.pos)
-          if (Array.isArray(l.texts)) setTexts(l.texts)
-          if (d.printArea?.w) setPaW(String(d.printArea.w))
-          if (d.printArea?.h) setPaH(String(d.printArea.h))
-          const p = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
-          if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front") }
+          if (t) applyTemplate(t)
         })
         .catch(() => {})
     }, 0)
     return () => clearTimeout(id)
+    // applyTemplate deliberately absent: it is redefined every render and listing it would
+    // re-run this on every keystroke, re-fetching the template and stamping the canvas back
+    // over whatever had just been edited.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateParam])
 
   // Load the Images library (own uploads + order art). Kept as a plain fn so an upload
@@ -520,7 +534,7 @@ export function DesignMaker() {
                 )}
               </>
             )}
-            <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setLibOpen(true)}>Saved designs</Button>
+            <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setLibOpen(true)}>Saved designs &amp; templates</Button>
           </div>
           {/* The layer list used to be here AND the selected layer's controls were on the
               right, so working on one layer meant crossing the canvas: pick on the left, edit
@@ -713,7 +727,9 @@ export function DesignMaker() {
           setMockup(p.img || (cp ? mockupOf(cp) : ""))
           setSide("front")
         }} />
-      <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }} />
+      <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen}
+        onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }}
+        onPickTemplate={applyTemplate} />
       {/* One dialog for both sources — the rail decides which list it is showing. */}
       <ArtPickerDialog
         open={browse !== null}

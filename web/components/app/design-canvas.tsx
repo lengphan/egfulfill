@@ -2493,7 +2493,24 @@ export function DesignCanvasDialog({
         </div>
         </div>
         </div>
-        <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }} />
+        <LibraryPickerDialog
+          open={libOpen} onOpenChange={setLibOpen}
+          onPick={(u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }}
+          /* A TEMPLATE BRINGS ITS PLACEMENT. Taking only the picture and centring it is what
+             the sheet import used to do, and it is the same loss here: somebody positioned
+             that artwork on that garment, and re-centring it throws the decision away. The
+             blank is NOT applied — this canvas belongs to an order line whose garment is
+             already decided. */
+          onPickTemplate={(t) => {
+            const l = (t.layers ?? {}) as { images?: { src?: string; pos?: Pos }[]; designUrl?: string; pos?: Pos }
+            const first = Array.isArray(l.images) ? l.images.find((im) => im?.src) : null
+            const art = String(first?.src ?? l.designUrl ?? "")
+            if (!art) { setErr("That template has no artwork saved on it."); return }
+            setErr(null)
+            setDesignUrl(art)
+            setPos(first?.pos ?? l.pos ?? DEFAULT_POS)
+          }}
+        />
         {/* The partner route for print methods. Anchored to the LINE (orderId + sku), which
             pushToPink accepts directly — no board card has to exist first, so this is one
             click rather than "create a card, then push the card". */}
