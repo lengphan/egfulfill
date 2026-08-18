@@ -63,9 +63,28 @@ export const metadata: Metadata = {
    *
    * `apple` is the one that matters here; `icon` keeps the manifest and the tab in step.
    */
+  /**
+   * THE UPLOADED MARK, not a file baked into the build.
+   *
+   * Settings › Branding uploads a favicon, stores it, and serves it at
+   * /api/branding/favicon — and nothing ever pointed the browser at that URL. The tab kept
+   * rendering the packaged icon, so the upload appeared to do nothing at all, which is
+   * exactly what it looked like.
+   *
+   * The route NEVER 404s: uploaded mark if there is one, bundled default otherwise, so
+   * pointing at it costs nothing on a deployment that has never uploaded one. It sends
+   * max-age=300, so a changed mark appears within five minutes rather than being cached
+   * for the life of the tab.
+   *
+   * `app/favicon.ico` and `app/icon.png` had to GO with this: Next's file convention emits
+   * its own <link rel="icon"> and that one wins over anything declared here, so leaving
+   * them would have kept the packaged icon winning silently. They are in public/ as
+   * fallback-icon.* — nothing links them, and the server's own default is the real
+   * fallback.
+   */
   icons: {
-    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
-    apple: [{ url: "/icons/icon-192.png", sizes: "180x180", type: "image/png" }],
+    icon: [{ url: "/api/branding/favicon", type: "image/png" }],
+    apple: [{ url: "/api/branding/favicon", sizes: "180x180", type: "image/png" }],
   },
 }
 // viewport-fit=cover so the scanner overlay reaches under the iPhone notch.
