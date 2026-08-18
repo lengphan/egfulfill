@@ -1586,10 +1586,17 @@ export function DesignCanvasDialog({
         // 380px rail, the 24px gap and the 48px of padding. A fixed 1180px gave the rail far
         // more room than it uses and the surplus read as blank around the window. max-w-fit
         // does not work here — it under-measures the grid and clips the rail off the edge.
-        // Tracks the stage's own cap above — the width is garment + gap + rail, so when the
-        // garment stops growing the dialog has to stop with it or the surplus comes back as
-        // blank around the window.
-        className="sm:max-w-2xl lg:max-w-[min(96vw,calc(min(64vh,50vw,520px)+452px))]"
+        /**
+         * A PLAIN CAP, now that the grid can shrink.
+         *
+         * This computed its width from the stage's — garment + gap + rail + padding — while
+         * the stage track was `auto`, which sizes to its content's MAX width rather than to
+         * the room available. So on any window narrower than the sum, the two tracks
+         * insisted on 924px inside a 791px dialog: the rail ran off the right edge and the
+         * whole thing scrolled sideways. The track is minmax(0,1fr) now, so the stage gives
+         * way and this only has to say how wide the window may get.
+         */
+        className="sm:max-w-2xl lg:max-w-[min(96vw,940px)]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -1655,7 +1662,7 @@ export function DesignCanvasDialog({
             when it does scroll the garment stays put instead of leaving the screen. Below lg
             it collapses back to the original single stack — two columns in a phone-width
             dialog would make both of them useless. */}
-        <div className="grid gap-5 lg:grid-cols-[auto_380px] lg:items-start lg:gap-6">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
         {/* The left column is sized to the stage itself rather than to half the dialog. An
             even 50/50 split gave the controls far more width than their cards use and stranded
             the remainder as dead space beside them; letting the garment take what it needs and
@@ -1752,7 +1759,7 @@ export function DesignCanvasDialog({
           * which genuinely was too small) and it lets the two columns end near each other,
           * which is what stops a dialog reading as half-empty.
           */}
-        <div className="relative w-full max-w-[min(100%,64vh,520px)]">
+        <div className="relative w-full max-w-[min(100%,54vh,460px)]">
           <DesignStage
             className="w-full" mockup={activeMockup}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
@@ -2103,8 +2110,14 @@ export function DesignCanvasDialog({
               * with green.
               */}
             <div className="border-t border-border pt-2.5 first:border-t-0 first:pt-0">
-              <div className="flex min-w-0 items-baseline gap-2">
-                <span className={cn("size-1.5 shrink-0 rounded-full", designUrl ? "bg-success" : "bg-muted-foreground/40")} />
+              {/* THE SAME MARK AS THE STEP BELOW IT. This briefly carried a small dot while
+                  the next step carried a numbered circle that turns into a tick — two ways
+                  of saying "where am I" in one column, eighty pixels apart. Numbered, and
+                  ticked when done, like its neighbour. */}
+              <div className="flex min-w-0 items-center gap-2">
+                {designUrl
+                  ? <CheckCircle size={18} weight="fill" className="shrink-0 text-success" />
+                  : <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full border border-border bg-background text-2xs font-bold text-muted-foreground">1</span>}
                 <span className="text-sm font-medium">Your design</span>
                 {designUrl && designNo != null && (
                   <span className="truncate font-mono text-2xs font-medium text-muted-foreground">DSN-{designNo}</span>
