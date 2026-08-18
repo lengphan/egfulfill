@@ -2959,9 +2959,16 @@ export function ordersRoutes(app, requireAuth) {
         body, href: '/chat', entityId: channel,
       });
     }
-    // Whoever answers should see the internal picture before they reply. Fire-and-
-    // forget: the message is already saved, the brief catches up a moment later.
-    if (ref && channel !== 'announce') postOrderBriefing(channel, ref);
+    /*
+     * Whoever answers should see the internal picture before they reply. Fire-and-forget:
+     * the message is already saved, the brief catches up a moment later.
+     *
+     * ONLY WHEN A SELLER WROTE IT. The brief is written FOR staff, so a staff message
+     * triggering one is an AI call that briefs the person who just spoke. That was every
+     * internal note and every attachment — the package photo the phone posts is a staff
+     * message about an order, so each one bought a briefing nobody asked for.
+     */
+    if (ref && channel !== 'announce' && !isStaff(req.user)) postOrderBriefing(channel, ref);
 
     if (channel.indexOf('support-') === 0) {
       const fromSeller = !isStaff(req.user);
