@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { DownloadSimple, CircleNotch } from "@phosphor-icons/react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { downloadDesignFile, filesForLine, type DesignFileRow, type OrderDesign } from "@/lib/api"
 import { designSrc } from "@/lib/order-image"
 
@@ -48,34 +49,62 @@ export function LineDownloads({ design, files, item }: {
     finally { setBusy(null) }
   }
 
+  const count = (art ? 1 : 0) + machine.length
+
+  /**
+   * ON THE PICTURE, NOT UNDER THE TEXT.
+   *
+   * "⤓ Artwork" as a text link under the sku put a coloured word in the middle of a block
+   * of grey facts — the loudest thing on a line whose job is naming the garment, for an
+   * action nobody takes on most visits. And a second link beside it for the stitch file made
+   * a row of links out of a row of information.
+   *
+   * The artwork IS the thumbnail, so the download belongs on the thumbnail: a quiet corner
+   * button, mirroring the item number badge on the opposite corner, with a count when the
+   * line has more than one file. Always visible rather than hover-only — a control that
+   * appears on hover does not exist on a phone, and this is a floor tool.
+   */
   return (
-    <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs">
-      {/* The ARTWORK is already a URL the browser can save — no round trip, and it is the
-          same bytes the canvas is rendering, so what downloads is what you are looking at. */}
-      {art && (
-        <a
-          href={art}
-          download={`${stem}.png`}
-          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-        >
-          <DownloadSimple size={12} weight="bold" /> Artwork
-        </a>
-      )}
-      {machine.map((f) => (
-        <button
-          key={f.designId}
-          type="button"
-          onClick={() => void grab(f)}
-          disabled={busy === f.designId}
-          title={f.name || "Machine file"}
-          className="inline-flex items-center gap-1 font-medium text-primary hover:underline disabled:opacity-60"
-        >
-          {busy === f.designId
-            ? <CircleNotch size={12} className="animate-spin" />
-            : <DownloadSimple size={12} weight="bold" />}
-          {f.name || "Machine file"}
-        </button>
-      ))}
-    </span>
+    <Popover>
+      <PopoverTrigger
+        title={`${count} file${count === 1 ? "" : "s"} on this line — artwork${machine.length ? " and stitch file" : ""}`}
+        className="eg-tap absolute -bottom-1.5 -left-1.5 z-10 inline-flex items-center gap-0.5 rounded-full border border-border bg-card px-1.5 py-1 text-2xs font-semibold text-muted-foreground shadow-sm transition-colors hover:border-primary hover:text-primary"
+      >
+        <DownloadSimple size={12} weight="bold" />
+        {count > 1 && count}
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-1">
+        {/* The ARTWORK is already a URL the browser can save — no round trip, and it is the
+            same bytes the canvas is rendering, so what downloads is what you are looking at. */}
+        {art && (
+          <a
+            href={art}
+            download={`${stem}.png`}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent"
+          >
+            <DownloadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate">Artwork</span>
+            <span className="shrink-0 text-2xs text-muted-foreground">PNG</span>
+          </a>
+        )}
+        {machine.map((f) => (
+          <button
+            key={f.designId}
+            type="button"
+            onClick={() => void grab(f)}
+            disabled={busy === f.designId}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent disabled:opacity-60"
+          >
+            {busy === f.designId
+              ? <CircleNotch size={14} className="shrink-0 animate-spin" />
+              : <DownloadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />}
+            <span className="min-w-0 flex-1 truncate" title={f.name || undefined}>{f.name || "Machine file"}</span>
+            {/* The KIND, not the id. The slug this used to print is unreadable and
+                unactionable; "EMB" is the fact somebody is looking for. */}
+            <span className="shrink-0 text-2xs uppercase text-muted-foreground">{f.kind}</span>
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
   )
 }

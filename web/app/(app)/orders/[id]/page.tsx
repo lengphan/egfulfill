@@ -339,7 +339,23 @@ export default function OrderDetailPage() {
   const preSubmit = ["", "new", "draft"].includes(String(order.factory_status || ""))
   // Admin can still correct a line after submit — the price is frozen either way — until
   // the blanks go to a supplier. Everyone else is locked at submit.
-  const canEditVariants = preSubmit || (role === "admin" && !(order as { blanks_ordered?: boolean }).blanks_ordered)
+  /**
+   * THE FLOOR MAY CORRECT A LINE UNTIL IT IS APPROVED — mirrors the same rule in
+   * server/src/routes/orders.js (item-setup). Approved is where a human has confirmed the
+   * blank on every line, so after it a change contradicts the check rather than being part
+   * of it; before it, an operator spotting the wrong colour on the way in should not have
+   * to find an admin.
+   *
+   * NOTHING HERE RE-PRICES. unit_cost/ship_fee were frozen on the line at submit, so an
+   * edit changes what we MAKE and never what was billed. That is stated at the controls.
+   */
+  const stageNow = String(order.factory_status || "").toLowerCase()
+  const beforeApproval = ["", "new", "draft", "pending", "in_review"].includes(stageNow)
+  const canEditVariants = preSubmit
+    || (isStaff && beforeApproval)
+    || (role === "admin" && !(order as { blanks_ordered?: boolean }).blanks_ordered)
+  /** Adding a LINE is staff-only and stops at approval — the server refuses it after. */
+  const canAddItem = isStaff && beforeApproval
   // Was a private copy of numOf, so the detail page still showed the raw "etsy-4120118148"
   // after the boards were stripping the source prefix. Use the shared formatter.
   const num = numOf(order)
@@ -546,6 +562,9 @@ export default function OrderDetailPage() {
                       {/* The blank with its artwork placed — the seller sees the same
                           composite the floor will produce from. */}
                       <div className="relative shrink-0">
+                        {/* The line's files, on the corner of its own picture — see
+                            LineDownloads for why they are not a link under the text. */}
+                        <LineDownloads design={design} files={dfiles} item={it} />
                         <ItemAvatar
                           item={it}
                           designs={designs}
@@ -579,10 +598,6 @@ export default function OrderDetailPage() {
                             {/* Same line as the production queue: what the buyer chose, next
                                 to what we are choosing. */}
                             <OrderedVariant item={it} />
-                            {/* The files this line is made from, on the line. They were
-                                reachable only by opening the design window and finding the
-                                button inside — one line at a time, on an order with four. */}
-                            <LineDownloads design={design} files={dfiles} item={it} />
                             {/* THIS LINE's board state, with the lane named. "Sent to design"
                                 and "Approved" are different answers, and until now the only
                                 signal was an order-wide chip that lit for every item the
