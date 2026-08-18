@@ -70,8 +70,14 @@ export function topupsRoutes(app, requireAuth) {
    * close, but a force-quit, a dead battery or a lost connection never sends that — so age
    * is the backstop.
    *
-   * Two hours, and only VietQR: a MANUAL transfer is genuinely waiting on a human to check
-   * a receipt and must never be aged out from under them.
+   * THIRTY MINUTES, and only VietQR. Short is safe here precisely because aging does not
+   * throw the request away: vietqr.js still settles an abandoned ref, so someone who saved
+   * the QR and paid tomorrow is still credited. The window only decides how long an unpaid
+   * request sits in a queue someone is supposed to act on — and nobody can act on a VietQR
+   * request anyway, since it confirms itself on payment.
+   *
+   * A MANUAL transfer is genuinely waiting on a human to check a receipt and must never be
+   * aged out from under them.
    *
    * 'abandoned', not deleted — the virtual account stays live and vietqr.js still settles an
    * abandoned ref if the money turns up late.
@@ -79,7 +85,7 @@ export function topupsRoutes(app, requireAuth) {
   async function ageOutStale() {
     await q(`update topup_requests set status='abandoned'
               where method='VietQR' and status='pending'
-                and created_at < now() - interval '2 hours'`).catch(() => {});
+                and created_at < now() - interval '30 minutes'`).catch(() => {});
   }
 
   app.get('/api/topups', { preHandler: requireAuth }, async (req) => {
