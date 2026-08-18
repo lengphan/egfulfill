@@ -493,7 +493,7 @@ export function IntegrationsPanel() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="truncate font-semibold">{active.name}</span>
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs font-medium uppercase tracking-wide text-muted-foreground">{active.group}</span>
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 eg-label text-muted-foreground">{active.group}</span>
                 </span>
                 <span className={"inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-2xs font-medium " + activeMeta.pill}>
                   {activeMeta.label}

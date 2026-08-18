@@ -34,4 +34,4 @@ export const DISPATCH_GRID =
 
 /** Header strip shared by both lists — same type, same rule, same rhythm. */
 export const DISPATCH_HEAD =
-  "border-b border-border py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground"
+  "border-b border-border py-2 eg-label text-muted-foreground"

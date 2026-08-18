@@ -275,7 +275,7 @@ function MatchRow({ m, similar, onUse }: { m: ReuseMatch; similar?: boolean; onU
         </div>
       </div>
       {similar && m.distance != null && (
-        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs font-medium text-muted-foreground">
+        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
           {m.distance === 0 ? tl("ui", "near-identical") : t("ui.bitsDifferent", { n: m.distance })}
         </span>
       )}
@@ -369,8 +369,8 @@ function InternalNote({ orderId, value }: { orderId: string; value: string }) {
   return (
     <div>
       <div className="mb-0.5 flex items-center gap-2">
-        <span className="font-semibold uppercase tracking-wide text-muted-foreground">Factory note</span>
-        <span className="text-3xs text-muted-foreground">
+        <span className="eg-label text-muted-foreground">Factory note</span>
+        <span className="text-2xs text-muted-foreground">
           {state === "saving" ? "saving…" : state === "saved" ? "saved" : state === "error" ? "couldn't save" : "staff only"}
         </span>
       </div>
@@ -2300,7 +2300,7 @@ export function OrdersHub() {
                                         {tl("stage", s.label)}
                                         {/* Marked, so a catch-up is never mistaken for an
                                             ordinary one-step move before it's clicked. */}
-                                        {s.walk && <span className="ml-auto text-3xs text-muted-foreground">{tl("ui", "catch up")}</span>}
+                                        {s.walk && <span className="ml-auto text-2xs text-muted-foreground">{tl("ui", "catch up")}</span>}
                                       </DropdownMenuItem>
                                     ))}
                                   </DropdownMenuGroup>
@@ -2375,7 +2375,7 @@ export function OrdersHub() {
                     return (
                       <div className="mb-3 grid gap-3 rounded-lg border border-border bg-muted/30 p-3 text-xs sm:grid-cols-2">
                         <div>
-                          <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Ship to")}</div>
+                          <div className="mb-0.5 eg-label text-muted-foreground">{tl("ui", "Ship to")}</div>
                           {masked ? (
                             // Say WHICH it is: the address exists and is being withheld, not
                             // missing. Region is kept so a seller can still recognise the
@@ -2387,7 +2387,7 @@ export function OrdersHub() {
                               <div className="select-none tracking-widest text-muted-foreground">••••••••••</div>
                               <div>{[a.city, a.state].filter(Boolean).join(", ")}</div>
                               {a.country && <div>{a.country}</div>}
-                              <div className="mt-1 text-3xs text-muted-foreground">
+                              <div className="mt-1 text-2xs text-muted-foreground">
                                 Street and postcode are held by the factory — ask support if an order needs checking.
                               </div>
                             </div>
@@ -2406,7 +2406,7 @@ export function OrdersHub() {
                         <div className="space-y-2">
                           {personal.length > 0 && (
                             <div>
-                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">{tl("ui", "Personalisation")}</div>
+                              <div className="mb-0.5 eg-label text-muted-foreground">{tl("ui", "Personalisation")}</div>
                               {personal.map((p, i) => <div key={i} className="leading-relaxed">{decodeEntities(p)}</div>)}
                             </div>
                           )}
@@ -2880,7 +2880,7 @@ export function OrdersHub() {
 
                 {reuse?.exact.length ? (
                   <div>
-                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{tl("ui", "Identical artwork")}</div>
+                    <div className="mb-1.5 eg-label text-muted-foreground">{tl("ui", "Identical artwork")}</div>
                     <div className="space-y-1.5">
                       {reuse.exact.map((m) => (
                     <MatchRow
@@ -2907,7 +2907,7 @@ export function OrdersHub() {
 
                 {reuse?.similar.length ? (
                   <div>
-                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{tl("ui", "Looks similar — confirm before reusing")}</div>
+                    <div className="mb-1.5 eg-label text-muted-foreground">{tl("ui", "Looks similar — confirm before reusing")}</div>
                     <div className="space-y-1.5">
                       {reuse.similar.map((m) => <MatchRow key={m.design_id} m={m} similar />)}
                     </div>
@@ -3099,7 +3099,7 @@ export function OrdersHub() {
                 <ol className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
                   {path.map((s, i) => (
                     <li key={s || "new"} className="flex items-center gap-2 text-sm">
-                      <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary/10 text-3xs font-medium text-primary">{i + 1}</span>
+                      <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary/10 text-2xs font-medium text-primary">{i + 1}</span>
                       {stageMeta(s)?.label ?? s}
                     </li>
                   ))}

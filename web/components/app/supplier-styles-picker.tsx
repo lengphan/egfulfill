@@ -195,7 +195,7 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
                           </div>
                           {/* Counts, not the full lists. A 40-colour style would otherwise
                               own the row; the detail belongs on the printed catalogue. */}
-                          <div className="mt-0.5 text-3xs text-muted-foreground">
+                          <div className="mt-0.5 text-2xs text-muted-foreground">
                             {st.colors.length} colour{st.colors.length === 1 ? "" : "s"} · {st.sizes.length} size{st.sizes.length === 1 ? "" : "s"}
                             {st.sizes.length > 0 && <> · {st.sizes.slice(0, 8).join(" ")}{st.sizes.length > 8 ? "…" : ""}</>}
                           </div>

@@ -726,7 +726,7 @@ export default function OrderDetailPage() {
                               a plain human message stays verbatim with its line breaks. */}
                           {m.text ? (hasMarkdown(m.text) ? <Markdown>{m.text}</Markdown> : <span className="whitespace-pre-wrap">{m.text}</span>) : null}
                         </div>
-                        <span className="mt-0.5 text-3xs text-muted-foreground">
+                        <span className="mt-0.5 text-2xs text-muted-foreground">
                           {m.by ? `${m.by} · ` : m.role && m.role !== "seller" ? `${m.role} · ` : ""}
                           {fmtMsgTime(m.ts)}
                         </span>

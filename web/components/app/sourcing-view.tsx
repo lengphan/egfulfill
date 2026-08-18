@@ -493,7 +493,7 @@ export function SourcingView() {
                         {r.image
                           // eslint-disable-next-line @next/next/no-img-element
                           ? <img src={fullImg(r.image)} alt="" className="size-9 rounded border border-border object-cover" />
-                          : <span className="flex size-9 items-center justify-center rounded border border-dashed border-border text-3xs text-muted-foreground">—</span>}
+                          : <span className="flex size-9 items-center justify-center rounded border border-dashed border-border text-2xs text-muted-foreground">—</span>}
                       </td>
                       {/* A CARET, because the row expanding was the page's best feature and
                           nothing said so. The profit calculator, the rival comparison and

@@ -135,7 +135,7 @@ export function NotificationsView() {
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-sm font-medium">{n.title}</span>
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-3xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="rounded bg-muted px-1.5 py-0.5 eg-label text-muted-foreground">
                     {TYPE_LABEL[n.type] ?? n.type}
                   </span>
                 </span>

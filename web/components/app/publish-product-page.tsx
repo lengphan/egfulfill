@@ -112,7 +112,7 @@ function VariantChips({
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-2">
-        <span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="eg-label text-muted-foreground">
           {label} ({picked.length}/{options.length})
         </span>
         <button
@@ -251,7 +251,7 @@ function TiktokFields({ dest, fields, onChange }: {
 
   return (
     <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-      <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="eg-label text-muted-foreground">
         {dest.shop_name} needs
       </div>
       {fields.loadErr && <p className="text-xs text-destructive">{fields.loadErr}</p>}
@@ -300,7 +300,7 @@ function TiktokFields({ dest, fields, onChange }: {
           <p className="text-xs text-muted-foreground">No leaf category matches that.</p>
         )}
         {fields.query.trim() && matches.length > 0 && (
-          <p className="text-3xs text-muted-foreground">Showing {matches.length} match{matches.length === 1 ? "" : "es"}.</p>
+          <p className="text-2xs text-muted-foreground">Showing {matches.length} match{matches.length === 1 ? "" : "es"}.</p>
         )}
       </div>
 
@@ -1385,9 +1385,9 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
-                      {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-3xs font-semibold uppercase text-primary-foreground">Primary</span>}
+                      {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-2xs font-semibold uppercase text-primary-foreground">Primary</span>}
                       <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                        {i !== 0 && <button onClick={() => makePrimary(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-3xs font-semibold text-black">Primary</button>}
+                        {i !== 0 && <button onClick={() => makePrimary(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">Primary</button>}
                         <button onClick={() => removeImage(i)} aria-label="Remove photo" className="rounded bg-white/90 p-1 text-black"><Trash size={11} weight="bold" /></button>
                       </div>
                     </div>
@@ -1692,7 +1692,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   three admins this can reach. */}
               {dests !== null && dests.length > 0 && (
                 <div className="space-y-1">
-                  <span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">When it&apos;s created</span>
+                  <span className="eg-label text-muted-foreground">When it&apos;s created</span>
                   <div className="grid gap-1 sm:grid-cols-2">
                     {[
                       { live: false, label: "Save as draft", hint: "You review and activate it in the shop." },
@@ -1746,7 +1746,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   choosing one to represent the rest was the thing hiding the others. */}
               {blank && (
                 <label className="flex flex-col gap-1">
-                  <span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Method</span>
+                  <span className="eg-label text-muted-foreground">Method</span>
                   <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                     {methodOpts.length === 0 && <option value="">Any</option>}
                     {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}

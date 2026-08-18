@@ -147,7 +147,7 @@ export function VariantField({
           control now, so the one field that blocks the line still says so — the tinted
           border alone reads as decoration next to three untinted neighbours. */}
       {required && unset && (
-        <span className="shrink-0 text-3xs font-medium text-primary">{tl("field", "Required")}</span>
+        <span className="shrink-0 text-2xs font-medium text-primary">{tl("field", "Required")}</span>
       )}
       {hasOptions && <CaretDown size={11} className="shrink-0 text-muted-foreground" />}
     </DropdownMenuTrigger>

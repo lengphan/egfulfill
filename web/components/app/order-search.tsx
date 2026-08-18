@@ -88,7 +88,7 @@ export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => v
             placeholder="Search orders — number, customer, or SKU"
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
-          <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-3xs text-muted-foreground sm:block">esc</kbd>
+          <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-2xs text-muted-foreground sm:block">esc</kbd>
         </div>
         {qy.trim() && (
           <div className="max-h-[50vh] overflow-y-auto p-1.5">

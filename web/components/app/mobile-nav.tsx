@@ -40,7 +40,7 @@ export function MobileNav({ sections, onLogout, role }: { sections: MobileNavSec
             <nav className="flex-1 overflow-y-auto p-3">
               {sections.map((section, i) => (
                 <div key={i} className="mb-1">
-                  {section.heading && <div className="px-3 pb-2 pt-5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{nl("nav", section.heading)}</div>}
+                  {section.heading && <div className="px-3 pb-2 pt-5 eg-label text-muted-foreground">{nl("nav", section.heading)}</div>}
                   {section.items.map((item) => {
                     const active = pathname === item.href || pathname.startsWith(item.href + "/")
                     const Icon = item.icon

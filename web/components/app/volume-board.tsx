@@ -60,7 +60,7 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
   return (
     <>
       {!data.applied && (
-        <div className="mb-4 inline-flex rounded-full bg-muted px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="mb-4 inline-flex rounded-full bg-muted px-2.5 py-1 eg-label text-muted-foreground">
           Preview
         </div>
       )}

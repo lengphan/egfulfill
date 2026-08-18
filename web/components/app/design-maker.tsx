@@ -105,7 +105,7 @@ function ImageThumb({ url, src, name, badge, title, onPlace, onDelete }: {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src ?? url} alt={name || ""} className="aspect-square w-full object-cover" />
         {badge && (
-          <span className="block truncate border-t border-border bg-card px-1 py-0.5 text-3xs font-medium text-muted-foreground">
+          <span className="block truncate border-t border-border bg-card px-1 py-0.5 text-2xs font-medium text-muted-foreground">
             {badge}
           </span>
         )}
@@ -469,13 +469,13 @@ export function DesignMaker() {
         {/* Left: sources + layers */}
         <aside className="hidden w-60 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-3 lg:flex">
           <div className="space-y-1.5">
-            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Blank</div>
+            <div className="eg-label text-muted-foreground">Blank</div>
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}>{mockup ? "Change blank" : "Pick a blank"}</Button>
           </div>
           {/* Print area — the printable rectangle scales against a 12x16 base, matching
               what production actually trims to. */}
           <div className="space-y-1.5">
-            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Print area (in)</div>
+            <div className="eg-label text-muted-foreground">Print area (in)</div>
             <div className="flex items-center gap-1.5">
               <Input value={paW} onChange={(e) => setPaW(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area width in inches" />
               <span className="text-xs text-muted-foreground">x</span>
@@ -486,7 +486,7 @@ export function DesignMaker() {
               copy in "Your uploads"; click any thumbnail to drop it on the design. */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Images</div>
+              <div className="eg-label text-muted-foreground">Images</div>
               <label className="flex cursor-pointer items-center gap-1 text-2xs font-medium text-primary hover:underline">
                 <UploadSimple size={12} weight="bold" /> Upload
                 <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onUploadImages(e.target.files); e.target.value = "" }} />
@@ -501,9 +501,9 @@ export function DesignMaker() {
                 {sellerImages.length > 0 && (
                   <>
                     <div className="flex items-baseline justify-between">
-                      <div className="text-3xs font-medium text-muted-foreground">Your uploads</div>
+                      <div className="text-2xs font-medium text-muted-foreground">Your uploads</div>
                       {sellerImages.length > RAIL_LIMIT && (
-                        <button type="button" onClick={() => setBrowse("uploads")} className="text-3xs font-medium text-primary hover:underline">
+                        <button type="button" onClick={() => setBrowse("uploads")} className="text-2xs font-medium text-primary hover:underline">
                           All {sellerImages.length}
                         </button>
                       )}
@@ -516,13 +516,13 @@ export function DesignMaker() {
                 {orderUploads.length > 0 && (
                   <>
                     <div className="mt-1 flex items-baseline justify-between">
-                      <div className="text-3xs font-medium text-muted-foreground">From your orders</div>
+                      <div className="text-2xs font-medium text-muted-foreground">From your orders</div>
                       {/* ONE way in, not two. "All 74" up here and "Browse order art" below
                           the grid opened the same dialog, ten pixels of thumbnails apart —
                           two controls for one action, and neither said which orders. The
                           link carries it, named for what it opens. */}
                       {orderUploads.length > RAIL_LIMIT && (
-                        <button type="button" onClick={() => setBrowse("orders")} className="text-3xs font-medium text-primary hover:underline">
+                        <button type="button" onClick={() => setBrowse("orders")} className="text-2xs font-medium text-primary hover:underline">
                           Browse All Orders
                         </button>
                       )}
@@ -552,7 +552,7 @@ export function DesignMaker() {
             {/* Position pills — only when the blank actually has more than one face. A
                 single-face blank showing a lone "Front" pill is noise, not a choice. */}
             {faces.length > 1 && (
-              <div className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-border bg-card/80 p-0.5 backdrop-blur">
+              <div className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-border bg-card/80 p-1 backdrop-blur">
                 {faces.map((f) => (
                   <button
                     key={f.side}
@@ -610,7 +610,7 @@ export function DesignMaker() {
               had a few hundred buyer uploads it was several screens down and read as missing.
               Adding and editing a layer are one job; they belong on one side. */}
           <div className="space-y-1.5">
-            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Add</div>
+            <div className="eg-label text-muted-foreground">Add</div>
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={addText}>
               Add text
             </Button>
@@ -618,7 +618,7 @@ export function DesignMaker() {
 
           {selText ? (
             <div className="space-y-3 border-t border-border pt-3">
-              <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Text</div>
+              <div className="eg-label text-muted-foreground">Text</div>
               <Input value={selText.text} onChange={(e) => updateText(selText.id, { text: e.target.value })} placeholder="Your text" />
               <label className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-muted-foreground">Size</span>
@@ -647,7 +647,7 @@ export function DesignMaker() {
                 * runs bottom-up matches the array and nothing else anybody has ever used.
                 */}
               <div className="flex items-baseline justify-between gap-2">
-                <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Layers</div>
+                <div className="eg-label text-muted-foreground">Layers</div>
                 <span className="text-2xs tabular-nums text-muted-foreground">{images.length + texts.length} / {MAX_LAYERS}</span>
               </div>
               <div className="space-y-1">

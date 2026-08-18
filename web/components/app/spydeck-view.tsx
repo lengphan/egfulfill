@@ -99,7 +99,7 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
   return (
     <div className="rounded-lg bg-muted/60 px-2 py-2 text-center leading-none">
       <div className="truncate text-base font-bold tabular-nums">{value}</div>
-      <div className="mt-1 text-3xs font-medium text-muted-foreground">
+      <div className="mt-1 text-2xs font-medium text-muted-foreground">
         {label}{sub ? <span className="text-muted-foreground/60"> · {sub}</span> : null}
       </div>
     </div>
@@ -216,7 +216,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
               <Package size={22} weight="duotone" />
               {/* Says WHICH thing is missing. "No image" beside a listing that has images on
                   the marketplace reads as "this publish failed", and it did not. */}
-              <span className="px-2 text-center text-3xs leading-tight">no saved photo</span>
+              <span className="px-2 text-center text-2xs leading-tight">no saved photo</span>
             </span>
           )}
           <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover/img:bg-black/25 group-hover/img:opacity-100">
@@ -226,7 +226,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
         {/* State, not a "trending" flag — the one thing you open this tab to check. Every
             publish lands as a DRAFT; the seller activates it on the marketplace. */}
         <span className={
-          "absolute left-2 top-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-3xs font-bold uppercase tracking-wide text-white shadow-sm " +
+          "absolute left-2 top-2 inline-flex items-center gap-1 rounded-md px-2 py-1 eg-label text-white shadow-sm " +
           (live ? "bg-emerald-600" : "bg-amber-500")
         }>
           {live ? <><CheckCircle size={11} weight="fill" /> Live</> : <>Draft</>}
@@ -254,7 +254,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
         {thin ? (
           // Not "no variants" — unknown. A card that renders a confident 0 for something it
           // never recorded is the empty state that looks like a working one.
-          <div className="mt-2.5 rounded-lg border border-dashed border-border px-2 py-2 text-3xs leading-relaxed text-muted-foreground">
+          <div className="mt-2.5 rounded-lg border border-dashed border-border px-2 py-2 text-2xs leading-relaxed text-muted-foreground">
             Published before this tab recorded build details — the blank and variants aren&apos;t stored for this one. Open it on {platform} to see what listed.
           </div>
         ) : (
@@ -265,24 +265,24 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
               <StatBox label="Sizes" value={String(sizes.length)} />
             </div>
             {p?.images_uploaded != null && (
-              <div className="mt-1.5 text-3xs text-muted-foreground">
+              <div className="mt-1.5 text-2xs text-muted-foreground">
                 {p.images_uploaded} photo{p.images_uploaded === 1 ? "" : "s"} uploaded
               </div>
             )}
             {(colors.length > 0 || sizes.length > 0) && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {[...colors, ...sizes].slice(0, 8).map((v) => (
-                  <span key={v} className="rounded bg-muted px-1.5 py-0.5 text-3xs leading-tight text-muted-foreground">{v}</span>
+                  <span key={v} className="rounded bg-muted px-1.5 py-0.5 text-2xs leading-tight text-muted-foreground">{v}</span>
                 ))}
                 {colors.length + sizes.length > 8 && (
-                  <span className="rounded px-1 py-0.5 text-3xs leading-tight text-muted-foreground/70">+{colors.length + sizes.length - 8}</span>
+                  <span className="rounded px-1 py-0.5 text-2xs leading-tight text-muted-foreground/70">+{colors.length + sizes.length - 8}</span>
                 )}
               </div>
             )}
             {/* The publish succeeded but the inventory PUT didn't — a flat listing wearing a
                 success badge is exactly the thing worth saying out loud. */}
             {p?.variants_error && (
-              <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1.5 text-3xs leading-relaxed text-amber-700 dark:text-amber-400">
+              <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1.5 text-2xs leading-relaxed text-amber-700 dark:text-amber-400">
                 <Warning size={12} weight="fill" className="mt-px shrink-0" />
                 <span>Listed flat — variants were rejected: {p.variants_error}</span>
               </div>
@@ -296,7 +296,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
             everyone's cannot tell without this, and the name was recorded from the very
             first row and surfaced nowhere. */}
         {(l.by_name || l.uploaded_at) && (
-          <div className="mt-2 flex items-center gap-1.5 truncate text-3xs text-muted-foreground">
+          <div className="mt-2 flex items-center gap-1.5 truncate text-2xs text-muted-foreground">
             {l.by_name && (
               <>
                 <UserIcon size={11} weight="bold" className="shrink-0 opacity-70" />
@@ -483,7 +483,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
             <div className="flex size-full items-center justify-center text-muted-foreground"><Binoculars size={22} weight="duotone" /></div>
           )}
           {trending && (
-            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 text-3xs font-bold uppercase tracking-wide text-white shadow-sm">
+            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 eg-label text-white shadow-sm">
               <TrendUp size={11} weight="bold" /> Trending
             </span>
           )}
@@ -499,7 +499,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
               matches in the tooltip. */}
           {tmHits.length > 0 && (
             <span
-              className="absolute bottom-2 right-2 inline-flex max-w-[62%] items-center gap-1 rounded-md bg-amber-500/90 px-1.5 py-1 text-3xs font-bold uppercase tracking-wide text-white backdrop-blur"
+              className="absolute bottom-2 right-2 inline-flex max-w-[62%] items-center gap-1 rounded-md bg-amber-500/90 px-1.5 py-1 eg-label text-white backdrop-blur"
               title={`Possible trademark: ${tmHits.join(", ")} — heuristic check, not legal advice. A listing mentioning a known brand may risk takedown; verify before copying the idea.`}
             >
               <Warning size={11} weight="fill" className="shrink-0" />
@@ -533,8 +533,8 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
           {tags.length > 0 && (
             <div className="mt-3">
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-3xs font-semibold uppercase tracking-wide text-muted-foreground">{tags.length} keywords</span>
-                <button type="button" onClick={(ev) => { ev.preventDefault(); copyAll() }} className="text-3xs font-medium text-primary hover:underline">
+                <span className="eg-label text-muted-foreground">{tags.length} keywords</span>
+                <button type="button" onClick={(ev) => { ev.preventDefault(); copyAll() }} className="text-2xs font-medium text-primary hover:underline">
                   {copied ? "Copied!" : "Copy all"}
                 </button>
               </div>
@@ -545,7 +545,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
                     type="button"
                     onClick={(ev) => { ev.preventDefault(); onSearchTag(t) }}
                     title={`Research "${t}"`}
-                    className="rounded bg-muted px-1.5 py-0.5 text-3xs leading-tight text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    className="rounded bg-muted px-1.5 py-0.5 text-2xs leading-tight text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   >
                     {t}
                   </button>

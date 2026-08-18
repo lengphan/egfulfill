@@ -535,7 +535,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (
           <Card key={k.label} className="gap-0 p-5">
-            <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="eg-label text-muted-foreground">
               {k.label}
             </div>
             <div className="mt-2 text-3xl font-extrabold tracking-tight tabular-nums">{k.value}</div>
@@ -567,7 +567,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
         </div>
         {pending.length > 0 && (
           <div className="border-b border-border bg-muted/30 px-4 py-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Awaiting confirmation</div>
+            <div className="mb-2 eg-label text-muted-foreground">Awaiting confirmation</div>
             <div className="space-y-1.5">
               {pending.map((p) => {
                 const rejected = p.status === "rejected"

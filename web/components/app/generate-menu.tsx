@@ -156,7 +156,7 @@ export function GenerateButton({ disabled, armed, onArm }: {
         <>
           <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
           <div className="absolute bottom-full left-0 z-20 mb-1 max-h-[70vh] w-[23rem] overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-lg">
-            <div className="mb-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Generate</div>
+            <div className="mb-2 eg-label text-muted-foreground">Generate</div>
 
             {loading && <div className="py-6 text-center"><CircleNotch size={16} className="mx-auto animate-spin text-muted-foreground" /></div>}
 

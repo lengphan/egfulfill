@@ -431,7 +431,7 @@ export function ProductsCatalog() {
                         {sizes.slice(0, 7).map((s) => (
                           <span
                             key={s}
-                            className="shrink-0 rounded border border-border px-1.5 py-0.5 text-3xs font-medium text-muted-foreground"
+                            className="shrink-0 rounded border border-border px-1.5 py-0.5 text-2xs font-medium text-muted-foreground"
                           >
                             {s}
                           </span>

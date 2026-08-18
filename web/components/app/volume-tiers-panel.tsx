@@ -160,7 +160,7 @@ export function VolumeTiersPanel() {
                way every other list in the app sits in one. Same change as the packages table
                above it, because these two cards sit on one screen. */
             <div className="divide-y divide-border border-b border-border">
-              <div className={TIER_ROW + " py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground"}>
+              <div className={TIER_ROW + " py-2 eg-label text-muted-foreground"}>
                 <span>Name</span>
                 <span className="text-right">From (units)</span>
                 {/* The rung's upper bound. It was only ever implied by the NEXT row's
@@ -238,7 +238,7 @@ export function VolumeTiersPanel() {
         {/* WHO THIS WOULD ACTUALLY HIT. */}
         <div className="border-t border-border px-5 pt-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="eg-label text-muted-foreground">
               Who lands where
             </span>
             <Input
@@ -261,7 +261,7 @@ export function VolumeTiersPanel() {
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[26rem] text-sm">
                 <thead>
-                  <tr className="text-2xs uppercase tracking-wider text-muted-foreground">
+                  <tr className="eg-label text-muted-foreground">
                     <th className="py-1.5 pr-3 text-left font-semibold">Seller</th>
                     <th className="py-1.5 pr-3 text-right font-semibold">Orders</th>
                     <th className="py-1.5 pr-3 text-right font-semibold">Units</th>
@@ -308,7 +308,7 @@ export function VolumeTiersPanel() {
               preview implementation would be free to disagree with the real thing. */}
           {preview && (
             <div className="mt-4 rounded-xl border border-border bg-card p-4">
-              <div className="mb-3 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="mb-3 eg-label text-muted-foreground">
                 Seller&apos;s view · <span className="font-mono normal-case">{preview.slice(0, 8)}…</span>
               </div>
               {previewData

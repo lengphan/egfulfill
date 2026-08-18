@@ -338,7 +338,7 @@ export function CatalogView() {
                                 colours themselves are on the product page and in the printed
                                 catalogue, where they are the point. */}
                             {(colorsOf(p).length > 0 || sizesOf(p).length > 0) && (
-                              <div className="mt-1 truncate text-3xs text-muted-foreground">
+                              <div className="mt-1 truncate text-2xs text-muted-foreground">
                                 {colorsOf(p).length} colour{colorsOf(p).length === 1 ? "" : "s"} · {sizesOf(p).length} size{sizesOf(p).length === 1 ? "" : "s"}
                                 {sizesOf(p).length > 0 && <> · {sizesOf(p).slice(0, 8).join(" ")}{sizesOf(p).length > 8 ? "…" : ""}</>}
                               </div>

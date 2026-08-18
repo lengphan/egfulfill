@@ -155,7 +155,7 @@ function placedRows(bySide: Record<string, Record<string, OrderDesign>> | undefi
 function ItemNumberBadge({ no, title }: { no: number | null; title?: string }) {
   return (
     <span
-      className={"flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-bold tabular-nums text-primary-foreground " + (no == null ? "text-3xs" : "text-xs")}
+      className={"flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-bold tabular-nums text-primary-foreground " + (no == null ? "text-2xs" : "text-xs")}
       title={title ?? (no == null ? "Applies to every item on this order" : `Item ${no}`)}
     >
       {no ?? "All"}
@@ -195,7 +195,7 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
           <img src={r.src} alt="" className="size-9 shrink-0 rounded-md border border-border bg-white object-contain" />
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-medium">{r.name}</div>
-            <div className="flex flex-wrap items-center gap-1.5 text-3xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground">
               {/* The FACE, as a chip — it is the thing that makes two otherwise identical
                   rows different, so it should not be buried mid-sentence. */}
               <span className="rounded bg-muted px-1.5 py-0.5 font-medium capitalize text-foreground/70">{r.side}</span>
@@ -369,7 +369,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
       >
         {busy ? <CircleNotch size={18} className="animate-spin text-muted-foreground" /> : <UploadSimple size={18} weight="bold" className="text-muted-foreground" />}
         <span className="text-xs font-medium">{busy ? `Uploading ${busy}…` : "Drop files here or click to browse"}</span>
-        {!compact && <span className="text-3xs text-muted-foreground">.pes goes to the seller · .emb + images stay on the factory boards</span>}
+        {!compact && <span className="text-2xs text-muted-foreground">.pes goes to the seller · .emb + images stay on the factory boards</span>}
         <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => { if (e.target.files) upload(e.target.files); e.target.value = "" }} />
       </div>
 
@@ -392,13 +392,13 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
             const k = KIND_META[f.kind || "other"] ?? KIND_META.other
             return (
               <div key={f.designId} className="relative flex items-center gap-2 p-2">
-                <span className={"flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-3xs font-bold " + k.cls}>{k.icon} {k.label}</span>
+                <span className={"flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-bold " + k.cls}>{k.icon} {k.label}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-xs font-medium">{f.name}</span>
-                    {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-3xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+                    {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-2xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
                   </div>
-                  <div className="truncate text-3xs text-muted-foreground">{scopeLabel(f)}{k.hint}</div>
+                  <div className="truncate text-2xs text-muted-foreground">{scopeLabel(f)}{k.hint}</div>
                 </div>
 
                 {/* Only .pes is sold, so only .pes gets a price — and only admin/warehouse
@@ -659,7 +659,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
       <span className={slim ? "text-2xs font-medium text-muted-foreground" : "text-xs font-medium"}>
         {busy ? `Sending ${busy}…` : slim ? "Add another machine file or design image" : "Have a machine file or a design image? Drop it here"}
       </span>
-      {!slim && <span className="text-3xs text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>}
+      {!slim && <span className="text-2xs text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>}
       <input ref={inputRef} type="file" multiple accept={MACHINE_ACCEPT + ",image/*"} className="hidden"
         onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = "" }} />
     </div>
@@ -735,7 +735,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
               <div className="truncate text-xs font-medium">{s.name}</div>
               {/* Says what it will BECOME, because the two kinds land in different places
                   and only one of them shows up on the mockup. */}
-              <div className="text-3xs text-muted-foreground">
+              <div className="text-2xs text-muted-foreground">
                 {s.image ? "artwork — placed on the item" : "machine file — we check it instead of digitising"}
                 {items.length > 0 && s.target !== ALL ? " · matched by name" : ""}
               </div>
@@ -752,7 +752,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             ) : (
               // Not a disabled dropdown — there is no choice to grey out. It says why, and
               // Attach below leaves this row alone.
-              <span className="shrink-0 rounded-lg bg-amber-50 px-2 py-1 text-3xs font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+              <span className="shrink-0 rounded-lg bg-amber-50 px-2 py-1 text-2xs font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
                 No embroidery item on this order
               </span>
             ))}
@@ -921,7 +921,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-sm font-medium">{f.name}</span>
-              {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-3xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+              {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-2xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
             </div>
             <div className="text-xs text-muted-foreground">
               {f.sku ? `Item ${f.sku} · ` : ""}

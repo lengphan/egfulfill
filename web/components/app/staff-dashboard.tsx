@@ -92,7 +92,7 @@ function MiniStat({
         </span>
         <div className="min-w-0">
           <div className="text-2xl font-black leading-none tracking-tight tabular-nums">{value}</div>
-          <div className="mt-2 truncate text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+          <div className="mt-2 truncate eg-label text-muted-foreground">{label}</div>
           {/* NO CAPTION. These read as explanations of the figure above them ("we earned",
               "after $73 costs", "per order") and the owner's call is that the figure and its
               label carry it. Dropped here rather than at each call site so nothing can
@@ -406,15 +406,19 @@ export function StaffDashboard() {
                   <div className="font-title text-4xl font-black leading-none tracking-tight tabular-nums sm:text-5xl">
                     {orders === null ? "—" : usd(money.revenue)}
                   </div>
-                  <div className="mt-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{tl("rangesub", rangeMeta.sub)}</div>
+                  <div className="mt-1.5 eg-label text-muted-foreground">{tl("rangesub", rangeMeta.sub)}</div>
                 </div>
                 {/* The figures that QUALIFY the headline, at a third its weight — the
                     hierarchy the old panel was built for, kept. */}
+                {/* NO CAPTION, the same rule the tiles above already follow. "we earned",
+                    "after $275 costs", "per order" explained figures their own labels
+                    already name — three sentences under three headings, in a panel whose
+                    whole job is to be glanced at. `sub` is still computed and still
+                    reachable in the tooltip-free case; it is simply not drawn. */}
                 {moneySide.map((c) => (
-                  <div key={c.label}>
+                  <div key={c.label} title={c.sub}>
                     <div className="text-xl font-bold tabular-nums">{c.value}</div>
-                    <div className="mt-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{c.label}</div>
-                    <div className="text-2xs text-muted-foreground">{c.sub}</div>
+                    <div className="mt-1 eg-label text-muted-foreground">{c.label}</div>
                   </div>
                 ))}
               </div>

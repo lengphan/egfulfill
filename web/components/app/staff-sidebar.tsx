@@ -77,7 +77,7 @@ export function StaffSidebar() {
         {/* Seller-side tools this role may use (admin: all; operator/warehouse: a curated set). */}
         {tools.length > 0 && (
           <>
-            <div className="px-3 pb-2 pt-5 text-2xs font-semibold uppercase tracking-wider text-sidebar-foreground/70">{nl("nav", "Tools")}</div>
+            <div className="px-3 pb-2 pt-5 eg-label text-sidebar-foreground/70">{nl("nav", "Tools")}</div>
             {tools.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/")
               const Icon = item.icon
@@ -92,7 +92,7 @@ export function StaffSidebar() {
         )}
 
         {/* Common to every staff member — profile + factory chat. */}
-        <div className="px-3 pb-2 pt-5 text-2xs font-semibold uppercase tracking-wider text-sidebar-foreground/70">{nl("nav", "Account")}</div>
+        <div className="px-3 pb-2 pt-5 eg-label text-sidebar-foreground/70">{nl("nav", "Account")}</div>
         {[{ label: "Chat", href: "/chat", icon: ChatCircleDots }, { label: "Settings", href: "/settings", icon: Gear }].map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/")
           const Icon = item.icon

@@ -201,7 +201,7 @@ export function SupplierDetailDialog({
         <DialogHeader>
           <DialogTitle className="min-w-0 space-y-0.5">
             {(d?.brand || seed?.brand) && (
-              <span className="block truncate text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="block truncate eg-label text-muted-foreground">
                 {d?.brand || seed?.brand}
               </span>
             )}
@@ -507,7 +507,7 @@ export function SupplierDetailDialog({
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="eg-label text-muted-foreground">{label}</div>
       <div className="text-sm">{children}</div>
     </div>
   )

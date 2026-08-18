@@ -125,7 +125,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
           <div className="space-y-4 py-1">
             {/* Payout details */}
             <div className="space-y-2.5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your payout details</div>
+              <div className="eg-label text-muted-foreground">Your payout details</div>
               <label className="flex flex-col gap-1">
                 <span className="text-2xs text-muted-foreground">Method</span>
                 <select value={type} onChange={(e) => changeMethod(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
@@ -158,7 +158,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
                       <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent">
                         <UploadSimple size={20} weight="bold" />
                         Upload your bank QR code
-                        <span className="text-3xs">PNG or JPG · up to 2 MB</span>
+                        <span className="text-2xs">PNG or JPG · up to 2 MB</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
                       </label>
                     )}
@@ -179,7 +179,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
             {/* Amount */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amount</div>
+                <div className="eg-label text-muted-foreground">Amount</div>
                 <button onClick={() => setAmount(String(Math.max(0, Math.floor(ceiling))))} disabled={ceiling < bounds.min} className="text-xs font-medium text-primary hover:underline disabled:opacity-40">Withdraw all</button>
               </div>
               <div className="relative">

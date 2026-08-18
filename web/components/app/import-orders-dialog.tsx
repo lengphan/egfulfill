@@ -464,7 +464,7 @@ export function ImportOrdersDialog({
                     Ship Address 2 four columns from the street it continues. */}
                 {columnBands().map((band) => (
                   <div key={`${band.group}-${band.start}`} className="space-y-1">
-                    <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="eg-label text-muted-foreground">
                       {GROUP_LABEL[band.group]}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -607,7 +607,7 @@ export function ImportOrdersDialog({
                       the master picks up a column rename without being rebuilt. */}
                   {isTemplateAdmin && copyUrl && (
                     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 p-3">
-                      <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Admin</span>
+                      <span className="eg-label text-muted-foreground">Admin</span>
                       <Button
                         variant="outline"
                         size="sm"

@@ -574,7 +574,7 @@ export function BroadcastsView() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-2xs uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-border text-left eg-label text-muted-foreground">
                   <th className="py-2 pr-3 font-medium">Subject</th>
                   <th className="py-2 pr-3 font-medium">Audience</th>
                   <th className="py-2 pr-3 font-medium">Status</th>
@@ -771,7 +771,7 @@ export function BroadcastsView() {
                             {r.email}
                             {r.name && <span className="ml-1.5 text-muted-foreground">{r.name}</span>}
                           </span>
-                          {r.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">added</span>}
+                          {r.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">added</span>}
                           <button type="button" onClick={() => cDrop(r)} aria-label={`Remove ${r.email}`}
                                   className="eg-tap shrink-0 text-muted-foreground transition-colors hover:text-destructive">
                             <X size={12} weight="bold" />
@@ -883,11 +883,11 @@ export function BroadcastsView() {
                           {/* The reason sits under the address it belongs to — a failure list
                               that doesn't say why is just a shorter list. */}
                           {d.status === "failed" && d.error && (
-                            <span className="mt-0.5 block font-mono text-3xs leading-snug text-red-700 dark:text-red-300">{d.error}</span>
+                            <span className="mt-0.5 block font-mono text-2xs leading-snug text-red-700 dark:text-red-300">{d.error}</span>
                           )}
                         </span>
-                        {d.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">added</span>}
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-3xs ${
+                        {d.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">added</span>}
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-2xs ${
                           d.status === "sent"
                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
                             : "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300"
@@ -980,7 +980,7 @@ export function BroadcastsView() {
                           {r.email}
                           {r.name && <span className="ml-1.5 text-muted-foreground">{r.name}</span>}
                         </span>
-                        {r.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">added</span>}
+                        {r.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">added</span>}
                         <button
                           type="button"
                           onClick={() => void dropRecipient(r)}
@@ -1004,7 +1004,7 @@ export function BroadcastsView() {
                     <Button size="sm" variant="outline" disabled={!addr.trim() || counting} onClick={() => void addRecipient()}>Add</Button>
                   </div>
                   {/* Said plainly, because it is the part people assume doesn't work. */}
-                  <p className="border-t border-border px-2.5 py-1.5 text-3xs text-muted-foreground">
+                  <p className="border-t border-border px-2.5 py-1.5 text-2xs text-muted-foreground">
                     Added addresses get a real unsubscribe link — opting out suppresses that address for good, account or not.
                   </p>
                 </div>

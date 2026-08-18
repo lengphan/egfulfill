@@ -106,7 +106,7 @@ export function SellerUploadHistory() {
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-sm font-medium">{numOf(o)}</span>
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-3xs font-medium capitalize text-muted-foreground">{platformOf(o)}</span>
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-2xs font-medium capitalize text-muted-foreground">{platformOf(o)}</span>
                     </div>
                     {o.store && <div className="truncate text-xs text-muted-foreground">{o.store}</div>}
                   </TableCell>

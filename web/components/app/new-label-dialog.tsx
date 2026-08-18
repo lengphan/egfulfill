@@ -432,7 +432,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
           <>
             <div className="grid gap-x-5 gap-y-3 py-1 md:grid-cols-2">
               <div className="space-y-3 md:col-span-1">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+              <div className="eg-label text-muted-foreground">Ship to</div>
               {/* Live validation status sits INSIDE the box, bottom-right; extra bottom padding
                   keeps the last address line clear of it. */}
               <div className="relative">
@@ -453,9 +453,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-2xs font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
                 </div>
               </div>
-              <p className="text-3xs text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
+              <p className="text-2xs text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
 
-              <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Parcel</div>
+              <div className="pt-1 eg-label text-muted-foreground">Parcel</div>
 
               {/* THE PACKAGE FIRST. It is the choice that fills three of the five numbers
                   below, so asking for it last meant typing dimensions and then overwriting
@@ -536,7 +536,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   to reach. Its own column, its own scroll, so a long list of services
                   never pushes the Buy button off screen. */}
               <div className="space-y-3 md:col-span-1">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rates</div>
+              <div className="eg-label text-muted-foreground">Rates</div>
               <Button variant="outline" className="w-full" onClick={getRates} disabled={ratesLoading || !addrComplete(to) || !addrComplete(from)}>
                 {ratesLoading ? <><CircleNotch size={14} className="animate-spin" /> Getting rates…</> : rates ? "Refresh rates" : <><Truck size={14} weight="bold" /> Get rates</>}
               </Button>

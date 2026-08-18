@@ -151,7 +151,7 @@ export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
           {/* Real money already booked into wallet_ledger — the actual spend, not an estimate. */}
           {data.ledgered.some((c) => c.dollars > 0 || c.count > 0) && (
             <div className="mt-5">
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Real costs (from the ledger)</div>
+              <div className="mb-1.5 eg-label text-muted-foreground">Real costs (from the ledger)</div>
               <div className="grid gap-2 sm:grid-cols-4">
                 {data.ledgered.map((c) => (
                   <div key={c.type} className="rounded-lg border border-border bg-muted/20 p-2.5 text-center">

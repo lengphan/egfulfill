@@ -79,7 +79,7 @@ function Slider({ label, hint, unit, value, min, max, step, onChange }: {
         min={min} max={max} step={step}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">{hint}</span>
+      <span className="mt-1 block text-2xs leading-snug text-muted-foreground">{hint}</span>
     </label>
   )
 }
@@ -184,7 +184,7 @@ export function MotionEditor({ value, onChange }: {
                 <option value="custom">Custom — {curveKey(preset.ease)}</option>
               )}
             </select>
-            <span className="mt-1 block font-mono text-[11px] text-muted-foreground">
+            <span className="mt-1 block font-mono text-2xs text-muted-foreground">
               cubic-bezier({preset.ease.join(", ")})
             </span>
           </label>
@@ -245,7 +245,7 @@ export function MotionEditor({ value, onChange }: {
             ))}
           </div>
 
-          <p className="mt-5 text-[11px] leading-snug text-black/45">
+          <p className="mt-5 text-2xs leading-snug text-black/45">
             The last element lands at{" "}
             <span className="font-mono">
               {(preset.delay + 8 * preset.stagger + preset.duration).toFixed(2)}s

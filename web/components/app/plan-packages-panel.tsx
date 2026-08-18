@@ -113,7 +113,7 @@ export function PlanPackagesPanel() {
               one line about to touch another. The card is already the frame; the rows sit
               directly in it, full width, separated the way every other list in the app is. */}
           <div className="divide-y divide-border border-b border-border">
-            <div className={ROW + " py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground"}>
+            <div className={ROW + " py-2 eg-label text-muted-foreground"}>
               <span>Plan</span>
               <span className="text-right">Sellers</span>
               <span className="text-right">Per month</span>

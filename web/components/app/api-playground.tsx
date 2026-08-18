@@ -183,7 +183,7 @@ export function ApiPlayground() {
       {/* Key bar */}
       <SectionCard
         title={<span className="flex items-center gap-2">Your API key
-          <span className={"rounded-full px-2 py-0.5 text-3xs font-semibold uppercase " + (env === "live" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>{env === "live" ? "Live" : "Sandbox"}</span>
+          <span className={"rounded-full px-2 py-0.5 text-2xs font-semibold uppercase " + (env === "live" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>{env === "live" ? "Live" : "Sandbox"}</span>
         </span>}
         actions={
           <div className="flex rounded-lg border border-border p-0.5">
@@ -259,7 +259,7 @@ export function ApiPlayground() {
                 (selected.id === e.id ? "bg-primary/10 text-primary" : "hover:bg-accent")
               }
             >
-              <span className={"rounded px-1.5 py-0.5 font-mono text-3xs font-bold " + methodTone[e.method]}>{e.method}</span>
+              <span className={"rounded px-1.5 py-0.5 font-mono text-2xs font-bold " + methodTone[e.method]}>{e.method}</span>
               <span className="truncate font-medium">{e.title}</span>
             </button>
           ))}

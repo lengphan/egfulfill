@@ -160,7 +160,7 @@ export function CashAccountsPanel() {
   return (
     <div className="space-y-2 rounded-xl bg-muted/40 p-2.5">
       <div className="flex items-baseline justify-between gap-2 px-0.5">
-        <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Accounts</span>
+        <span className="eg-label text-muted-foreground">Accounts</span>
         <button onClick={() => add()} className="eg-tap text-2xs font-medium text-primary hover:underline">+ Add</button>
       </div>
 
@@ -171,10 +171,10 @@ export function CashAccountsPanel() {
         // group/acct so the controls stay out of sight until this card is pointed at — three
         // buttons on every card is a wall of chrome on a figure you mostly just read.
         <Card key={a.id} className="group/acct gap-0 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-center gap-1.5 eg-label text-muted-foreground">
             {a.kind === "card" ? <CreditCard size={11} /> : <Bank size={11} />}
             <span className="truncate">{a.name}</span>
-            {a.is_postage && <span className="ml-auto shrink-0 rounded bg-primary/10 px-1 text-3xs normal-case text-primary">postage</span>}
+            {a.is_postage && <span className="ml-auto shrink-0 rounded bg-primary/10 px-1 text-2xs normal-case text-primary">postage</span>}
           </div>
           <div className="mt-0.5 flex items-baseline justify-between gap-2">
             <span className={"text-base font-bold tracking-tight tabular-nums " + (a.balance < 0 ? "text-red-600 dark:text-red-400" : "")}>
@@ -206,10 +206,10 @@ export function CashAccountsPanel() {
 
       {view.unassigned.entries > 0 && (
         <Card className="group/un gap-0 border-dashed px-3 py-2">
-          <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Unassigned</div>
+          <div className="eg-label text-muted-foreground">Unassigned</div>
           <div className="mt-0.5 flex items-baseline justify-between gap-2">
             <span className="text-base font-bold tabular-nums">{usd(view.unassigned.amount)}</span>
-            <span className="text-3xs text-muted-foreground">{view.unassigned.entries} entries</span>
+            <span className="text-2xs text-muted-foreground">{view.unassigned.entries} entries</span>
           </div>
           {/* Postage places itself from the moment a card is marked — but everything bought
               BEFORE that is still sitting here, and seventy-odd rows through a per-row picker
@@ -230,7 +230,7 @@ export function CashAccountsPanel() {
           footing with real balances. The one-click id still matters: a hand-typed
           "Ping Pong" becomes `ping-pong` and then silently receives nothing. */}
       {missing.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1 pt-0.5 text-3xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-1 pt-0.5 text-2xs text-muted-foreground">
           <span>Add:</span>
           {missing.map((sg) => (
             <button key={sg.id} onClick={() => add(sg)} disabled={busy === sg.id}

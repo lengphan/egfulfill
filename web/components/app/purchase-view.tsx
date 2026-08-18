@@ -114,13 +114,13 @@ function SourceTags({ line }: { line: POLine }) {
         // lines have no `num`, and fall back to what they always showed.
         const label = s.num || `#${s.order}`
         return (
-          <span key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground"
+          <span key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground"
                 title={`${s.qty} of these are for order ${label}${s.num ? ` (${s.order})` : ""}`}>
             {label} ×{s.qty}
           </span>
         )
       })}
-      {src.length > 4 && <span className="text-3xs text-muted-foreground">+{src.length - 4} more</span>}
+      {src.length > 4 && <span className="text-2xs text-muted-foreground">+{src.length - 4} more</span>}
     </span>
   )
 }
@@ -1376,7 +1376,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                               <span className="tabular-nums text-foreground">{t.tracking}</span>
                               {/* A box number only appears on split shipments — which is
                                   exactly when you need to know there's more than one. */}
-                              {t.box && <span className="rounded bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">box {t.box}</span>}
+                              {t.box && <span className="rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">box {t.box}</span>}
                               {t.deliveredAt
                                 ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
                                     <CheckCircle size={10} weight="fill" /> delivered
@@ -1751,7 +1751,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                                       <span className={covers ? "font-semibold text-foreground" : "font-medium text-muted-foreground"}>{w.abbr}</span>
                                       <span className="tabular-nums text-muted-foreground">{w.qty}</span>
                                     </span>
-                                    <span className="text-3xs leading-none text-muted-foreground">
+                                    <span className="text-2xs leading-none text-muted-foreground">
                                       {eta.deliveryAt ? fmtEta(eta.deliveryAt) : "no ETA"}
                                     </span>
                                   </label>
@@ -1773,7 +1773,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                               className="h-8 w-full px-1 text-center text-sm tabular-nums"
                             />
                             <span className="text-2xs font-medium leading-none">Otto</span>
-                            <span className="text-3xs leading-none text-muted-foreground">
+                            <span className="text-2xs leading-none text-muted-foreground">
                               {ottoStock[l.sku] == null ? "stock unknown" : `${ottoStock[l.sku]} avail`}
                             </span>
                           </label>

@@ -44,7 +44,7 @@ export function StatCard({
   // and the row it sits in gets room to breathe (p-6).
   const body = (
     <>
-      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+      <div className="flex items-center gap-1.5 eg-label text-muted-foreground">
         {/* Monochrome and inline, not a tinted plate floating in the corner. A coloured
             chip on every card meant a row of four met the eye as four identical stickers
             before a single word was read — the same reasoning that already de-tinted the
@@ -52,7 +52,10 @@ export function StatCard({
         {Icon && <Icon size={14} className="shrink-0 opacity-70" />}
         <span className="min-w-0 truncate">{label}</span>
       </div>
-      <div className="mt-2.5 text-[1.75rem] font-black leading-none tracking-tight tabular-nums sm:text-[2.125rem]">{value}</div>
+      {/* ON THE SCALE. This was 28px stepping to 34px — two sizes that exist nowhere else,
+          and 34 sat two pixels from the dashboard's own 36px figure, which is a difference
+          the eye reads as a mistake rather than a level. 24 → 36 are both steps. */}
+      <div className="mt-2.5 text-2xl font-black leading-none tracking-tight tabular-nums sm:text-4xl">{value}</div>
     </>
   )
 

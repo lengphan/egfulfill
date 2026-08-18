@@ -812,7 +812,7 @@ export function ProductEditorDialog({
             {img && (
               <div className="space-y-1">
                 <label className="flex items-center gap-1.5">
-                  <span className="w-8 shrink-0 text-3xs uppercase tracking-wider text-muted-foreground">Zoom</span>
+                  <span className="w-8 shrink-0 eg-label text-muted-foreground">Zoom</span>
                   <input
                     type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={5} value={imgZoom || 100}
                     onChange={(e) => setImgZoom(Number(e.target.value))}
@@ -820,7 +820,7 @@ export function ProductEditorDialog({
                   />
                 </label>
                 <label className="flex items-center gap-1.5">
-                  <span className="w-8 shrink-0 text-3xs uppercase tracking-wider text-muted-foreground">Up/dn</span>
+                  <span className="w-8 shrink-0 eg-label text-muted-foreground">Up/dn</span>
                   {/* The ENDS are the same numbers they always were (0–100, 50 centre) — what
                       grew is how far each one moves the picture. It used to pan through the
                       cover overflow, which on a 4:3 photo in a square box is zero: the slider
@@ -835,7 +835,7 @@ export function ProductEditorDialog({
                   <button
                     type="button"
                     onClick={() => { setImgZoom(100); setImgFocusY(50) }}
-                    className="w-full text-3xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    className="w-full text-2xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                   >
                     Reset framing
                   </button>
@@ -1379,7 +1379,7 @@ export function ProductEditorDialog({
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={u} alt="" className="size-full object-cover" draggable={false} />
                     </button>
-                    {u === img && <span className="pointer-events-none absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-3xs font-semibold text-primary-foreground shadow">Main</span>}
+                    {u === img && <span className="pointer-events-none absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-2xs font-semibold text-primary-foreground shadow">Main</span>}
                     {assigned && matchConf[assigned] === "high" && <Check size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-success" aria-label="Confident match" />}
                     {assigned && matchConf[assigned] === "low" && <Question size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-amber-500" aria-label="Guessed — verify" />}
                     {/* Colour tag overlaid on the photo. */}

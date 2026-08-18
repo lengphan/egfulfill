@@ -63,7 +63,7 @@ export function ColumnsMenu({
               <DotsSixVertical size={13} weight="bold" className="shrink-0 text-muted-foreground" />
               <span className={"flex-1 truncate " + (off ? "text-muted-foreground line-through" : "")}>{col.label}</span>
               {col.locked ? (
-                <span className="text-3xs text-muted-foreground">always</span>
+                <span className="text-2xs text-muted-foreground">always</span>
               ) : (
                 <button onClick={() => toggle(id)} aria-label={off ? `Show ${col.label}` : `Hide ${col.label}`} className="shrink-0 text-muted-foreground hover:text-foreground">
                   {off ? <EyeSlash size={14} /> : <Eye size={14} weight="fill" />}

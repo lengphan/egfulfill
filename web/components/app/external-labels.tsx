@@ -423,7 +423,7 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
               </span>
               {/* Their own word for the state, kept verbatim beside ours — it is what
                   their dashboard shows, so the two can be matched up. */}
-              {u.status && <span className="block truncate text-2xs uppercase tracking-wide opacity-70">{u.status}</span>}
+              {u.status && <span className="block truncate eg-label opacity-70">{u.status}</span>}
             </span>
             <span className="min-w-0 text-xs">
               {trackText ? (
@@ -482,7 +482,7 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
  *  charged for it, no stage moves, and no seller is behind it. */
 function ExternalTag() {
   return (
-    <span className="mt-0.5 w-fit rounded border border-border bg-muted px-1 py-px text-3xs font-medium uppercase tracking-wide text-muted-foreground">
+    <span className="mt-0.5 w-fit rounded border border-border bg-muted px-1 py-px eg-label text-muted-foreground">
       External
     </span>
   )

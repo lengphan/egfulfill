@@ -158,8 +158,8 @@ export function QuickOrderDialog({
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium">{s.size}</div>
                 {s.sku
-                  ? <div className="truncate font-mono text-3xs text-muted-foreground">{s.sku}</div>
-                  : <div className="truncate text-3xs text-amber-700">no supplier sku — can&apos;t be ordered</div>}
+                  ? <div className="truncate font-mono text-2xs text-muted-foreground">{s.sku}</div>
+                  : <div className="truncate text-2xs text-amber-700">no supplier sku — can&apos;t be ordered</div>}
               </div>
               <Input
                 value={qty[s.size] ?? ""}

@@ -65,7 +65,7 @@ function ThreadSelect({ value, options, onChange }: {
       <DropdownMenuTrigger className="flex h-8 w-full min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
         <span className="size-3.5 shrink-0 rounded-full border border-black/15" style={{ background: current.hex }} />
         <span className="truncate font-medium">{current.name}</span>
-        <span className="shrink-0 font-mono text-3xs text-muted-foreground">{current.code}</span>
+        <span className="shrink-0 font-mono text-2xs text-muted-foreground">{current.code}</span>
         <CaretDown size={11} weight="bold" className="ml-auto shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-64 min-w-56 overflow-y-auto">
@@ -74,9 +74,9 @@ function ThreadSelect({ value, options, onChange }: {
             <span className="size-3.5 shrink-0 rounded-full border border-black/15" style={{ background: o.hex }} />
             <span className="truncate">{o.name}</span>
             {i === 0 && (
-              <span className="shrink-0 rounded bg-muted px-1 py-px text-3xs font-medium text-muted-foreground">best match</span>
+              <span className="shrink-0 rounded bg-muted px-1 py-px text-2xs font-medium text-muted-foreground">best match</span>
             )}
-            <span className="ml-auto shrink-0 font-mono text-3xs text-muted-foreground">{o.code}</span>
+            <span className="ml-auto shrink-0 font-mono text-2xs text-muted-foreground">{o.code}</span>
             {o.code === value && <Check size={12} weight="bold" className="shrink-0 text-primary" />}
           </DropdownMenuItem>
         ))}
@@ -528,7 +528,7 @@ export function DesignStage({
           style={{ left: `${printZone.x}%`, top: `${printZone.y}%`, width: `${printZone.w}%`, height: `${printZone.h}%` }}
         >
           {printLabel && (
-            <span className="absolute -top-5 left-0 rounded bg-background/80 px-1 text-3xs font-medium tracking-wide text-muted-foreground">
+            <span className="absolute -top-5 left-0 rounded bg-background/80 px-1 text-2xs font-medium tracking-wide text-muted-foreground">
               {printLabel}
             </span>
           )}
@@ -629,7 +629,7 @@ export function DesignStage({
             className="block rounded-full border-2 border-white shadow-lg ring-1 ring-black/20"
             style={{ width: LOUPE, height: LOUPE }}
           />
-          <div className="mt-1 flex items-center justify-center gap-1.5 rounded-md bg-foreground/90 px-1.5 py-0.5 text-3xs font-medium text-background">
+          <div className="mt-1 flex items-center justify-center gap-1.5 rounded-md bg-foreground/90 px-1.5 py-0.5 text-2xs font-medium text-background">
             <span className="size-2.5 rounded-full border border-white/40" style={{ background: loupe.hex }} />
             <span className="font-mono">{loupe.hex}</span>
           </div>
@@ -731,7 +731,7 @@ function CustomerFileThumb({ src }: { src: string }) {
     return (
       <a href={canvasReadableSrc(src)} target="_blank" rel="noreferrer"
          title="We can't render this file here — open it to view"
-         className={box + " grid place-items-center bg-muted text-3xs font-semibold text-muted-foreground hover:bg-accent"}>
+         className={box + " grid place-items-center bg-muted text-2xs font-semibold text-muted-foreground hover:bg-accent"}>
         {art.pdf ? "PDF" : "FILE"}
       </a>
     )
@@ -1833,7 +1833,7 @@ export function DesignCanvasDialog({
                     decides both the fee and the wait. A DTG line has no such choice, so it
                     is not offered one. */}
                 <span className="text-xs font-medium leading-tight">Drop a file<br />or click to browse</span>
-                <span className="text-3xs font-normal leading-tight opacity-80">
+                <span className="text-2xs font-normal leading-tight opacity-80">
                   {isEmb ? "PNG or JPG — or a .EMB / .PES / .DST" : "PNG or JPG"}
                 </span>
               </span>
@@ -2386,7 +2386,7 @@ export function DesignCanvasDialog({
                                   Standard, and a charge chosen by someone who can't see the
                                   amount is a charge made blind. Only once fees load. */}
                               {fee !== null && (
-                                <span className="block text-3xs font-normal tabular-nums opacity-70">{usd(fee)}</span>
+                                <span className="block text-2xs font-normal tabular-nums opacity-70">{usd(fee)}</span>
                               )}
                             </>
                           )}

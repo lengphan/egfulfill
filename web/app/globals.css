@@ -10,8 +10,17 @@
        here so dense UI has a legitimate step to reach for instead of inventing one.
        NOTE: the print components (label sheets, catalog print, QR captions) size text in
        millimetres of paper and keep their own arbitrary values on purpose. */
-    --text-2xs: 0.6875rem;   /* 11px */
-    --text-3xs: 0.625rem;    /* 10px */
+    /* SIX STEPS, and nothing between them.
+       11 · 12 · 14 · 18 · 24 · 36. Nine sizes were in use across the app — including 34 AND
+       36, and 10 AND 11 AND 12. A pair that close is not a level of hierarchy: the eye
+       cannot resolve it as a decision, so it reads the screen as misaligned rather than
+       ranked, which is the "patchy" feeling. Three of those steps were removed rather than
+       renamed; what is left is far enough apart to mean something.
+       10px is gone: `text-2xs` was a step below the smallest legible caption, used 137
+       times, and at 10px Inter's counters close up on a laptop screen.
+       NOTE: the print components (label sheets, catalog print, QR captions) size text in
+       millimetres of paper and keep their own arbitrary values on purpose. */
+    --text-2xs: 0.6875rem;   /* 11px — the smallest step */
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
     /* TWO heading tokens, because marketing and the app want opposite things.
@@ -326,6 +335,28 @@
    a laptop moves. These set `padding-inline`, so they override the shell's `px-4 md:px-8`
    at these widths rather than fighting it. */
 .eg-content { max-width: 1600px; }
+
+/**
+ * ONE MICRO-LABEL, and it is deliberately spaced.
+ *
+ * Section headers, table column captions and field labels were written five ways: 11px and
+ * 10px, 500 and 600, `tracking-wide` and `tracking-wider` and `tracking-widest` — sometimes
+ * two of them a few pixels apart on the same panel. None of those differences carried
+ * meaning, so the eye read them as things that failed to line up. That is what makes a
+ * screen look patchy: not variety, NEAR-variety.
+ *
+ * 0.12em is a real interval, not the 0.025em that `tracking-wide` gives at this size — at
+ * 11px that reads as normal text that came out slightly wrong. Small, spaced capitals are
+ * the one place letter-spacing is doing typographic work rather than decoration: they are
+ * being read as a label, not as a sentence.
+ */
+.eg-label {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.35;
+}
 @media (min-width: 1024px) { .eg-content { padding-inline: 3rem; } }
 @media (min-width: 1440px) { .eg-content { padding-inline: 4rem; } }
 @media (min-width: 1800px) { .eg-content { padding-inline: 5rem; } }

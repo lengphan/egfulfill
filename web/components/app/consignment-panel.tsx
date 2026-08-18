@@ -179,7 +179,7 @@ export function ConsignmentPanel() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-semibold">{s.id}</span>
-                    <span className={"rounded-full px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide " + (STATUS_TONE[s.status] ?? "bg-muted text-muted-foreground")}>
+                    <span className={"rounded-full px-2 py-0.5 eg-label " + (STATUS_TONE[s.status] ?? "bg-muted text-muted-foreground")}>
                       {s.status.replace(/_/g, " ")}
                     </span>
                     {s.seller_name && <span className="text-sm text-muted-foreground">{s.seller_name}</span>}
@@ -364,7 +364,7 @@ export function ConsignmentPanel() {
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
                     <div className={"h-full " + (pct > 85 ? "bg-amber-500" : "bg-primary")} style={{ width: `${pct}%` }} />
                   </div>
-                  <div className="mt-1 text-3xs text-muted-foreground">{b.used}/{b.capacity} units</div>
+                  <div className="mt-1 text-2xs text-muted-foreground">{b.used}/{b.capacity} units</div>
                 </div>
               )
             })}

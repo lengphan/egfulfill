@@ -192,7 +192,7 @@ export function WebhooksPanel() {
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {(w.events?.length ? w.events : ["all events"]).map((e) => (
-                      <span key={e} className="rounded bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">{e}</span>
+                      <span key={e} className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground">{e}</span>
                     ))}
                   </div>
 

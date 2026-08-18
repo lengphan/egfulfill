@@ -92,9 +92,9 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
           </button>
         </div>
         <div className="grid grid-cols-3 gap-1.5 text-center">
-          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.listings)}</div><div className="text-3xs text-muted-foreground">Products</div></div>
-          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.sales)}</div><div className="text-3xs text-muted-foreground">Sales</div></div>
-          <div className="rounded-lg bg-muted/50 py-1.5"><div className="flex items-center justify-center gap-0.5 text-sm font-semibold tabular-nums">{s.rating != null ? <>{s.rating.toFixed(1)}<Star size={11} weight="fill" className="text-amber-500" /></> : "—"}</div><div className="text-3xs text-muted-foreground">{fmtK(s.reviews)} reviews</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.listings)}</div><div className="text-2xs text-muted-foreground">Products</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.sales)}</div><div className="text-2xs text-muted-foreground">Sales</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="flex items-center justify-center gap-0.5 text-sm font-semibold tabular-nums">{s.rating != null ? <>{s.rating.toFixed(1)}<Star size={11} weight="fill" className="text-amber-500" /></> : "—"}</div><div className="text-2xs text-muted-foreground">{fmtK(s.reviews)} reviews</div></div>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => onOpen(s)} className={cn(CARD_ACTION_PRIMARY, "flex-1")}>

@@ -686,7 +686,7 @@ export default function ChatPage() {
                     clears on the next load, ignore it and it stays — a to-do, the way every
                     other messenger reads. */}
                 {!!c.count && (
-                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-3xs font-bold tabular-nums text-primary-foreground">
+                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-2xs font-bold tabular-nums text-primary-foreground">
                     {c.count > 99 ? "99+" : c.count}
                   </span>
                 )}
@@ -907,7 +907,7 @@ export default function ChatPage() {
                           )
                         })()}
                       </div>
-                      <span className="mt-0.5 flex items-center gap-1.5 px-1 text-3xs text-muted-foreground">
+                      <span className="mt-0.5 flex items-center gap-1.5 px-1 text-2xs text-muted-foreground">
                         {m.orderRef && (
                           // Which order this is about — the context the per-order
                           // channels used to carry in their name.
@@ -1030,7 +1030,7 @@ export default function ChatPage() {
                   ) : (
                     <div className="flex size-16 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-muted/50 px-1">
                       <FileText size={18} weight="duotone" className="text-muted-foreground" />
-                      <span className="w-full truncate text-center text-3xs text-muted-foreground">{pendingAtt.name}</span>
+                      <span className="w-full truncate text-center text-2xs text-muted-foreground">{pendingAtt.name}</span>
                     </div>
                   )}
                   <button

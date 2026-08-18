@@ -33,7 +33,7 @@ export function ProductThumb({ src, alt = "", className = "" }: {
       ) : (
         /* "no image" rather than an icon: a product with no photograph is a thing someone
            has to go and fix, and it should read as missing rather than as styling. */
-        <div className="flex size-full items-center justify-center text-center text-3xs text-muted-foreground">
+        <div className="flex size-full items-center justify-center text-center text-2xs text-muted-foreground">
           no image
         </div>
       )}

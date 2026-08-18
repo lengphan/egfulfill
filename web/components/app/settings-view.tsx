@@ -497,7 +497,7 @@ function ApiKeysPanel() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium">{k.label || "Test key"}</span>
-                  <Badge variant="secondary" className="text-3xs uppercase">{k.mode}</Badge>
+                  <Badge variant="secondary" className="text-2xs uppercase">{k.mode}</Badge>
                   {k.revoked_at && <span className="text-2xs font-medium text-red-600">revoked</span>}
                 </div>
                 <div className="mt-0.5 font-mono text-xs text-muted-foreground">
@@ -963,7 +963,7 @@ function FeeGroup({ title, hint, children }: { title: string; hint: string; chil
   if (q && !groupItself && Children.count(rows) === 0) return null
   return (
     <section className="mt-5 first:mt-0">
-      <h4 className="text-sm font-semibold uppercase tracking-widest text-primary">{title}</h4>
+      <h4 className="eg-label text-primary">{title}</h4>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
       <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">{rows}</div>
     </section>
@@ -1657,7 +1657,7 @@ function PlatformPanel() {
         </p>
 
         <div className="mb-3 overflow-hidden rounded-lg border border-border">
-          <div className="grid grid-cols-[auto_7rem_1fr_auto] items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="grid grid-cols-[auto_7rem_1fr_auto] items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5 eg-label text-muted-foreground">
             <span className="w-6" />
             <span>Code</span>
             <span>Name</span>
@@ -1784,7 +1784,7 @@ function PlatformPanel() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1">
-                  <span className="mr-1 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Sides</span>
+                  <span className="mr-1 eg-label text-muted-foreground">Sides</span>
                   {ALL_SIDES.map((sd) => {
                     const on = sides.includes(sd)
                     return (
@@ -2064,7 +2064,7 @@ function UserStat({ label, value, hint }: { label: string; value?: number; hint?
       <div className="text-lg font-medium tabular-nums">
         {value == null ? <span className="text-muted-foreground/50">—</span> : value.toLocaleString("en-US")}
       </div>
-      {hint && <div className="text-[11px] leading-tight text-muted-foreground">{hint}</div>}
+      {hint && <div className="text-2xs leading-tight text-muted-foreground">{hint}</div>}
     </div>
   )
 }
@@ -2398,7 +2398,7 @@ function UsersPanel() {
                 as a claim, not a loose number. Same grid + same per-cell breakpoints as the
                 rows, so each label sits exactly above its values. */}
             {paged.pageItems.length > 0 && (
-              <div className={USER_ROW_GRID + " py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"}>
+              <div className={USER_ROW_GRID + " py-2 eg-label text-muted-foreground"}>
                 <span className="min-w-0">Account</span>
                 <span className="hidden lg:block">Joined</span>
                 <span className="hidden lg:block">Order limit (/day)</span>
@@ -2878,7 +2878,7 @@ function PiiRetentionPanel() {
       <div className="space-y-3 rounded-lg border bg-card p-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <label className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">Delete after</label>
+            <label className="eg-label text-muted-foreground">Delete after</label>
             <div className="flex items-center gap-1.5">
               <Input
                 value={days}
@@ -2947,7 +2947,7 @@ function freqLabel(days: number): string {
 function BackupStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-lg border bg-card px-3 py-2.5">
-      <div className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="eg-label text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-lg font-semibold leading-tight tabular-nums">{value}</div>
       {sub ? <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div> : null}
     </div>
@@ -3088,7 +3088,7 @@ function BackupsPanel() {
       <div className="mt-4 overflow-x-auto rounded-lg border">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr className="border-b bg-muted/40 text-left eg-label text-muted-foreground">
               <th className="px-4 py-3 font-medium">When</th>
               <th className="px-4 py-3 font-medium">Type</th>
               <th className="px-4 py-3 font-medium">Size</th>

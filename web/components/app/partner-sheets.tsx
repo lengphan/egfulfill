@@ -245,7 +245,7 @@ export function PartnerSheets() {
 
           {layout.sheets.map((sheet) => (
             <div key={sheet.name} className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{sheet.name}</h3>
+              <h3 className="eg-label text-muted-foreground">{sheet.name}</h3>
               {sheet.blocks.map((block) => {
                 const m: BlockMapping = mapping[block.id] ?? emptyBlockMapping(block)
                 const preview = blockRows(block, m, (rows ?? []).slice(0, 3))

@@ -1024,7 +1024,7 @@ export function DispatchBoard() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <div className={HIST_GRID + " border-b border-border py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground"}>
+              <div className={HIST_GRID + " border-b border-border py-2 eg-label text-muted-foreground"}>
                 <span />
                 <span>Status</span>
                 <span>Order / file</span>

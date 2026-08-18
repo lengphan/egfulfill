@@ -100,7 +100,7 @@ export function ThreadBreakdown({
                   {/* Artwork colour AND cone colour: they are not the same, and a
                       digitiser needs to see how far the match had to travel. */}
                   {r.poor && (
-                    <div className="mt-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-3xs font-medium text-amber-700">
+                    <div className="mt-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-2xs font-medium text-amber-700">
                       No close match in stock
                     </div>
                   )}

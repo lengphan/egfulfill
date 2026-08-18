@@ -109,7 +109,7 @@ export function FactoryColumnsMenu({ order, hidden, onOrder, onHidden, className
                 </span>
                 <span className="truncate">{tl("col", FACTORY_COLS[id].label)}</span>
                 {/* Says WHY it can't be turned off, rather than just refusing the click. */}
-                {locked && <span className="ml-auto shrink-0 text-3xs text-muted-foreground">always on</span>}
+                {locked && <span className="ml-auto shrink-0 text-2xs text-muted-foreground">always on</span>}
               </button>
             </div>
           )
