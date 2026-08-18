@@ -725,6 +725,32 @@ export default function OrderDetailPage() {
                               keyed off content — so a brief bolds instead of showing literal **;
                               a plain human message stays verbatim with its line breaks. */}
                           {m.text ? (hasMarkdown(m.text) ? <Markdown>{m.text}</Markdown> : <span className="whitespace-pre-wrap">{m.text}</span>) : null}
+                          {/* ATTACHMENTS. This panel rendered text only, so a package photo
+                              taken on the phone arrived as the words "Package photo" and
+                              nothing else — the picture was stored and posted correctly, and
+                              simply had nowhere to appear on this screen. */}
+                          {(() => {
+                            const att = m.attachment as { url?: string; name?: string; mime?: string } | undefined
+                            if (!att?.url) return null
+                            const isImg = (att.mime || "").startsWith("image/")
+                            return (
+                              <a
+                                href={att.url} target="_blank" rel="noreferrer"
+                                className={"block w-fit " + (m.text ? "mt-1.5" : "")}
+                              >
+                                {isImg ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={att.url}
+                                    alt={att.name || "attachment"}
+                                    className="max-h-80 max-w-full rounded-lg border border-border"
+                                  />
+                                ) : (
+                                  <span className="underline underline-offset-2">{att.name || "Attachment"}</span>
+                                )}
+                              </a>
+                            )
+                          })()}
                         </div>
                         <span className="mt-0.5 text-2xs text-muted-foreground">
                           {m.by ? `${m.by} · ` : m.role && m.role !== "seller" ? `${m.role} · ` : ""}
