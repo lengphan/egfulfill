@@ -356,12 +356,22 @@ export function DesignerBoard() {
    */
   const isAdmin = getUser()?.role === "admin"
   const boardCards = useMemo(
-    // Designers see design WORK, not files-to-check. A card that already carries a stitch
-    // file (design_id — a seller's supplied .emb, or a factory check) is a verification job,
-    // not digitising, so it stays factory-internal. An EMB *image* (no file yet) IS design
-    // work, so once a human deliberately sends it to the board a designer sees it and can
-    // digitise it. Vendor (Pink) cards are partner-driven and never a designer's to claim.
-    () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor && !c.design_id) : (cards ?? [])),
+    /**
+     * Designers see design WORK, not files-to-check. A card that already carries a stitch
+     * file is a verification job, not digitising, so it stays factory-internal. Vendor
+     * (Pink) cards are partner-driven and never a designer's to claim.
+     *
+     * BUT `design_id` IS NOT "HAS A STITCH FILE". It is the number minted for a piece of
+     * ARTWORK — design_cards.js calls designNoFor(artHash) on every card it creates, so
+     * every card pushed from an order line carries one. Filtering on it hid every card a
+     * human had deliberately sent to the board: the send worked, the card sat in `incoming`
+     * with its artwork, and the designer's board showed nothing. Observed as card 74 on
+     * order etsy-4147237501, design_id 1143, invisible to designers and visible to staff.
+     *
+     * isEmbCard is the real question — a card flagged EMB, or typed as one, is a supplied
+     * file to check. An EMB *image* with no file yet is design work and stays.
+     */
+    () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor && !isEmbCard(c)) : (cards ?? [])),
     [cards, isDesigner],
   )
   // Only meaningful on the designer portal, where partner cards are the ones being hidden;
