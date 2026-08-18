@@ -964,7 +964,11 @@ function FeeGroup({ title, hint, children }: { title: string; hint: string; chil
     <section className="mt-5 first:mt-0">
       <h4 className="eg-label text-primary">{title}</h4>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-      <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">{rows}</div>
+      {/* THREE TRACKS ON A WIDE SCREEN. At two columns a group of three fees put one on a
+          row of its own, which reads as a different KIND of thing rather than the third
+          alternative it is. Pairs still sit side by side; nothing here is wider than a
+          money field. */}
+      <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">{rows}</div>
     </section>
   )
 }
@@ -1441,17 +1445,17 @@ function PlatformPanel() {
           title="Design work — what a seller pays"
           hint="One of these three, never two: it depends on who cut the machine file."
         >
-          <MoneyField label="We cut it — standard" hint="Their artwork, ordinary difficulty" value={designStd} onChange={setDesignStd} />
-          <MoneyField label="We cut it — complex" hint="Intricate. Quoted first; charged only if they accept" value={designCx} onChange={setDesignCx} />
-          <MoneyField label="They sent their own file" hint="We open and check it rather than cut it" value={checkFee} onChange={setCheckFee} />
+          <MoneyField label="Standard" hint="We cut it — their artwork, ordinary difficulty" value={designStd} onChange={setDesignStd} />
+          <MoneyField label="Complex" hint="We cut it — intricate. Quoted first, charged only if accepted" value={designCx} onChange={setDesignCx} />
+          <MoneyField label="Their own file" hint="They sent it — we open and check rather than cut" value={checkFee} onChange={setCheckFee} />
         </FeeGroup>
 
         <FeeGroup
           title="The file itself — what a seller pays"
           hint="Charged separately, when they want to download the .pes/.emb. Paying for the work and owning the file are two transactions."
         >
-          <MoneyField label="Download — standard" value={embPrice} onChange={setEmbPrice} />
-          <MoneyField label="Download — complex" hint="When the design work was complex" value={embCx} onChange={setEmbCx} />
+          <MoneyField label="Standard" hint="Download the machine file for an ordinary design" value={embPrice} onChange={setEmbPrice} />
+          <MoneyField label="Complex" hint="Download it when the design work was complex" value={embCx} onChange={setEmbCx} />
         </FeeGroup>
 
         <FeeGroup
