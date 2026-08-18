@@ -901,8 +901,17 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
       in_stock: Number(stock) || 0,
       reorder_at: Number(reorder) || 25,
       category: picked.type || category.trim() || undefined,
-      // The supplier is NOT copied from the product. It is a factory-only field on the
-      // catalogue side, and an inventory row is read on screens a seller can reach.
+      /**
+       * THE SUPPLIER COMES WITH IT — I had this the other way round, on the reasoning that a
+       * supplier name is factory-only. It is, and this is a factory field: GET /api/inventory
+       * is staff-only and the partner stock feed selects sku/name/variant/counts and never
+       * this. §2.9 is about what we PUBLISH.
+       *
+       * It matters because replenishment groups a shortfall by `inventory.supplier`. Without
+       * it, a row we created from a catalogue product that plainly names its supplier still
+       * reaches the cart as "Unassigned · order by hand" — a line nobody can place.
+       */
+      supplier: picked.supplier?.trim() || undefined,
       visibility,
     })))
   }

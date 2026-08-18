@@ -1945,12 +1945,43 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
           // column would throw into the catch and file nothing at all, silently. A null
           // visibility already READS as factory-only (visOf), which is the safe default and
           // the one every other creation path lands on.
+          /**
+           * THE SUPPLIER COMES WITH IT, and it is the field that decides whether a shortage
+           * can be BOUGHT. replenish.js groups a shortfall by `inventory.supplier`, so a row
+           * created without one lands in the cart as "Unassigned · order by hand" — a line
+           * nobody can place, for a blank whose supplier the catalogue knew all along.
+           *
+           * Safe to store: `supplier` is never selected by the partner stock feed (see
+           * VISIBLE_TO_PARTNERS in sandbox.js — an allow-list of sku/name/variant/counts),
+           * and GET /api/inventory is requireStaff. It reaches the factory and the purchase
+           * resolver, and nothing else. §2.9 is about what we PUBLISH.
+           */
           `insert into inventory (sku, name, variant, in_stock, reserved, reorder_at, category)
            values ($1,$2,$3,0,0,25,$4)
            on conflict (sku) do nothing`,
           [key, p.name || null, variantLabel(v.size, v.color) || null, p.type || null]
         ).catch(() => ({ rowCount: 0 }));
         tracked += r.rowCount || 0;
+        /**
+         * THE SUPPLIER, WRITTEN SEPARATELY — and it is the field that decides whether a
+         * shortage can be BOUGHT. replenish.js groups a shortfall by `inventory.supplier`,
+         * so a row created without one lands in the cart as "Unassigned · order by hand":
+         * a line nobody can place, for a blank whose supplier the catalogue knew all along.
+         *
+         * Its own statement because `supplier` is NOT in schema.sql — inventory.js adds it
+         * at its own route load, and naming a column that may not exist yet would throw the
+         * whole insert into the catch and file no row at all. This one is allowed to fail.
+         *
+         * `where supplier is null` so it never overwrites what somebody typed.
+         *
+         * Safe to store: the partner stock feed selects sku/name/variant/counts and never
+         * this (VISIBLE_TO_PARTNERS in sandbox.js is an allow-list), and GET /api/inventory
+         * is requireStaff. §2.9 is about what we publish, and this is published nowhere.
+         */
+        if (r.rowCount && p.supplier && String(p.supplier).trim()) {
+          await q('update inventory set supplier=$2 where sku=$1 and supplier is null',
+            [key, String(p.supplier).trim()]).catch(() => {});
+        }
       }
     }
     if (tracked) {
