@@ -1674,7 +1674,18 @@ export function DesignCanvasDialog({
             very edge, and the dialog's rounded corner and padding cut the top off the side
             pills — the row that was clipped in half. Two units of clearance is enough to
             keep them whole and still holds the garment in view while the rail scrolls. */}
-        <div className="lg:sticky lg:top-2 lg:w-[min(70vh,50vw)] lg:self-start">
+        {/**
+          * NO WIDTH OF ITS OWN. It carried `lg:w-[min(70vh,50vw)]` — 630px on a 900-tall
+          * window — while the track beside it is a fixed 380px rail. 630 + 380 + gap +
+          * padding exceeds the dialog's cap, so the rail hung off the right edge and the
+          * window scrolled sideways. Capping the STAGE did nothing about it, because the
+          * column was never asking the stage how wide to be.
+          *
+          * The track is minmax(0,1fr), so w-full is the column taking what it is given and
+          * the stage's own max-width decides how big the garment gets. One thing setting the
+          * width instead of three disagreeing about it.
+          */}
+        <div className="min-w-0 lg:sticky lg:top-2 lg:w-full lg:self-start">
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {/**
           * A SIDE LIST, not just a mockup switcher.
