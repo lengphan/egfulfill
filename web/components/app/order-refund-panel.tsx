@@ -48,7 +48,14 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
   const load = useCallback(() => {
     setLoadErr(null)
     getOrderCharges(orderId)
-      .then((r) => { setState(r); setLoadErr(null) })
+      .then((r) => {
+        setState(r); setLoadErr(null)
+        /* EVERY REFUNDABLE PART STARTS TICKED. There is one button now, and its amount is
+           whatever is selected — so the panel has to open already saying the full figure,
+           or "Refund" would read as $0.00 until someone ticked something. Untick to send
+           back less. Re-seeded after each refund, so what remains is ticked. */
+        setPicked(new Set(r.parts.filter((p) => p.refundable > 0).map((p) => p.key)))
+      })
       .catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't load this order's charges."))
   }, [orderId])
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
@@ -111,6 +118,14 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
     } finally { sending.current = false; setBusy(false) }
   }
 
+  /* "Everything" means every refundable part is ticked AND nobody typed a smaller amount
+     into one. A typed-down part is a partial refund even when all the boxes are ticked. */
+  const isEverything =
+    parts.filter((p) => p.refundable > 0).every((p) => picked.has(p.key)) &&
+    selected.every((p) => {
+      const typed = Number(amounts[p.key])
+      return !(isFinite(typed) && typed > 0 && typed < p.refundable)
+    })
   const nothingLeft = state.refundable <= 0
 
   return (
@@ -180,13 +195,23 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
               disabled={busy}
               className="h-9"
             />
+            {/* ONE BUTTON, and it always states the amount it will send.
+                Two buttons made the reader compare them to work out which was which, on a
+                panel where the difference is money leaving. The amount follows the ticks:
+                everything by default, less when a part is unticked.
+
+                Whether that becomes a `full` or a per-part refund is decided from the
+                SELECTION rather than from which button was pressed — refunding every part
+                at its full amount IS the whole order, and letting the server take its own
+                "everything" path avoids the two disagreeing over a rounding penny. */}
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => send("selected")} disabled={busy || !selected.length}>
+              <Button
+                size="sm"
+                onClick={() => send(isEverything ? "full" : "selected")}
+                disabled={busy || !selected.length}
+              >
                 {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
-                {selected.length ? `Refund ${usd(planned)}` : "Refund selected"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => send("full")} disabled={busy}>
-                Refund everything ({usd(state.refundable)})
+                Refund {usd(isEverything ? state.refundable : planned)}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
