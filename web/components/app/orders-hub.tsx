@@ -2205,7 +2205,12 @@ export function OrdersHub() {
                             const backLabel = holdFrom != null ? (stageMeta(holdFrom)?.label || "Draft") : null
                             return (
                               <span className="inline-flex shrink-0 items-center gap-1.5">
-                                {norm === "on_hold" && (backLabel != null ? (
+                                {/* Nothing when we don't know where the hold came from. It read
+                                    "resolve in ⋯", which is an instruction to press another
+                                    control rather than a control — and the ⋯ menu now offers
+                                    Clear hold on exactly these rows, so the sentence was
+                                    pointing at something that says it better itself. */}
+                                {norm === "on_hold" && backLabel != null && (
                                   <Button
                                     size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs"
                                     disabled={busy === `ord:${o.id}`}
@@ -2214,9 +2219,7 @@ export function OrdersHub() {
                                   >
                                     Back to {backLabel}
                                   </Button>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">resolve in ⋯</span>
-                                ))}
+                                )}
                               </span>
                             )
                           })()}
@@ -2339,16 +2342,40 @@ export function OrdersHub() {
                                         {isRush(o) ? tl("ui", "Clear rush") : tl("ui", "Rush")}
                                       </DropdownMenuItem>
                                     ) : null}
-                                    {exc.map((s) => (
-                                      <DropdownMenuItem
-                                        key={s.id}
-                                        disabled={!!s.deny}
-                                        title={s.deny ?? undefined}
-                                        onClick={() => { if (!s.deny) setOrderStatus(o, s.id) }}
-                                      >
-                                        {tl("stage", s.label)}
-                                      </DropdownMenuItem>
-                                    ))}
+                                    {exc.map((s) => {
+                                      /**
+                                       * ON HOLD IS A TOGGLE, like Rush beside it.
+                                       *
+                                       * The menu offered "On hold" on an order that was
+                                       * already on hold — an item that either did nothing or
+                                       * re-applied the state it was already in, on the one
+                                       * row whose reader wants the opposite. Rush two lines
+                                       * up has read "Clear rush" all along; this now matches.
+                                       *
+                                       * It returns the order to the stage the hold
+                                       * interrupted (meta.hold_from). An old hold that never
+                                       * recorded one goes back to Draft — the one stage that
+                                       * asserts nothing about production having started, so a
+                                       * missing prior can't fake progress.
+                                       */
+                                      const onHoldNow = s.id === "on_hold" && normalizeStage(stage) === "on_hold"
+                                      const holdFrom = (o.meta?.hold_from as string | undefined) ?? ""
+                                      return (
+                                        <DropdownMenuItem
+                                          key={s.id}
+                                          disabled={!onHoldNow && !!s.deny}
+                                          title={onHoldNow
+                                            ? `Take this order off hold and return it to ${stageMeta(holdFrom)?.label || "Draft"}`
+                                            : s.deny ?? undefined}
+                                          onClick={() => {
+                                            if (onHoldNow) { setOrderStatus(o, holdFrom); return }
+                                            if (!s.deny) setOrderStatus(o, s.id)
+                                          }}
+                                        >
+                                          {onHoldNow ? tl("ui", "Clear hold") : tl("stage", s.label)}
+                                        </DropdownMenuItem>
+                                      )
+                                    })}
                                   </DropdownMenuGroup>
                                 </>
                               )}

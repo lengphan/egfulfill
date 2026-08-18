@@ -249,6 +249,7 @@ const vi: Dict = {
   "ui.Start": "Bắt đầu",
   "ui.Rush": "Gấp",
   "ui.Clear rush": "Bỏ đánh dấu gấp",
+  "ui.Clear hold": "Bỏ tạm giữ",
   "ui.Move to": "Chuyển sang",
   "ui.TikTok label": "Nhãn TikTok",
   "ui.Open TikTok label": "Mở nhãn TikTok",
