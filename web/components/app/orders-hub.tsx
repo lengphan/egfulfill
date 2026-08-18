@@ -2523,6 +2523,12 @@ export function OrdersHub() {
                             {/* Stock sits with Qty: how many we need, how many we hold. */}
                             <OrderedVariant
                               item={it}
+                              // The RESOLVED blank sku, not the line's `blank` — which is a
+                              // product NAME on most real lines. This is the code the shelf
+                              // is keyed on and the one a purchase order quotes, and it is
+                              // all a manual line has where a marketplace line has a listing
+                              // sku.
+                              blankSku={stockSkuOf(it, catalog, stock) || undefined}
                               className="sm:pr-[15rem]"
                               after={
                                 <>

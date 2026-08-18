@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
+import { stockSkuOf } from "@/lib/stock-status"
 import { useRouter } from "next/navigation"
 import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -412,7 +413,13 @@ export function OrdersList() {
                                         </span>
                                       </div>
                                       {/* The seller's own view of what their buyer picked. */}
-                                      <OrderedVariant item={it} />
+                                      <OrderedVariant
+                                        item={it}
+                                        // Same three facts on the seller's own list: a
+                                        // manual line has no listing variant, so without
+                                        // this the row had nothing but a name.
+                                        blankSku={stockSkuOf(it, catalog) || undefined}
+                                      />
                                       {canEditVariants && ["", "new", "draft"].includes(String(o.factory_status || "")) ? (
                                         <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                                       ) : (

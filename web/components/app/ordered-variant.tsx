@@ -23,7 +23,24 @@ import { decodeEntities } from "@/lib/order-format"
  *
  * Renders nothing when the line carries neither, so a manual order gains no empty strip.
  */
-export function OrderedVariant({ item, className = "", after }: { item: OrderItem; className?: string; after?: React.ReactNode }) {
+export function OrderedVariant({ item, className = "", after, blankSku }: {
+  item: OrderItem
+  className?: string
+  after?: React.ReactNode
+  /**
+   * The BLANK we buy against, resolved by a caller that has the catalogue.
+   *
+   * A manual order has one name and no listing variant — no "Ordered" line, and often no
+   * listing sku either — so this whole strip returned null and took Qty and the stock
+   * reading with it. The identifiers a manual line does have are the blank and the count,
+   * and those are exactly what someone pulling stock needs.
+   *
+   * Labelled separately from "Listing SKU" on purpose (CLAUDE.md §5): one is the seller's
+   * code for what was sold, the other is the garment we buy. A bare mono string beside a
+   * size and a count is the ambiguity that distinction exists to prevent.
+   */
+  blankSku?: string | null
+}) {
   // Entities arrive HTML-encoded from the marketplaces (&amp;, &#39;) — the same decode the
   // order title gets, or "Men&#39;s" is what a packer reads.
   const ordered = decodeEntities(String(item.variant ?? "").trim())
@@ -40,7 +57,14 @@ export function OrderedVariant({ item, className = "", after }: { item: OrderIte
   // "one of these" and "nobody has told me" looked identical — and a picker scanning a
   // multi-line order needs a number on every row to count against.
   const qty = Math.max(1, Number(item.qty) || 1)
-  if (!ordered && !sku) return null
+  /** What a manual line offers instead of a listing sku: the blank itself. `blank` is a
+   *  product NAME on most real lines, so a resolved sku from the caller wins when there is
+   *  one. */
+  const blank = String(blankSku ?? "").trim() || String(item.blank ?? "").trim()
+  // NO EARLY RETURN. It used to bail when there was neither a variant nor a listing sku —
+  // which is every manual order — and that took Qty and the stock reading off the row with
+  // it. Every line has a quantity, and the whole point of showing it always is that its
+  // absence must never be ambiguous.
 
   /**
    * TWO ROWS: what they ordered, then how we refer to it.
@@ -68,6 +92,9 @@ export function OrderedVariant({ item, className = "", after }: { item: OrderIte
    */
   const parts: React.ReactNode[] = []
   if (sku) parts.push(<span key="s"><span className="font-medium text-foreground/70">Listing SKU:</span> <span className="font-mono">{sku}</span></span>)
+  // The blank stands in where there is no listing sku — a manual line — and sits beside it
+  // where there is one, because they are different codes for different things.
+  if (blank) parts.push(<span key="b"><span className="font-medium text-foreground/70">Blank:</span> <span className="font-mono">{blank}</span></span>)
   // ALWAYS PRESENT, including x1. An absent count and a count of one must never look the
   // same to someone pulling stock. Emphasised past one so a 6 catches the eye where a 1
   // should not.
