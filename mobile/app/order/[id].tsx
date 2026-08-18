@@ -1,18 +1,34 @@
 import { useCallback, useEffect, useState } from "react"
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking, Alert } from "react-native"
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking, Alert, RefreshControl } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLocalSearchParams, router } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { getOrder, getOrderMessages, getMe, setOrderStage, type Order, type ChatEntry, type User } from "@/lib/api"
-import { normalizeStage, units, isOverdue, numOf, platformOf, nextStage, STAGE_LABEL } from "@/lib/orders"
-import { C } from "@/lib/theme"
-import { PackagePhoto, ActivityRow } from "@/components/package-photo"
+import {
+  getOrder, getOrderMessages, getOrderDesigns, getMe, setOrderStage, markLabelPrinted,
+  type Order, type OrderDesign, type ChatEntry, type User,
+} from "@/lib/api"
+import {
+  normalizeStage, units, isOverdue, numOf, platformOf, plainNum, nextStage,
+  STAGE_LABEL, STAGE_VERB,
+} from "@/lib/orders"
+import { C, R, LIFT, toneOf } from "@/lib/theme"
+import { ActivityRow } from "@/components/activity"
+import { ConfirmShipment } from "@/components/confirm-shipment"
+import { OrderLine } from "@/components/order-line"
+import { Barcode } from "@/components/barcode"
 
 /**
- * ONE ORDER — mainly so a tracking number can be read, and followed, from a phone.
+ * ONE ORDER — the job, on the floor, in the hand.
  *
- * Tracking is the reason this screen exists on a phone at all: it is the question asked
- * away from a desk. Everything else here is context for it.
+ * It reads top to bottom as the work happens: what this is → the one thing to press now →
+ * how to find it and prove it (barcode, label) → the LINES, each with its own artwork and
+ * its own files → what has already happened to it.
+ *
+ * The rebuild fixed four things that made the first version something to look at rather
+ * than something to use: there was no obvious place to press to start; the lines were
+ * collapsed into a piece count, so an order's items and its files could not be told apart;
+ * there was no barcode, so the phone could not stand in for the paper ticket; and the proof
+ * photo was a button with no place in the sequence (see confirm-shipment.tsx).
  */
 
 /** Carrier tracking pages. Only carriers we actually ship with — a guessed URL that 404s is
@@ -31,6 +47,15 @@ function trackingLink(carrier?: string | null, code?: string | null) {
   return make ? make(code) : null
 }
 
+function Section({ title, right }: { title: string; right?: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: 28, marginBottom: 12 }}>
+      <Text style={{ fontSize: 12, fontWeight: "900", color: C.fg, letterSpacing: 1.4 }}>{title}</Text>
+      {right ? <Text style={{ fontSize: 12, color: C.muted, fontWeight: "600" }}>{right}</Text> : null}
+    </View>
+  )
+}
+
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={{
@@ -38,7 +63,7 @@ function Row({ label, value }: { label: string; value: string }) {
       paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.border,
     }}>
       <Text style={{ fontSize: 14, color: C.muted }}>{label}</Text>
-      <Text style={{ fontSize: 14, fontWeight: "600", color: C.fg, flexShrink: 1, textAlign: "right" }}>{value}</Text>
+      <Text style={{ fontSize: 14, fontWeight: "700", color: C.fg, flexShrink: 1, textAlign: "right" }}>{value}</Text>
     </View>
   )
 }
@@ -48,18 +73,24 @@ export default function OrderDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const [o, setO] = useState<Order | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [designs, setDesigns] = useState<OrderDesign[]>([])
   const [activity, setActivity] = useState<ChatEntry[] | null>(null)
   const [me, setMe] = useState<User | null>(null)
   const [moving, setMoving] = useState(false)
+  const [printing, setPrinting] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
     try { setO(await getOrder(String(id))); setErr(null) }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load this order.") }
+    // The files are a SEPARATE request and a separate failure: a design route that errors
+    // must not blank the order. Lines then say "no artwork yet", which is the honest
+    // reading of what this screen knows.
+    try { setDesigns(await getOrderDesigns(String(id))) } catch { setDesigns([]) }
   }, [id])
 
-  // Separate from the order fetch: a failing activity thread should not blank the tracking
-  // number, which is what the screen is actually opened for.
+  // Separate again: a failing activity thread should not blank the work above it.
   const loadActivity = useCallback(async () => {
     if (!id) return
     try { setActivity(await getOrderMessages(String(id))) } catch { setActivity([]) }
@@ -67,6 +98,10 @@ export default function OrderDetail() {
 
   useEffect(() => { load(); loadActivity() }, [load, loadActivity])
   useEffect(() => { getMe().then(setMe).catch(() => setMe(null)) }, [])
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true); await Promise.all([load(), loadActivity()]); setRefreshing(false)
+  }, [load, loadActivity])
 
   const advance = useCallback(async () => {
     if (!o) return
@@ -87,8 +122,36 @@ export default function OrderDetail() {
     }
   }, [o, load, loadActivity])
 
+  /**
+   * PRINT THE LABEL — hand the PDF to the OS.
+   *
+   * There is no print module in this app, and it does not need one: opening the carrier's
+   * PDF puts it in the system viewer, whose share sheet holds AirPrint (and every
+   * network printer the phone knows). The stamp is ours, and it is best-effort — the label
+   * really was opened whether or not the stamp is allowed, and only warehouse/admin may
+   * make that custody claim, so an operator gets told rather than silently ignored.
+   */
+  const printLabel = useCallback(async () => {
+    if (!o?.tracking_label_url) return
+    setPrinting(true)
+    try {
+      await Linking.openURL(o.tracking_label_url)
+      const r = await markLabelPrinted(String(o.id))
+      if (r.error) Alert.alert("Label opened", `Not stamped as printed: ${r.error}`)
+      else await load()
+    } catch (e) {
+      Alert.alert("Couldn't open the label", e instanceof Error ? e.message : "Try again.")
+    } finally { setPrinting(false) }
+  }, [o, load])
+
   const code = o?.tracking ?? null
   const link = trackingLink(o?.carrier, code)
+  const stage = normalizeStage(o?.factory_status)
+  const tone = toneOf(stage)
+  const staff = !!me?.role && me.role !== "seller"
+  const to = o ? nextStage(o) : null
+  const items = o?.items ?? []
+  const late = o ? isOverdue(o) : false
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
@@ -98,7 +161,7 @@ export default function OrderDetail() {
         hitSlop={8}
       >
         <Ionicons name="chevron-back" size={22} color={C.primary} />
-        <Text style={{ color: C.primary, fontSize: 16 }}>Orders</Text>
+        <Text style={{ color: C.primary, fontSize: 16, fontWeight: "600" }}>Orders</Text>
       </Pressable>
 
       {!o && !err ? (
@@ -108,92 +171,185 @@ export default function OrderDetail() {
       ) : err ? (
         <Text style={{ color: C.alert, fontSize: 14, paddingHorizontal: 20, marginTop: 12 }}>{err}</Text>
       ) : o ? (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 32 }}>
-          <Text style={{ fontSize: 34, fontWeight: "900", color: C.fg }}>{numOf(o)}</Text>
-          <Text style={{ fontSize: 16, color: C.muted, marginTop: 4 }}>
-            {platformOf(o)} · {normalizeStage(o.factory_status)}{isOverdue(o) ? " · late" : ""}
-          </Text>
-
-          {/* TRACKING FIRST — the thing this screen is opened for. */}
-          <View style={{ marginTop: 20, borderRadius: 16, padding: 18, backgroundColor: C.accent }}>
-            <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1 }}>TRACKING</Text>
-            {code ? (
-              <>
-                <Text selectable style={{ fontSize: 19, fontWeight: "800", color: C.fg, marginTop: 8 }}>{code}</Text>
-                {o.carrier ? <Text style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{o.carrier}</Text> : null}
-                {link && (
-                  <Pressable
-                    onPress={() => Linking.openURL(link)}
-                    style={({ pressed }) => ({
-                      marginTop: 14, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center",
-                      backgroundColor: C.primary, opacity: pressed ? 0.85 : 1,
-                    })}
-                  >
-                    <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 15 }}>Track shipment</Text>
-                  </Pressable>
-                )}
-              </>
-            ) : (
-              /* Not shipped is a FACT, not a blank. An empty panel here would be
-                 indistinguishable from a screen that failed to load it. */
-              <Text style={{ fontSize: 15, color: C.muted, marginTop: 8 }}>
-                Not shipped yet — no tracking number.
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.primary} />}
+        >
+          {/* ── THE JOB, in one block ──────────────────────────────────────────── */}
+          <View style={{ backgroundColor: C.ink, borderRadius: R.xl, padding: 22, ...LIFT }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: "800", color: C.lime, letterSpacing: 1.4 }}>
+                {platformOf(o).toUpperCase()}
               </Text>
-            )}
+              {o.rush && (
+                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: C.warn }}>
+                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff", letterSpacing: 0.6 }}>RUSH</Text>
+                </View>
+              )}
+              {late && (
+                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: C.alert }}>
+                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff", letterSpacing: 0.6 }}>LATE</Text>
+                </View>
+              )}
+            </View>
+
+            <Text selectable style={{ fontSize: 42, fontWeight: "900", color: C.onInk, letterSpacing: -1.6, marginTop: 6 }}>
+              {numOf(o)}
+            </Text>
+
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
+              <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.pill, backgroundColor: tone.bg }}>
+                <Text style={{ fontSize: 11, fontWeight: "900", color: tone.fg, letterSpacing: 0.6 }}>
+                  {(STAGE_LABEL[stage] ?? stage).toUpperCase()}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 13, color: C.onInk, opacity: 0.65 }}>
+                {items.length} {items.length === 1 ? "line" : "lines"} · {units(o)} pc
+                {o.total != null ? ` · $${(Number(o.total) || 0).toFixed(2)}` : ""}
+              </Text>
+            </View>
           </View>
 
-          <View style={{ marginTop: 24 }}>
-            <Row label="Pieces" value={`${units(o)}`} />
-            {o.status ? <Row label="Status" value={String(o.status)} /> : null}
-            {o.ship_by ? <Row label="Ship by" value={new Date(o.ship_by).toLocaleDateString()} /> : null}
-            {o.created_at ? <Row label="Placed" value={new Date(o.created_at).toLocaleDateString()} /> : null}
-            {o.total != null ? <Row label="Total" value={`$${(Number(o.total) || 0).toFixed(2)}`} /> : null}
-          </View>
-
-          {/* MOVE IT ON — one step, and only ever the next one. The server refuses a skip
-              for everyone, so offering a list of stages would mostly be offering refusals. */}
-          {(() => {
-            if (!me?.role || me.role === "seller") return null
-            const to = nextStage(o)
-            if (!to) return null
-            return (
+          {/* ── THE ONE THING TO PRESS ─────────────────────────────────────────────
+              Directly under the job and nowhere else. Which button it is depends on where
+              the order stands: everything before production is a move, production itself
+              ends in a shipment, and a shipped order has nothing to press at all. */}
+          {staff && (
+            stage === "working" ? (
+              <ConfirmShipment orderId={String(o.id)} role={me?.role} by={me?.name} onDone={refresh} />
+            ) : to ? (
               <Pressable
                 onPress={advance}
                 disabled={moving}
                 style={({ pressed }) => ({
-                  flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-                  marginTop: 28, height: 54, borderRadius: 14,
-                  borderWidth: 1.5, borderColor: C.primary,
-                  opacity: pressed || moving ? 0.6 : 1,
+                  flexDirection: "row", alignItems: "center", gap: 12,
+                  marginTop: 8, borderRadius: R.lg, backgroundColor: C.primary,
+                  paddingVertical: 18, paddingHorizontal: 20,
+                  opacity: pressed || moving ? 0.8 : 1,
                 })}
               >
-                {moving
-                  ? <ActivityIndicator color={C.primary} />
-                  : <Ionicons name="arrow-forward-circle" size={20} color={C.primary} />}
-                <Text style={{ color: C.primary, fontWeight: "800", fontSize: 16 }}>
-                  Move to {STAGE_LABEL[to] ?? to}
-                </Text>
+                <View style={{
+                  width: 40, height: 40, borderRadius: R.md, backgroundColor: C.onPrimary,
+                  alignItems: "center", justifyContent: "center",
+                }}>
+                  {moving
+                    ? <ActivityIndicator color={C.primary} />
+                    : <Ionicons name={to === "working" ? "play" : "arrow-forward"} size={20} color={C.primary} />}
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: C.onPrimary, letterSpacing: -0.4 }}>
+                    {to === "working" ? "Start production" : (STAGE_VERB[to] ?? `Move to ${STAGE_LABEL[to] ?? to}`)}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: C.onPrimary, opacity: 0.75, marginTop: 2 }}>
+                    Moves the whole order to {STAGE_LABEL[to] ?? to}
+                  </Text>
+                </View>
+                <Ionicons name="arrow-forward" size={20} color={C.onPrimary} />
               </Pressable>
-            )
-          })()}
+            ) : null
+          )}
 
-          {/* THE PROOF SHOT. Lives on the order screen because that is where the parcel is
-              when the photo is worth taking. */}
-          <View style={{ marginTop: 28 }}>
-            <PackagePhoto
-              orderId={String(o.id)}
-              role={me?.role}
-              by={me?.name}
-              onPosted={loadActivity}
-            />
+          {/* ── THE TICKET ─────────────────────────────────────────────────────────
+              The number as a scannable code, so the handset IS the work ticket for the
+              parcel in the other hand. */}
+          <Section title="WORK TICKET" right="Scan from the screen" />
+          <View style={{
+            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
+            paddingVertical: 18, alignItems: "center", ...LIFT,
+          }}>
+            <Barcode value={plainNum(String(o.id))} height={62} />
           </View>
 
-          <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1, marginTop: 28 }}>
-            ACTIVITY
-          </Text>
-          <View style={{ marginTop: 4 }}>
+          {/* ── TRACKING ───────────────────────────────────────────────────────── */}
+          <Section title="SHIPPING" />
+          <View style={{
+            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
+            padding: 18, ...LIFT,
+          }}>
+            {code ? (
+              <>
+                <Text selectable style={{ fontSize: 20, fontWeight: "900", color: C.fg, letterSpacing: -0.4 }}>{code}</Text>
+                <Text style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>
+                  {[o.carrier, o.label_printed_at ? "label printed" : null].filter(Boolean).join(" · ") || "carrier unknown"}
+                </Text>
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+                  {link && (
+                    <Pressable
+                      onPress={() => Linking.openURL(link)}
+                      style={({ pressed }) => ({
+                        flex: 1, height: 46, borderRadius: R.md, flexDirection: "row", gap: 8,
+                        alignItems: "center", justifyContent: "center",
+                        backgroundColor: C.primary, opacity: pressed ? 0.85 : 1,
+                      })}
+                    >
+                      <Ionicons name="navigate" size={16} color={C.onPrimary} />
+                      <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 15 }}>Track</Text>
+                    </Pressable>
+                  )}
+                  {/* Staff only, and only when there is a PDF: the server nulls the label
+                      URL for a seller because the buyer's full address is printed on it. */}
+                  {o.tracking_label_url ? (
+                    <Pressable
+                      onPress={printLabel}
+                      disabled={printing}
+                      style={({ pressed }) => ({
+                        flex: 1, height: 46, borderRadius: R.md, flexDirection: "row", gap: 8,
+                        alignItems: "center", justifyContent: "center",
+                        borderWidth: 1.5, borderColor: C.ink, opacity: pressed || printing ? 0.6 : 1,
+                      })}
+                    >
+                      {printing ? <ActivityIndicator color={C.ink} /> : <Ionicons name="print" size={16} color={C.ink} />}
+                      <Text style={{ color: C.ink, fontWeight: "800", fontSize: 15 }}>Print label</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </>
+            ) : (
+              /* Not shipped is a FACT, not a blank. An empty panel here would be
+                 indistinguishable from a screen that failed to load it. */
+              <Text style={{ fontSize: 15, color: C.muted }}>Not shipped yet — no tracking number.</Text>
+            )}
+          </View>
+
+          {/* ── THE LINES ──────────────────────────────────────────────────────────
+              Each with its own artwork, its own files and its own button. This is the
+              screen's centre of gravity: an order is not a piece count. */}
+          <Section title="ITEMS" right={`${items.length} · ${units(o)} pc`} />
+          {items.length === 0 ? (
+            <Text style={{ fontSize: 15, color: C.muted, paddingVertical: 12 }}>This order has no lines on it.</Text>
+          ) : (
+            items.map((it, i) => (
+              <OrderLine
+                key={it.line_id || it.id || `${it.sku}-${i}`}
+                orderId={String(o.id)}
+                item={it}
+                index={i}
+                designs={designs}
+                canWork={staff}
+                onChanged={refresh}
+              />
+            ))
+          )}
+
+          <Section title="DETAILS" />
+          <View style={{
+            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
+            paddingHorizontal: 16, paddingBottom: 2, ...LIFT,
+          }}>
+            {o.status ? <Row label="Status" value={String(o.status)} /> : null}
+            {o.ship_by ? <Row label="Ship by" value={new Date(o.ship_by).toLocaleDateString()} /> : null}
+            {o.created_at ? <Row label="Placed" value={new Date(o.created_at).toLocaleDateString()} /> : null}
+            {o.total != null ? <Row label="Total" value={`$${(Number(o.total) || 0).toFixed(2)}`} /> : null}
+            <Row label="Order id" value={String(o.id)} />
+          </View>
+
+          <Section title="ACTIVITY" />
+          <View style={{
+            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
+            paddingHorizontal: 16, paddingVertical: 4, ...LIFT,
+          }}>
             {activity === null
-              ? <ActivityIndicator style={{ marginTop: 16 }} color={C.primary} />
+              ? <ActivityIndicator style={{ marginVertical: 16 }} color={C.primary} />
               : activity.length === 0
                 ? <Text style={{ fontSize: 15, color: C.muted, paddingVertical: 14 }}>Nothing logged yet.</Text>
                 : activity.slice().reverse().map((e) => <ActivityRow key={String(e.id)} e={e} />)}

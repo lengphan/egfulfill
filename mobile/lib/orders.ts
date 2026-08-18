@@ -39,11 +39,21 @@ export function normalizeStage(s?: string | null): string {
   return ""
 }
 
-/** Human words for a stage. "" is an order nobody has started. */
+/*
+ * The FACTORY's own words for a stage — the exact labels in web/lib/factory-status.ts.
+ *
+ * These are not the seller's words: a seller sees collapsed stages, where approved and
+ * working both read "In Process", because which internal step it is on is not their
+ * business. The floor needs to know which. Two vocabularies on purpose — the mistake is
+ * mixing them, or inventing a third here, which "In production" and "In review" were.
+ */
 export const STAGE_LABEL: Record<string, string> = {
-  "": "New", in_review: "In review", approved: "Approved", working: "In production",
+  "": "New", in_review: "Pending", approved: "Approved", working: "Working",
   shipped: "Shipped", on_hold: "On hold", cancelled: "Cancelled", refunded: "Refunded",
 }
+/** The stage as a person reads it. Raw ids ("working", "in_review") were being printed
+ *  straight onto rows, which is why the phone and the boards disagreed on wording. */
+export const stageLabel = (o: Order) => STAGE_LABEL[normalizeStage(o.factory_status)] ?? ""
 
 /**
  * The ONE stage this order may move to next, or null at the end of the line.
@@ -110,4 +120,90 @@ export const numOf = (o: Order) => (o.seq ? `#${o.seq}` : plainNum(String(o.id))
 export const platformOf = (o: Order) => {
   const raw = (String(o.id ?? "").match(SOURCE_PREFIX)?.[1] ?? "manual").toLowerCase()
   return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
+}
+
+/* ── LINES ────────────────────────────────────────────────────────────────────
+ * A line is the unit of work. The order is the unit of shipping. Everything below keeps
+ * those two apart, because conflating them is what makes a three-line order look like one
+ * job on a small screen.
+ */
+
+/**
+ * HOW A LINE IS ADDRESSED — mirrors the server's DESIGN_KEY,
+ * `coalesce('L:' || line_id, 'S:' || sku)` in orders.js.
+ *
+ * The prefixes are load-bearing there and here: plain coalesce(line_id, sku) mixes two
+ * identifier namespaces, and Etsy hands out the same id shape for both, so one row's
+ * line_id has genuinely equalled another's sku.
+ */
+export const lineKey = (x: { line_id?: string | null; sku?: string | null }) =>
+  x.line_id ? `L:${x.line_id}` : x.sku ? `S:${x.sku}` : ""
+
+/**
+ * The files belonging to THIS line, and no other.
+ *
+ * Matched on line_id first and sku only as the fallback, which is the same order the
+ * server writes them in. Matching on sku alone is what makes an order with two identical
+ * blanks show one line's artwork against the other's — the exact question "which item is
+ * showing which file" is asking.
+ */
+export function designsFor<T extends { line_id?: string | null; sku?: string | null }>(
+  item: { line_id?: string | null; sku?: string | null },
+  designs: T[],
+): T[] {
+  const byLine = item.line_id ? designs.filter((d) => d.line_id && String(d.line_id) === String(item.line_id)) : []
+  if (byLine.length) return byLine
+  // Only rows that carry NO line_id may fall back to sku. A row that has one has already
+  // been matched (or belongs to a sibling), and letting it match by sku here is how a
+  // sibling's file reappears under the wrong line.
+  if (!item.sku) return []
+  return designs.filter((d) => !d.line_id && d.sku && String(d.sku) === String(item.sku))
+}
+
+/** Human words for a file. 'raster' is the artwork; the rest are machine files. */
+export const KIND_LABEL: Record<string, string> = {
+  raster: "Artwork", print: "Print file", pes: "PES", emb: "EMB", dst: "DST", exp: "EXP", jef: "JEF",
+}
+export const isArtwork = (kind?: string | null) => {
+  const k = String(kind || "raster").toLowerCase()
+  return k === "raster" || k === "print" || k === "image"
+}
+
+/** The picture to put beside a line: its OWN artwork first, the listing photo only if
+ *  there is none. A listing photo tells the floor nothing about what to print. */
+export function lineArt(
+  item: { img?: string | null; img_ref?: string | null; design_src?: string | null },
+  designs: { kind?: string | null; data?: string | null; url?: string | null }[],
+): string | null {
+  const art = designs.find((d) => isArtwork(d.kind))
+  return art?.url || art?.data || item.design_src || item.img_ref || item.img || null
+}
+
+/**
+ * The line's product name.
+ *
+ * The BLANK is the floor's name for a thing — stock, purchasing and the supplier all key
+ * off it — but it is a code, and a code alone is not a name a person recognises across a
+ * table. So the marketplace title leads when there is one and the blank rides underneath
+ * as the identifier it is, rather than both being stacked as if they were equals.
+ */
+export const lineTitle = (it: { name?: string | null; blank?: string | null; sku?: string | null }) =>
+  it.name || it.blank || it.sku || "Untitled line"
+
+/** Colour · size · method, already filtered — an empty variant must not print " ·  · ". */
+export const lineFacts = (it: { color?: string | null; size?: string | null; print_type?: string | null }) =>
+  [it.color, it.size, it.print_type].map((v) => (v ? String(v).trim() : "")).filter(Boolean)
+
+/** Where this LINE goes next. Same pipeline as the order — the floor moves lines. */
+export function nextLineStage(it: { factory_status?: string | null }): string | null {
+  const at = normalizeStage(it.factory_status)
+  if (EXCEPTIONS.includes(at)) return null
+  const i = at === "" ? -1 : PIPELINE.indexOf(at as (typeof PIPELINE)[number])
+  return PIPELINE[i + 1] ?? null
+}
+
+/** The word on the button that starts the work, rather than the name of a state. Someone
+ *  looking for where to press is looking for a verb. */
+export const STAGE_VERB: Record<string, string> = {
+  in_review: "Send to review", approved: "Approve", working: "Start", shipped: "Ship",
 }

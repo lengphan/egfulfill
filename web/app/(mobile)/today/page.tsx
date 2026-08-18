@@ -79,7 +79,7 @@ export default function TodayPage() {
         count: open.filter((o) => isOverdue(o)).length, tone: "alert", icon: Warning, urgent: true },
       { key: "rush", label: "Rush", hint: "flagged urgent", href: "/orders?status=rush",
         count: open.filter((o) => o.rush).length, tone: "warn", icon: Lightning, urgent: true },
-      { key: "working", label: "In production", hint: "on the floor now", href: "/orders",
+      { key: "working", label: "Working", hint: "on the floor now", href: "/orders",
         count: open.filter((o) => normalizeStage(o.factory_status) === "working").length, tone: "work", icon: ArrowClockwise },
       { key: "scan", label: "Awaiting scan", hint: "printed, not yet scanned", href: "/inventory?tab=scan",
         count: open.filter((o) => !!o.label_printed_at && !o.label_scanned_at).length, tone: "quiet", icon: Barcode },

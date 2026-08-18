@@ -12,6 +12,7 @@ import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, 
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
+import { StageBadge } from "@/components/app/stage-badge"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { OrderHistory } from "@/components/app/order-history"
@@ -489,7 +490,21 @@ export default function OrderDetailPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
               <h1 className="font-title text-2xl font-semibold tracking-tight">{num}</h1>
-              <SellerStatusBadge order={order} />
+              {/*
+                * THE FACTORY READS ITS OWN VOCABULARY.
+                *
+                * The two are deliberately different — a seller sees collapsed stages, so
+                * approved/working/packed all read "In Process", while the floor needs to
+                * know WHICH of those it is. This page showed the seller's word to everyone,
+                * so a staffer met "Working" on the list and "In Process" on the order, for
+                * one unchanged order. Same badge the list uses, for staff.
+                *
+                * A seller still sees their own status here: it is their order, and the
+                * collapsed vocabulary is what the rest of their account speaks.
+                */}
+              {isStaff
+                ? <StageBadge status={order.factory_status} />
+                : <SellerStatusBadge order={order} />}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">
               {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}
