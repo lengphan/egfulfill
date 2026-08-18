@@ -127,6 +127,45 @@ export const postOrderMessage = (
     }),
   })
 
+/* ── Wallet top-up (VietQR) ───────────────────────────────────────────────────
+ * ONE QR, and it comes from the SERVER. VietQR issues a virtual account and only
+ * reconciles payments made against the code it issued — an EMVCo payload built on the
+ * device would scan and pay perfectly well, and the money would never be matched to an
+ * account. `qrCode` is that server-issued string; the device only draws it. */
+export type VqrTier = { usd: number; rate: number }
+export type TopupConfig = {
+  rate: number
+  tiers: VqrTier[]
+  minUsd: number
+  smallPresets: number[]
+  bulkPresets: number[]
+}
+export type VietqrPayment = {
+  ok?: boolean
+  qrCode?: string
+  qrLink?: string
+  /** OUR short reference (EG000007) — what the poll matches on. */
+  note?: string
+  /** The full transfer description as the bank shows it; VietQR wraps our ref in a
+   *  virtual-account prefix, so showing `note` alone does not match what the payer sees. */
+  content?: string
+  amount?: number
+  amountUsd?: number
+  name?: string
+  bankCode?: string
+  account?: string
+  vaAccount?: string
+  error?: string
+}
+export const getTopupConfig = () => request<TopupConfig>("/api/vietqr/rate")
+export const createVietqrPayment = (amount: number, amountUsd?: number) =>
+  request<VietqrPayment>("/api/vietqr/create-payment", {
+    method: "POST",
+    body: JSON.stringify({ amount, amountUsd }),
+  })
+export const vietqrStatus = (ref: string) =>
+  request<{ paid: boolean }>(`/api/vietqr/status?ref=${encodeURIComponent(ref)}`)
+
 /** Store a photo and get a same-origin proxy URL back. 12MB ceiling server-side, which is
  *  why the camera is asked for a compressed image rather than the raw capture. */
 export const uploadAttachment = (dataUrl: string, name: string) =>

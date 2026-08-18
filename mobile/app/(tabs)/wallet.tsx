@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useState } from "react"
-import { View, Text, FlatList, RefreshControl, ActivityIndicator } from "react-native"
+import { View, Text, FlatList, RefreshControl, ActivityIndicator, Pressable } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getWallet, type WalletResponse, type LedgerRow } from "@/lib/api"
+import { router } from "expo-router"
+import { Ionicons } from "@expo/vector-icons"
 import { C } from "@/lib/theme"
 
 /**
- * WALLET — the balance, and what moved it.
+ * WALLET — the balance, what moved it, and the way to add more.
  *
  * `low` comes from the SERVER, which owns the threshold. A client picking its own number is
  * how one screen warns while another stays quiet about the same balance.
- *
- * Topping up is not here yet, and the screen says so rather than showing a button that does
- * nothing: the top-up flow is a VietQR virtual account whose QR must come from the server
- * (a locally built one is never reconciled, and the money lands untracked).
  */
 const money = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
 
@@ -70,6 +68,18 @@ export default function Wallet() {
             {err ? "—" : money(w?.balance ?? 0)}
           </Text>
         </View>
+
+        <Pressable
+          onPress={() => router.push("/topup")}
+          style={({ pressed }) => ({
+            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+            marginTop: 12, height: 52, borderRadius: 14, backgroundColor: C.primary,
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <Ionicons name="add-circle" size={20} color={C.onPrimary} />
+          <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 16 }}>Add funds</Text>
+        </Pressable>
 
         {err && <Text style={{ color: C.alert, fontSize: 14, marginTop: 16 }}>{err}</Text>}
 
