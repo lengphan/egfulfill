@@ -321,6 +321,23 @@ export function DesignMaker() {
   const measured = images.map(dpiOf).filter((d): d is number => d != null)
   const worstDpi = measured.length ? Math.min(...measured) : null
   const quality = dpiVerdict(images.length === 0 ? null : worstDpi)
+  /** Stage zoom. The wheel had no meaning on the canvas at all — the one gesture every
+   *  editor answers with zoom did nothing here. Clamped, and reset from the chip. */
+  const [zoom, setZoom] = useState(1)
+  const stageWrap = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = stageWrap.current
+    if (!el) return
+    // Attached by hand, NOT via onWheel: React registers wheel at the root as passive, so
+    // preventDefault there is ignored and the page scrolls behind the zoom.
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      // Exponential, so a notch feels the same at 40% as it does at 300%.
+      setZoom((z) => Math.min(3, Math.max(0.4, z * Math.pow(0.9985, e.deltaY))))
+    }
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
+  }, [])
   const nextLayerId = useRef(1)
   /**
    * EVERYTHING DECIDED BEFORE ANY STATE IS SET.
@@ -738,9 +755,19 @@ export function DesignMaker() {
               full width alone, its height matched that width and the mockup ran off the
               top and bottom of the panel — the cap was cut off by the frame. Capping the
               width by viewport height keeps the whole square visible. */}
-          <div className="flex h-full max-h-full w-full flex-col items-center justify-center gap-3">
+          <div className="relative flex h-full max-h-full w-full flex-col items-center justify-center gap-3">
             {/* Position pills — only when the blank actually has more than one face. A
                 single-face blank showing a lone "Front" pill is noise, not a choice. */}
+            {zoom !== 1 && (
+              <button
+                type="button"
+                onClick={() => setZoom(1)}
+                title="Back to 100%"
+                className="absolute right-6 top-6 z-10 rounded-full border border-border bg-card/90 px-2.5 py-1 text-2xs font-medium tabular-nums backdrop-blur hover:text-primary"
+              >
+                {Math.round(zoom * 100)}% · reset
+              </button>
+            )}
             {faces.length > 1 && (
               <div className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-border bg-card/80 p-1 backdrop-blur">
                 {faces.map((f) => (
@@ -770,7 +797,12 @@ export function DesignMaker() {
                 e.preventDefault(); setDragOver(false)
                 onUploadImages(e.dataTransfer.files)
               }}
+              ref={stageWrap}
               className={"relative w-full max-w-[min(100%,calc(100svh-12rem))] rounded-xl transition-shadow " + (dragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "")}
+              // Scaled, not resized. The stage's own drag maths reads getBoundingClientRect,
+              // which reports the SCALED box, so a layer dragged at 200% still lands where
+              // the pointer is — percentages stay percentages.
+              style={{ transform: zoom === 1 ? undefined : `scale(${zoom})` }}
             >
               <DesignStage
                 className="w-full"
