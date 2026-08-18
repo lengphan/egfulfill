@@ -238,7 +238,7 @@ export default function OrderDetail() {
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ fontSize: 18, fontWeight: "900", color: C.onPrimary, letterSpacing: -0.4 }}>
-                    {to === "working" ? "Start production" : (STAGE_VERB[to] ?? `Move to ${STAGE_LABEL[to] ?? to}`)}
+                    {STAGE_VERB[to] ?? `Move to ${STAGE_LABEL[to] ?? to}`}
                   </Text>
                   <Text style={{ fontSize: 13, color: C.onPrimary, opacity: 0.75, marginTop: 2 }}>
                     Moves the whole order to {STAGE_LABEL[to] ?? to}
@@ -270,7 +270,8 @@ export default function OrderDetail() {
               <>
                 <Text selectable style={{ fontSize: 20, fontWeight: "900", color: C.fg, letterSpacing: -0.4 }}>{code}</Text>
                 <Text style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>
-                  {[o.carrier, o.label_printed_at ? "label printed" : null].filter(Boolean).join(" · ") || "carrier unknown"}
+                  {[o.carrier ? String(o.carrier).toUpperCase() : null, o.label_printed_at ? "label printed" : null]
+                    .filter(Boolean).join(" · ") || "Carrier unknown"}
                 </Text>
                 <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
                   {link && (

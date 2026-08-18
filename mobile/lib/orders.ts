@@ -202,8 +202,14 @@ export function nextLineStage(it: { factory_status?: string | null }): string | 
   return PIPELINE[i + 1] ?? null
 }
 
-/** The word on the button that starts the work, rather than the name of a state. Someone
- *  looking for where to press is looking for a verb. */
+/**
+ * The word on the button that starts the work, rather than the name of a state. Someone
+ * looking for where to press is looking for a verb.
+ *
+ * These are VERBS FOR THE STAGES ABOVE, not a second set of names for them — anything
+ * without an entry falls back to "Move to <STAGE_LABEL>", which is why in_review has none.
+ * "Send to review" would have been a third vocabulary for a stage the floor calls Pending.
+ */
 export const STAGE_VERB: Record<string, string> = {
-  in_review: "Send to review", approved: "Approve", working: "Start", shipped: "Ship",
+  approved: "Approve", working: "Start", shipped: "Ship",
 }

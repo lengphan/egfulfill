@@ -120,11 +120,15 @@ export default function Orders() {
     }
   }, [movable, clearSelection, load])
 
-  // One verb for the batch when they all agree, the neutral one when they do not.
+  // One verb when the batch all agrees, the neutral one when it does not — and the count
+  // inside the phrase rather than appended to it ("Start 4", not "Start this line 4").
   const batchStages = new Set(movable.map((o) => nextStage(o)))
-  const batchVerb = batchStages.size === 1
-    ? (STAGE_VERB[[...batchStages][0] as string] ?? `Move to ${STAGE_LABEL[[...batchStages][0] as string]}`)
-    : "Move on"
+  const n = movable.length
+  const batchLabel = !n
+    ? "Nothing to move"
+    : batchStages.size === 1
+      ? `${STAGE_VERB[[...batchStages][0] as string] ?? `Move to ${STAGE_LABEL[[...batchStages][0] as string]}`} ${n}`
+      : `Move ${n} on`
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
@@ -264,7 +268,7 @@ export default function Orders() {
               ? <ActivityIndicator color={C.ink} />
               : <Ionicons name="arrow-forward" size={16} color={movable.length ? C.ink : C.muted} />}
             <Text style={{ fontSize: 15, fontWeight: "900", color: movable.length ? C.ink : C.muted }}>
-              {batchVerb}{movable.length ? ` ${movable.length}` : ""}
+              {batchLabel}
             </Text>
           </Pressable>
         </View>
