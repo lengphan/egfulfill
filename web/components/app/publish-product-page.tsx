@@ -1290,7 +1290,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
           </p>
           <div className="flex justify-center gap-2">
             <Button variant="outline" onClick={() => router.push("/spydeck")}>SpyDeck</Button>
-            <Button variant="outline" onClick={() => router.push("/design/maker")}>Design maker</Button>
+            <Button variant="outline" onClick={() => router.push("/design/maker")}>Design</Button>
           </div>
         </div>
       )}

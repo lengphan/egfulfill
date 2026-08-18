@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
@@ -459,10 +459,37 @@ export function DesignMaker() {
   }
 
   return (
-    <div className="flex h-[calc(100svh-7rem)] flex-col gap-3">
+    /**
+     * FULL SCREEN, over the app chrome rather than inside it.
+     *
+     * The editor was a 100svh-7rem box inside `eg-content`'s gutters, with the sidebar
+     * holding 240px on the left — so the stage, the one thing a person is actually looking
+     * at, got what was left after three other panels. An editor is a room, not a page: it
+     * takes the window while it is open and gives it back when you leave.
+     *
+     * z-40 is deliberate and sits between two things: the sidebar (z-30), which this
+     * covers, and dialogs (z-50) — the blank picker, the art browser and every confirm
+     * still open ON TOP of the editor rather than behind it.
+     *
+     * Fixed is safe here even though a motion wrapper is above us: PageTransition animates
+     * OPACITY only, and opacity makes a stacking context, not a containing block. A
+     * transform on that wrapper would silently re-anchor this to it — so if it ever gains
+     * one, this has to move out of the shell instead.
+     */
+    <div className="fixed inset-0 z-40 flex flex-col gap-3 bg-background p-3 md:p-4">
       <div className="flex items-center gap-3">
         <DesignLabTabs />
         {msg && <span className={"ml-2 text-sm " + (msg.tone === "ok" ? "text-success" : "text-destructive")}>{msg.text}</span>}
+        {/* THE WAY OUT. A surface that covers the whole window has to carry its own exit —
+            the sidebar and the top bar are underneath this, so without it the only way
+            back is the browser's own Back. */}
+        <Button
+          variant="ghost" size="sm" className="ml-auto shrink-0"
+          onClick={() => router.push("/design?tab=library")}
+          title="Close the editor"
+        >
+          <X size={15} weight="bold" /> Close
+        </Button>
       </div>
 
       <div className="flex min-h-0 flex-1 gap-3">
@@ -704,7 +731,7 @@ export function DesignMaker() {
                 const id = stashPublishDraft({
                   prefill: { title: name, images: composed ? [composed] : [], blank: product, designUrl, designPos: pos },
                   returnTo: "/design/maker",
-                  returnLabel: "Back to Design maker",
+                  returnLabel: "Back to Design",
                   title: "Publish product",
                 })
                 if (!id) { setPubErr("Couldn't open the publish page — this design is too large for the browser to hand over."); return }

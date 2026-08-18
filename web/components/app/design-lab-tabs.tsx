@@ -27,7 +27,9 @@ const TABS = [
   // carrying a param makes it a value change, which the hook does track.
   { key: "library", label: "Library", href: "/design?tab=library" },
   { key: "templates", label: "Templates", href: "/design?tab=templates" },
-  { key: "maker", label: "Design maker", href: "/design/maker" },
+  // "Design", not "Design maker". It sits beside two one-word toggles, and the bar reads as
+  // a set of three — a two-word member of a three-word set is the one the eye stops on.
+  { key: "maker", label: "Design", href: "/design/maker" },
 ] as const
 
 export type DesignLabTab = (typeof TABS)[number]["key"]
