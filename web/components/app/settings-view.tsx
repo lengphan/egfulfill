@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { ACTION_CATEGORIES } from "@/components/app/activity-meta"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
+import { BrandingPanel } from "@/components/app/branding-panel"
 import { PanelPicker } from "@/components/app/panel-picker"
 import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
@@ -3382,6 +3383,7 @@ export function SettingsView() {
         {canPlatform && <TabsTrigger value="usage"><TabLabel>Usage</TabLabel></TabsTrigger>}
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
         {isAdmin && <TabsTrigger value="site"><TabLabel>Site content</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="branding"><TabLabel>Branding</TabLabel></TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity"><TabLabel>Activity</TabLabel></TabsTrigger>}
         {/* Backups — admin-only. Restoring a lost database is the least reversible thing on
             the platform, so who can trigger/delete a backup matches who can touch money. */}
@@ -3474,6 +3476,11 @@ export function SettingsView() {
       {isAdmin && (
         <TabsContent value="permissions">
           <PermissionsMatrix />
+        </TabsContent>
+      )}
+      {isAdmin && (
+        <TabsContent value="branding">
+          <BrandingPanel />
         </TabsContent>
       )}
       {isAdmin && (

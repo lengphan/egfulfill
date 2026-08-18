@@ -43,6 +43,7 @@ import { teamRoutes } from './routes/team.js';
 import { sandboxRoutes, authKey, keyAllows } from './routes/sandbox.js';
 import { webhookRoutes } from './webhooks.js';
 import { adminSecretsRoutes } from './routes/admin_secrets.js';
+import { brandingRoutes } from './routes/branding.js';
 import { wilcomRoutes } from './routes/wilcom.js';
 import { usageRoutes } from './routes/usage.js';
 import { auditRoutes } from './audit.js';
@@ -540,6 +541,7 @@ teamRoutes(app, requireAuth);                          // seller team members + 
 sandboxRoutes(app, requireAuth);                       // seller API keys (/api/keys) + safe /api/test/* sandbox (simulated, no side effects) — isolated key-auth, global hook untouched
 webhookRoutes(app, requireAuth, authKey, keyAllows);              // outbound webhooks (/api/webhooks) — what makes the public API push instead of poll-only; JWT *or* X-API-Key, since registering one is a partner action
 adminSecretsRoutes(app, requireAdmin);                 // ADMIN: masked last-4 of integration credentials — even masked it maps which integrations are worth attacking
+brandingRoutes(app, requireAuth, requireAdmin);        // favicon / logo / app name — editable without a deploy; the PALETTE deliberately stays in code
 wilcomRoutes(app, requireDesignStaff);                  // Wilcom EWA digitising — operator/designer/admin, NOT warehouse: every call bills
 usageRoutes(app, requireAdmin, requireAdmin);          // ADMIN: what the integrations COST us per platform + threshold config — not needed to pick, print or ship
 auditRoutes(app, requireAdmin, requireAuth);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes

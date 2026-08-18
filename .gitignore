@@ -35,3 +35,7 @@ agent-memory/
 .env.local
 .env.production
 !.env.example
+
+# Vercel project link — contains org/project IDs, and a stray one in a subfolder
+# can re-point a deploy at the wrong directory.
+.vercel/

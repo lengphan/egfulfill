@@ -944,6 +944,24 @@ export type CatalogProduct = {
 // AI assistant config (admin) — key status + model, editable in Settings › Integrations.
 export type AiModel = { id: string; label: string }
 export type AiConfig = { keySet?: boolean; last4?: string | null; masked?: string | null; fromEnv?: boolean; model?: string; models?: AiModel[]; ok?: boolean; error?: string }
+// ── Branding (admin): the marks and names, editable without a deploy ──────────
+// Scope is deliberately favicon / logo / app name. The PALETTE stays in code: --primary
+// inks ~247 pieces of text as well as filling buttons, the status colours carry meaning on
+// the floor, and contrast here is measured rather than eyeballed — so a colour picker in an
+// admin panel is a way to make a quarter of the app unreadable without anyone noticing.
+export type Branding = { appName?: string; logoUrl?: string; faviconUrl?: string; error?: string }
+export function getBranding() {
+  return api<Branding>(`/api/branding`)
+}
+export function setBranding(body: { appName?: string; logoUrl?: string }) {
+  return api<Branding & { ok?: boolean }>(`/api/admin/branding`, { method: "PUT", body: JSON.stringify(body) })
+}
+/** `dataUrl` is a base64 data URL read from a file input. Max 2MB, PNG/JPEG/WebP/SVG/ICO. */
+export function uploadBrandingAsset(kind: "favicon" | "logo", dataUrl: string) {
+  return api<{ ok?: boolean; kind?: string; url?: string; bytes?: number; error?: string }>(
+    `/api/admin/branding/upload`, { method: "POST", body: JSON.stringify({ kind, dataUrl }) })
+}
+
 export function getAiConfig() {
   return api<AiConfig>(`/api/admin/ai-config`)
 }
