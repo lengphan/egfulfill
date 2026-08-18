@@ -43,20 +43,23 @@ export default async function MarketingLayout({ children }: { children: React.Re
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
-          {/* The identity block. It names the company, the app and a reachable human in one
-              place because a marketplace reviewing us for API access looks for exactly that,
-              and a support widget is not a published contact method. */}
+          {/* The identity block. It names the company, the app and the way to reach us.
+              The address itself used to sit here in the clear; it is on /contact now — which
+              is a PAGE a marketplace reviewing us for API access can cite, rather than a
+              mailto in a footer, and it keeps the address off every page for a scraper.
+              KEEP A ROUTE TO A HUMAN HERE. A support widget is not a published contact
+              method, so if this link goes, /contact must still publish the address. */}
           <div>
             <div className="font-display text-xl font-semibold tracking-tight">egful</div>
             <div className="mt-1 text-sm text-muted-foreground">
               EGFUL — hands-off print-on-demand fulfillment.
             </div>
-            <a
-              href="mailto:linh@embroiderygoods.com"
+            <Link
+              href="/contact"
               className="mt-2 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
             >
-              linh@embroiderygoods.com
-            </a>
+              Contact us
+            </Link>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <Link href="/catalog" className="hover:text-foreground">Products</Link>

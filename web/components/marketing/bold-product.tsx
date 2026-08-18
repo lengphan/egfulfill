@@ -56,6 +56,11 @@ const FILE_GUIDES: { label: string; body: string; methods: string[] }[] = [
   { label: "Stitch files", methods: ["EMB"], body: "Send a .DST, .PES or .EMB and we run it as-is. Send a PNG instead and we digitise it for you." },
   { label: "Small text", methods: ["EMB"], body: "Anything under 5mm tall tends to close up in stitches. Larger, or set it in a heavier face." },
   { label: "Placement", methods: [], body: "Tell us where it goes and how wide — or leave it and we'll centre it at a standard size." },
+  /* Was a paragraph hanging under the grid, which left the last column carrying one card and
+     the reassurance orphaned below all three. It is the same kind of statement as the rest —
+     what to do about a file — so it is a guideline, and it squares the flow at six. KEEP IT
+     LAST: the list is numbered by index, and "not sure" only reads right after the specifics. */
+  { label: "Not sure?", methods: [], body: "Send what you have. We check every file before it goes on a machine, and we'll tell you if something won't hold up." },
 ]
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -77,6 +82,14 @@ export function BoldProduct({ product, shipping }: {
   const specNames = [...new Set(specs.map((x) => x.spec))]
   const sizeNames = [...new Set(specs.map((x) => x.size))]
   const specAt = (size: string, spec: string) => specs.find((x) => x.size === size && x.spec === spec)?.value ?? ""
+  // The guidelines that apply to THIS product: the universal ones (no methods declared) plus
+  // any whose technique the product actually names. Hoisted out of the JSX because the COUNT
+  // is what decides the track count below.
+  const guides = FILE_GUIDES.filter((g) => g.methods.length === 0 || product.methods.some((m) => g.methods.some((k) => m.toUpperCase().includes(k))))
+  // THREE TRACKS ONLY WHEN THE LIST DIVIDES INTO THEM. Six cards fill three columns exactly;
+  // four or five leave a hole under the short track, which is what made the section read as
+  // unfinished. Two columns take any even-or-odd count without a visible gap.
+  const guideCols = guides.length % 3 === 0 ? "sm:columns-2 lg:columns-3" : "sm:columns-2"
 
   return (
     <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
@@ -440,8 +453,10 @@ export function BoldProduct({ product, shipping }: {
                 <h2 className="mt-2 font-display text-4xl font-black tracking-tight sm:text-5xl" style={{ color: ACCENT_INK }}>
                   Artwork guidelines
                 </h2>
-                <dl className="mt-10 gap-x-12 sm:columns-2 lg:columns-3">
-                  {FILE_GUIDES.filter((g) => g.methods.length === 0 || product.methods.some((m) => g.methods.some((k) => m.toUpperCase().includes(k)))).map((g, i) => (
+                {/* -mb-8 cancels the last card's own margin, so the plate's bottom padding is
+                    the 64px it says it is rather than 96px of colour under the last line. */}
+                <dl className={`mt-10 -mb-8 gap-x-12 ${guideCols}`}>
+                  {guides.map((g, i) => (
                     <div key={g.label} className="mb-8 break-inside-avoid">
                       <dt className="flex items-baseline gap-2.5">
                         <span className="font-mono text-xs font-bold tabular-nums" style={{ color: ACID }}>
@@ -455,10 +470,6 @@ export function BoldProduct({ product, shipping }: {
                     </div>
                   ))}
                 </dl>
-                <p className="mt-4 max-w-2xl text-sm leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.8 }}>
-                  Not sure? Send what you have — we check every file before it goes on a machine,
-                  and we&apos;ll tell you if something won&apos;t hold up.
-                </p>
               </Rise>
             </div>
           </div>
