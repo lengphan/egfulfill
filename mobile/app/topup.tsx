@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Share } from "react-native"
+import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert } from "react-native"
+import * as FileSystem from "expo-file-system/legacy"
+import * as Sharing from "expo-sharing"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import QRCode from "react-native-qrcode-svg"
 import {
-  getTopupConfig, createVietqrPayment, vietqrStatus,
-  type TopupConfig, type VietqrPayment,
+  getTopupConfig, createVietqrPayment, vietqrStatus, getWallet,
+  type TopupConfig, type VietqrPayment, type LedgerRow,
 } from "@/lib/api"
 import { C } from "@/lib/theme"
 
@@ -34,9 +36,18 @@ export default function TopUp() {
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const poll = useRef<ReturnType<typeof setInterval> | null>(null)
+  const qrRef = useRef<{ toDataURL?: (cb: (b64: string) => void) => void } | null>(null)
+  const [saving, setSaving] = useState(false)
+  /* Past top-ups come from the LEDGER, not a top-up table: every method (VietQR, card,
+     PayPal, manual transfer) books the same `topup` row, so the ledger is the one place
+     that has all of them and cannot disagree with the balance. */
+  const [history, setHistory] = useState<LedgerRow[] | null>(null)
 
   useEffect(() => {
     getTopupConfig().then(setCfg).catch(() => setErr("Couldn't load top-up settings."))
+    getWallet()
+      .then((w) => setHistory((w.ledger ?? []).filter((r) => String(r.type) === "topup").slice(0, 5)))
+      .catch(() => setHistory([]))
     // Polling must stop when this screen goes away, or it keeps running against a closed
     // payment for as long as the app is open.
     return () => { if (poll.current) clearInterval(poll.current) }
@@ -95,6 +106,38 @@ export default function TopUp() {
     }
   }, [usdAmt, minUsd, rate, vndAmt])
 
+  /*
+   * SAVE THE QR AS AN IMAGE.
+   *
+   * The QR is drawn as SVG, so there is no file to hand anywhere until it is rasterised —
+   * `toDataURL` is the renderer's own callback and gives back base64 PNG. Written to the
+   * cache (not Documents: it is a throwaway of a payment that expires) and handed to the
+   * share sheet, where "Save Image" puts it in Photos without us asking for the photo
+   * library permission up front.
+   */
+  const saveQr = useCallback(async () => {
+    const ref = qrRef.current
+    if (!ref?.toDataURL) { Alert.alert("Nothing to save", "The code hasn't finished drawing yet."); return }
+    setSaving(true)
+    try {
+      const b64: string = await new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error("The code took too long to render.")), 8000)
+        ref.toDataURL!((data) => { clearTimeout(t); resolve(data) })
+      })
+      const file = `${FileSystem.cacheDirectory}egful-topup-${payment?.note || "qr"}.png`
+      await FileSystem.writeAsStringAsync(file, b64, { encoding: FileSystem.EncodingType.Base64 })
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert("Can't share here", "Saving images isn't available on this device.")
+        return
+      }
+      await Sharing.shareAsync(file, { mimeType: "image/png", dialogTitle: "Save the payment QR" })
+    } catch (e) {
+      Alert.alert("Couldn't save the QR", e instanceof Error ? e.message : "Try again.")
+    } finally {
+      setSaving(false)
+    }
+  }, [payment])
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       <Pressable
@@ -131,7 +174,7 @@ export default function TopUp() {
           <View style={{ alignItems: "center", marginTop: 20 }}>
             <View style={{ padding: 16, borderRadius: 20, backgroundColor: "#ffffff", borderWidth: 1, borderColor: C.border }}>
               {payment.qrCode
-                ? <QRCode value={payment.qrCode} size={220} />
+                ? <QRCode value={payment.qrCode} size={220} getRef={(c) => { qrRef.current = c }} />
                 : <Text style={{ color: C.muted }}>No scannable code</Text>}
             </View>
 
@@ -156,16 +199,27 @@ export default function TopUp() {
               <Text style={{ fontSize: 14, color: C.muted }}>Waiting for your transfer…</Text>
             </View>
 
+            {/* SAVE THE CODE, THEN LEAVE. Paying means switching to a banking app, and a QR
+                you can only see in OUR app is one you cannot scan from inside theirs. Saved
+                as an image so it can be picked from Photos in the bank's own scanner. */}
             <Pressable
-              onPress={() => Share.share({ message: payment.qrCode || payment.content || "" })}
+              onPress={saveQr}
+              disabled={saving || !payment.qrCode}
               style={({ pressed }) => ({
-                marginTop: 20, height: 48, borderRadius: 14, paddingHorizontal: 24,
-                alignItems: "center", justifyContent: "center",
-                borderWidth: 1, borderColor: C.border, opacity: pressed ? 0.6 : 1,
+                flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                marginTop: 20, height: 50, borderRadius: 14, paddingHorizontal: 24,
+                borderWidth: 1, borderColor: C.border, opacity: pressed || saving ? 0.6 : 1,
               })}
             >
-              <Text style={{ fontSize: 15, fontWeight: "600", color: C.fg }}>Share payment details</Text>
+              {saving
+                ? <ActivityIndicator color={C.primary} />
+                : <Ionicons name="download-outline" size={18} color={C.fg} />}
+              <Text style={{ fontSize: 15, fontWeight: "600", color: C.fg }}>Save QR image</Text>
             </Pressable>
+
+            <Text style={{ fontSize: 13, color: C.muted, marginTop: 14, textAlign: "center", paddingHorizontal: 12 }}>
+              Save it, pay in your banking app, then come back — this screen updates itself.
+            </Text>
           </View>
         ) : (
           <>
@@ -235,6 +289,41 @@ export default function TopUp() {
               <View style={{ alignItems: "center", marginTop: 20 }}>
                 <ActivityIndicator color={C.primary} />
               </View>
+            )}
+
+            {/* PAST TOP-UPS — short on purpose. This answers one question ("did my last
+                transfer land?") and anything longer belongs in the wallet's full ledger,
+                which is one screen away. Five rows, amount and date, nothing else. */}
+            {history !== null && history.length > 0 && (
+              <View style={{ marginTop: 36 }}>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1 }}>
+                  RECENT TOP-UPS
+                </Text>
+                <View style={{ marginTop: 6 }}>
+                  {history.map((r) => (
+                    <View
+                      key={String(r.id)}
+                      style={{
+                        flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12,
+                        paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.border,
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: C.muted }}>
+                        {new Date(r.created_at).toLocaleDateString()}
+                      </Text>
+                      <Text style={{ fontSize: 15, fontWeight: "800", color: "#0a7c42" }}>
+                        +${(Number(r.delta) || 0).toFixed(2)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {history !== null && history.length === 0 && (
+              <Text style={{ fontSize: 14, color: C.muted, marginTop: 36 }}>
+                No top-ups yet.
+              </Text>
             )}
           </>
         )}
