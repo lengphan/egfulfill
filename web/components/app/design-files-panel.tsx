@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
+import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X, DotsThree, DownloadSimple } from "@phosphor-icons/react"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, designsBySide, sidesForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
@@ -205,25 +206,45 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
               (it renders on the mockup), so the link fetches the bytes it is showing rather
               than routing through the paywalled deliverable endpoint — this is the seller's
               own artwork on their own order, not a file we cut. */}
-          <a
-            href={r.src}
-            download={r.name || "artwork"}
-            title="Download this artwork"
-            className="eg-tap shrink-0 rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Download
-          </a>
-          {onRemove && (
-            <button
-              onClick={() => onRemove(r)}
-              disabled={busy === r.key}
-              title={`Take the ${r.side} artwork off this item`}
-              aria-label={`Take ${r.name} off the ${r.side} of item ${r.no ?? ""}`.trim()}
-              className="shrink-0 flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+          {/**
+            * ONE CONTROL PER ROW, at the end of it.
+            *
+            * A download pill and a corner ✕ is two marks competing at the edge of a row you
+            * are scanning for a file name — and the corner ✕ in particular sat on top of the
+            * content rather than in the row. Everything a row can do lives behind one ⋯,
+            * which is where the rest of this app already keeps row actions.
+            */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={`Actions for ${r.name}`}
+              title="Actions"
+              className="eg-tap flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
-              <X size={11} weight="bold" />
-            </button>
-          )}
+              <DotsThree size={16} weight="bold" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                onClick={() => {
+                  // Same-origin already (it draws on the mockup above), so the bytes are
+                  // fetched straight rather than through the paywalled deliverable route —
+                  // this is artwork on the seller's own order, not a file we cut.
+                  const a = document.createElement("a")
+                  a.href = r.src; a.download = r.name || "artwork"; a.click()
+                }}
+              >
+                <DownloadSimple size={14} weight="bold" /> Download artwork
+              </DropdownMenuItem>
+              {onRemove && (
+                <DropdownMenuItem
+                  disabled={busy === r.key}
+                  onClick={() => onRemove(r)}
+                  className="text-destructive"
+                >
+                  <X size={13} weight="bold" /> Take off the {r.side}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       ))}
     </div>

@@ -39,9 +39,25 @@ function DropdownMenuContent({
         side={side}
         sideOffset={sideOffset}
       >
+        {/**
+          * IT COMES OUT OF THE THING YOU PRESSED.
+          *
+          * origin-(--transform-origin) was already anchored to the trigger by Base UI, but
+          * the motion was a flat 100ms fade — so a menu hanging off a small mark appeared
+          * beside it rather than FROM it, and the connection between control and panel had
+          * to be inferred from position alone.
+          *
+          * 180ms on a back-out curve: the overshoot past 1 is what reads as a spring rather
+          * than a scale, and it is the cheapest way to get one out of a CSS animation.
+          * Opening is the gesture worth animating; closing stays at 100ms and eases out,
+          * because a menu you have finished with should get out of the way.
+          *
+          * motion-reduce:duration-0 — the whole thing is opt-out, like every other movement
+          * in this codebase.
+          */}
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
-          className={cn("z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-2xl bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/5 duration-100 outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95", className )}
+          className={cn("z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-2xl bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/5 duration-[180ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:duration-0 data-closed:duration-100 data-closed:ease-out outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-90 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95", className )}
           {...props}
         />
       </MenuPrimitive.Positioner>
