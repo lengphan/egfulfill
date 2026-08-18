@@ -55,6 +55,7 @@ import { designSrc } from "@/lib/order-image"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 import { LineDownloads } from "@/components/app/line-downloads"
 import { TrackingNumber } from "@/components/app/tracking-number"
+import { AddTracking } from "@/components/app/add-tracking"
 
 // Same fallbacks as the boards' toAddrOf — marketplace payloads spell the address a dozen
 // ways, so the ship-to a label uses must read them all. Kept identical on purpose.
@@ -847,6 +848,9 @@ export default function OrderDetailPage() {
                   })()}
                   {order.carrier && <div className="font-medium">{order.carrier}</div>}
                   <TrackingNumber carrier={order.carrier} tracking={order.tracking} />
+                  {/* No tracking yet: the number often exists somewhere — a seller shipped it
+                      themselves, a partner emailed it — and the order had nowhere to put it. */}
+                  {!order.tracking && <AddTracking orderId={order.id} onSaved={reloadAll} />}
                   {canFetchTiktokLabel(order) && (
                     <>
                       <button
