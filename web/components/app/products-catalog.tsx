@@ -255,10 +255,14 @@ export function ProductsCatalog() {
               key={c}
               onClick={() => setCat(c)}
               className={
-                "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors " +
+                /* ONE CHIP CARRIES COLOUR, the rest are text. Every category was a bordered
+                   pill, so a row of eight met the eye as eight buttons and the selected one
+                   had to shout over them. The unselected ones sit on the canvas now — the
+                   selection is the only thing drawn. */
+                "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors " +
                 (cat === c
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground")
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground")
               }
             >
               {c}
@@ -316,7 +320,11 @@ export function ProductsCatalog() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: Math.min(i, 8) * 0.04, ease: [0.21, 0.5, 0.28, 1] }}
                 whileHover={reduce ? undefined : { y: -4 }}
-                className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                /* NO SHADOW. A drop shadow under a white card on a white canvas is a grey
+                   smudge doing the job a hairline already does — twelve of them in a grid
+                   read as haze. The border separates; hover raises the CARD, not a blur
+                   under it. */
+                className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 {/* image / placeholder */}
                 <div className="relative aspect-square overflow-hidden bg-white">
@@ -413,7 +421,11 @@ export function ProductsCatalog() {
                       )}
                       {colors.length === 0 && <span className="text-2xs text-muted-foreground">No colours set</span>}
                     </div>
-                    <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">
+                    {/* TEXT, NOT A PILL. Every card carried a beige type chip and three
+                        beige size chips — four boxes per tile, forty-eight in a grid of
+                        twelve, and not one of them was a control. The words say the same
+                        thing; the boxes were the "lots of shaded beige". */}
+                    <span className="shrink-0 text-2xs font-medium text-muted-foreground">
                       {p.type || "Uncategorised"}
                     </span>
                   </div>
@@ -423,7 +435,7 @@ export function ProductsCatalog() {
                       shorter card than its neighbours; and it read p.sizes directly,
                       which is empty on the many catalog rows that carry sizes only as
                       per-size price tiers (sizesOf unions both). */}
-                  <div className="mt-3 flex min-h-6 items-center gap-1 overflow-hidden">
+                  <div className="mt-3 flex min-h-6 items-center gap-2 overflow-hidden">
                     {sizes.length === 0 ? (
                       <span className="text-2xs text-muted-foreground">No sizes set</span>
                     ) : (
@@ -431,7 +443,10 @@ export function ProductsCatalog() {
                         {sizes.slice(0, 7).map((s) => (
                           <span
                             key={s}
-                            className="shrink-0 rounded border border-border px-1.5 py-0.5 text-2xs font-medium text-muted-foreground"
+                            /* One line of sizes, not seven outlined boxes. They are a
+                               reading, not seven controls — the border made each one look
+                               pressable and turned a run of sizes into a keyboard. */
+                            className="shrink-0 text-2xs font-medium tabular-nums text-muted-foreground"
                           >
                             {s}
                           </span>

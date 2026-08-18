@@ -47,7 +47,11 @@ export function FulfillmentSpeed({ orders, loading }: { orders: OrderRow[]; load
             const Icon = r.icon
             return (
               <div key={r.label} className="flex items-center gap-3 px-5 py-3">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Icon size={16} weight="duotone" /></span>
+                {/* NO PLATE. A beige rounded square behind every icon meant four identical tiles
+                    down the left of a four-row list — the plates lined up and the icons did
+                    not read at all, because the eye met the boxes first. The icon alone, at
+                    the weight the rest of the app uses. */}
+                <Icon size={17} weight="regular" className="mt-0.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0">
                   <div className="text-sm font-medium leading-tight">{r.label}</div>
                   <div className="text-xs text-muted-foreground leading-tight">{r.hint}</div>
@@ -62,7 +66,7 @@ export function FulfillmentSpeed({ orders, loading }: { orders: OrderRow[]; load
           {/* On-time is the one that needs data to build up: est_delivery is only captured
               once a parcel starts moving, so it is honestly empty until orders ship. */}
           <div className="flex items-center gap-3 px-5 py-3">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><SealCheck size={16} weight="duotone" /></span>
+            <SealCheck size={17} weight="regular" className="mt-0.5 shrink-0 text-muted-foreground" />
             <div className="min-w-0">
               <div className="text-sm font-medium leading-tight">{tl("speed", "On-time")}</div>
               <div className="text-xs text-muted-foreground leading-tight">{tl("speed", "delivered by USPS ETA")}</div>

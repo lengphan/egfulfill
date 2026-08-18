@@ -18,6 +18,7 @@ export function StatCard({
   icon: Icon,
   onClick,
   active,
+  tone,
 }: {
   label: string
   value: string
@@ -56,6 +57,11 @@ export function StatCard({
           and 34 sat two pixels from the dashboard's own 36px figure, which is a difference
           the eye reads as a mistake rather than a level. 24 → 36 are both steps. */}
       <div className="mt-2.5 text-2xl font-black leading-none tracking-tight tabular-nums sm:text-4xl">{value}</div>
+      {/* THE ONE LIME MARK. A 2px bar under the figure, on the tile the caller flagged
+          positive — nothing else on the screen carries it, which is the entire reason it
+          registers. Lime can never letter anything (1.05:1 on white: invisible), so it is
+          used the only way it works — as a solid shape. */}
+      {tone === "pos" && <span className="mt-2.5 block h-[3px] w-9 rounded-full bg-[var(--brand-foreground)]" />}
     </>
   )
 
