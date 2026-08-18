@@ -96,7 +96,7 @@ egful.store {
 	# full architecture doc. Markdown at the root is blocked too — CLAUDE.md is only
 	# absent today because it's gitignored, so it would go public the moment anyone
 	# commits it, which is not a safe thing to depend on.
-	@hidden path /.env* /*/.env* /.git /.git/* /.github /.github/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/* /docs /docs/* /*.md
+	@hidden path /.env* /*/.env* /.git /.git/* /.github /.github/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /mobile /mobile/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/* /docs /docs/* /*.md
 	handle @hidden {
 		respond 404
 	}
