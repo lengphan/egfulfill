@@ -94,7 +94,25 @@ export function OrderedVariant({ item, className = "", after, blankSku }: {
   if (sku) parts.push(<span key="s"><span className="font-medium text-foreground/70">Listing SKU:</span> <span className="font-mono">{sku}</span></span>)
   // The blank stands in where there is no listing sku — a manual line — and sits beside it
   // where there is one, because they are different codes for different things.
-  if (blank) parts.push(<span key="b"><span className="font-medium text-foreground/70">Blank:</span> <span className="font-mono">{blank}</span></span>)
+  /**
+   * THE BLANK'S SKU, not its title.
+   *
+   * `blank` holds a product NAME — the server's own resolveBlankName writes the name into
+   * it — so this line printed "Gildan Unisex Heavy Blend™ Crewneck Sweatshirt" under a row
+   * whose heading is already the item's title. Two long names stacked, and neither of them
+   * the code anyone picks stock or raises a PO against.
+   *
+   * The caller resolves the catalog row and hands the sku down; the name stays as the
+   * tooltip, so nothing is lost — it moves to where a long string belongs. Falls back to
+   * the name when the blank matches no catalog product, because saying nothing there would
+   * hide that the line has a blank at all.
+   */
+  if (blankSku || blank) parts.push(
+    <span key="b" title={blank || undefined}>
+      <span className="font-medium text-foreground/70">Blank SKU:</span>{" "}
+      <span className="font-mono">{blankSku || blank}</span>
+    </span>
+  )
   // ALWAYS PRESENT, including x1. An absent count and a count of one must never look the
   // same to someone pulling stock. Emphasised past one so a 6 catches the eye where a 1
   // should not.

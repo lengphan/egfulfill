@@ -46,6 +46,7 @@ import {
   type CatalogProduct,
   type ShipAddress,
 } from "@/lib/api"
+import { resolveProduct } from "@/lib/variant-resolve"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
 import { OrderStageMenu } from "@/components/app/order-stage-menu"
@@ -639,7 +640,10 @@ export default function OrderDetailPage() {
                             </div>
                             {/* Same line as the production queue: what the buyer chose, next
                                 to what we are choosing. */}
-                            <OrderedVariant item={it} />
+                            {/* The catalogue row is what turns a blank NAME into the sku
+                                production actually keys on — resolveProduct is the shared
+                                resolver (CLAUDE.md §5), not a private copy. */}
+                            <OrderedVariant item={it} blankSku={resolveProduct(it, catalog)?.sku ?? undefined} />
                             {/* THIS LINE's board state, with the lane named. "Sent to design"
                                 and "Approved" are different answers, and until now the only
                                 signal was an order-wide chip that lit for every item the
