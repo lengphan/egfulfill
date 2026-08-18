@@ -57,10 +57,14 @@ export function OrderHistory({ orderId, items = [] }: { orderId: string; items?:
       title="Order history"
     >
       <div className="max-h-72 overflow-y-auto p-3">
+        {/* BARE, because this is already inside a SectionCard. `variant="card"` gave the
+            feed its own rounded border, so the panel drew a box, and the list drew another
+            box just inside it — two frames around one list, which is what makes a page of
+            cards read as clutter. The prop exists for exactly this. */}
         <ActivityFeed
           rows={rows}
           resolveLine={resolveLine}
-          variant="card"
+          variant="bare"
           empty="Nothing recorded for this order yet — changes from here on will appear."
         />
       </div>

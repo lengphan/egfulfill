@@ -78,7 +78,12 @@ export function ActivityFeed({
     return <div className={"px-3 py-6 text-center text-sm text-muted-foreground " + (className ?? "")}>{empty ?? "Nothing recorded yet."}</div>
   }
 
-  const wrap = variant === "card" ? "divide-y divide-border overflow-hidden rounded-xl border border-border " : ""
+  // A list still needs its rows separated when it is bare — bare means "no card of my own",
+  // not "no structure". Compact rows are the exception: they are hover-highlighted chips in
+  // a popover, and hairlines between them read as a table nobody asked for.
+  const wrap = variant === "card"
+    ? "divide-y divide-border overflow-hidden rounded-xl border border-border "
+    : (compact ? "" : "divide-y divide-border ")
 
   return (
     <div className={wrap + (className ?? "")}>
