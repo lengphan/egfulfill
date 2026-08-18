@@ -88,17 +88,42 @@ export function topupsRoutes(app, requireAuth) {
                 and created_at < now() - interval '30 minutes'`).catch(() => {});
   }
 
+  /*
+   * AN UNPAID VietQR IS NOT STAFF WORK.
+   *
+   * The queue is a to-do list: everything in it should be something a person must act on.
+   * A VietQR request confirms ITSELF the moment the money lands, so while it is unpaid
+   * there is nothing for an admin to do but look at it — and the Confirm button beside it
+   * belongs to manual transfers, where a human really does have to read a receipt.
+   *
+   * So staff see a VietQR row only once it has been PAID. The seller still sees their own
+   * while it is pending, because for them it is not a to-do, it is "I said I would send
+   * this" — which is worth remembering and is theirs to see.
+   *
+   * Abandoned is hidden from everyone; it is a window somebody closed.
+   */
+  const HIDE_UNPAID_VQR = "not (method = 'VietQR' and status in ('pending','abandoned'))";
+
   app.get('/api/topups', { preHandler: requireAuth }, async (req) => {
     await ageOutStale();
     if (isStaff(req.user)) {
       const st = req.query && req.query.status;
       const r = st
-        ? await q('select * from topup_requests where status=$1 order by created_at desc limit 200', [st])
-        : await q("select * from topup_requests where status <> 'abandoned' order by created_at desc limit 200");
+        ? await q(`select * from topup_requests where status=$1 and ${HIDE_UNPAID_VQR}
+                    order by created_at desc limit 200`, [st])
+        : await q(`select * from topup_requests where ${HIDE_UNPAID_VQR}
+                    order by created_at desc limit 200`);
       return r.rows;
     }
+    /*
+     * THE SELLER KEEPS ALL OF THEIRS, ABANDONED INCLUDED.
+     *
+     * Hiding a closed window from the person who closed it removes the only way back to it.
+     * The virtual account is still live and the ref still settles, so an unpaid request is
+     * not rubbish — it is a payment they can still make. It just isn't anyone else's work.
+     */
     const r = await q(
-      "select * from topup_requests where seller_id=$1 and status <> 'abandoned' order by created_at desc limit 100",
+      'select * from topup_requests where seller_id=$1 order by created_at desc limit 100',
       [req.user.sub]);
     return r.rows;
   });
