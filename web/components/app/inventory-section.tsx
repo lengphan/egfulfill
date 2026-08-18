@@ -45,7 +45,7 @@ export function InventorySection() {
       {/* One mobile section hero for the whole page (the top bar is desktop-only); the
           inner views hide their own hero via `embedded`. */}
       <div className="flex items-center gap-3 md:hidden">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
+        <Package size={18} weight="regular"  className="shrink-0 text-primary" />
         <div className="min-w-0">
           <PageTitle>Inventory</PageTitle>
           <p className="truncate text-sm text-muted-foreground">Stock levels on hand and the scan station.</p>

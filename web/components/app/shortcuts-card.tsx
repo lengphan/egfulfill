@@ -194,7 +194,7 @@ export function ShortcutsCard({
                 const Icon = c.icon
                 return (
                   <button key={c.href} onClick={() => add(c.href)} className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent">
-                    <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary"><Icon size={14} weight="duotone" /></span>
+                    <Icon size={18} weight="regular"  className="shrink-0 text-primary" />
                     {nl("nav", c.label)}
                   </button>
                 )

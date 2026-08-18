@@ -523,7 +523,7 @@ export function DesignerBoard() {
       <div className="flex items-center gap-3">
         {/* Icon+title hidden on desktop (top bar names the page); the board/list toggle
             on the right stays. On mobile the hero is the title. */}
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><PenNib size={18} weight="fill" /></span>
+        <PenNib size={18} weight="regular"  className="shrink-0 text-primary md:hidden" />
         <div className="min-w-0 md:hidden">
           <PageTitle>Designer</PageTitle>
           <p className="truncate text-sm text-muted-foreground">{view === "board" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
@@ -1012,7 +1012,7 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
       <div className="overflow-hidden rounded-2xl border border-border">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+            <thead className="border-b border-border text-left eg-label text-muted-foreground">
               <tr>
                 {shown.map((c) => <th key={c.id} className={"px-4 py-2.5 font-medium " + (c.align === "right" ? "text-right" : "")}>{labelOf(c)}</th>)}
               </tr>

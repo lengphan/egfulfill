@@ -79,9 +79,7 @@ export function HelpCenter() {
             const Ico = ICONS[c.icon] ?? Rocket
             return (
               <a key={c.id} href={`#${c.id}`} className="group rounded-xl border border-border p-4 transition-colors hover:border-primary hover:bg-accent">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Ico size={18} weight="duotone" />
-                </span>
+                <Ico size={18} weight="regular"  className="shrink-0 text-primary" />
                 <div className="mt-3 font-semibold">{tl("helpCat", c.title)}</div>
                 <div className="mt-1 text-sm text-muted-foreground">{tl("helpCatDesc", c.desc)}</div>
               </a>

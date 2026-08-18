@@ -366,7 +366,7 @@ export function ShipmentsView() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <tr className="border-b border-border text-left eg-label text-muted-foreground">
                 <th className="px-5 py-2 font-medium">Order</th>
                 <th className="px-3 py-2 font-medium">Customer</th>
                 <th className="px-3 py-2 font-medium">Tracking</th>

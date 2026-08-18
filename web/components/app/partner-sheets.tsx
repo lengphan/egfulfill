@@ -263,7 +263,7 @@ export function PartnerSheets() {
                     {m.mode === "rows" && (
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                          <tr className="border-b border-border text-left eg-label text-muted-foreground">
                             {/* nowrap: a partner header is a phrase ("PALLET SIZE (mm, width
                                 x height)") and the column it names has to stay legible as one. */}
                             <th className="whitespace-nowrap px-3 py-2 font-medium">Their column</th>
@@ -317,7 +317,7 @@ export function PartnerSheets() {
                       <div className="overflow-x-auto px-3 py-2">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                            <tr className="border-b border-border text-left eg-label text-muted-foreground">
                               {block.columns.map((c) => <th key={c.index} className="px-1 py-2 font-medium">{c.label}</th>)}
                               <th className="w-8" />
                             </tr>

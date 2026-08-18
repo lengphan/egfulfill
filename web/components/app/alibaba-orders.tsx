@@ -221,7 +221,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                           <div className="space-y-3">
                             <div className="overflow-x-auto">
                               <table className="w-full text-sm">
-                                <thead className="text-left text-xs text-muted-foreground">
+                                <thead className="border-b border-border text-left eg-label text-muted-foreground">
                                   <tr>
                                     <th className="py-1.5 pr-3 font-medium">Item</th>
                                     <th className="py-1.5 pr-3 font-medium">Variant</th>

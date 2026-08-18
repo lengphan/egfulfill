@@ -127,7 +127,7 @@ export function DashboardView() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><House size={18} weight="fill" /></span>
+        <House size={18} weight="regular"  className="shrink-0 text-primary" />
         <div>
           <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
           <p className="text-sm text-muted-foreground">

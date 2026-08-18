@@ -202,7 +202,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
     <div className="space-y-4">
       {!embedded && (
         <div className="flex items-center gap-3 md:hidden">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BarcodeIcon size={18} weight="fill" /></span>
+          <BarcodeIcon size={18} weight="regular"  className="shrink-0 text-primary" />
           <div className="min-w-0">
             <PageTitle>Scan</PageTitle>
             <p className="truncate text-sm text-muted-foreground">Scan stock in and out. Works with a scanner gun or your phone camera.</p>

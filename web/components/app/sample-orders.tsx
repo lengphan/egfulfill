@@ -238,7 +238,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+            <thead className="border-b border-border text-left eg-label text-muted-foreground">
               <tr>
                 <th className="px-4 py-2.5 font-medium">Order no.</th>
                 <th className="px-4 py-2.5 font-medium">Supplier</th>

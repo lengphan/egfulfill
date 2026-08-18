@@ -51,7 +51,7 @@ export function CatalogExportHistory({ onOpen }: { onOpen: (id: string) => void 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <tr className="border-b border-border text-left eg-label text-muted-foreground">
                 <th className="px-2 py-2 font-medium">Catalogue</th>
                 <th className="px-2 py-2 font-medium">Saved</th>
                 <th className="px-2 py-2 font-medium">Styles</th>

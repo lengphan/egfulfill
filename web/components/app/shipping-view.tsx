@@ -43,7 +43,7 @@ export function ShippingView() {
     <div className="space-y-4">
       {/* One mobile section hero for the whole page (the top bar is desktop-only). */}
       <div className="flex items-center gap-3 md:hidden">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Truck size={18} weight="fill" /></span>
+        <Truck size={18} weight="regular"  className="shrink-0 text-primary" />
         <div className="min-w-0">
           <PageTitle>Shipping</PageTitle>
           <p className="truncate text-sm text-muted-foreground">Today&apos;s dispatch queue, the shipment archive, and what a parcel costs.</p>

@@ -1425,7 +1425,7 @@ export function OrdersHub() {
       {/* Mobile-only: the top bar names the page on desktop, so the hero would just
           duplicate it there. On mobile the top bar is hidden, so the hero IS the title. */}
       <div className="flex items-center gap-3 md:hidden">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
+        <Package size={18} weight="regular"  className="shrink-0 text-primary" />
         <div>
           <h1 className="font-title text-2xl font-semibold tracking-tight">{tl("nav", "Orders")}</h1>
           <p className="text-sm text-muted-foreground">{subtitle}</p>

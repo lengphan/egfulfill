@@ -110,9 +110,7 @@ export function NotificationsView() {
         <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
-          <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-            <Bell size={22} weight="duotone" />
-          </span>
+          <Bell size={18} weight="regular"  className="shrink-0 text-muted-foreground" />
           <div className="font-medium">{unreadOnly ? "Nothing unread" : "No notifications yet"}</div>
           <div className="max-w-sm text-sm text-muted-foreground">
             {unreadOnly

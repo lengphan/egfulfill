@@ -153,7 +153,7 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <tr className="border-b border-border text-left eg-label text-muted-foreground">
                 <th className="w-8 px-2 py-2" />
                 <th className="px-2 py-2 font-medium">Style</th>
                 <th className="px-2 py-2 font-medium">Catalogue price</th>

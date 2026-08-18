@@ -40,7 +40,7 @@ export function DesignerEarnings() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 md:hidden">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><CurrencyDollar size={18} weight="fill" /></span>
+        <CurrencyDollar size={18} weight="regular"  className="shrink-0 text-primary" />
         <div className="min-w-0">
           <PageTitle>Earnings</PageTitle>
           <p className="truncate text-sm text-muted-foreground">Credits land here when a design is approved. Every entry is on the ledger.</p>
@@ -66,7 +66,7 @@ export function DesignerEarnings() {
               <div className="py-16 text-center text-sm text-muted-foreground">No earnings yet — credit a designer from an approved card.</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                <thead className="border-b border-border text-left eg-label text-muted-foreground">
                   <tr><th className="px-4 py-2.5 font-medium">When</th><th className="px-4 py-2.5 font-medium">Detail</th><th className="px-4 py-2.5 font-medium">Type</th><th className="px-4 py-2.5 text-right font-medium">Amount</th></tr>
                 </thead>
                 <tbody>

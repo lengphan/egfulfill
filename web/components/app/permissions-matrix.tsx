@@ -74,7 +74,7 @@ export function PermissionsMatrix() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <tr className="border-b border-border text-left eg-label text-muted-foreground">
                       <th className="py-2 pr-4 font-medium">Surface</th>
                       {VIS_ROLES.map((r) => <th key={r} className="px-3 py-2 text-center font-medium">{VIS_ROLE_LABEL[r]}</th>)}
                     </tr>

@@ -465,7 +465,7 @@ export function SourcingView() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-border text-xs text-muted-foreground">
+              <thead className="border-b border-border text-left eg-label text-muted-foreground">
                 <tr>
                   <th className="w-12 px-4 py-2" />
                   <th className="px-4 py-2 text-left font-medium">Product</th>

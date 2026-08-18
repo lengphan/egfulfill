@@ -731,7 +731,7 @@ export function ImportOrdersDialog({
                 )}
                 <div className="max-h-64 overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-muted/60 text-left text-xs text-muted-foreground">
+                    <thead className="sticky top-0 z-10 bg-card border-b border-border text-left eg-label text-muted-foreground">
                       <tr>
                         <th className="px-3 py-2 font-medium">#</th>
                         <th className="px-3 py-2 font-medium">Order</th>

@@ -629,9 +629,7 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
     <div>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Sparkle size={16} weight="fill" />
-          </span>
+          <Sparkle size={18} weight="regular"  className="shrink-0 text-primary" />
           <div>
             <div className="font-semibold">AI Assistant (Claude)</div>
             <div className="text-xs text-muted-foreground">Powers the account-aware auto-reply in seller Support chat.</div>
@@ -773,9 +771,7 @@ function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
     <div>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <ImageSquare size={16} weight="fill" />
-          </span>
+          <ImageSquare size={18} weight="regular"  className="shrink-0 text-primary" />
           <div>
             <div className="font-semibold">Image AI (Nano Banana)</div>
             <div className="text-xs text-muted-foreground">Product images from a prompt, in staff&rsquo;s own My EG chat. Not offered to sellers.</div>

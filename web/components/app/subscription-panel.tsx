@@ -315,9 +315,7 @@ export function SubscriptionPanel() {
         <div className="flex flex-wrap items-start justify-between gap-4 p-5">
           <div className="min-w-0 max-w-lg">
             <div className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <MagnifyingGlass size={16} weight="bold" />
-              </span>
+              <MagnifyingGlass size={18} weight="bold"  className="shrink-0 text-primary" />
               <div className="font-semibold">SpyDeck research</div>
               <span className="rounded-full bg-primary/10 px-2 py-0.5 eg-label text-primary">
                 Research

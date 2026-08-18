@@ -16,7 +16,7 @@ export function SuppliersView({ embedded = false }: { embedded?: boolean }) {
     <div className="space-y-4">
       {!embedded && (
         <div className="flex items-center gap-3 md:hidden">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
+          <Package size={18} weight="regular"  className="shrink-0 text-primary" />
           <div className="min-w-0">
             <PageTitle>Suppliers</PageTitle>
             <p className="truncate text-sm text-muted-foreground">Browse S&amp;S and Otto blanks in one feed and add them to Products.</p>

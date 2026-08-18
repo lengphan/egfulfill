@@ -100,9 +100,7 @@ function ChannelMark({ channelKey, name, markH }: { channelKey: string; name: st
   return (
     <span className="flex h-[60px] items-center">
       {step > 1 ? (
-        <span className="flex size-12 items-center justify-center rounded-lg bg-muted">
-          <Storefront size={24} weight="duotone" className="text-muted-foreground" />
-        </span>
+        <Storefront size={18} weight="regular" className="shrink-0 text-muted-foreground" />
       ) : (
         // A static local asset with an onError fallback; next/image gives no benefit and
         // swallows the 404 we rely on. (The directive must sit on the line IMMEDIATELY

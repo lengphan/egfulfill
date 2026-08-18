@@ -253,7 +253,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         {/* Icon+title hidden on desktop (the top bar names the page); the Saving
             indicator on the right stays. On mobile the hero is the title. */}
         {!embedded && (<>
-          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><Package size={18} weight="fill" /></span>
+          <Package size={18} weight="regular"  className="shrink-0 text-primary md:hidden" />
           <div className="min-w-0 md:hidden">
             <PageTitle>Inventory</PageTitle>
             <p className="truncate text-sm text-muted-foreground">Track stock per variant, flag low/out, and print SKU barcodes.</p>
@@ -351,7 +351,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                <thead className="border-b border-border text-left eg-label text-muted-foreground">
                   <tr>
                     <th className="py-2.5 pl-3 pr-1">
                       <input

@@ -87,9 +87,7 @@ function MiniStat({
             selected nav item. Five tiles across the top of the page is where the accent
             earns its keep — it was violet-on-violet-wash here, which is a tint, not a
             colour. */}
-        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-primary dark:bg-brand/15 dark:text-brand">
-          <Icon size={16} weight="bold" />
-        </span>
+        <Icon size={18} weight="bold"  className="mt-0.5 shrink-0 text-primary dark:bg-brand/15 dark:text-brand" />
         <div className="min-w-0">
           <div className="text-2xl font-black leading-none tracking-tight tabular-nums">{value}</div>
           <div className="mt-2 truncate eg-label text-muted-foreground">{label}</div>
@@ -342,7 +340,7 @@ export function StaffDashboard() {
       <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><SquaresFour size={18} weight="fill" /></span>
+          <SquaresFour size={18} weight="regular"  className="shrink-0 text-primary" />
           <div>
             <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
             <p className="text-sm text-muted-foreground">

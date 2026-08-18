@@ -67,7 +67,7 @@ export function CampaignsView() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 md:hidden">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Megaphone size={18} weight="fill" /></span>
+          <Megaphone size={18} weight="regular"  className="shrink-0 text-primary" />
           <div>
             <PageTitle>Campaigns</PageTitle>
             <p className="text-sm text-muted-foreground">Facebook &amp; Google ad performance{data ? ` · ${data.since} → ${data.until}` : ""}</p>
@@ -140,7 +140,7 @@ export function CampaignsView() {
           <SectionCard title="Campaigns">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                <thead className="border-b border-border text-left eg-label text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5 font-medium">Campaign</th>
                     <th className="px-4 py-2.5 font-medium">Channel</th>

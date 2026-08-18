@@ -253,7 +253,7 @@ export function CatalogView() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <tr className="border-b border-border text-left eg-label text-muted-foreground">
                   {/* SELECT ALL — every row the current search shows, not every row in the
                       catalogue, because the visible set is the one somebody just narrowed to
                       and a tick that reaches past it is a bulk action nobody aimed.
