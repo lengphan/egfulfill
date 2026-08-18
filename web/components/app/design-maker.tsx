@@ -1048,7 +1048,7 @@ export function DesignMaker() {
               {bg.msg && <p className="text-2xs text-muted-foreground">{bg.msg}</p>}
             </div>
           ) : (
-            <div className="border-t border-border pt-3 text-sm text-muted-foreground">Place artwork from the left, or add text above, then select a layer to edit it.</div>
+            <div className="border-t border-border pt-3 text-sm text-muted-foreground">Pick a blank, then place artwork or add text from the tools on the left. Select a layer and its controls appear here.</div>
           )}
 
           {/* What publishing will and won't carry. Kept next to the work rather than on the
