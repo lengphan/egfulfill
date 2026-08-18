@@ -110,7 +110,7 @@ export function AiPricingPanel() {
                   onChange={(e) => setFreePerMonth(e.target.value)}
                 />
                 <span className="text-xs text-muted-foreground">
-                  0 means every image is paid. An allowance costs us {COST_HIGH.toFixed(2)} each.
+                  0 means every image is paid. Each free one still costs us ${COST_HIGH.toFixed(2)}.
                 </span>
               </label>
 
