@@ -1,8 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X, DotsThree, DownloadSimple } from "@phosphor-icons/react"
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X, DownloadSimple } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, designsBySide, sidesForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
@@ -207,44 +206,38 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
               than routing through the paywalled deliverable endpoint — this is the seller's
               own artwork on their own order, not a file we cut. */}
           {/**
-            * ONE CONTROL PER ROW, at the end of it.
+            * THE ACTIONS, VISIBLE AND IN THE SAME PLACE ON EVERY ROW.
             *
-            * A download pill and a corner ✕ is two marks competing at the edge of a row you
-            * are scanning for a file name — and the corner ✕ in particular sat on top of the
-            * content rather than in the row. Everything a row can do lives behind one ⋯,
-            * which is where the rest of this app already keeps row actions.
+            * They were behind a ⋯ for a moment, and that was the wrong call: this list holds
+            * two or three files and the only two things you ever do to one are get it and
+            * take it off. A menu to reach a two-item menu is a click spent on nothing.
+            *
+            * Same trailing pair as the machine-file rows below, so the two lists read as one
+            * table rather than as two kinds of object.
             */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              aria-label={`Actions for ${r.name}`}
-              title="Actions"
-              className="eg-tap flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          <Button
+            variant="outline" size="sm" className="h-7 shrink-0 px-2 text-xs"
+            onClick={() => {
+              // Same-origin already (it draws on the mockup above), so the bytes are fetched
+              // straight rather than through the paywalled deliverable route — this is
+              // artwork on the seller's own order, not a file we cut.
+              const a = document.createElement("a")
+              a.href = r.src; a.download = r.name || "artwork"; a.click()
+            }}
+          >
+            <DownloadSimple size={13} weight="bold" /> Download
+          </Button>
+          {onRemove && (
+            <Button
+              variant="ghost" size="sm"
+              className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
+              disabled={busy === r.key}
+              onClick={() => onRemove(r)}
+              title={`Take the ${r.side} artwork off this item`}
             >
-              <DotsThree size={16} weight="bold" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem
-                onClick={() => {
-                  // Same-origin already (it draws on the mockup above), so the bytes are
-                  // fetched straight rather than through the paywalled deliverable route —
-                  // this is artwork on the seller's own order, not a file we cut.
-                  const a = document.createElement("a")
-                  a.href = r.src; a.download = r.name || "artwork"; a.click()
-                }}
-              >
-                <DownloadSimple size={14} weight="bold" /> Download artwork
-              </DropdownMenuItem>
-              {onRemove && (
-                <DropdownMenuItem
-                  disabled={busy === r.key}
-                  onClick={() => onRemove(r)}
-                  className="text-destructive"
-                >
-                  <X size={13} weight="bold" /> Take off the {r.side}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              Remove
+            </Button>
+          )}
         </div>
       ))}
     </div>
@@ -1041,7 +1034,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             * the browser you uploaded from" is not a filing system.
             */}
           {(
-            <Button size="sm" variant={f.paid || !f.price ? "outline" : "default"} disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
+            <Button size="sm" variant={f.paid || !f.price ? "outline" : "default"} className="h-7 shrink-0 px-2 text-xs" disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
               {/* Word alone. The glyph said nothing "Download" doesn't, and it made this
                   button visibly heavier than the field beside it — the pair is a control
                   and its action, so they should look like a pair. The spinner stays: that
@@ -1052,25 +1045,26 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             </Button>
           )}
           {/**
-            * REMOVE SITS ON THE CORNER, NOT IN THE LINE.
+            * REMOVE IS IN THE ROW, beside Download, on every row.
             *
-            * A trash button in the row's own flow is one more control competing with the
-            * things you came to read — the name, where it goes, the download — and it was
-            * the widest-reaching of them sitting closest to the one you press most.
+            * It floated on the corner — a small ✕ hanging off the top-right, over the
+            * content rather than in it. On a list where the artwork rows above carry their
+            * actions inline that made the two look like different kinds of object, and the
+            * ✕ itself read as "dismiss this notice" rather than "delete this file".
             *
-            * Top-right, small, outside the content: the same place a dismiss lives
-            * everywhere else in this app, so it is found without being looked at.
+            * Word, not glyph: this deletes a file off an order. A ✕ is the mark we use for
+            * closing things, and it should not also mean destroying one.
             */}
           {canRemove && (
-            <button
+            <Button
+              variant="ghost" size="sm"
+              className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
               onClick={() => remove(f)}
               disabled={busy === f.designId}
-              title="Remove this file"
-              aria-label={`Remove ${f.name}`}
-              className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-destructive/40 hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+              title="Remove this file from the order"
             >
-              <X size={10} weight="bold" />
-            </button>
+              Remove
+            </Button>
           )}
         </div>
       ))}
