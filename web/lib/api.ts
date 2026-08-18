@@ -880,7 +880,10 @@ export type CatalogProduct = {
   // S&S/Otto syncs). `price` is the BASE COST charged to the seller. Leave `price` blank
   // and pricing computes it as cost + the `base_markup` setting, so a supplier sync only
   // has to supply what it paid. A typed `price` always wins.
-  sizePrices?: { size: string; price: number; shipping: number | null; cost?: number | null }[]
+  /** `blank` is what this size costs UNDECORATED — charged when an order line carries no
+   *  print method. Null when we don't sell this one as a blank, which leaves the printed
+   *  base cost in charge; it is never 0, because 0 would mean giving the garment away. */
+  sizePrices?: { size: string; price: number; shipping: number | null; cost?: number | null; blank?: number | null }[]
   /** Product cost for the whole product, when sizes don't differ. Same role as tier.cost. */
   productCost?: number | string | null
   /** Shipping physicals for label buying + the dim-weight check. Weight in ounces, box in

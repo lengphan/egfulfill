@@ -180,7 +180,25 @@ function costPartsOf(row, item, fees) {
   // someone retyping a price per size per product.
   const tier = tierFor(d, item.size);
   let base = null;
-  if (tier && tier.price != null) { const p = num(tier.price); if (p != null && p > 0) base = p; }
+  /**
+   * A BLANK IS ITS OWN PRICE, when someone has set one.
+   *
+   * Sometimes an order is just the garment — no print — and charging the printed base for
+   * it overcharges the seller for work nobody did. The number lives on the size tier
+   * (`blank`), beside the base cost, because a blank is the same garment in the same size
+   * with nothing done to it: a column, not a second variant dimension.
+   *
+   * TWO GUARDS, and both matter. It applies only when the line names NO print method — a
+   * line that says DTG is not a blank whatever else is true — and only when the tier holds
+   * a real positive number. Products with no blank price behave exactly as they did, which
+   * is what keeps this from silently repricing the whole catalogue the day it ships.
+   */
+  const isBlankLine = !String(item.print_type || '').trim();
+  if (isBlankLine && tier && tier.blank != null) {
+    const bl = num(tier.blank);
+    if (bl != null && bl > 0) base = bl;
+  }
+  if (base == null && tier && tier.price != null) { const p = num(tier.price); if (p != null && p > 0) base = p; }
   if (base == null && tier && tier.cost != null) { const c = num(tier.cost); if (c != null && c > 0) base = c + markup; }
   if (base == null) base = num(d.basePrice ?? d.base_price ?? row.base_price);
   if (base == null) { const c = num(d.productCost ?? d.product_cost); if (c != null && c > 0) base = c + markup; }

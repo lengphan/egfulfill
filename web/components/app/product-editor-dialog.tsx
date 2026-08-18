@@ -137,7 +137,10 @@ const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v))
 
 // The stored sizePrices ARRAY ([{size, price, shipping}] — the canonical shape from
 // eg-products.js) → editable strings keyed by size, for the inputs below.
-type Tier = { price: string; shipping: string; cost: string }
+/** `blank` is what a seller pays for this size UNDECORATED. It rides in the size row
+ *  rather than behind a variant picker of its own: a blank is the same garment in the same
+ *  size with nothing done to it, so it is a column here, not a second dimension. */
+type Tier = { price: string; shipping: string; cost: string; blank: string }
 function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
   const out: Record<string, Tier> = {}
   if (!Array.isArray(v)) return out
@@ -147,6 +150,7 @@ function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
       price: t.price != null && isFinite(Number(t.price)) ? String(Number(t.price)) : "",
       shipping: t.shipping != null && isFinite(Number(t.shipping)) ? String(Number(t.shipping)) : "",
       cost: t.cost != null && isFinite(Number(t.cost)) ? String(Number(t.cost)) : "",
+      blank: t.blank != null && isFinite(Number(t.blank)) ? String(Number(t.blank)) : "",
     }
   }
   return out
@@ -168,11 +172,15 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
     // because pricing derives the base cost from it plus the markup.
     if (!hasPrice && !hasCost) continue
     const ship = t.shipping.trim() === "" ? null : Number(t.shipping)
+    // Blank price is optional and NULL when unset — never 0. Zero would mean "we give the
+    // garment away", and the server only uses this field when it is a real number.
+    const blk = t.blank.trim() === "" ? null : Number(t.blank)
     out.push({
       size,
       price: hasPrice ? price : 0,
       cost: hasCost ? cost : null,
       shipping: ship != null && isFinite(ship) && ship >= 0 ? ship : null,
+      blank: blk != null && isFinite(blk) && blk > 0 ? blk : null,
     })
   }
   return out.length ? out : undefined
@@ -313,6 +321,7 @@ export function ProductEditorDialog({
   const [stock, setStock] = useState<Record<string, string>>({})
   const [loadedStock, setLoadedStock] = useState<Record<string, string>>({})
   const [bulkStock, setBulkStock] = useState("")
+  const [bulkBlank, setBulkBlank] = useState("")
   /** Which size has its colourways open. One at a time — this is a drawer under a row, not
    *  the grid of 496 fields the table replaced. */
   const [stockOpen, setStockOpen] = useState<string | null>(null)
@@ -635,8 +644,8 @@ export function ProductEditorDialog({
   // product cost, else the product-level one. Shipping is a flat fee. A blank field is left
   // alone, so you can bulk-set just one column.
   const applyBulk = () => {
-    const b = bulkBase.trim(), sh = bulkShip.trim(), st = bulkStock.trim()
-    if (b === "" && sh === "" && st === "") return
+    const b = bulkBase.trim(), sh = bulkShip.trim(), st = bulkStock.trim(), bl = bulkBlank.trim()
+    if (b === "" && sh === "" && st === "" && bl === "") return
     // Stock too, now that it is a column of this table. An "apply to all" that skipped one
     // of the three fields beside it would mean something different depending on which one
     // you typed in.
@@ -658,7 +667,7 @@ export function ProductEditorDialog({
     setTiers((prev) => {
       const nextT: Record<string, Tier> = { ...prev }
       for (const s of sizes) {
-        const cur = nextT[s] ?? { price: "", shipping: "", cost: "" }
+        const cur = nextT[s] ?? { price: "", shipping: "", cost: "", blank: "" }
         let price = cur.price
         if (b !== "") {
           const rowCost = num(cur.cost)
@@ -666,7 +675,11 @@ export function ProductEditorDialog({
           const nextBase = bulkPct ? cost * (1 + amt / 100) : cost + amt
           price = String(Math.round(nextBase * 100) / 100)
         }
-        nextT[s] = { ...cur, price, shipping: sh !== "" ? String(Number(sh) || 0) : cur.shipping }
+        nextT[s] = {
+          ...cur, price,
+          shipping: sh !== "" ? String(Number(sh) || 0) : cur.shipping,
+          blank: bl !== "" ? String(Number(bl) || 0) : cur.blank,
+        }
       }
       return nextT
     })
@@ -1122,6 +1135,12 @@ export function ProductEditorDialog({
                     </div>
                     <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
                       placeholder={bulkPct ? "upcharge %" : "upcharge $"} className="h-8 w-32 text-xs" inputMode="decimal" aria-label="Base upcharge over product cost" />
+                    {/* BLANK, in the same bulk row. "Apply to all" that skipped it would
+                        mean something different depending on which box you typed in — the
+                        same argument that put stock in here. */}
+                    <span className="text-xs text-muted-foreground">· blank</span>
+                    <Input value={bulkBlank} onChange={(e) => setBulkBlank(e.target.value.replace(/[^0-9.]/g, ""))}
+                      placeholder="$ each" className="h-8 w-20 text-xs" inputMode="decimal" aria-label="Bulk blank price" />
                     <span className="text-xs text-muted-foreground">· shipping</span>
                     <Input value={bulkShip} onChange={(e) => setBulkShip(e.target.value.replace(/[^0-9.]/g, ""))}
                       placeholder="$ flat" className="h-8 w-20 text-xs" inputMode="decimal" aria-label="Bulk shipping fee" />
@@ -1129,15 +1148,15 @@ export function ProductEditorDialog({
                     <Input value={bulkStock} onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
                       placeholder="units" className="h-8 w-20 text-xs" inputMode="numeric" aria-label="Bulk stock" disabled={!ourSku}
                       title={ourSku ? undefined : "Give the product a SKU — stock is held against it"} />
-                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim() && !bulkStock.trim()}>Apply to all</Button>
+                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim() && !bulkStock.trim() && !bulkBlank.trim()}>Apply to all</Button>
                   </div>
                 )}
                 {/* STOCK IS A COLUMN HERE. It was a size × colour grid of its own below —
                     the only place in this form asking for a second dimension, to answer a
                     question ("how many 3XL?") this row is already asking. Held per SIZE now,
                     so the sku is EG-1001-L rather than EG-1001-L-BLK. */}
-                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_5rem_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
-                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span><span>Stock</span><span className="text-right">Margin</span><span />
+                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_1fr_5rem_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
+                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span title="What this size costs undecorated — charged when a line carries no print method">Blank ($)</span><span>Shipping ($)</span><span>Stock</span><span className="text-right">Margin</span><span />
                 </div>
                 <div className="mt-1 space-y-1.5">
                   {sizes.map((s) => {
@@ -1146,10 +1165,10 @@ export function ProductEditorDialog({
                     // What pricing will actually charge if Base cost is left blank.
                     const derived = t?.cost?.trim() && isFinite(costN) && costN > 0 ? (costN + markup).toFixed(2) : ""
                     const patch = (k: keyof Tier, v: string) =>
-                      setTiers((p) => ({ ...p, [s]: { ...{ price: "", shipping: "", cost: "" }, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
+                      setTiers((p) => ({ ...p, [s]: { ...{ price: "", shipping: "", cost: "", blank: "" }, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
                     return (
                     <Fragment key={s}>
-                    <div className="grid grid-cols-[3rem_1fr_1fr_1fr_5rem_4.5rem_1.5rem] items-center gap-2">
+                    <div className="grid grid-cols-[3rem_1fr_1fr_1fr_1fr_5rem_4.5rem_1.5rem] items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground">{s}</span>
                       <Input
                         value={t?.cost ?? ""}
@@ -1174,6 +1193,17 @@ export function ProductEditorDialog({
                           ? `Auto: product cost ${costN.toFixed(2)} + ${markup.toFixed(2)} markup = ${derived}`
                           : basePrice.trim() !== "" ? "Using the product-level base cost above" : "Enter a product cost to price this size"}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Base cost for size ${s}`}
+                      />
+                      <Input
+                        value={t?.blank ?? ""}
+                        onChange={(e) => patch("blank", e.target.value)}
+                        /* Empty means "we don't sell this one as a blank", NOT free. The
+                           server only reaches for this when it holds a real number, so a
+                           blank cell leaves the printed base cost in charge exactly as
+                           before. */
+                        placeholder="—"
+                        title="What a seller pays for this size with nothing printed on it. Leave empty to charge the base cost."
+                        className="h-8 text-xs" inputMode="decimal" aria-label={`Blank price for size ${s}`}
                       />
                       <Input
                         value={t?.shipping ?? ""}
