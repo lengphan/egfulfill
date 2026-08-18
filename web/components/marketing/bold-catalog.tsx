@@ -154,7 +154,13 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
     <Rise preset="bloom" index={Math.min(index, 6)}
           className="group overflow-hidden rounded-2xl border border-black/[0.09] bg-white transition-colors hover:border-black/30">
       <Link href={`/catalog/${p.slug}`} className="block">
-        <div className="relative aspect-square overflow-hidden" style={{ background: ACCENT }}>
+        {/* WHITE UNDER A PHOTO, accent only when there ISN'T one — the same rule the product
+            page follows for its hero. This well was accent unconditionally, and the photos are
+            object-contain on a supplier's white studio field, so every shot that didn't fill
+            the square was framed in violet bars. The accent is for plates and CTA bands
+            (CLAUDE.md 4); a colour behind a garment competes with the garment.
+            The no-photo branch below prints a cream icon, which needs the accent to stay. */}
+        <div className="relative aspect-square overflow-hidden" style={{ background: src ? "#fff" : ACCENT }}>
           {src ? (
             <div className="absolute inset-0" style={framingStyle(p)}>
               <Image
