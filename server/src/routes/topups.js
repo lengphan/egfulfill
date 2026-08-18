@@ -62,15 +62,38 @@ export function topupsRoutes(app, requireAuth) {
 
   // List: staff (admin/warehouse share the factory wallet) see all (optional
   // ?status=pending); sellers see only their own.
+  /*
+   * AGE OUT THE ONES NOBODY EVER PAID.
+   *
+   * A VietQR request is written the moment the QR is drawn, so opening the dialog and
+   * closing it left a row in this queue forever. The client marks its own row abandoned on
+   * close, but a force-quit, a dead battery or a lost connection never sends that — so age
+   * is the backstop.
+   *
+   * Two hours, and only VietQR: a MANUAL transfer is genuinely waiting on a human to check
+   * a receipt and must never be aged out from under them.
+   *
+   * 'abandoned', not deleted — the virtual account stays live and vietqr.js still settles an
+   * abandoned ref if the money turns up late.
+   */
+  async function ageOutStale() {
+    await q(`update topup_requests set status='abandoned'
+              where method='VietQR' and status='pending'
+                and created_at < now() - interval '2 hours'`).catch(() => {});
+  }
+
   app.get('/api/topups', { preHandler: requireAuth }, async (req) => {
+    await ageOutStale();
     if (isStaff(req.user)) {
       const st = req.query && req.query.status;
       const r = st
         ? await q('select * from topup_requests where status=$1 order by created_at desc limit 200', [st])
-        : await q('select * from topup_requests order by created_at desc limit 200');
+        : await q("select * from topup_requests where status <> 'abandoned' order by created_at desc limit 200");
       return r.rows;
     }
-    const r = await q('select * from topup_requests where seller_id=$1 order by created_at desc limit 100', [req.user.sub]);
+    const r = await q(
+      "select * from topup_requests where seller_id=$1 and status <> 'abandoned' order by created_at desc limit 100",
+      [req.user.sub]);
     return r.rows;
   });
 

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StripeCardForm } from "@/components/app/stripe-card-form"
-import { createVietqrPayment, vietqrStatus, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment, type TopupConfig } from "@/lib/api"
+import { createVietqrPayment, vietqrStatus, abandonVietqr, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment, type TopupConfig } from "@/lib/api"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -94,7 +94,25 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
   const stopPoll = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }, [])
-  useEffect(() => stopPoll, [stopPoll])
+
+  /*
+   * CLOSING WITHOUT PAYING TAKES THE REQUEST BACK.
+   *
+   * The row is written when the QR is DRAWN, so opening this dialog to look at a rate left
+   * a "Pending top-up" for an admin to act on and an "Awaiting confirmation" line in the
+   * seller's history — for money nobody ever sent. A queue full of things nobody must act
+   * on is one people stop reading.
+   *
+   * Held in a ref so the unmount cleanup sees the CURRENT payment, and cleared the moment
+   * one is paid so a real top-up is never withdrawn. The server only marks it, so a code
+   * someone saved and paid an hour later still settles.
+   */
+  const openRef = useRef<string | null>(null)
+  useEffect(() => () => {
+    stopPoll()
+    const ref = openRef.current
+    if (ref) { openRef.current = null; abandonVietqr(ref).catch(() => {}) }
+  }, [stopPoll])
 
   const usdAmt = Number(amount) || 0
   // The best (lowest VND/$1) tier this amount qualifies for — tiers are ascending, so the
@@ -131,9 +149,10 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
       else if (p.qrLink && /^https?:\/\//i.test(p.qrLink)) setQrImg(p.qrLink)
       else throw new Error("VietQR returned no scannable code — check the server's VietQR keys.")
       const ref = p.note || ""
+      openRef.current = ref || null
       if (ref) {
         pollRef.current = setInterval(async () => {
-          try { const s = await vietqrStatus(ref); if (s.paid) { stopPoll(); setPhase("paid"); onFunded() } } catch { /* keep polling */ }
+          try { const s = await vietqrStatus(ref); if (s.paid) { stopPoll(); openRef.current = null; setPhase("paid"); onFunded() } } catch { /* keep polling */ }
         }, 4000)
       }
     } catch (e) {

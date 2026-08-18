@@ -163,6 +163,14 @@ export const createVietqrPayment = (amount: number, amountUsd?: number) =>
     method: "POST",
     body: JSON.stringify({ amount, amountUsd }),
   })
+/** Tell the server nobody is going to pay this one, so it stops sitting in the admin queue
+ *  and the seller's history. The virtual account stays live and a late payment still
+ *  reconciles — this only hides a request nobody acted on. */
+export const abandonVietqr = (ref: string) =>
+  request<{ ok?: boolean; abandoned?: number }>("/api/vietqr/abandon", {
+    method: "POST",
+    body: JSON.stringify({ ref }),
+  })
 export const vietqrStatus = (ref: string) =>
   request<{ paid: boolean }>(`/api/vietqr/status?ref=${encodeURIComponent(ref)}`)
 

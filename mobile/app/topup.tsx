@@ -7,7 +7,7 @@ import { router } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import QRCode from "react-native-qrcode-svg"
 import {
-  getTopupConfig, createVietqrPayment, vietqrStatus, getWallet,
+  getTopupConfig, createVietqrPayment, vietqrStatus, getWallet, abandonVietqr,
   type TopupConfig, type VietqrPayment, type LedgerRow,
 } from "@/lib/api"
 import { C } from "@/lib/theme"
@@ -42,15 +42,26 @@ export default function TopUp() {
      PayPal, manual transfer) books the same `topup` row, so the ledger is the one place
      that has all of them and cannot disagree with the balance. */
   const [history, setHistory] = useState<LedgerRow[] | null>(null)
+  /* The ref of a payment that is still open. Held in a ref, not state, because the cleanup
+     below runs on unmount and would otherwise close over the value from first render. */
+  const openRef = useRef<string | null>(null)
 
   useEffect(() => {
     getTopupConfig().then(setCfg).catch(() => setErr("Couldn't load top-up settings."))
     getWallet()
       .then((w) => setHistory((w.ledger ?? []).filter((r) => String(r.type) === "topup").slice(0, 5)))
       .catch(() => setHistory([]))
-    // Polling must stop when this screen goes away, or it keeps running against a closed
-    // payment for as long as the app is open.
-    return () => { if (poll.current) clearInterval(poll.current) }
+    return () => {
+      // Polling must stop when this screen goes away, or it keeps running against a closed
+      // payment for as long as the app is open.
+      if (poll.current) clearInterval(poll.current)
+      /* LEAVING WITHOUT PAYING. Writing the request when the QR is DRAWN means merely
+         looking at a payment put a row in the admin queue; this takes it back out. Cleared
+         on success, so a paid one is never withdrawn. Fire-and-forget: the screen is going
+         away and a failure here must not block that. */
+      const ref = openRef.current
+      if (ref) { openRef.current = null; abandonVietqr(ref).catch(() => {}) }
+    }
   }, [])
 
   const usdAmt = Number(amount) || 0
@@ -88,12 +99,14 @@ export default function TopUp() {
 
       setPayment(p); setPhase("qr")
       const ref = p.note || ""
+      openRef.current = ref || null
       if (ref) {
         poll.current = setInterval(async () => {
           try {
             const s = await vietqrStatus(ref)
             if (s.paid) {
               if (poll.current) clearInterval(poll.current)
+              openRef.current = null   // paid — never withdraw it
               setPhase("paid")
             }
           } catch { /* a dropped poll is not a failed payment — keep asking */ }

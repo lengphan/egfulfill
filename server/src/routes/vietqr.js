@@ -128,9 +128,18 @@ export function vietqrRoutes(app, requireAuth) {
         // Anything short, ambiguous, or unmatched stays pending for a human, which is the
         // same "suggest, a human confirms" line the rest of the system draws around money.
         const received = Number(b.amount) || 0;
+        /*
+         * ABANDONED ROWS STILL MATCH.
+         *
+         * Closing the QR marks a request 'abandoned' so it stops cluttering the admin queue
+         * and the seller's history — but the virtual account stays live, and someone who
+         * saved the code and paid an hour later must still be credited. Matching only
+         * 'pending' would leave that money arriving with nothing to reconcile it against,
+         * which is the one outcome worse than a noisy list.
+         */
         const cands = (await q(
           `select * from topup_requests
-             where status='pending' and ref is not null and length(ref) >= 6
+             where status in ('pending','abandoned') and ref is not null and length(ref) >= 6
                and $1 ilike '%'||ref||'%'
              order by created_at asc`, [content]
         ).catch(() => ({ rows: [] }))).rows || [];
@@ -178,6 +187,29 @@ export function vietqrRoutes(app, requireAuth) {
 
   // ── Our UI ──────────────────────────────────────────────────────────────────
   // Poll: has a credit transaction matching this order/reference arrived?
+  /*
+   * THE PAYER WALKED AWAY.
+   *
+   * A request was written the moment the QR was drawn, so merely LOOKING at a payment put a
+   * row in the admin's "Pending top-ups" queue and in the seller's "Awaiting confirmation"
+   * list. Most of those were never going to be paid — the person was checking a rate, or
+   * changed their mind — and a queue full of things nobody must act on is a queue people
+   * stop reading.
+   *
+   * Marked, not deleted: the virtual account is still live, and the matcher above still
+   * settles an abandoned ref if the money ever arrives. Only the caller's OWN pending row,
+   * and never one that has already been received.
+   */
+  app.post('/api/vietqr/abandon', { preHandler: requireAuth }, async (req, reply) => {
+    const ref = String((req.body && req.body.ref) || '').trim();
+    if (!ref) { reply.code(400); return { error: 'ref required' }; }
+    const r = await q(
+      `update topup_requests set status='abandoned'
+        where ref=$1 and seller_id=$2 and status='pending'
+        returning id`, [ref, req.user.sub]).catch(() => ({ rowCount: 0 }));
+    return { ok: true, abandoned: r.rowCount || 0 };
+  });
+
   app.get('/api/vietqr/status', { preHandler: requireAuth }, async (req) => {
     const ref = String((req.query && req.query.ref) || '').trim();
     // A short ref substring-matches half the table, so this poll used to hand any seller

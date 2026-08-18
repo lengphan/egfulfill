@@ -397,6 +397,14 @@ export function setVietqrRate(
 ) {
   return api<Partial<TopupConfig> & { ok?: boolean; error?: string }>(`/api/vietqr/rate`, { method: "PUT", body: JSON.stringify({ rate, tiers, ...extra }) })
 }
+/** Nobody is going to pay this one — take it out of the admin queue and the seller's
+ *  history. The virtual account stays live and a late payment still reconciles; this only
+ *  hides a request that was never acted on. */
+export function abandonVietqr(ref: string) {
+  return api<{ ok?: boolean; abandoned?: number }>(`/api/vietqr/abandon`, {
+    method: "POST", body: JSON.stringify({ ref }),
+  })
+}
 export function vietqrStatus(ref: string) {
   return api<{ paid: boolean; transaction?: unknown }>(`/api/vietqr/status?ref=${encodeURIComponent(ref)}`)
 }
