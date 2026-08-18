@@ -983,17 +983,20 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
           )}
 
           {/**
-            * DOWNLOAD ON EVERY ROW — for staff. For a seller, on everything but their own.
+            * DOWNLOAD ON EVERY ROW, FOR EVERYONE WHO MAY HAVE THE BYTES.
             *
-            * This was hidden for `source === "seller"` outright, on the reasoning that the
-            * file came from the seller's own browser and the route refuses a
-            * non-deliverable to them anyway. True of the SELLER, and false of everyone
-            * else reading the same card: the route's very first check is `if
-            * (!isStaff(req.user))`, so staff may fetch any file on any order — and the one
-            * file staff most often want is precisely the one the seller just sent. There
-            * was no way to get it from here at all; you had to go find it elsewhere.
+            * Hidden for `source === "seller"` outright once, on the reasoning that the file
+            * came from the seller's own browser so a button would only produce "forbidden".
+            * Both halves of that were wrong. Staff may fetch ANY file — the route's first
+            * check is `if (!isStaff(req.user))` — and the file staff most often want is the
+            * one the seller just sent. And a seller may now take back what they sent: the
+            * route's guards protect OUR work (factory files, the .pes paywall), neither of
+            * which describes their own upload.
+            *
+            * An order opened months later is the only copy some of these have; "it is in
+            * the browser you uploaded from" is not a filing system.
             */}
-          {(f.source !== "seller" || !isSeller) && (
+          {(
             <Button size="sm" variant={f.paid || !f.price ? "outline" : "default"} disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
               {/* Word alone. The glyph said nothing "Download" doesn't, and it made this
                   button visibly heavier than the field beside it — the pair is a control

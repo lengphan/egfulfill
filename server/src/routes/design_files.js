@@ -612,20 +612,36 @@ export function designFilesRoutes(app, requireAuth) {
 
   // Download a machine file. Staff any; a seller only their own AND only once paid.
   app.get('/api/design_files/:designId', { preHandler: requireAuth }, async (req, reply) => {
-    const r = await q('select design_id, order_id, sku, seller_id, file_name, mime, data, url, storage_key, price, kind from design_file_data where design_id=$1', [String(req.params.designId)]);
+    const r = await q('select design_id, order_id, sku, seller_id, file_name, mime, data, url, storage_key, price, kind, source from design_file_data where design_id=$1', [String(req.params.designId)]);
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'not found' }; }
     if (!isStaff(req.user)) {
       const eff = await effectiveSeller(req.user);
       if (row.seller_id && row.seller_id !== eff) { reply.code(403); return { error: 'forbidden' }; }
-      // Factory working files are not seller deliverables, whatever the price says.
-      if (row.kind && row.kind !== 'pes') { reply.code(403); return { error: 'forbidden' }; }
-      // The paywall. Without this the bytes were one direct GET away, whatever the
-      // client-side flag said.
-      const price = Number(row.price) || 0;
-      if (price > 0 && !(await isPaid(row, eff))) {
-        reply.code(402);   // Payment Required
-        return { error: 'This file has not been purchased yet.', price, needsPurchase: true };
+      /**
+       * A SELLER MAY ALWAYS TAKE BACK WHAT THEY SENT.
+       *
+       * The two guards below exist to protect OUR work: a factory working file is not a
+       * deliverable, and a digitised .pes is paid for before it is handed over. Neither
+       * describes a file the seller uploaded themselves — they already have it, they gave
+       * it to us, and charging them to fetch their own artwork back would be absurd.
+       *
+       * `source === 'seller'` is the same flag the listing route already trusts for exactly
+       * this (it reports those rows as `paid`), so this is closing a gap between the two
+       * rather than opening the paywall: the seller-ID check above still stands, so this
+       * only ever returns a file to the account that sent it.
+       */
+      const isOwnUpload = row.source === 'seller';
+      if (!isOwnUpload) {
+        // Factory working files are not seller deliverables, whatever the price says.
+        if (row.kind && row.kind !== 'pes') { reply.code(403); return { error: 'forbidden' }; }
+        // The paywall. Without this the bytes were one direct GET away, whatever the
+        // client-side flag said.
+        const price = Number(row.price) || 0;
+        if (price > 0 && !(await isPaid(row, eff))) {
+          reply.code(402);   // Payment Required
+          return { error: 'This file has not been purchased yet.', price, needsPurchase: true };
+        }
       }
     }
     /**
