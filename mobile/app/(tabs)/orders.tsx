@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator } from "react-native"
+import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Image } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
-import { getOrders, type Order } from "@/lib/api"
+import { getOrders, assetUrl, type Order } from "@/lib/api"
 import { isOpen, isOverdue, normalizeStage, units, numOf, platformOf, plainNum } from "@/lib/orders"
 import { C } from "@/lib/theme"
 
@@ -114,12 +114,46 @@ export default function Orders() {
                   opacity: pressed ? 0.6 : 1,
                 })}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  {/* THE ARTWORK, so a row is recognisable before it is read. The thumbnail
+                      route is unauthenticated by design — an <img> cannot carry a bearer
+                      header — and guarded by a 122-bit row id instead. */}
+                  {(() => {
+                    const first = (item.items ?? [])[0]
+                    const uri = assetUrl(first?.img_ref || first?.img)
+                    return uri ? (
+                      <Image
+                        source={{ uri }}
+                        style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: C.accent }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={{
+                        width: 52, height: 52, borderRadius: 10, backgroundColor: C.accent,
+                        alignItems: "center", justifyContent: "center",
+                      }}>
+                        <Text style={{ fontSize: 11, color: C.muted, fontWeight: "700" }}>No art</Text>
+                      </View>
+                    )
+                  })()}
+
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: "800", color: C.fg }}>
                       {numOf(item)}
                     </Text>
-                    <Text style={{ fontSize: 14, color: C.muted, marginTop: 3 }}>
+                    {/* The BLANK, not the listing sku: stock, purchasing and the supplier all
+                        key off the blank, and the listing sku carries a print-method suffix
+                        the floor does not stock. Falls back to the sku when no blank is
+                        resolved, so a line is never nameless. */}
+                    <Text numberOfLines={1} style={{ fontSize: 14, color: C.fg, marginTop: 3 }}>
+                      {(() => {
+                        const its = item.items ?? []
+                        const first = its[0]
+                        const label = first?.blank || first?.sku || first?.name || "—"
+                        return its.length > 1 ? `${label} +${its.length - 1}` : label
+                      })()}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
                       {platformOf(item)} · {normalizeStage(item.factory_status)} · {units(item)} pc
                     </Text>
                   </View>

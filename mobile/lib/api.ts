@@ -42,7 +42,28 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export type User = { id?: string; name?: string; email?: string; role?: string }
-export type OrderItem = { qty?: number | null }
+export type OrderItem = {
+  id?: string
+  qty?: number | null
+  /** The marketplace listing SKU — carries a print-method suffix (-EMB, -DTG …). */
+  sku?: string | null
+  /** The BLANK the stock is held against. Not the same thing as `sku`, and the one that
+   *  matters on the floor: stock, purchasing and the supplier all key off this. */
+  blank?: string | null
+  name?: string | null
+  color?: string | null
+  size?: string | null
+  /** A plain URL when the artwork is stored remotely… */
+  img?: string | null
+  /** …and a RELATIVE path when it is a data URL the server split out to keep the list
+   *  small. Needs the API origin in front of it; see `assetUrl`. */
+  img_ref?: string | null
+}
+
+/** Absolute URL for a path the API returned relative (thumbnails). Bare `img` values are
+ *  already absolute and pass through untouched. */
+export const assetUrl = (u?: string | null) =>
+  !u ? null : /^https?:\/\//i.test(u) ? u : `${API_BASE}${u.startsWith("/") ? "" : "/"}${u}`
 export type Order = {
   id: string
   num?: string | null
