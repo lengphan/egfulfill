@@ -171,40 +171,59 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
   busy?: string | null
 }) {
   if (!rows.length) return null
+  /**
+   * ONE ROW SHAPE FOR EVERY FILE ON AN ORDER — number, picture, name, where it goes, get it.
+   *
+   * Placed artwork and machine files were two lists that looked like two different kinds of
+   * object: this one carried a sentence ("Gildan Unisex Heavy Blend™ Crewneck Sweatshirt ·
+   * placed in the designer") where the other carried controls, and neither offered the same
+   * thing in the same place. They are both "a file on this order"; the only real difference
+   * is what we do with it.
+   *
+   * NO CARD OF ITS OWN. It drew a rounded border inside the panel's card — a box in a box,
+   * around a list the panel had already framed.
+   */
   return (
-    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+    <div className="divide-y divide-border">
       {rows.map((r) => (
-        <div key={r.key} className="relative flex items-center gap-3 p-2.5">
+        <div key={r.key} className="relative flex items-center gap-2.5 py-2">
+          {r.no != null && <ItemNumberBadge no={r.no} title={`Item ${r.no}${r.item ? ` — ${r.item}` : ""}`} />}
+          {/* The artwork itself, small. A name alone leaves "is that the right one?"
+              unanswered, and the picture is already loaded for the mockup above. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={r.src} alt="" className="size-9 shrink-0 rounded-md border border-border bg-white object-contain" />
+          {/* NAME, then the face. The blank's title and "placed in the designer" are gone:
+              the first repeats the item row this badge already points at, and the second
+              describes every row in this list, so it distinguished nothing. */}
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium">{r.name}</div>
+          </div>
+          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium capitalize text-foreground/70" title="Which face this artwork is on">
+            {r.side}
+          </span>
+          {/* DOWNLOAD, matching the machine-file row. Placed artwork is already same-origin
+              (it renders on the mockup), so the link fetches the bytes it is showing rather
+              than routing through the paywalled deliverable endpoint — this is the seller's
+              own artwork on their own order, not a file we cut. */}
+          <a
+            href={r.src}
+            download={r.name || "artwork"}
+            title="Download this artwork"
+            className="eg-tap shrink-0 rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Download
+          </a>
           {onRemove && (
             <button
               onClick={() => onRemove(r)}
               disabled={busy === r.key}
               title={`Take the ${r.side} artwork off this item`}
               aria-label={`Take ${r.name} off the ${r.side} of item ${r.no ?? ""}`.trim()}
-              className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+              className="shrink-0 flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
             >
-              <X size={10} weight="bold" />
+              <X size={11} weight="bold" />
             </button>
           )}
-          {/* The artwork itself, small. A name alone still leaves "is that the right one?"
-              unanswered, and the picture is already loaded for the mockup above. */}
-          {/* WHERE IT IS ASSIGNED — the badge, not a sentence. Same mark as the item row it
-              belongs to, so the two are matched by eye instead of by reading. */}
-          {r.no != null && <ItemNumberBadge no={r.no} title={`Item ${r.no}${r.item ? ` — ${r.item}` : ""}`} />}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={r.src} alt="" className="size-9 shrink-0 rounded-md border border-border bg-white object-contain" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-xs font-medium">{r.name}</div>
-            <div className="flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground">
-              {/* The FACE, as a chip — it is the thing that makes two otherwise identical
-                  rows different, so it should not be buried mid-sentence. */}
-              <span className="rounded bg-muted px-1.5 py-0.5 font-medium capitalize text-foreground/70">{r.side}</span>
-              <span className="truncate">{r.item ? `${r.item} · ` : ""}placed in the designer</span>
-            </div>
-          </div>
-          {/* The ARTWORK badge is gone. The row already carries a picture of the artwork and
-              says "placed in the designer" underneath — a coloured chip repeating that was
-              the third mark on one row and the least informative of them. */}
         </div>
       ))}
     </div>
@@ -893,8 +912,12 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
     <div className="space-y-2">
       {notices}
       <PlacedArtworkList rows={placed} onRemove={(r) => void detach(r)} busy={busy} />
+      {/* SAME SHAPE AS THE ARTWORK ABOVE. These were bordered cards, one per file, stacked
+          inside the panel's own card — a box per row inside a box — while the placed
+          artwork above them was a plain divided list. Two lists of files on one order that
+          did not look like the same kind of thing. Rows and hairlines for both. */}
       {orderFiles(files).map((f) => (
-        <div key={f.designId} className="relative flex items-center gap-3 rounded-xl border border-border p-3">
+        <div key={f.designId} className="relative flex items-center gap-2.5 border-t border-border py-2 first:border-t-0">
           {/**
             * WHICH ITEM THIS FILE IS FOR — the number, not a glyph.
             *
