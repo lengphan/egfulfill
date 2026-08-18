@@ -889,7 +889,7 @@ export function ProductEditorDialog({
                   half-column and leaving a blank gap beside Type. */}
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Type</span>
-                  <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{typeNames.map((t) => <option key={t}>{t}</option>)}</select>
+                  <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select eg-control pr-8">{typeNames.map((t) => <option key={t}>{t}</option>)}</select>
                 </label>
                 {/* STATUS IS THE VISIBILITY SWITCH — it decides who sees the product, and
                     there is no second flag to remember. Active reaches the public marketing
@@ -898,7 +898,7 @@ export function ProductEditorDialog({
                     web, which is exactly how five Active products and a one-product website
                     coexisted for months. */}
                 <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Status</span>
-                  <select value={status} onChange={(e) => setStatus(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                  <select value={status} onChange={(e) => setStatus(e.target.value)} className="eg-select eg-control pr-8">
                     <option>Active</option>
                     <option>Sellers only</option>
                     <option>Staff only</option>

@@ -719,7 +719,7 @@ function TeamPanel() {
         <select
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          className="eg-select h-9 rounded-2xl border border-border bg-card px-3 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="eg-select eg-control pr-8"
         >
           <option value="editor">Editor</option>
           <option value="viewer">Viewer</option>
@@ -2348,7 +2348,7 @@ function UsersPanel() {
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Email</span><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="ops@egful.store" className="h-9" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Password</span><PasswordInput value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="8+ characters" className="h-9" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Role</span>
-            <select value={nu.role} onChange={(e) => setNu({ ...nu, role: e.target.value })} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
+            <select value={nu.role} onChange={(e) => setNu({ ...nu, role: e.target.value })} className="eg-select eg-control pr-8 capitalize">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
           </label>
           <Button size="sm" onClick={addUser} disabled={busy === "new"}>{busy === "new" ? <CircleNotch size={14} className="animate-spin" /> : <><UserPlus size={14} weight="bold" /> Create</>}</Button>
           {nuErr && <span className="w-full text-sm text-destructive">{nuErr}</span>}

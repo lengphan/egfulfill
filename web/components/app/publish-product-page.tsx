@@ -1747,7 +1747,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               {blank && (
                 <label className="flex flex-col gap-1">
                   <span className="eg-label text-muted-foreground">Method</span>
-                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select eg-control pr-8">
                     {methodOpts.length === 0 && <option value="">Any</option>}
                     {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
                   </select>

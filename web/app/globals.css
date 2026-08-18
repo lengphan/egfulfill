@@ -357,6 +357,36 @@
   text-transform: uppercase;
   line-height: 1.35;
 }
+
+/**
+ * ONE TOOLBAR CONTROL, matching the Button it stands beside.
+ *
+ * A filter row held a rounded-full button, a rounded-2xl select, a bare checkbox label and
+ * an input, at two heights and three radii — four shapes for four controls doing the same
+ * kind of job, which is what reads as "different fonts and weights" even when the type is
+ * identical. The button was the one that looked right, so everything else takes ITS shell:
+ * same height, same radius, same 14px medium, same border and hover.
+ *
+ * Deliberately NOT applied to a control inside a form field, where a full pill around a
+ * text input is a lozenge you cannot see the start of. This is for toolbars.
+ */
+.eg-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2rem;                 /* the Button's default size */
+  padding-inline: 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition: border-color .15s ease, color .15s ease;
+}
+.eg-control:hover { border-color: color-mix(in oklch, var(--primary) 40%, transparent); }
+.eg-control:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 30%, transparent); }
 /* THE GUTTER, WIDENED. Content used to start 32px from the sidebar on a laptop and 48px on
    a large monitor — close enough to the chrome that the page read as one continuous slab,
    and the space that WAS there sat inside the cards rather than around them. A page needs

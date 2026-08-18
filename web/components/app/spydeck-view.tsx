@@ -1279,13 +1279,13 @@ export function SpyDeckView() {
             {canFilter && showFilters && (
               <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-3 lg:grid-cols-6">
                 <FilterField label="Category">
-                  <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                  <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select eg-control pr-8">
                     <option value="">All</option>
                     {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </FilterField>
                 <FilterField label="Sort by">
-                  <select value={sortSel} onChange={(e) => setSortSel(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                  <select value={sortSel} onChange={(e) => setSortSel(e.target.value)} className="eg-select eg-control pr-8">
                     <option value="relevance">Relevance</option>
                     {/* Ranked from what has been fetched, not from Etsy — see CLIENT_SORTS. */}
                     <option value="best">Est. best sellers</option>

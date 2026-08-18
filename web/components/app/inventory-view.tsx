@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretDown } from "@phosphor-icons/react"
+import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretDown } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { InboundPanel } from "@/components/app/inbound-panel"
@@ -306,7 +306,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, name, variant…" className="h-9 pl-9" />
           </div>
           {cats.length > 0 && (
-            <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+            <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select eg-control pr-8">
               <option value="">All categories</option>
               {cats.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -314,7 +314,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           {/* The clean-up filter. Off by default: this table's job is what we HOLD, and a
               blank we can no longer buy is still stock on a shelf until someone decides
               otherwise. */}
-          <label className="flex h-9 cursor-pointer items-center gap-1.5 rounded-2xl border border-border bg-card px-3 text-sm">
+          <label className="flex eg-control cursor-pointer">
             <input type="checkbox" checked={onlyUnavailable} onChange={(e) => setOnlyUnavailable(e.target.checked)} className="size-3.5 accent-[var(--primary)]" />
             No longer stocked
           </label>
@@ -322,27 +322,25 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
             value={vis}
             onChange={(e) => setVis(e.target.value as "" | SkuVisibility)}
             aria-label="Filter by visibility"
-            className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="eg-select eg-control pr-8"
           >
             <option value="">All visibility</option>
             {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
           </select>
           {sel.size > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
+            <Button variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => setPrintOpen(true)} disabled={filtered.length === 0}>
-            <Printer size={14} weight="bold" /> {sel.size ? `Print ${sel.size} selected` : "Print labels"}
+          <Button variant="outline" onClick={() => setPrintOpen(true)} disabled={filtered.length === 0}>
+            {sel.size ? `Print ${sel.size} selected` : "Print labels"}
           </Button>
-          <Button size="sm" onClick={() => setAddOpen(true)}><Plus size={14} weight="bold" /> Add item</Button>
+          <Button onClick={() => setAddOpen(true)}>Add item</Button>
         </div>
 
-        <div className="border-b border-border px-4 py-2.5 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">Factory only</span> never leaves the building — stock arrives this way,
-          because receiving a blank is not a decision to sell it.{" "}
-          <span className="font-medium text-foreground">Sellers</span> publishes the SKU in the partner stock feed.{" "}
-          <span className="font-medium text-foreground">Public</span> additionally clears it for unauthenticated surfaces —
-          nothing reads that yet, so today it records the decision rather than changing what is served.
-        </div>
+        {/* THE PARAGRAPH IS GONE. Four sentences with three words bolded inside them, above
+            a table — five type weights in a strip whose job was to define a dropdown that
+            has three options in it. The definitions live on the control: each option's
+            meaning is one line under the select in the Add-item dialog, which is where
+            somebody is actually choosing. */}
 
         {items === null ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
@@ -1077,7 +1075,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
             <select
               value={visibility}
               onChange={(e) => setVisibility(e.target.value as SkuVisibility)}
-              className="eg-select h-9 rounded-2xl border border-border bg-card px-3 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="eg-select eg-control pr-8"
             >
               {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
             </select>
