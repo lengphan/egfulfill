@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, Warning, Sparkle, ImageSquare, FilmSlate, CaretDown } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getDeskImageConfig, getDeskVideoConfig, type DeskImageConfig, type DeskVideoConfig } from "@/lib/api"
@@ -39,10 +39,15 @@ type Mode = "image" | "video"
 /**
  * The settings panel. It does NOT generate anything — it arms the composer and closes.
  */
-export function GenerateButton({ disabled, armed, onArm, allowVideo = true, priceNote }: {
+export function GenerateButton({ disabled, armed, onArm, allowVideo = true, priceNote, autoArm = false }: {
   disabled?: boolean
   armed: GenSettings | null
   onArm: (g: GenSettings | null) => void
+  /** Arm with the default model as soon as the composer mounts, so a channel that exists
+   *  ONLY for generating does not make someone open a settings panel to confirm defaults
+   *  the panel would have filled in anyway. Typing and pressing Enter becomes the whole
+   *  interaction; the panel stays there for changing a setting, not for starting. */
+  autoArm?: boolean
   /** Sellers buy images only — video stays a factory tool, so the choice is not offered. */
   allowVideo?: boolean
   /** What this caller pays, e.g. "$0.50 each" or "3 free left this month". Shown so the
@@ -80,16 +85,26 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
 
   // Config is fetched on OPEN — an event — never from an effect watching state the fetch
   // would itself rewrite.
-  const openMenu = useCallback(async () => {
-    const next = !open
-    setOpen(next)
-    if (!next || (img && vid) || loading) return
+  const loadConfig = useCallback(async () => {
     setLoading(true)
     try {
-      const [i, v] = await Promise.all([getDeskImageConfig(), getDeskVideoConfig()])
-      setImg(i); setVid(v)
+      /*
+       * VIDEO IS FETCHED SEPARATELY, AND ITS FAILURE IS NOT FATAL.
+       *
+       * Both configs used to load in one Promise.all. Video is admin-only, so for a seller
+       * that promise rejected and took the IMAGE config down with it — the panel reported
+       * "Staff only" on a feature the seller is entitled to and paying for. Video is asked
+       * for only when it is on offer, and a refusal there leaves images working.
+       */
+      const i = await getDeskImageConfig()
+      setImg(i)
       setImgModel(i.model); setImgSize(i.models.find((m) => m.id === i.model)?.defaultSize || "1K")
-      setVidModel(v.model); setVidRes(v.models.find((m) => m.id === v.model)?.defaultResolution || "1080p")
+
+      const v = allowVideo ? await getDeskVideoConfig().catch(() => null) : null
+      if (v) {
+        setVid(v)
+        setVidModel(v.model); setVidRes(v.models.find((m) => m.id === v.model)?.defaultResolution || "1080p")
+      }
       const iM = i.models.find((m) => m.id === i.model)
       if (i.enabled && iM) {
         onArm({
@@ -104,7 +119,27 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
     } finally {
       setLoading(false)
     }
-  }, [open, img, vid, loading, onArm])
+  }, [onArm, allowVideo])
+
+  const openMenu = useCallback(async () => {
+    const next = !open
+    setOpen(next)
+    if (!next || img || loading) return
+    await loadConfig()
+  }, [open, img, loading, loadConfig])
+
+  /*
+   * ARM ONCE, ON MOUNT. Guarded by a ref rather than by state the fetch itself writes: a
+   * condition like `!armed` would be re-satisfied by every failure and ask forever. One
+   * attempt per mount, success or not.
+   */
+  const armedOnce = useRef(false)
+  useEffect(() => {
+    if (!autoArm || armedOnce.current || disabled) return
+    armedOnce.current = true
+    const t = setTimeout(() => { loadConfig() }, 0)
+    return () => clearTimeout(t)
+  }, [autoArm, disabled, loadConfig])
 
   /*
    * Build the armed settings from current state, with overrides for the value being changed
