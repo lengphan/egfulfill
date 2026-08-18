@@ -47,12 +47,18 @@ const shipOrigin = (s: ShipmentRow) => (isLoose(s) ? "Label with no order" : pla
 
 /** What the CARRIER says. Kept visually distinct from the factory stage, because the whole
  *  reason to open this page is usually that the two disagree. */
+/* THE WORD, COLOURED — not a filled capsule around it. A tinted pill per row turns a
+   column of statuses into a column of stickers: the fill is the loudest thing in the table
+   and it says nothing the word does not, while three of them stacked read as one block.
+   The colour stays ON THE TEXT, because these hues are the floor's reserved vocabulary
+   (amber waiting, emerald done, rose wrong) and dropping them would cost real meaning —
+   what goes is the box. */
 const DELIVERY: Record<string, { label: string; cls: string }> = {
-  awaiting_pickup: { label: "Not collected", cls: "bg-amber-100 text-amber-700" },
-  in_transit: { label: "In transit", cls: "bg-blue-100 text-blue-700" },
-  delivered: { label: "Delivered", cls: "bg-emerald-100 text-emerald-700" },
-  returned: { label: "Returning", cls: "bg-rose-100 text-rose-700" },
-  failed: { label: "Failed", cls: "bg-rose-100 text-rose-700" },
+  awaiting_pickup: { label: "Not collected", cls: "text-amber-700 dark:text-amber-400" },
+  in_transit: { label: "In transit", cls: "text-blue-700 dark:text-blue-400" },
+  delivered: { label: "Delivered", cls: "text-emerald-700 dark:text-emerald-400" },
+  returned: { label: "Returning", cls: "text-rose-700 dark:text-rose-400" },
+  failed: { label: "Failed", cls: "text-rose-700 dark:text-rose-400" },
 }
 
 const when = (s: string | null) =>
@@ -474,7 +480,7 @@ export function ShipmentsView() {
                           </Badge>
                         </>
                       ) : d ? (
-                        <Badge variant="secondary" className={d.cls}>{d.label}</Badge>
+                        <span className={"text-xs font-medium " + d.cls}>{d.label}</span>
                       ) : (
                         // Never blank, and it names WHO hasn't acted. "Not checked" was read
                         // as a claim about the parcel — something wrong with it — when it is

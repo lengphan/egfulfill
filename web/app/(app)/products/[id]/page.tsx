@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
-import { Package } from "@phosphor-icons/react"
+import { Package, CaretLeft } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getCatalogProducts, getDesignFees, type CatalogProduct, type DesignFees } from "@/lib/api"
@@ -131,9 +131,17 @@ export default function ProductDetailPage() {
 
   return (
     <div className="space-y-5">
-      <Button variant="ghost" size="sm" onClick={() => router.push("/products")} className="text-muted-foreground">
-        Products
-      </Button>
+      {/* BACK, AND IT LOOKS LIKE IT. This was a ghost button reading "Products" — the same
+          weight and colour as a heading, with nothing on it to say it was the way out, so
+          finding the way back meant guessing which word was clickable. An arrow pointing
+          left, ahead of the word, is the one convention every reader already has. */}
+      <button
+        type="button"
+        onClick={() => router.push("/products")}
+        className="-ml-1 inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <CaretLeft size={14} weight="bold" /> Products
+      </button>
 
       {/* Fill the page container (eg-content, 1600px) like every other page — the old
           max-w-6xl cap left a big empty right gutter. The image column is still capped so the

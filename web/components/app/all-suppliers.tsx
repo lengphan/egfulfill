@@ -560,7 +560,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
                       <UploadSimple size={13} weight="bold" /> Choose file
                     </Button>
                   ) : (
-                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-medium text-emerald-700">Automatic</span>
+                    <span className="shrink-0 whitespace-nowrap text-2xs font-medium text-emerald-700">Automatic</span>
                   )}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{src.how}</p>

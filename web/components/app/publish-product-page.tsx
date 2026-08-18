@@ -1645,7 +1645,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     <span className="font-medium">{dests[0].shop_name}</span>
                     <span className="text-xs text-muted-foreground">· {dests[0].platform_label}</span>
                     {dests[0].dry_run && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">dry run — nothing is sent</span>
+                      <span className="whitespace-nowrap text-2xs font-medium text-amber-700">dry run — nothing is sent</span>
                     )}
                   </div>
                 ) : (
@@ -1671,7 +1671,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                           <span className="font-medium">{d.shop_name}</span>
                           <span className="text-xs text-muted-foreground">{d.platform_label}</span>
                           {d.dry_run && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">dry run</span>
+                            <span className="whitespace-nowrap text-2xs font-medium text-amber-700">dry run</span>
                           )}
                           {isDone(d.connection_id) && (
                             <span className="ml-auto text-2xs font-medium text-success">published</span>

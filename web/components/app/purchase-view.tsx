@@ -1273,7 +1273,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       </span>
                     </button>
                     {po.status === "placed" && !reallySent(po)
-                      ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                      ? <span className="whitespace-nowrap text-xs font-medium text-amber-700"
                               title="Built and recorded, but never transmitted — the supplier's live-order gate is off">
                           Not sent
                         </span>
@@ -1283,13 +1283,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       // "Placed" for that is the same lie as reading it for a dry run, and
                       // costs someone a search through a portal that has never seen it.
                       : po.status === "placed" && isSandboxOrder(po)
-                      ? <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700"
+                      ? <span className="whitespace-nowrap text-xs font-medium text-violet-700"
                               title="Placed against the supplier's SANDBOX environment, not the live account. No blanks are on their way — switch OTTOCAP_API_BASE to Otto's production host to order for real.">
                           Sandbox
                         </span>
-                      : po.status === "placed" ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">Placed</span>
+                      : po.status === "placed" ? <span className="whitespace-nowrap text-xs font-medium text-sky-700">Placed</span>
                       : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
-                        : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
+                        : <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
                     <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
                       Reorder
                     </Button>
@@ -1657,7 +1657,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         it. Amber, not an error: this cart is legal, it just cannot be sent yet,
                         and only Otto imposes it. */}
                     {g.api === "otto" && g.lines.reduce((n, l) => n + num(l.qty), 0) < OTTO_MIN_UNITS && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-medium text-amber-800">
+                      <span className="whitespace-nowrap text-2xs font-medium text-amber-700">
                         under Otto&apos;s {OTTO_MIN_UNITS}-piece minimum
                       </span>
                     )}

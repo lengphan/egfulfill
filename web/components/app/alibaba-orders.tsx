@@ -194,7 +194,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                             detail — so like Chat, this appears once the row is open rather
                             than as a button that would have to ask you to open it first. */}
                         {imported[o.tradeId] ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
                                 title={`Purchase order ${imported[o.tradeId]} created — receive it from the Orders tab`}>
                             <CheckCircle size={11} weight="fill" /> {imported[o.tradeId]}
                           </span>

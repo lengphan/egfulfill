@@ -581,9 +581,9 @@ function ProductGroup({
       <td className="px-4 py-2">
         {/* nowrap: the visibility column narrowed this one enough that "In stock" wrapped
             onto two lines and the row grew a step. */}
-        {isOut(it) ? <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Out</span>
-          : isLow(it) ? <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Low</span>
-            : <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
+        {isOut(it) ? <span className="whitespace-nowrap text-xs font-medium text-red-700">Out</span>
+          : isLow(it) ? <span className="whitespace-nowrap text-xs font-medium text-amber-700">Low</span>
+            : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
       </td>
       <td className="px-4 py-2 hidden md:table-cell">
         <select
@@ -651,9 +651,9 @@ function ProductGroup({
         <td className="px-4 py-2 text-center font-semibold tabular-nums">{stock - reserved}</td>
         <td className="px-2 py-2 hidden md:table-cell" />
         <td className="px-4 py-2">
-          {out === group.rows.length ? <span className="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">All out</span>
-            : out || low ? <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{out ? `${out} out` : `${low} low`}</span>
-              : <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
+          {out === group.rows.length ? <span className="whitespace-nowrap text-xs font-medium text-red-700">All out</span>
+            : out || low ? <span className="whitespace-nowrap text-xs font-medium text-amber-700">{out ? `${out} out` : `${low} low`}</span>
+              : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
         </td>
         <td className="px-4 py-2 text-xs text-muted-foreground hidden md:table-cell">
           {/* One word only when the variants agree. Showing the first row's setting as if it

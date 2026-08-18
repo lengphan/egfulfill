@@ -5,7 +5,7 @@ import { VariantField } from "@/components/app/variant-field"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Plus, CheckCircle, WarningCircle, CircleNotch, Package, X } from "@phosphor-icons/react"
+import { Plus, CheckCircle, WarningCircle, CircleNotch, Package, X, CaretLeft } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -240,7 +240,7 @@ export default function NewOrderPage() {
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => router.push("/orders")} className="text-muted-foreground">
-          Orders
+          <CaretLeft size={14} weight="bold" /> Orders
         </Button>
         <h1 className="font-title text-2xl font-semibold tracking-tight">New order</h1>
       </div>

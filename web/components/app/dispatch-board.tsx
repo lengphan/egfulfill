@@ -154,14 +154,20 @@ function methodOf(o: OrderRow): { label: string; icon: Icon } | null {
  *  declared during render is remounted every frame and the lint rule that forbids it exists
  *  because that has bitten this codebase before. */
 function DispStatus({ k, label }: { k: DispKey; label: string }) {
+  /**
+   * THE WORD, IN THE STATUS COLOUR. No glyph beside it.
+   *
+   * The icon was carrying the colour and the word was in ordinary ink, so the pair said one
+   * thing twice — and it said it differently from every other status in the app, some of
+   * which were tinted capsules. A column of statuses only has to be readable down its own
+   * length, and a 13px glyph repeated forty times is texture, not information.
+   *
+   * The hue stays: emerald done, violet in production, amber needs a look, red cancelled,
+   * grey waiting. That vocabulary is the floor's and it is reserved. What goes is the
+   * decoration around it.
+   */
   const m = DISP_MARK[k]
-  const I = m.icon
-  return (
-    <span className="inline-flex max-w-full items-center gap-1.5 text-xs font-medium">
-      <I size={13} weight={m.weight ?? "fill"} className={"shrink-0 " + m.cls} />
-      <span className="truncate">{label}</span>
-    </span>
-  )
+  return <span className={"block max-w-full truncate text-xs font-medium " + m.cls}>{label}</span>
 }
 
 // Shared column template for the history table — the header and every row use it so the

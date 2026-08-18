@@ -882,7 +882,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
         )}
       </div>
       <span className="max-w-[220px] truncate font-medium">{cardLabel(c)}</span>
-      {isEmbCard(c) && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-2xs font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
+      {isEmbCard(c) && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-2xs font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
     </div>
   ) },
   { id: "order", label: "Order", cell: (c) => <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">{c.order_id ? String(c.order_id) : "—"}</span> },
@@ -897,7 +897,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
     : c.claimed_by
       ? <span className="text-foreground">{String(c.claimed_by)}</span>
       : <span className="text-muted-foreground">Unclaimed</span> },
-  { id: "priority", label: "Priority", cell: (c) => (c.priority && c.priority !== "normal" ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(c.priority)}</span> : <span className="text-muted-foreground">—</span>) },
+  { id: "priority", label: "Priority", cell: (c) => (c.priority && c.priority !== "normal" ? <span className="whitespace-nowrap text-xs font-medium text-amber-700">{String(c.priority)}</span> : <span className="text-muted-foreground">—</span>) },
   { id: "files", label: "Files", cell: (c) => ((c.file_count ?? 0) > 0 ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Paperclip size={11} weight="bold" /> {c.file_count}</span> : <span className="text-muted-foreground">—</span>) },
   // The lane IS the status, so it's labelled "Status". (The old separate "Status" column only
   // said Credited/—, which the Payout column already implies — removed.)
@@ -1223,8 +1223,8 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         {/* Compact meta line — method / priority / product, order state, customer, claimer.
             Status moved up to the header, so it isn't repeated here. */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-          {isEmbCard(card) && <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700"><Needle size={10} weight="bold" /> Embroidery</span>}
-          {card.priority && card.priority !== "normal" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(card.priority)}</span>}
+          {isEmbCard(card) && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-indigo-700"><Needle size={10} weight="bold" /> Embroidery</span>}
+          {card.priority && card.priority !== "normal" && <span className="whitespace-nowrap text-xs font-medium text-amber-700">{String(card.priority)}</span>}
           <span>{card.product || card.type || "No product / type set"}</span>
           <span aria-hidden>·</span>
           {card.order_id

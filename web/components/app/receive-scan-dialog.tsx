@@ -184,7 +184,7 @@ export function ReceiveScanDialog({
                       </div>
                     </div>
                     {l.ordered > l.qty ? (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      <span className="shrink-0 whitespace-nowrap text-xs font-medium text-amber-700">
                         {l.qty} of {l.ordered}
                       </span>
                     ) : (
