@@ -635,6 +635,23 @@ export function ordersRoutes(app, requireAuth) {
     .then((r) => { if (r && r.rowCount) console.log(`[order_items] minted line_id for ${r.rowCount} unaddressable line(s)`); })
     .catch(() => {});
   /**
+   * AND THE COLLIDING SIBLINGS — a line with a sku but no line_id is addressable only as
+   * `S:<sku>`, which is not an address at all when another line on the same order has the
+   * same sku. Editing one changed both; artwork placed on one showed on both.
+   *
+   * Targeted rather than blanket: only rows that ACTUALLY share a sku with a sibling. A
+   * lone line keyed by its sku is unambiguous and is left alone, so this is a small write
+   * that touches only the orders that were broken.
+   */
+  q(`update order_items t set line_id = 'BL' || t.id
+       where (t.line_id is null or t.line_id = '')
+         and exists (select 1 from order_items s
+                      where s.order_id = t.order_id
+                        and coalesce(s.sku, '') = coalesce(t.sku, '')
+                        and s.id <> t.id)`)
+    .then((r) => { if (r && r.rowCount) console.log(`[order_items] separated ${r.rowCount} identical-sku sibling line(s)`); })
+    .catch(() => {});
+  /**
    * Which design charge this line attracts. One field, three mutually exclusive outcomes:
    *
    *   'standard'  we cut the machine file from the seller's artwork  -> design_fee_standard
@@ -869,7 +886,13 @@ export function ordersRoutes(app, requireAuth) {
   // insert path that ever forgets to set a key, for every order type, without touching a board.
   async function healOrphanLines(row) {
     const items = row && Array.isArray(row.items) ? row.items : [];
-    const orphans = items.filter((it) => it && it.id != null && !it.line_id && (it.sku == null || it.sku === ''));
+    // Unaddressable = no line_id AND (no sku, OR a sibling on this order shares the sku).
+    // The second half is the one that was missing: identical-sku lines both key on `S:<sku>`,
+    // so a write meant for one lands on all of them.
+    const skuCount = new Map();
+    for (const it of items) { const k = String(it && it.sku != null ? it.sku : ''); skuCount.set(k, (skuCount.get(k) || 0) + 1); }
+    const orphans = items.filter((it) => it && it.id != null && !it.line_id
+      && (it.sku == null || it.sku === '' || (skuCount.get(String(it.sku)) || 0) > 1));
     if (!orphans.length) return row;
     await Promise.all(orphans.map((it) => q(`update order_items set line_id = 'BL' || id where id = $1 and line_id is null`, [it.id]).catch(() => {})));
     for (const it of orphans) it.line_id = 'BL' + it.id;
@@ -1355,7 +1378,19 @@ export function ordersRoutes(app, requireAuth) {
       // left it impossible to ever set the blank ("line_id or sku required"). Mint a stable
       // line_id here when the client didn't send one and there's no sku to key on. The client
       // reads it back and echoes it on later edits, so it stays stable.
-      const lineId = it.lineId || (it.sku ? null : `FFL-${Date.now().toString(36)}${(li++).toString(36)}${Math.random().toString(36).slice(2, 6)}`);
+      /**
+       * ALWAYS MINT. A SKU IS NOT IDENTITY.
+       *
+       * This minted an id only when the line had no sku — so two lines of the SAME sku both
+       * came out with line_id null, and every downstream write keys on `sku` when there is
+       * no line_id. Editing one sibling's blank edited both; artwork upserted onto
+       * `S:<sku>` and appeared on both. That is the reported bug, and CLAUDE.md §5 names
+       * the rule it broke: two lines of the same SKU are different jobs.
+       *
+       * A supplied lineId still wins — marketplace importers carry their own, and they must
+       * stay stable across a re-sync.
+       */
+      const lineId = it.lineId || `FFL-${Date.now().toString(36)}${(li++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       // Re-inherit the frozen price for this line. Never taken from the request body: the
       // client has no business naming what an order already cost, and the only legitimate
       // writer of these columns is freezeQuote at charge time.
