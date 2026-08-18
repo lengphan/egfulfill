@@ -1586,6 +1586,24 @@ export function ordersRoutes(app, requireAuth) {
       // back — awaiting the merge rather than firing and hoping is the difference
       // between a partner learning "we can't print that colour" and learning nothing.
       // Merged into meta rather than assigned, so cancelling never clobbers external_id.
+      /**
+       * WHERE IT WAS WHEN IT WAS HELD.
+       *
+       * On hold is a STOP, not a place in the pipeline, so coming off it has to go
+       * somewhere — and "somewhere" is where the work actually was. Recorded at the moment
+       * of holding, because afterwards the stage IS on_hold and the previous one is gone.
+       * The UI falls back to Working when this is absent, which is what every order held
+       * before today will do.
+       */
+      if (stage === 'on_hold') {
+        const cur = await q('select factory_status from orders where id=$1', [req.params.id])
+          .then((r) => String(r.rows[0]?.factory_status || '')).catch(() => '');
+        const from = normalizeStage(cur);
+        if (from && from !== 'on_hold') {
+          await q(`update orders set meta = coalesce(meta,'{}'::jsonb) || $2::jsonb where id=$1`,
+            [req.params.id, JSON.stringify({ held_from: from })]).catch(() => {});
+        }
+      }
       if (stage === 'cancelled' && typeof body.reason === 'string' && body.reason.trim()) {
         await q(
           `update orders set meta = coalesce(meta,'{}'::jsonb) || $2::jsonb where id=$1`,

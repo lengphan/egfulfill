@@ -62,6 +62,11 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   const prod = withReason([{ id: "", label: "Draft", tone: "new" as const },
     ...FACTORY_STAGES.filter((s) => !(fac && s.id === "in_review"))])
   const exc = withReason(EXCEPTION_STAGES)
+  /** On hold is a STOP, not a stage — it has to be leavable from the same menu that set it.
+   *  `resumeTo` is where the order goes back to: what it was doing before, when the order
+   *  remembers, else Working, which is what "carry on" means. */
+  const isOnHold = normalizeStage(stage) === "on_hold"
+  const resumeTo = String((order as { meta?: { held_from?: string } } | null)?.meta?.held_from || "") || "working"
 
   const onStage = async (s: { id: string; label: string; deny: string | null; walk: boolean }) => {
     if (s.walk) {
@@ -97,6 +102,20 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
+        {/* THE WAY OFF HOLD. Putting an order on hold was one click and taking it off was
+            none: the exception list offers On hold / Cancelled / Refunded, and every
+            production stage below is disabled for a held order, so the menu that put it
+            there had no row that brought it back. This one does, and it names where it
+            goes — the stage the order was at is the honest destination, and Working is
+            what "carry on" means when there is nothing recorded. */}
+        {isOnHold && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setOrderStatus(resumeTo)}>
+              Take off hold — back to {FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? "Working"}
+            </DropdownMenuItem>
+          </>
+        )}
         {exc.length > 0 && (
           <>
             <DropdownMenuSeparator />

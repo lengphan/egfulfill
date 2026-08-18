@@ -29,6 +29,8 @@ import {
   designsBySide,
   designForLine,
   getOrderDesigns,
+  getDesignFiles,
+  type DesignFileRow,
   getOrderMessages,
   getOrderQuote,
   getOrderCharges,
@@ -51,6 +53,7 @@ import { LabelActionButton } from "@/components/app/label-action-button"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { designSrc } from "@/lib/order-image"
 import { OrderedVariant } from "@/components/app/ordered-variant"
+import { LineDownloads } from "@/components/app/line-downloads"
 
 // Same fallbacks as the boards' toAddrOf — marketplace payloads spell the address a dozen
 // ways, so the ship-to a label uses must read them all. Kept identical on purpose.
@@ -98,6 +101,9 @@ export default function OrderDetailPage() {
   const [ttLabelBusy, setTtLabelBusy] = useState(false)
   const [ttLabelErr, setTtLabelErr] = useState<string | null>(null)
   const [designs, setDesigns] = useState<Record<string, OrderDesign>>({})
+  /** The order's design FILES (stitch files and the like), so each line can offer its own.
+   *  Separate from `designs`, which holds artwork and placement. */
+  const [dfiles, setDfiles] = useState<DesignFileRow[]>([])
   /**
    * The same rows, BY FACE. `designs` is deliberately singular — one design per line, the
    * front — because that is what a mockup, an avatar and a readiness dot each want. The
@@ -174,6 +180,7 @@ export default function OrderDetailPage() {
   }, [id])
 
   const reloadDesigns = () => {
+    getDesignFiles(id).then((r) => setDfiles(r ?? [])).catch(() => {})
     getOrderDesigns(id)
       .then((r) => {
         {
@@ -570,6 +577,10 @@ export default function OrderDetailPage() {
                             {/* Same line as the production queue: what the buyer chose, next
                                 to what we are choosing. */}
                             <OrderedVariant item={it} />
+                            {/* The files this line is made from, on the line. They were
+                                reachable only by opening the design window and finding the
+                                button inside — one line at a time, on an order with four. */}
+                            <LineDownloads design={design} files={dfiles} item={it} />
                             {/* THIS LINE's board state, with the lane named. "Sent to design"
                                 and "Approved" are different answers, and until now the only
                                 signal was an order-wide chip that lit for every item the
