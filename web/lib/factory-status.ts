@@ -47,6 +47,24 @@ export type FactoryStage = { id: string; label: string; tone: FactoryTone }
  */
 export const FACTORY_STAGES: FactoryStage[] = [
   { id: "in_review", label: "Pending", tone: "review" },    // seller submitted + paid; awaiting factory approval; cancellable by them
+  /**
+   * APPROVED — a person has looked at the blank.
+   *
+   * The pipeline went straight from a seller's submission to "being made", so nothing on
+   * the board could say the thing the floor actually needs to know before cutting: that an
+   * operator has SELECTED OR CONFIRMED THE BLANK on every line. A marketplace order arrives
+   * with its variants unset (CLAUDE.md §5); "Working" on one of those meant production had
+   * accepted an order nobody had finished setting up.
+   *
+   * It is a real stage rather than a stamp because it gates: Working is one step past it,
+   * so an order cannot be made until someone has stood behind its blanks — and the moment
+   * of approval, and who did it, is in the history like every other stage change.
+   *
+   * The id was already in normalizeStage's retired list, folding onto working. It is out of
+   * that list now; no live row carried it (checked against production: 0 orders, 0 items),
+   * so nothing reclassifies.
+   */
+  { id: "approved", label: "Approved", tone: "neutral" },   // an operator has confirmed the blank on every line
   { id: "working", label: "Working", tone: "prod" },        // accepted into production; being made
   { id: "shipped", label: "Shipped", tone: "shipped" },
 ]
@@ -75,7 +93,7 @@ export function normalizeStage(s?: string | null): string {
   // whatever paperwork step they were named after. 'awaiting_scan' joins them: an order
   // carrying it was accepted into production, which is what "working" says, and where its
   // label has got to is read from label_scanned_at as it always was.
-  if (["approved", "ready_print", "in_queue", "queued", "prescan", "printed", "label", "labelled", "labeled",
+  if (["ready_print", "in_queue", "queued", "prescan", "printed", "label", "labelled", "labeled",
        "awaiting_scan", "awaiting-scan",
        "scanned", "printing", "qc", "production", "in_production", "in-prod", "prepress",
        "packing", "packed", "ready", "finished"].includes(v)) return "working"
@@ -159,7 +177,9 @@ export function lineProgress(items: { factory_status?: string | null }[]): { tot
 // An operator may accept work INTO production; they still cannot claim it left. The zone
 // used to end at "awaiting_scan" — with that stage gone, "working" is the same boundary
 // under the name that survived.
-const OP_ZONE = new Set(["", "in_review", "working"])
+/* Approved is IN the operator zone — confirming the blank is the operator's job, and
+   the stage exists to record that they did it. */
+const OP_ZONE = new Set(["", "in_review", "approved", "working"])
 const OP_STOPS = new Set(["on_hold"])
 const MONEY_STAGES = new Set(["cancelled", "refunded"])
 

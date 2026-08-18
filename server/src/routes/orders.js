@@ -68,7 +68,11 @@ function notifyOrderEvent(orderId, event, extra) {
 // always carried (web/lib/order-readiness.ts). The dispatch queue is now read from those:
 // a label we bought, not yet scanned. Legacy rows fold to 'working' below, exactly as
 // 'printed'/'scanned'/'packing' already do.
-const PIPELINE = ['in_review', 'working', 'shipped'];
+/* Approved sits between the seller's submission and production: a person has selected or
+   confirmed the blank on every line. See FACTORY_STAGES in web/lib/factory-status.ts —
+   these two mirror each other and must change together. 'approved' was in the retired list
+   below, folding onto working; it is out of it now, and no live row carried it. */
+const PIPELINE = ['in_review', 'approved', 'working', 'shipped'];
 // Flagged + Backorder were retired; normalizeStage collapses any legacy value onto on_hold.
 const EXCEPTIONS = ['on_hold', 'cancelled', 'refunded'];
 function normalizeStage(s) {
@@ -79,7 +83,7 @@ function normalizeStage(s) {
   // whatever paperwork step they were named after. 'awaiting_scan' joins them: the 3 orders
   // and 6 line items still carrying it were accepted into production, which is what
   // 'working' says, and their label state is read from label_scanned_at as it always was.
-  if (['approved', 'ready_print', 'in_queue', 'queued', 'prescan', 'printed', 'label', 'labelled', 'labeled',
+  if (['ready_print', 'in_queue', 'queued', 'prescan', 'printed', 'label', 'labelled', 'labeled',
        'awaiting_scan', 'awaiting-scan',
        'scanned', 'printing', 'qc', 'production', 'in_production', 'in-prod', 'prepress',
        'packing', 'packed', 'ready', 'finished'].includes(v)) return 'working';
