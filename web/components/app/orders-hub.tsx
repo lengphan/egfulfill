@@ -2607,11 +2607,19 @@ export function OrdersHub() {
                                     if (!cones.length) return null
                                     return (
                                       <ThreadBreakdown artwork={artworkFor(o, it)}>
+                                        {/* THE CONES NEED ROOM. They were overlapped by half a
+                                            pixel (-space-x-0.5) inside a tinted box, so eight
+                                            colours read as one smear and the count was pressed
+                                            against them — on the one control here that opens
+                                            something. Spaced, on the canvas like every other
+                                            detail on this line, and underlined on hover so it
+                                            says it can be pressed. The map behind it already
+                                            names every cone and its code. */}
                                         <span
-                                          className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground hover:bg-muted/80"
-                                          title={`${cones.length} thread colour${cones.length === 1 ? "" : "s"} matched — click for the cone map`}
+                                          className="inline-flex items-center gap-1.5 text-2xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                          title={`${cones.length} thread colour${cones.length === 1 ? "" : "s"} matched — click for the cone map, with every name and code`}
                                         >
-                                          <span className="flex items-center -space-x-0.5">
+                                          <span className="flex items-center gap-1">
                                             {cones.slice(0, 8).map((c) => (
                                               <span key={c.code} className="size-2.5 rounded-full border border-black/10" style={{ background: c.hex }} />
                                             ))}
@@ -2673,24 +2681,14 @@ export function OrdersHub() {
                                 // keyed on the RESOLVED blank for the same reason: falling back
                                 // to the listing sku attributed a file to a line whose garment
                                 // nobody had picked.
-                                // Same rule as the thread pill above: gated on a chosen blank,
-                                // looked up on the key the rows were actually written with.
-                                const product = resolveProduct(it, catalog)
-                                if (!product && !String(it.blank || "").trim()) return null
-                                const skuU = String(product?.sku || it.blank || it.sku || "").toUpperCase()
-                                const file = (dfiles[o.id] ?? []).find((f) => String(f.sku ?? "").toUpperCase() === skuU)
-                                if (!file) return null
-                                // The same pill language as the Label/Scan/Design and Stock
-                                // pills: rounded-md, px-2 py-0.5, neutral because a file id is
-                                // information rather than status.
-                                return (
-                                  <span
-                                    className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-2xs font-medium text-muted-foreground"
-                                    title={`Machine file ${file.name ?? ""} · ${file.designId}`}
-                                  >
-                                    <FileArrowDown size={10} weight="bold" /> {file.designId}
-                                  </span>
-                                )
+                                /* THE MACHINE FILE'S ID IS NOT NEWS. It printed a slug —
+                                   "EMB-EG-18000-09-07-2026-pant-EMB" — built from the line
+                                   and the file name, in mono, on every row that has a stitch
+                                   file. Nobody reads it, nobody can act on it, and it is the
+                                   widest thing on the line. That a file EXISTS is already
+                                   said by the Design tag in the readiness strip, and the file
+                                   itself is downloadable from the order page's own row. */
+                                return null
                               })()}
                             </div>
                           </div>

@@ -60,7 +60,7 @@ export function ThreadBreakdown({
       <PopoverContent className="w-80 p-0" align="start">
         <div className="border-b border-border px-3 py-2">
           <div className="text-sm font-semibold">Thread map</div>
-          <div className="text-xs text-muted-foreground">Which cone covers which part of the design</div>
+          <div className="text-xs text-muted-foreground">Every cone this design needs — name, code, and the part it covers</div>
         </div>
 
         {shown === null ? (
@@ -95,7 +95,9 @@ export function ThreadBreakdown({
                   <div className="flex items-center gap-1.5">
                     <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: r.thread.hex }} />
                     <span className="truncate text-sm font-medium">{r.thread.name}</span>
-                    <span className="shrink-0 font-mono text-2xs text-muted-foreground">{r.thread.code}</span>
+                    {/* Selectable: a code gets typed into a machine or read down a phone, and a
+                        span you cannot select is one somebody transcribes by eye. */}
+                    <span className="shrink-0 select-all font-mono text-2xs text-muted-foreground">{r.thread.code}</span>
                   </div>
                   {/* Artwork colour AND cone colour: they are not the same, and a
                       digitiser needs to see how far the match had to travel. */}
