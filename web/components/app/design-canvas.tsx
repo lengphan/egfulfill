@@ -90,7 +90,7 @@ function ThreadSelect({ value, options, onChange }: {
 export function DesignStage({
   mockup, designUrl = "", pos = DEFAULT_POS, setPos, onRemove, onCopy, copyLabel, className,
   texts, updateText, images, updateImage, onEraseBg, eraseBusy, onUndoErase, selected, onSelect, picking, onPickColor,
-  printZone, printLabel, emptyHint,
+  printZone, emptyHint,
 }: {
   mockup?: string
   /** The single artwork. Optional because a caller driving `images` has no single one —
@@ -123,7 +123,6 @@ export function DesignStage({
   /** Printable rectangle (0–100% of the stage). Drawn as the dashed guide the old maker
    *  had — without it there's nothing showing where artwork may actually go. */
   printZone?: { x: number; y: number; w: number; h: number }
-  printLabel?: string
   /** Shown instead of a bare icon when there's no blank yet. */
   emptyHint?: React.ReactNode
 }) {
@@ -521,18 +520,16 @@ export function DesignStage({
       )}
 
       {/* The printable area. Everything outside it is trimmed in production, so it has to
-          be visible while placing artwork — the port had dropped this entirely. */}
+          be visible while placing artwork — the port had dropped this entirely.
+          THE RECTANGLE, WITHOUT A CAPTION. It used to carry a `12" x 16" print area` chip
+          floating above its top-left corner, which sat over the garment, moved with the box
+          and repeated a number the Print area fields already show. The dashed outline says
+          "this is the printable area" on its own. */}
       {printZone && mockup && (
         <div
           className="pointer-events-none absolute rounded-[2px] border border-dashed border-foreground/35"
           style={{ left: `${printZone.x}%`, top: `${printZone.y}%`, width: `${printZone.w}%`, height: `${printZone.h}%` }}
-        >
-          {printLabel && (
-            <span className="absolute -top-5 left-0 rounded bg-background/80 px-1 text-2xs font-medium tracking-wide text-muted-foreground">
-              {printLabel}
-            </span>
-          )}
-        </div>
+        />
       )}
 
       {/**

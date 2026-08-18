@@ -785,7 +785,6 @@ export function DesignMaker() {
                 onUndoErase={selImage && bg.canUndo ? bg.undo : undefined}
                 selected={selected} onSelect={setSelected}
                 printZone={zone}
-                printLabel={`${Number(paW) || BASE_PRINT_IN.w}" x ${Number(paH) || BASE_PRINT_IN.h}" print area`}
               />
               {dragOver && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-primary/10 text-sm font-medium text-primary">
