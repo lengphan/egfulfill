@@ -39,10 +39,15 @@ type Mode = "image" | "video"
 /**
  * The settings panel. It does NOT generate anything — it arms the composer and closes.
  */
-export function GenerateButton({ disabled, armed, onArm }: {
+export function GenerateButton({ disabled, armed, onArm, allowVideo = true, priceNote }: {
   disabled?: boolean
   armed: GenSettings | null
   onArm: (g: GenSettings | null) => void
+  /** Sellers buy images only — video stays a factory tool, so the choice is not offered. */
+  allowVideo?: boolean
+  /** What this caller pays, e.g. "$0.50 each" or "3 free left this month". Shown so the
+   *  price is visible BEFORE the button is pressed, not discovered on the wallet after. */
+  priceNote?: string | null
 }) {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<Mode>("image")
@@ -59,7 +64,9 @@ export function GenerateButton({ disabled, armed, onArm }: {
   const [vidRatio, setVidRatio] = useState("9:16")
   const [secs, setSecs] = useState(8)
 
-  const isVideo = mode === "video"
+  // Belt as well as braces: hiding the selector stops the choice being MADE, but the mode
+  // is state and this is what stops a seller ever arming a video the server would refuse.
+  const isVideo = mode === "video" && allowVideo
   const imgSpec = img?.models.find((m) => m.id === imgModel) || null
   const vidSpec = vid?.models.find((m) => m.id === vidModel) || null
   // A size one variant offers may not exist on another (Lite has no 4K), so switching models
@@ -186,7 +193,10 @@ export function GenerateButton({ disabled, armed, onArm }: {
 
             {cfg?.enabled && (
               <div className="space-y-2.5">
-                <div>
+                {priceNote && (
+                  <div className="rounded-md bg-muted/60 px-2 py-1.5 text-2xs text-muted-foreground">{priceNote}</div>
+                )}
+                <div className={allowVideo ? undefined : "hidden"}>
                   <div className="mb-1 text-2xs text-muted-foreground">What are we making?</div>
                   <select value={mode} onChange={(e) => { const m = e.target.value as Mode; setMode(m); setErr(null); armWith({ mode: m }) }} className={selectCls}>
                     <option value="image">Image</option>

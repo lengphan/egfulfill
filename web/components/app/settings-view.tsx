@@ -20,6 +20,7 @@ import { ActivityFeed } from "@/components/app/activity-feed"
 import { ACTION_CATEGORIES } from "@/components/app/activity-meta"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { BrandingPanel } from "@/components/app/branding-panel"
+import { AiPricingPanel } from "@/components/app/ai-pricing-panel"
 import { PanelPicker } from "@/components/app/panel-picker"
 import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
@@ -3426,6 +3427,9 @@ export function SettingsView() {
               theirs to touch — a second reason it does not belong here. */}
           <div className="space-y-4">
             <PlatformPanel />
+            {/* Admin-gated INSIDE a tab operators can open — the panel reads an admin-only
+                route, and an operator would otherwise meet a 403 where a price should be. */}
+            {isAdmin && <AiPricingPanel />}
           </div>
         </TabsContent>
       )}

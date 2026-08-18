@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User, Smiley, Paperclip, X, FileText, ImageSquare, FilmSlate } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { generateDeskImage, generateDeskVideo, getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment } from "@/lib/api"
+import { generateDeskImage, generateDeskVideo, getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment, getAiQuote, type AiQuote } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
@@ -131,6 +131,24 @@ export default function ChatPage() {
   const myName = getUser()?.name || "You"
   const isStaffUser = (() => { const r = getUser()?.role; return !!r && r !== "seller" })()
   const isAdmin = getUser()?.role === "admin"
+  /*
+   * Sellers may generate IMAGES when an admin has switched it on, and they pay for each one
+   * from their wallet. The quote is read from the server rather than inferred from the role,
+   * because "switched on" is a setting and only the server knows it — and the price shown
+   * beside the button has to be the price actually charged.
+   *
+   * Video is not sold: `allowVideo` stays admin-only below.
+   */
+  const [aiQuote, setAiQuote] = useState<AiQuote | null>(null)
+  useEffect(() => {
+    const t = setTimeout(() => { getAiQuote().then(setAiQuote).catch(() => setAiQuote(null)) }, 0)
+    return () => clearTimeout(t)
+  }, [])
+  const canGenerate = isAdmin || !!aiQuote?.enabled
+  const priceNote = !aiQuote || aiQuote.staff ? null
+    : aiQuote.freeLeft > 0
+      ? `${aiQuote.freeLeft} free image${aiQuote.freeLeft === 1 ? "" : "s"} left this month, then $${aiQuote.imagePrice.toFixed(2)} each.`
+      : `$${aiQuote.imagePrice.toFixed(2)} per image, charged to your wallet.`
   // Designers work artwork for the factory and aren't part of seller conversations, so
   // they get the artwork threads instead of the seller support inbox (which 403s).
   const isDesigner = getUser()?.role === "designer"
@@ -1110,8 +1128,9 @@ export default function ChatPage() {
               {/* Generate — STAFF ONLY, and only in the staffer's own "My EG" channel. Each
                   generation bills Google, so it is not offered on a seller thread, a factory
                   room or an inbox conversation; the server enforces the same two rules. */}
-              {isAdmin && activeId === supportId && (
-                <GenerateButton disabled={signedOut || !activeId} armed={gen} onArm={setGen} />
+              {canGenerate && activeId === supportId && (
+                <GenerateButton disabled={signedOut || !activeId} armed={gen} onArm={setGen}
+                  allowVideo={isAdmin} priceNote={priceNote} />
               )}
               <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />
               <Button variant="ghost" size="icon" className="size-9 shrink-0" onClick={() => attachRef.current?.click()}

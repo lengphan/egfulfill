@@ -970,6 +970,40 @@ export function uploadBrandingAsset(kind: "favicon" | "logo", dataUrl: string) {
     `/api/admin/branding/upload`, { method: "POST", body: JSON.stringify({ kind, dataUrl }) })
 }
 
+// ── AI generation pricing ────────────────────────────────────────────────────
+// Two reads on purpose, the same split /api/design_fees uses: a seller may know what THEY
+// pay and what they have left, and never what a render costs us. `AiQuote` is per-caller —
+// it counts that account's own month and day — so it must not be cached across users.
+export type AiQuote = {
+  staff: boolean
+  enabled: boolean
+  imagePrice: number
+  videoPrice: number
+  freeLeft: number
+  freeImagesPerMonth?: number
+  imagesLeftToday: number | null
+  videosLeftToday: number | null
+}
+export type AiPricing = {
+  sellersEnabled: boolean
+  imagePrice: number
+  videoPrice: number
+  freeImagesPerMonth: number
+  dailyImageCap: number
+  dailyVideoCap: number
+}
+/** What the signed-in caller pays right now. Safe for sellers. */
+export function getAiQuote() {
+  return api<AiQuote>(`/api/ai_pricing`)
+}
+export function getAiPricing() {
+  return api<AiPricing>(`/api/admin/ai_pricing`)
+}
+export function saveAiPricing(body: Partial<AiPricing>) {
+  return api<AiPricing & { ok?: boolean; error?: string }>(
+    `/api/admin/ai_pricing`, { method: "PUT", body: JSON.stringify(body) })
+}
+
 export function getAiConfig() {
   return api<AiConfig>(`/api/admin/ai-config`)
 }
