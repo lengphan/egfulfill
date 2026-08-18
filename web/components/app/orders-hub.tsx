@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
@@ -1105,7 +1106,7 @@ export function OrdersHub() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [narrow, visibleData],
   )
-  const rowTmpl = narrow ? "auto auto minmax(0,1fr) auto" : gridTmpl
+  const rowTmpl = narrow ? "auto minmax(0,1fr) auto" : gridTmpl
   /**
    * The width this table actually WANTS, so it can scroll instead of bursting its card.
    *
@@ -1956,14 +1957,14 @@ export function OrdersHub() {
                       aria-label={`Select ${numOf(o)}`}
                       className="size-4 shrink-0 rounded border-input accent-primary"
                     />
-                    <button
+                    {!narrow && <button
                       onClick={() => toggleCollapse(o.id)}
                       aria-expanded={!isCollapsed}
                       aria-label={isCollapsed ? `Expand ${numOf(o)}` : `Collapse ${numOf(o)}`}
                       className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
                       <CaretRight size={13} weight="bold" className={"transition-transform " + (isCollapsed ? "" : "rotate-90")} />
-                    </button>
+                    </button>}
 
                     {/* DATA COLUMNS — rendered in the user's saved order (drag/hide via the
                         header). Cells are defined above; the action cluster stays pinned
@@ -1981,7 +1982,10 @@ export function OrdersHub() {
                        * opposite it, and everything else is one quiet line underneath.
                        * Same `cell` renders as the table; only the arrangement differs.
                        */
-                      <div className="min-w-0">
+                      <Link
+                        href={`/orders/${encodeURIComponent(o.id)}`}
+                        className="-my-1 block min-w-0 rounded-lg py-1 transition-colors active:bg-accent/60"
+                      >
                         <div className="flex items-center justify-between gap-2">
                           <span className="min-w-0 truncate">{cell.order}</span>
                           <span className="shrink-0">{cell.status}</span>
@@ -1994,8 +1998,9 @@ export function OrdersHub() {
                               column's own tooltip already draws that distinction ("1 line ·
                               2 units"), and pluralising on the line count printed "2 item". */}
                           <span>{units === 1 ? "unit" : "units"}</span>
+                          <CaretRight size={11} weight="bold" className="ml-auto shrink-0 text-muted-foreground/50" />
                         </div>
-                      </div>
+                      </Link>
                     ) : visibleData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
 
                     {/* One PRIMARY action for the current stage/role; everything rarer
