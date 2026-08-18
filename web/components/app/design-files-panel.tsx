@@ -982,10 +982,18 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             </label>
           )}
 
-          {/* No download for their own upload: the file came FROM this browser, and the
-              route refuses a non-deliverable to a seller anyway — so a button here would
-              only ever produce "forbidden". */}
-          {f.source !== "seller" && (
+          {/**
+            * DOWNLOAD ON EVERY ROW — for staff. For a seller, on everything but their own.
+            *
+            * This was hidden for `source === "seller"` outright, on the reasoning that the
+            * file came from the seller's own browser and the route refuses a
+            * non-deliverable to them anyway. True of the SELLER, and false of everyone
+            * else reading the same card: the route's very first check is `if
+            * (!isStaff(req.user))`, so staff may fetch any file on any order — and the one
+            * file staff most often want is precisely the one the seller just sent. There
+            * was no way to get it from here at all; you had to go find it elsewhere.
+            */}
+          {(f.source !== "seller" || !isSeller) && (
             <Button size="sm" variant={f.paid || !f.price ? "outline" : "default"} disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
               {/* Word alone. The glyph said nothing "Download" doesn't, and it made this
                   button visibly heavier than the field beside it — the pair is a control
