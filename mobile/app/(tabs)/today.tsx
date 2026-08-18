@@ -16,7 +16,7 @@ import { C, S } from "@/lib/theme"
  * The counts come from the same /api/orders every board reads, through the same rules, so
  * a number here cannot disagree with the console.
  */
-type Job = { key: string; label: string; hint: string; count: number; tone: keyof typeof TONE; urgent?: boolean }
+type Job = { key: string; label: string; count: number; tone: keyof typeof TONE; urgent?: boolean }
 
 const TONE = { alert: C.alert, warn: C.warn, work: C.primary, quiet: C.muted } as const
 
@@ -39,13 +39,13 @@ export default function Today() {
 
   const open = (orders ?? []).filter(isOpen)
   const jobs: Job[] = [
-    { key: "overdue", label: "Overdue", hint: "past the ship-by date", tone: "alert", urgent: true,
+    { key: "overdue", label: "Overdue", tone: "alert", urgent: true,
       count: open.filter(isOverdue).length },
-    { key: "rush", label: "Rush", hint: "flagged urgent", tone: "warn", urgent: true,
+    { key: "rush", label: "Rush", tone: "warn", urgent: true,
       count: open.filter((o) => o.rush).length },
-    { key: "working", label: "In production", hint: "on the floor now", tone: "work",
+    { key: "working", label: "In production", tone: "work",
       count: open.filter((o) => normalizeStage(o.factory_status) === "working").length },
-    { key: "scan", label: "Awaiting scan", hint: "printed, not yet scanned", tone: "quiet",
+    { key: "scan", label: "Awaiting scan", tone: "quiet",
       count: open.filter((o) => !!o.label_printed_at && !o.label_scanned_at).length },
   ]
   const needsYou = jobs.filter((j) => j.urgent).reduce((n, j) => n + j.count, 0)
@@ -73,7 +73,7 @@ export default function Today() {
             {orders === null ? "—" : needsYou}
           </Text>
           <Text style={{ color: C.onPrimary, opacity: 0.75, fontSize: 12, marginTop: 4 }}>
-            {orders === null ? "Loading…" : needsYou === 0 ? "Nothing overdue or rushed" : "overdue and rush, across the floor"}
+            {orders === null ? "Loading…" : needsYou === 0 ? "Nothing overdue or rushed" : "overdue and rush"}
           </Text>
         </View>
       </View>
@@ -96,7 +96,6 @@ export default function Today() {
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: TONE[j.tone] }} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontSize: 15, fontWeight: "600", color: C.fg }}>{j.label}</Text>
-              <Text style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>{j.hint}</Text>
             </View>
             <Text style={{ fontSize: 18, fontWeight: "800", color: TONE[j.tone] }}>
               {orders === null ? "—" : j.count}

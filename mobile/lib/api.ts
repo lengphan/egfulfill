@@ -45,6 +45,7 @@ export type User = { id?: string; name?: string; email?: string; role?: string }
 export type OrderItem = { qty?: number | null }
 export type Order = {
   id: string
+  num?: string | null
   seq?: number | null
   factory_status?: string | null
   rush?: boolean
@@ -53,6 +54,31 @@ export type Order = {
   label_printed_at?: string | null
   label_scanned_at?: string | null
   items?: OrderItem[]
+  /* Shipping. Optional throughout: the list payload does not always carry them, and a
+     screen must be able to say "not shipped yet" rather than render an empty box that
+     looks like a broken feature. */
+  carrier?: string | null
+  tracking?: string | null
+  status?: string | null
+  total?: number | string | null
+}
+
+export type LedgerRow = {
+  id: number
+  delta: number | string
+  type: string
+  note: string | null
+  created_at: string
+  balance_after?: number
+}
+export type WalletResponse = {
+  account: string
+  balance: number
+  ledger: LedgerRow[]
+  /** The server decides what "low" means — a client that picks its own threshold is how
+   *  two screens end up disagreeing about whether to warn. */
+  low?: boolean
+  lowBelow?: number | null
 }
 
 export async function login(email: string, password: string) {
@@ -67,3 +93,5 @@ export async function login(email: string, password: string) {
 
 export const getMe = () => request<User>("/api/me")
 export const getOrders = () => request<Order[]>("/api/orders")
+export const getOrder = (id: string) => request<Order>(`/api/orders/${encodeURIComponent(id)}`)
+export const getWallet = () => request<WalletResponse>("/api/wallet")

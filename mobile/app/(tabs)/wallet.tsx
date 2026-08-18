@@ -1,0 +1,110 @@
+import { useCallback, useEffect, useState } from "react"
+import { View, Text, FlatList, RefreshControl, ActivityIndicator } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { getWallet, type WalletResponse, type LedgerRow } from "@/lib/api"
+import { C } from "@/lib/theme"
+
+/**
+ * WALLET — the balance, and what moved it.
+ *
+ * `low` comes from the SERVER, which owns the threshold. A client picking its own number is
+ * how one screen warns while another stays quiet about the same balance.
+ *
+ * Topping up is not here yet, and the screen says so rather than showing a button that does
+ * nothing: the top-up flow is a VietQR virtual account whose QR must come from the server
+ * (a locally built one is never reconciled, and the money lands untracked).
+ */
+const money = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
+
+/** node-pg hands numerics back as strings; a ledger that renders "12.00" + "3.00" as text
+ *  would sort and sign wrongly, so every row is coerced once, here. */
+const delta = (r: LedgerRow) => Number(r.delta) || 0
+
+export default function Wallet() {
+  const insets = useSafeAreaInsets()
+  const [w, setW] = useState<WalletResponse | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const load = useCallback(async () => {
+    try { setW(await getWallet()); setErr(null) }
+    catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load your wallet.") }
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true); await load(); setRefreshing(false)
+  }, [load])
+
+  if (w === null && !err) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={C.primary} />
+      </View>
+    )
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
+      <View style={{ paddingHorizontal: 20 }}>
+        <Text style={{ fontSize: 32, fontWeight: "900", color: C.fg, marginTop: 8 }}>Wallet</Text>
+
+        <View style={{
+          marginTop: 16, borderRadius: 20, padding: 20,
+          backgroundColor: w?.low ? C.alert : C.primary,
+        }}>
+          <Text style={{ color: C.onPrimary, opacity: 0.8, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
+            BALANCE
+          </Text>
+          <Text style={{ color: C.onPrimary, fontSize: 44, fontWeight: "900", marginTop: 6 }}>
+            {err ? "—" : money(w?.balance ?? 0)}
+          </Text>
+          {w?.low && (
+            <Text style={{ color: C.onPrimary, opacity: 0.85, fontSize: 13, marginTop: 4 }}>
+              Running low{w.lowBelow != null ? ` — under ${money(w.lowBelow)}` : ""}
+            </Text>
+          )}
+        </View>
+
+        {err && <Text style={{ color: C.alert, fontSize: 14, marginTop: 16 }}>{err}</Text>}
+
+        <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1, marginTop: 24 }}>
+          RECENT
+        </Text>
+      </View>
+
+      <FlatList
+        data={w?.ledger ?? []}
+        keyExtractor={(r) => String(r.id)}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24 }}
+        ListEmptyComponent={
+          <Text style={{ color: C.muted, fontSize: 14, marginTop: 16 }}>
+            {err ? "Couldn't load your history." : "Nothing has moved yet."}
+          </Text>
+        }
+        renderItem={({ item }) => {
+          const d = delta(item)
+          return (
+            <View style={{
+              flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12,
+              paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border,
+            }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "600", color: C.fg }}>
+                  {item.note || item.type}
+                </Text>
+                <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                  {new Date(item.created_at).toLocaleDateString()}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 15, fontWeight: "800", color: d < 0 ? C.fg : "#0a7c42" }}>
+                {d < 0 ? "−" : "+"}{money(Math.abs(d))}
+              </Text>
+            </View>
+          )
+        }}
+      />
+    </View>
+  )
+}
