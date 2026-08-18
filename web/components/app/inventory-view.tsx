@@ -372,14 +372,21 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                     </th>
                     <th className="px-4 py-2.5 font-medium">Item</th>
                     <th className="px-4 py-2.5 font-medium hidden md:table-cell">SKU</th>
-                    <th className="px-2 py-2.5 text-center font-medium hidden md:table-cell">Labels</th>
+                    {/* LABELS waits for a wide screen. It is the sticker count, which only matters
+                        once something is ticked for printing — and it was taking 90px of a laptop
+                        away from the column that holds the row's only control. */}
+                    <th className="hidden px-2 py-2.5 text-center font-medium xl:table-cell">Labels</th>
                     <th className="px-4 py-2.5 text-center font-medium">In stock</th>
-                    <th className="px-4 py-2.5 text-center font-medium hidden md:table-cell">Reserved</th>
+                    {/* RESERVED and REORDER AT stand down under 1536px. Eleven columns did not fit a
+                        laptop, so the table scrolled sideways and Visibility — the one CONTROL in
+                        the row — sat off the right edge where nobody found it. These two are
+                        reference numbers you look up, not ones you scan down. */}
+                    <th className="hidden px-4 py-2.5 text-center font-medium 2xl:table-cell">Reserved</th>
                     <th className="px-4 py-2.5 text-center font-medium">Available</th>
-                    <th className="px-4 py-2.5 text-center font-medium hidden md:table-cell">Reorder&nbsp;at</th>
+                    <th className="hidden px-4 py-2.5 text-center font-medium 2xl:table-cell">Reorder&nbsp;at</th>
                     <th className="px-4 py-2.5 font-medium">Status</th>
                     <th className="px-4 py-2.5 font-medium hidden md:table-cell">Visibility</th>
-                    <th className="px-4 py-2.5" />
+                    <th className="sticky right-0 z-10 bg-card px-4 py-2.5" />
                   </tr>
                 </thead>
                 <tbody>
@@ -547,12 +554,12 @@ function ProductGroup({
           type="button"
           onClick={() => onZoom(it.sku)}
           title={`Show a scannable code for ${it.sku}`}
-          className="block w-[12rem] break-all text-left font-mono text-xs font-medium underline-offset-2 hover:underline"
+          className="block w-[8.5rem] break-all text-left font-mono text-xs font-medium underline-offset-2 hover:underline"
         >
           {it.sku}
         </button>
       </td>
-      <td className="px-2 py-2 text-center hidden md:table-cell">
+      <td className="hidden px-2 py-2 text-center xl:table-cell">
         {/* How many stickers for THIS variant. Only meaningful once it's ticked, so it's
             disabled until then. */}
         <Input
@@ -564,21 +571,21 @@ function ProductGroup({
           className="mx-auto h-8 w-14 text-center"
         />
       </td>
-      <td className="px-2 py-2 text-center"><Input value={String(num(it.in_stock))} onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
+      <td className="px-2 py-2 text-center"><Input value={String(num(it.in_stock))} onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-14 text-center" /></td>
       {/* RESERVED IS NOT TYPED ANY MORE — the system holds it. Accepting an order into
           production reserves its blanks and shipping or cancelling releases them, tracked
           per order, so a number typed here would be silently corrected the next time either
           happens. Shown, because it is the difference between In stock and Available. */}
-      <td className="px-2 py-2 text-center hidden md:table-cell">
+      <td className="hidden px-2 py-2 text-center 2xl:table-cell">
         <span
-          className={"inline-block w-16 text-center tabular-nums " + (num(it.reserved) > 0 ? "font-medium" : "text-muted-foreground")}
+          className={"inline-block w-14 text-center tabular-nums " + (num(it.reserved) > 0 ? "font-medium" : "text-muted-foreground")}
           title={num(it.reserved) > 0 ? `${num(it.reserved)} held for orders in production` : "Nothing held for production"}
         >
           {num(it.reserved)}
         </span>
       </td>
       <td className="px-4 py-2 text-center font-semibold tabular-nums">{avail(it)}</td>
-      <td className="px-2 py-2 text-center hidden md:table-cell"><Input value={String(it.reorder_at ?? 25)} onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
+      <td className="hidden px-2 py-2 text-center 2xl:table-cell"><Input value={String(it.reorder_at ?? 25)} onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-14 text-center" /></td>
       <td className="px-4 py-2">
         {/* nowrap: the visibility column narrowed this one enough that "In stock" wrapped
             onto two lines and the row grew a step. */}
@@ -586,7 +593,7 @@ function ProductGroup({
           : isLow(it) ? <span className="whitespace-nowrap text-xs font-medium text-amber-700">Low</span>
             : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
       </td>
-      <td className="px-4 py-2 hidden md:table-cell">
+      <td className="sticky right-14 z-10 hidden bg-card px-4 py-2 md:table-cell">
         <select
           value={visOf(it)}
           onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
@@ -601,7 +608,7 @@ function ProductGroup({
           {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
         </select>
       </td>
-      <td className="px-4 py-2">
+      <td className="sticky right-0 z-10 bg-card px-4 py-2">
         <div className="flex items-center justify-end gap-1">
           <button onClick={() => onHistory(it.sku)} title="Scan history" className="text-muted-foreground hover:text-foreground"><ClockCounterClockwise size={15} /></button>
           <button onClick={() => remove(it.sku)} title="Remove" className="text-muted-foreground hover:text-red-600"><Trash size={15} /></button>
