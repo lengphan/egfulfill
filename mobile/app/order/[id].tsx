@@ -3,9 +3,10 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking } from "r
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLocalSearchParams, router } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { getOrder, type Order } from "@/lib/api"
+import { getOrder, getOrderMessages, getMe, type Order, type ChatEntry, type User } from "@/lib/api"
 import { normalizeStage, units, isOverdue, numOf, platformOf } from "@/lib/orders"
 import { C } from "@/lib/theme"
+import { PackagePhoto, ActivityRow } from "@/components/package-photo"
 
 /**
  * ONE ORDER — mainly so a tracking number can be read, and followed, from a phone.
@@ -47,13 +48,24 @@ export default function OrderDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const [o, setO] = useState<Order | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [activity, setActivity] = useState<ChatEntry[] | null>(null)
+  const [me, setMe] = useState<User | null>(null)
 
   const load = useCallback(async () => {
     if (!id) return
     try { setO(await getOrder(String(id))); setErr(null) }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load this order.") }
   }, [id])
-  useEffect(() => { load() }, [load])
+
+  // Separate from the order fetch: a failing activity thread should not blank the tracking
+  // number, which is what the screen is actually opened for.
+  const loadActivity = useCallback(async () => {
+    if (!id) return
+    try { setActivity(await getOrderMessages(String(id))) } catch { setActivity([]) }
+  }, [id])
+
+  useEffect(() => { load(); loadActivity() }, [load, loadActivity])
+  useEffect(() => { getMe().then(setMe).catch(() => setMe(null)) }, [])
 
   const code = o?.tracking ?? null
   const link = trackingLink(o?.carrier, code)
@@ -116,6 +128,28 @@ export default function OrderDetail() {
             {o.ship_by ? <Row label="Ship by" value={new Date(o.ship_by).toLocaleDateString()} /> : null}
             {o.created_at ? <Row label="Placed" value={new Date(o.created_at).toLocaleDateString()} /> : null}
             {o.total != null ? <Row label="Total" value={`$${(Number(o.total) || 0).toFixed(2)}`} /> : null}
+          </View>
+
+          {/* THE PROOF SHOT. Lives on the order screen because that is where the parcel is
+              when the photo is worth taking. */}
+          <View style={{ marginTop: 28 }}>
+            <PackagePhoto
+              orderId={String(o.id)}
+              role={me?.role}
+              by={me?.name}
+              onPosted={loadActivity}
+            />
+          </View>
+
+          <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1, marginTop: 28 }}>
+            ACTIVITY
+          </Text>
+          <View style={{ marginTop: 4 }}>
+            {activity === null
+              ? <ActivityIndicator style={{ marginTop: 16 }} color={C.primary} />
+              : activity.length === 0
+                ? <Text style={{ fontSize: 15, color: C.muted, paddingVertical: 14 }}>Nothing logged yet.</Text>
+                : activity.slice().reverse().map((e) => <ActivityRow key={String(e.id)} e={e} />)}
           </View>
         </ScrollView>
       ) : null}

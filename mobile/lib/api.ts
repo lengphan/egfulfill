@@ -95,3 +95,42 @@ export const getMe = () => request<User>("/api/me")
 export const getOrders = () => request<Order[]>("/api/orders")
 export const getOrder = (id: string) => request<Order>(`/api/orders/${encodeURIComponent(id)}`)
 export const getWallet = () => request<WalletResponse>("/api/wallet")
+
+/* ── Order activity ───────────────────────────────────────────────────────────
+ * The same thread the web order page shows. `sender_role` is taken from what the
+ * CLIENT sends (`b.role || 'seller'` server-side), so the caller's real role has to be
+ * passed or a photo taken on the factory floor is filed as if the seller sent it. */
+export type ChatAttachment = { url: string; name: string; mime: string; size?: number }
+export type ChatEntry = {
+  id: number | string
+  by?: string
+  role?: string
+  me?: boolean
+  text?: string
+  ts?: number
+  system?: boolean
+  attachment?: ChatAttachment | null
+}
+export const getOrderMessages = (id: string) =>
+  request<ChatEntry[]>(`/api/orders/${encodeURIComponent(id)}/messages`)
+
+export const postOrderMessage = (
+  id: string,
+  text: string,
+  opts: { role?: string; by?: string; clientId?: string; attachment?: ChatAttachment | null } = {},
+) =>
+  request<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      text, role: opts.role ?? "seller", by: opts.by,
+      clientId: opts.clientId, attachment: opts.attachment ?? undefined,
+    }),
+  })
+
+/** Store a photo and get a same-origin proxy URL back. 12MB ceiling server-side, which is
+ *  why the camera is asked for a compressed image rather than the raw capture. */
+export const uploadAttachment = (dataUrl: string, name: string) =>
+  request<ChatAttachment & { error?: string }>("/api/support/attachment", {
+    method: "POST",
+    body: JSON.stringify({ dataUrl, name }),
+  })

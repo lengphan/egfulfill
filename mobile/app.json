@@ -30,7 +30,15 @@
           "backgroundColor": "#ffffff",
           "imageWidth": 180
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "EGFUL uses the camera to photograph a finished package and attach it to the order.",
+          "photosPermission": "EGFUL uses your photos to attach an existing package photo to an order."
+        }
+      ],
+      "expo-font"
     ],
     "extra": {
       "apiBase": "https://api.egful.store"
