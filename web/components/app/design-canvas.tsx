@@ -1586,7 +1586,10 @@ export function DesignCanvasDialog({
         // 380px rail, the 24px gap and the 48px of padding. A fixed 1180px gave the rail far
         // more room than it uses and the surplus read as blank around the window. max-w-fit
         // does not work here — it under-measures the grid and clips the rail off the edge.
-        className="sm:max-w-2xl lg:max-w-[min(96vw,calc(min(70vh,50vw)+452px))]"
+        // Tracks the stage's own cap above — the width is garment + gap + rail, so when the
+        // garment stops growing the dialog has to stop with it or the surplus comes back as
+        // blank around the window.
+        className="sm:max-w-2xl lg:max-w-[min(96vw,calc(min(64vh,50vw,520px)+452px))]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -1737,7 +1740,19 @@ export function DesignCanvasDialog({
             dialog's own padding without the garment ever running off a short screen. At the
             old 42vh a 620px-tall window drew it about 258px across, too small to judge
             placement on, which is the one thing this window exists for. */}
-        <div className="relative w-full max-w-[min(100%,78vh)]">
+        {/**
+          * AND A CEILING IN PIXELS, because vh alone has no idea what is beside it.
+          *
+          * 78vh on a tall window drew the garment about 780px across while the rail next to
+          * it is 380px wide and its content runs to roughly 430px tall — so the window was
+          * sized by the picture and the whole lower half of the right-hand column was empty.
+          * The dead space was not a gap to fill; it was the stage being bigger than the job.
+          *
+          * 520px is still far more than judging placement needs (the old failure was 258px,
+          * which genuinely was too small) and it lets the two columns end near each other,
+          * which is what stops a dialog reading as half-empty.
+          */}
+        <div className="relative w-full max-w-[min(100%,64vh,520px)]">
           <DesignStage
             className="w-full" mockup={activeMockup}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
@@ -2075,8 +2090,21 @@ export function DesignCanvasDialog({
               * border already says done; the design number is the only fact the title cannot
               * carry, so that is what stays beside it.
               */}
-            <div className={cn("rounded-lg border px-2.5 py-2", designUrl ? "border-success/40 bg-success/5" : "border-dashed border-border bg-muted/20")}>
+            {/**
+              * SECTIONS, NOT A STACK OF CARDS.
+              *
+              * Three bordered, tinted boxes stood one on top of another inside a dialog that
+              * is itself a card — the artwork, the route, the charge — each shouting its own
+              * state in its own colour. Only one of them is ever the thing you came to do,
+              * and the boxes made all three look equally urgent.
+              *
+              * Hairlines between sections instead. The STATE still reads, on the dot beside
+              * the title where a glance already goes, rather than by flooding a whole panel
+              * with green.
+              */}
+            <div className="border-t border-border pt-2.5 first:border-t-0 first:pt-0">
               <div className="flex min-w-0 items-baseline gap-2">
+                <span className={cn("size-1.5 shrink-0 rounded-full", designUrl ? "bg-success" : "bg-muted-foreground/40")} />
                 <span className="text-sm font-medium">Your design</span>
                 {designUrl && designNo != null && (
                   <span className="truncate font-mono text-2xs font-medium text-muted-foreground">DSN-{designNo}</span>
@@ -2102,10 +2130,7 @@ export function DesignCanvasDialog({
                 partner step beside it used success, so two "done" states were two colours.
                 The middle state is the brand tone, not green: it is under way, not finished. */}
             {isEmb && (
-            <div className={cn("rounded-lg border px-2.5 py-2",
-              hasMachineFile ? "border-success/40 bg-success/5"
-              : sentToDesigner ? "border-primary/40 bg-primary/5"
-              : "border-dashed border-border bg-muted/20")}>
+            <div className="border-t border-border pt-2.5">
               {/**
                 * Same trim as the card above: the border carries the state, so the circle and
                 * the sentence explaining it both go. What is KEPT is what a title cannot say —
@@ -2222,11 +2247,12 @@ export function DesignCanvasDialog({
                 Staff only, like its embroidery counterpart: opening a partner task spends
                 money, and the person being charged must not be the one who spends it. */}
             {!isEmb && isStaff && (
-              <div className={"rounded-lg border p-2.5 " + (artworkChangedSinceSend
-                ? "border-amber-300 bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-950/20"
-                : sentToPartner
-                  ? "border-success/40 bg-success/5"
-                  : "border-dashed border-border bg-muted/20")}>
+              /* The amber STAYS as a tint — "you replaced the image and Pink still has the
+                 old one" is a warning about work already sent, and a dot is not enough for
+                 something that costs money to get wrong. Done and to-do lose theirs. */
+              <div className={"border-t border-border pt-2.5 " + (artworkChangedSinceSend
+                ? "rounded-lg border border-amber-300 bg-amber-50/60 p-2.5 dark:border-amber-900/40 dark:bg-amber-950/20"
+                : "")}>
                 <div className="flex items-start gap-2">
                   {/* SENT LOOKS LIKE DONE, the same way step 1 does. This step reported "On
                       the board · In progress" whether or not it had actually gone to the
@@ -2308,12 +2334,14 @@ export function DesignCanvasDialog({
               a design window; the summary line carries the answer, so staff only expand
               when they disagree with it. */}
           {isStaff && (
-            <div className="rounded-lg border border-border">
+            /* The charge is an OUTCOME of the route above, not a fourth choice — so it is a
+               line you can open, not a panel with a frame of its own. */
+            <div className="border-t border-border">
               <button
                 type="button"
                 onClick={() => setChargeOpen((v) => !v)}
                 aria-expanded={chargeOpen}
-                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent"
+                className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-2 text-left transition-colors hover:bg-accent"
               >
                 <span className="min-w-0">
                   <span className="block text-xs font-medium">Design charge</span>
