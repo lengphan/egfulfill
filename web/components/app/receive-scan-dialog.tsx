@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getSsBox, getInventory, saveInventory, type SsBox, type InventoryItem } from "@/lib/api"
+import { getSsBox, getInventory, patchInventoryItem, addInventoryItem, type SsBox } from "@/lib/api"
 import { BarcodeCamera } from "@/components/app/barcode-camera"
 
 const num = (v: unknown) => Number(v) || 0
@@ -68,20 +68,26 @@ export function ReceiveScanDialog({
     if (!box) return
     setSaving(true); setErr(null)
     try {
-      const inv = (await getInventory().catch(() => [])) ?? []
-      const next: InventoryItem[] = inv.map((i) => ({ ...i }))
+      /**
+       * PER LINE. This built the whole inventory array and POSTed it, and that endpoint
+       * REPLACES the table — every sku missing from the payload is deleted and every count
+       * is written from this snapshot. Receiving is the one moment when several people are
+       * touching stock at once: a box being scanned in here while a gun is scanning out on
+       * the floor, and the whole-list write silently wins.
+       */
+      const live = (await getInventory().catch(() => [])) ?? []
+      const bySku = new Map(live.map((i) => [String(i.sku).toUpperCase(), i]))
       for (const l of box.lines) {
         if (!l.qty) continue
-        const hit = next.find((x) => x.sku === l.sku)
-        if (hit) hit.in_stock = num(hit.in_stock) + l.qty
-        else next.push({
+        const hit = bySku.get(String(l.sku).toUpperCase())
+        if (hit) await patchInventoryItem(hit.sku, { in_stock: num(hit.in_stock) + l.qty })
+        else await addInventoryItem({
           sku: l.sku,
           name: l.title || l.style || l.sku,
           variant: [l.color, l.size].filter(Boolean).join(" / ") || undefined,
-          in_stock: l.qty, reorder_at: 25, supplier: "S&S Activewear",
+          in_stock: l.qty, reorder_at: 25, supplier: "S&S Activewear", visibility: "factory",
         })
       }
-      await saveInventory(next)
       setDone(`Box ${box.boxNumber} received — ${box.lines.reduce((s, l) => s + l.qty, 0)} units added to stock.`)
       setBox(null); setCode("")
       onReceived?.()

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
+  getInventory, patchInventoryItem, addInventoryItem, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
   getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsOrder, getSsInventory, getSsDaysInTransit, getOttoInventory, type PoReturn, type SsShipment,
   ssOrder, resolveSuppliers, getSupplierOptions, setFactorySettings, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine, type PaymentProfile,
 } from "@/lib/api"
@@ -570,20 +570,41 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   const receive = async (po: PurchaseOrder) => {
     setBusy(po.num); setMsg(null)
     try {
-      // Stock rows are matched on sku AND variant for the same reason the PO lines are:
-      // receiving 10 White/XL and 2 Black/2XL of one style must produce TWO stock rows, or
-      // the floor is told it has 12 of whichever variant was already there — and picks the
-      // wrong garment off the shelf with the system agreeing.
-      const byKey = new Map((inv ?? []).map((it) => [lineKey(it), it]))
-      const next = [...(inv ?? [])]
+      /**
+       * PER LINE, NEVER THE WHOLE LIST.
+       *
+       * This built the entire inventory array and POSTed it. That endpoint REPLACES the
+       * table: every sku missing from the payload is deleted, and every row's value is
+       * written from this page's snapshot. On a floor where a scan gun is writing to the
+       * same rows, receiving one carton that way erases whatever was counted while this
+       * page sat open — and deletes any sku added since it loaded. The Incoming-stock panel
+       * already writes per line; this one is where the risk actually lived, because
+       * Purchasing is where cartons are received.
+       *
+       * The shelf is re-read HERE rather than trusted from state, for the same reason: the
+       * count to add to is the one in the database now, not the one this page fetched.
+       *
+       * Matched on sku, which is what inventory is keyed by. The old sku+variant key could
+       * find nothing and push a duplicate row for a sku that already existed — two rows for
+       * one shelf, which the whole-list write would then persist.
+       */
+      const live = (await getInventory()) ?? []
+      const bySku = new Map(live.map((it) => [String(it.sku).toUpperCase(), it]))
       for (const l of po.items) {
-        const existing = byKey.get(lineKey(l))
-        if (existing) { const i = next.findIndex((x) => lineKey(x) === lineKey(l)); next[i] = { ...existing, in_stock: num(existing.in_stock) + num(l.qty) } }
-        else next.push({ sku: l.sku, name: l.name, variant: l.variant, in_stock: num(l.qty), reorder_at: 25, supplier: po.supplier })
+        const key = String(l.sku || "").trim().toUpperCase()
+        if (!key) continue
+        const existing = bySku.get(key)
+        if (existing) await patchInventoryItem(existing.sku, { in_stock: num(existing.in_stock) + num(l.qty) })
+        else await addInventoryItem({
+          sku: l.sku, name: l.name, variant: l.variant, in_stock: num(l.qty),
+          reorder_at: 25, supplier: po.supplier ?? undefined, visibility: "factory",
+        })
       }
-      await saveInventory(next)
       await savePurchaseOrder({ ...po, status: "received", meta: { ...(po.meta || {}), receivedAt: new Date().toISOString() } })
-      setInv(next); setMsg({ ok: true, text: "Received into inventory." }); load()
+      // Re-read rather than setting a locally-built array: the shelf just changed under
+      // several writes, and the truth is the server's.
+      getInventory().then((r) => setInv(r ?? [])).catch(() => {})
+      setMsg({ ok: true, text: "Received into inventory." }); load()
     } catch { setMsg({ ok: false, text: "Couldn't receive." }) } finally { setBusy(null) }
   }
 

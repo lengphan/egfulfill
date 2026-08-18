@@ -14,7 +14,7 @@ import { Barcode } from "@/components/app/barcode"
 import { ScanQr } from "@/components/app/scan-code"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, getCatalogProducts, type CatalogProduct, type InventoryItem, type OrderItem, type ScanRow, type SkuVisibility } from "@/lib/api"
+import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, getCatalogProducts, getPurchaseOrders, type CatalogProduct, type InventoryItem, type OrderItem, type ScanRow, type SkuVisibility } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { variantSku, variantLabel, productSizes, productColors } from "@/lib/variant-sku"
@@ -93,6 +93,15 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
   /** The catalogue, for the row photo and for "Add from catalogue". Read once; a product's
    *  picture doesn't change while a stock count is being typed. */
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
+  /**
+   * UNITS ON A PLACED PO, per sku.
+   *
+   * A row reading "0 · Out" while six are on a purchase order arriving Friday is the state
+   * that gets them ordered twice — the Purchasing board knew and Inventory did not. Read
+   * once, joined by sku; no new column, because the answer belongs beside the word that
+   * would otherwise send somebody shopping.
+   */
+  const [onOrder, setOnOrder] = useState<Record<string, number>>({})
   /** Which product groups are expanded. Collapsed by default — the point of grouping is a
    *  table of PRODUCTS, and a page that opens with every variant showing is the flat list
    *  again with extra indentation. */
@@ -107,6 +116,19 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
     const id = setTimeout(() => {
       if (!getToken()) return
       getCatalogProducts().then((r) => setCatalog(r ?? [])).catch(() => {})
+      // PLACED only. A draft has not been sent to anyone, so nothing is coming; received is
+      // already counted in in_stock and would be promised twice.
+      getPurchaseOrders().then((rows) => {
+        const by: Record<string, number> = {}
+        for (const po of rows ?? []) {
+          if (String(po.status || "") !== "placed") continue
+          for (const l of po.items ?? []) {
+            const k = String(l.sku || "").trim().toUpperCase()
+            if (k) by[k] = (by[k] ?? 0) + (Number(l.qty) || 0)
+          }
+        }
+        setOnOrder(by)
+      }).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -414,6 +436,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                         meta={meta}
                         sel={sel} setSel={setSel} copies={copies} setCopies={setCopies}
                         edit={edit} setVisibility={setVisibility} remove={remove} onHistory={setHistSku} onZoom={setZoomSku}
+                        onOrder={onOrder}
                       />
                     )
                   })}
@@ -476,7 +499,7 @@ function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: num
  * which is where the count is actually held.
  */
 function ProductGroup({
-  group, open, onToggle, selected, onSelect, single, meta, sel, setSel, copies, setCopies, edit, setVisibility, remove, onHistory, onZoom,
+  group, open, onToggle, selected, onSelect, single, meta, sel, setSel, copies, setCopies, edit, setVisibility, remove, onHistory, onZoom, onOrder,
 }: {
   group: Group
   open: boolean
@@ -494,6 +517,8 @@ function ProductGroup({
   remove: (sku: string) => void
   onHistory: (sku: string) => void
   onZoom: (sku: string) => void
+  /** sku (upper) → units on a placed purchase order. */
+  onOrder: Record<string, number>
 }) {
   const row = (it: InventoryItem, indented: boolean) => (
     <tr key={it.sku} className={"border-t border-border " + (sel.has(it.sku) ? "bg-primary/[0.04]" : "") + (indented ? " bg-muted/30" : "")}>
@@ -596,6 +621,15 @@ function ProductGroup({
         {isOut(it) ? <span className="whitespace-nowrap text-xs font-medium text-red-700">Out</span>
           : isLow(it) ? <span className="whitespace-nowrap text-xs font-medium text-amber-700">Low</span>
             : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
+        {/* ON ORDER, beside the word that would otherwise send somebody shopping. Only when
+            the shelf is short — a count of what is coming means nothing next to "In stock",
+            and it is the Out and Low rows that get bought twice. */}
+        {(isOut(it) || isLow(it)) && (onOrder[String(it.sku).toUpperCase()] ?? 0) > 0 && (
+          <span className="block whitespace-nowrap text-2xs text-muted-foreground"
+                title="Units on a purchase order that has been placed but not yet received">
+            {onOrder[String(it.sku).toUpperCase()]} on order
+          </span>
+        )}
       </td>
       <td className="sticky right-14 z-10 hidden bg-card px-4 py-2 md:table-cell">
         <select
