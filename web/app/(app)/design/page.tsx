@@ -62,11 +62,22 @@ function DesignLab() {
     <div className="space-y-4">
       <DesignLabTabs />
 
-      {/* The PAGE is Design Lab; this section is the artwork library inside it. Sharing
-          the name made the page look like it held two of the same thing. */}
+      {/**
+        * IMAGES, not "designs".
+        *
+        * This holds uploaded ARTWORK — the picture you put on a garment. Three other things
+        * in this system were already called a design: the artwork attached to an order line
+        * (DSN-1042, in the designer), a designer's work card on the board (also DSN-), and a
+        * saved template (TPL-). One word over four meanings, and the numbers looked alike,
+        * so "send me the design id" was an ambiguous request in a system that runs on ids.
+        *
+        * IMG- is its own namespace and says what the thing is. DSN- keeps meaning what it
+        * meant — the design work on an order — which is the pair people actually need to
+        * tell apart.
+        */}
       {tab === "library" ? (
         <SectionCard
-          title="Your designs"
+          title="Your images"
           actions={
             <Button size="sm" onClick={() => setStudioOpen(true)} disabled={signedOut}>
               <Plus size={14} weight="bold" /> Add artwork
@@ -82,9 +93,9 @@ function DesignLab() {
               <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 <PenNib size={22} weight="duotone" />
               </span>
-              <div className="font-medium">{signedOut ? "Sign in to build your design library" : "No designs yet"}</div>
+              <div className="font-medium">{signedOut ? "Sign in to build your image library" : "No images yet"}</div>
               <div className="max-w-xs text-sm text-muted-foreground">
-                {signedOut ? "Your saved designs live here." : "Create a design — pick a blank, drop your artwork, save. Then reuse it on any order."}
+                {signedOut ? "Your saved artwork lives here." : "Add artwork — upload a picture and it is reusable on any order or design."}
               </div>
               {!signedOut && (
                 <Button size="sm" className="mt-1" onClick={() => setStudioOpen(true)}>
@@ -113,7 +124,7 @@ function DesignLab() {
                     <button
                       onClick={() => remove(d.id)}
                       className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100"
-                      aria-label="Delete design"
+                      aria-label="Delete image"
                     >
                       <Trash size={13} weight="bold" />
                     </button>
@@ -154,11 +165,11 @@ function DesignLab() {
                       {/* The ID, visible and copyable — the reference sellers put on an import
                           sheet, so it's shown at a readable size, not a tiny caption. */}
                       <button
-                        onClick={() => { navigator.clipboard?.writeText(`DSN-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
-                        title="Copy this design's ID for an import sheet"
+                        onClick={() => { navigator.clipboard?.writeText(`IMG-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
+                        title="Copy this image's reference"
                         className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 font-mono text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                       >
-                        {copied === String(d.id) ? "Copied ✓" : `DSN-${d.id}`}
+                        {copied === String(d.id) ? "Copied ✓" : `IMG-${d.id}`}
                       </button>
                     </div>
                   </div>

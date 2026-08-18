@@ -25,7 +25,7 @@ const TABS = [
   // NO search params left useSearchParams() holding the old value, so the hook kept
   // reporting "templates" and clicking Library re-rendered the Templates panel. Both hrefs
   // carrying a param makes it a value change, which the hook does track.
-  { key: "library", label: "Library", href: "/design?tab=library" },
+  { key: "library", label: "Images", href: "/design?tab=library" },
   { key: "templates", label: "Templates", href: "/design?tab=templates" },
   // "Design", not "Design maker". It sits beside two one-word toggles, and the bar reads as
   // a set of three — a two-word member of a three-word set is the one the eye stops on.

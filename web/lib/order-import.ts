@@ -66,7 +66,7 @@ export const CSV_COLUMNS: CsvColumn[] = [
   // product, and it is the one production and pricing key on.
   { header: "Listing SKU", key: "item_sku", required: false, section: "product", help: "The SELLER's own SKU on their marketplace listing. Records only — it does not decide what we make. Safe to leave blank." },
   { header: "Blank SKU", key: "blank", required: false, section: "product", help: "OUR catalog product — the garment we print on. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
-  { header: "Template ID", key: "template_id", required: false, section: "product", help: "A saved design template — type the number from its card (TPL-12), or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one." },
+  { header: "Template/Design ID", key: "template_id", required: false, section: "product", help: "A saved template — type the number from its card (TPL-12) or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one. An image reference (IMG-30) is not applied here yet — it names artwork in your library, which is a different thing from a template." },
   { header: "Item Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
   { header: "Print Type", key: "print_type", required: false, section: "product", help: "DTG / DTF / EMB / … Defaults to DTG if blank." },
   { header: "Item Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
@@ -215,7 +215,7 @@ const COL_ALIASES: Record<string, string[]> = {
   blank: ["blank", "blank_sku", "base_product", "base_sku", "catalog_sku", "product_blank"],
   // A saved template carries blank + artwork + placement + method in one reference, so a
   // row that names one needs almost nothing else — the remaining columns become overrides.
-  template_id: ["template_id", "template", "tpl", "tpl_id", "design_template"],
+  template_id: ["template_id", "template", "tpl", "tpl_id", "design_template", "template_design_id", "design_template_id"],
   item_name: ["item_name", "item", "product", "product_name", "title", "lineitem_name", "item_title", "product_title", "description"],
   item_quantity: ["item_quantity", "quantity", "qty", "lineitem_quantity", "line_item_quantity", "item_qty"],
   item_price: ["item_price", "price", "unit_price", "lineitem_price", "line_item_price", "product_price"],
@@ -227,6 +227,11 @@ const COL_ALIASES: Record<string, string[]> = {
   internal_notes: ["internal_notes", "notes", "note", "internal_note", "order_note"],
   shipping_service: ["shipping_service", "service", "ship_method", "shipping_method"],
   sales_channel: ["sales_channel", "channel", "source"],
+  // "Template ID" is headed "Template/Design ID" now. BOTH SPELLINGS RESOLVE — a header is
+  // normalised to a key, so renaming the column without aliasing the new spelling would
+  // quietly stop it resolving on every sheet already downloaded, and the next import would
+  // arrive with no artwork and no explanation. Old sheets keep working; that is the deal
+  // with anything people hold a copy of.
 }
 const ALIAS_LOOKUP: Record<string, string> = {}
 Object.keys(COL_ALIASES).forEach((canon) => COL_ALIASES[canon].forEach((v) => { ALIAS_LOOKUP[v] = canon }))

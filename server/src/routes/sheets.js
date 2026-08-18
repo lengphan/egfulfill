@@ -76,7 +76,9 @@ const T_COLUMNS = [
   { h: 'Product Title', g: 'product', duty: 'req', sample: 'Custom Embroidered Tee with Name' },
   { h: 'Listing SKU', g: 'product', duty: '', sample: 'TEE-EMB-NAME-01' },
   { h: 'Blank SKU', g: 'product', duty: '', sample: 'G5000' },
-  { h: 'Template ID', g: 'product', duty: '', sample: 'TPL-12' },
+  // Renamed to match the import dialog. The importer aliases the old spelling, so a sheet
+  // downloaded before this keeps working — see COL_ALIASES in web/lib/order-import.ts.
+  { h: 'Template/Design ID', g: 'product', duty: '', sample: 'TPL-12' },
   { h: 'Item Quantity', g: 'product', duty: '', sample: '1' },
   { h: 'Print Type', g: 'product', duty: '', sample: 'DTG', opts: 'methods' },
   { h: 'Item Color', g: 'product', duty: '', sample: 'White' },
