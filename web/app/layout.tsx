@@ -53,6 +53,20 @@ export const metadata: Metadata = {
   verification: { google: "iEGQO5RIl12PF_7Mjt00ZtOhbanPeohsHG6Pnd6uCLE" },
   // Lets iOS run the installed app full-screen (Android reads the manifest).
   appleWebApp: { capable: true, title: "EGFUL Staff", statusBarStyle: "black-translucent" },
+  /*
+   * iOS DOES NOT READ THE WEB MANIFEST FOR ADD TO HOME SCREEN.
+   *
+   * Android takes its icon from manifest.icons; Safari looks for a rel="apple-touch-icon"
+   * link and, finding none, renders a SCREENSHOT of the page as the home-screen icon. So
+   * every iPhone install so far has been getting a blurry picture of whatever was on screen
+   * instead of the mark — invisible from the desktop, and the first thing you see on a phone.
+   *
+   * `apple` is the one that matters here; `icon` keeps the manifest and the tab in step.
+   */
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/icon-192.png", sizes: "180x180", type: "image/png" }],
+  },
 }
 // viewport-fit=cover so the scanner overlay reaches under the iPhone notch.
 export const viewport: Viewport = {

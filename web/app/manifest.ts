@@ -1,15 +1,18 @@
 import type { MetadataRoute } from "next"
 
 // Makes the app installable on iPhone + Android ("Add to Home Screen"), replacing
-// the old static floor.webmanifest. start_url points at the scan station because
-// that's what the warehouse opens the installed app for — now the Scan tab of the
-// merged Inventory section (the old /scan route also redirects here).
+// the old static floor.webmanifest.
+//
+// start_url is /today now, not the scan station. It pointed at Scan because that was the
+// only reason to install this — there was no app home to open. There is one now: Today
+// carries the counts, and Scan is one tap away on the tab bar. Opening straight into a
+// camera made every other job a journey backwards through a console built for a mouse.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "EGFUL — Staff",
-    short_name: "Staff",
-    description: "Warehouse floor app: barcode scan for stock in/out, inventory, and orders.",
-    start_url: "/inventory?tab=scan",
+    name: "EGFUL",
+    short_name: "EGFUL",
+    description: "Orders, stock and the scan station — the factory floor on a phone.",
+    start_url: "/today",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
