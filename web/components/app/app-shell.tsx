@@ -86,7 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <TopBar />
           {/* eg-content is THE page container — one width and one gutter for every page,
               no per-page opt-out. See app/globals.css. */}
-          <main className="eg-content mx-auto px-4 py-5 md:px-8 md:py-6">
+          <main className="eg-content mx-auto px-4 py-5 md:px-10 md:py-8">
             <PageTransition>{children}</PageTransition>
           </main>
         </div>
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="md:pl-60">
         <TopBar />
-        <main className="eg-content mx-auto space-y-4 px-4 py-5 md:px-8 md:py-6">
+        <main className="eg-content mx-auto space-y-4 px-4 py-5 md:px-10 md:py-8">
           {/* Seller-only, and above the page rather than on one screen: a short wallet
               stops an order being submitted from ANYWHERE, so a warning that only appears
               on the wallet page arrives after the refusal it was meant to prevent.

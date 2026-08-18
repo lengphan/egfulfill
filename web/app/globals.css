@@ -357,9 +357,17 @@
   text-transform: uppercase;
   line-height: 1.35;
 }
-@media (min-width: 1024px) { .eg-content { padding-inline: 3rem; } }
-@media (min-width: 1440px) { .eg-content { padding-inline: 4rem; } }
-@media (min-width: 1800px) { .eg-content { padding-inline: 5rem; } }
+/* THE GUTTER, WIDENED. Content used to start 32px from the sidebar on a laptop and 48px on
+   a large monitor — close enough to the chrome that the page read as one continuous slab,
+   and the space that WAS there sat inside the cards rather than around them. A page needs
+   air at its edge before it needs air in its middle: that is the difference between a
+   dashboard that looks composed and one that looks like it filled the window.
+   Still stepped rather than jumping once, so no single width makes the margin snap, and
+   still unchanged below 1024px — a laptop has no room to give away. */
+@media (min-width: 1024px) { .eg-content { padding-inline: 4rem; } }
+@media (min-width: 1280px) { .eg-content { padding-inline: 5rem; } }
+@media (min-width: 1440px) { .eg-content { padding-inline: 6.5rem; } }
+@media (min-width: 1800px) { .eg-content { padding-inline: 8rem; } }
 
 /* CONTENT ZOOM. One rule for the WHOLE app — the level is a custom property on <html>
    written by lib/zoom.ts, so it survives client-side navigation, refresh and sign-out
