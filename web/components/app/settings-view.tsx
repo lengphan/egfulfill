@@ -1806,13 +1806,20 @@ function PlatformPanel() {
                 <div className="flex flex-wrap gap-2">
                   {sides.map((sd) => {
                     const url = t.mockups?.[sd] || (sd === "front" ? t.mockup ?? "" : "")
+                    // One writer for both upload paths, so the legacy front field can never
+                    // drift from mockups.front while it is still the tile's fallback.
+                    const setMockup = (data: string) => setType(
+                      sd === "front"
+                        ? { mockups: { ...(t.mockups ?? {}), [sd]: data }, mockup: data }
+                        : { mockups: { ...(t.mockups ?? {}), [sd]: data } },
+                    )
                     return (
                       /* Bigger (64px → 96px) with the side named UNDERNEATH rather than
                          inside the empty state — an outline is a drawing you have to
                          actually recognise, and a 9px label that vanished the moment an
                          image loaded meant a filled row of six was unlabelled. Accepts a
                          dropped file as well as a click, matching the product dialog. */
-                      <div key={sd} className="group/tile flex w-24 flex-col gap-1">
+                      <div key={sd} className="group/tile relative flex w-24 flex-col gap-1">
                         <label
                           className="relative block size-24 cursor-pointer overflow-hidden rounded-lg border-2 border-border bg-muted transition-colors hover:border-primary/50"
                           title={`${sd} outline — click or drop an image`}
@@ -1822,7 +1829,7 @@ function PlatformPanel() {
                             if (!f) return
                             e.preventDefault()
                             const rd = new FileReader()
-                            rd.onload = () => setType({ mockups: { ...(t.mockups ?? {}), [sd]: String(rd.result) } })
+                            rd.onload = () => setMockup(String(rd.result))
                             rd.readAsDataURL(f)
                           }}
                         >
@@ -1839,20 +1846,38 @@ function PlatformPanel() {
                             onChange={(e) => {
                               const f = e.target.files?.[0]; if (!f) return
                               const rd = new FileReader()
-                              rd.onload = () => setType({ mockups: { ...(t.mockups ?? {}), [sd]: String(rd.result) } })
+                              rd.onload = () => setMockup(String(rd.result))
                               rd.readAsDataURL(f)
                             }}
                           />
-                          {url && (
-                            <button
-                              onClick={(e) => { e.preventDefault(); const m = { ...(t.mockups ?? {}) }; delete m[sd]; setType({ mockups: m }) }}
-                              className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full bg-foreground/75 text-background opacity-0 transition-opacity group-hover/tile:opacity-100 focus-visible:opacity-100"
-                              aria-label={`Clear ${sd} outline`}
-                            >
-                              <X size={12} weight="bold" />
-                            </button>
-                          )}
                         </label>
+                        {/* OUTSIDE THE LABEL, not in it. The label is overflow-hidden so it can
+                            clip the outline to its rounded corners — which also clipped this
+                            badge to a quarter-circle wherever it overhung. It hangs off the
+                            tile now, which is the element that has no clipping of its own.
+                            Always visible, never hover-only: on a touch screen there is no
+                            hover, so the only way to clear an outline was unreachable. */}
+                        {url && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const m = { ...(t.mockups ?? {}) }
+                              delete m[sd]
+                              // FRONT ALSO LIVES IN THE LEGACY `mockup` FIELD, and the tile reads
+                              // that as its fallback — so deleting only mockups.front put the
+                              // picture straight back and the ✕ looked broken. It was the one
+                              // outline that could not be cleared. Clearing both keeps the
+                              // documented invariant (mockup mirrors mockups.front) true.
+                              setType(sd === "front" ? { mockups: m, mockup: null } : { mockups: m })
+                            }}
+                            className="absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border border-background bg-foreground/85 text-background shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                            aria-label={`Clear ${sd} outline`}
+                            title={`Clear the ${sd} outline`}
+                          >
+                            <X size={12} weight="bold" />
+                          </button>
+                        )}
                         <span className="truncate text-xs font-medium capitalize">{sd}</span>
                       </div>
                     )
