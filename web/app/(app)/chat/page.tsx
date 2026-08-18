@@ -1145,8 +1145,15 @@ export default function ChatPage() {
                   generation bills Google, so it is not offered on a seller thread, a factory
                   room or an inbox conversation; the server enforces the same two rules. */}
               {canGenerate && genHere && (
-                <GenerateButton disabled={signedOut || !activeId} armed={gen} onArm={setGen}
-                  allowVideo={isAdmin} priceNote={priceNote} />
+                <GenerateButton
+                  disabled={signedOut || !activeId} armed={gen} onArm={setGen}
+                  allowVideo={isAdmin} priceNote={priceNote}
+                  /* The Generations channel exists ONLY to generate, so it arms itself. A
+                     staffer's "My EG" is a general assistant thread where most messages are
+                     not image prompts, and arming it would put a price on the send button
+                     for ordinary chat. */
+                  autoArm={!!genChannel && activeId === genChannel}
+                />
               )}
               <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />
               <Button variant="ghost" size="icon" className="size-9 shrink-0" onClick={() => attachRef.current?.click()}
