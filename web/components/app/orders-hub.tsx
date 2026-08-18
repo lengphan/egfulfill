@@ -1706,7 +1706,11 @@ export function OrdersHub() {
                (Deliberately NOT an app-wide sweep: `uppercase tracking-wide` is the idiom for
                section labels, the sidebar's TOOLS/ACCOUNT and the stat cards. This is the one
                place two type treatments collide inside a single control strip.) */
-            className={"items-center gap-x-3 border-b border-border bg-muted/30 px-5 py-2 text-xs font-semibold text-muted-foreground " + (narrow ? "hidden" : "grid")}
+            /* THE SAME HEADER AS EVERY TABLE. This board is a CSS grid, not a <table>, so
+               it sat out the sweep that put small spaced capitals over a hairline on the
+               other nineteen — and a beige bar in sentence case is exactly the variant
+               that made you able to tell which screen you were on from the header row. */
+            className={"items-center gap-x-3 border-b border-border px-5 py-2.5 eg-label text-muted-foreground " + (narrow ? "hidden" : "grid")}
             style={{ gridTemplateColumns: rowTmpl, minWidth: rowMinPx }}
           >
             {dispatchOn && <span />}
@@ -1720,7 +1724,7 @@ export function OrdersHub() {
                 // Sticky like the cells below it — the header scrolls in the same container,
                 // so without this a column title would slide underneath the pinned actions.
                 // relative, for the tint overlay that matches the strip's own background.
-                <span key={id} className="relative sticky right-0 z-10 -mr-5 bg-card pr-5 before:absolute before:inset-0 before:bg-muted/30" />
+                <span key={id} className="relative sticky right-0 z-10 -mr-5 bg-card pr-5" />
               ) : (
                 // A header now does two jobs: DRAG reorders the column, CLICK sorts by it.
                 // They coexist because a drag never ends in a click. `ready` (the List

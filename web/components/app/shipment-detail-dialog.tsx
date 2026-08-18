@@ -462,7 +462,7 @@ export function ShipmentDetailDialog({
               question, so the question is simply asked. */}
           {isLoose && (
             <div className="rounded-lg border border-border">
-              <div className="border-b border-border bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <div className="border-b border-border px-3 py-2 eg-label text-muted-foreground">
                 {cands === null ? "Looking for its order…"
                   : cands.length === 0 ? "No order matches this parcel"
                   : cands.length === 1 ? "This parcel looks like it belongs to"
