@@ -32,23 +32,43 @@ export type PrintMethod = { key: string; label: string }
  *
  * Every entry has a matching `method_*` surcharge in factory_settings KEYS. Keep in step.
  */
-const METHOD_TABLE: (PrintMethod & { re: RegExp })[] = [
-  { key: "dtf", label: "DTF printing", re: /dtf/ },
-  { key: "dtg", label: "DTG printing", re: /dtg|direct to garment/ },
-  { key: "emb", label: "Embroidery", re: /emb|embroid/ },
-  { key: "apl", label: "Appliqué", re: /appliqu|\bapl\b/ },
-  { key: "lsr", label: "Laser", re: /laser|\blsr\b|engrav/ },
-  { key: "scr", label: "Screen print", re: /screen|\bscr\b/ },
+const METHOD_TABLE: (PrintMethod & { re: RegExp; offered?: boolean })[] = [
+  { key: "dtf", label: "DTF printing", re: /dtf/, offered: true },
+  { key: "dtg", label: "DTG printing", re: /dtg|direct to garment/, offered: true },
+  { key: "emb", label: "Embroidery", re: /emb|embroid/, offered: true },
+  { key: "apl", label: "Appliqué", re: /appliqu|\bapl\b/, offered: true },
+  { key: "lsr", label: "Laser", re: /laser|\blsr\b|engrav/, offered: true },
+  { key: "scr", label: "Screen print", re: /screen|\bscr\b/, offered: true },
+  // RECOGNISED, NOT OFFERED — the same standing UV has below.
+  // We don't sell these two, so they come out of every picker; they stay in the table
+  // because products and orders in the database already say "Sublimation", and a technique
+  // deleted outright stops normalising, which turns a real method into a junk key and
+  // loses it from the line it is printed on. Recognise everything; offer what we do.
   { key: "sub", label: "Sublimation", re: /sublim|\bdye\b|\bsub\b/ },
   { key: "vnl", label: "Vinyl", re: /vinyl|htv|\bvnl\b/ },
 ]
 
-/** The methods a product may be assigned — the SINGLE source for every picker. */
-export const PRODUCT_METHODS: PrintMethod[] = METHOD_TABLE.map(({ key, label }) => ({ key, label }))
+/**
+ * The methods a product may be ASSIGNED — the single source for every picker.
+ *
+ * The offered subset, not the whole table: see the note on sub/vnl above. Anything that
+ * needs to READ a stored method — a filter chip's label, a line's badge — must go through
+ * methodByKey instead, or a retired technique renders as a bare key.
+ */
+export const PRODUCT_METHODS: PrintMethod[] = METHOD_TABLE.filter((m) => m.offered).map(({ key, label }) => ({ key, label }))
 
-/** Look one up by key. Null for the ad-hoc keys normTech invents for unknown techniques. */
-export const methodByKey = (key: string): PrintMethod | null =>
-  PRODUCT_METHODS.find((m) => m.key === key) ?? null
+/**
+ * Look one up by key — across the WHOLE table, offered or not.
+ *
+ * This read PRODUCT_METHODS, which was the same list until methods started being retired
+ * from the pickers. Reading the offered subset here would mean a product saved as
+ * Sublimation lost its label the day we stopped selling it.
+ * Null only for the ad-hoc keys normTech invents for genuinely unknown techniques.
+ */
+export const methodByKey = (key: string): PrintMethod | null => {
+  const m = METHOD_TABLE.find((x) => x.key === key)
+  return m ? { key: m.key, label: m.label } : null
+}
 
 /** Normalise one raw technique to a stable {key,label}. */
 export function normTech(raw: string): PrintMethod | null {

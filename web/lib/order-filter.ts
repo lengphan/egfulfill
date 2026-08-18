@@ -9,7 +9,7 @@
 
 import { type OrderRow, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { numOf, platformOf, decodeEntities } from "@/lib/order-format"
-import { normalizeMethods, PRODUCT_METHODS, type PrintMethod } from "@/lib/print-method"
+import { normalizeMethods, methodByKey, type PrintMethod } from "@/lib/print-method"
 import { ALL_STATUSES, FACTORY_STAGES, EXCEPTION_STAGES, orderStage, isException } from "@/lib/factory-status"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock } from "@/lib/stock-status"
@@ -275,7 +275,10 @@ export function orderFacets(orders: OrderRow[]) {
     // normTech labels a technique as a phrase ("DTF printing") because it's written into
     // sentences elsewhere; a filter wants the short name the picker uses ("DTF"), so prefer
     // the canonical roster's label and fall back to the phrase for anything not on it.
-    for (const m of methodsOfOrder(o)) methods.set(m.key, PRODUCT_METHODS.find((p) => p.key === m.key)?.label ?? m.label)
+    // Whatever the ORDERS actually carry, named properly — including techniques we have
+    // stopped offering. This read the offered list, so a retired method fell back to
+    // normTech's own label rather than the table's.
+    for (const m of methodsOfOrder(o)) methods.set(m.key, methodByKey(m.key)?.label ?? m.label)
   }
   return {
     platforms: [...platforms].sort((a, b) => a.localeCompare(b)),

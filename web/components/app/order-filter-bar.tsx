@@ -11,7 +11,7 @@ import {
   statusLabel, READY_OPTIONS, readyLabel, EMPTY_ORDER_QUERY,
   type OrderQuery, type FilterContext,
 } from "@/lib/order-filter"
-import { PRODUCT_METHODS } from "@/lib/print-method"
+import { methodByKey } from "@/lib/print-method"
 import { type OrderRow, type CatalogProduct } from "@/lib/api"
 
 /** One dropdown in the bar.
@@ -265,7 +265,9 @@ export function emptyOrdersMessage(
   if (q.ready) bits.push(tl("ready", readyLabel(q.ready)).toLowerCase())
   if (q.platform) bits.push(q.platform)
   if (q.store) bits.push(q.store)
-  if (q.method) bits.push(PRODUCT_METHODS.find((m) => m.key === q.method)?.label ?? q.method.toUpperCase())
+  // methodByKey, not PRODUCT_METHODS: the latter is only what we still OFFER, so a filter
+  // pinned to a retired technique would print its bare key back at you.
+  if (q.method) bits.push(methodByKey(q.method)?.label ?? q.method.toUpperCase())
   if (q.days !== null) bits.push(tl("daterange", dateRangeLabel(q.days)).toLowerCase())
   // A stock filter with no catalog loaded yet can only return nothing, and "no orders match
   // short on stock" would read as a fact about the orders rather than about the page.

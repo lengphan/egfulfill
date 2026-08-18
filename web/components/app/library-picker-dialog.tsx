@@ -99,7 +99,10 @@ export function LibraryPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      {/* WIDER, so the cards can be. At 2xl a four-column grid gave each design about
+          150px — a thumbnail you squint at to tell two designs apart, which defeats a
+          picker whose entire job is recognising one. */}
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader><DialogTitle>Choose from your library</DialogTitle></DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -134,7 +137,10 @@ export function LibraryPickerDialog({
                   : "No templates yet — save one from the Design Lab and it shows up here."}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            /* Three tracks at the top end rather than four, and two below — about 280px a
+               card instead of 150px. A library is read by eye; the name underneath is the
+               confirmation, not the identification. */
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {source === "designs" ? shownDesigns.map((d) => (
                 <button
                   key={String(d.id)}
@@ -145,7 +151,7 @@ export function LibraryPickerDialog({
                   <div className="relative flex aspect-square items-center justify-center bg-muted">
                     {d.thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={d.thumb} alt={d.name ?? ""} className="size-full object-contain" />
+                      <img src={d.thumb} alt={d.name ?? ""} className="size-full object-contain p-1" />
                     ) : (
                       <PenNib size={22} weight="duotone" className="text-muted-foreground/40" />
                     )}
@@ -165,7 +171,7 @@ export function LibraryPickerDialog({
                   <div className="relative flex aspect-square items-center justify-center bg-muted">
                     {t.composite || artOf(t) ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={t.composite || artOf(t)} alt={t.name ?? ""} className="size-full object-contain" />
+                      <img src={t.composite || artOf(t)} alt={t.name ?? ""} className="size-full object-contain p-1" />
                     ) : (
                       <Stack size={22} weight="duotone" className="text-muted-foreground/40" />
                     )}

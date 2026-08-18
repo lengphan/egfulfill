@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, X } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
@@ -624,18 +624,21 @@ export function DesignMaker() {
      */
     <div className="fixed inset-0 z-40 flex flex-col gap-3 bg-background p-3 md:p-4">
       <div className="flex items-center gap-3">
+        {/* THE WAY OUT, FIRST IN THE ROW. A surface that covers the whole window has to
+            carry its own exit — the sidebar and the top bar are underneath this, so
+            without one the only way back is the browser's own Back.
+            It was `ml-auto`, which pinned it to the far right of a full-width header: on a
+            wide screen that is most of a metre from the tabs, and an exit nobody finds is
+            an exit that isn't there. Back controls live top-left, so this one does. */}
+        <Button
+          variant="ghost" size="sm" className="shrink-0 -ml-1"
+          onClick={() => router.push("/design?tab=library")}
+          title="Leave the editor"
+        >
+          <ArrowLeft size={15} weight="bold" /> Back
+        </Button>
         <DesignLabTabs />
         {msg && <span className={"ml-2 text-sm " + (msg.tone === "ok" ? "text-success" : "text-destructive")}>{msg.text}</span>}
-        {/* THE WAY OUT. A surface that covers the whole window has to carry its own exit —
-            the sidebar and the top bar are underneath this, so without it the only way
-            back is the browser's own Back. */}
-        <Button
-          variant="ghost" size="sm" className="ml-auto shrink-0"
-          onClick={() => router.push("/design?tab=library")}
-          title="Close the editor"
-        >
-          <X size={15} weight="bold" /> Close
-        </Button>
       </div>
 
       <div className="flex min-h-0 flex-1 gap-3">
