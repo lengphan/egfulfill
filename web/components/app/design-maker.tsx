@@ -419,8 +419,11 @@ export function DesignMaker() {
   // Which image source the browse dialog is showing, or null when it's closed. One piece of
   // state rather than two booleans: they are the same dialog and can never both be open.
   const [browse, setBrowse] = useState<null | "uploads" | "orders">(null)
-  /** Which tool's panel is open beside the rail. One at a time, like every editor. */
-  const [tool, setTool] = useState<ToolKey>("images")
+  /** Which tool's panel is open beside the rail. One at a time, like every editor.
+   *  Opens on BLANK: nothing else in here does anything until a garment is chosen, and
+   *  landing on Artwork put the one required first step behind a tab nobody had a reason
+   *  to press. Once a blank is picked the panel moves on to Artwork by itself. */
+  const [tool, setTool] = useState<ToolKey>("blank")
   // Background removal — the same hook the mini designer uses, so the two can't drift.
   /**
    * THE ERASER ACTS ON THE SELECTED LAYER.
@@ -1073,6 +1076,7 @@ export function DesignMaker() {
           setProduct(cp)
           setMockup(p.img || (cp ? mockupOf(cp) : ""))
           setSide("front")
+          setTool("images")
         }} />
       <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen}
         onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }}
