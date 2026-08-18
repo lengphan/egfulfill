@@ -3,7 +3,7 @@ import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityInd
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import { getOrders, type Order } from "@/lib/api"
-import { isOpen, isOverdue, normalizeStage, units } from "@/lib/orders"
+import { isOpen, isOverdue, normalizeStage, units, numOf, platformOf, plainNum } from "@/lib/orders"
 import { C } from "@/lib/theme"
 
 /**
@@ -45,7 +45,9 @@ export default function Orders() {
     // id AND num: a marketplace order's id (`etsy-abc`) is not the number anyone reads
     // (`#4099…`), so searching only one of them finds nothing for half the floor.
     return byFilter.filter((o) =>
-      String(o.num ?? "").toLowerCase().includes(q) || String(o.id).toLowerCase().includes(q))
+      plainNum(String(o.id)).toLowerCase().includes(q)
+      || String(o.seq ?? "").includes(q)
+      || String(o.id).toLowerCase().includes(q))
   }, [orders, filter, search])
 
   return (
@@ -114,11 +116,11 @@ export default function Orders() {
               >
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: "700", color: C.fg }}>
-                      {item.num ?? item.id}
+                    <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: "800", color: C.fg }}>
+                      {numOf(item)}
                     </Text>
-                    <Text style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
-                      {normalizeStage(item.factory_status)} · {units(item)} pc
+                    <Text style={{ fontSize: 14, color: C.muted, marginTop: 3 }}>
+                      {platformOf(item)} · {normalizeStage(item.factory_status)} · {units(item)} pc
                     </Text>
                   </View>
                   {late && (

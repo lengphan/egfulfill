@@ -42,3 +42,29 @@ export function ageLabel(o: Order): string {
   const h = (Date.now() - new Date(o.created_at).getTime()) / 3_600_000
   return h < 24 ? `${Math.max(1, Math.round(h))}h` : `${Math.round(h / 24)}d`
 }
+
+/*
+ * HOW AN ORDER IS NAMED — mirrors web/lib/order-format.ts.
+ *
+ * `etsy-4148231554` is a ROUTING id, not a number anyone reads. The buyer, the marketplace
+ * and the packing slip all say 4148231554; the `etsy-` is ours. Our own orders carry a seq
+ * and are written `#1234`.
+ *
+ * The platform belongs on the row's second line, not welded to the front of the number.
+ *
+ * DUPLICATED, and it should not be: this file already mirrors the stage vocabulary in
+ * server/src/routes/orders.js, and this makes a third copy of rules the web also holds.
+ * The fix is a shared package both apps import; until then, changing either side means
+ * changing both.
+ */
+const SOURCE_PREFIX = /^(etsy|shopify|amazon|ebay|tiktok|woo|walmart)-/i
+const PLATFORM_NAMES: Record<string, string> = {
+  etsy: "Etsy", shopify: "Shopify", tiktok: "TikTok", amazon: "Amazon",
+  ebay: "eBay", woo: "WooCommerce", walmart: "Walmart", manual: "Manual",
+}
+export const plainNum = (id: string) => String(id ?? "").replace(SOURCE_PREFIX, "")
+export const numOf = (o: Order) => (o.seq ? `#${o.seq}` : plainNum(String(o.id)))
+export const platformOf = (o: Order) => {
+  const raw = (String(o.id ?? "").match(SOURCE_PREFIX)?.[1] ?? "manual").toLowerCase()
+  return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
+}

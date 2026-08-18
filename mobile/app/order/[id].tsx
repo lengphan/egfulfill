@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLocalSearchParams, router } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrder, type Order } from "@/lib/api"
-import { normalizeStage, units, isOverdue } from "@/lib/orders"
+import { normalizeStage, units, isOverdue, numOf, platformOf } from "@/lib/orders"
 import { C } from "@/lib/theme"
 
 /**
@@ -77,9 +77,9 @@ export default function OrderDetail() {
         <Text style={{ color: C.alert, fontSize: 14, paddingHorizontal: 20, marginTop: 12 }}>{err}</Text>
       ) : o ? (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 32 }}>
-          <Text style={{ fontSize: 30, fontWeight: "900", color: C.fg }}>{o.num ?? o.id}</Text>
-          <Text style={{ fontSize: 15, color: C.muted, marginTop: 4 }}>
-            {normalizeStage(o.factory_status)}{isOverdue(o) ? " · late" : ""}
+          <Text style={{ fontSize: 34, fontWeight: "900", color: C.fg }}>{numOf(o)}</Text>
+          <Text style={{ fontSize: 16, color: C.muted, marginTop: 4 }}>
+            {platformOf(o)} · {normalizeStage(o.factory_status)}{isOverdue(o) ? " · late" : ""}
           </Text>
 
           {/* TRACKING FIRST — the thing this screen is opened for. */}
