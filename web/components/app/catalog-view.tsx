@@ -270,12 +270,12 @@ export function CatalogView() {
                       onChange={(e) => void toggleAllShown(e.target.checked)}
                     />
                   </th>
-                  <th className="px-2 py-2 font-medium">Product</th>
-                  <th className="px-2 py-2 font-medium">Catalogue price</th>
+                  <th className="px-2 py-2">Product</th>
+                  <th className="px-2 py-2">Catalogue price</th>
                   {/* Labelled as what it is, and not editable here. The two prices sitting
                       side by side is the point — it's how someone sees they are different
                       things rather than discovering it later. */}
-                  <th className="px-2 py-2 font-medium">Seller pays</th>
+                  <th className="px-2 py-2">Seller pays</th>
                 </tr>
               </thead>
               <tbody>

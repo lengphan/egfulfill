@@ -468,14 +468,14 @@ export function SourcingView() {
               <thead className="border-b border-border text-left eg-label text-muted-foreground">
                 <tr>
                   <th className="w-12 px-4 py-2" />
-                  <th className="px-4 py-2 text-left font-medium">Product</th>
-                  <th className="px-4 py-2 text-left font-medium">Source</th>
-                  <th className="px-4 py-2 text-right font-medium">Unit</th>
-                  <th className="px-4 py-2 text-right font-medium">MOQ</th>
-                  <th className="px-4 py-2 text-right font-medium">Freight/unit</th>
-                  <th className="px-4 py-2 text-right font-medium">Landed</th>
-                  <th className="px-4 py-2 text-right font-medium">Lead</th>
-                  <th className="px-4 py-2 text-left font-medium">Stage</th>
+                  <th className="px-4 py-2 text-left">Product</th>
+                  <th className="px-4 py-2 text-left">Source</th>
+                  <th className="px-4 py-2 text-right">Unit</th>
+                  <th className="px-4 py-2 text-right">MOQ</th>
+                  <th className="px-4 py-2 text-right">Freight/unit</th>
+                  <th className="px-4 py-2 text-right">Landed</th>
+                  <th className="px-4 py-2 text-right">Lead</th>
+                  <th className="px-4 py-2 text-left">Stage</th>
                   <th className="px-4 py-2" />
                 </tr>
               </thead>

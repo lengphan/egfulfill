@@ -575,13 +575,13 @@ export function BroadcastsView() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                  <th className="py-2 pr-3 font-medium">Subject</th>
-                  <th className="py-2 pr-3 font-medium">Audience</th>
-                  <th className="py-2 pr-3 font-medium">Status</th>
-                  <th className="py-2 pr-3 text-right font-medium">Sent</th>
-                  <th className="py-2 pr-3 font-medium">Sent by</th>
-                  <th className="py-2 pr-3 font-medium">When</th>
-                  <th className="py-2 font-medium" />
+                  <th className="py-2 pr-3">Subject</th>
+                  <th className="py-2 pr-3">Audience</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 pr-3 text-right">Sent</th>
+                  <th className="py-2 pr-3">Sent by</th>
+                  <th className="py-2 pr-3">When</th>
+                  <th className="py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

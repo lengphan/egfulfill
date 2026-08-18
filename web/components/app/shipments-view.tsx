@@ -373,15 +373,15 @@ export function ShipmentsView() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                <th className="px-5 py-2 font-medium">Order</th>
-                <th className="px-3 py-2 font-medium">Customer</th>
-                <th className="px-3 py-2 font-medium">Tracking</th>
-                <th className="px-3 py-2 text-right font-medium">Price</th>
+                <th className="px-5 py-2">Order</th>
+                <th className="px-3 py-2">Customer</th>
+                <th className="px-3 py-2">Tracking</th>
+                <th className="px-3 py-2 text-right">Price</th>
                 {/* "Carrier says" was written to keep it distinct from the floor's own
                     stage — a real distinction, but the column header is the wrong place to
                     argue it, and it read as a sentence fragment. The badge below already
                     says whose claim it is by being the carrier's vocabulary. */}
-                <th className="whitespace-nowrap px-4 py-2 font-medium">Delivery status</th>
+                <th className="whitespace-nowrap px-4 py-2">Delivery status</th>
               </tr>
             </thead>
             <tbody>

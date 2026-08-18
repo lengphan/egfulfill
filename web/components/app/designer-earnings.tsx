@@ -67,7 +67,7 @@ export function DesignerEarnings() {
             ) : (
               <table className="w-full text-sm">
                 <thead className="border-b border-border text-left eg-label text-muted-foreground">
-                  <tr><th className="px-4 py-2.5 font-medium">When</th><th className="px-4 py-2.5 font-medium">Detail</th><th className="px-4 py-2.5 font-medium">Type</th><th className="px-4 py-2.5 text-right font-medium">Amount</th></tr>
+                  <tr><th className="px-4 py-2.5">When</th><th className="px-4 py-2.5">Detail</th><th className="px-4 py-2.5">Type</th><th className="px-4 py-2.5 text-right">Amount</th></tr>
                 </thead>
                 <tbody>
                   {ledger.rows.map((r) => {

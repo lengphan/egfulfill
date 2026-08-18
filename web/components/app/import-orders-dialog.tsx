@@ -733,11 +733,11 @@ export function ImportOrdersDialog({
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 z-10 bg-card border-b border-border text-left eg-label text-muted-foreground">
                       <tr>
-                        <th className="px-3 py-2 font-medium">#</th>
-                        <th className="px-3 py-2 font-medium">Order</th>
-                        <th className="px-3 py-2 font-medium">Ship to</th>
-                        <th className="px-3 py-2 font-medium">Item</th>
-                        <th className="px-3 py-2 font-medium">Status</th>
+                        <th className="px-3 py-2">#</th>
+                        <th className="px-3 py-2">Order</th>
+                        <th className="px-3 py-2">Ship to</th>
+                        <th className="px-3 py-2">Item</th>
+                        <th className="px-3 py-2">Status</th>
                       </tr>
                     </thead>
                     <tbody>

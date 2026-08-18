@@ -262,13 +262,13 @@ export function VolumeTiersPanel() {
               <table className="w-full min-w-[26rem] text-sm">
                 <thead>
                   <tr className="eg-label text-muted-foreground">
-                    <th className="py-1.5 pr-3 text-left font-semibold">Seller</th>
-                    <th className="py-1.5 pr-3 text-right font-semibold">Orders</th>
-                    <th className="py-1.5 pr-3 text-right font-semibold">Units</th>
+                    <th className="py-1.5 pr-3 text-left">Seller</th>
+                    <th className="py-1.5 pr-3 text-right">Orders</th>
+                    <th className="py-1.5 pr-3 text-right">Units</th>
                     {/* "Would earn" while the ladder priced nothing. It does now, and these
                         units are what set the rate being charged — a conditional heading over
                         a real number is the same overclaim in reverse. */}
-                    <th className="py-1.5 text-right font-semibold">Earns</th>
+                    <th className="py-1.5 text-right">Earns</th>
                   </tr>
                 </thead>
                 <tbody>

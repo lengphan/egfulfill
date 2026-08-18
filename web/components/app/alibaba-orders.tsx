@@ -223,10 +223,10 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                               <table className="w-full text-sm">
                                 <thead className="border-b border-border text-left eg-label text-muted-foreground">
                                   <tr>
-                                    <th className="py-1.5 pr-3 font-medium">Item</th>
-                                    <th className="py-1.5 pr-3 font-medium">Variant</th>
-                                    <th className="py-1.5 pr-3 text-right font-medium">Qty</th>
-                                    <th className="py-1.5 text-right font-medium">Unit</th>
+                                    <th className="py-1.5 pr-3">Item</th>
+                                    <th className="py-1.5 pr-3">Variant</th>
+                                    <th className="py-1.5 pr-3 text-right">Qty</th>
+                                    <th className="py-1.5 text-right">Unit</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">

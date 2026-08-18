@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, type Icon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
@@ -204,6 +204,25 @@ function ImageThumb({ url, src, name, badge, title, onPlace, onDelete }: {
  * uploads, which pushed Text and Layers so far down the panel that people did not know
  * they were there.
  */
+/**
+ * THE TOOL RAIL.
+ *
+ * Every source of content used to be a differently shaped control in one 240px column: a
+ * full-width outline button for the blank, a text link for Upload, another text link for
+ * order art, another outline button for the library. Four ways to say "open a source",
+ * none of them related, stacked under four shouting ALL-CAPS labels.
+ *
+ * One idiom instead — icon over label, all the same size — so the panel is a set of tools
+ * rather than a pile of controls, and the panel beside it shows one at a time.
+ */
+type ToolKey = "blank" | "images" | "text"
+
+const TOOLS: { key: ToolKey; label: string; Icon: Icon }[] = [
+  { key: "blank", label: "Blank", Icon: TShirt },
+  { key: "images", label: "Artwork", Icon: ImageSquare },
+  { key: "text", label: "Text", Icon: TextT },
+]
+
 const RAIL_LIMIT = 6
 
 /**
@@ -400,6 +419,8 @@ export function DesignMaker() {
   // Which image source the browse dialog is showing, or null when it's closed. One piece of
   // state rather than two booleans: they are the same dialog and can never both be open.
   const [browse, setBrowse] = useState<null | "uploads" | "orders">(null)
+  /** Which tool's panel is open beside the rail. One at a time, like every editor. */
+  const [tool, setTool] = useState<ToolKey>("images")
   // Background removal — the same hook the mini designer uses, so the two can't drift.
   /**
    * THE ERASER ACTS ON THE SELECTED LAYER.
@@ -608,6 +629,51 @@ export function DesignMaker() {
     } finally { setSaving(false) }
   }
 
+  /** Hand the design to the publish page. Lifted out of the button so the top bar can
+   *  own the action without carrying forty lines of JSX with it. */
+  const publishProduct = async () => {
+              // 2000px, which is Etsy's own floor for a listing photo. 1200 was under it,
+              // so the picture a buyer judges the product by arrived soft on the one
+              // channel most of these listings go to.
+              const composed = await composeDesign(frontStack.images, frontStack.texts, 2000)
+              /**
+               * THE FACTORY GETS THE WHOLE FRONT, not the bottom of the stack.
+               *
+               * `designUrl` was `images[0].src` — layer one and nothing else. A design of
+               * a logo, a name and a badge published a correct-looking listing and sent
+               * production a lone logo; every text layer was lost outright, because text
+               * is not in `images` at all.
+               *
+               * Flattened only when there is something to flatten. A single image with no
+               * text is passed through AS THE ORIGINAL FILE — re-rastering it would throw
+               * away resolution the uploaded file has and the canvas doesn't, and that is
+               * the common case.
+               *
+               * 2400px is the ceiling on the flattened one on purpose: this travels to the
+               * publish page through sessionStorage, which is a few megabytes, and a
+               * failed stash is reported below rather than swallowed.
+               */
+              const single = frontStack.images.length === 1 && frontStack.texts.length === 0
+              const art = single
+                ? frontStack.images[0].src
+                : await composeDesign(frontStack.images, frontStack.texts, 2400)
+              // A flattened front is already placed — it IS the print area — so it must
+              // not carry the bottom layer's offset a second time.
+              const artPos = single ? (frontStack.images[0]?.pos ?? pos) : { ...DEFAULT_POS, w: 100 }
+              // Publishing is its own PAGE now, so the listing travels through
+              // sessionStorage rather than as a prop — see lib/publish-draft.ts. A failed
+              // stash is said out loud: navigating to a page whose draft was never stored
+              // would land on an empty form with no explanation.
+              const id = stashPublishDraft({
+                prefill: { title: name, images: composed ? [composed] : [], blank: product, designUrl: art, designPos: artPos },
+                returnTo: "/design/maker",
+                returnLabel: "Back to Design",
+                title: "Publish product",
+              })
+              if (!id) { setPubErr("Couldn't open the publish page — this design is too large for the browser to hand over."); return }
+              router.push(`/publish?d=${id}`)
+  }
+
   const saveToLibrary = async () => {
     if (!designUrl && texts.length === 0) { setMsg({ tone: "err", text: "Add artwork or text first." }); return }
     setSaving(true); setMsg(null)
@@ -640,60 +706,86 @@ export function DesignMaker() {
      * one, this has to move out of the shell instead.
      */
     <div className="fixed inset-0 z-40 flex flex-col gap-3 bg-background p-3 md:p-4">
-      <div className="flex items-center gap-3">
-        {/* THE WAY OUT, FIRST IN THE ROW. A surface that covers the whole window has to
-            carry its own exit — the sidebar and the top bar are underneath this, so
-            without one the only way back is the browser's own Back.
-            It was `ml-auto`, which pinned it to the far right of a full-width header: on a
-            wide screen that is most of a metre from the tabs, and an exit nobody finds is
-            an exit that isn't there. Back controls live top-left, so this one does. */}
+      {/**
+        * ONE TOP BAR: where you are, what it is called, and what you can do with it.
+        *
+        * The actions used to be the bottom of the right-hand panel — a design name, two
+        * outline buttons and Publish, all the same width and weight as the layer controls
+        * above them, so the one action that matters looked like another field. A toolbar is
+        * where a person looks for "finish this", and Publish is the only filled button in
+        * the editor.
+        */}
+      <header className="flex shrink-0 items-center gap-2">
+        {/* THE WAY OUT, FIRST IN THE ROW. This surface covers the sidebar and the top bar,
+            so without its own exit the only way back is the browser's. */}
         <Button
-          variant="ghost" size="sm" className="shrink-0 -ml-1"
+          variant="ghost" size="sm" className="-ml-1 shrink-0"
           onClick={() => router.push("/design?tab=library")}
           title="Leave the editor"
         >
           <ArrowLeft size={15} weight="bold" /> Back
         </Button>
-        <DesignLabTabs />
-        {msg && <span className={"ml-2 text-sm " + (msg.tone === "ok" ? "text-success" : "text-destructive")}>{msg.text}</span>}
-      </div>
+        <DesignLabTabs className="hidden shrink-0 md:flex" />
+        {/* The name, as a title rather than a form field: transparent until you touch it.
+            It was an Input at the bottom of a panel, which made naming a design feel like
+            filling something in rather than titling your work. */}
+        <Input
+          value={name} onChange={(e) => setName(e.target.value)}
+          placeholder="Untitled design" aria-label="Design name"
+          className="h-8 w-40 min-w-0 border-transparent bg-transparent px-2 text-sm font-medium shadow-none hover:border-border focus:border-border lg:w-56"
+        />
+        {msg && <span className={"truncate text-xs " + (msg.tone === "ok" ? "text-success" : "text-destructive")}>{msg.text}</span>}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={saveToLibrary} disabled={saving} title="Save a flattened copy to your library">
+            {saving ? <CircleNotch size={14} className="animate-spin" /> : <FloppyDisk size={14} weight="bold" />} Save
+          </Button>
+          <Button variant="outline" size="sm" onClick={saveAsTemplate} disabled={saving} title="Save the editable pieces, every side, as a template">
+            <Stack size={14} weight="bold" /> Template
+          </Button>
+          <Button size="sm" onClick={publishProduct} disabled={!designUrl && texts.length === 0}>
+            Publish
+          </Button>
+        </div>
+      </header>
 
       <div className="flex min-h-0 flex-1 gap-3">
-        {/* Left: sources + layers */}
+        {/* Left: the rail, then the panel for whatever it has selected. */}
+        <nav aria-label="Tools" className="hidden w-16 shrink-0 flex-col gap-1 rounded-2xl border border-border bg-card p-1.5 lg:flex">
+          {TOOLS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTool(key)}
+              aria-current={tool === key ? "true" : undefined}
+              className={"flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-2xs font-medium transition-colors " +
+                (tool === key ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+            >
+              <Icon size={19} weight={tool === key ? "fill" : "regular"} />
+              {label}
+            </button>
+          ))}
+        </nav>
+
         <aside className="hidden w-60 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-3 lg:flex">
-          <div className="space-y-1.5">
-            <div className="eg-label text-muted-foreground">Blank</div>
-            <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}>{mockup ? "Change blank" : "Pick a blank"}</Button>
-          </div>
-          {/* Print area — the printable rectangle scales against a 12x16 base, matching
-              what production actually trims to. */}
-          <div className="space-y-1.5">
-            <div className="eg-label text-muted-foreground">Print area (in)</div>
-            <div className="flex items-center gap-1.5">
-              <Input value={paW} onChange={(e) => setPaW(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area width in inches" />
-              <span className="text-xs text-muted-foreground">x</span>
-              <Input value={paH} onChange={(e) => setPaH(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area height in inches" />
+          {tool === "blank" && (
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">Blank</div>
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}>{mockup ? "Change blank" : "Pick a blank"}</Button>
+              {product && (
+                <div className="space-y-0.5 text-xs text-muted-foreground">
+                  <div className="font-medium text-foreground">{product.name}</div>
+                  {/* Never the supplier — see CLAUDE.md 2.9. The seller sees what they are
+                      buying from US, not who we buy it from. */}
+                  {product.sku && <div className="font-mono text-2xs">{product.sku}</div>}
+                </div>
+              )}
             </div>
-            {/* Only once there is something to judge. An empty stage showing "too low"
-                would be reporting on nothing, and a meter that is wrong while idle is one
-                nobody reads when it matters. */}
-            {images.length > 0 && (
-              <div className={"flex items-start gap-1.5 text-2xs " + QUALITY_TONE[quality.tone]} role="status">
-                <span className="mt-1 size-1.5 shrink-0 rounded-full bg-current" />
-                <span>
-                  {quality.label}
-                  {worstDpi != null && <span className="tabular-nums"> · {Math.round(worstDpi)} DPI at {areaIn.w}&quot;</span>}
-                  {quality.tone === "bad" && <> — scale it down, or send a larger file. Under 150 DPI shows as soft edges on the garment.</>}
-                  {quality.tone === "warn" && <> — fine for DTG and DTF; embroidery and fine detail want 300.</>}
-                </span>
-              </div>
-            )}
-          </div>
-          {/* Images — your reusable uploads + buyer art from your orders. Upload keeps a
-              copy in "Your uploads"; click any thumbnail to drop it on the design. */}
-          <div className="space-y-1.5">
+          )}
+          {/* Artwork — your reusable uploads + buyer art from your orders. */}
+          {tool === "images" && (
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="eg-label text-muted-foreground">Images</div>
+              <div className="text-sm font-semibold">Artwork</div>
               <label className="flex cursor-pointer items-center gap-1 text-2xs font-medium text-primary hover:underline">
                 <UploadSimple size={12} weight="bold" /> Upload
                 <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onUploadImages(e.target.files); e.target.value = "" }} />
@@ -743,6 +835,21 @@ export function DesignMaker() {
             )}
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setLibOpen(true)}>Saved designs &amp; templates</Button>
           </div>
+          )}
+
+          {tool === "text" && (
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">Text</div>
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={addText}>
+                <TextT size={14} weight="bold" /> Add text
+              </Button>
+              <p className="text-2xs text-muted-foreground">
+                Added text lands in the middle of the print area. Select it on the canvas to
+                change the words, size and colour — the controls are on the right, with the
+                rest of the layer.
+              </p>
+            </div>
+          )}
           {/* The layer list used to be here AND the selected layer's controls were on the
               right, so working on one layer meant crossing the canvas: pick on the left, edit
               on the right, look in the middle. One list, on the right, with the controls it
@@ -756,40 +863,6 @@ export function DesignMaker() {
               top and bottom of the panel — the cap was cut off by the frame. Capping the
               width by viewport height keeps the whole square visible. */}
           <div className="relative flex h-full max-h-full w-full flex-col items-center justify-center gap-3">
-            {/* Position pills — only when the blank actually has more than one face. A
-                single-face blank showing a lone "Front" pill is noise, not a choice. */}
-            {zoom !== 1 && (
-              <button
-                type="button"
-                onClick={() => setZoom(1)}
-                title="Back to 100%"
-                className="absolute right-6 top-6 z-10 rounded-full border border-border bg-card/90 px-2.5 py-1 text-2xs font-medium tabular-nums backdrop-blur hover:text-primary"
-              >
-                {Math.round(zoom * 100)}% · reset
-              </button>
-            )}
-            {faces.length > 1 && (
-              <div className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-border bg-card/80 p-1 backdrop-blur">
-                {faces.map((f) => (
-                  <button
-                    key={f.side}
-                    onClick={() => setSide(f.side)}
-                    className={
-                      "eg-tap rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors " +
-                      (side === f.side ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
-                    }
-                  >
-                    {f.side}
-                    {/* A dot on a face that carries work. With one stack per side the pills
-                        are now the only way to see that the back has anything on it — the
-                        stage shows one face at a time. */}
-                    {((stacks[f.side]?.images.length ?? 0) + (stacks[f.side]?.texts.length ?? 0)) > 0 && (
-                      <span className={"ml-1.5 inline-block size-1.5 rounded-full align-middle " + (side === f.side ? "bg-primary-foreground/80" : "bg-primary")} />
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
@@ -827,25 +900,84 @@ export function DesignMaker() {
                 </div>
               )}
             </div>
+            {/* UNDER the picture, not floating on it. The pills sat over the garment's shoulders,
+                which is both artwork you are trying to judge and — on a hat — the print area
+                itself. Every product creator in this trade puts the faces on a shelf below
+                the stage, because that is the one strip of the canvas nothing is drawn in. */}
+            {zoom !== 1 && (
+              <button
+                type="button"
+                onClick={() => setZoom(1)}
+                title="Back to 100%"
+                className="absolute right-6 top-6 z-10 rounded-full border border-border bg-card/90 px-2.5 py-1 text-2xs font-medium tabular-nums backdrop-blur hover:text-primary"
+              >
+                {Math.round(zoom * 100)}% · reset
+              </button>
+            )}
+            {faces.length > 1 && (
+              <div className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-border bg-card/80 p-1 backdrop-blur">
+                {faces.map((f) => (
+                  <button
+                    key={f.side}
+                    onClick={() => setSide(f.side)}
+                    className={
+                      "eg-tap rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors " +
+                      (side === f.side ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
+                    }
+                  >
+                    {f.side}
+                    {/* A dot on a face that carries work. With one stack per side the pills
+                        are now the only way to see that the back has anything on it — the
+                        stage shows one face at a time. */}
+                    {((stacks[f.side]?.images.length ?? 0) + (stacks[f.side]?.texts.length ?? 0)) > 0 && (
+                      <span className={"ml-1.5 inline-block size-1.5 rounded-full align-middle " + (side === f.side ? "bg-primary-foreground/80" : "bg-primary")} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right: properties + actions */}
         <aside className="hidden w-72 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-4 lg:flex">
-          {/* ADD, at the top of the panel you are already looking at.
-              "Add text" used to sit in the left rail below the image grids, so once a seller
-              had a few hundred buyer uploads it was several screens down and read as missing.
-              Adding and editing a layer are one job; they belong on one side. */}
-          <div className="space-y-1.5">
-            <div className="eg-label text-muted-foreground">Add</div>
-            <Button variant="outline" size="sm" className="w-full justify-start" onClick={addText}>
-              Add text
-            </Button>
+          {/**
+            * THE SPEC, at the top of the panel: what this side prints at.
+            *
+            * Inches alone is not a spec — nobody can make a file from "12 x 16". The pixel
+            * target at 300 DPI is the number a designer actually needs, and it is the one
+            * thing Printify puts in front of you and we did not.
+            */}
+          <div className="space-y-2">
+            <div className="text-sm font-semibold">Print area</div>
+            <div className="flex items-center gap-1.5">
+              <Input value={paW} onChange={(e) => setPaW(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area width in inches" />
+              <span className="text-xs text-muted-foreground">×</span>
+              <Input value={paH} onChange={(e) => setPaH(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area height in inches" />
+              <span className="text-xs text-muted-foreground">in</span>
+            </div>
+            <div className="flex items-baseline justify-between text-2xs text-muted-foreground">
+              <span className="tabular-nums">{Math.round(areaIn.w * 300)} × {Math.round(areaIn.h * 300)} px</span>
+              <span>at 300 DPI</span>
+            </div>
+            {/* Only once there is something to judge. A meter that is wrong while idle is
+                one nobody reads when it matters. */}
+            {images.length > 0 && (
+              <div className={"flex items-start gap-1.5 text-2xs " + QUALITY_TONE[quality.tone]} role="status">
+                <span className="mt-1 size-1.5 shrink-0 rounded-full bg-current" />
+                <span>
+                  {quality.label}
+                  {worstDpi != null && <span className="tabular-nums"> · {Math.round(worstDpi)} DPI</span>}
+                  {quality.tone === "bad" && <> — scale it down, or send a larger file.</>}
+                  {quality.tone === "warn" && <> — fine for DTG and DTF; embroidery wants 300.</>}
+                </span>
+              </div>
+            )}
           </div>
 
           {selText ? (
             <div className="space-y-3 border-t border-border pt-3">
-              <div className="eg-label text-muted-foreground">Text</div>
+              <div className="text-sm font-semibold">Text</div>
               <Input value={selText.text} onChange={(e) => updateText(selText.id, { text: e.target.value })} placeholder="Your text" />
               <label className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-muted-foreground">Size</span>
@@ -874,7 +1006,7 @@ export function DesignMaker() {
                 * runs bottom-up matches the array and nothing else anybody has ever used.
                 */}
               <div className="flex items-baseline justify-between gap-2">
-                <div className="eg-label text-muted-foreground">Layers</div>
+                <div className="text-sm font-semibold">Layers</div>
                 <span className="text-2xs tabular-nums text-muted-foreground">{images.length + texts.length} / {MAX_LAYERS}</span>
               </div>
               <div className="space-y-1">
@@ -919,75 +1051,18 @@ export function DesignMaker() {
             <div className="border-t border-border pt-3 text-sm text-muted-foreground">Place artwork from the left, or add text above, then select a layer to edit it.</div>
           )}
 
-          <div className="mt-auto space-y-2 border-t border-border pt-3">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Design name" />
-            <Button variant="outline" className="w-full" onClick={saveAsTemplate} disabled={saving}>
-              {saving ? <CircleNotch size={15} className="animate-spin" /> : <><Stack size={15} weight="bold" /> Save as template</>}
-            </Button>
-            <Button variant="outline" className="w-full" onClick={saveToLibrary} disabled={saving}>
-              {saving ? <CircleNotch size={15} className="animate-spin" /> : <><FloppyDisk size={15} weight="bold" /> Save to library</>}
-            </Button>
-            <Button
-              className="w-full"
-              onClick={async () => {
-                // 2000px, which is Etsy's own floor for a listing photo. 1200 was under it,
-                // so the picture a buyer judges the product by arrived soft on the one
-                // channel most of these listings go to.
-                const composed = await composeDesign(frontStack.images, frontStack.texts, 2000)
-                /**
-                 * THE FACTORY GETS THE WHOLE FRONT, not the bottom of the stack.
-                 *
-                 * `designUrl` was `images[0].src` — layer one and nothing else. A design of
-                 * a logo, a name and a badge published a correct-looking listing and sent
-                 * production a lone logo; every text layer was lost outright, because text
-                 * is not in `images` at all.
-                 *
-                 * Flattened only when there is something to flatten. A single image with no
-                 * text is passed through AS THE ORIGINAL FILE — re-rastering it would throw
-                 * away resolution the uploaded file has and the canvas doesn't, and that is
-                 * the common case.
-                 *
-                 * 2400px is the ceiling on the flattened one on purpose: this travels to the
-                 * publish page through sessionStorage, which is a few megabytes, and a
-                 * failed stash is reported below rather than swallowed.
-                 */
-                const single = frontStack.images.length === 1 && frontStack.texts.length === 0
-                const art = single
-                  ? frontStack.images[0].src
-                  : await composeDesign(frontStack.images, frontStack.texts, 2400)
-                // A flattened front is already placed — it IS the print area — so it must
-                // not carry the bottom layer's offset a second time.
-                const artPos = single ? (frontStack.images[0]?.pos ?? pos) : { ...DEFAULT_POS, w: 100 }
-                // Publishing is its own PAGE now, so the listing travels through
-                // sessionStorage rather than as a prop — see lib/publish-draft.ts. A failed
-                // stash is said out loud: navigating to a page whose draft was never stored
-                // would land on an empty form with no explanation.
-                const id = stashPublishDraft({
-                  prefill: { title: name, images: composed ? [composed] : [], blank: product, designUrl: art, designPos: artPos },
-                  returnTo: "/design/maker",
-                  returnLabel: "Back to Design",
-                  title: "Publish product",
-                })
-                if (!id) { setPubErr("Couldn't open the publish page — this design is too large for the browser to hand over."); return }
-                router.push(`/publish?d=${id}`)
-              }}
-              disabled={!designUrl && texts.length === 0}
-            >
-              Publish product
-            </Button>
-            {pubErr && <p className="text-xs text-destructive">{pubErr}</p>}
-            {/* SAID OUT LOUD, because the listing carries the front only. The sides are real
-                in the editor and in a saved template now, but published_listings holds one
-                artwork and the order sync writes it as side 'front' — so a back print would
-                travel no further than this page without saying so. Honest beats silent: a
-                seller who is told can save the template and hand the back to the factory
-                through the order, which does support per-side artwork. */}
-            {paintedSides.filter((sd) => sd !== "front").length > 0 && (
-              <p className="text-2xs text-amber-600 dark:text-amber-500">
-                Publishing sends the FRONT. {paintedSides.filter((sd) => sd !== "front").join(", ")} {paintedSides.filter((sd) => sd !== "front").length === 1 ? "is" : "are"} saved with the template but not with the listing.
-              </p>
-            )}
-          </div>
+          {/* What publishing will and won't carry. Kept next to the work rather than on the
+              button: it is a fact about this design, not about the click. */}
+          {(pubErr || paintedSides.filter((sd) => sd !== "front").length > 0) && (
+            <div className="mt-auto space-y-1.5 border-t border-border pt-3">
+              {pubErr && <p className="text-xs text-destructive">{pubErr}</p>}
+              {paintedSides.filter((sd) => sd !== "front").length > 0 && (
+                <p className="text-2xs text-amber-600 dark:text-amber-500">
+                  Publishing sends the FRONT. {paintedSides.filter((sd) => sd !== "front").join(", ")} {paintedSides.filter((sd) => sd !== "front").length === 1 ? "is" : "are"} saved with the template but not with the listing.
+                </p>
+              )}
+            </div>
+          )}
         </aside>
       </div>
 

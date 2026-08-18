@@ -158,7 +158,9 @@ export function CashAccountsPanel() {
    * the order panel already uses. Different region, no new vocabulary.
    */
   return (
-    <div className="space-y-2 rounded-xl bg-muted/40 p-2.5">
+    /* No tinted well. The account cards are white on white already and the tint drew a
+       second box around a group the cards' own borders had already grouped. */
+    <div className="space-y-2 p-0.5">
       <div className="flex items-baseline justify-between gap-2 px-0.5">
         <span className="eg-label text-muted-foreground">Accounts</span>
         <button onClick={() => add()} className="eg-tap text-2xs font-medium text-primary hover:underline">+ Add</button>

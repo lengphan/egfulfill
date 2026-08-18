@@ -976,18 +976,18 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 <table className="w-full border-collapse text-[13px]">
                   <thead>
                     <tr className="border-b border-neutral-300 text-left align-bottom">
-                      <th className="pb-2 pr-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Style</th>
-                      <th className="pb-2 pr-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Sku</th>
+                      <th className="pb-2 pr-3 text-[10px] uppercase tracking-wider text-neutral-500">Style</th>
+                      <th className="pb-2 pr-3 text-[10px] uppercase tracking-wider text-neutral-500">Sku</th>
                       {/* "Base" was wrong: it printed catalog_price, the trade rate. This is the number
                           a reader orders at, whichever of the two it resolves to. */}
                       {/* ONE COLUMN PER TECHNIQUE. "Unit" was the base plus whichever
                           surcharge the product's first listed method carried, so a blank
                           offered in both was quoted at one of them and the sheet was wrong
                           about the other. Stitches cost more than ink. */}
-                      <th className="pb-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Printing</th>
-                      <th className="pb-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Embroidery</th>
-                      <th className="pb-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-500">First item<br />shipping</th>
-                      <th className="pb-2 pl-3 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Additional item<br />shipping</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">Printing</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">Embroidery</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">First item<br />shipping</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">Additional item<br />shipping</th>
                     </tr>
                   </thead>
                   <tbody>

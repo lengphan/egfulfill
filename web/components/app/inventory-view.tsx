@@ -352,7 +352,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               <table className="w-full text-sm">
                 <thead className="border-b border-border text-left eg-label text-muted-foreground">
                   <tr>
-                    <th className="py-2.5 pl-3 pr-1">
+                    <th className="py-2.5 whitespace-nowrap pl-3 pr-1">
                       <input
                         type="checkbox"
                         aria-label="Select all on this page"
@@ -368,23 +368,23 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                         }}
                       />
                     </th>
-                    <th className="px-4 py-2.5 font-medium">Item</th>
-                    <th className="px-4 py-2.5 font-medium hidden md:table-cell">SKU</th>
+                    <th className="px-4 py-2.5 whitespace-nowrap">Item</th>
+                    <th className="px-4 py-2.5 whitespace-nowrap hidden md:table-cell">SKU</th>
                     {/* LABELS waits for a wide screen. It is the sticker count, which only matters
                         once something is ticked for printing — and it was taking 90px of a laptop
                         away from the column that holds the row's only control. */}
-                    <th className="hidden px-2 py-2.5 text-center font-medium xl:table-cell">Labels</th>
-                    <th className="px-4 py-2.5 text-center font-medium">In stock</th>
+                    <th className="hidden px-2 py-2.5 whitespace-nowrap text-center xl:table-cell">Labels</th>
+                    <th className="px-4 py-2.5 whitespace-nowrap text-center">In stock</th>
                     {/* RESERVED and REORDER AT stand down under 1536px. Eleven columns did not fit a
                         laptop, so the table scrolled sideways and Visibility — the one CONTROL in
                         the row — sat off the right edge where nobody found it. These two are
                         reference numbers you look up, not ones you scan down. */}
-                    <th className="hidden px-4 py-2.5 text-center font-medium 2xl:table-cell">Reserved</th>
-                    <th className="px-4 py-2.5 text-center font-medium">Available</th>
-                    <th className="hidden px-4 py-2.5 text-center font-medium 2xl:table-cell">Reorder&nbsp;at</th>
-                    <th className="px-4 py-2.5 font-medium">Status</th>
-                    <th className="px-4 py-2.5 font-medium hidden md:table-cell">Visibility</th>
-                    <th className="sticky right-0 z-10 bg-card px-4 py-2.5" />
+                    <th className="hidden px-4 py-2.5 whitespace-nowrap text-center 2xl:table-cell">Reserved</th>
+                    <th className="px-4 py-2.5 whitespace-nowrap text-center">Available</th>
+                    <th className="hidden px-4 py-2.5 whitespace-nowrap text-center 2xl:table-cell">Reorder&nbsp;at</th>
+                    <th className="px-4 py-2.5 whitespace-nowrap">Status</th>
+                    <th className="px-4 py-2.5 whitespace-nowrap hidden md:table-cell">Visibility</th>
+                    <th className="sticky right-0 z-10 bg-card px-4 py-2.5 whitespace-nowrap" />
                   </tr>
                 </thead>
                 <tbody>

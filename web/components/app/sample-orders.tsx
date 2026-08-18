@@ -240,12 +240,12 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
           <table className="w-full text-sm">
             <thead className="border-b border-border text-left eg-label text-muted-foreground">
               <tr>
-                <th className="px-4 py-2.5 font-medium">Order no.</th>
-                <th className="px-4 py-2.5 font-medium">Supplier</th>
-                <th className="px-4 py-2.5 text-right font-medium">Cost</th>
-                <th className="px-4 py-2.5 text-right font-medium">Units</th>
-                <th className="px-4 py-2.5 font-medium">Placed</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
+                <th className="px-4 py-2.5">Order no.</th>
+                <th className="px-4 py-2.5">Supplier</th>
+                <th className="px-4 py-2.5 text-right">Cost</th>
+                <th className="px-4 py-2.5 text-right">Units</th>
+                <th className="px-4 py-2.5">Placed</th>
+                <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>

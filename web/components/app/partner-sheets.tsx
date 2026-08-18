@@ -266,11 +266,11 @@ export function PartnerSheets() {
                           <tr className="border-b border-border text-left eg-label text-muted-foreground">
                             {/* nowrap: a partner header is a phrase ("PALLET SIZE (mm, width
                                 x height)") and the column it names has to stay legible as one. */}
-                            <th className="whitespace-nowrap px-3 py-2 font-medium">Their column</th>
-                            <th className="px-3 py-2 font-medium">Filled from</th>
+                            <th className="whitespace-nowrap px-3 py-2">Their column</th>
+                            <th className="px-3 py-2">Filled from</th>
                             {/* Takes the slack, so the control and the value it produces
                                 sit next to each other instead of at opposite margins. */}
-                            <th className="w-full px-3 py-2 font-medium">First row</th>
+                            <th className="w-full px-3 py-2">First row</th>
                           </tr>
                         </thead>
                         <tbody>

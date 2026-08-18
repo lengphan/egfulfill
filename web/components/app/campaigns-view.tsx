@@ -142,14 +142,14 @@ export function CampaignsView() {
               <table className="w-full text-sm">
                 <thead className="border-b border-border text-left eg-label text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2.5 font-medium">Campaign</th>
-                    <th className="px-4 py-2.5 font-medium">Channel</th>
-                    <th className="px-4 py-2.5 font-medium">Status</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Budget/day</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Spend</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Clicks</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Conv.</th>
-                    <th className="px-4 py-2.5 text-right font-medium">ROAS</th>
+                    <th className="px-4 py-2.5">Campaign</th>
+                    <th className="px-4 py-2.5">Channel</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5 text-right">Budget/day</th>
+                    <th className="px-4 py-2.5 text-right">Spend</th>
+                    <th className="px-4 py-2.5 text-right">Clicks</th>
+                    <th className="px-4 py-2.5 text-right">Conv.</th>
+                    <th className="px-4 py-2.5 text-right">ROAS</th>
                     <th className="px-4 py-2.5" />
                   </tr>
                 </thead>

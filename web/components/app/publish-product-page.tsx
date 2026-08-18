@@ -1544,12 +1544,12 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                           <tr className="text-muted-foreground">
                             {/* px-2 matters: with no horizontal padding these ran together
                                 as "SizeProductionShipping". */}
-                            <th className="px-2 pb-1 text-left font-medium">Size</th>
-                            <th className="px-2 pb-1 text-right font-medium">Production</th>
-                            <th className="px-2 pb-1 text-right font-medium">Shipping</th>
-                            <th className="px-2 pb-1 text-right font-medium">Your cost</th>
-                            <th className="px-2 pb-1 text-right font-medium">Retail</th>
-                            <th className="px-2 pb-1 text-right font-medium">Profit</th>
+                            <th className="px-2 pb-1 text-left">Size</th>
+                            <th className="px-2 pb-1 text-right">Production</th>
+                            <th className="px-2 pb-1 text-right">Shipping</th>
+                            <th className="px-2 pb-1 text-right">Your cost</th>
+                            <th className="px-2 pb-1 text-right">Retail</th>
+                            <th className="px-2 pb-1 text-right">Profit</th>
                           </tr>
                         </thead>
                         <tbody>

@@ -3113,10 +3113,10 @@ function BackupsPanel() {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left eg-label text-muted-foreground">
-              <th className="px-4 py-3 font-medium">When</th>
-              <th className="px-4 py-3 font-medium">Type</th>
-              <th className="px-4 py-3 font-medium">Size</th>
-              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3">When</th>
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Size</th>
+              <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3" aria-label="Actions" />
             </tr>
           </thead>
