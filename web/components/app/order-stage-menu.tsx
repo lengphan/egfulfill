@@ -111,8 +111,18 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
         {isOnHold && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setOrderStatus(resumeTo)}>
-              Take off hold — back to {FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? "Working"}
+            {/* TWO WORDS AND A HINT, not a sentence that wraps. "Take off hold — back to
+                Working" ran onto two lines and took a whole row of the menu for one action;
+                the destination is a detail, so it sits on the right in muted ink the way
+                "catch up" does above, and in the title for anyone who wants it spelled out. */}
+            <DropdownMenuItem
+              onClick={() => setOrderStatus(resumeTo)}
+              title={`Puts this back to ${FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? "Working"} — where it was when it was held`}
+            >
+              Clear hold
+              <span className="ml-auto text-2xs text-muted-foreground">
+                {FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? "Working"}
+              </span>
             </DropdownMenuItem>
           </>
         )}

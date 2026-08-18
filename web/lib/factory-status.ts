@@ -256,7 +256,10 @@ export function stageDenialReason(role: string, current: string | null | undefin
      * itself, on an order whose variants may still be unset, which is the case Approved was
      * added to catch. Admin is past this check already and may skip.
      */
-    if (to === "working" && at !== "approved") {
+    /* Coming off a HOLD is not starting production — it is putting the order back where the
+       stop found it, which may well be Working. Gating that on Approved would strand every
+       held order that was already being made. */
+    if (to === "working" && at !== "approved" && at !== "on_hold") {
       return "Start it from Approved — an operator confirms the blank first."
     }
     return null
@@ -264,6 +267,16 @@ export function stageDenialReason(role: string, current: string | null | undefin
   if (role === "operator") {
     if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision — put the order on hold instead."
     if (OP_STOPS.has(to)) return null                       // andon cord: any stage
+    /**
+     * AND THE CORD LETS GO. Raising a stop is an operator's right from any stage; releasing
+     * it has to be the same right, or the andon cord is a trap — the one who pulled it
+     * cannot undo a false alarm, and has to find a warehouse to say "never mind".
+     *
+     * Coming off hold is not starting production: it is putting the order back where it was
+     * before the stop, which is why it is allowed even to Working, which an operator may not
+     * otherwise set. Money stages are still refused above.
+     */
+    if (at === "on_hold") return null
     // Tested on the DESTINATION, not the origin. As `at === "in_review"` it blocked only
     // the direct hop, and OP_ZONE also holds the next stage along — so the same move went
     // through in two clicks via Working. Anything past Received has been PAID for.
