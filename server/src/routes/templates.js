@@ -91,6 +91,34 @@ async function offloadDeep(node, seen, depth = 0) {
  */
 const MAX_LAYERS = 10;
 
+/**
+ * HOW MANY LAYERS A SAVED DESIGN ACTUALLY HAS, whatever shape it arrives in.
+ *
+ * The check here used to be `Array.isArray(b.layers) ? b.layers : []`, and the maker has
+ * never sent an array — it sends `{ images, texts, designUrl, pos }`. So the guard read
+ * zero, and, worse, the EMPTY ARRAY is what got stored: every "Save as template" since the
+ * layer stack landed wrote `layers = []` and a reopened template came back with nothing to
+ * edit. The composite still rendered on the card, which is exactly why it looked like it
+ * worked.
+ *
+ * Counted PER SIDE, not in total. A design is capped at ten layers because a layer list
+ * longer than that stops being readable — and that is true of one face at a time. Ten on
+ * the front and ten on the back are two legible lists, so a two-sided design must not be
+ * refused for the sum of them.
+ */
+function maxSideLayers(node) {
+  if (!node || typeof node !== 'object') return 0;
+  // The oldest shape: a bare array of layers.
+  if (Array.isArray(node)) return node.length;
+  // Per-side: { sides: { front: { images, texts }, back: {…} } }
+  if (node.sides && typeof node.sides === 'object' && !Array.isArray(node.sides)) {
+    return Object.values(node.sides).reduce((n, s) => Math.max(n, maxSideLayers(s)), 0);
+  }
+  // Flat, one face: { images, texts }
+  return (Array.isArray(node.images) ? node.images.length : 0)
+       + (Array.isArray(node.texts) ? node.texts.length : 0);
+}
+
 export function templatesRoutes(app, requireAuth) {
   q(`create table if not exists templates (
        id text primary key,
@@ -112,10 +140,13 @@ export function templatesRoutes(app, requireAuth) {
   app.post('/api/templates', { preHandler: requireAuth }, async (req, reply) => {
     const b = req.body || {};
     if (!b.id) return { error: 'template id required' };
-    const layersIn = Array.isArray(b.layers) ? b.layers : [];
-    if (layersIn.length > MAX_LAYERS) {
+    // Objects as well as arrays — see maxSideLayers. `|| {}` rather than `|| []` so the
+    // stored value keeps the shape the editor can reopen.
+    const layersIn = (b.layers && typeof b.layers === 'object') ? b.layers : {};
+    const layerCount = maxSideLayers(layersIn);
+    if (layerCount > MAX_LAYERS) {
       reply.code(400);
-      return { error: `A template can hold ${MAX_LAYERS} layers — this one has ${layersIn.length}. Flatten or remove some and save again.` };
+      return { error: `A template can hold ${MAX_LAYERS} layers per side — this one has ${layerCount}. Flatten or remove some and save again.` };
     }
     // Every picture out of the row and into the bucket before it is written. Awaited, not
     // fire-and-forget: a template whose composite is a link to an object that failed to
@@ -134,7 +165,7 @@ export function templatesRoutes(app, requireAuth) {
          layers=excluded.layers, updated_at=now()`,
       [String(b.id), req.user.sub, b.name || null, data, composite, JSON.stringify(layers)]
     );
-    return { ok: true, id: b.id, layers: layers.length };
+    return { ok: true, id: b.id, layers: layerCount };
   });
 
   /**
