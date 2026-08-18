@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import { getOrders, clearToken, type Order } from "@/lib/api"
+import { getOrders, type Order } from "@/lib/api"
 import { isOpen, isOverdue, normalizeStage } from "@/lib/orders"
-import { router } from "expo-router"
 import { C, S } from "@/lib/theme"
 
 /**
@@ -111,12 +110,6 @@ export default function Today() {
         <ActivityIndicator style={{ marginTop: S.xl }} color={C.primary} />
       ) : null}
 
-      <Pressable
-        onPress={async () => { await clearToken(); router.replace("/login") }}
-        style={{ marginHorizontal: S.xl, marginTop: S.xl * 1.5, height: 48, borderRadius: 24, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" }}
-      >
-        <Text style={{ color: C.muted, fontSize: 14, fontWeight: "600" }}>Sign out</Text>
-      </Pressable>
     </ScrollView>
   )
 }

@@ -49,21 +49,26 @@ export default function Wallet() {
       <View style={{ paddingHorizontal: 20 }}>
         <Text style={{ fontSize: 32, fontWeight: "900", color: C.fg, marginTop: 8 }}>Wallet</Text>
 
+        {/* A BALANCE IS READ OFTEN, so it is a quiet card rather than a coloured block —
+            and "low" is a chip, not a repaint. Turning the whole panel red made a working
+            wallet look broken, and left no louder state for something that IS broken. */}
         <View style={{
-          marginTop: 16, borderRadius: 20, padding: 20,
-          backgroundColor: w?.low ? C.alert : C.primary,
+          marginTop: 16, borderRadius: 20, padding: 22,
+          backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
         }}>
-          <Text style={{ color: C.onPrimary, opacity: 0.8, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
-            BALANCE
-          </Text>
-          <Text style={{ color: C.onPrimary, fontSize: 44, fontWeight: "900", marginTop: 6 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ color: C.muted, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>BALANCE</Text>
+            {w?.low && (
+              <View style={{ paddingHorizontal: 10, height: 24, borderRadius: 12, justifyContent: "center", backgroundColor: "#fff4e5" }}>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: C.warn }}>
+                  LOW{w.lowBelow != null ? ` · UNDER ${money(w.lowBelow)}` : ""}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={{ color: C.fg, fontSize: 46, fontWeight: "900", marginTop: 8 }}>
             {err ? "—" : money(w?.balance ?? 0)}
           </Text>
-          {w?.low && (
-            <Text style={{ color: C.onPrimary, opacity: 0.85, fontSize: 13, marginTop: 4 }}>
-              Running low{w.lowBelow != null ? ` — under ${money(w.lowBelow)}` : ""}
-            </Text>
-          )}
         </View>
 
         {err && <Text style={{ color: C.alert, fontSize: 14, marginTop: 16 }}>{err}</Text>}
