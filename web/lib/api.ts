@@ -981,6 +981,9 @@ export type AiQuote = {
   videoPrice: number
   freeLeft: number
   freeImagesPerMonth?: number
+  /** The channel generated images land in, named by the server — a team member shares the
+   *  owner's, and cannot work that id out for themselves. Absent for staff. */
+  genChannel?: string
   imagesLeftToday: number | null
   videosLeftToday: number | null
 }

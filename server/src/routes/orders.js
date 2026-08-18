@@ -2708,7 +2708,11 @@ export function ordersRoutes(app, requireAuth) {
     const s = String(id);
     // desk-<uid> is the private personal Workbench — a synthetic channel like the others,
     // never a real order, so it passes straight through (access is gated in canSeeThread).
-    if (s === 'staff-general' || s === 'announce' || s.indexOf('support-') === 0 || s.indexOf('desk-') === 0) {
+    // gen-<accountId> is a seller ACCOUNT's AI generations channel — synthetic like the
+    // others, and scoped to the account rather than the person so a team shares one, exactly
+    // as they already share one wallet.
+    if (s === 'staff-general' || s === 'announce' || s.indexOf('support-') === 0
+        || s.indexOf('desk-') === 0 || s.indexOf('gen-') === 0) {
       return { channel: s, orderRef: null };
     }
     if (s.indexOf('design-') === 0) return { channel: 'staff-general', orderRef: s.slice(7) };
@@ -2756,10 +2760,38 @@ export function ordersRoutes(app, requireAuth) {
     // of failure as an internal brief reaching a seller, so this is a hard identity match
     // on the authenticated user and nothing else.
     if (id.indexOf('desk-') === 0) return id === ('desk-' + user.sub);
+    /*
+     * AI GENERATIONS — the seller account's own channel.
+     *
+     * Per ACCOUNT, not per person: resolveSeller, so a team member opens the same channel the
+     * owner does. That is the opposite choice from `support-` directly above, and deliberately
+     * so — a support conversation can cover billing the owner never delegated, whereas the
+     * images a team generates are the account's work and are paid for from the account's wallet.
+     *
+     * Staff are excluded. These exist precisely so generated images stop landing in the
+     * support thread that staff read; letting staff read them here would undo that.
+     */
+    if (id.indexOf('gen-') === 0) {
+      if (isStaff(user)) return false;
+      const sel = await resolveSeller(user);
+      return !!sel?.id && id === ('gen-' + sel.id);
+    }
     return false;
   }
 
   async function canSeeOrder(user, orderId) {
+    /*
+     * GENERATIONS ARE CHECKED BEFORE THE STAFF SHORTCUT, and that order is the rule.
+     *
+     * `isStaff(user) → true` below is a blanket pass, so a `gen-` id tested after it would be
+     * readable by every staff account — which is exactly the leak these channels exist to
+     * close. Account-scoped, sellers only, no staff exception.
+     */
+    if (String(orderId).indexOf('gen-') === 0) {
+      if (isStaff(user)) return false;
+      const s = await resolveSeller(user);
+      return !!s?.id && orderId === ('gen-' + s.id);
+    }
     if (isStaff(user)) return true;
     // Support conversations ride on order_messages under a synthetic id `support-<sellerId>`.
     // A seller may only see/post to their OWN support thread; staff (above) see all of them.

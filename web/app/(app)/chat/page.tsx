@@ -31,7 +31,7 @@ const SUGGESTIONS = [
 // used to spawn a room per order (plus a second `design-<id>` room), which buried the
 // real conversations under dozens of empty ones.
 type Convo = {
-  id: string; kind: "support" | "staff" | "inbox" | "announce"; title: string; sub: string
+  id: string; kind: "support" | "staff" | "inbox" | "announce" | "gen"; title: string; sub: string
   escalated?: boolean
   /** Incoming messages since our last reply — the unread badge. Zero once answered, which
    *  is how every other messenger behaves: the badge is a to-do, not a size. */
@@ -144,6 +144,7 @@ export default function ChatPage() {
     const t = setTimeout(() => { getAiQuote().then(setAiQuote).catch(() => setAiQuote(null)) }, 0)
     return () => clearTimeout(t)
   }, [])
+  const genChannel = aiQuote && !aiQuote.staff && aiQuote.enabled ? aiQuote.genChannel ?? null : null
   const canGenerate = isAdmin || !!aiQuote?.enabled
   const priceNote = !aiQuote || aiQuote.staff ? null
     : aiQuote.freeLeft > 0
@@ -183,6 +184,12 @@ export default function ChatPage() {
     const list: Convo[] = []
     if (isStaffUser) list.push({ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "All boards — production & artwork" })
     if (supportId) list.push({ id: supportId, kind: "support", title: isStaffUser ? "My EG" : "EGFUL Support", sub: isStaffUser ? "Your AI assistant" : "Assistant + team" })
+    /*
+     * GENERATIONS — the account's own channel, so AI images stop arriving in the middle of a
+     * support conversation staff are reading. Listed only when the server says this account
+     * has one (it names the id: a team member cannot derive their owner's account id).
+     */
+    if (genChannel) list.push({ id: genChannel, kind: "gen", title: "Generations", sub: "Images you have made with AI" })
     // Admin writes, everyone else reads. Designers aren't part of seller-facing comms.
     if (!isDesigner) list.push({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: isAdmin ? "Broadcast to all sellers" : "From EGFUL" })
     /**
@@ -210,7 +217,7 @@ export default function ChatPage() {
     // vanish from the rail the moment you click one.
     for (const c of opened) if (!list.some((x) => x.id === c.id)) list.push(c)
     return list
-  }, [isStaffUser, isDesigner, isAdmin, supportId, inbox, opened])
+  }, [isStaffUser, isDesigner, isAdmin, supportId, inbox, opened, genChannel])
 
   // Filtered rail. Searching only narrows what's already there; sellers who have
   // never written in come from the directory below, not from this list.

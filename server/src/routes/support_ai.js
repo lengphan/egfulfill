@@ -902,9 +902,6 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     if (!prompt) { reply.code(400); return { error: 'Describe the image you want.' }; }
     if (prompt.length > 4000) { reply.code(400); return { error: 'That prompt is too long (max 4000 characters).' }; }
 
-    // The caller's OWN assistant channel — same thread "My EG" already reads.
-    const threadId = 'support-' + req.user.sub;
-
     /*
      * REFERENCE PHOTOS. Bare asset NAMES, never URLs — a URL here would be a fetcher aimed
      * at anything the server can reach, and these are read straight off our own storage.
@@ -937,6 +934,19 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       reply.code(e.status || 400);
       return { error: e.message || 'Could not start this generation.', shortfall: e.shortfall };
     }
+
+    /*
+     * WHERE THE IMAGE LANDS.
+     *
+     * Staff keep their own "My EG" assistant channel. A SELLER gets `gen-<accountId>` — their
+     * account's Generations channel — and not their support thread, because support is a
+     * conversation staff read: every render a seller made would have arrived in the middle of
+     * it, burying the actual questions under artwork.
+     *
+     * Account-scoped, from the same resolution that decided whose wallet paid, so the channel
+     * and the charge can never disagree about whose generation this is.
+     */
+    const threadId = charge.staff ? 'support-' + req.user.sub : 'gen-' + charge.sellerId;
 
     let img;
     try {

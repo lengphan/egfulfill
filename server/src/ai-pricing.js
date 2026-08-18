@@ -141,6 +141,10 @@ export async function quoteFor(user) {
   return {
     staff: false,
     enabled: pricing.sellersEnabled,
+    // The channel generated images land in. Named by the SERVER because a team member cannot
+    // work out their owner's account id, and guessing it client-side is how the rail would
+    // end up pointing at a channel the reader is not allowed to open.
+    genChannel: 'gen-' + sellerId,
     imagePrice: freeLeft > 0 ? 0 : pricing.imagePrice,
     videoPrice: pricing.videoPrice,
     freeLeft,
