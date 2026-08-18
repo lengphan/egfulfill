@@ -111,6 +111,17 @@ const en: Dict = {
   "dash.lineShare": "{pct}% of the floor",
   "dash.lineOldest": "Oldest waiting {age}",
   "dash.today": "today",
+
+  // Help centre. These existed in Vietnamese only, so English fell through to the raw key
+  // and the page rendered "help.title" as its heading.
+  "help.title": "What can we help with?",
+  "help.subtitle": "Search the guides, or pick a topic below.",
+  "help.searchPlaceholder": "Search for an answer\u2026",
+  "help.noResults": "No article matches \u201c{query}\u201d. Try another word, or email support below.",
+  "help.stillNeedHelp": "Still need help?",
+  "help.responseTime": "Our team usually replies within 2 hours on working days.",
+  "help.emailSupport": "Email support",
+  "help.liveChat": "Live chat",
 }
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.

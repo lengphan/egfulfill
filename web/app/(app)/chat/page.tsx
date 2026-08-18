@@ -146,6 +146,14 @@ export default function ChatPage() {
   }, [])
   const genChannel = aiQuote && !aiQuote.staff && aiQuote.enabled ? aiQuote.genChannel ?? null : null
   const canGenerate = isAdmin || !!aiQuote?.enabled
+  /*
+   * WHERE THE CONTROL LIVES HAS TO MATCH WHERE THE IMAGE LANDS.
+   *
+   * Staff generate into their own "My EG" assistant thread. A seller's images go to their
+   * Generations channel — so gating the button on the support thread left sellers looking at
+   * the very channel their images arrive in, with no way to make one.
+   */
+  const genHere = genChannel ? activeId === genChannel : activeId === supportId
   const priceNote = !aiQuote || aiQuote.staff ? null
     : aiQuote.freeLeft > 0
       ? `${aiQuote.freeLeft} free image${aiQuote.freeLeft === 1 ? "" : "s"} left this month, then $${aiQuote.imagePrice.toFixed(2)} each.`
@@ -817,6 +825,7 @@ export default function ChatPage() {
                 {isSupport ? "Ask about an order, billing, integrations — mention an order with @ to pull it in. Our assistant answers from your account, and a teammate follows up when needed."
                   : active?.kind === "staff" ? "Internal team chat — production, artwork, and orders in one room. Mention an order with @ to pull it in."
                   : active?.kind === "announce" ? "Product news and service updates from EGFUL."
+                  : active?.kind === "gen" ? "Describe what you want and press Generate. Images you make appear here."
                   : "Everything this seller has asked about, in one thread."}
               </div>
               {isSupport && (
@@ -1135,7 +1144,7 @@ export default function ChatPage() {
               {/* Generate — STAFF ONLY, and only in the staffer's own "My EG" channel. Each
                   generation bills Google, so it is not offered on a seller thread, a factory
                   room or an inbox conversation; the server enforces the same two rules. */}
-              {canGenerate && activeId === supportId && (
+              {canGenerate && genHere && (
                 <GenerateButton disabled={signedOut || !activeId} armed={gen} onArm={setGen}
                   allowVideo={isAdmin} priceNote={priceNote} />
               )}
