@@ -81,7 +81,7 @@ export function BrandingPanel() {
   const faviconSrc = b?.faviconUrl ? `${b.faviconUrl}${b.faviconUrl.includes("?") ? "&" : "?"}v=${bust}` : ""
 
   return (
-    <SectionCard title="Branding">
+    <SectionCard title="Branding" bodyClassName="p-5">
       <div className="space-y-6">
         <div className="grid gap-5 sm:grid-cols-2">
           {/* FAVICON */}
