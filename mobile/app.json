@@ -38,7 +38,13 @@
           "photosPermission": "EGFUL uses your photos to attach an existing package photo to an order."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "EGFUL uses the camera to scan stock labels in and out."
+        }
+      ]
     ],
     "extra": {
       "apiBase": "https://api.egful.store"

@@ -58,6 +58,38 @@ export type OrderItem = {
   /** …and a RELATIVE path when it is a data URL the server split out to keep the list
    *  small. Needs the API origin in front of it; see `assetUrl`. */
   img_ref?: string | null
+  /** LINE IDENTITY. Two lines of the same SKU are two different jobs, and the server keys
+   *  item-status and item-setup on this whenever it is present — keying on sku alone moved
+   *  identical-SKU siblings together, which is routine on an Etsy order. */
+  line_id?: string | null
+  /** The decoration method (EMB / DTG / DTF …). Blank means an undecorated blank, which
+   *  needs no artwork — so it must not be shown as a line that is missing its file. */
+  print_type?: string | null
+  /** The line's OWN stage. Production is per item: one line can be printing while another
+   *  waits. The order's stage is a different (and coarser) fact. */
+  factory_status?: string | null
+  /** Artwork the seller supplied as a URL, rather than bytes we stored. */
+  design_src?: string | null
+}
+
+/**
+ * ONE STORED FILE for one line — what /api/orders/:id/designs hands back.
+ *
+ * `kind` is 'raster' for the artwork image and 'pes'/'emb'/'dst' for a stitch file, and
+ * `side` is front/back/sleeve. Together with line_id they are what makes "which file
+ * belongs to which item" answerable — a flat list of an order's files is not, because two
+ * lines of the same order routinely carry different artwork on the same side.
+ */
+export type OrderDesign = {
+  sku?: string | null
+  line_id?: string | null
+  kind?: string | null
+  side?: string | null
+  name?: string | null
+  /** A URL either way: the server mints a same-origin address for stored bytes and passes
+   *  a data URL through for rows that predate storage. Both go straight into an <Image>. */
+  data?: string | null
+  url?: string | null
 }
 
 /** Absolute URL for a path the API returned relative (thumbnails). Bare `img` values are
@@ -82,6 +114,10 @@ export type Order = {
   tracking?: string | null
   status?: string | null
   total?: number | string | null
+  /** The carrier's label PDF. STAFF ONLY — the server nulls it for a seller, because the
+   *  buyer's full address is printed on it and every masked field above would otherwise be
+   *  cosmetic. So a missing value here is a permission, not an error. */
+  tracking_label_url?: string | null
 }
 
 export type LedgerRow = {
@@ -117,6 +153,26 @@ export const getOrders = () => request<Order[]>("/api/orders")
 export const getOrder = (id: string) => request<Order>(`/api/orders/${encodeURIComponent(id)}`)
 export const getWallet = () => request<WalletResponse>("/api/wallet")
 
+/*
+ * INVENTORY SCAN — the same endpoint the warehouse station on the web posts to.
+ *
+ * The code on a label carries a SKU: ours, or the internal EG-… one printed at receiving
+ * for consigned stock. The server resolves both, so the phone sends the scanned string
+ * through untouched rather than deciding what kind of code it is.
+ */
+export type ScanResult = {
+  ok?: boolean
+  error?: string
+  sku?: string
+  in_stock?: number
+  name?: string | null
+}
+export const scanInventory = (sku: string, direction: "in" | "out", qty = 1) =>
+  request<ScanResult>("/api/inventory/scan", {
+    method: "POST",
+    body: JSON.stringify({ sku, direction, qty }),
+  })
+
 /**
  * Move an order's factory stage.
  *
@@ -130,6 +186,43 @@ export const setOrderStage = (id: string, factoryStatus: string) =>
     method: "PATCH",
     body: JSON.stringify({ factoryStatus }),
   })
+
+/**
+ * Move ONE LINE's stage — the per-item flag the whole floor works from.
+ *
+ * This, not the order-level PATCH, is what "start" means on a phone: production is per
+ * item, so a three-line order is three jobs and the person holding one of them should not
+ * have to move the other two to record what they did.
+ *
+ * Addressed by line_id when the line has one, exactly as the server prefers: a marketplace
+ * line with a NULL sku matches nothing, and identical-SKU siblings move together.
+ */
+export const setItemStatus = (
+  id: string,
+  line: { line_id?: string | null; sku?: string | null },
+  status: string,
+) =>
+  request<{ ok?: boolean; error?: string; blockers?: string[] }>(
+    `/api/orders/${encodeURIComponent(id)}/item-status`,
+    { method: "POST", body: JSON.stringify({ line_id: line.line_id ?? undefined, sku: line.sku ?? undefined, status }) },
+  )
+
+/** Every stored file on the order, addressed by line. See OrderDesign. */
+export const getOrderDesigns = (id: string) =>
+  request<OrderDesign[]>(`/api/orders/${encodeURIComponent(id)}/designs`)
+
+/**
+ * Stamp the label as printed — a custody claim, so WAREHOUSE OR ADMIN only.
+ *
+ * The 403 is the server's and is worth showing rather than hiding the button: an operator
+ * who opened the label did a real thing, and telling them who may stamp it is more use
+ * than a control that silently is not there.
+ */
+export const markLabelPrinted = (id: string, undo = false) =>
+  request<{ ok?: boolean; error?: string; label_printed_at?: string | null }>(
+    `/api/orders/${encodeURIComponent(id)}/label-printed`,
+    { method: "POST", body: JSON.stringify({ undo }) },
+  )
 
 /* ── Order activity ───────────────────────────────────────────────────────────
  * The same thread the web order page shows. `sender_role` is taken from what the
