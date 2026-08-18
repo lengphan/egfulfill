@@ -327,13 +327,19 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
             <option value="">All visibility</option>
             {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
           </select>
-          {sel.size > 0 && (
-            <Button variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
-          )}
-          <Button variant="outline" onClick={() => setPrintOpen(true)} disabled={filtered.length === 0}>
-            {sel.size ? `Print ${sel.size} selected` : "Print labels"}
-          </Button>
-          <Button onClick={() => setAddOpen(true)}>Add item</Button>
+          {/* FILTERS LEFT, ACTIONS RIGHT. They were one undifferentiated run, so "Add item"
+              sat in the middle of the things that narrow the list — and the eye has no way
+              to know which half of a row it is in. ml-auto is the whole separation: a gap
+              says "these do something to the list, those do something to the world". */}
+          <div className="ml-auto flex items-center gap-2">
+            {sel.size > 0 && (
+              <Button variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
+            )}
+            <Button variant="outline" onClick={() => setPrintOpen(true)} disabled={filtered.length === 0}>
+              {sel.size ? `Print ${sel.size} selected` : "Print labels"}
+            </Button>
+            <Button onClick={() => setAddOpen(true)}>Add item</Button>
+          </div>
         </div>
 
         {/* THE PARAGRAPH IS GONE. Four sentences with three words bolded inside them, above

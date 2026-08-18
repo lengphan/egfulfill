@@ -859,8 +859,8 @@ export function DispatchBoard() {
             {/* PRINT / documents — grouped: manifest, labels, and (when scanning out) the
                 USPS SCAN form. All are "produce a document" actions, none touch the scan. */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-                <Printer size={14} weight="bold" /> Print <CaretDown size={12} weight="bold" className="text-muted-foreground" />
+              <DropdownMenuTrigger className="eg-control">
+                Print <CaretDown size={12} weight="bold" className="text-muted-foreground" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-52 p-1">
                 <DropdownMenuItem disabled={!chosen.length} onClick={printPackingSlips}>
@@ -885,19 +885,20 @@ export function DispatchBoard() {
                 among the others rather than a band above them. */}
             <AddLabelButton onStage={stageFiles} onError={setErr} />
 
-            {/* Label + slip in one click — the two documents that leave with the parcel. */}
-            <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={labelAndSlip}
-              title="Open the shipping label(s) and print the packing slip(s) together">
-              Label &amp; Slip
-            </Button>
-
-            {/* PULL BACK / undo — grouped: take orders off the board, or cancel the batch at
-                the partner. Both are "walk it back", kept out of the primary row. */}
+            {/* SEVEN BUTTONS IN A ROW IS A SEARCH, NOT A TOOLBAR.
+                Label & Slip and the two walk-it-back actions move behind one More menu, so
+                the row carries only what a shift actually presses: print, send, scan, finish.
+                The rule: at most a handful of actions in the row, one of them filled, and
+                everything occasional behind a menu — including the things that spend most of
+                their life disabled, which were taking prime space to do nothing. */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-                <ArrowUUpLeft size={14} weight="bold" /> Pull back <CaretDown size={12} weight="bold" className="text-muted-foreground" />
+              <DropdownMenuTrigger className="eg-control">
+                More <CaretDown size={12} weight="bold" className="text-muted-foreground" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 p-1">
+                <DropdownMenuItem disabled={!chosenWithLabel.length || busy} onClick={labelAndSlip}>
+                  Label &amp; Slip
+                </DropdownMenuItem>
                 {/* Discards any selected file that was dropped but never sent. Only staged
                     files — an ORDER has nothing to discard, it is listed because it has an
                     unscanned label. */}
@@ -925,19 +926,19 @@ export function DispatchBoard() {
                 title={stagedChosen.length
                   ? `Upload ${chosenWithLabel.length ? "these labels and " : ""}${stagedChosen.length} dropped file${stagedChosen.length === 1 ? "" : "s"} to byeastside's pre-scan queue`
                   : "Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label"}>
-                {busy ? <CircleNotch size={14} className="animate-spin" /> : <><TrayArrowDown size={14} weight="bold" /> Send to byeastside</>}
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : "Send to byeastside"}
               </Button>
             )}
             {canScanOut && (
               <Button size="sm" variant="outline" disabled={!chosen.length || busy} onClick={markScanned}
                 title="Record that we scanned these ourselves — starts the buyer's tracking. Doesn't change what production is doing.">
-                {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Scanned here</>}
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : "Scanned here"}
               </Button>
             )}
             {canScanOut && (
               <Button size="sm" disabled={!chosen.length || busy || !canFinish} onClick={finishAll}
                 title={canFinish ? "Mark the selected orders Shipped & Fulfilled" : "Your role can't ship orders out"}>
-                {busy ? <CircleNotch size={14} className="animate-spin" /> : <><Truck size={14} weight="bold" /> Finish All</>}
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : "Finish All"}
               </Button>
             )}
           </div>

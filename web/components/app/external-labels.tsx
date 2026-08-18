@@ -173,9 +173,9 @@ export function AddLabelButton({ onStage, onError }: { onStage: (files: File[]) 
   return (
     <label
       title="Choose label PDFs — or just drop them anywhere on this page"
-      className="eg-tap inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent focus-within:outline-none focus-within:ring-2 focus-within:ring-ring/50"
+      className="eg-tap eg-control cursor-pointer"
     >
-      <UploadSimple size={14} weight="bold" /> Add label PDF
+      Add label PDF
       <input
         type="file" multiple className="sr-only" accept="application/pdf"
         onChange={(e) => {
