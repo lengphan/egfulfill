@@ -163,7 +163,10 @@ export async function autoReplenish(orderId) {
       const exact = colour && Object.keys(ci).find((k) => k.toLowerCase() === colour.toLowerCase());
       const image = (exact && ci[exact]) || d.img || d.image || d.hero
         || (Array.isArray(d.images) ? d.images.find(Boolean) : '') || Object.values(ci).find(Boolean) || '';
-      shownAs.set(sku, { name: d.name || row?.name || '', image: image || '' });
+      // WHERE TO BUY IT, when the product says. A hand-bought blank reaches the cart with
+      // a name and nothing else, and the person holding it then has to remember where it
+      // came from. Carried per line so the cart can link straight out.
+      shownAs.set(sku, { name: d.name || row?.name || '', image: image || '', url: String(d.supplierUrl || '').trim() });
     }
     if (!byVariant.has(sku)) byVariant.set(sku, new Map());
     const v = byVariant.get(sku);
@@ -291,9 +294,11 @@ export async function autoReplenish(orderId) {
         const shown = shownAs.get(it.sku) || {};
         if (!hit.name && shown.name) hit.name = shown.name;
         if (!hit.image && shown.image) hit.image = shown.image;
+        if (!hit.supplierUrl && shown.url) hit.supplierUrl = shown.url;
       } else {
         const shown = shownAs.get(it.sku) || {};
         list.push({ sku: it.sku, name: shown.name || undefined, image: shown.image || undefined,
+                    supplierUrl: shown.url || undefined,
                     variant: it.variant || '', qty: it.qty, price: 0, supplier,
                     auto: true, sources: [src], savedAt: new Date().toISOString() });
       }

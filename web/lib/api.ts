@@ -896,6 +896,14 @@ export type CatalogProduct = {
   additionalItemShipping?: number | null
   description?: string
   supplier?: string // "S&S" | "Otto Cap" | "" — where the blank derives from
+  /**
+   * The page we actually buy this on. Staff-only, like supplierSku, and published nowhere.
+   *
+   * It exists so "order by hand" is one click: a shortage of a hand-bought blank reaches the
+   * purchase cart with nothing but a name, and the person holding it then has to remember
+   * where it came from. Typed once on the product; carried onto every parked line for it.
+   */
+  supplierUrl?: string
   mainColor?: string
   sizes?: string[]
   images?: string[]
@@ -1617,7 +1625,10 @@ export function saveFactoryList(k: string, v: unknown) {
   return api<{ ok?: boolean }>(`/api/factory_lists/${encodeURIComponent(k)}`, { method: "POST", body: JSON.stringify(v) })
 }
 /** A PO line pulled out of a draft but kept to re-add later. */
-export type SavedPOLine = POLine & { supplier?: string | null; savedAt?: string }
+export type SavedPOLine = POLine & { supplier?: string | null; savedAt?: string
+  /** Where to buy it, from the product. Staff-only, and the whole point of it is that
+   *  "order by hand" should not mean "go and remember where this came from". */
+  supplierUrl?: string | null }
 export type PurchaseOrder = { num: string; supplier?: string | null; items: POLine[]; status: string; total?: number; meta?: Record<string, unknown> | null; created_at?: string }
 export function getPurchaseOrders() {
   return api<PurchaseOrder[]>(`/api/purchase`)

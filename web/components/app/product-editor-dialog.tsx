@@ -117,6 +117,10 @@ export function ProductEditorDialog({
   const nextSkuRef = useRef(nextSku)
   useEffect(() => { nextSkuRef.current = nextSku }, [nextSku])
   const [supplierSku, setSupplierSku] = useState("")
+  /** Who we buy this from, and the page to buy it on. Staff-only, like supplierSku — and the
+   *  pair that turns an auto-filed inventory row into a shortage somebody can act on. */
+  const [supplier, setSupplier] = useState("")
+  const [supplierUrl, setSupplierUrl] = useState("")
   const [type, setType] = useState("Apparel")
   // Managed types + their category mockups.
   const [types, setTypes] = useState<ProductType[]>([])
@@ -286,6 +290,8 @@ export function ProductEditorDialog({
       // placeholder made the blank look filled.
       setSku(String(p?.sku ?? "") || nextSkuRef.current || "")
       setSupplierSku(String(p?.supplierSku ?? ""))
+      setSupplier(String(p?.supplier ?? ""))
+      setSupplierUrl(String((p as { supplierUrl?: string } | null)?.supplierUrl ?? ""))
       setType(p?.type ?? "Apparel")
       setMethod(p?.method ?? "DTG")
       setProductCost(p?.productCost != null ? String(p.productCost) : "")
@@ -411,7 +417,9 @@ export function ProductEditorDialog({
     dropImages(urls)
   }
 
-  const supplier = product?.supplier
+  /** The supplier the IMPORT came from (read-only context for suggestions), distinct from
+   *  the editable `supplier` field this form now saves. */
+  const importSupplier = product?.supplier
 
   // Lowercase word tokens of a colour name, for matching against an image filename/URL:
   // "Wild Plum" → ["wild","plum"], "Caribbean Blue" → ["caribbean","blue"]. ≥3 chars so a
@@ -640,6 +648,8 @@ export function ProductEditorDialog({
       // product without a sku is one that silently can't be stocked or resolved.
       sku: cleanSku(sku) || cleanSku(nextSku ?? "") || undefined,
       supplierSku: supplierSku.trim() || undefined,
+      supplier: supplier.trim() || undefined,
+      supplierUrl: supplierUrl.trim() || undefined,
       type, method, status,
       // Only ever sent as a real boolean, so a product that has never been featured does not
       // gain the field on every save.
@@ -732,7 +742,7 @@ export function ProductEditorDialog({
         <DialogHeader className="border-b border-border px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
             {title ?? (product ? "Edit product" : "New product")}
-            {supplier && <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"><Tag size={11} weight="fill" /> {supplier}</span>}
+            {importSupplier && <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"><Tag size={11} weight="fill" /> {importSupplier}</span>}
           </DialogTitle>
         </DialogHeader>
 
@@ -850,6 +860,27 @@ export function ProductEditorDialog({
                   <span className="text-sm text-muted-foreground">Supplier SKU</span>
                   <Input value={supplierSku} onChange={(e) => setSupplierSku(e.target.value)} placeholder="optional" className="h-9 font-mono" />
                   <span className="text-2xs text-muted-foreground">Never shown to sellers or published anywhere.</span>
+                </label>
+              </div>
+              {/* WHO WE BUY IT FROM, AND WHERE — the two facts that decide whether a shortage
+                  can be acted on, and the only two this form did not ask for.
+                  Saving a product files its inventory rows automatically (catalog.js), and
+                  those rows are grouped in the purchase cart by SUPPLIER. With the field
+                  blank, a blank we buy every week still reaches the cart as "Unassigned ·
+                  order by hand" — a line nobody can place. Filled once here, and every
+                  shortage of this product for the rest of its life arrives ready to buy.
+                  Same confidentiality as the Supplier SKU above: staff-only, published
+                  nowhere. */}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-muted-foreground">Supplier</span>
+                  <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="S&amp;S Activewear, a local shop, Alibaba…" className="h-9" />
+                  <span className="text-2xs text-muted-foreground">Groups this product&apos;s shortages in the purchase cart.</span>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-muted-foreground">Where to buy</span>
+                  <Input value={supplierUrl} onChange={(e) => setSupplierUrl(e.target.value)} placeholder="https://… (optional)" className="h-9" inputMode="url" />
+                  <span className="text-2xs text-muted-foreground">Opens straight from the cart, so &ldquo;order by hand&rdquo; is one click.</span>
                 </label>
               </div>
               {/* Type + Status share the top row; Status used to sit alone far down the

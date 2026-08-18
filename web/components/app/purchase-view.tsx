@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { cartChanged } from "@/lib/cart-events"
-import { ShoppingCart, CircleNotch, CheckCircle, Trash, CaretRight, ArrowClockwise } from "@phosphor-icons/react"
+import { ShoppingCart, CircleNotch, CheckCircle, Trash, CaretRight, ArrowClockwise, ArrowSquareOut } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -1681,6 +1681,20 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           <span className="ml-1.5 font-mono opacity-70">{l.sku}</span>
                         </div>
                         <SourceTags line={l} />
+                        {/* ONE CLICK TO THE PAGE IT IS BOUGHT ON. A hand-ordered line used
+                            to carry a supplier's name and nothing else, so "order by hand"
+                            meant "go and remember where this came from". Typed once on the
+                            product; every shortage of it arrives with the link. */}
+                        {(l as { supplierUrl?: string | null }).supplierUrl && (
+                          <a
+                            href={String((l as { supplierUrl?: string | null }).supplierUrl)}
+                            target="_blank" rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-0.5 inline-flex items-center gap-1 text-2xs font-medium text-primary hover:underline"
+                          >
+                            <ArrowSquareOut size={11} weight="bold" /> Where to buy
+                          </a>
+                        )}
                       </div>
                       {/* QTY SLOTS — flex-1 so they occupy the band BETWEEN the product and
                           the price, but kept as a TIGHT cluster (fixed small gap) centred in
