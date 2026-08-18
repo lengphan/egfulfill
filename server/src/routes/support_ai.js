@@ -15,6 +15,7 @@ import { q } from '../db.js';
 import { egBroadcast } from '../events.js';
 import { putObject, getObject, storageEnabled } from '../storage.js';
 import { generateImage, imageConfig, priceUsd, IMAGE_MODELS, ASPECT_RATIOS, RATIO_HINTS } from '../gemini.js';
+import { readPricing, quoteFor, chargeForGeneration, refundGeneration } from '../ai-pricing.js';
 import {
   startVideo, checkVideo, fetchVideo, meterVideo, videoConfig, usdFor,
   VIDEO_MODELS, VIDEO_RATIOS, VIDEO_RATIO_HINTS, VIDEO_DURATIONS,
@@ -834,6 +835,32 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
    * Enforced on the SERVER, not by hiding the control — the client hides it as well, but
    * that is convenience, and this is the boundary.
    */
+  /*
+   * IMAGES ARE THE EXCEPTION, and only for sellers who pay for them.
+   *
+   * A seller spends their OWN wallet, so the money argument above does not apply to them —
+   * it applies to the other staff roles, who spend ours. Hence three outcomes rather than
+   * two: admin generates free, a seller generates if an admin has switched it on and their
+   * balance covers it, and operator/warehouse/designer are still refused.
+   *
+   * Video stays admin-only regardless. A clip costs up to fifteen images and is a marketing
+   * asset rather than something that becomes a listing.
+   */
+  const imageGate = async (req, reply) => {
+    const role = String(req.user?.role || 'seller');
+    if (role === 'admin') return null;
+    if (role !== 'seller') {
+      reply.code(403);
+      return { error: 'Generating images is limited to admins and sellers.' };
+    }
+    const pricing = await readPricing();
+    if (!pricing.sellersEnabled) {
+      reply.code(403);
+      return { error: 'AI generation is not switched on for your account yet.' };
+    }
+    return null;
+  };
+
   const adminOnly = (req, reply) => {
     if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Generating images and video is admin-only.' }; }
     return null;
@@ -849,10 +876,13 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   // parameter here that could aim a billable call at somebody else's channel.
 
   // What the composer needs to draw its picker — and whether the feature is on at all.
-  app.get('/api/desk/image/config', { preHandler: requireStaff }, async (req, reply) => {
-    const denied = adminOnly(req, reply); if (denied) return denied;
+  app.get('/api/desk/image/config', { preHandler: requireAuth }, async (req, reply) => {
+    const denied = await imageGate(req, reply); if (denied) return denied;
     const cfg = await imageConfig();
     return {
+      // What THIS caller pays and what they have left, so the composer can price the button
+      // and say "3 free left this month" rather than making someone find out by pressing it.
+      quote: await quoteFor(req.user),
       enabled: !!cfg.key && storageEnabled(),
       // Told apart so the UI can say WHICH half is missing rather than "unavailable".
       keySet: !!cfg.key,
@@ -864,8 +894,8 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     };
   });
 
-  app.post('/api/desk/image', { preHandler: requireStaff }, async (req, reply) => {
-    const denied = adminOnly(req, reply); if (denied) return denied;
+  app.post('/api/desk/image', { preHandler: requireAuth }, async (req, reply) => {
+    const denied = await imageGate(req, reply); if (denied) return denied;
     if (!storageEnabled()) { reply.code(503); return { error: 'File storage is not configured, so a generated image could not be kept.' }; }
     const b = req.body || {};
     const prompt = String(b.prompt || '').trim();
@@ -893,6 +923,21 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       } catch { /* unreadable reference — carry on without it */ }
     }
 
+    /*
+     * TAKE THE MONEY FIRST. moveFunds refuses to overdraw a seller wallet, so charging here
+     * is what stops an unfunded render BEFORE Google bills us for it. Doing this after would
+     * mean paying for images we cannot charge for.
+     *
+     * Staff come back { usd: 0, staff: true } and nothing moves.
+     */
+    let charge;
+    try {
+      charge = await chargeForGeneration(req.user, 'image');
+    } catch (e) {
+      reply.code(e.status || 400);
+      return { error: e.message || 'Could not start this generation.', shortfall: e.shortfall };
+    }
+
     let img;
     try {
       img = await generateImage({ prompt, aspectRatio: b.aspectRatio, imageSize: b.imageSize, model: b.model, images: refs });
@@ -901,9 +946,12 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       // showed up as a dead spinner with nothing said, which is how the assistant's other
       // no-op paths became undiagnosable.
       req.log?.warn?.({ err: String(e), detail: e.detail }, 'desk-image generation failed');
+      // Nothing was rendered, so nothing is owed. The refund also releases the daily-cap
+      // slot and any free allowance the attempt consumed.
+      await refundGeneration(charge, 'image generation failed');
       // `overloaded` = this MODEL is out of capacity, not the account or the request. The
       // client offers a switch to a less contended model rather than just "try later".
-      return { ok: false, disabled: !!e.disabled, overloaded: !!e.overloaded, error: e.message || 'Image generation failed' };
+      return { ok: false, disabled: !!e.disabled, overloaded: !!e.overloaded, refunded: Number(charge.usd) > 0, error: e.message || 'Image generation failed' };
     }
 
     // Store PRIVATE and hand back a same-origin proxy URL, exactly like a chat upload:
@@ -915,8 +963,11 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       await putObject(`chat/${name}`, img.buffer, img.mime, 'private');
     } catch (e) {
       req.log?.error?.({ err: String(e) }, 'desk-image storage failed');
+      // Google billed US for this one and there is no getting that back — but the seller has
+      // nothing they can use, and the failure is ours, so they are not the ones who pay for it.
+      await refundGeneration(charge, 'image could not be saved');
       // The money was already spent at Google — say so plainly rather than implying a retry is free.
-      return { ok: false, error: 'The image was generated but could not be saved: ' + ((e && e.message) || 'storage error') };
+      return { ok: false, refunded: Number(charge.usd) > 0, error: 'The image was generated but could not be saved: ' + ((e && e.message) || 'storage error') };
     }
     const base = (process.env.PUBLIC_API_ORIGIN || 'https://egful.store').replace(/\/+$/, '');
     const attachment = { url: `${base}/api/support/asset/${name}`, name: prompt.slice(0, 80), mime: img.mime, size: img.buffer.length };
@@ -929,7 +980,15 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       [threadId, null, 'assistant', prompt, attachment, JSON.stringify(meta), clientId]);
     egBroadcast({ type: 'order-message' });
 
-    return { ok: true, attachment, model: img.model, size: img.size, aspectRatio: img.aspectRatio, usd: img.usd, refsUsed: img.refsUsed || 0 };
+    // `usd` is what GOOGLE cost us and is staff-only reading; `charged` is what the seller
+    // actually paid. Keeping them separate is what stops our cost being shown as their price.
+    return {
+      ok: true, attachment, model: img.model, size: img.size, aspectRatio: img.aspectRatio,
+      usd: charge.staff ? img.usd : undefined,
+      charged: charge.usd, free: charge.free,
+      quote: await quoteFor(req.user),
+      refsUsed: img.refsUsed || 0,
+    };
   });
 
   // ── Video generation (Veo), same gate and same channel as images ─────────────

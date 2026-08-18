@@ -5,6 +5,7 @@
 
 import { q } from '../db.js';
 import { audit } from '../audit.js';
+import { readPricing, writePricing, quoteFor, AI_PRICING_KEY } from '../ai-pricing.js';
 
 // Per-category flat shipping and per-method surcharges. Admin-editable so pricing policy
 // is a settings change, not a deploy. `emb_price` is NOT the embroidery surcharge — it's
@@ -460,6 +461,28 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       },
       shipExtra: Number(nums.ship_extra) || 0,
     };
+  });
+
+  /*
+   * AI GENERATION PRICING.
+   *
+   * Split the same way the design fees above are: a seller reads only what THEY pay and
+   * what they have left, and the knobs behind it are admin-only. The seller-facing read is
+   * per-caller — it counts their own month and day — so it cannot be cached across accounts.
+   */
+  app.get('/api/ai_pricing', { preHandler: requireAuth }, async (req) => await quoteFor(req.user));
+
+  app.get('/api/admin/ai_pricing', { preHandler: requireAdmin }, async () => await readPricing());
+
+  app.put('/api/admin/ai_pricing', { preHandler: requireAdmin }, async (req, reply) => {
+    const b = req.body || {};
+    if (b && typeof b !== 'object') { reply.code(400); return { error: 'Expected a settings object.' }; }
+    const before = await readPricing();
+    const after = await writePricing(b);
+    // Prices are the kind of setting people later disagree about having changed, so the
+    // audit carries both sides rather than just the new one.
+    audit(req, 'settings.ai_pricing', { entityType: 'settings', entityId: AI_PRICING_KEY, before, after });
+    return { ok: true, ...after };
   });
 
   app.get('/api/factory/settings', { preHandler: requireStaff }, async () => {
